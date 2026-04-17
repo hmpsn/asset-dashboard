@@ -4302,8 +4302,20 @@
           "est": "3-5h",
           "priority": "P2",
           "sprint": "D",
-          "status": "pending",
-          "notes": "When DataForSEO is selected as seoDataProvider, all keyword/domain intelligence should route through it. Capabilities DataForSEO does not natively support (backlinks, SERP feature codes) should automatically fall back to SEMRush if both providers are configured. Current state: getBacklinksProvider() already does this reactively for backlinks — DataForSEO marks the capability disabled after a 403, then falls back. What's missing: (1) Proactive capability declarations — DataForSEO registers unsupported capabilities at init rather than waiting for a failure. (2) SERP features fallback — hasSerpOpportunity() currently parses SEMRush-specific Fk codes; needs a getSerPFeaturesProvider() path so DataForSEO workspaces can still capture SERP signals via SEMRush fallback. (3) Generalize getBacklinksProvider() into getCapableProvider(capability) to handle both cases and any future gaps cleanly. (4) Workspace settings UI — show which provider is serving which data type (e.g. 'Keywords: DataForSEO | Backlinks: SEMRush (fallback)') so admins have visibility. Architecture: seo-data-provider.ts already has the capability flag system (markCapabilityDisabled / isCapabilityDisabled) — this feature expands it from reactive-only to proactive + generalized."
+          "status": "done",
+          "shippedAt": "2026-04-16",
+          "notes": "Shipped. getProviderForCapability(capability, preferred?) added to seo-data-provider.ts. getBacklinksProvider() now delegates to it. DataForSEO proactive init probe (Task 6) marks backlinks disabled before the first user request."
+        },
+        {
+          "id": "pr-218-cross-provider-keyword-backlink-hardening",
+          "title": "Cross-Provider Keyword & Backlink Hardening (A3/A4 fixes)",
+          "source": "Session 2026-04-16 — regression fixes post-provider abstraction",
+          "est": "4-6h",
+          "priority": "P1",
+          "sprint": "D",
+          "status": "done",
+          "shippedAt": "2026-04-16",
+          "notes": "Shipped — PR #218. (1) serpFeatures carry: competitorKeywordData now includes optional serpFeatures field to preserve SERP feature data from both DFS and SEMRush (previously silently dropped). (2) Provider date normalization: normalizeProviderDate() helper converts raw Unix epoch timestamps and string dates from SEMRush and DataForSEO to ISO-8601 format at provider boundary — prevents 'Invalid Date' in referring-domain dates. (3) Competitor keyword limits: Full-mode fetch raised 100 → 200; SEMRush overfetches 2× + sorts by volume to match DFS ordering. (4) Regression guards: Two pr-check rules guard against provider date/serpFeatures loss. Feature #300."
         }
       ]
     }

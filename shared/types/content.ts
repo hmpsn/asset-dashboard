@@ -37,7 +37,7 @@ export interface ContentBrief {
   realTopResults?: { position: number; title: string; url: string }[];
   // Keyword pre-assignment (v6) — template/matrix keyword locking
   keywordLocked?: boolean;
-  keywordSource?: 'manual' | 'semrush' | 'gsc' | 'matrix' | 'template';
+  keywordSource?: 'manual' | 'semrush' | 'dataforseo' | 'gsc' | 'matrix' | 'template';
   keywordValidation?: {
     volume: number;
     difficulty: number;

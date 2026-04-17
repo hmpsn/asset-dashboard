@@ -10,6 +10,8 @@ interface BacklinksOverview {
   nofollowLinks: number;
   textLinks: number;
   imageLinks: number;
+  formLinks: number;
+  frameLinks: number;
 }
 
 interface ReferringDomain {
@@ -62,12 +64,12 @@ export function BacklinkProfile({ workspaceId }: Props) {
   }
 
   if (error) {
-    if (error.includes('SEMRush is not configured')) {
+    if (error.includes('No SEO data provider configured')) {
       return (
         <SectionCard>
           <div className="px-4 py-4 flex items-center gap-2 text-zinc-500 text-xs">
             <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-            <span>Backlink data requires SEMRush. Set <code className="text-zinc-400">SEMRUSH_API_KEY</code> in environment to enable.</span>
+            <span>Backlink data requires an SEO provider. Set <code className="text-zinc-400">SEMRUSH_API_KEY</code> or <code className="text-zinc-400">DATAFORSEO_LOGIN</code> in environment to enable.</span>
           </div>
         </SectionCard>
       );
@@ -105,7 +107,9 @@ export function BacklinkProfile({ workspaceId }: Props) {
         <StatCard label="Total Backlinks" value={fmtNum(overview.totalBacklinks)} icon={Link2} />
         <StatCard label="Referring Domains" value={fmtNum(overview.referringDomains)} icon={Globe} />
         <StatCard label="Follow Links" value={`${followPct}%`} sub={`${fmtNum(overview.followLinks)} follow`} icon={Shield} />
-        <StatCard label="Link Types" value={`${fmtNum(overview.textLinks)} text`} sub={`${fmtNum(overview.imageLinks)} image`} icon={ExternalLink} />
+        {(overview.textLinks > 0 || overview.imageLinks > 0 || overview.formLinks > 0 || overview.frameLinks > 0) && (
+          <StatCard label="Link Types" value={`${fmtNum(overview.textLinks)} text`} sub={`${fmtNum(overview.imageLinks)} image`} icon={ExternalLink} />
+        )}
       </div>
 
       {/* Referring domains table */}

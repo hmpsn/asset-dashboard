@@ -34,7 +34,7 @@ import type { ContentPageType } from './content.js';
 export type { ContentPageType as BlueprintPageType };
 
 export type EntryScope = 'included' | 'recommended';
-export type KeywordSource = 'ai_suggested' | 'semrush' | 'manual';
+export type KeywordSource = 'ai_suggested' | 'semrush' | 'dataforseo' | 'manual';
 
 export interface BlueprintEntry {
   id: string;

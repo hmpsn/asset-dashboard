@@ -7,6 +7,7 @@ import path from 'path';
 
 import { getUploadRoot, getDataDir } from '../data-dir.js';
 import { createLogger } from '../logger.js';
+import { getCachedMetricsBatch, cacheMetricsBatch } from '../keyword-metrics-cache.js';
 import type {
   SeoDataProvider,
   KeywordMetrics,
@@ -19,7 +20,7 @@ import type {
   BacklinksOverview,
   ReferringDomain,
 } from '../seo-data-provider.js';
-import { markCapabilityDisabled } from '../seo-data-provider.js';
+import { markCapabilityDisabled, normalizeProviderDate } from '../seo-data-provider.js';
 
 const log = createLogger('dataforseo');
 const UPLOAD_ROOT = getUploadRoot();
@@ -112,6 +113,40 @@ const BACKLINK_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 function markBacklinksDisabled(): void {
   markCapabilityDisabled('dataforseo', 'backlinks', BACKLINK_COOLDOWN_MS);
+}
+
+// ── Probe result persistence (avoids billable probe on every server restart) ──
+// The in-memory registry's 24h capability TTL resets on restart. Frequently-restarting
+// deploys (rolling updates, dev reloads) would otherwise consume a probe credit per restart.
+// Cache the probe outcome to disk with the same 24h TTL; refresh only when stale or absent.
+
+interface ProbeResult {
+  /** 'backlinks-disabled' | 'backlinks-available' */
+  outcome: 'backlinks-disabled' | 'backlinks-available';
+  probedAt: string;
+}
+
+function getProbeCachePath(): string {
+  return path.join(CREDIT_DIR, 'probe-result.json');
+}
+
+function readProbeCache(): ProbeResult | null {
+  try {
+    const raw = fs.readFileSync(getProbeCachePath(), 'utf-8');
+    const parsed = JSON.parse(raw) as ProbeResult;
+    const age = Date.now() - new Date(parsed.probedAt).getTime();
+    if (age > BACKLINK_COOLDOWN_MS) return null;
+    return parsed;
+  } catch (err) { return null; }
+}
+
+function writeProbeCache(outcome: ProbeResult['outcome']): void {
+  try {
+    fs.writeFileSync(
+      getProbeCachePath(),
+      JSON.stringify({ outcome, probedAt: new Date().toISOString() } satisfies ProbeResult, null, 2),
+    );
+  } catch (err) { log.warn({ err }, 'Failed to persist DataForSEO probe result'); }
 }
 
 function isSubscriptionError(err: unknown): boolean {
@@ -223,6 +258,35 @@ export class DataForSeoProvider implements SeoDataProvider {
     return !!getCredentials();
   }
 
+  async init(): Promise<void> {
+    if (!this.isConfigured()) return;
+
+    // Reuse a recent probe result from disk so rolling restarts don't spend a credit per boot.
+    const cached = readProbeCache();
+    if (cached) {
+      if (cached.outcome === 'backlinks-disabled') {
+        markBacklinksDisabled();
+        log.info({ probedAt: cached.probedAt }, 'DataForSEO backlinks disabled (cached probe)');
+      }
+      return;
+    }
+
+    try {
+      await apiCall('backlinks/summary/live', [{ target: 'example.com', include_subdomains: false }]);
+      writeProbeCache('backlinks-available');
+    } catch (err) {
+      // Only 40204 is a reliable signal in the cold-start probe context
+      const errMsg = err instanceof Error ? err.message : String(err);
+      if (errMsg.includes('40204')) {
+        markBacklinksDisabled();
+        writeProbeCache('backlinks-disabled');
+        log.info('DataForSEO backlinks subscription not available — proactively falling back to SEMRush');
+      }
+      // Non-subscription errors (network, rate limit) are silently ignored — reactive detection
+      // handles them, and we deliberately don't cache them so transient issues get retried next boot.
+    }
+  }
+
   // ── getKeywordMetrics → search_volume ──
   async getKeywordMetrics(keywords: string[], workspaceId: string, database = 'us'): Promise<KeywordMetrics[]> {
     const results: KeywordMetrics[] = [];
@@ -240,24 +304,69 @@ export class DataForSeoProvider implements SeoDataProvider {
       }
     }
 
-    if (uncached.length === 0 || areCreditsExhausted()) return results;
+    if (uncached.length === 0) return results;
+
+    // L1: Check global SQLite cache for keywords that missed L2
+    let globalHits: Map<string, KeywordMetrics>;
+    try {
+      const rawHits = getCachedMetricsBatch(uncached, database, CACHE_TTL_KEYWORD);
+      globalHits = rawHits as Map<string, KeywordMetrics>;
+    } catch (err) {
+      log.warn({ err }, 'DataForSEO L1 cache lookup failed — falling through to API');
+      globalHits = new Map();
+    }
+    const stillUncached: string[] = [];
+    for (const kw of uncached) {
+      const hit = globalHits.get(kw.toLowerCase());
+      if (hit) {
+        results.push(hit);
+        logCreditUsage({ credits: 0, endpoint: 'search_volume', query: kw, rowsReturned: 1, workspaceId, cached: true });
+      } else {
+        stillUncached.push(kw);
+      }
+    }
+
+    if (stillUncached.length === 0 || areCreditsExhausted()) return results;
 
     // Batch up to 1000 per request
     const batches: string[][] = [];
-    for (let i = 0; i < uncached.length; i += 1000) {
-      batches.push(uncached.slice(i, i + 1000));
+    for (let i = 0; i < stillUncached.length; i += 1000) {
+      batches.push(stillUncached.slice(i, i + 1000));
     }
 
     for (const batch of batches) {
       try {
-        const json = await apiCall('keywords_data/google_ads/search_volume/live', [{
-          keywords: batch,
-          location_code: locationCode(database),
-          language_code: 'en',
-        }]);
+        const [volumeJson, kdJson] = await Promise.all([
+          apiCall('keywords_data/google_ads/search_volume/live', [{
+            keywords: batch,
+            location_code: locationCode(database),
+            language_code: 'en',
+          }]),
+          apiCall('dataforseo_labs/google/keyword_difficulty/live', [{
+            keywords: batch,
+            location_code: locationCode(database),
+            language_code: 'en',
+          }]).catch(() => null),   // graceful fallback if KD endpoint unavailable
+        ]);
 
-        const taskResults = getTaskResult(json);
-        const cost = getTaskCost(json);
+        // Build KD lookup map
+        const kdMap = new Map<string, number>();
+        if (kdJson) {
+          const kdResults = getTaskResult(kdJson);
+          for (const item of kdResults) {
+            const kw = item.keyword as string;
+            const kd = item.keyword_difficulty as number;
+            if (kw && typeof kd === 'number') kdMap.set(kw.toLowerCase(), kd);
+          }
+          const kdCost = getTaskCost(kdJson);
+          if (kdCost > 0) {
+            logCreditUsage({ credits: kdCost, endpoint: 'keyword_difficulty', query: batch.join(',').slice(0, 100), rowsReturned: kdResults.length, workspaceId, cached: false });
+          }
+        }
+
+        const taskResults = getTaskResult(volumeJson);
+        const cost = getTaskCost(volumeJson);
+        const batchResults: KeywordMetrics[] = [];
 
         for (const item of taskResults) {
           const keyword = item.keyword as string;
@@ -271,7 +380,7 @@ export class DataForSeoProvider implements SeoDataProvider {
           const metrics: KeywordMetrics = {
             keyword,
             volume: searchVolume,
-            difficulty: competitionIndex,
+            difficulty: kdMap.get(keyword.toLowerCase()) ?? competitionIndex,
             cpc,
             competition: typeof competition === 'number' ? competition : 0,
             results: 0, // DataForSEO doesn't provide this in this endpoint
@@ -279,10 +388,12 @@ export class DataForSeoProvider implements SeoDataProvider {
           };
 
           results.push(metrics);
+          batchResults.push(metrics);
           const cacheKey = `kw_${database}_${keyword.toLowerCase().replace(/\s+/g, '_')}`;
           writeCache(workspaceId, cacheKey, metrics);
         }
 
+        cacheMetricsBatch(batchResults, database);
         logCreditUsage({ credits: cost, endpoint: 'search_volume', query: batch.join(',').slice(0, 100), rowsReturned: taskResults.length, workspaceId, cached: false });
       } catch (err) {
         log.error({ err }, 'DataForSEO search_volume error');
@@ -323,7 +434,7 @@ export class DataForSeoProvider implements SeoDataProvider {
         return {
           keyword: (kwData?.keyword as string) ?? '',
           volume: (kwInfo?.search_volume as number) ?? 0,
-          difficulty: Math.round(((kwInfo?.competition as number) ?? 0) * 100),
+          difficulty: (kwInfo?.keyword_difficulty as number) ?? Math.round(((kwInfo?.competition as number) ?? 0) * 100),
           cpc: (kwInfo?.cpc as number) ?? 0,
         };
       });
@@ -367,7 +478,7 @@ export class DataForSeoProvider implements SeoDataProvider {
         return {
           keyword: (kwData?.keyword as string) ?? '',
           volume: (kwInfo?.search_volume as number) ?? 0,
-          difficulty: Math.round(((kwInfo?.competition as number) ?? 0) * 100),
+          difficulty: (kwInfo?.keyword_difficulty as number) ?? Math.round(((kwInfo?.competition as number) ?? 0) * 100),
           cpc: (kwInfo?.cpc as number) ?? 0,
         };
       });
@@ -384,7 +495,7 @@ export class DataForSeoProvider implements SeoDataProvider {
   // ── getDomainKeywords → ranked_keywords ──
   async getDomainKeywords(domain: string, workspaceId: string, limit = 100, database = 'us'): Promise<DomainKeyword[]> {
     const target = cleanDomain(domain);
-    const cacheKey = `domain_ranked_${database}_${target.replace(/\./g, '_')}_${limit}`;
+    const cacheKey = `domain_ranked_${database}_${target.replace(/\./g, '_')}_${limit}_vol`;
     const cached = readCache<DomainKeyword[]>(workspaceId, cacheKey, CACHE_TTL_DOMAIN_ORGANIC);
     if (cached) {
       logCreditUsage({ credits: 0, endpoint: 'ranked_keywords', query: target, rowsReturned: cached.length, workspaceId, cached: true });
@@ -394,12 +505,16 @@ export class DataForSeoProvider implements SeoDataProvider {
     if (areCreditsExhausted()) return [];
 
     try {
+      // NOTE: `dataforseo_labs/google/ranked_keywords/live` does NOT accept an `item_types`
+      // parameter. Including it returns error 40501 "Invalid Field: 'item_types'". The endpoint
+      // returns all ranked keyword types by default; the SERP feature type is read per-item from
+      // `ranked_serp_element.serp_item.type` in the dedupe loop below.
       const json = await apiCall('dataforseo_labs/google/ranked_keywords/live', [{
         target,
         location_code: locationCode(database),
         language_code: 'en',
         limit,
-        item_types: ['organic', 'featured_snippet', 'local_pack'],
+        order_by: ['keyword_data.keyword_info.search_volume,desc'],
       }]);
 
       const taskResults = getTaskResult(json);
@@ -416,7 +531,8 @@ export class DataForSeoProvider implements SeoDataProvider {
         const itemType = (serpItem?.type as string) ?? 'organic';
         if (keyword && itemType !== 'organic') {
           if (!serpFeaturesMap.has(keyword)) serpFeaturesMap.set(keyword, new Set());
-          serpFeaturesMap.get(keyword)!.add(itemType);
+          const normalizedType = itemType === 'videos' ? 'video' : itemType;
+          serpFeaturesMap.get(keyword)!.add(normalizedType);
         }
       }
 
@@ -443,7 +559,7 @@ export class DataForSeoProvider implements SeoDataProvider {
           keyword,
           position: (serpItem?.rank_group as number) ?? 0,
           volume: (kwInfo?.search_volume as number) ?? 0,
-          difficulty: Math.round(((kwInfo?.competition as number) ?? 0) * 100),
+          difficulty: (kwInfo?.keyword_difficulty as number) ?? Math.round(((kwInfo?.competition as number) ?? 0) * 100),
           cpc: (kwInfo?.cpc as number) ?? 0,
           url: (serpItem?.url as string) ?? '',
           traffic: (serpItem?.etv as number) ?? 0,
@@ -462,7 +578,7 @@ export class DataForSeoProvider implements SeoDataProvider {
     }
   }
 
-  // ── getDomainOverview → ranked_keywords with limit=0 for aggregate metrics ──
+  // ── getDomainOverview → ranked_keywords with limit=1 (only `metrics` aggregate is read) ──
   async getDomainOverview(domain: string, workspaceId: string, database = 'us'): Promise<DomainOverview | null> {
     const target = cleanDomain(domain);
     const cacheKey = `domain_overview_${database}_${target.replace(/\./g, '_')}`;
@@ -475,12 +591,14 @@ export class DataForSeoProvider implements SeoDataProvider {
     if (areCreditsExhausted()) return null;
 
     try {
+      // NOTE: See getDomainKeywords above — `ranked_keywords/live` rejects `item_types`
+      // with error 40501. We only read `resultObj.metrics.organic`, which the endpoint
+      // aggregates across all types regardless of what's returned in `items`.
       const json = await apiCall('dataforseo_labs/google/ranked_keywords/live', [{
         target,
         location_code: locationCode(database),
         language_code: 'en',
         limit: 1,
-        item_types: ['organic'],
       }]);
 
       const taskResults = getTaskResult(json);
@@ -690,12 +808,17 @@ export class DataForSeoProvider implements SeoDataProvider {
       const cost = getTaskCost(json);
       const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
 
-      const results: ReferringDomain[] = items.map(item => ({
-        domain: (item.domain as string) ?? '',
-        backlinksCount: (item.backlinks as number) ?? 0,
-        firstSeen: (item.first_seen as string) ?? '',
-        lastSeen: (item.lost_date as string) ?? 'N/A',
-      }));
+      const results: ReferringDomain[] = items.map(item => {
+        const lastVisited = item.last_visited as string | undefined;
+        const firstSeen = item.first_seen as string | undefined;
+        return {
+          domain: (item.domain as string) ?? '',
+          backlinksCount: (item.backlinks as number) ?? 0,
+          firstSeen: normalizeProviderDate(firstSeen ?? ''),
+          // Empty string (not 'N/A') so the frontend falsy-check renders '—' instead of 'Invalid Date'
+          lastSeen: normalizeProviderDate(lastVisited ?? firstSeen ?? ''),
+        };
+      });
 
       logCreditUsage({ credits: cost, endpoint: 'backlinks_referring_domains', query: target, rowsReturned: results.length, workspaceId, cached: false });
       writeCache(workspaceId, cacheKey, results);

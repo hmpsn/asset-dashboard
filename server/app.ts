@@ -114,7 +114,14 @@ import { DataForSeoProvider } from './providers/dataforseo-provider.js';
 
 // ─── Register SEO data providers ───
 registerProvider('semrush', new SemrushProvider());
-registerProvider('dataforseo', new DataForSeoProvider());
+const dfsProv = new DataForSeoProvider();
+registerProvider('dataforseo', dfsProv);
+// Skip the billable probe in test mode — integration tests that import app.ts must not
+// trigger real API calls against DataForSEO even if CI env has DATAFORSEO_LOGIN set.
+// Unit tests call provider.init() directly to exercise the probe logic with mocked fetch.
+if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
+  dfsProv.init().catch((err: unknown) => log.warn({ err }, 'DataForSEO capability probe failed'));
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

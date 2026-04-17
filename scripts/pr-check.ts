@@ -3316,6 +3316,56 @@ export const CHECKS: Check[] = [
       return matches;
     },
   },
+  {
+    name: 'Raw provider date passed to new Date()',
+    pattern: 'new Date\\((\\w+\\.)?(first_?[sS]een|last_?[sS]een|last_?[vV]isited)',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/seo-data-provider.ts'],
+    excludeLines: ['// provider-date-ok'],
+    message: 'Raw provider date fields (first_seen, last_seen, last_visited) must go through normalizeProviderDate() at the provider boundary, not new Date() directly. Unix-epoch strings do not parse and cause "Invalid Date" downstream. Add // provider-date-ok if the value is already normalized.',
+    severity: 'warn',
+    rationale: 'Prevents Invalid Date regressions after PR #218 A4 finding: SEMRush emits Unix epoch strings that new Date() cannot parse.',
+    claudeMdRef: '#code-conventions',
+  },
+  {
+    name: 'Competitor keyword push missing serpFeatures',
+    pattern: 'competitorKeywordData\\.push\\(\\{',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    excludeLines: ['// compkw-serp-ok'],
+    message: 'competitorKeywordData entries must carry serpFeatures from the source DomainKeyword. Without it, downstream SERP-feature chip rendering and opportunity scoring go dark. See docs/rules/automated-rules.md. Add // compkw-serp-ok if intentionally dropping.',
+    severity: 'warn',
+    rationale: 'Prevents regression of PR #218 A3 finding: DomainKeyword.serpFeatures was silently dropped in the inline mapping.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      // For each match of the pattern, look ahead up to 12 lines and require
+      // `serpFeatures` to appear before a closing `});`. Flag if not.
+      const hits: Array<{ file: string; line: number; text: string }> = [];
+      for (const file of files) {
+        if (!file.endsWith('.ts') || !file.includes('server/')) continue;
+        let content: string;
+        try { content = readFileSync(file, 'utf-8'); } catch { continue; }
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!lines[i].includes('competitorKeywordData.push({')) continue;
+          // Look ahead up to 12 lines for either `serpFeatures:` or the closing `});`
+          let foundField = false;
+          let foundClose = false;
+          for (let j = i; j < Math.min(i + 12, lines.length); j++) {
+            if (lines[j].includes('serpFeatures')) { foundField = true; break; }
+            if (lines[j].includes('});')) { foundClose = true; break; }
+          }
+          if (foundClose && !foundField) {
+            const hatch = '// compkw-serp-ok';
+            if (hasHatch(lines, i, hatch)) continue;
+            hits.push({ file, line: i + 1, text: lines[i].trim() });
+          }
+        }
+      }
+      return hits;
+    },
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────

@@ -233,3 +233,60 @@ describe('isStale', () => {
     expect(isStale(undefined, 6 * 60 * 60 * 1000)).toBe(true);
   });
 });
+
+// ── Branded Query Filtering ───────────────────────────────────────
+
+describe('computeRankingOpportunities — branded query filter', () => {
+  // All three rows qualify by position (4-20) and impressions (>=50)
+  const queryPageData: QueryPageRow[] = [
+    { query: 'hubspot pricing', page: 'https://example.com/blog/crm-guide', clicks: 5, impressions: 500, ctr: 0.01, position: 8 },
+    { query: 'best crm software', page: 'https://example.com/services', clicks: 10, impressions: 600, ctr: 0.017, position: 10 },
+    { query: 'hubspot alternatives', page: 'https://example.com/blog/alternatives', clicks: 8, impressions: 400, ctr: 0.02, position: 7 },
+  ];
+
+  it('filters out queries containing competitor brand tokens', () => {
+    const results = computeRankingOpportunities(queryPageData, ['hubspot']);
+    const queries = results.map(r => r.data.query);
+    expect(queries).not.toContain('hubspot pricing');
+    expect(queries).not.toContain('hubspot alternatives');
+    expect(queries).toContain('best crm software');
+  });
+
+  it('returns all qualifying results when no brandTokens provided', () => {
+    const results = computeRankingOpportunities(queryPageData);
+    expect(results.length).toBe(3);
+  });
+
+  it('returns all qualifying results when brandTokens is empty array', () => {
+    const results = computeRankingOpportunities(queryPageData, []);
+    expect(results.length).toBe(3);
+  });
+});
+
+describe('computeCannibalizationInsights — branded query filter', () => {
+  const queryPageData: QueryPageRow[] = [
+    // Branded cannibalization — navigational, not actionable
+    { query: 'salesforce crm', page: 'https://example.com/page-a', clicks: 20, impressions: 800, ctr: 0.025, position: 5 },
+    { query: 'salesforce crm', page: 'https://example.com/page-b', clicks: 15, impressions: 600, ctr: 0.025, position: 9 },
+    // Non-branded cannibalization — should remain
+    { query: 'seo services', page: 'https://example.com/seo', clicks: 50, impressions: 1000, ctr: 0.05, position: 5 },
+    { query: 'seo services', page: 'https://example.com/services', clicks: 20, impressions: 800, ctr: 0.025, position: 9 },
+  ];
+
+  it('filters out cannibalization for branded competitor queries', () => {
+    const results = computeCannibalizationInsights(queryPageData, ['salesforce']);
+    const queries = results.map(r => r.data.query);
+    expect(queries).not.toContain('salesforce crm');
+    expect(queries).toContain('seo services');
+  });
+
+  it('returns all cannibalization results when no brandTokens provided', () => {
+    const results = computeCannibalizationInsights(queryPageData);
+    expect(results.length).toBe(2);
+  });
+
+  it('returns all cannibalization results when brandTokens is empty array', () => {
+    const results = computeCannibalizationInsights(queryPageData, []);
+    expect(results.length).toBe(2);
+  });
+});

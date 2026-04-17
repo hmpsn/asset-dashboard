@@ -3519,3 +3519,16 @@ Current feature count: **299**. Last updated: April 2026.
 **Files:** `server/routes/stripe.ts` (middleware applied to 3 config endpoints), `server/middleware/admin-auth.ts` (requireAdminAuth implementation)
 
 **Agency value:** Closes a privilege-escalation vector where a client JWT token could be used to read Stripe secret keys or alter payment configuration. Stripe config is admin-only by design; this enforces that at the route level.
+
+---
+
+### 300. Cross-Provider Keyword & Backlink Hardening (PR #218 A3/A4 fixes)
+**What it does:** Fixes data loss and date formatting regressions in competitor keyword and backlink data flowing from SEMRush and DataForSEO into strategy generation and admin/client views. (1) **serpFeatures carry**: `competitorKeywordData` interface now includes optional `serpFeatures?: string` field to preserve SERP feature data from both DFS and SEMRush alongside keyword metrics (volume, KD, intent). Previously data was fetched but silently dropped at the serialization layer. (2) **Provider date normalization**: `normalizeProviderDate()` helper converts raw Unix epoch timestamps (seconds/milliseconds) and string dates from SEMRush and DataForSEO to ISO-8601 format at the provider boundary — preventing "Invalid Date" display in referring-domain dates and backlink recency. Applied in `semrush.ts` backlinks methods and `dataForSeo.ts` backlinks + keyword methods. (3) **Competitor keyword limits**: Full-mode competitor keyword fetch raised 100 → 200 per provider; SEMRush overfetches 2× + sorts by volume client-side to match DFS server-side ordering for consistent rank ordering across strategies. (4) **Regression guards**: Two pr-check rules added — "Raw provider date passed to new Date()" flags direct date instantiation without normalization; "Competitor keyword push missing serpFeatures" enforces field carry at strategy-build time.
+
+**Files:** `shared/types/workspace.ts` (competitorKeywordData item type), `server/seo-data-provider.ts` (normalizeProviderDate), `server/semrush.ts` (date normalization in getTopReferringDomains), `server/providers/dataforseo-provider.ts` (order_by + date normalization), `server/routes/keyword-strategy.ts` (serpFeatures carry, compLimit 100→200, fetchMultiplier), `scripts/pr-check.ts` (2 regression rules), `tests/unit/seo-data-provider.test.ts`, `tests/unit/semrush.test.ts`, `tests/unit/dataforseo-provider.test.ts`, `tests/integration/backlinks-date-shape.test.ts`, `tests/integration/keyword-strategy-serp-features.test.ts`
+
+**Agency value:** Strategy data now carries complete competitive intelligence (keywords + SERP features) without loss. Backlink dates display correctly instead of "Invalid Date", enabling accurate link recency analysis. Consistent ordering across DFS/SEMRush backends reduces confusion when analyzing competitor tactics.
+
+**Client value:** Complete keyword strategy includes all ranking signals (SERP features inform content brief structure). Accurate backlink dates give confidence in link profile freshness analysis.
+
+**Mutual:** Unified data normalization prevents integration drift between provider APIs. Regression guards prevent future similar losses during refactoring.

@@ -818,14 +818,15 @@ describe('estimateCreditCost()', () => {
 
   it('full mode includes domain, competitor, keyword, and related costs', () => {
     const cost = estimateCreditCost({ mode: 'full', competitorCount: 2, keywordCount: 50 });
-    // domain(100*10=1000) + competitors(2*100*10=2000) + keywords(50*10=500) + related(10*20*10=2000)
-    expect(cost).toBe(5500);
+    // domain(100*10=1000) + competitors(2*400*10=8000) + keywords(50*10=500) + related(10*20*10=2000)
+    // 400 rows/competitor = 200 compLimit × 2× SEMRush overfetch (worst-case estimate)
+    expect(cost).toBe(11500);
   });
 
   it('full mode defaults to 2 competitors and 50 keywords when omitted', () => {
     const cost = estimateCreditCost({ mode: 'full' });
     // Same formula as above with defaults
-    expect(cost).toBe(5500);
+    expect(cost).toBe(11500);
   });
 
   it('quick mode defaults to 50 keywords when keywordCount is omitted', () => {

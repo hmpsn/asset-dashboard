@@ -98,6 +98,9 @@ export interface SeoDataProvider {
   /** Check if this provider has valid credentials configured */
   isConfigured(): boolean;
 
+  /** Optional startup probe to detect unavailable capabilities early */
+  init?(): Promise<void>;
+
   // Keyword Intelligence
   getKeywordMetrics(keywords: string[], workspaceId: string, database?: string): Promise<KeywordMetrics[]>;
   getRelatedKeywords(keyword: string, workspaceId: string, limit?: number, database?: string): Promise<RelatedKeyword[]>;
@@ -176,21 +179,34 @@ export function clearCapabilityDisabled(providerName: ProviderName, capability: 
   disabledCapabilities.get(providerName)?.delete(capability);
 }
 
+/** FOR TEST USE ONLY. Clears all registered providers and capability flags. */
+export function _resetRegistryForTest(): void {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('_resetRegistryForTest must not be called in production');
+  }
+  providers.clear();
+  disabledCapabilities.clear();
+}
+
+/** Returns the human-readable display name for a provider. */
+export function getProviderDisplayName(providerName: string): string {
+  return providerName === 'dataforseo' ? 'DataForSEO' : 'SEMRush';
+}
+
 /**
- * Get a provider that supports backlinks. If the preferred provider's backlinks
- * are unavailable (e.g. DataForSEO without backlinks subscription), falls back
- * to another configured provider that does support them.
+ * Generic capability-aware provider resolver.
+ * Returns the preferred provider if the capability is available,
+ * or falls back to any other configured provider that has it.
  */
-export function getBacklinksProvider(preferred?: ProviderName): SeoDataProvider | null {
+export function getProviderForCapability(capability: string, preferred?: ProviderName): SeoDataProvider | null {
   const primary = getConfiguredProvider(preferred);
   if (!primary) return null;
 
-  // Check if primary provider has backlinks disabled
   const primaryName = [...providers.entries()].find(([, p]) => p === primary)?.[0];
-  if (primaryName && isCapabilityDisabled(primaryName, 'backlinks')) {
-    // Fall back to any other configured provider that supports backlinks
+  if (primaryName && isCapabilityDisabled(primaryName, capability)) {
+    // Primary provider cannot serve this capability — try fallbacks
     for (const [name, p] of providers.entries()) {
-      if (name !== primaryName && p.isConfigured() && !isCapabilityDisabled(name, 'backlinks')) {
+      if (name !== primaryName && p.isConfigured() && !isCapabilityDisabled(name, capability)) {
         return p;
       }
     }
@@ -198,6 +214,15 @@ export function getBacklinksProvider(preferred?: ProviderName): SeoDataProvider 
   }
 
   return primary;
+}
+
+/**
+ * Get a provider that supports backlinks. If the preferred provider's backlinks
+ * are unavailable (e.g. DataForSEO without backlinks subscription), falls back
+ * to another configured provider that does support them.
+ */
+export function getBacklinksProvider(preferred?: ProviderName): SeoDataProvider | null {
+  return getProviderForCapability('backlinks', preferred);
 }
 
 export function isAnyProviderConfigured(): boolean {
@@ -209,4 +234,37 @@ export function isAnyProviderConfigured(): boolean {
 
 export function listProviders(): { name: ProviderName; configured: boolean }[] {
   return [...providers.entries()].map(([name, p]) => ({ name, configured: p.isConfigured() }));
+}
+
+/**
+ * Normalize a provider-supplied date string to ISO-8601.
+ *
+ * Handles the three formats our providers return:
+ *   - SEMRush Unix epoch seconds as a string: "1747509061"
+ *   - Unix epoch milliseconds: "1747509061000"
+ *   - DataForSEO "YYYY-MM-DD HH:mm:ss +00:00" (ISO-parseable)
+ *   - ISO-8601 pass-through: "2025-05-17T00:00:00.000Z"
+ *
+ * Returns '' for empty, zero/negative epochs, and unparseable input. The empty
+ * return is intentional — the frontend falsy-check renders '—' instead of
+ * "Invalid Date", which is the whole reason this helper exists.
+ *
+ * See docs/rules/automated-rules.md → "Raw provider date passed to new Date()".
+ */
+export function normalizeProviderDate(raw: string): string {
+  if (!raw) return '';
+
+  // Numeric string → Unix epoch (sec vs ms discriminated by magnitude)
+  if (/^-?\d+$/.test(raw)) {
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n <= 0) return '';
+    const ms = n > 1e12 ? n : n * 1000;
+    const d = new Date(ms);
+    return Number.isNaN(d.getTime()) ? '' : d.toISOString();
+  }
+
+  // Otherwise try Date.parse (handles ISO-8601 and DFS "YYYY-MM-DD HH:mm:ss +00:00")
+  const parsed = Date.parse(raw);
+  if (Number.isNaN(parsed)) return '';
+  return new Date(parsed).toISOString();
 }

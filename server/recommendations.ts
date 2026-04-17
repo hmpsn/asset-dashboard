@@ -22,7 +22,10 @@ import { getAllGscPages } from './search-console.js';
 import { getGA4TopPages } from './google-analytics.js';
 import { loadDecayAnalysis } from './content-decay.js';
 import type { DecayingPage } from './content-decay.js';
-import { getDeclinedKeywords } from './routes/keyword-strategy.js';
+import { getDeclinedKeywords } from './keyword-feedback.js';
+import { listPageKeywords } from './page-keywords.js';
+import { broadcastToWorkspace } from './broadcast.js';
+import { WS_EVENTS } from './ws-events.js';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -603,7 +606,15 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         // 2C: skip if the target keyword was declined by the client
         if (cg.targetKeyword && declinedKeywords.has(cg.targetKeyword.toLowerCase())) continue;
 
-        const impactScore = cg.priority === 'high' ? 65 : cg.priority === 'medium' ? 45 : 25;
+        const baseScore = cg.priority === 'high' ? 65 : cg.priority === 'medium' ? 45 : 25;
+        // Boost impact score based on actual volume data when available
+        const volumeBoost = cg.volume && cg.volume > 0
+          ? Math.min(25, Math.round((Math.log10(cg.volume) / 5) * 25)) // up to +25 for high-volume gaps
+          : 0;
+        const difficultyPenalty = cg.difficulty && cg.difficulty > 60
+          ? Math.round((cg.difficulty - 60) * 0.25) // -0 to -10 for very hard keywords
+          : 0;
+        const impactScore = Math.max(10, Math.min(100, baseScore + volumeBoost - difficultyPenalty));
         recs.push({
           id: `rec_${crypto.randomBytes(6).toString('hex')}`,
           workspaceId,
@@ -629,9 +640,11 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       }
     }
 
-    // Pages with declining positions (from page map)
-    if (strategy.pageMap) {
-      for (const pm of strategy.pageMap) {
+    // Pages with ranking opportunities (from page_keywords table — pageMap is stripped
+    // from the strategy blob before saving, so always read from the dedicated table).
+    const pageKeywords = listPageKeywords(workspaceId);
+    if (pageKeywords.length > 0) {
+      for (const pm of pageKeywords) {
         // 2C: skip if the primary keyword was declined
         if (pm.primaryKeyword && declinedKeywords.has(pm.primaryKeyword.toLowerCase())) continue;
 
@@ -855,6 +868,8 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
 
   saveRecommendations(set);
   log.info(`Generated ${recs.length} recommendations for ${workspaceId}: ${summary.fixNow} fix-now, ${summary.fixSoon} fix-soon, ${summary.fixLater} fix-later, ${summary.ongoing} ongoing${autoResolved > 0 ? `, ${autoResolved} auto-resolved` : ''}`);
+
+  broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { count: recs.length });
 
   return set;
 }

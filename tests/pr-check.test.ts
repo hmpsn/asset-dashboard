@@ -3757,6 +3757,137 @@ describe('Rule: Re-upsert without cloneInsightParams', () => {
   });
 });
 
+describe('Rule: Competitor keyword push missing serpFeatures', () => {
+  const RULE = 'Competitor keyword push missing serpFeatures';
+
+  it('flags a competitorKeywordData.push({ block without serpFeatures', () => {
+    const file = write(
+      uniqPath('rule-compkw-serp', 'server/keyword-strategy.ts'),
+      lines(
+        'export function buildCompetitorData(keywords: any[]) {',
+        '  const competitorKeywordData: any[] = [];',
+        '  for (const ck of keywords) {',
+        '    competitorKeywordData.push({',
+        '      keyword: ck.keyword,',
+        '      volume: ck.volume,',
+        '      cpc: ck.cpc,',
+        '    });',
+        '  }',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(4);
+  });
+
+  it('does not flag when serpFeatures is present in the push block', () => {
+    const file = write(
+      uniqPath('rule-compkw-serp', 'server/keyword-strategy-ok.ts'),
+      lines(
+        'export function buildCompetitorData(keywords: any[]) {',
+        '  const competitorKeywordData: any[] = [];',
+        '  for (const ck of keywords) {',
+        '    competitorKeywordData.push({',
+        '      keyword: ck.keyword,',
+        '      volume: ck.volume,',
+        '      serpFeatures: ck.serpFeatures,',
+        '    });',
+        '  }',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with inline // compkw-serp-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-compkw-serp', 'server/keyword-strategy-hatch-inline.ts'),
+      lines(
+        'export function buildCompetitorData(keywords: any[]) {',
+        '  const competitorKeywordData: any[] = [];',
+        '  for (const ck of keywords) {',
+        '    competitorKeywordData.push({ // compkw-serp-ok — intentionally dropping serpFeatures here',
+        '      keyword: ck.keyword,',
+        '      volume: ck.volume,',
+        '    });',
+        '  }',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with above-line // compkw-serp-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-compkw-serp', 'server/keyword-strategy-hatch-above.ts'),
+      lines(
+        'export function buildCompetitorData(keywords: any[]) {',
+        '  const competitorKeywordData: any[] = [];',
+        '  for (const ck of keywords) {',
+        '    // compkw-serp-ok — serpFeatures not applicable for this data source',
+        '    competitorKeywordData.push({',
+        '      keyword: ck.keyword,',
+        '      volume: ck.volume,',
+        '    });',
+        '  }',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag files outside server/', () => {
+    const file = write(
+      uniqPath('rule-compkw-serp', 'src/not-server.ts'),
+      lines(
+        'const competitorKeywordData: any[] = [];',
+        'competitorKeywordData.push({',
+        '  keyword: "foo",',
+        '});',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: Raw provider date passed to new Date()', () => {
+  const RULE = CHECKS.find(c => c.name === 'Raw provider date passed to new Date()')!;
+
+  it('flags new Date() receiving a first_seen field in server/', () => {
+    const dir = path.join(TMPDIR, 'provider-date-trigger/server');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'semrush.ts'), "const d = new Date(item.first_seen);\n");
+    const hits = checkDirectory(path.join(TMPDIR, 'provider-date-trigger'), RULE);
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits.some(h => h.includes('semrush.ts'))).toBe(true);
+  });
+
+  it('flags new Date() receiving a lastSeen field in server/', () => {
+    const dir = path.join(TMPDIR, 'provider-date-trigger2/server');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'dfs.ts'), "return new Date(row.lastSeen);\n");
+    const hits = checkDirectory(path.join(TMPDIR, 'provider-date-trigger2'), RULE);
+    expect(hits.length).toBeGreaterThan(0);
+  });
+
+  it('suppresses with // provider-date-ok hatch', () => {
+    const dir = path.join(TMPDIR, 'provider-date-hatch/server');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'custom.ts'), "const d = new Date(item.first_seen); // provider-date-ok\n");
+    const hits = checkDirectory(path.join(TMPDIR, 'provider-date-hatch'), RULE);
+    expect(hits.length).toBe(0);
+  });
+
+  it('has pathFilter configured to server/', () => {
+    expect(RULE.pathFilter).toBe('server/');
+  });
+
+  it('excludes server/seo-data-provider.ts (the normalizer definition site)', () => {
+    expect(RULE.exclude).toContain('server/seo-data-provider.ts');
+  });
+});
+
 describe('Meta: customCheck rule name registry', () => {
   const EXPECTED_CUSTOM_CHECK_RULES = [
     'Global keydown missing isContentEditable guard',
@@ -3802,6 +3933,8 @@ describe('Meta: customCheck rule name registry', () => {
     'isProgrammingError near new URL() or fetch()',
     // PR #201 re-upsert field-drop guard
     'Re-upsert without cloneInsightParams',
+    // PR #218 A3/A4 bug pattern guards
+    'Competitor keyword push missing serpFeatures',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {

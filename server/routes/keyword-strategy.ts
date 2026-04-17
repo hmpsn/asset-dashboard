@@ -54,8 +54,15 @@ import { isFeatureEnabled } from '../feature-flags.js';
 import { filterBrandedKeywords, filterBrandedContentGaps, extractBrandTokens } from '../competitor-brand-filter.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';
 import { isProgrammingError } from '../errors.js';
+import { generateRecommendations } from '../recommendations.js';
+import { getDeclinedKeywords, getRequestedKeywords } from '../keyword-feedback.js';
 
 const log = createLogger('keyword-strategy');
+
+// Dedup guard: prevents concurrent background recommendation runs for the same workspace
+// (e.g. rapid strategy re-generations). Final write wins via SQLite upsert; this just
+// avoids wasted work and redundant broadcasts.
+const recsInFlight = new Set<string>();
 
 // ── Incremental mode helpers ─────────────────────────────────────
 
@@ -580,7 +587,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     const relatedKws: RelatedKeyword[] = [];
     const allQuestionKws: { seed: string; questions: { keyword: string; volume: number }[] }[] = [];
     // Competitor keyword data — used to enrich the keyword pool and give competitor proof to content gaps
-    const competitorKeywordData: Array<{ keyword: string; volume: number; difficulty: number; domain: string; position: number }> = [];
+    const competitorKeywordData: Array<{ keyword: string; volume: number; difficulty: number; domain: string; position: number; serpFeatures?: string }> = [];
 
     const fetchCompetitors = strategyMode !== 'incremental' || shouldFetchCompetitorData(ws);
 
@@ -655,12 +662,31 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         // Both quick and full: fetch competitor keywords (their top terms become our keyword pool)
         if (fetchCompetitors && competitorDomains.length > 0) {
           try {
-            const compLimit = semrushMode === 'full' ? 100 : 50;
+            // Raised 100 → 200 (full mode) to capture the long tail of high-value
+            // competitor keywords. Cost: ~4× provider credits vs old 100-row limit
+            // (200 compLimit × 2× SEMRush overfetch = 400 rows × 10 credits each).
+            // Worth it for gap-analysis quality. PR #221 A-series verification notes.
+            const compLimit = semrushMode === 'full' ? 200 : 50;
+
+            // Provider parity: DFS gets an explicit search_volume,desc order_by
+            // (see dataforseo-provider.ts), so its top-N already IS top-N-by-volume.
+            // SEMRush domain_organic has no URL-level sort knob and returns rank-ordered
+            // by default. To get the same semantics we overfetch 2× and re-sort in-memory.
+            const fetchMultiplier = provider.name === 'semrush' ? 2 : 1;
+            const fetchLimit = compLimit * fetchMultiplier;
+
             sendProgress('semrush', `Fetching competitor keywords (${competitorDomains.length} competitors)...`, 0.58);
             for (const comp of competitorDomains.slice(0, 3)) {
               const cleanComp = comp.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
               try {
-                const compKws = await provider.getDomainKeywords(cleanComp, ws.id, compLimit);
+                // cache-miss-ok: fetchLimit intentionally differs from compLimit for SEMRush overfetch.
+                // SEMRush cache key includes the limit param, so _400 entries don't collide with _200.
+                const rawKws = await provider.getDomainKeywords(cleanComp, ws.id, fetchLimit);
+                // Sort by volume DESC, then slice to compLimit. For DFS this is a no-op
+                // (already sorted); for SEMRush this is the parity step.
+                const compKws = [...rawKws]
+                  .sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0))
+                  .slice(0, compLimit);
                 for (const ck of compKws) {
                   competitorKeywordData.push({
                     keyword: ck.keyword,
@@ -668,9 +694,13 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
                     difficulty: ck.difficulty,
                     domain: cleanComp,
                     position: ck.position,
+                    // serpFeatures carried so downstream SERP-feature chip rendering
+                    // and opportunity scoring can see it. DomainKeyword.serpFeatures
+                    // is populated by both providers (DFS dedupe loop, SEMRush Fk column).
+                    serpFeatures: ck.serpFeatures,
                   });
                 }
-                log.info(`Got ${compKws.length} keywords from competitor ${cleanComp}`);
+                log.info(`Got ${compKws.length} keywords from competitor ${cleanComp} (fetched ${rawKws.length})`);
               } catch (err) {
                 log.warn({ err }, `Failed to fetch keywords for competitor ${cleanComp}`);
               }
@@ -988,7 +1018,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         let entry = `- ${p.path}: "${p.title}"`;
         if (p.seoTitle) entry += ` | SEO: "${p.seoTitle}"`;
         if (p.seoDesc) entry += ` | Desc: "${p.seoDesc.slice(0, 150)}"`;
-        if (p.contentSnippet) entry += `\n  Content: ${p.contentSnippet.slice(0, 400)}`;
+        if (p.contentSnippet) entry += `\n  Content: ${p.contentSnippet.slice(0, 800)}`;
         const pageGsc = gscByPath.get(p.path);
         if (pageGsc && pageGsc.length > 0) {
           const topGsc = pageGsc.sort((a, b) => b.impressions - a.impressions).slice(0, 5);
@@ -1042,7 +1072,7 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
         const parsed = JSON.parse(raw);
         log.info(`Batch ${batchIdx + 1} returned ${Array.isArray(parsed) ? parsed.length : 0} page mappings`);
         sendProgress('ai', `Batch ${batchIdx + 1}/${batches.length} complete (${Array.isArray(parsed) ? parsed.length : 0} pages)`, 0.55 + ((batchIdx + 1) / batches.length) * 0.20);
-        // Strip AI-hallucinated volume/difficulty — those must come from SEMRush enrichment only
+        // Strip AI-hallucinated volume/difficulty — those must come from keyword-provider enrichment only
         // Also strip "(invented)" suffix and pre-enrich keywords that are already in the pool
         if (Array.isArray(parsed)) {
           let fromPool = 0;
@@ -1373,7 +1403,7 @@ Return JSON with this EXACT structure (do NOT include a pageMap — it's already
   "contentGaps": [
     {
       "topic": "New content piece to create",
-      "targetKeyword": "primary keyword (MUST be from SEMRush/GSC data when available)",
+      "targetKeyword": "primary keyword (MUST be from keyword-provider/GSC data when available)",
       "intent": "informational|commercial|transactional|navigational",
       "priority": "high|medium|low",
       "rationale": "Why and expected impact",
@@ -2140,6 +2170,15 @@ Rules:
 
     // Trigger background llms.txt regeneration after strategy update
     queueLlmsTxtRegeneration(ws.id, 'keyword_strategy_updated');
+
+    // Refresh recommendations so quick wins / content gaps / ranking opportunities
+    // reflect the new strategy immediately, without waiting for the next manual audit.
+    if (!recsInFlight.has(ws.id)) {
+      recsInFlight.add(ws.id);
+      generateRecommendations(ws.id)
+        .catch(err => log.warn({ err, workspaceId: ws.id }, 'Failed to refresh recommendations after strategy update'))
+        .finally(() => recsInFlight.delete(ws.id));
+    }
     return;
   } catch (err) {
     if (keepalive) clearInterval(keepalive);
@@ -2263,18 +2302,6 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', validate(patchStrateg
 });
 
 // ── Keyword Feedback (approve/decline) ──────────────────────────
-
-/** Get all declined keywords for a workspace (used by strategy generator to exclude) */
-export function getDeclinedKeywords(workspaceId: string): string[] {
-  const rows = db.prepare('SELECT keyword FROM keyword_feedback WHERE workspace_id = ? AND status = ?').all(workspaceId, 'declined') as { keyword: string }[];
-  return rows.map(r => r.keyword);
-}
-
-/** Get all client-requested keywords for a workspace (used by strategy generator to prioritize) */
-export function getRequestedKeywords(workspaceId: string): string[] {
-  const rows = db.prepare('SELECT keyword FROM keyword_feedback WHERE workspace_id = ? AND status = ?').all(workspaceId, 'requested') as { keyword: string }[];
-  return rows.map(r => r.keyword);
-}
 
 /** Get all keyword feedback for a workspace */
 function getAllFeedback(workspaceId: string) {

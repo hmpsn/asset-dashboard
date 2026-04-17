@@ -344,11 +344,11 @@ describe('generateBrief — prompt construction', () => {
     expect(promptContent).toContain('200 clicks');
   });
 
-  it('includes SEMRush metrics in the prompt when provided', async () => {
+  it('includes SEO provider metrics in the prompt when provided', async () => {
     mockOpenAIJsonResponse('content-brief', makeMockBriefResponse());
 
     await generateBrief(TEST_WS_ID, 'seo tools', {
-      semrushMetrics: {
+      keywordMetrics: {
         keyword: 'seo tools',
         volume: 12000,
         difficulty: 65,
@@ -357,7 +357,7 @@ describe('generateBrief — prompt construction', () => {
         results: 450000000,
         trend: [9000, 9500, 10000, 10500, 11000, 11500, 12000, 12000, 12500, 12000, 11500, 12000],
       },
-      semrushRelated: [
+      relatedKeywords: [
         { keyword: 'best seo tools', volume: 6000, difficulty: 55, cpc: 3.25 },
         { keyword: 'free seo tools', volume: 8000, difficulty: 45, cpc: 2.10 },
       ],
