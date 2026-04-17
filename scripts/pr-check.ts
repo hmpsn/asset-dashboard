@@ -3357,9 +3357,8 @@ export const CHECKS: Check[] = [
             if (lines[j].includes('});')) { foundClose = true; break; }
           }
           if (foundClose && !foundField) {
-            // hatch check (this line OR preceding line)
             const hatch = '// compkw-serp-ok';
-            if (lines[i].includes(hatch) || (i > 0 && lines[i - 1].includes(hatch))) continue;
+            if (hasHatch(lines, i, hatch)) continue;
             hits.push({ file, line: i + 1, text: lines[i].trim() });
           }
         }
