@@ -57,9 +57,9 @@ function enforceLimit(text: string, maxLen: number): string {
     const lastExclamation = truncated.lastIndexOf('!');
 
     let cutPoint = maxLen;
-    if (lastSpace > maxLen * 0.7) cutPoint = lastSpace;
-    else if (lastPeriod > maxLen * 0.7) cutPoint = lastPeriod + 1;
-    else if (lastExclamation > maxLen * 0.7) cutPoint = lastExclamation + 1;
+    if (lastSpace > maxLen * 0.6) cutPoint = lastSpace;
+    else if (lastPeriod > maxLen * 0.6) cutPoint = lastPeriod + 1;
+    else if (lastExclamation > maxLen * 0.6) cutPoint = lastExclamation + 1;
 
     return t.slice(0, cutPoint);
   }
