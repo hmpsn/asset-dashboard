@@ -342,7 +342,8 @@ export async function runSiteSpeed(
   const wsId = workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
   const ws = wsId ? getWorkspace(wsId) : undefined;
   const token = ws?.webflowToken || process.env.WEBFLOW_API_TOKEN || '';
-  const subdomain = await getSiteSubdomain(siteId, token);
+  let subdomain: string | null = null;
+  try { subdomain = await getSiteSubdomain(siteId, token); } catch { /* no token configured */ }
   const baseUrl = subdomain ? `https://${subdomain}.webflow.io` : '';
 
   if (!baseUrl) {
