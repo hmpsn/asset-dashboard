@@ -11,7 +11,7 @@ import { useCart } from './useCart';
 import type { ProductType } from '../../../shared/types/payments.ts';
 import type { RecPriority, RecType, RecStatus, Recommendation, RecommendationSet } from '../../../shared/types/recommendations.ts';
 import { STUDIO_NAME } from '../../constants';
-import { getOptional, post, patch, del } from '../../api/client';
+import { get, post, patch, del } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
 
 // ─── Props ────────────────────────────────────────────────────────
@@ -113,12 +113,13 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
 
   const isPremium = tier === 'premium';
 
-  // queryFn returns RecommendationSet | null — same shape cached by useRecommendations,
+  // queryFn returns RecommendationSet — same shape cached by useRecommendations,
   // which uses select to project to Recommendation[]. Both must cache the same type.
-  const { data, isLoading, isError } = useQuery<RecommendationSet | null>({
+  // Uses get() (throws on non-200) so HTTP errors surface via isError, not silent null.
+  const { data, isLoading, isError } = useQuery<RecommendationSet>({
     queryKey: queryKeys.shared.recommendations(workspaceId),
-    queryFn: (): Promise<RecommendationSet | null> =>
-      getOptional<RecommendationSet>(`/api/public/recommendations/${workspaceId}`),
+    queryFn: (): Promise<RecommendationSet> =>
+      get<RecommendationSet>(`/api/public/recommendations/${workspaceId}`),
     staleTime: 60_000,
   });
 
@@ -136,7 +137,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
   const handleStatusUpdate = async (recId: string, status: RecStatus) => {
     try {
       await patch(`/api/public/recommendations/${workspaceId}/${recId}`, { status });
-      qc.setQueryData<RecommendationSet>(queryKeys.shared.recommendations(workspaceId), prev => {
+      qc.setQueryData<RecommendationSet | undefined>(queryKeys.shared.recommendations(workspaceId), prev => {
         if (!prev) return prev;
         return { ...prev, recommendations: prev.recommendations.map(r => r.id === recId ? { ...r, status, updatedAt: new Date().toISOString() } : r) };
       });
@@ -147,7 +148,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
   const handleDismiss = async (recId: string) => {
     try {
       await del(`/api/public/recommendations/${workspaceId}/${recId}`);
-      qc.setQueryData<RecommendationSet>(queryKeys.shared.recommendations(workspaceId), prev => {
+      qc.setQueryData<RecommendationSet | undefined>(queryKeys.shared.recommendations(workspaceId), prev => {
         if (!prev) return prev;
         return { ...prev, recommendations: prev.recommendations.map(r => r.id === recId ? { ...r, status: 'dismissed' as RecStatus } : r) };
       });

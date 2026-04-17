@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getOptional } from '../api/client';
+import { get } from '../api/client';
 import { queryKeys } from '../lib/queryKeys';
 import type { Recommendation, RecommendationSet } from '../../shared/types/recommendations.ts';
 
@@ -15,11 +15,9 @@ import type { Recommendation, RecommendationSet } from '../../shared/types/recom
 export function useRecommendations(workspaceId?: string) {
   const { data: recs = [], isSuccess: loaded } = useQuery({
     queryKey: queryKeys.shared.recommendations(workspaceId!),
-    queryFn: async (): Promise<RecommendationSet | null> => {
-      return getOptional<RecommendationSet>(`/api/public/recommendations/${workspaceId}`) ?? null;
-    },
-    select: (set: RecommendationSet | null): Recommendation[] =>
-      set?.recommendations ?? [],
+    queryFn: (): Promise<RecommendationSet> =>
+      get<RecommendationSet>(`/api/public/recommendations/${workspaceId}`),
+    select: (set: RecommendationSet): Recommendation[] => set.recommendations,
     enabled: !!workspaceId,
     staleTime: 60_000,
   });
