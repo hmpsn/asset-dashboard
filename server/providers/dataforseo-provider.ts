@@ -495,7 +495,7 @@ export class DataForSeoProvider implements SeoDataProvider {
   // ── getDomainKeywords → ranked_keywords ──
   async getDomainKeywords(domain: string, workspaceId: string, limit = 100, database = 'us'): Promise<DomainKeyword[]> {
     const target = cleanDomain(domain);
-    const cacheKey = `domain_ranked_${database}_${target.replace(/\./g, '_')}_${limit}`;
+    const cacheKey = `domain_ranked_${database}_${target.replace(/\./g, '_')}_${limit}_vol`;
     const cached = readCache<DomainKeyword[]>(workspaceId, cacheKey, CACHE_TTL_DOMAIN_ORGANIC);
     if (cached) {
       logCreditUsage({ credits: 0, endpoint: 'ranked_keywords', query: target, rowsReturned: cached.length, workspaceId, cached: true });

@@ -841,8 +841,11 @@ export function estimateCreditCost(opts: {
     return (opts.keywordCount || 50) * 10;
   }
   // Full mode: domain organic + competitors + keyword overview + related
+  // compLimit is 200 (raised from 100 in PR #221). SEMRush overfetches 2× (400 rows)
+  // to sort by volume in-memory; DFS uses server-side order_by so no overfetch (200 rows).
+  // Estimate uses the SEMRush worst-case (400 rows × 10 credits) to avoid understating.
   const domainCost = 100 * 10; // client domain, 100 rows
-  const compCost = (opts.competitorCount || 2) * 100 * 10; // per competitor
+  const compCost = (opts.competitorCount || 2) * 400 * 10; // per competitor: 400 rows × 10 credits (SEMRush: 200 compLimit × 2× overfetch)
   const kwCost = (opts.keywordCount || 50) * 10;
   const relatedCost = 10 * 20 * 10; // 10 seed keywords, 20 related each
   return domainCost + compCost + kwCost + relatedCost;

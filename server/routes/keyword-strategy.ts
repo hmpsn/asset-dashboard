@@ -656,8 +656,9 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         if (fetchCompetitors && competitorDomains.length > 0) {
           try {
             // Raised 100 → 200 (full mode) to capture the long tail of high-value
-            // competitor keywords. Cost: ~2× provider credits per competitor, worth it
-            // for gap-analysis quality. PR #218 A-series verification notes.
+            // competitor keywords. Cost: ~4× provider credits vs old 100-row limit
+            // (200 compLimit × 2× SEMRush overfetch = 400 rows × 10 credits each).
+            // Worth it for gap-analysis quality. PR #221 A-series verification notes.
             const compLimit = semrushMode === 'full' ? 200 : 50;
 
             // Provider parity: DFS gets an explicit search_volume,desc order_by
