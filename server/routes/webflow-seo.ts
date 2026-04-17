@@ -43,6 +43,29 @@ import { fireBridge } from '../bridge-infrastructure.js';
 
 const log = createLogger('webflow-seo');
 
+/**
+ * Enforce a character limit on SEO text with smart truncation.
+ * Prefers cutting at a sentence boundary (. or !) or word boundary
+ * within the last 30% of the allowed length, falling back to a hard cut.
+ */
+function enforceLimit(text: string, maxLen: number): string {
+  const t = text.replace(/^["']|["']$/g, '').trim();
+  if (t.length > maxLen) {
+    const truncated = t.slice(0, maxLen);
+    const lastSpace = truncated.lastIndexOf(' ');
+    const lastPeriod = truncated.lastIndexOf('.');
+    const lastExclamation = truncated.lastIndexOf('!');
+
+    let cutPoint = maxLen;
+    if (lastSpace > maxLen * 0.7) cutPoint = lastSpace;
+    else if (lastPeriod > maxLen * 0.7) cutPoint = lastPeriod + 1;
+    else if (lastExclamation > maxLen * 0.7) cutPoint = lastExclamation + 1;
+
+    return t.slice(0, cutPoint);
+  }
+  return t;
+}
+
 // --- SEO Audit ---
 router.get('/api/webflow/seo-audit/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   try {
@@ -312,25 +335,6 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
       }
     } catch { /* best-effort — fetch on external URL, continue without content */ } // url-fetch-ok
   }
-
-  // Enforce character limits helper - STRICT enforcement
-  const enforceLimit = (text: string, maxLen: number): string => {
-    const t = text.replace(/^["']|["']$/g, '').trim();
-    if (t.length > maxLen) {
-      const truncated = t.slice(0, maxLen);
-      const lastSpace = truncated.lastIndexOf(' ');
-      const lastPeriod = truncated.lastIndexOf('.');
-      const lastExclamation = truncated.lastIndexOf('!');
-      
-      let cutPoint = maxLen;
-      if (lastSpace > maxLen * 0.7) cutPoint = lastSpace;
-      else if (lastPeriod > maxLen * 0.7) cutPoint = lastPeriod + 1;
-      else if (lastExclamation > maxLen * 0.7) cutPoint = lastExclamation + 1;
-      
-      return t.slice(0, cutPoint);
-    }
-    return t;
-  };
 
   try {
     // Persisted page analysis (optimizationIssues + recommendations from keyword analysis)
@@ -768,15 +772,6 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
       allGscData = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 28);
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-seo: programming error'); /* non-critical */ }
   }
-
-  // Enforce character limits helper
-  const enforceLimit = (text: string, max: number): string => {
-    const t = text.replace(/^["']|["']$/g, '').trim();
-    if (t.length <= max) return t;
-    const truncated = t.slice(0, max);
-    const lastSpace = truncated.lastIndexOf(' ');
-    return lastSpace > max * 0.6 ? truncated.slice(0, lastSpace) : truncated;
-  };
 
   // Build sibling title map so each page knows what other pages in this batch use
   // Prevents generating duplicate/similar titles across the site
@@ -1591,15 +1586,6 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', requireWorkspaceAccess('worksp
           allGscData = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 28);
         } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'bulk-rewrite: programming error'); }
       }
-
-      // Character limit enforcement helper
-      const enforceLimit = (text: string, max: number): string => {
-        const t = text.replace(/^["']|["']$/g, '').trim();
-        if (t.length <= max) return t;
-        const truncated = t.slice(0, max);
-        const lastSpace = truncated.lastIndexOf(' ');
-        return lastSpace > max * 0.6 ? truncated.slice(0, lastSpace) : truncated;
-      };
 
       // Sibling title map
       const siblingTitles: Record<string, string[]> = {};
