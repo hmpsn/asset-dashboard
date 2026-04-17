@@ -59,6 +59,11 @@ import { getDeclinedKeywords, getRequestedKeywords } from '../keyword-feedback.j
 
 const log = createLogger('keyword-strategy');
 
+// Dedup guard: prevents concurrent background recommendation runs for the same workspace
+// (e.g. rapid strategy re-generations). Final write wins via SQLite upsert; this just
+// avoids wasted work and redundant broadcasts.
+const recsInFlight = new Set<string>();
+
 // ── Incremental mode helpers ─────────────────────────────────────
 
 const INCREMENTAL_THRESHOLD_DAYS = 7;
@@ -2168,9 +2173,12 @@ Rules:
 
     // Refresh recommendations so quick wins / content gaps / ranking opportunities
     // reflect the new strategy immediately, without waiting for the next manual audit.
-    generateRecommendations(ws.id).catch(err =>
-      log.warn({ err, workspaceId: ws.id }, 'Failed to refresh recommendations after strategy update'),
-    );
+    if (!recsInFlight.has(ws.id)) {
+      recsInFlight.add(ws.id);
+      generateRecommendations(ws.id)
+        .catch(err => log.warn({ err, workspaceId: ws.id }, 'Failed to refresh recommendations after strategy update'))
+        .finally(() => recsInFlight.delete(ws.id));
+    }
     return;
   } catch (err) {
     if (keepalive) clearInterval(keepalive);

@@ -2,43 +2,24 @@ import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getOptional } from '../api/client';
 import { queryKeys } from '../lib/queryKeys';
-
-export interface Recommendation {
-  id: string;
-  workspaceId: string;
-  priority: 'fix_now' | 'fix_soon' | 'fix_later' | 'ongoing';
-  type: 'technical' | 'content' | 'content_refresh' | 'schema' | 'metadata' | 'performance' | 'accessibility' | 'strategy' | 'aeo';
-  title: string;
-  description: string;
-  insight: string;
-  impact: 'high' | 'medium' | 'low';
-  effort: 'low' | 'medium' | 'high';
-  impactScore: number;
-  source: string;
-  affectedPages: string[];
-  trafficAtRisk: number;
-  impressionsAtRisk: number;
-  estimatedGain: string;
-  actionType: 'automated' | 'manual' | 'content_creation' | 'purchase';
-  productType?: string;
-  productPrice?: number;
-  status: 'pending' | 'in_progress' | 'completed' | 'dismissed';
-  assignedTo?: 'team' | 'client';
-  createdAt: string;
-  updatedAt: string;
-}
+import type { Recommendation, RecommendationSet } from '../../shared/types/recommendations.ts';
 
 /**
  * Fetch active recommendations for a workspace and provide helpers
  * to filter them by page slug and type.
+ *
+ * Uses queryKeys.shared.recommendations — the same key as InsightsEngine.
+ * The queryFn caches the full RecommendationSet; select projects to Recommendation[]
+ * so callers that only need the array don't cause a cache shape collision.
  */
 export function useRecommendations(workspaceId?: string) {
   const { data: recs = [], isSuccess: loaded } = useQuery({
     queryKey: queryKeys.shared.recommendations(workspaceId!),
-    queryFn: async () => {
-      const data = await getOptional<{ recommendations?: Recommendation[] }>(`/api/public/recommendations/${workspaceId}`);
-      return data && Array.isArray(data.recommendations) ? data.recommendations : [];
+    queryFn: async (): Promise<RecommendationSet | null> => {
+      return getOptional<RecommendationSet>(`/api/public/recommendations/${workspaceId}`) ?? null;
     },
+    select: (set: RecommendationSet | null): Recommendation[] =>
+      set?.recommendations ?? [],
     enabled: !!workspaceId,
     staleTime: 60_000,
   });

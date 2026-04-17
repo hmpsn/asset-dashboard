@@ -11,7 +11,7 @@ import { useCart } from './useCart';
 import type { ProductType } from '../../../shared/types/payments.ts';
 import type { RecPriority, RecType, RecStatus, Recommendation, RecommendationSet } from '../../../shared/types/recommendations.ts';
 import { STUDIO_NAME } from '../../constants';
-import { get, post, patch, del } from '../../api/client';
+import { getOptional, post, patch, del } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
 
 // ─── Props ────────────────────────────────────────────────────────
@@ -113,9 +113,12 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
 
   const isPremium = tier === 'premium';
 
-  const { data, isLoading, isError } = useQuery<RecommendationSet>({
+  // queryFn returns RecommendationSet | null — same shape cached by useRecommendations,
+  // which uses select to project to Recommendation[]. Both must cache the same type.
+  const { data, isLoading, isError } = useQuery<RecommendationSet | null>({
     queryKey: queryKeys.shared.recommendations(workspaceId),
-    queryFn: () => get<RecommendationSet>(`/api/public/recommendations/${workspaceId}`),
+    queryFn: (): Promise<RecommendationSet | null> =>
+      getOptional<RecommendationSet>(`/api/public/recommendations/${workspaceId}`),
     staleTime: 60_000,
   });
 
@@ -125,11 +128,11 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
     try {
       const set = await post<RecommendationSet>(`/api/public/recommendations/${workspaceId}/generate`);
       qc.setQueryData(queryKeys.shared.recommendations(workspaceId), set);
-    } catch { /* error shown via isError */ }
+    } catch { /* silently fail — button stops spinning; user can retry */ }
     setRegenerating(false);
   };
 
-  // Update status (optimistic)
+  // Update status (on success)
   const handleStatusUpdate = async (recId: string, status: RecStatus) => {
     try {
       await patch(`/api/public/recommendations/${workspaceId}/${recId}`, { status });
@@ -140,7 +143,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
     } catch (err) { console.error('InsightsEngine operation failed:', err); }
   };
 
-  // Dismiss (optimistic)
+  // Dismiss (on success)
   const handleDismiss = async (recId: string) => {
     try {
       await del(`/api/public/recommendations/${workspaceId}/${recId}`);
