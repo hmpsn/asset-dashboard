@@ -115,10 +115,5 @@ export const SEVERITY_CONFIG: Record<Severity, { label: string; color: string; b
   info: { label: 'Info', color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/30', icon: Info },
 };
 
-// Scoring constants (must match server/audit-page.ts)
-// Weights calibrated to industry tools (SEMRush, Ahrefs):
-//   error: critical -15, other -10
-//   warning: critical -5, moderate -3, other -2
-//   info: 0 (no score impact)
-export const CRITICAL_CHECKS = new Set(['title', 'meta-description', 'canonical', 'h1', 'robots', 'duplicate-title', 'mixed-content', 'ssl', 'robots-txt']);
-export const MODERATE_CHECKS = new Set(['content-length', 'heading-hierarchy', 'internal-links', 'img-alt', 'og-tags', 'og-image', 'link-text', 'url', 'lang', 'viewport', 'duplicate-description', 'img-filesize', 'html-size']);
+// Scoring constants — re-exported from shared/scoring.ts (single source of truth)
+export { CRITICAL_CHECKS, MODERATE_CHECKS } from '../../../shared/scoring';
