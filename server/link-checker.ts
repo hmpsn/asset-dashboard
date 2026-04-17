@@ -3,10 +3,9 @@ import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
 import { getWorkspacePages } from './workspace-data.js';
 import { listWorkspaces, getWorkspace } from './workspaces.js';
+import { webflowFetch } from './webflow-client.js';
 
 const log = createLogger('link-checker');
-
-const WEBFLOW_API = 'https://api.webflow.com/v2';
 
 export interface DeadLink {
   url: string;
@@ -34,9 +33,7 @@ export interface SiteDomainInfo {
 }
 
 export async function getSiteDomains(siteId: string, token: string): Promise<SiteDomainInfo | null> {
-  const res = await fetch(`${WEBFLOW_API}/sites/${siteId}`, {
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-  });
+  const res = await webflowFetch(`/sites/${siteId}`, {}, token || undefined);
   if (!res.ok) return null;
   const data = await res.json() as {
     shortName?: string;
