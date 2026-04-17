@@ -4,6 +4,7 @@ import { useAnomalyAlerts } from '../hooks/admin';
 import { post } from '../api/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '../lib/queryKeys';
+import { timeAgo } from '../lib/timeAgo';
 
 interface AnomalyAlertsProps {
   workspaceId: string;
@@ -43,16 +44,6 @@ function SeverityIcon({ severity }: { severity: 'critical' | 'warning' | 'positi
   if (severity === 'positive') return <TrendingUp className={cls} />;
   if (severity === 'critical') return <TrendingDown className={cls} />;
   return <AlertTriangle className={cls} />;
-}
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
 }
 
 export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }: AnomalyAlertsProps) {

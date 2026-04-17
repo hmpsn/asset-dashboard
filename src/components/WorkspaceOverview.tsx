@@ -16,23 +16,12 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recha
 import { MetricRingSvg, PageHeader, SectionCard, Badge, StatCard } from './ui';
 import { chartAxisColor, themeColor } from './ui/constants';
 import { STUDIO_NAME } from '../constants';
+import { timeAgo } from '../lib/timeAgo';
 
 // Types imported from useWorkspaceOverview hook
 
 // ScoreRing replaced by unified <MetricRingSvg /> from ./ui
 const ScoreRing = MetricRingSvg;
-
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
 
 export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (id: string) => void }) {
   const navigate = useNavigate();
