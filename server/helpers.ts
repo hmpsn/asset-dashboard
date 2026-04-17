@@ -74,9 +74,9 @@ function globToRegex(pattern: string): RegExp {
 
 // ── Audit Suppression Helpers ──
 
-// Re-export from shared/scoring.ts (single source of truth)
-export const CRITICAL_CHECKS_SET = CRITICAL_CHECKS;
-export const MODERATE_CHECKS_SET = MODERATE_CHECKS;
+// Re-export from shared/scoring.ts (single source of truth — copies to prevent external mutation)
+export const CRITICAL_CHECKS_SET = new Set(CRITICAL_CHECKS);
+export const MODERATE_CHECKS_SET = new Set(MODERATE_CHECKS);
 
 export interface AuditSuppression { check: string; pageSlug: string; pagePattern?: string; reason?: string; createdAt: string }
 
