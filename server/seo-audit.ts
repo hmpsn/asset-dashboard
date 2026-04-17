@@ -69,8 +69,6 @@ export async function fetchPageMeta(pageId: string, tokenOverride?: string): Pro
   } catch (err) { /* network failure — expected */ return null; }
 }
 
-// Re-export so existing callers that import from seo-audit continue to work
-export { fetchPublishedHtml } from './helpers.js';
 
 interface SiteInfo {
   subdomain: string | null;
