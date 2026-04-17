@@ -191,5 +191,9 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.diagnosticForInsightAll(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.diagnostics(workspaceId) });
     },
+    [WS_EVENTS.RECOMMENDATIONS_UPDATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.shared.recommendations(workspaceId) });
+    },
   });
 }
