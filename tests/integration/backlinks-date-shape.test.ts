@@ -1,16 +1,19 @@
 /**
- * Regression tests for A3 (PR #218): date shape contract on
- * GET /api/backlinks/:workspaceId
+ * HTTP response contract tests for GET /api/backlinks/:workspaceId — date shape.
  *
- * Before PR #218 the route could return raw Unix epoch strings (e.g. "1747440000")
- * or "Invalid Date" in firstSeen / lastSeen fields because provider dates were
- * passed straight to new Date() without normalisation. normalizeProviderDate() was
- * added in Task 2 and wired into both providers in Tasks 3 and 4.
+ * Context (A4, PR #218): SEMRush and DataForSEO returned Unix epoch second strings
+ * for first_seen / last_seen, which produced "Invalid Date" in the Backlink Profile
+ * table. The fix (Tasks 2–4) added normalizeProviderDate() at the provider boundary.
  *
- * These tests guard against regression by asserting:
- *   1. Any non-empty date in referringDomains is a valid, Date-parseable ISO string
- *   2. No 10-digit numeric string (raw Unix epoch) leaks through
- *   3. Missing dates produce '' (empty string), not "Invalid Date"
+ * These tests lock in the *HTTP response contract*: the route must not corrupt
+ * dates that are already ISO-8601, and must pass empty strings through unchanged.
+ * The normalization *logic* is guarded by unit tests in:
+ *   - tests/unit/seo-data-provider.test.ts (normalizeProviderDate — 7 cases)
+ *   - tests/unit/semrush.test.ts (SEMRush CSV→ISO conversion)
+ *   - tests/unit/dataforseo-provider.test.ts (DFS epoch→ISO conversion)
+ *
+ * The mock provider here returns already-normalized values, so these tests exercise
+ * the route serialization path, not the provider normalization path.
  *
  * Architecture: mirrors backlinks-routes.test.ts exactly —
  *   in-process server + vi.mock for seo-data-provider so no real API calls occur.
