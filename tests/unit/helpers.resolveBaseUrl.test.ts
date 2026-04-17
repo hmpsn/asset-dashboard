@@ -49,4 +49,16 @@ describe('resolveBaseUrl', () => {
     const ws = {};
     expect(await resolveBaseUrl(ws)).toBe('');
   });
+
+  it('returns empty string (does not throw) when getSiteSubdomain throws missing-token error', async () => {
+    mockGetSiteSubdomain.mockRejectedValue(new Error('WEBFLOW_API_TOKEN not configured'));
+    const ws = { webflowSiteId: 'site-abc' };
+    await expect(resolveBaseUrl(ws)).resolves.toBe('');
+  });
+
+  it('returns empty string (does not throw) when getSiteSubdomain throws network error', async () => {
+    mockGetSiteSubdomain.mockRejectedValue(new Error('fetch failed'));
+    const ws = { webflowSiteId: 'site-abc' };
+    await expect(resolveBaseUrl(ws)).resolves.toBe('');
+  });
 });
