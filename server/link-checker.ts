@@ -3,10 +3,10 @@ import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
 import { getWorkspacePages } from './workspace-data.js';
 import { listWorkspaces, getWorkspace } from './workspaces.js';
+import { webflowFetch } from './webflow-client.js';
+import { fetchPublishedHtml } from './helpers.js';
 
 const log = createLogger('link-checker');
-
-const WEBFLOW_API = 'https://api.webflow.com/v2';
 
 export interface DeadLink {
   url: string;
@@ -34,9 +34,8 @@ export interface SiteDomainInfo {
 }
 
 export async function getSiteDomains(siteId: string, token: string): Promise<SiteDomainInfo | null> {
-  const res = await fetch(`${WEBFLOW_API}/sites/${siteId}`, {
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-  });
+  if (!token) return null;
+  const res = await webflowFetch(`/sites/${siteId}`, {}, token);
   if (!res.ok) return null;
   const data = await res.json() as {
     shortName?: string;
@@ -54,14 +53,6 @@ export async function getSiteDomains(siteId: string, token: string): Promise<Sit
     customDomains,
     defaultDomain: customDomains[0] || staging,
   };
-}
-
-async function fetchPublishedHtml(url: string): Promise<string | null> {
-  try {
-    const res = await fetch(url, { redirect: 'follow' });
-    if (!res.ok) return null;
-    return await res.text();
-  } catch (err) { /* network failure — expected */ return null; }
 }
 
 export function isCheckableUrl(href: string): boolean {

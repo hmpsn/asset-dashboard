@@ -9,10 +9,9 @@ import { createLogger } from './logger.js';
 import { getWorkspacePages } from './workspace-data.js';
 import { listWorkspaces, getWorkspace } from './workspaces.js';
 import { isProgrammingError } from './errors.js';
+import { getSiteSubdomain } from './webflow-pages.js';
 
 const log = createLogger('redirect-scanner');
-
-const WEBFLOW_API = 'https://api.webflow.com/v2';
 
 export interface RedirectHop {
   url: string;
@@ -61,15 +60,6 @@ export interface RedirectScanResult {
     longestChain: number;
   };
   scannedAt: string;
-}
-
-async function getSiteSubdomain(siteId: string, token: string): Promise<string | null> {
-  const res = await fetch(`${WEBFLOW_API}/sites/${siteId}`, {
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-  });
-  if (!res.ok) return null;
-  const data = await res.json() as { shortName?: string };
-  return data.shortName || null;
 }
 
 async function traceRedirects(url: string, maxHops = 10): Promise<{ hops: RedirectHop[]; finalUrl: string; finalStatus: number; isLoop: boolean }> {
@@ -212,7 +202,8 @@ export async function scanRedirects(siteId: string, workspaceId?: string, liveDo
   const wsId = workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
   const ws = wsId ? getWorkspace(wsId) : undefined;
   const token = ws?.webflowToken || process.env.WEBFLOW_API_TOKEN || '';
-  const subdomain = await getSiteSubdomain(siteId, token);
+  let subdomain: string | null = null;
+  try { subdomain = await getSiteSubdomain(siteId, token); } catch { /* no token configured */ }
   const baseUrl = liveDomain
     ? (liveDomain.startsWith('http') ? liveDomain : `https://${liveDomain}`)
     : subdomain ? `https://${subdomain}.webflow.io` : '';

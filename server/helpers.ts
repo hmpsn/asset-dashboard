@@ -362,3 +362,17 @@ export function writeEnvFile(vars: Record<string, string>) {
   const content = Object.entries(vars).map(([k, v]) => `${k}=${v.replace(/[\r\n]/g, '')}`).join('\n') + '\n';
   fs.writeFileSync(ENV_PATH, content);
 }
+
+/**
+ * Fetch the published HTML of a URL. Returns null on network failure or non-OK response.
+ * Lives here (not seo-audit.ts) to avoid a circular import:
+ * seo-audit.ts imports checkSiteLinks from link-checker.ts, so link-checker.ts
+ * cannot import from seo-audit.ts without creating a cycle.
+ */
+export async function fetchPublishedHtml(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, { redirect: 'follow' });
+    if (!res.ok) return null;
+    return await res.text();
+  } catch { return null; }
+}

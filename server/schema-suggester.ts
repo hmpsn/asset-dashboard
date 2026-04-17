@@ -10,14 +10,11 @@ import type { ContentBrief } from '../shared/types/content.ts';
 import { buildPlanContextForPage } from './schema-plan.js';
 import { getAncestorChain, getParentNode, getSiblingNodes, getChildNodes } from './site-architecture.js';
 import { isProgrammingError } from './errors.js';
+import { getSiteSubdomain } from './webflow-pages.js';
+import { fetchPageMeta } from './seo-audit.js';
+import { fetchPublishedHtml } from './helpers.js';
 
 const log = createLogger('schema');
-
-const WEBFLOW_API = 'https://api.webflow.com/v2';
-
-function getToken(tokenOverride?: string): string | null {
-  return tokenOverride || process.env.WEBFLOW_API_TOKEN || null;
-}
 
 export interface RichResultEligibility {
   type: string;
@@ -1000,46 +997,6 @@ function verifySchemaContent(schema: Record<string, unknown>, pageText: string, 
   return stripped;
 }
 
-interface PageMeta {
-  id: string;
-  title: string;
-  slug: string;
-  seo?: { title?: string; description?: string };
-}
-
-async function fetchPageMeta(pageId: string, tokenOverride?: string): Promise<PageMeta | null> {
-  const token = getToken(tokenOverride);
-  if (!token) return null;
-  try {
-    const res = await fetch(`${WEBFLOW_API}/pages/${pageId}`, {
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    });
-    if (!res.ok) return null;
-    return await res.json() as PageMeta;
-  } catch (err) { /* network failure — expected */ return null; }
-}
-
-async function fetchPublishedHtml(url: string): Promise<string | null> {
-  try {
-    const res = await fetch(url, { redirect: 'follow' });
-    if (!res.ok) return null;
-    return await res.text();
-  } catch (err) { /* network failure — expected */ return null; }
-}
-
-async function getSiteSubdomain(siteId: string, tokenOverride?: string): Promise<string | null> {
-  const token = getToken(tokenOverride);
-  if (!token) return null;
-  try {
-    const res = await fetch(`${WEBFLOW_API}/sites/${siteId}`, {
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    });
-    if (!res.ok) return null;
-    const data = await res.json() as { shortName?: string };
-    return data.shortName || null;
-  } catch (err) { /* network failure — expected */ return null; }
-}
-
 // Detect existing JSON-LD schemas in HTML
 function extractExistingSchemas(html: string): { types: string[]; json: Record<string, unknown>[] } {
   const types: string[] = [];
@@ -1909,7 +1866,8 @@ export async function generateSchemaForPage(
   queryPageData?: Array<{ query: string; page: string; impressions: number; position: number }>,
   insightsMap?: Map<string, { healthScore?: number; healthTrend?: string; isQuickWin?: boolean }>,
 ): Promise<SchemaPageSuggestion | null> {
-  const subdomain = await getSiteSubdomain(siteId, tokenOverride);
+  let subdomain: string | null = null;
+  try { subdomain = await getSiteSubdomain(siteId, tokenOverride); } catch { /* no token configured */ }
   const liveDomain = ctx.liveDomain;
   const baseUrl = liveDomain
     ? (liveDomain.startsWith('http') ? liveDomain : `https://${liveDomain}`)
@@ -2017,7 +1975,8 @@ export async function generateSchemaSuggestions(
   queryPageData?: Array<{ query: string; page: string; impressions: number; position: number }>,
   insightsMap?: Map<string, { healthScore?: number; healthTrend?: string; isQuickWin?: boolean }>,
 ): Promise<SchemaPageSuggestion[]> {
-  const subdomain = await getSiteSubdomain(siteId, tokenOverride);
+  let subdomain: string | null = null;
+  try { subdomain = await getSiteSubdomain(siteId, tokenOverride); } catch { /* no token configured */ }
   const liveDomain = ctx.liveDomain;
   const baseUrl = liveDomain
     ? (liveDomain.startsWith('http') ? liveDomain : `https://${liveDomain}`)

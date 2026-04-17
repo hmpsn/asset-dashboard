@@ -9,18 +9,13 @@ import { listWorkspaces, getBrandName } from './workspaces.js';
 import { callOpenAI } from './openai-helpers.js';
 import { extractMetaContent, extractLinks } from './seo-audit-html.js';
 import { auditPage, isExcludedPage, CHECK_CATEGORY } from './audit-page.js';
-import { resolvePagePath } from './helpers.js';
+import { resolvePagePath, fetchPublishedHtml } from './helpers.js';
 export type { Severity, CheckCategory, SeoIssue, PageSeoResult } from './audit-page.js';
 import type { SeoIssue, PageSeoResult } from './audit-page.js';
 import { createLogger } from './logger.js';
+import { getToken, webflowFetch } from './webflow-client.js';
 
 const log = createLogger('seo-audit');
-
-const WEBFLOW_API = 'https://api.webflow.com/v2';
-
-function getToken(tokenOverride?: string): string | null {
-  return tokenOverride || process.env.WEBFLOW_API_TOKEN || null;
-}
 
 
 export interface CwvMetricSummary {
@@ -65,25 +60,15 @@ interface PageMeta {
   openGraph?: { title?: string; description?: string; titleCopied?: boolean; descriptionCopied?: boolean };
 }
 
-async function fetchPageMeta(pageId: string, tokenOverride?: string): Promise<PageMeta | null> {
-  const token = getToken(tokenOverride);
-  if (!token) return null;
+export async function fetchPageMeta(pageId: string, tokenOverride?: string): Promise<PageMeta | null> {
+  if (!tokenOverride && !getToken()) return null;
   try {
-    const res = await fetch(`${WEBFLOW_API}/pages/${pageId}`, {
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    });
+    const res = await webflowFetch(`/pages/${pageId}`, {}, tokenOverride);
     if (!res.ok) return null;
     return await res.json() as PageMeta;
   } catch (err) { /* network failure — expected */ return null; }
 }
 
-async function fetchPublishedHtml(url: string): Promise<string | null> {
-  try {
-    const res = await fetch(url, { redirect: 'follow' });
-    if (!res.ok) return null;
-    return await res.text();
-  } catch (err) { /* network failure — expected */ return null; }
-}
 
 interface SiteInfo {
   subdomain: string | null;
@@ -91,14 +76,10 @@ interface SiteInfo {
 }
 
 async function getSiteInfo(siteId: string, tokenOverride?: string): Promise<SiteInfo> {
-  const token = getToken(tokenOverride);
-  if (!token) return { subdomain: null, customDomain: null };
+  if (!tokenOverride && !getToken()) return { subdomain: null, customDomain: null };
   try {
     // Fetch site info for subdomain
-    const siteRes = await fetch(`${WEBFLOW_API}/sites/${siteId}`, {
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(5000),
-    });
+    const siteRes = await webflowFetch(`/sites/${siteId}`, { signal: AbortSignal.timeout(5000) }, tokenOverride);
     let subdomain: string | null = null;
     if (siteRes.ok) {
       const siteData = await siteRes.json() as { shortName?: string };
@@ -108,10 +89,7 @@ async function getSiteInfo(siteId: string, tokenOverride?: string): Promise<Site
     // Fetch custom domains from dedicated endpoint
     let customDomain: string | null = null;
     try {
-      const domainRes = await fetch(`${WEBFLOW_API}/sites/${siteId}/custom_domains`, {
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(5000),
-      });
+      const domainRes = await webflowFetch(`/sites/${siteId}/custom_domains`, { signal: AbortSignal.timeout(5000) }, tokenOverride);
       if (domainRes.ok) {
         const domainData = await domainRes.json() as { customDomains?: { url?: string }[] };
         const domains = domainData.customDomains || [];
