@@ -9,7 +9,7 @@ import { createLogger } from './logger.js';
 import { getWorkspacePages } from './workspace-data.js';
 import { listWorkspaces, getWorkspace } from './workspaces.js';
 import { isProgrammingError } from './errors.js';
-import { getSiteSubdomain } from './webflow-pages.js';
+import { resolveBaseUrl } from './url-helpers.js';
 
 const log = createLogger('redirect-scanner');
 
@@ -202,11 +202,7 @@ export async function scanRedirects(siteId: string, workspaceId?: string, liveDo
   const wsId = workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
   const ws = wsId ? getWorkspace(wsId) : undefined;
   const token = ws?.webflowToken || process.env.WEBFLOW_API_TOKEN || '';
-  let subdomain: string | null = null;
-  try { subdomain = await getSiteSubdomain(siteId, token); } catch { /* no token configured */ }
-  const baseUrl = liveDomain
-    ? (liveDomain.startsWith('http') ? liveDomain : `https://${liveDomain}`)
-    : subdomain ? `https://${subdomain}.webflow.io` : '';
+  const baseUrl = await resolveBaseUrl({ liveDomain, webflowSiteId: siteId }, token || undefined);
   log.info(`Using baseUrl: ${baseUrl} (liveDomain=${liveDomain || '(none)'})`);
   if (!baseUrl) {
     return {

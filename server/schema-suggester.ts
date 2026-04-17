@@ -10,9 +10,9 @@ import type { ContentBrief } from '../shared/types/content.ts';
 import { buildPlanContextForPage } from './schema-plan.js';
 import { getAncestorChain, getParentNode, getSiblingNodes, getChildNodes } from './site-architecture.js';
 import { isProgrammingError } from './errors.js';
-import { getSiteSubdomain } from './webflow-pages.js';
 import { fetchPageMeta } from './seo-audit.js';
 import { fetchPublishedHtml } from './helpers.js';
+import { resolveBaseUrl } from './url-helpers.js';
 
 const log = createLogger('schema');
 
@@ -997,6 +997,7 @@ function verifySchemaContent(schema: Record<string, unknown>, pageText: string, 
   return stripped;
 }
 
+
 // Detect existing JSON-LD schemas in HTML
 function extractExistingSchemas(html: string): { types: string[]; json: Record<string, unknown>[] } {
   const types: string[] = [];
@@ -1866,12 +1867,7 @@ export async function generateSchemaForPage(
   queryPageData?: Array<{ query: string; page: string; impressions: number; position: number }>,
   insightsMap?: Map<string, { healthScore?: number; healthTrend?: string; isQuickWin?: boolean }>,
 ): Promise<SchemaPageSuggestion | null> {
-  let subdomain: string | null = null;
-  try { subdomain = await getSiteSubdomain(siteId, tokenOverride); } catch { /* no token configured */ }
-  const liveDomain = ctx.liveDomain;
-  const baseUrl = liveDomain
-    ? (liveDomain.startsWith('http') ? liveDomain : `https://${liveDomain}`)
-    : subdomain ? `https://${subdomain}.webflow.io` : '';
+  const baseUrl = await resolveBaseUrl({ liveDomain: ctx.liveDomain, webflowSiteId: siteId }, tokenOverride);
   if (!baseUrl) return null;
 
   const meta = await fetchPageMeta(pageId, tokenOverride);
@@ -1975,13 +1971,8 @@ export async function generateSchemaSuggestions(
   queryPageData?: Array<{ query: string; page: string; impressions: number; position: number }>,
   insightsMap?: Map<string, { healthScore?: number; healthTrend?: string; isQuickWin?: boolean }>,
 ): Promise<SchemaPageSuggestion[]> {
-  let subdomain: string | null = null;
-  try { subdomain = await getSiteSubdomain(siteId, tokenOverride); } catch { /* no token configured */ }
-  const liveDomain = ctx.liveDomain;
-  const baseUrl = liveDomain
-    ? (liveDomain.startsWith('http') ? liveDomain : `https://${liveDomain}`)
-    : subdomain ? `https://${subdomain}.webflow.io` : '';
-  log.info(`baseUrl=${baseUrl}, liveDomain=${liveDomain || '(none)'}`);
+  const baseUrl = await resolveBaseUrl({ liveDomain: ctx.liveDomain, webflowSiteId: siteId }, tokenOverride);
+  log.info(`baseUrl=${baseUrl}, liveDomain=${ctx.liveDomain || '(none)'}`);
   if (!baseUrl) {
     log.error({ detail: siteId }, 'No subdomain or liveDomain found for site');
     return [];

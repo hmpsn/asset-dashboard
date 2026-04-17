@@ -35,6 +35,7 @@ import type * as AnalyticsInsightsStore from '../analytics-insights-store.js';
 import { buildKeywordMapContext } from '../seo-context.js';
 import { isProgrammingError } from '../errors.js';
 import { applySuppressionsToAudit } from '../helpers.js';
+import { resolveBaseUrl } from '../url-helpers.js';
 import { createJob, updateJob, isJobCancelled, hasActiveJob, registerAbort } from '../jobs.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
@@ -294,13 +295,7 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
   if (!resolvedPageContent && pagePath && workspaceId) {
     try {
       const ws = getWorkspace(workspaceId);
-      let baseUrl = '';
-      if (ws?.liveDomain) {
-        baseUrl = ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`;
-      } else if (ws?.webflowSiteId) {
-        const sub = await getSiteSubdomain(ws.webflowSiteId, getTokenForSite(ws.webflowSiteId) || undefined);
-        if (sub) baseUrl = `https://${sub}.webflow.io`;
-      }
+      const baseUrl = await resolveBaseUrl(ws ?? {}, getTokenForSite(ws?.webflowSiteId ?? '') || undefined);
       if (baseUrl) {
         const slug = pagePath.replace(/^\//, '');
         log.info(`Fetching page content from ${baseUrl}/${slug}`);
@@ -557,15 +552,7 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery
 
   // Try to fetch page content for pages that don't have it (best-effort)
   const ws = workspaceId ? getWorkspace(workspaceId) : listWorkspaces().find(w => w.webflowSiteId === siteId);
-  let baseUrl = '';
-  if (ws?.liveDomain) {
-    baseUrl = ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`;
-  } else {
-    try {
-      const sub = await getSiteSubdomain(siteId, token);
-      if (sub) baseUrl = `https://${sub}.webflow.io`;
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-seo/pages: programming error'); /* best-effort */ }
-  }
+  const baseUrl = await resolveBaseUrl({ liveDomain: ws?.liveDomain, webflowSiteId: siteId }, token);
 
   const inlineBrandName = getBrandName(ws);
 
@@ -749,15 +736,7 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
   if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
 
   const ws = workspaceId ? getWorkspace(workspaceId) : listWorkspaces().find(w => w.webflowSiteId === siteId);
-  let baseUrl = '';
-  if (ws?.liveDomain) {
-    baseUrl = ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`;
-  } else {
-    try {
-      const sub = await getSiteSubdomain(siteId, token);
-      if (sub) baseUrl = `https://${sub}.webflow.io`;
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-seo: programming error'); /* best-effort */ }
-  }
+  const baseUrl = await resolveBaseUrl({ liveDomain: ws?.liveDomain, webflowSiteId: siteId }, token);
 
   const inlineBrandName = getBrandName(ws);
   const isBothMode = field === 'both';
@@ -1149,15 +1128,7 @@ router.post('/api/webflow/seo-copy', async (req, res) => {
   let content = pageContent || '';
   if (!content) {
     const ws = getWorkspace(workspaceId);
-    let baseUrl = '';
-    if (ws?.liveDomain) {
-      baseUrl = ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`;
-    } else if (ws?.webflowSiteId) {
-      try {
-        const sub = await getSiteSubdomain(ws.webflowSiteId, getTokenForSite(ws.webflowSiteId) || undefined);
-        if (sub) baseUrl = `https://${sub}.webflow.io`;
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-seo: programming error'); /* best-effort */ }
-    }
+    const baseUrl = await resolveBaseUrl(ws ?? {}, getTokenForSite(ws?.webflowSiteId ?? '') || undefined);
     if (baseUrl) {
       try {
         const url = `${baseUrl}${pagePath === '/' ? '' : pagePath}`;
@@ -1318,15 +1289,7 @@ router.post('/api/seo/:workspaceId/bulk-analyze', requireWorkspaceAccess('worksp
       const kwMapCtx = formatPageMapForPrompt(intel.seoContext);
 
       // Resolve live URL base
-      let baseUrl = '';
-      if (ws.liveDomain) {
-        baseUrl = ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`;
-      } else if (siteId) {
-        try {
-          const sub = await getSiteSubdomain(siteId, token);
-          if (sub) baseUrl = `https://${sub}.webflow.io`;
-        } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'bulk-analyze: programming error'); }
-      }
+      const baseUrl = await resolveBaseUrl({ liveDomain: ws.liveDomain, webflowSiteId: siteId }, token);
 
       let done = 0;
       let failed = 0;
@@ -1564,15 +1527,7 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', requireWorkspaceAccess('worksp
       updateJob(job.id, { status: 'running', message: 'Building workspace context...' });
 
       const token = getTokenForSite(siteId) || undefined;
-      let baseUrl = '';
-      if (ws.liveDomain) {
-        baseUrl = ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`;
-      } else {
-        try {
-          const sub = await getSiteSubdomain(siteId, token);
-          if (sub) baseUrl = `https://${sub}.webflow.io`;
-        } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'bulk-rewrite: programming error'); }
-      }
+      const baseUrl = await resolveBaseUrl({ liveDomain: ws.liveDomain, webflowSiteId: siteId }, token);
 
       const inlineBrandName = getBrandName(ws);
       const isBothMode = field === 'both';

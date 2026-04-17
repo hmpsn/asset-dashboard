@@ -13,6 +13,7 @@ import { generateAltText } from '../alttext.js';
 import { getDataDir } from '../data-dir.js';
 import { notifyClientRecommendationsReady, notifyClientAuditComplete } from '../email.js';
 import { applySuppressionsToAudit, buildSchemaContext, resolvePagePath } from '../helpers.js';
+import { resolveBaseUrl } from '../url-helpers.js';
 import { getCachedArchitecture } from '../site-architecture.js';
 import {
   createJob,
@@ -402,15 +403,7 @@ router.post('/api/jobs', async (req, res) => {
 
             // Resolve base URL for page content fetching
             const bulkWs = bwsId ? getWorkspace(bwsId) : listWorkspaces().find(w => w.webflowSiteId === seoSiteId);
-            let bulkBaseUrl = '';
-            if (bulkWs?.liveDomain) {
-              bulkBaseUrl = bulkWs.liveDomain.startsWith('http') ? bulkWs.liveDomain : `https://${bulkWs.liveDomain}`;
-            } else {
-              try {
-                const sub = await getSiteSubdomain(seoSiteId, token);
-                if (sub) bulkBaseUrl = `https://${sub}.webflow.io`;
-              } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'jobs: programming error'); /* best-effort */ }
-            }
+            const bulkBaseUrl = await resolveBaseUrl({ liveDomain: bulkWs?.liveDomain, webflowSiteId: seoSiteId }, token);
             const bulkBrandName = getBrandName(bulkWs);
 
             const results: Array<{ pageId: string; text: string; applied: boolean; error?: string }> = [];
@@ -653,13 +646,7 @@ router.post('/api/jobs', async (req, res) => {
 
             // Discover CMS pages from sitemap
             const paWs = getWorkspace(paWsId);
-            let baseUrl = '';
-            if (paWs?.liveDomain) {
-              baseUrl = paWs.liveDomain.startsWith('http') ? paWs.liveDomain : `https://${paWs.liveDomain}`;
-            } else {
-              const sub = await getSiteSubdomain(paSiteId, paToken);
-              if (sub) baseUrl = `https://${sub}.webflow.io`;
-            }
+            const baseUrl = await resolveBaseUrl({ liveDomain: paWs?.liveDomain, webflowSiteId: paSiteId }, paToken);
             if (baseUrl) {
               try {
                 const staticPaths = buildStaticPathSet(published);
