@@ -45,7 +45,7 @@ const log = createLogger('webflow-seo');
 
 /**
  * Enforce a character limit on SEO text with smart truncation.
- * Prefers cutting at a sentence boundary (. or !) or word boundary
+ * Prefers cutting at a word boundary (space), then sentence boundary (. or !),
  * within the last 40% of the allowed length, falling back to a hard cut.
  */
 function enforceLimit(text: string, maxLen: number): string {

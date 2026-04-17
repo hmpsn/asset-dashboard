@@ -609,7 +609,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     const infos = pages.reduce((sum, p) => sum + p.issues.filter(i => i.severity === 'info').length, 0);
     // Exclude noindex pages from site score — they don't affect search rankings
     const indexedPages = pages.filter(p => !p.noindex);
-    const siteScore = indexedPages.length > 0 ? Math.round(indexedPages.reduce((sum, p) => sum + p.score, 0) / indexedPages.length) : 0;
+    const siteScore = indexedPages.length > 0 ? Math.round(indexedPages.reduce((sum, p) => sum + p.score, 0) / indexedPages.length) : 100;
 
     return { ...data, pages, errors, warnings, infos, siteScore };
   }, [data, suppressions]);

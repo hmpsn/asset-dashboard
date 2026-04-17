@@ -9,12 +9,12 @@
  *   info:    0 (no score impact — industry standard)
  */
 
-export const CRITICAL_CHECKS = new Set([
+export const CRITICAL_CHECKS: ReadonlySet<string> = new Set([
   'title', 'meta-description', 'canonical', 'h1', 'robots',
   'duplicate-title', 'mixed-content', 'ssl', 'robots-txt',
 ]);
 
-export const MODERATE_CHECKS = new Set([
+export const MODERATE_CHECKS: ReadonlySet<string> = new Set([
   'content-length', 'heading-hierarchy', 'internal-links', 'img-alt',
   'og-tags', 'og-image', 'link-text', 'url', 'lang', 'viewport',
   'duplicate-description', 'img-filesize', 'html-size',
