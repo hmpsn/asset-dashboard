@@ -4305,6 +4305,17 @@
           "status": "done",
           "shippedAt": "2026-04-16",
           "notes": "Shipped. getProviderForCapability(capability, preferred?) added to seo-data-provider.ts. getBacklinksProvider() now delegates to it. DataForSEO proactive init probe (Task 6) marks backlinks disabled before the first user request."
+        },
+        {
+          "id": "pr-218-cross-provider-keyword-backlink-hardening",
+          "title": "Cross-Provider Keyword & Backlink Hardening (A3/A4 fixes)",
+          "source": "Session 2026-04-16 — regression fixes post-provider abstraction",
+          "est": "4-6h",
+          "priority": "P1",
+          "sprint": "D",
+          "status": "done",
+          "shippedAt": "2026-04-16",
+          "notes": "Shipped — PR #218. (1) serpFeatures carry: competitorKeywordData now includes optional serpFeatures field to preserve SERP feature data from both DFS and SEMRush (previously silently dropped). (2) Provider date normalization: normalizeProviderDate() helper converts raw Unix epoch timestamps and string dates from SEMRush and DataForSEO to ISO-8601 format at provider boundary — prevents 'Invalid Date' in referring-domain dates. (3) Competitor keyword limits: Full-mode fetch raised 100 → 200; SEMRush overfetches 2× + sorts by volume to match DFS ordering. (4) Regression guards: Two pr-check rules guard against provider date/serpFeatures loss. Feature #300."
         }
       ]
     }
