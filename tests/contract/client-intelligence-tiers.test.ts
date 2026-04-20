@@ -131,6 +131,11 @@ describe('free tier — fields absent', () => {
     const body = await fetchIntelligence(freeWsId);
     expect(body).not.toHaveProperty('siteHealthSummary');
   });
+
+  it('does NOT include copyPipelineStatus (growth+ only)', async () => {
+    const body = await fetchIntelligence(freeWsId);
+    expect(body).not.toHaveProperty('copyPipelineStatus');
+  });
 });
 
 // ── Growth tier ───────────────────────────────────────────────────────────
@@ -168,6 +173,19 @@ describe('growth tier — fields present', () => {
     expect(highlights).toHaveProperty('overallWinRate');
     expect(highlights).toHaveProperty('topActionType');
     expect(highlights).toHaveProperty('recentWins');
+  });
+});
+
+describe('growth tier — copyPipelineStatus', () => {
+  it('response includes copyPipelineStatus key (growth+ field)', async () => {
+    const body = await fetchIntelligence(growthWsId);
+    expect(body).toHaveProperty('copyPipelineStatus');
+  });
+
+  it('copyPipelineStatus is null when no copy sections exist', async () => {
+    // Fresh seeded workspace has no copy pipeline sections, so value is null
+    const body = await fetchIntelligence(growthWsId);
+    expect(body.copyPipelineStatus).toBeNull();
   });
 });
 
@@ -209,6 +227,13 @@ describe('premium tier — fields present', () => {
   it('response includes siteHealthSummary (premium-only field)', async () => {
     const body = await fetchIntelligence(premiumWsId);
     expect(body).toHaveProperty('siteHealthSummary');
+  });
+
+  it('response includes copyPipelineStatus (growth+ field, null when no sections)', async () => {
+    const body = await fetchIntelligence(premiumWsId);
+    expect(body).toHaveProperty('copyPipelineStatus');
+    // Fresh workspace has no copy sections — null is the correct value
+    expect(body.copyPipelineStatus).toBeNull();
   });
 
   it('siteHealthSummary has the correct shape when present', async () => {

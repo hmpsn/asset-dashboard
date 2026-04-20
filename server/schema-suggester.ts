@@ -2,7 +2,7 @@ import { discoverCmsUrls, buildStaticPathSet, getCollectionSchema, listCollectio
 import { getWorkspacePages } from './workspace-data.js';
 import { listWorkspaces } from './workspaces.js';
 import { callOpenAI } from './openai-helpers.js';
-import { resolvePagePath } from './helpers.js';
+import { resolvePagePath, stripHtmlToText } from './helpers.js';
 import { createLogger } from './logger.js';
 import { saveSiteTemplate, getOrSeedSiteTemplate, getSchemaPlan } from './schema-store.js';
 import { getBrief } from './content-brief.js';
@@ -10,14 +10,11 @@ import type { ContentBrief } from '../shared/types/content.ts';
 import { buildPlanContextForPage } from './schema-plan.js';
 import { getAncestorChain, getParentNode, getSiblingNodes, getChildNodes } from './site-architecture.js';
 import { isProgrammingError } from './errors.js';
+import { fetchPageMeta } from './seo-audit.js';
+import { fetchPublishedHtml } from './helpers.js';
+import { resolveBaseUrl } from './url-helpers.js';
 
 const log = createLogger('schema');
-
-const WEBFLOW_API = 'https://api.webflow.com/v2';
-
-function getToken(tokenOverride?: string): string | null {
-  return tokenOverride || process.env.WEBFLOW_API_TOKEN || null;
-}
 
 export interface RichResultEligibility {
   type: string;
@@ -1000,45 +997,6 @@ function verifySchemaContent(schema: Record<string, unknown>, pageText: string, 
   return stripped;
 }
 
-interface PageMeta {
-  id: string;
-  title: string;
-  slug: string;
-  seo?: { title?: string; description?: string };
-}
-
-async function fetchPageMeta(pageId: string, tokenOverride?: string): Promise<PageMeta | null> {
-  const token = getToken(tokenOverride);
-  if (!token) return null;
-  try {
-    const res = await fetch(`${WEBFLOW_API}/pages/${pageId}`, {
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    });
-    if (!res.ok) return null;
-    return await res.json() as PageMeta;
-  } catch (err) { /* network failure — expected */ return null; }
-}
-
-async function fetchPublishedHtml(url: string): Promise<string | null> {
-  try {
-    const res = await fetch(url, { redirect: 'follow' });
-    if (!res.ok) return null;
-    return await res.text();
-  } catch (err) { /* network failure — expected */ return null; }
-}
-
-async function getSiteSubdomain(siteId: string, tokenOverride?: string): Promise<string | null> {
-  const token = getToken(tokenOverride);
-  if (!token) return null;
-  try {
-    const res = await fetch(`${WEBFLOW_API}/sites/${siteId}`, {
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    });
-    if (!res.ok) return null;
-    const data = await res.json() as { shortName?: string };
-    return data.shortName || null;
-  } catch (err) { /* network failure — expected */ return null; }
-}
 
 // Detect existing JSON-LD schemas in HTML
 function extractExistingSchemas(html: string): { types: string[]; json: Record<string, unknown>[] } {
@@ -1064,18 +1022,7 @@ function extractExistingSchemas(html: string): { types: string[]; json: Record<s
 // --- AI-Powered Unified Schema Generation ---
 
 function extractPageContent(html: string): string {
-  const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
-  const body = bodyMatch ? bodyMatch[1] : html;
-  return body
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<nav[\s\S]*?<\/nav>/gi, '')
-    .replace(/<footer[\s\S]*?<\/footer>/gi, '')
-    .replace(/<header[\s\S]*?<\/header>/gi, '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 4000);
+  return stripHtmlToText(html, { stripHeader: true, maxLength: 4000 });
 }
 
 function extractStructuredInfo(html: string) {
@@ -1909,11 +1856,7 @@ export async function generateSchemaForPage(
   queryPageData?: Array<{ query: string; page: string; impressions: number; position: number }>,
   insightsMap?: Map<string, { healthScore?: number; healthTrend?: string; isQuickWin?: boolean }>,
 ): Promise<SchemaPageSuggestion | null> {
-  const subdomain = await getSiteSubdomain(siteId, tokenOverride);
-  const liveDomain = ctx.liveDomain;
-  const baseUrl = liveDomain
-    ? (liveDomain.startsWith('http') ? liveDomain : `https://${liveDomain}`)
-    : subdomain ? `https://${subdomain}.webflow.io` : '';
+  const baseUrl = await resolveBaseUrl({ liveDomain: ctx.liveDomain, webflowSiteId: siteId }, tokenOverride);
   if (!baseUrl) return null;
 
   const meta = await fetchPageMeta(pageId, tokenOverride);
@@ -2017,12 +1960,8 @@ export async function generateSchemaSuggestions(
   queryPageData?: Array<{ query: string; page: string; impressions: number; position: number }>,
   insightsMap?: Map<string, { healthScore?: number; healthTrend?: string; isQuickWin?: boolean }>,
 ): Promise<SchemaPageSuggestion[]> {
-  const subdomain = await getSiteSubdomain(siteId, tokenOverride);
-  const liveDomain = ctx.liveDomain;
-  const baseUrl = liveDomain
-    ? (liveDomain.startsWith('http') ? liveDomain : `https://${liveDomain}`)
-    : subdomain ? `https://${subdomain}.webflow.io` : '';
-  log.info(`baseUrl=${baseUrl}, liveDomain=${liveDomain || '(none)'}`);
+  const baseUrl = await resolveBaseUrl({ liveDomain: ctx.liveDomain, webflowSiteId: siteId }, tokenOverride);
+  log.info(`baseUrl=${baseUrl}, liveDomain=${ctx.liveDomain || '(none)'}`);
   if (!baseUrl) {
     log.error({ detail: siteId }, 'No subdomain or liveDomain found for site');
     return [];

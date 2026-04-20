@@ -154,7 +154,7 @@ router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess(
 
     // Adaptive pipeline: inject workspace learnings into the brief prompt
     let adaptedBusinessContext = businessContext || ws?.keywordStrategy?.businessContext;
-    if (isFeatureEnabled('outcome-adaptive-pipeline')) {
+    if (isFeatureEnabled('outcome-ai-injection')) {
       try {
         const learnings = getWorkspaceLearnings(req.params.workspaceId);
         if (learnings) {

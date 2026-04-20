@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { useContentCalendar } from '../hooks/admin';
 import { EmptyState } from './ui';
 import { adminPath } from '../routes';
+import { timeAgo } from '../lib/timeAgo';
 
 // ── Types ──
 
@@ -69,17 +70,6 @@ function formatMonthYear(d: Date): string {
 
 function dayKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-function relativeDate(iso: string): string {
-  const d = new Date(iso);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffDays = Math.floor(diffMs / 86400000);
-  if (diffDays === 0) return 'Today';
-  if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 // ── Component ──
@@ -341,7 +331,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
                       </span>
                     </div>
                     <div className="text-[11px] text-zinc-600 flex-shrink-0">
-                      {relativeDate(item.date)}
+                      {timeAgo(item.date)}
                     </div>
                   </div>
                 );

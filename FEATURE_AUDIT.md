@@ -3532,3 +3532,38 @@ Current feature count: **299**. Last updated: April 2026.
 **Client value:** Complete keyword strategy includes all ranking signals (SERP features inform content brief structure). Accurate backlink dates give confidence in link profile freshness analysis.
 
 **Mutual:** Unified data normalization prevents integration drift between provider APIs. Regression guards prevent future similar losses during refactoring.
+
+---
+
+### 301. Intelligence Engine Data Wiring — 12 Gap Closures
+**What it does:** Closes 12 confirmed data gaps where workspace fields were assembled or computed but never reached the intelligence engine's formatters, assemblers, or client routes. Fix-forward approach — extends existing assemblers and formatters without structural changes.
+
+**Assembler gaps closed:**
+- `businessPriorities` (admin-set string[]) → merged into `businessProfile.goals` in `assembleSeoContext`
+- Contact info (`phone`, `email`, `address`, `socialProfiles`, `openingHours`) from `workspace.businessProfile` → merged into `SeoContextSlice.businessProfile` in `assembleSeoContext`
+- `rewritePlaybook` string → split into `patterns` array, populated as `ContentPipelineSlice.rewritePlaybook`
+- `contentPricing` from workspace → populated in `ContentPipelineSlice`
+- `scoringConfig` from workspace → populated in `LearningsSlice`
+- Annotation `page_url` → `pageUrl` field added to `analytics_annotations` table (migration 065), `Annotation` type, and `assembleOperational` mapping
+
+**Formatter gaps closed (in `formatForPrompt`):**
+- `intentSignals` (new/total count + types) rendered in `formatClientSignalsSection` at non-compact verbosity
+- `aeoReadiness` (pages checked + passing rate) rendered in `formatSiteHealthSection` at non-compact verbosity
+- `redirectDetails` (up to 5 chains with url/target/chainDepth/status) rendered in `formatSiteHealthSection` at detailed verbosity
+- Contact info (`phone`, `email`, `address`, `openingHours`, `socialProfiles`) rendered in `formatSeoContextSection` at detailed verbosity
+- `contentPricing` rendered in `formatContentPipelineSection` at non-compact verbosity
+- `scoringConfig` thresholds (up to 5 action types) rendered in `formatLearningsSection` at detailed verbosity
+
+**Bug fix — `briefs.byStatus` always empty:** `computeContentPipelineSummary` was hardcoding `byStatus: {}`. Client portal showed "0 briefs in progress" even when briefs existed. Fixed by adding a `briefsByStatus` prepared statement using the `createStmtCache` pattern. Required migration 066 to add `status TEXT NOT NULL DEFAULT 'draft'` to `content_briefs`.
+
+**Client route — `copyPipelineStatus`:** `formatCopyPipelineForClient` added to `client-intelligence.ts`, surfacing `totalSections`, `approvedSections`, `inReviewSections`, `approvalRate` for Growth+ tier clients.
+
+**Rewrite-chat refactor:** Route now reads `rewritePlaybook` from `intel.contentPipeline.rewritePlaybook.patterns` (intelligence slice) instead of directly from the workspace row, eliminating the direct workspace read for this field.
+
+**Dead type removed:** `keywordRecommendations` field removed from `SeoContextSlice` and all downstream references (test fixtures, `KNOWN_UNRENDERED_FIELDS` in pr-check).
+
+**Files:** `shared/types/intelligence.ts`, `server/db/migrations/065-annotations-page-url.sql`, `server/db/migrations/066-content-briefs-status.sql`, `server/analytics-annotations.ts`, `server/workspace-data.ts`, `server/workspace-intelligence.ts`, `server/routes/client-intelligence.ts`, `server/routes/rewrite-chat.ts`, `tests/unit/workspace-data.test.ts`, `tests/unit/workspace-intelligence.test.ts`, `tests/contract/client-intelligence-tiers.test.ts`, `tests/intelligence-types.test.ts`, `tests/contract/intelligence-slice-population.test.ts`, `scripts/pr-check.ts`
+
+**Agency value:** AI prompts now draw on the full workspace context — contact info for local SEO, scoring thresholds for learning framing, content pricing for pipeline briefings, and annotation page URLs for traffic event attribution. Prompt quality improves without structural changes.
+
+**Client value:** Client portal now correctly shows in-progress brief counts (was always 0). Copy pipeline status is surfaced in the Growth+ intelligence endpoint for client-facing dashboards.

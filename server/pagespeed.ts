@@ -3,10 +3,9 @@ import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
 import { getWorkspacePages } from './workspace-data.js';
 import { listWorkspaces, getWorkspace } from './workspaces.js';
+import { getSiteSubdomain } from './webflow-pages.js';
 
 const log = createLogger('pagespeed');
-
-const WEBFLOW_API = 'https://api.webflow.com/v2';
 const PSI_API = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed';
 
 export interface CoreWebVitals {
@@ -55,15 +54,6 @@ export interface SiteSpeedResult {
   averageScore: number;
   averageVitals: CoreWebVitals;
   testedAt: string;
-}
-
-async function getSiteSubdomain(siteId: string, token: string): Promise<string | null> {
-  const res = await fetch(`${WEBFLOW_API}/sites/${siteId}`, {
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-  });
-  if (!res.ok) return null;
-  const data = await res.json() as { shortName?: string };
-  return data.shortName || null;
 }
 
 async function runPageSpeed(url: string, strategy: 'mobile' | 'desktop'): Promise<Record<string, unknown> | null> {
@@ -352,7 +342,8 @@ export async function runSiteSpeed(
   const wsId = workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
   const ws = wsId ? getWorkspace(wsId) : undefined;
   const token = ws?.webflowToken || process.env.WEBFLOW_API_TOKEN || '';
-  const subdomain = await getSiteSubdomain(siteId, token);
+  let subdomain: string | null = null;
+  try { subdomain = await getSiteSubdomain(siteId, token); } catch { /* no token configured */ }
   const baseUrl = subdomain ? `https://${subdomain}.webflow.io` : '';
 
   if (!baseUrl) {

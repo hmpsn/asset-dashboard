@@ -49,8 +49,6 @@ export interface ChatState {
   showChatHistory: boolean;
   chatUsage: { allowed: boolean; used: number; limit: number; remaining: number; tier: string } | null;
   roiValue: number | null;
-  proactiveInsight: string | null;
-  proactiveInsightLoading: boolean;
   /** Intent detected from the most recent AI response — drives CTA rendering */
   lastIntent: 'content_interest' | 'service_interest' | null;
 }
@@ -65,8 +63,7 @@ export interface ChatActions {
   setChatSessions: React.Dispatch<React.SetStateAction<Array<{ id: string; title: string; messageCount: number; updatedAt: string }>>>;
   setShowChatHistory: React.Dispatch<React.SetStateAction<boolean>>;
   setChatUsage: React.Dispatch<React.SetStateAction<{ allowed: boolean; used: number; limit: number; remaining: number; tier: string } | null>>;
-  setProactiveInsight: React.Dispatch<React.SetStateAction<string | null>>;
-  setProactiveInsightLoading: React.Dispatch<React.SetStateAction<boolean>>;
+
   /** Clear lastIntent — call after CTA is actioned so it doesn't re-appear on next render */
   clearIntent: () => void;
   askAi: (question: string) => Promise<void>;
@@ -81,9 +78,6 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const proactiveInsightSent = useRef(false);
-  const [proactiveInsight, setProactiveInsight] = useState<string | null>(null);
-  const [proactiveInsightLoading, setProactiveInsightLoading] = useState(false);
-  const inlineInsightFetched = useRef(false);
   const [chatSessionId, setChatSessionId] = useState<string>(() => `cs-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
   const [chatSessions, setChatSessions] = useState<Array<{ id: string; title: string; messageCount: number; updatedAt: string }>>([]);
   const [showChatHistory, setShowChatHistory] = useState(false);
@@ -283,73 +277,6 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
     return `Here's what's happening with your site right now:\n\n${bullets.join('\n\n')}`;
   }, [deps]);
 
-  // Build inline insight from already-loaded data (zero AI cost)
-  const buildInlineInsight = useCallback((): string | null => {
-    const { overview, ga4Overview, audit, anomalies, searchComparison, ga4Comparison, strategyData } = deps;
-    if (!overview && !ga4Overview) return null;
-
-    const sentences: string[] = [];
-
-    // Lead with the biggest change (positive or negative)
-    const changes: { label: string; pct: number }[] = [];
-    if (searchComparison?.change && searchComparison.previous?.clicks && searchComparison.previous.clicks > 0) {
-      changes.push({ label: 'search clicks', pct: (searchComparison.change.clicks / searchComparison.previous.clicks) * 100 });
-    }
-    if (searchComparison?.change && searchComparison.previous?.impressions && searchComparison.previous.impressions > 0) {
-      changes.push({ label: 'impressions', pct: (searchComparison.change.impressions / searchComparison.previous.impressions) * 100 });
-    }
-    if (ga4Comparison?.change && ga4Comparison.previous?.totalUsers && ga4Comparison.previous.totalUsers > 0) {
-      changes.push({ label: 'users', pct: (ga4Comparison.change.users / ga4Comparison.previous.totalUsers) * 100 });
-    }
-    if (ga4Comparison?.change && ga4Comparison.previous?.totalSessions && ga4Comparison.previous.totalSessions > 0) {
-      changes.push({ label: 'sessions', pct: (ga4Comparison.change.sessions / ga4Comparison.previous.totalSessions) * 100 });
-    }
-
-    // Sort by absolute magnitude
-    changes.sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct));
-    if (changes.length > 0 && Math.abs(changes[0].pct) >= 3) {
-      const c = changes[0];
-      const dir = c.pct > 0 ? 'up' : 'down';
-      sentences.push(`Your ${c.label} are ${dir} ${Math.abs(c.pct).toFixed(0)}% compared to the prior period.`);
-    } else if (overview) {
-      sentences.push(`Your site is averaging position ${overview.avgPosition?.toFixed(1) ?? '—'} with ${overview.totalClicks?.toLocaleString() ?? '—'} clicks this period.`);
-    } else if (ga4Overview) {
-      sentences.push(`Your site had ${ga4Overview.totalUsers?.toLocaleString() ?? '—'} users and ${ga4Overview.totalSessions?.toLocaleString() ?? '—'} sessions this period.`);
-    }
-
-    // Anomalies or health concern
-    if (anomalies.length > 0) {
-      const high = anomalies.filter(a => a.severity === 'high' || a.severity === 'critical');
-      if (high.length > 0) {
-        sentences.push(`There ${high.length === 1 ? 'is' : 'are'} ${high.length} alert${high.length > 1 ? 's' : ''} that may need attention.`);
-      }
-    } else if (audit && audit.errors > 0) {
-      sentences.push(`Your site health score is ${audit.siteScore}/100 with ${audit.errors} issue${audit.errors > 1 ? 's' : ''} to address.`);
-    } else if (audit && audit.siteScore >= 80) {
-      sentences.push(`Site health is strong at ${audit.siteScore}/100.`);
-    }
-
-    // Actionable next step
-    const quickWins = strategyData?.quickWins?.length ?? 0;
-    if (quickWins > 0) {
-      sentences.push(`Check your ${quickWins} quick win${quickWins > 1 ? 's' : ''} in the Strategy tab for easy ranking improvements.`);
-    } else if (audit && audit.errors > 0) {
-      sentences.push('Review the Site Health tab to resolve outstanding issues.');
-    }
-
-    return sentences.length > 0 ? sentences.join(' ') : null;
-  }, [deps]);
-
-  // Generate inline insight after dashboard data loads (paid tiers only, zero AI cost)
-  useEffect(() => {
-    const { ws, overview, ga4Overview, effectiveTier } = deps;
-    if (ws && (overview || ga4Overview) && effectiveTier !== 'free' && !inlineInsightFetched.current) {
-      inlineInsightFetched.current = true;
-      const insight = buildInlineInsight();
-      if (insight) setProactiveInsight(insight);
-    }
-  }, [deps.overview, deps.ga4Overview, deps.ws, buildInlineInsight]);
-
   // Fetch chat usage and ROI data when chat opens
   useEffect(() => {
     if (chatOpen && deps.ws) {
@@ -387,8 +314,6 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
     roiValue,
     lastIntent,
     clearIntent: () => setLastIntent(null),
-    proactiveInsight, setProactiveInsight,
-    proactiveInsightLoading, setProactiveInsightLoading,
     askAi,
     buildChatContext,
   };

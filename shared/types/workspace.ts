@@ -117,7 +117,8 @@ export interface CannibalizationItem {
 export interface KeywordStrategy {
   siteKeywords: string[];        // top-level target keywords for the whole site
   siteKeywordMetrics?: { keyword: string; volume: number; difficulty: number }[]; // SEMRush data for site keywords
-  pageMap: PageKeywordMap[];     // keyword assignments per page
+  /** Stored separately in the page_keywords table; omitted in the workspace JSON blob. */
+  pageMap?: PageKeywordMap[];    // keyword assignments per page
   opportunities: string[];       // keyword gaps / untapped opportunities
   contentGaps?: ContentGap[];    // specific content pieces that should be created
   quickWins?: QuickWin[];        // low-effort, high-impact fixes
@@ -142,6 +143,33 @@ export interface KeywordStrategy {
   questionKeywords?: { seed: string; questions: { keyword: string; volume: number }[] }[]; // question-based keywords for FAQ/AEO
   businessContext?: string;      // user-provided context (locations, services, industry)
   semrushMode?: 'quick' | 'full' | 'none'; // which SEMRush mode was used
+  /** Enriched search signals stored alongside strategy (not included in pageMap). */
+  searchSignals?: {
+    /** Matches DeviceBreakdown from server/search-console.ts */
+    deviceBreakdown?: { device: string; clicks: number; impressions: number; ctr: number; position: number }[];
+    /** Matches PeriodComparison from server/search-console.ts */
+    periodComparison?: {
+      current: { clicks: number; impressions: number; ctr: number; position: number };
+      previous: { clicks: number; impressions: number; ctr: number; position: number };
+      change: { clicks: number; impressions: number; ctr: number; position: number };
+      changePercent: { clicks: number; impressions: number; ctr: number; position: number };
+    };
+    /** Matches CountryBreakdown from server/search-console.ts */
+    topCountries?: { country: string; clicks: number; impressions: number; ctr: number; position: number }[];
+    /** Matches GA4OrganicOverview from server/google-analytics.ts */
+    organicOverview?: {
+      organicUsers: number;
+      organicSessions: number;
+      organicPageviews: number;
+      organicBounceRate: number;
+      engagementRate: number;
+      avgEngagementTime: number;
+      shareOfTotalUsers: number;
+      dateRange: { start: string; end: string };
+    };
+    /** Matches GA4LandingPage[] from server/google-analytics.ts */
+    organicLandingPages?: { landingPage: string; sessions: number; users: number; bounceRate: number; avgEngagementTime: number; conversions: number }[];
+  };
   generatedAt: string;
 }
 

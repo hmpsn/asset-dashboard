@@ -26,7 +26,6 @@ const FLAG_GROUPS: Array<{ label: string; keys: string[] }> = [
       'outcome-external-detection',
       'outcome-ai-injection',
       'outcome-client-reporting',
-      'outcome-adaptive-pipeline',
       'outcome-predictive',
     ],
   },
@@ -86,7 +85,6 @@ const FLAG_LABELS: Record<string, string> = {
   'outcome-external-detection': 'External change detection (weekly)',
   'outcome-ai-injection':       'Inject outcomes into AI context',
   'outcome-client-reporting':   'Client-facing outcome reporting',
-  'outcome-adaptive-pipeline':  'Adaptive measurement pipeline',
   'outcome-predictive':         'Predictive scoring (future)',
   // Copy & Brand Engine
   'copy-engine':                'Copy Engine — core',

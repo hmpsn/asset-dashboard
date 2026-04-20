@@ -34,7 +34,8 @@ import { getInsights } from '../analytics-insights-store.js';
 import type * as AnalyticsInsightsStore from '../analytics-insights-store.js';
 import { buildKeywordMapContext } from '../seo-context.js';
 import { isProgrammingError } from '../errors.js';
-import { applySuppressionsToAudit } from '../helpers.js';
+import { applySuppressionsToAudit, stripHtmlToText, stripCodeFences } from '../helpers.js';
+import { resolveBaseUrl } from '../url-helpers.js';
 import { createJob, updateJob, isJobCancelled, hasActiveJob, registerAbort } from '../jobs.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
@@ -42,6 +43,29 @@ import { validate, z } from '../middleware/validate.js';
 import { fireBridge } from '../bridge-infrastructure.js';
 
 const log = createLogger('webflow-seo');
+
+/**
+ * Enforce a character limit on SEO text with smart truncation.
+ * Prefers cutting at a word boundary (space), then sentence boundary (. or !),
+ * within the last 40% of the allowed length, falling back to a hard cut.
+ */
+function enforceLimit(text: string, maxLen: number): string {
+  const t = text.replace(/^["']|["']$/g, '').trim();
+  if (t.length > maxLen) {
+    const truncated = t.slice(0, maxLen);
+    const lastSpace = truncated.lastIndexOf(' ');
+    const lastPeriod = truncated.lastIndexOf('.');
+    const lastExclamation = truncated.lastIndexOf('!');
+
+    let cutPoint = maxLen;
+    if (lastSpace > maxLen * 0.6) cutPoint = lastSpace;
+    else if (lastPeriod > maxLen * 0.6) cutPoint = lastPeriod + 1;
+    else if (lastExclamation > maxLen * 0.6) cutPoint = lastExclamation + 1;
+
+    return t.slice(0, cutPoint);
+  }
+  return t;
+}
 
 // --- SEO Audit ---
 router.get('/api/webflow/seo-audit/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
@@ -271,13 +295,7 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
   if (!resolvedPageContent && pagePath && workspaceId) {
     try {
       const ws = getWorkspace(workspaceId);
-      let baseUrl = '';
-      if (ws?.liveDomain) {
-        baseUrl = ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`;
-      } else if (ws?.webflowSiteId) {
-        const sub = await getSiteSubdomain(ws.webflowSiteId, getTokenForSite(ws.webflowSiteId) || undefined);
-        if (sub) baseUrl = `https://${sub}.webflow.io`;
-      }
+      const baseUrl = await resolveBaseUrl(ws ?? {}, getTokenForSite(ws?.webflowSiteId ?? '') || undefined);
       if (baseUrl) {
         const slug = pagePath.replace(/^\//, '');
         log.info(`Fetching page content from ${baseUrl}/${slug}`);
@@ -299,38 +317,11 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
             headingsBlock = `\nPage heading structure:\n${headings.join('\n')}`;
           }
 
-          resolvedPageContent = body
-            .replace(/<script[\s\S]*?<\/script>/gi, '')
-            .replace(/<style[\s\S]*?<\/style>/gi, '')
-            .replace(/<nav[\s\S]*?<\/nav>/gi, '')
-            .replace(/<footer[\s\S]*?<\/footer>/gi, '')
-            .replace(/<[^>]+>/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim()
-            .slice(0, 1500);
+          resolvedPageContent = stripHtmlToText(html, { maxLength: 1500 });
         }
       }
     } catch { /* best-effort — fetch on external URL, continue without content */ } // url-fetch-ok
   }
-
-  // Enforce character limits helper - STRICT enforcement
-  const enforceLimit = (text: string, maxLen: number): string => {
-    const t = text.replace(/^["']|["']$/g, '').trim();
-    if (t.length > maxLen) {
-      const truncated = t.slice(0, maxLen);
-      const lastSpace = truncated.lastIndexOf(' ');
-      const lastPeriod = truncated.lastIndexOf('.');
-      const lastExclamation = truncated.lastIndexOf('!');
-      
-      let cutPoint = maxLen;
-      if (lastSpace > maxLen * 0.7) cutPoint = lastSpace;
-      else if (lastPeriod > maxLen * 0.7) cutPoint = lastPeriod + 1;
-      else if (lastExclamation > maxLen * 0.7) cutPoint = lastExclamation + 1;
-      
-      return t.slice(0, cutPoint);
-    }
-    return t;
-  };
 
   try {
     // Persisted page analysis (optimizationIssues + recommendations from keyword analysis)
@@ -426,7 +417,7 @@ Return ONLY a JSON array of 3 objects, each with "title" and "description" keys.
 
       let pairs: Array<{ title: string; description: string }>;
       try {
-        const parsed = JSON.parse(aiText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
+        const parsed = JSON.parse(stripCodeFences(aiText));
         pairs = Array.isArray(parsed)
           ? parsed.map((p: { title?: string; description?: string }) => ({
               title: enforceLimit(String(p.title || ''), 60),
@@ -522,7 +513,7 @@ Return ONLY a JSON array of 3 strings. No explanation.`;
     // Parse the 3 variations
     let variations: string[];
     try {
-      const parsed = JSON.parse(aiText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
+      const parsed = JSON.parse(stripCodeFences(aiText));
       variations = Array.isArray(parsed) ? parsed.map((v: string) => enforceLimit(String(v), maxLen)) : [enforceLimit(String(parsed), maxLen)];
     } catch (err) {
       log.debug({ err }, 'webflow-seo: expected error — degrading gracefully');
@@ -553,15 +544,7 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery
 
   // Try to fetch page content for pages that don't have it (best-effort)
   const ws = workspaceId ? getWorkspace(workspaceId) : listWorkspaces().find(w => w.webflowSiteId === siteId);
-  let baseUrl = '';
-  if (ws?.liveDomain) {
-    baseUrl = ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`;
-  } else {
-    try {
-      const sub = await getSiteSubdomain(siteId, token);
-      if (sub) baseUrl = `https://${sub}.webflow.io`;
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-seo/pages: programming error'); /* best-effort */ }
-  }
+  const baseUrl = await resolveBaseUrl({ liveDomain: ws?.liveDomain, webflowSiteId: siteId }, token);
 
   const inlineBrandName = getBrandName(ws);
 
@@ -595,17 +578,7 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery
           const htmlRes = await fetch(`${baseUrl}/${page.slug}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
           if (htmlRes.ok) {
             const html = await htmlRes.text();
-            const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-            const body = bodyMatch ? bodyMatch[1] : html;
-            contentExcerpt = body
-              .replace(/<script[\s\S]*?<\/script>/gi, '')
-              .replace(/<style[\s\S]*?<\/style>/gi, '')
-              .replace(/<nav[\s\S]*?<\/nav>/gi, '')
-              .replace(/<footer[\s\S]*?<\/footer>/gi, '')
-              .replace(/<[^>]+>/g, ' ')
-              .replace(/\s+/g, ' ')
-              .trim()
-              .slice(0, 800);
+            contentExcerpt = stripHtmlToText(html, { maxLength: 800 });
           }
         } catch { /* best-effort — fetch on external URL */ } // url-fetch-ok
       }
@@ -745,15 +718,7 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
   if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
 
   const ws = workspaceId ? getWorkspace(workspaceId) : listWorkspaces().find(w => w.webflowSiteId === siteId);
-  let baseUrl = '';
-  if (ws?.liveDomain) {
-    baseUrl = ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`;
-  } else {
-    try {
-      const sub = await getSiteSubdomain(siteId, token);
-      if (sub) baseUrl = `https://${sub}.webflow.io`;
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-seo: programming error'); /* best-effort */ }
-  }
+  const baseUrl = await resolveBaseUrl({ liveDomain: ws?.liveDomain, webflowSiteId: siteId }, token);
 
   const inlineBrandName = getBrandName(ws);
   const isBothMode = field === 'both';
@@ -768,15 +733,6 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
       allGscData = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 28);
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-seo: programming error'); /* non-critical */ }
   }
-
-  // Enforce character limits helper
-  const enforceLimit = (text: string, max: number): string => {
-    const t = text.replace(/^["']|["']$/g, '').trim();
-    if (t.length <= max) return t;
-    const truncated = t.slice(0, max);
-    const lastSpace = truncated.lastIndexOf(' ');
-    return lastSpace > max * 0.6 ? truncated.slice(0, lastSpace) : truncated;
-  };
 
   // Build sibling title map so each page knows what other pages in this batch use
   // Prevents generating duplicate/similar titles across the site
@@ -832,17 +788,7 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
           const htmlRes = await fetch(`${baseUrl}/${page.slug}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
           if (htmlRes.ok) {
             const html = await htmlRes.text();
-            const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-            const body = bodyMatch ? bodyMatch[1] : html;
-            contentExcerpt = body
-              .replace(/<script[\s\S]*?<\/script>/gi, '')
-              .replace(/<style[\s\S]*?<\/style>/gi, '')
-              .replace(/<nav[\s\S]*?<\/nav>/gi, '')
-              .replace(/<footer[\s\S]*?<\/footer>/gi, '')
-              .replace(/<[^>]+>/g, ' ')
-              .replace(/\s+/g, ' ')
-              .trim()
-              .slice(0, 800);
+            contentExcerpt = stripHtmlToText(html, { maxLength: 800 });
           }
         } catch { /* best-effort — fetch on external URL */ } // url-fetch-ok
       }
@@ -907,7 +853,7 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
 
         let pairs: Array<{ title: string; description: string }>;
         try {
-          const parsed = JSON.parse(aiText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
+          const parsed = JSON.parse(stripCodeFences(aiText));
           pairs = Array.isArray(parsed)
             ? parsed.map((p: { title?: string; description?: string }) => ({
                 title: enforceLimit(String(p.title || ''), 60),
@@ -955,7 +901,7 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
       // Parse 3 variations
       let variations: string[];
       try {
-        const parsed = JSON.parse(aiText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
+        const parsed = JSON.parse(stripCodeFences(aiText));
         variations = Array.isArray(parsed)
           ? parsed.map((v: string) => enforceLimit(String(v), maxLen)).filter(Boolean)
           : [enforceLimit(String(parsed), maxLen)];
@@ -1115,18 +1061,7 @@ router.get('/api/webflow/page-html/:siteId', requireWorkspaceAccessFromQuery(), 
     const metaDescription = metaDescMatch ? metaDescMatch[1].trim() : undefined;
 
     // Extract body text: strip tags, scripts, styles
-    const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-    const body = bodyMatch ? bodyMatch[1] : html;
-    const text = body
-      .replace(/<script[\s\S]*?<\/script>/gi, '')
-      .replace(/<style[\s\S]*?<\/style>/gi, '')
-      .replace(/<nav[\s\S]*?<\/nav>/gi, '')
-      .replace(/<footer[\s\S]*?<\/footer>/gi, '')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/&[a-z]+;/gi, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 8000);
+    const text = stripHtmlToText(html, { maxLength: 8000 });
     res.json({ text, seoTitle, metaDescription });
   } catch (e) {
     log.error({ err: e }, 'Page HTML fetch error');
@@ -1154,15 +1089,7 @@ router.post('/api/webflow/seo-copy', async (req, res) => {
   let content = pageContent || '';
   if (!content) {
     const ws = getWorkspace(workspaceId);
-    let baseUrl = '';
-    if (ws?.liveDomain) {
-      baseUrl = ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`;
-    } else if (ws?.webflowSiteId) {
-      try {
-        const sub = await getSiteSubdomain(ws.webflowSiteId, getTokenForSite(ws.webflowSiteId) || undefined);
-        if (sub) baseUrl = `https://${sub}.webflow.io`;
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-seo: programming error'); /* best-effort */ }
-    }
+    const baseUrl = await resolveBaseUrl(ws ?? {}, getTokenForSite(ws?.webflowSiteId ?? '') || undefined);
     if (baseUrl) {
       try {
         const url = `${baseUrl}${pagePath === '/' ? '' : pagePath}`;
@@ -1170,17 +1097,7 @@ router.post('/api/webflow/seo-copy', async (req, res) => {
         const r = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(10000) });
         if (r.ok) {
           const html = await r.text();
-          const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-          const body = bodyMatch ? bodyMatch[1] : html;
-          content = body
-            .replace(/<script[\s\S]*?<\/script>/gi, '')
-            .replace(/<style[\s\S]*?<\/style>/gi, '')
-            .replace(/<nav[\s\S]*?<\/nav>/gi, '')
-            .replace(/<footer[\s\S]*?<\/footer>/gi, '')
-            .replace(/<[^>]+>/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim()
-            .slice(0, 4000);
+          content = stripHtmlToText(html, { maxLength: 4000 });
         }
       } catch { /* non-critical — proceed without content */ }
     }
@@ -1245,7 +1162,7 @@ Return ONLY valid JSON, no markdown fences.`;
     });
 
     const raw = aiResult.text || '{}';
-    const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '');
+    const cleaned = stripCodeFences(raw);
 
     let parsed;
     try {
@@ -1323,15 +1240,7 @@ router.post('/api/seo/:workspaceId/bulk-analyze', requireWorkspaceAccess('worksp
       const kwMapCtx = formatPageMapForPrompt(intel.seoContext);
 
       // Resolve live URL base
-      let baseUrl = '';
-      if (ws.liveDomain) {
-        baseUrl = ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`;
-      } else if (siteId) {
-        try {
-          const sub = await getSiteSubdomain(siteId, token);
-          if (sub) baseUrl = `https://${sub}.webflow.io`;
-        } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'bulk-analyze: programming error'); }
-      }
+      const baseUrl = await resolveBaseUrl({ liveDomain: ws.liveDomain, webflowSiteId: siteId }, token);
 
       let done = 0;
       let failed = 0;
@@ -1351,18 +1260,7 @@ router.post('/api/seo/:workspaceId/bulk-analyze', requireWorkspaceAccess('worksp
               });
               if (htmlRes.ok) {
                 const html = await htmlRes.text();
-                const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-                const body = bodyMatch ? bodyMatch[1] : html;
-                pageContent = body
-                  .replace(/<script[\s\S]*?<\/script>/gi, '')
-                  .replace(/<style[\s\S]*?<\/style>/gi, '')
-                  .replace(/<nav[\s\S]*?<\/nav>/gi, '')
-                  .replace(/<footer[\s\S]*?<\/footer>/gi, '')
-                  .replace(/<[^>]+>/g, ' ')
-                  .replace(/&[a-z]+;/gi, ' ')
-                  .replace(/\s+/g, ' ')
-                  .trim()
-                  .slice(0, 3000);
+                pageContent = stripHtmlToText(html, { maxLength: 3000 });
               }
             } catch { /* best-effort — fetch on external URL */ } // url-fetch-ok
           }
@@ -1412,7 +1310,7 @@ IMPORTANT: Return ONLY valid JSON.`;
           });
 
           const raw = aiResult.text || '{}';
-          const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+          const cleaned = stripCodeFences(raw);
           let analysis: Record<string, unknown>;
           try {
             analysis = JSON.parse(cleaned);
@@ -1569,15 +1467,7 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', requireWorkspaceAccess('worksp
       updateJob(job.id, { status: 'running', message: 'Building workspace context...' });
 
       const token = getTokenForSite(siteId) || undefined;
-      let baseUrl = '';
-      if (ws.liveDomain) {
-        baseUrl = ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`;
-      } else {
-        try {
-          const sub = await getSiteSubdomain(siteId, token);
-          if (sub) baseUrl = `https://${sub}.webflow.io`;
-        } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'bulk-rewrite: programming error'); }
-      }
+      const baseUrl = await resolveBaseUrl({ liveDomain: ws.liveDomain, webflowSiteId: siteId }, token);
 
       const inlineBrandName = getBrandName(ws);
       const isBothMode = field === 'both';
@@ -1591,15 +1481,6 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', requireWorkspaceAccess('worksp
           allGscData = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 28);
         } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'bulk-rewrite: programming error'); }
       }
-
-      // Character limit enforcement helper
-      const enforceLimit = (text: string, max: number): string => {
-        const t = text.replace(/^["']|["']$/g, '').trim();
-        if (t.length <= max) return t;
-        const truncated = t.slice(0, max);
-        const lastSpace = truncated.lastIndexOf(' ');
-        return lastSpace > max * 0.6 ? truncated.slice(0, lastSpace) : truncated;
-      };
 
       // Sibling title map
       const siblingTitles: Record<string, string[]> = {};
@@ -1650,17 +1531,7 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', requireWorkspaceAccess('worksp
               const htmlRes = await fetch(`${baseUrl}/${page.slug}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
               if (htmlRes.ok) {
                 const html = await htmlRes.text();
-                const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-                const body = bodyMatch ? bodyMatch[1] : html;
-                contentExcerpt = body
-                  .replace(/<script[\s\S]*?<\/script>/gi, '')
-                  .replace(/<style[\s\S]*?<\/style>/gi, '')
-                  .replace(/<nav[\s\S]*?<\/nav>/gi, '')
-                  .replace(/<footer[\s\S]*?<\/footer>/gi, '')
-                  .replace(/<[^>]+>/g, ' ')
-                  .replace(/\s+/g, ' ')
-                  .trim()
-                  .slice(0, 800);
+                contentExcerpt = stripHtmlToText(html, { maxLength: 800 });
               }
             } catch { /* best-effort — fetch on external URL */ } // url-fetch-ok
           }
@@ -1713,7 +1584,7 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', requireWorkspaceAccess('worksp
             });
             let pairs: Array<{ title: string; description: string }>;
             try {
-              const parsed = JSON.parse(aiText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
+              const parsed = JSON.parse(stripCodeFences(aiText));
               pairs = Array.isArray(parsed)
                 ? parsed.map((p: { title?: string; description?: string }) => ({
                     title: enforceLimit(String(p.title || ''), 60),
@@ -1753,7 +1624,7 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', requireWorkspaceAccess('worksp
           });
           let variations: string[];
           try {
-            const parsed = JSON.parse(aiText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
+            const parsed = JSON.parse(stripCodeFences(aiText));
             variations = Array.isArray(parsed)
               ? parsed.map((v: string) => enforceLimit(String(v), maxLen)).filter(Boolean)
               : [enforceLimit(String(parsed), maxLen)];

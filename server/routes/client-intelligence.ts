@@ -17,6 +17,7 @@ import type {
   ClientLearningHighlights,
   ClientSiteHealthSummary,
   ClientDecayAlert,
+  ClientCopyPipelineStatus,
   InsightsSlice,
   ContentPipelineSlice,
   LearningsSlice,
@@ -120,6 +121,17 @@ function countSerpOpportunities(seoContext: SeoContextSlice): number | null {
   return sf.featuredSnippets + sf.peopleAlsoAsk + sf.videoCarousel + (sf.localPack ? 1 : 0);
 }
 
+function formatCopyPipelineForClient(pipeline: ContentPipelineSlice): ClientCopyPipelineStatus | null {
+  const cp = pipeline.copyPipeline;
+  if (!cp || cp.totalSections === 0) return null;
+  return {
+    totalSections: cp.totalSections,
+    approvedSections: cp.approvedSections,
+    inReviewSections: cp.clientReviewSections,
+    approvalRate: cp.approvalRate,
+  };
+}
+
 // GET /api/public/intelligence/:workspaceId
 router.get('/api/public/intelligence/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
@@ -149,6 +161,9 @@ router.get('/api/public/intelligence/:workspaceId', async (req, res) => {
         serpOpportunities: intel.seoContext ? countSerpOpportunities(intel.seoContext) : null,
         compositeHealthScore: intel.clientSignals?.compositeHealthScore ?? null,
         weCalledIt: intel.learnings?.weCalledIt ?? [],
+        copyPipelineStatus: intel.contentPipeline
+          ? formatCopyPipelineForClient(intel.contentPipeline)
+          : null,
       }),
       ...(tier === 'premium' && {
         siteHealthSummary: intel.siteHealth ? formatSiteHealthForClient(intel.siteHealth) : null,

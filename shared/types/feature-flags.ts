@@ -31,7 +31,6 @@ export const FEATURE_FLAGS = {
   'outcome-ai-injection': false,
   'outcome-client-reporting': false,
   'outcome-external-detection': false,
-  'outcome-adaptive-pipeline': false,
   'outcome-playbooks': false,
   'outcome-predictive': false,
 
