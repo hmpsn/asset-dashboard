@@ -256,6 +256,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
       if (linkResult.deadLinks.length > 0) {
         siteWideIssues.push({
           check: 'dead-links',
+          category: 'technical',
           severity: internalDead > 0 ? 'error' : 'warning',
           message: `${linkResult.deadLinks.length} broken link${linkResult.deadLinks.length > 1 ? 's' : ''} found${internalDead > 0 ? ` (${internalDead} internal)` : ''}`,
           recommendation: 'Broken links harm user experience and crawlability. Fix or redirect internal broken links immediately; update or remove broken external links.',
