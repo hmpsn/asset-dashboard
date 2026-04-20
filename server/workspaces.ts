@@ -237,9 +237,6 @@ const stmts = createStmtCache(() => ({
   listPageEditStates: db.prepare<[workspaceId: string]>(
     `SELECT * FROM page_edit_states WHERE workspace_id = ?`,
   ),
-  getPageEditState: db.prepare<[workspaceId: string, pageId: string]>(
-    `SELECT * FROM page_edit_states WHERE workspace_id = ? AND page_id = ?`,
-  ),
   upsertPageEditState: db.prepare(`
     INSERT OR REPLACE INTO page_edit_states
       (workspace_id, page_id, slug, status, audit_issues, fields, source,
@@ -253,14 +250,8 @@ const stmts = createStmtCache(() => ({
   deletePageEditState: db.prepare<[workspaceId: string, pageId: string]>(
     `DELETE FROM page_edit_states WHERE workspace_id = ? AND page_id = ?`,
   ),
-  clearAllPageEditStates: db.prepare<[workspaceId: string]>(
-    `DELETE FROM page_edit_states WHERE workspace_id = ?`,
-  ),
   getPageIdBySlug: db.prepare<[workspaceId: string, slug: string]>(
     `SELECT page_id FROM page_edit_states WHERE workspace_id = ? AND slug = ?`,
-  ),
-  deletePageEditStatesByStatus: db.prepare<[workspaceId: string, status: string]>(
-    `DELETE FROM page_edit_states WHERE workspace_id = ? AND status = ?`,
   ),
 }));
 
@@ -496,134 +487,11 @@ export function getPageIdBySlug(workspaceId: string, slug: string): string | und
   return undefined;
 }
 
-// --- Unified Page Edit State helpers ---
+export {
+  updatePageState,
+  getPageState,
+  getAllPageStates,
+  clearPageStatesByStatus,
+  clearPageState,
+} from './page-edit-states.js';
 
-const STATUS_PRIORITY: Record<PageEditStatus, number> = {
-  clean: 0, 'issue-detected': 1, 'fix-proposed': 2, 'in-review': 3, approved: 4, rejected: 4, live: 5,
-};
-
-export function updatePageState(
-  workspaceId: string,
-  pageId: string,
-  updates: Partial<Omit<PageEditState, 'pageId' | 'updatedAt'>>,
-): PageEditState | null {
-  const row = stmts().getById.get(workspaceId) as WorkspaceRow | undefined;
-  if (!row) return null;
-
-  const existingRow = stmts().getPageEditState.get(workspaceId, pageId) as PageEditRow | undefined;
-  let existing: PageEditState | undefined;
-  if (existingRow) {
-    existing = {
-      pageId: existingRow.page_id,
-      slug: existingRow.slug ?? undefined,
-      status: existingRow.status as PageEditStatus,
-      auditIssues: existingRow.audit_issues ? parseJsonSafeArray(existingRow.audit_issues, z.string(), { workspaceId, field: 'audit_issues', table: 'page_edit_states' }) : undefined,
-      fields: existingRow.fields ? parseJsonSafeArray(existingRow.fields, z.string(), { workspaceId, field: 'fields', table: 'page_edit_states' }) : undefined,
-      source: existingRow.source as PageEditState['source'] ?? undefined,
-      approvalBatchId: existingRow.approval_batch_id ?? undefined,
-      contentRequestId: existingRow.content_request_id ?? undefined,
-      workOrderId: existingRow.work_order_id ?? undefined,
-      recommendationId: existingRow.recommendation_id ?? undefined,
-      rejectionNote: existingRow.rejection_note ?? undefined,
-      updatedAt: existingRow.updated_at,
-      updatedBy: existingRow.updated_by as PageEditState['updatedBy'] ?? undefined,
-    };
-  }
-
-  // Don't downgrade status unless explicitly setting to clean or rejected
-  if (existing && updates.status && updates.status !== 'clean' && updates.status !== 'rejected') {
-    if (STATUS_PRIORITY[existing.status] > STATUS_PRIORITY[updates.status]) {
-      // Still merge non-status fields
-      const { status: _s, ...rest } = updates; // eslint-disable-line @typescript-eslint/no-unused-vars
-      if (Object.keys(rest).length === 0) return existing;
-      updates = rest;
-    }
-  }
-
-  const now = new Date().toISOString();
-  const base: PageEditState = existing
-    ? { ...existing }
-    : { pageId, status: 'clean', updatedAt: now };
-  const merged: PageEditState = Object.assign(base, updates, { pageId, updatedAt: now });
-
-  stmts().upsertPageEditState.run({
-    workspace_id: workspaceId,
-    page_id: pageId,
-    slug: merged.slug ?? null,
-    status: merged.status,
-    audit_issues: merged.auditIssues ? JSON.stringify(merged.auditIssues) : null,
-    fields: merged.fields ? JSON.stringify(merged.fields) : null,
-    source: merged.source ?? null,
-    approval_batch_id: merged.approvalBatchId ?? null,
-    content_request_id: merged.contentRequestId ?? null,
-    work_order_id: merged.workOrderId ?? null,
-    recommendation_id: merged.recommendationId ?? null,
-    rejection_note: merged.rejectionNote ?? null,
-    updated_at: merged.updatedAt,
-    updated_by: merged.updatedBy ?? null,
-  });
-
-  return merged;
-}
-
-export function getPageState(workspaceId: string, pageId: string): PageEditState | undefined {
-  const row = stmts().getPageEditState.get(workspaceId, pageId) as PageEditRow | undefined;
-  if (!row) return undefined;
-  return {
-    pageId: row.page_id,
-    slug: row.slug ?? undefined,
-    status: row.status as PageEditStatus,
-    auditIssues: row.audit_issues ? parseJsonSafeArray(row.audit_issues, z.string(), { workspaceId, field: 'audit_issues', table: 'page_edit_states' }) : undefined,
-    fields: row.fields ? parseJsonSafeArray(row.fields, z.string(), { workspaceId, field: 'fields', table: 'page_edit_states' }) : undefined,
-    source: row.source as PageEditState['source'] ?? undefined,
-    approvalBatchId: row.approval_batch_id ?? undefined,
-    contentRequestId: row.content_request_id ?? undefined,
-    workOrderId: row.work_order_id ?? undefined,
-    recommendationId: row.recommendation_id ?? undefined,
-    rejectionNote: row.rejection_note ?? undefined,
-    updatedAt: row.updated_at,
-    updatedBy: row.updated_by as PageEditState['updatedBy'] ?? undefined,
-  };
-}
-
-export function getAllPageStates(workspaceId: string): Record<string, PageEditState> {
-  const rows = stmts().listPageEditStates.all(workspaceId) as PageEditRow[];
-  const states: Record<string, PageEditState> = {};
-  for (const row of rows) {
-    states[row.page_id] = {
-      pageId: row.page_id,
-      slug: row.slug ?? undefined,
-      status: row.status as PageEditStatus,
-      auditIssues: row.audit_issues ? parseJsonSafeArray(row.audit_issues, z.string(), { workspaceId, field: 'audit_issues', table: 'page_edit_states' }) : undefined,
-      fields: row.fields ? parseJsonSafeArray(row.fields, z.string(), { workspaceId, field: 'fields', table: 'page_edit_states' }) : undefined,
-      source: row.source as PageEditState['source'] ?? undefined,
-      approvalBatchId: row.approval_batch_id ?? undefined,
-      contentRequestId: row.content_request_id ?? undefined,
-      workOrderId: row.work_order_id ?? undefined,
-      recommendationId: row.recommendation_id ?? undefined,
-      rejectionNote: row.rejection_note ?? undefined,
-      updatedAt: row.updated_at,
-      updatedBy: row.updated_by as PageEditState['updatedBy'] ?? undefined,
-    };
-  }
-  return states;
-}
-
-export function clearPageStatesByStatus(workspaceId: string, status: string): number {
-  const row = stmts().getById.get(workspaceId) as WorkspaceRow | undefined;
-  if (!row) return 0;
-  if (status === 'all') {
-    // Clear ALL page states for this workspace
-    const info = stmts().clearAllPageEditStates.run(workspaceId);
-    return info.changes;
-  }
-  const info = stmts().deletePageEditStatesByStatus.run(workspaceId, status);
-  return info.changes;
-}
-
-export function clearPageState(workspaceId: string, pageId: string): boolean {
-  const row = stmts().getById.get(workspaceId) as WorkspaceRow | undefined;
-  if (!row) return false;
-  stmts().deletePageEditState.run(workspaceId, pageId);
-  return true;
-}
