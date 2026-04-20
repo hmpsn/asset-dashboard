@@ -294,7 +294,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           <h3 className="text-sm font-semibold text-zinc-200">Keyword Strategy</h3>
           <p className="text-[11px] text-zinc-500 mt-0.5">
             {strategy
-              ? `Generated ${new Date(strategy.generatedAt).toLocaleDateString()} · ${strategy.pageMap.length} pages mapped`
+              ? `Generated ${new Date(strategy.generatedAt).toLocaleDateString()} · ${strategy.pageMap?.length ?? 0} pages mapped`
               : 'AI-powered keyword mapping for your entire site'}
           </p>
         </div>
@@ -571,7 +571,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       {strategy && (
         <>
           {/* ── Unvalidated Strategy Warning ── */}
-          {!strategy.pageMap.some((p: PageKeywordMap) => p.volume && p.volume > 0) && (
+          {!(strategy.pageMap ?? []).some((p: PageKeywordMap) => p.volume && p.volume > 0) && (
             <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3 flex items-start gap-2.5">
               <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
               <div className="text-xs text-amber-300/90 leading-relaxed">
@@ -583,7 +583,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
 
           {/* ── Summary Dashboard ── */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard size="hero" label="Pages Mapped" value={filteredPageMap.length} sub={filteredPageMap.length < strategy.pageMap.length ? `${strategy.pageMap.length - filteredPageMap.length} below threshold` : undefined} />
+            <StatCard size="hero" label="Pages Mapped" value={filteredPageMap.length} sub={filteredPageMap.length < (strategy.pageMap?.length ?? 0) ? `${(strategy.pageMap?.length ?? 0) - filteredPageMap.length} below threshold` : undefined} />
             <StatCard size="hero" label="Impressions" value={totalImpressions.toLocaleString()} icon={Eye} sub="last 90 days" />
             <StatCard size="hero" label="Clicks" value={totalClicks.toLocaleString()} icon={MousePointerClick} sub={totalImpressions > 0 ? `${((totalClicks / totalImpressions) * 100).toFixed(1)}% CTR` : undefined} />
             <StatCard size="hero" label="Avg Position" value={ranked.length > 0 ? `#${avgPos.toFixed(1)}` : '—'} icon={Trophy} valueColor={positionColor(avgPos)} sub={`${ranked.length} pages ranking`} />
@@ -733,7 +733,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                     SEMRush data: Keywords enriched with real search volume and difficulty. Cached for 7 days.
                   </span>
                 )}
-                {!strategy.pageMap.some((p: PageKeywordMap) => p.currentPosition) && (
+                {!(strategy.pageMap ?? []).some((p: PageKeywordMap) => p.currentPosition) && (
                   <span className="block mt-1 text-amber-400/80">
                     Tip: Connect Google Search Console to see ranking positions and get data-driven keyword suggestions.
                   </span>

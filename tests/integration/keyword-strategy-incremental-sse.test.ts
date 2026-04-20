@@ -27,7 +27,8 @@ import { upsertPageKeyword } from '../../server/page-keywords.js';
 import type { PageKeywordMap } from '../../shared/types/workspace.js';
 
 // Verify port is free: grep -r 'createTestContext(' tests/ | grep -o '1[0-9]\{4\}' | sort -n | tail -5
-const PORT = 13320;
+// Note: 13320 is taken by stripe-admin-auth.test.ts, 13321 by keyword-strategy-concurrent-guard.test.ts
+const PORT = 13322;
 
 const ctx = createTestContext(PORT);
 let workspaceId = '';

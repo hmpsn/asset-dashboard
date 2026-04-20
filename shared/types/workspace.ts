@@ -117,7 +117,8 @@ export interface CannibalizationItem {
 export interface KeywordStrategy {
   siteKeywords: string[];        // top-level target keywords for the whole site
   siteKeywordMetrics?: { keyword: string; volume: number; difficulty: number }[]; // SEMRush data for site keywords
-  pageMap: PageKeywordMap[];     // keyword assignments per page
+  /** Stored separately in the page_keywords table; omitted in the workspace JSON blob. */
+  pageMap?: PageKeywordMap[];    // keyword assignments per page
   opportunities: string[];       // keyword gaps / untapped opportunities
   contentGaps?: ContentGap[];    // specific content pieces that should be created
   quickWins?: QuickWin[];        // low-effort, high-impact fixes
@@ -142,6 +143,14 @@ export interface KeywordStrategy {
   questionKeywords?: { seed: string; questions: { keyword: string; volume: number }[] }[]; // question-based keywords for FAQ/AEO
   businessContext?: string;      // user-provided context (locations, services, industry)
   semrushMode?: 'quick' | 'full' | 'none'; // which SEMRush mode was used
+  /** Enriched search signals stored alongside strategy (not included in pageMap). */
+  searchSignals?: {
+    deviceBreakdown?: { device: string; clicks: number; impressions: number }[];
+    periodComparison?: { label: string; clicks: number; impressions: number; position: number };
+    topCountries?: { country: string; clicks: number; impressions: number }[];
+    organicOverview?: { clicks: number; impressions: number; ctr: number; position: number };
+    organicLandingPages?: { page: string; clicks: number; impressions: number; position: number }[];
+  };
   generatedAt: string;
 }
 

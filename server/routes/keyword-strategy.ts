@@ -58,6 +58,7 @@ import { generateRecommendations } from '../recommendations.js';
 import { getDeclinedKeywords, getRequestedKeywords } from '../keyword-feedback.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
+import { requireWorkspaceAccess } from '../auth.js';
 
 const log = createLogger('keyword-strategy');
 
@@ -210,7 +211,7 @@ export function buildStrategyIntelligenceBlock(opts: StrategyIntelligenceInput):
 }
 
 // --- Keyword Strategy Generation (SSE progress) ---
-router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
+router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (!ws.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
