@@ -1570,9 +1570,11 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
           try { return new URL(r.page).pathname === pm.pagePath; } catch (err) { return false; }
         });
         if (matchingRows.length > 0) {
-          const kwMatch = matchingRows.find(r => r.query.toLowerCase().includes(pm.primaryKeyword.toLowerCase()));
-          if (kwMatch) {
-            pm.currentPosition = kwMatch.position;
+          if (pm.primaryKeyword) {
+            const kwMatch = matchingRows.find(r => r.query.toLowerCase().includes(pm.primaryKeyword.toLowerCase()));
+            if (kwMatch) {
+              pm.currentPosition = kwMatch.position;
+            }
           }
           // Don't set currentPosition from a non-matching query — it's misleading
 
@@ -1819,6 +1821,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
     {
       const kwPages = new Map<string, Array<{ path: string; source: 'keyword_map' | 'gsc' }>>();
       for (const pm of strategy.pageMap) {
+        if (!pm.primaryKeyword) continue;
         const kw = pm.primaryKeyword.toLowerCase();
         if (!kwPages.has(kw)) kwPages.set(kw, []);
         kwPages.get(kw)!.push({ path: pm.pagePath, source: 'keyword_map' });
