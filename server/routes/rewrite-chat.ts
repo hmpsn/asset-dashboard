@@ -177,17 +177,18 @@ router.post('/api/rewrite-chat/:workspaceId', requireWorkspaceAccess('workspaceI
       addMessage(ws.id, sessionId, 'admin', 'user', question);
     }
 
-    // Build workspace intelligence (seoContext + pageProfile combined call)
+    // Build workspace intelligence (seoContext + pageProfile + contentPipeline combined call)
     const pagePath = pageUrl ? new URL(pageUrl).pathname : undefined;
-    const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext', 'pageProfile'],
+    const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext', 'pageProfile', 'contentPipeline'],
       pagePath });
     const seo = intel.seoContext;
     const knowledgeBase = formatKnowledgeBaseForPrompt(seo?.knowledgeBase);
 
-    // Build rewriting playbook block
+    // Build rewriting playbook block from intelligence slice
     let playbookBlock = '';
-    if (ws.rewritePlaybook?.trim()) {
-      playbookBlock = `\n\nREWRITING PLAYBOOK (follow these instructions when suggesting rewrites):\n${ws.rewritePlaybook.trim()}`;
+    const playbookPatterns = intel.contentPipeline?.rewritePlaybook?.patterns;
+    if (playbookPatterns && playbookPatterns.length > 0) {
+      playbookBlock = `\n\nREWRITING PLAYBOOK (follow these instructions when suggesting rewrites):\n${playbookPatterns.join('\n')}`;
     }
 
     // Build page context block

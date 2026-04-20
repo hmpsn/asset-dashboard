@@ -7,6 +7,9 @@ vi.mock('../../server/seo-context.js', () => ({
   getRawBrandVoice: vi.fn(() => ''),
   getRawKnowledge: vi.fn(() => ''),
 }));
+vi.mock('../../server/workspaces.js', () => ({
+  getWorkspace: vi.fn(),
+}));
 vi.mock('../../server/analytics-insights-store.js', () => ({
   getInsights: vi.fn(),
 }));
@@ -36,14 +39,16 @@ vi.mock('../../server/intelligence-cache.js', () => {
   };
 });
 
-import { buildWorkspaceIntelligence } from '../../server/workspace-intelligence.js';
+import { buildWorkspaceIntelligence, formatForPrompt } from '../../server/workspace-intelligence.js';
 import { buildSeoContext } from '../../server/seo-context.js';
 import { getInsights } from '../../server/analytics-insights-store.js';
 import { getWorkspaceLearnings } from '../../server/workspace-learnings.js';
+import { getWorkspace } from '../../server/workspaces.js';
 
 const mockBuildSeoContext = vi.mocked(buildSeoContext);
 const mockGetInsights = vi.mocked(getInsights);
 const mockGetLearnings = vi.mocked(getWorkspaceLearnings);
+const mockGetWorkspace = vi.mocked(getWorkspace);
 
 describe('buildWorkspaceIntelligence', () => {
   beforeEach(() => {
@@ -199,5 +204,199 @@ describe('assembleSeoContext — voice profile authority on intelligence path', 
     // And the raw brandVoice field (which used to be the only field) is still separate
     // — callers that need the pre-authority text can still reach it.
     expect(result.seoContext!.brandVoice).toBe('');
+  });
+});
+
+describe('assembleSeoContext — businessPriorities and contact info merging', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockBuildSeoContext.mockReturnValue({
+      strategy: undefined,
+      brandVoiceBlock: '',
+      businessContext: 'Test context',
+      personasBlock: '',
+      knowledgeBlock: '',
+      keywordBlock: '',
+      fullContext: '',
+    } as any);
+    mockGetInsights.mockReturnValue([]);
+    mockGetLearnings.mockReturnValue(null);
+  });
+
+  it('merges workspace.businessPriorities into businessProfile.goals', async () => {
+    mockGetWorkspace.mockReturnValue({
+      businessPriorities: ['Grow patient appointments by 25% in Q3', 'Expand to new markets'],
+      businessProfile: undefined,
+      intelligenceProfile: { industry: 'Healthcare', goals: ['Existing goal'], targetAudience: 'Patients' },
+    } as any);
+
+    const result = await buildWorkspaceIntelligence('ws-bp-1', { slices: ['seoContext'] });
+
+    expect(result.seoContext).toBeDefined();
+    expect(result.seoContext!.businessProfile).toBeDefined();
+    expect(result.seoContext!.businessProfile!.goals).toContain('Grow patient appointments by 25% in Q3');
+    expect(result.seoContext!.businessProfile!.goals).toContain('Expand to new markets');
+  });
+
+  it('merges phone from workspace.businessProfile into seoContext.businessProfile', async () => {
+    mockGetWorkspace.mockReturnValue({
+      businessPriorities: undefined,
+      businessProfile: {
+        phone: '+1-555-0100',
+        email: 'info@example.com',
+        address: { street: '123 Main St', city: 'Springfield', state: 'IL', zip: '62701', country: 'US' },
+      },
+      intelligenceProfile: { industry: 'Retail', goals: [], targetAudience: 'Consumers' },
+    } as any);
+
+    const result = await buildWorkspaceIntelligence('ws-bp-2', { slices: ['seoContext'] });
+
+    expect(result.seoContext!.businessProfile).toBeDefined();
+    expect(result.seoContext!.businessProfile!.phone).toBe('+1-555-0100');
+    // Address should be flattened to a comma-joined string
+    expect(result.seoContext!.businessProfile!.address).toContain('123 Main St');
+    expect(result.seoContext!.businessProfile!.address).toContain('Springfield');
+  });
+});
+
+describe('assembleContentPipeline — rewritePlaybook and contentPricing', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockBuildSeoContext.mockReturnValue({
+      strategy: undefined,
+      brandVoiceBlock: '',
+      businessContext: '',
+      personasBlock: '',
+      knowledgeBlock: '',
+      keywordBlock: '',
+      fullContext: '',
+    } as any);
+    mockGetInsights.mockReturnValue([]);
+    mockGetLearnings.mockReturnValue(null);
+  });
+
+  it('splits rewritePlaybook string into patterns array', async () => {
+    mockGetWorkspace.mockReturnValue({
+      rewritePlaybook: 'Always use active voice\nKeep paragraphs short\nUse numbered lists for steps',
+      contentPricing: undefined,
+      keywordStrategy: undefined,
+    } as any);
+
+    const result = await buildWorkspaceIntelligence('ws-rp-1', { slices: ['contentPipeline'] });
+
+    expect(result.contentPipeline).toBeDefined();
+    expect(result.contentPipeline!.rewritePlaybook).toBeDefined();
+    expect(result.contentPipeline!.rewritePlaybook!.patterns).toHaveLength(3);
+    expect(result.contentPipeline!.rewritePlaybook!.patterns[0]).toBe('Always use active voice');
+    expect(result.contentPipeline!.rewritePlaybook!.lastUsedAt).toBeNull();
+  });
+
+  it('leaves rewritePlaybook undefined when not set on workspace', async () => {
+    mockGetWorkspace.mockReturnValue({
+      rewritePlaybook: undefined,
+      contentPricing: undefined,
+      keywordStrategy: undefined,
+    } as any);
+
+    const result = await buildWorkspaceIntelligence('ws-rp-2', { slices: ['contentPipeline'] });
+
+    expect(result.contentPipeline).toBeDefined();
+    expect(result.contentPipeline!.rewritePlaybook).toBeUndefined();
+  });
+
+  it('populates contentPricing when workspace has pricing config', async () => {
+    mockGetWorkspace.mockReturnValue({
+      rewritePlaybook: undefined,
+      contentPricing: {
+        briefPrice: 49,
+        fullPostPrice: 199,
+        currency: 'USD',
+        briefLabel: 'Content Brief',
+        fullPostLabel: 'Full Article',
+      },
+      keywordStrategy: undefined,
+    } as any);
+
+    const result = await buildWorkspaceIntelligence('ws-cp-1', { slices: ['contentPipeline'] });
+
+    expect(result.contentPipeline?.contentPricing).toEqual({
+      briefPrice: 49,
+      fullPostPrice: 199,
+      currency: 'USD',
+      briefLabel: 'Content Brief',
+      fullPostLabel: 'Full Article',
+    });
+  });
+
+  it('leaves contentPricing undefined when not set on workspace', async () => {
+    mockGetWorkspace.mockReturnValue({
+      rewritePlaybook: undefined,
+      contentPricing: undefined,
+      keywordStrategy: undefined,
+    } as any);
+
+    const result = await buildWorkspaceIntelligence('ws-cp-2', { slices: ['contentPipeline'] });
+
+    expect(result.contentPipeline?.contentPricing).toBeUndefined();
+  });
+});
+
+describe('formatForPrompt — formatter rendering', () => {
+  it('renders intentSignals when newCount > 0', () => {
+    const intelligence = {
+      version: 1 as const,
+      workspaceId: 'ws-fmt-1',
+      assembledAt: new Date().toISOString(),
+      clientSignals: {
+        keywordFeedback: { approved: [], rejected: [], patterns: { approveRate: 0, topRejectionReasons: [] } },
+        contentGapVotes: [],
+        businessPriorities: [],
+        approvalPatterns: { approvalRate: 0, avgResponseTime: null },
+        recentChatTopics: [],
+        churnRisk: null,
+        churnSignals: [],
+        roi: null,
+        engagement: { lastLoginAt: null, loginFrequency: 'inactive' as const, chatSessionCount: 0, portalUsage: null },
+        compositeHealthScore: null,
+        feedbackItems: [],
+        serviceRequests: { pending: 0, total: 0 },
+        intentSignals: {
+          newCount: 3,
+          totalCount: 12,
+          recentTypes: ['service_interest', 'content_interest'],
+        },
+      },
+    };
+
+    const output = formatForPrompt(intelligence as any, { sections: ['clientSignals'] });
+    expect(output).toContain('Intent signals: 3 new of 12 total');
+    expect(output).toContain('service_interest');
+  });
+
+  it('renders aeoReadiness at standard verbosity', () => {
+    const intelligence = {
+      version: 1 as const,
+      workspaceId: 'ws-fmt-2',
+      assembledAt: new Date().toISOString(),
+      siteHealth: {
+        auditScore: 85,
+        auditScoreDelta: null,
+        deadLinks: 0,
+        redirectChains: 0,
+        schemaErrors: 0,
+        orphanPages: 0,
+        cwvPassRate: { mobile: null, desktop: null },
+        anomalyCount: 0,
+        anomalyTypes: [],
+        seoChangeVelocity: 0,
+        aeoReadiness: {
+          pagesChecked: 10,
+          passingRate: 0.7,
+        },
+      },
+    };
+
+    const output = formatForPrompt(intelligence as any, { sections: ['siteHealth'], verbosity: 'standard' });
+    expect(output).toContain('AEO readiness: 10 pages checked, 70% passing');
   });
 });

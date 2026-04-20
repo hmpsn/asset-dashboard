@@ -98,7 +98,6 @@ export interface SeoContextSlice {
   backlinkProfile?: BacklinkProfile;
   serpFeatures?: SerpFeatures;
   rankTracking?: RankTrackingSummary;
-  keywordRecommendations?: Array<{ keyword: string; volume: number; difficulty: number; relevance: number }>;
   strategyHistory?: StrategyHistory;
 }
 
@@ -128,6 +127,10 @@ export interface LearningsSlice {
   winRateByActionType?: Record<string, number>;
   roiAttribution?: ROIAttribution[];
   weCalledIt?: WeCalledItEntry[];
+  scoringConfig?: Partial<Record<string, {
+    primary_metric: string;
+    thresholds: { strong_win: number; win: number; neutral_band: number };
+  }>>;
 }
 
 export interface PageProfileSlice {
@@ -176,6 +179,13 @@ export interface ContentPipelineSlice {
   decayAlerts?: DecayAlert[];
   suggestedBriefs?: number;
   copyPipeline?: CopyPipelineSummary;
+  contentPricing?: {
+    briefPrice: number;
+    fullPostPrice: number;
+    currency: string;
+    briefLabel?: string;
+    fullPostLabel?: string;
+  };
 }
 
 export interface SiteHealthSlice {
@@ -233,8 +243,7 @@ export interface ClientSignalsSlice {
 
 export interface OperationalSlice {
   recentActivity: { type: string; description: string; timestamp: string }[];
-  /** Note: analytics_annotations table does NOT have a pageUrl column.
-   *  pageUrl is optional — populated only if derivable from context. May need schema update in Phase 3. */
+  /** Migration 065 added page_url column. pageUrl is optional — present when annotation was scoped to a specific page. */
   annotations: { date: string; label: string; pageUrl?: string }[];
   pendingJobs: number;
   // New in 3A
@@ -306,6 +315,7 @@ export interface ClientIntelligence {
   compositeHealthScore?: number | null;
   /** Predictions that came true — strongest wins from outcome tracking. */
   weCalledIt?: WeCalledItEntry[];
+  copyPipelineStatus?: ClientCopyPipelineStatus | null;
 
   // Premium only
   siteHealthSummary?: ClientSiteHealthSummary | null;
@@ -319,12 +329,24 @@ export interface ClientDecayAlert {
   hasRefreshBrief: boolean;
 }
 
+export interface ClientCopyPipelineStatus {
+  totalSections: number;
+  approvedSections: number;
+  inReviewSections: number;
+  approvalRate: number;
+}
+
 // ── New supporting types (Phase 3A) ─────────────────────────────────
 
 export interface BusinessProfile {
   industry: string;
   goals: string[];
   targetAudience: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  socialProfiles?: string[];
+  openingHours?: string;
 }
 
 export interface BacklinkProfile {

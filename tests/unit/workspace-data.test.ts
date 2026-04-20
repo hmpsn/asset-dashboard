@@ -1,5 +1,6 @@
 // tests/unit/workspace-data.test.ts
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
+import db from '../../server/db/index.js';
 
 // Mock the Webflow API
 vi.mock('../../server/webflow-pages.js', () => ({
@@ -12,7 +13,7 @@ vi.mock('../../server/workspaces.js', () => ({
   getWorkspace: vi.fn(),
 }));
 
-import { getWorkspacePages, getWorkspaceAllPages, invalidatePageCache } from '../../server/workspace-data.js';
+import { getWorkspacePages, getWorkspaceAllPages, invalidatePageCache, getContentPipelineSummary, invalidateContentPipelineCache } from '../../server/workspace-data.js';
 import { listPages } from '../../server/webflow-pages.js';
 import { getWorkspace } from '../../server/workspaces.js';
 
@@ -121,5 +122,74 @@ describe('getWorkspaceAllPages', () => {
     await getWorkspaceAllPages('ws-1', 'site-1');
     await getWorkspacePages('ws-1', 'site-1');
     expect(mockListPages).toHaveBeenCalledOnce(); // shared cache
+  });
+});
+
+describe('computeContentPipelineSummary — briefs.byStatus', () => {
+  const TEST_WORKSPACE = 'brief-byStatus-test-ws';
+  const insertedIds: string[] = [];
+
+  function insertBrief(id: string, status: string): void {
+    db.prepare(
+      `INSERT OR IGNORE INTO content_briefs
+         (id, workspace_id, target_keyword, secondary_keywords, suggested_title,
+          suggested_meta_desc, outline, word_count_target, intent, audience,
+          competitor_insights, internal_link_suggestions, created_at, status)
+       VALUES
+         (@id, @workspace_id, @target_keyword, @secondary_keywords, @suggested_title,
+          @suggested_meta_desc, @outline, @word_count_target, @intent, @audience,
+          @competitor_insights, @internal_link_suggestions, @created_at, @status)`,
+    ).run({
+      id,
+      workspace_id: TEST_WORKSPACE,
+      target_keyword: 'test keyword',
+      secondary_keywords: '[]',
+      suggested_title: 'Test Title',
+      suggested_meta_desc: 'Test meta description for brief',
+      outline: '[]',
+      word_count_target: 1200,
+      intent: 'informational',
+      audience: 'marketers',
+      competitor_insights: 'none',
+      internal_link_suggestions: '[]',
+      created_at: new Date().toISOString(),
+      status,
+    });
+    insertedIds.push(id);
+  }
+
+  afterAll(() => {
+    if (insertedIds.length > 0) {
+      db.prepare(
+        `DELETE FROM content_briefs WHERE workspace_id = ?`,
+      ).run(TEST_WORKSPACE);
+    }
+    db.prepare(`DELETE FROM content_pipeline_cache WHERE workspace_id = ?`).run(TEST_WORKSPACE);
+  });
+
+  it('returns {} byStatus for unknown workspace', () => {
+    const summary = getContentPipelineSummary('workspace-does-not-exist-xyz');
+    expect(summary.briefs.byStatus).toEqual({});
+    expect(summary.briefs.total).toBe(0);
+  });
+
+  it('populates byStatus with counts grouped by status and non-zero inProgress sum', () => {
+    insertBrief('brief-status-test-1', 'draft');
+    insertBrief('brief-status-test-2', 'in_review');
+    insertBrief('brief-status-test-3', 'in_review');
+
+    // Invalidate cache so computeContentPipelineSummary runs fresh
+    invalidateContentPipelineCache(TEST_WORKSPACE);
+
+    const summary = getContentPipelineSummary(TEST_WORKSPACE);
+
+    expect(summary.briefs.total).toBe(3);
+    expect(summary.briefs.byStatus).toEqual({ draft: 1, in_review: 2 });
+
+    const inProgressStatuses = ['in_review', 'ai_generated', 'draft'];
+    const inProgress = inProgressStatuses.reduce(
+      (sum, k) => sum + (summary.briefs.byStatus[k] ?? 0), 0,
+    );
+    expect(inProgress).toBeGreaterThan(0);
   });
 });

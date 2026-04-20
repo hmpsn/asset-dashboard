@@ -303,15 +303,16 @@ describe('assembleOperational', () => {
     expect(labels).toContain('Content refresh');
   });
 
-  it('analytics annotations do not include pageUrl (not in AnalyticsAnnotation interface)', async () => {
+  it('analytics annotations include pageUrl when present (added in Task 3)', async () => {
     const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
     const result = await buildWorkspaceIntelligence('ws-1', { slices: ['operational'] });
 
     const op = result.operational as OperationalSlice;
-    // AnalyticsAnnotation has: id, workspaceId, date, label, category, createdBy, createdAt — no pageUrl
+    // AnalyticsAnnotation now has pageUrl (added via migration 066, page_url column).
+    // The mock at line 63 provides pageUrl: '/blog/test' for the 'Traffic spike' annotation.
     const trafficSpike = op.annotations.find(a => a.label === 'Traffic spike');
     expect(trafficSpike).toBeDefined();
-    expect(trafficSpike?.pageUrl).toBeUndefined();
+    expect(trafficSpike?.pageUrl).toBe('/blog/test');
   });
 
   it('counts pending and running jobs as pendingJobs', async () => {
