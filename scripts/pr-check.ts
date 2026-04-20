@@ -504,7 +504,6 @@ const SLICE_FORMATTER_MAP: Array<{ sliceName: string; formatterName: string }> =
  *  which the property-access regex can't catch). */
 const KNOWN_UNRENDERED_FIELDS = new Set([
   // SeoContextSlice — backlinkProfile and serpFeatures are now rendered by formatSeoContextSection()
-  'keywordRecommendations',
   // InsightsSlice
   'byType', 'forPage',
   // bySeverity: rendered via `const { bySeverity } = insights` (destructuring, not .bySeverity)
