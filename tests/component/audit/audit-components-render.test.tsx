@@ -166,7 +166,7 @@ describe('DeadLinkPanel — smoke render', () => {
     expect(getByText('https://example.com/old-page')).toBeInTheDocument();
   });
 
-  it('shows redirect count badge when multiple links provided', () => {
+  it('shows total dead link count badge when multiple links provided', () => {
     const links = Array.from({ length: 3 }, (_, i) => ({
       url: `https://example.com/dead-${i}`,
       status: 404,
