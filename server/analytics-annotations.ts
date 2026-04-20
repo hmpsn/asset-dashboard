@@ -30,6 +30,9 @@ const stmts = createStmtCache(() => ({
     WHERE workspace_id = ?
     ORDER BY date DESC
   `),
+  delete: db.prepare(
+    `DELETE FROM analytics_annotations WHERE id = ? AND workspace_id = ?`
+  ),
 }));
 
 export function createAnnotation(opts: {
@@ -78,12 +81,13 @@ export function updateAnnotation(
   if (sets.length === 0) return false;
 
   vals.push(id, workspaceId);
+  // Dynamic column set prevents caching — statement shape varies per call
   const stmt = db.prepare(`UPDATE analytics_annotations SET ${sets.join(', ')} WHERE id = ? AND workspace_id = ?`);
   const result = stmt.run(...vals);
   return result.changes > 0;
 }
 
 export function deleteAnnotation(id: string, workspaceId: string): boolean {
-  const result = db.prepare('DELETE FROM analytics_annotations WHERE id = ? AND workspace_id = ?').run(id, workspaceId);
+  const result = stmts().delete.run(id, workspaceId);
   return result.changes > 0;
 }

@@ -173,7 +173,7 @@ describe('computeContentPipelineSummary — briefs.byStatus', () => {
     expect(summary.briefs.total).toBe(0);
   });
 
-  it('populates byStatus with counts grouped by status', () => {
+  it('populates byStatus with counts grouped by status and non-zero inProgress sum', () => {
     insertBrief('brief-status-test-1', 'draft');
     insertBrief('brief-status-test-2', 'in_review');
     insertBrief('brief-status-test-3', 'in_review');
@@ -185,12 +185,7 @@ describe('computeContentPipelineSummary — briefs.byStatus', () => {
 
     expect(summary.briefs.total).toBe(3);
     expect(summary.briefs.byStatus).toEqual({ draft: 1, in_review: 2 });
-  });
 
-  it('inProgress count (draft + in_review + ai_generated) is non-zero when briefs exist', () => {
-    // Uses the briefs already inserted in previous test; cache was recomputed
-    invalidateContentPipelineCache(TEST_WORKSPACE);
-    const summary = getContentPipelineSummary(TEST_WORKSPACE);
     const inProgressStatuses = ['in_review', 'ai_generated', 'draft'];
     const inProgress = inProgressStatuses.reduce(
       (sum, k) => sum + (summary.briefs.byStatus[k] ?? 0), 0,
