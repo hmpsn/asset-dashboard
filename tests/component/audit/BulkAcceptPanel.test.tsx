@@ -6,9 +6,10 @@
  * restore in-progress UI. This test verifies both halves of that contract.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BulkAcceptPanel } from '../../../src/components/audit/BulkAcceptPanel';
+import { seoBulkJobs } from '../../../src/api/seo';
 import type { SeoAuditResult } from '../../../src/components/audit/types';
 
 // ── Module mocks ────────────────────────────────────────────────────────────
@@ -43,6 +44,29 @@ const minimalData: SeoAuditResult = {
   warnings: 0,
   infos: 0,
   pages: [],
+  siteWideIssues: [],
+};
+
+const minimalDataWithFixes: SeoAuditResult = {
+  siteScore: 60,
+  totalPages: 1,
+  errors: 1,
+  warnings: 0,
+  infos: 0,
+  pages: [{
+    pageId: 'fixable-page-1',
+    page: 'Home',
+    slug: '/',
+    url: 'https://example.com/',
+    score: 60,
+    issues: [{
+      check: 'meta-description',
+      severity: 'warning',
+      message: 'Missing meta description',
+      recommendation: 'Add a meta description.',
+      suggestedFix: 'Add a compelling meta description that summarizes the page.',
+    }],
+  }],
   siteWideIssues: [],
 };
 
@@ -187,22 +211,23 @@ describe('BulkAcceptPanel — sessionStorage job recovery', () => {
     expect(mockJobsGet).not.toHaveBeenCalled();
   });
 
-  it('persists new job ID to sessionStorage when bulkAcceptJobId changes', async () => {
-    // No prior session storage — this verifies the persistence useEffect
-    const NEW_JOB_ID = 'job-new-persist';
-    sessionStorage.removeItem(SESSION_KEY);
+  it('persists job ID to sessionStorage when acceptAll is triggered', async () => {
+    vi.mocked(seoBulkJobs.bulkAcceptFixes).mockResolvedValue({ jobId: 'persisted-job-123' } as never);
 
-    mockJobsGet.mockResolvedValue({ status: 'done' });
-    const { onRegisterHandlers } = renderPanel();
+    const { onRegisterHandlers } = renderPanel({ data: minimalDataWithFixes });
 
-    // Wait for onRegisterHandlers to be called (which happens on mount)
+    // Wait for the component to register its handlers with the parent
+    await waitFor(() => expect(onRegisterHandlers).toHaveBeenCalled());
+
+    const handlers = onRegisterHandlers.mock.calls[0][0] as { acceptAll: () => Promise<void> };
+
+    // Trigger the real acceptAllSuggestions — it calls bulkAcceptFixes and setBulkAcceptJobId
+    await act(async () => { await handlers.acceptAll(); });
+
+    // The persistence useEffect writes bulkAcceptJobId to sessionStorage
     await waitFor(() => {
-      expect(onRegisterHandlers).toHaveBeenCalled();
+      expect(sessionStorage.getItem(SESSION_KEY)).toBe('persisted-job-123');
     });
-
-    // Simulate sessionStorage write by directly setting it (testing the effect pathway)
-    sessionStorage.setItem(SESSION_KEY, NEW_JOB_ID);
-    expect(sessionStorage.getItem(SESSION_KEY)).toBe(NEW_JOB_ID);
   });
 
   it('registers acceptAll and cancel handlers with parent', async () => {

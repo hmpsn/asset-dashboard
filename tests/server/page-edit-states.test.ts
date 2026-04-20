@@ -69,7 +69,7 @@ describe('updatePageState', () => {
     expect(result!.slug).toBe('/about'); // preserved from first write
   });
 
-  it('does not downgrade status (issue-detected → clean is blocked unless explicit)', () => {
+  it('does not downgrade status (in-review → fix-proposed is blocked by STATUS_PRIORITY)', () => {
     const ws = wsId('nodown');
     seedWorkspace(ws);
 

@@ -41,11 +41,11 @@ vi.mock('../../../src/hooks/admin', () => ({
   useAuditSchedule: () => ({ data: null }),
 }));
 
-// ── Wrapper ───────────────────────────────────────────────────────────────────
+// ── Wrapper — new QueryClient per test to avoid cross-test cache pollution ────
 
-function TestWrapper({ children }: { children: React.ReactNode }) {
+function makeWrapper() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return (
+  return ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={qc}>
       <MemoryRouter>{children}</MemoryRouter>
     </QueryClientProvider>
@@ -68,51 +68,36 @@ describe('CwvSummaryCard — smoke render', () => {
 
   it('renders without throwing when mobile CWV data provided', () => {
     expect(() =>
-      render(
-        <TestWrapper>
-          <CwvSummaryCard cwvSummary={{ mobile: mobileCwv }} />
-        </TestWrapper>,
-      ),
+      render(<CwvSummaryCard cwvSummary={{ mobile: mobileCwv }} />, { wrapper: makeWrapper() }),
     ).not.toThrow();
   });
 
   it('renders both mobile and desktop strategies', () => {
     const { getByText } = render(
-      <TestWrapper>
-        <CwvSummaryCard cwvSummary={{ mobile: mobileCwv, desktop: { ...mobileCwv, lighthouseScore: 95 } }} />
-      </TestWrapper>,
+      <CwvSummaryCard cwvSummary={{ mobile: mobileCwv, desktop: { ...mobileCwv, lighthouseScore: 95 } }} />,
+      { wrapper: makeWrapper() },
     );
     expect(getByText('Mobile')).toBeInTheDocument();
     expect(getByText('Desktop')).toBeInTheDocument();
   });
 
   it('renders nothing when both mobile and desktop are absent', () => {
-    const { container } = render(
-      <TestWrapper>
-        <CwvSummaryCard cwvSummary={{}} />
-      </TestWrapper>,
-    );
+    const { container } = render(<CwvSummaryCard cwvSummary={{}} />, { wrapper: makeWrapper() });
     expect(container.firstChild).toBeNull();
   });
 
   it('renders needs-improvement assessment badge', () => {
     const { getByText } = render(
-      <TestWrapper>
-        <CwvSummaryCard
-          cwvSummary={{
-            mobile: { ...mobileCwv, assessment: 'needs-improvement' },
-          }}
-        />
-      </TestWrapper>,
+      <CwvSummaryCard cwvSummary={{ mobile: { ...mobileCwv, assessment: 'needs-improvement' } }} />,
+      { wrapper: makeWrapper() },
     );
     expect(getByText('Needs Work')).toBeInTheDocument();
   });
 
   it('renders poor assessment as "Failed" badge', () => {
     const { getByText } = render(
-      <TestWrapper>
-        <CwvSummaryCard cwvSummary={{ mobile: { ...mobileCwv, assessment: 'poor' } }} />
-      </TestWrapper>,
+      <CwvSummaryCard cwvSummary={{ mobile: { ...mobileCwv, assessment: 'poor' } }} />,
+      { wrapper: makeWrapper() },
     );
     expect(getByText('Failed')).toBeInTheDocument();
   });
@@ -123,28 +108,22 @@ describe('CwvSummaryCard — smoke render', () => {
 describe('ScheduledAuditSettings — smoke render', () => {
   it('renders without throwing with a workspaceId', () => {
     expect(() =>
-      render(
-        <TestWrapper>
-          <ScheduledAuditSettings workspaceId="ws-sched-test" />
-        </TestWrapper>,
-      ),
+      render(<ScheduledAuditSettings workspaceId="ws-sched-test" />, { wrapper: makeWrapper() }),
     ).not.toThrow();
   });
 
   it('renders the "Configure" toggle button', () => {
     const { getByText } = render(
-      <TestWrapper>
-        <ScheduledAuditSettings workspaceId="ws-sched-test" />
-      </TestWrapper>,
+      <ScheduledAuditSettings workspaceId="ws-sched-test" />,
+      { wrapper: makeWrapper() },
     );
     expect(getByText('Configure')).toBeInTheDocument();
   });
 
   it('renders the "Scheduled Audits" label', () => {
     const { getByText } = render(
-      <TestWrapper>
-        <ScheduledAuditSettings workspaceId="ws-sched-test" />
-      </TestWrapper>,
+      <ScheduledAuditSettings workspaceId="ws-sched-test" />,
+      { wrapper: makeWrapper() },
     );
     expect(getByText('Scheduled Audits')).toBeInTheDocument();
   });
@@ -155,40 +134,32 @@ describe('ScheduledAuditSettings — smoke render', () => {
 describe('DeadLinkPanel — smoke render', () => {
   it('renders without throwing with an empty dead link list', () => {
     expect(() =>
-      render(
-        <TestWrapper>
-          <DeadLinkPanel deadLinkDetails={[]} siteId="site-1" />
-        </TestWrapper>,
-      ),
+      render(<DeadLinkPanel deadLinkDetails={[]} siteId="site-1" />, { wrapper: makeWrapper() }),
     ).not.toThrow();
   });
 
   it('renders the "Export CSV" button', () => {
     const { getByText } = render(
-      <TestWrapper>
-        <DeadLinkPanel deadLinkDetails={[]} siteId="site-1" />
-      </TestWrapper>,
+      <DeadLinkPanel deadLinkDetails={[]} siteId="site-1" />,
+      { wrapper: makeWrapper() },
     );
     expect(getByText('Export CSV')).toBeInTheDocument();
   });
 
   it('renders a dead link entry with status and URL', () => {
-    const deadLinks = [
-      {
-        url: 'https://example.com/old-page',
-        status: 404,
-        statusText: 'Not Found',
-        foundOn: 'Home',
-        foundOnSlug: '/',
-        anchorText: 'old link',
-        type: 'internal' as const,
-      },
-    ];
+    const deadLinks = [{
+      url: 'https://example.com/old-page',
+      status: 404,
+      statusText: 'Not Found',
+      foundOn: 'Home',
+      foundOnSlug: '/',
+      anchorText: 'old link',
+      type: 'internal' as const,
+    }];
 
     const { getByText } = render(
-      <TestWrapper>
-        <DeadLinkPanel deadLinkDetails={deadLinks} siteId="site-1" workspaceId="ws-dead" />
-      </TestWrapper>,
+      <DeadLinkPanel deadLinkDetails={deadLinks} siteId="site-1" workspaceId="ws-dead" />,
+      { wrapper: makeWrapper() },
     );
 
     expect(getByText('404')).toBeInTheDocument();
@@ -207,12 +178,10 @@ describe('DeadLinkPanel — smoke render', () => {
     }));
 
     const { getByText } = render(
-      <TestWrapper>
-        <DeadLinkPanel deadLinkDetails={links} siteId="site-1" />
-      </TestWrapper>,
+      <DeadLinkPanel deadLinkDetails={links} siteId="site-1" />,
+      { wrapper: makeWrapper() },
     );
 
-    // Count badge shows total
     expect(getByText('3')).toBeInTheDocument();
   });
 });
@@ -233,30 +202,9 @@ describe('BulkAcceptPanel — smoke render', () => {
   it('renders without throwing (returns null with no error state)', () => {
     expect(() =>
       render(
-        <TestWrapper>
-          <BulkAcceptPanel
-            workspaceId="ws-bulk-smoke"
-            siteId="site-bulk"
-            data={minimalData}
-            appliedFixes={new Set()}
-            setAppliedFixes={vi.fn()}
-            editedSuggestions={{}}
-            onBulkApplyingChange={vi.fn()}
-            onBulkProgressChange={vi.fn()}
-            onBulkError={vi.fn()}
-            onRegisterHandlers={vi.fn()}
-          />
-        </TestWrapper>,
-      ),
-    ).not.toThrow();
-  });
-
-  it('renders null (no DOM output) when there is no error', () => {
-    const { container } = render(
-      <TestWrapper>
         <BulkAcceptPanel
-          workspaceId="ws-bulk-smoke-2"
-          siteId="site-bulk-2"
+          workspaceId="ws-bulk-smoke"
+          siteId="site-bulk"
           data={minimalData}
           appliedFixes={new Set()}
           setAppliedFixes={vi.fn()}
@@ -265,10 +213,28 @@ describe('BulkAcceptPanel — smoke render', () => {
           onBulkProgressChange={vi.fn()}
           onBulkError={vi.fn()}
           onRegisterHandlers={vi.fn()}
-        />
-      </TestWrapper>,
+        />,
+        { wrapper: makeWrapper() },
+      ),
+    ).not.toThrow();
+  });
+
+  it('renders null (no DOM output) when there is no error', () => {
+    const { container } = render(
+      <BulkAcceptPanel
+        workspaceId="ws-bulk-smoke-2"
+        siteId="site-bulk-2"
+        data={minimalData}
+        appliedFixes={new Set()}
+        setAppliedFixes={vi.fn()}
+        editedSuggestions={{}}
+        onBulkApplyingChange={vi.fn()}
+        onBulkProgressChange={vi.fn()}
+        onBulkError={vi.fn()}
+        onRegisterHandlers={vi.fn()}
+      />,
+      { wrapper: makeWrapper() },
     );
-    // Component only renders error banner — should be empty in happy path
     expect(container.firstChild).toBeNull();
   });
 });
