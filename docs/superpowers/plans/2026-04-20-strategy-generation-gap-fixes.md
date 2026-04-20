@@ -10,6 +10,14 @@
 
 ---
 
+## Pre-requisites
+
+- [ ] Spec reviewed and accepted (provided inline — no separate spec file)
+- [ ] Pre-plan audit: **not required** — these are targeted bug fixes and single-site changes, not "all/every/throughout" refactors. Task 3a (flag consolidation) is a simple grep-and-replace of two string literals across ~6 files.
+- [ ] No shared contracts to pre-commit — all types already exist; no new shared-types files needed
+
+---
+
 ## Key File Reference
 
 | Symbol | Location |
@@ -33,27 +41,71 @@
 
 ---
 
-## PR 1: Quick-Win Bug Fixes
+## Task Dependencies
 
-> ⚠️ **Task 1a is already done.** `generateRecommendations` is already called after strategy generation via the `recsInFlight` guard at `keyword-strategy.ts:2174–2181`. Skip it.
+### PR 1
 
-### File Map
+Tasks 1, 2, 3, 4, 5 are logically independent but Tasks 2–4 all modify `keyword-strategy.ts`. Safest sequential order:
 
-| File | What changes |
-|------|-------------|
-| `server/ws-events.ts` | Add `STRATEGY_UPDATED` constant |
-| `src/lib/wsEvents.ts` | Mirror `STRATEGY_UPDATED` constant |
-| `server/routes/keyword-strategy.ts` | Tasks 1b, 1c, 1d, 1f |
-| `server/routes/jobs.ts` | Task 1e |
-| `tests/integration/keyword-strategy-incremental-sse.test.ts` | New — tests Task 1b |
+```
+Task 1 (ws-events.ts, wsEvents.ts)   ← parallel-safe with everything
+Task 5 (jobs.ts)                     ← parallel-safe with everything
+
+Sequential on keyword-strategy.ts (Tasks 2→3→4 can run back-to-back on same file):
+  Task 2 (lines 901–913)
+  Task 3 (line 1255)
+  Task 4 (line 747)
+
+Sequential after Task 1 (imports Task 1's new constant):
+  Task 6 (lines ~2122 + import block)
+```
+
+**Recommended execution for single agent:** 1 → 5 → 2 → 3 → 4 → 6  
+**For parallel dispatch:** Batch A: Task 1 ∥ Task 5 → Batch B: Tasks 2, 3, 4 (sequential on same file) → Task 6
+
+### PR 2
+
+All three tasks modify `keyword-strategy.ts`. Must be sequential. Task 9 modifies the early-exit block introduced by PR1 Task 2 — PR1 must be merged first.
+
+```
+Task 7 (~line 1383–1390)
+Task 8 (~lines 999, post-pageMap, contentGaps)
+Task 9 (~lines 65, 230, 901, 2181, catch)
+```
+
+### PR 3
+
+Task 13 (type replacement) touches code throughout the file. Must run last.
+
+```
+Task 10 (keyword-strategy.ts:865, content-briefs.ts)
+Task 11 (keyword-strategy.ts:1710–1715)
+Task 12 (keyword-strategy.ts:~1388)
+Task 13 (keyword-strategy.ts throughout — run last)
+```
 
 ---
 
-### Task 1 — Add STRATEGY_UPDATED event constants (prerequisite for Task 6)
+## PR 1: Quick-Win Bug Fixes
 
-**Files:**
-- Modify: `server/ws-events.ts`
-- Modify: `src/lib/wsEvents.ts`
+> ⚠️ **Task 1a is already done.** `generateRecommendations` is called post-generation via the `recsInFlight` guard at `keyword-strategy.ts:2174–2181`. Skip it.
+
+### File Map
+
+| File | Tasks |
+|------|-------|
+| `server/ws-events.ts` | Task 1 |
+| `src/lib/wsEvents.ts` | Task 1 |
+| `server/routes/keyword-strategy.ts` | Tasks 2, 3, 4, 6 |
+| `server/routes/jobs.ts` | Task 5 |
+| `tests/integration/keyword-strategy-incremental-sse.test.ts` | Task 2 (new) |
+
+---
+
+### Task 1 — Add STRATEGY_UPDATED event constants (Model: haiku)
+
+**Owns:** `server/ws-events.ts`, `src/lib/wsEvents.ts`  
+**Must not touch:** any file not listed above
 
 - [ ] **Step 1: Add constant to server ws-events.ts**
 
@@ -90,11 +142,10 @@ git commit -m "feat(ws-events): add STRATEGY_UPDATED event constant"
 
 ---
 
-### Task 2 — SSE done event on incremental early exit (spec 1b)
+### Task 2 — SSE done event on incremental early exit (Model: sonnet)
 
-**Files:**
-- Modify: `server/routes/keyword-strategy.ts` (lines 901–913)
-- Create: `tests/integration/keyword-strategy-incremental-sse.test.ts`
+**Owns:** `server/routes/keyword-strategy.ts` lines 901–913, `tests/integration/keyword-strategy-incremental-sse.test.ts`  
+**Must not touch:** line 747 (Task 4), line 1255 (Task 3), lines 2122+ (Task 6), `server/ws-events.ts` (Task 1)
 
 **Background:** When `mode=incremental` and all pages are already fresh, the handler returns early at line 901–913. On the SSE path it calls `sendProgress('complete', ...)` then `res.end()`, but never sends a `data:` event with `{ done: true }`. The frontend (`src/components/KeywordStrategy.tsx`) checks `evt.done && evt.strategy` to invalidate React Query caches — without this event the UI appears to hang after an incremental no-op.
 
@@ -107,8 +158,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 
-// Before using port 13320, verify it's free:
-// grep -r 'createTestContext(' tests/ | grep -v node_modules
+// Verify port is free: grep -r 'createTestContext(' tests/ | grep -o '1[0-9]\{4\}' | sort -n | tail -5
 const PORT = 13320;
 
 describe('keyword strategy — incremental early exit SSE', () => {
@@ -150,6 +200,7 @@ describe('keyword strategy — incremental early exit SSE', () => {
       try { return JSON.parse(l.slice(6)); } catch { return null; }
     }).filter(Boolean);
 
+    expect(events.length).toBeGreaterThan(0);
     const doneEvent = events.find((e: Record<string, unknown>) => e.done === true);
     expect(doneEvent).toBeDefined();
     expect(doneEvent?.upToDate).toBe(true);
@@ -186,7 +237,7 @@ if (pagesToAnalyze.length === 0) {
 }
 ```
 
-Replace only the `if (wantsStream)` branch with:
+Replace the `if (wantsStream)` branch:
 
 ```typescript
 if (pagesToAnalyze.length === 0) {
@@ -228,16 +279,16 @@ git commit -m "fix(keyword-strategy): send done SSE data event on incremental ea
 
 ---
 
-### Task 3 — Wrap uncaught new URL() in GSC summary (spec 1c)
+### Task 3 — Wrap uncaught new URL() in GSC summary (Model: haiku)
 
-**Files:**
-- Modify: `server/routes/keyword-strategy.ts` (line 1255)
+**Owns:** `server/routes/keyword-strategy.ts` line 1255  
+**Must not touch:** lines 901–913 (Task 2), line 747 (Task 4), lines 2122+ (Task 6)
 
 **Background:** Line 1255 calls `new URL(r.page).pathname` without try/catch. Every other `new URL()` in this file is wrapped. A single malformed GSC URL crashes the entire strategy generation for that workspace.
 
 - [ ] **Step 1: Fix the unwrapped call**
 
-Find line 1254–1255 in `server/routes/keyword-strategy.ts`:
+Find lines 1254–1255 in `server/routes/keyword-strategy.ts`:
 
 ```typescript
 gscSummary = `\n\nTop GSC queries (last 90 days):\n` +
@@ -272,10 +323,10 @@ git commit -m "fix(keyword-strategy): wrap new URL() in GSC summary with try/cat
 
 ---
 
-### Task 4 — Fix stale competitorDomainsAtLastFetch (spec 1d)
+### Task 4 — Fix stale competitorDomainsAtLastFetch (Model: haiku)
 
-**Files:**
-- Modify: `server/routes/keyword-strategy.ts` (line 747)
+**Owns:** `server/routes/keyword-strategy.ts` line 747  
+**Must not touch:** lines 901–913 (Task 2), line 1255 (Task 3), lines 2122+ (Task 6)
 
 **Background:** At line 747, `updateWorkspace` saves `competitorDomainsAtLastFetch: ws.competitorDomains ?? []`. But `ws` is a stale snapshot captured at request start — if the user submitted new `competitorDomains` in the request body, those were already saved to the DB at line 235 but `ws` still reflects the old value. The local variable `competitorDomains` (line 235) is the correct source.
 
@@ -291,7 +342,7 @@ if (fetchCompetitors && (competitorKeywordData.length > 0 || keywordGaps.length 
   });
 ```
 
-Replace the `competitorDomainsAtLastFetch` line:
+Replace `ws.competitorDomains ?? []` with `competitorDomains`:
 
 ```typescript
 if (fetchCompetitors && (competitorKeywordData.length > 0 || keywordGaps.length > 0)) {
@@ -318,10 +369,10 @@ git commit -m "fix(keyword-strategy): use request-body competitorDomains not sta
 
 ---
 
-### Task 5 — Forward mode parameter from job system (spec 1e)
+### Task 5 — Forward mode parameter from job system (Model: haiku)
 
-**Files:**
-- Modify: `server/routes/jobs.ts` (lines 537–544)
+**Owns:** `server/routes/jobs.ts` lines 537–544  
+**Must not touch:** any file in `server/routes/keyword-strategy.ts`
 
 **Background:** The job system calls the strategy endpoint internally but never forwards the `mode` parameter. A job queued with `params.mode: 'incremental'` silently runs a full regeneration instead.
 
@@ -373,17 +424,17 @@ git commit -m "fix(jobs): forward mode parameter when calling keyword strategy e
 
 ---
 
-### Task 6 — Broadcast STRATEGY_UPDATED via WebSocket (spec 1f)
+### Task 6 — Broadcast STRATEGY_UPDATED via WebSocket (Model: sonnet)
 
-**Files:**
-- Modify: `server/routes/keyword-strategy.ts` (~line 2122)
+**Owns:** `server/routes/keyword-strategy.ts` import block + lines 2122–2124  
+**Must not touch:** lines 901–913 (Task 2), line 1255 (Task 3), line 747 (Task 4), `server/ws-events.ts` (owned by Task 1 — read-only here)
 
-**Background:** After strategy is saved at line 2122, no WebSocket event is broadcast. Any open tab must poll or refresh to see the new strategy. The pattern from `server/routes/page-strategy.ts:143` (`broadcastToWorkspace(id, WS_EVENTS.BLUEPRINT_GENERATED, {...})`) is the model.
+**Background:** After strategy is saved at line 2122, no WebSocket event is broadcast. Any open tab must poll or refresh to see the new strategy. The pattern from `server/routes/page-strategy.ts:143` (`broadcastToWorkspace(id, WS_EVENTS.BLUEPRINT_GENERATED, {...})`) is the model. Depends on Task 1 having added `STRATEGY_UPDATED` to `WS_EVENTS`.
 
 - [ ] **Step 1: Verify imports not already present**
 
 ```bash
-grep -n "broadcastToWorkspace\|WS_EVENTS" server/routes/keyword-strategy.ts | head -10
+grep -n "broadcastToWorkspace\|from.*ws-events" server/routes/keyword-strategy.ts | head -10
 ```
 
 Expected: no results (neither is currently imported in this file).
@@ -456,18 +507,18 @@ git commit -m "feat(keyword-strategy): broadcast STRATEGY_UPDATED websocket even
 
 ### File Map
 
-| File | What changes |
-|------|-------------|
-| `server/routes/keyword-strategy.ts` | Tasks 2a, 2b, 2c |
-| `tests/unit/keyword-strategy-declined-filter.test.ts` | New — tests Task 2b logic |
-| `tests/integration/keyword-strategy-concurrent-guard.test.ts` | New — tests Task 2c |
+| File | Tasks |
+|------|-------|
+| `server/routes/keyword-strategy.ts` | Tasks 7, 8, 9 |
+| `tests/unit/keyword-strategy-declined-filter.test.ts` | Task 8 (new) |
+| `tests/integration/keyword-strategy-concurrent-guard.test.ts` | Task 9 (new) |
 
 ---
 
-### Task 7 — Wire performanceDeltas into strategy intelligence block (spec 2a)
+### Task 7 — Wire performanceDeltas into intelligence block (Model: sonnet)
 
-**Files:**
-- Modify: `server/routes/keyword-strategy.ts` (~line 1383)
+**Owns:** `server/routes/keyword-strategy.ts` lines ~1383–1390 and import line 46  
+**Must not touch:** lines ~999 (Task 8), lines ~65/230/901/2181/catch (Task 9)
 
 **Background:** `buildStrategyIntelligenceBlock` at line 1383 accepts `performanceDeltas?: Array<{ query, positionDelta, clicksDelta, currentPosition }>` but always receives `undefined`. Content decay insights from `getInsights(ws.id)` (already fetched in the same try-block) can fill this field, giving the AI visibility into pages losing organic clicks.
 
@@ -524,7 +575,7 @@ intelligenceBlock = buildStrategyIntelligenceBlock({
 });
 ```
 
-Make sure `insights` is in scope (it is — it's loaded via `getInsights(ws.id)` earlier in the same try block).
+`insights` is already in scope from `getInsights(ws.id)` earlier in the same try block.
 
 - [ ] **Step 3: Typecheck**
 
@@ -543,11 +594,10 @@ git commit -m "feat(keyword-strategy): wire content_decay insights into intellig
 
 ---
 
-### Task 8 — Hard-filter declined keywords from pool and AI output (spec 2b)
+### Task 8 — Hard-filter declined keywords from pool and AI output (Model: sonnet)
 
-**Files:**
-- Modify: `server/routes/keyword-strategy.ts` (~line 999 and content gap post-processing)
-- Create: `tests/unit/keyword-strategy-declined-filter.test.ts`
+**Owns:** `server/routes/keyword-strategy.ts` lines ~999 (pool filter), post-generation pageMap filter, contentGaps filter; `tests/unit/keyword-strategy-declined-filter.test.ts`  
+**Must not touch:** lines ~1383–1390 (Task 7), lines ~65/230/901/2181/catch (Task 9)
 
 **Background:** `declinedKeywords` (loaded at line 851) are injected as a prompt instruction, but the AI can still slip them through. Three hard filters are needed: (1) remove from keyword pool before the AI sees it, (2) strip from `pageMap` primary/secondary keywords after generation, (3) strip from `contentGaps` by `targetKeyword`. This mirrors how `filterBrandedKeywords` and `filterBrandedContentGaps` work.
 
@@ -604,7 +654,7 @@ describe('filterDeclinedFromPool', () => {
 npx vitest run tests/unit/keyword-strategy-declined-filter.test.ts
 ```
 
-Expected: PASS. This validates the logic before wiring it into the route.
+Expected: PASS. Confirms the logic before wiring.
 
 - [ ] **Step 3: Add hard filter on keyword pool**
 
@@ -631,7 +681,7 @@ log.info(`Keyword pool: ${keywordPool.size} unique terms ...`);
 
 - [ ] **Step 4: Add post-generation filter on pageMap**
 
-After the AI returns results and `strategy` is populated (search for `strategy.pageMap` first reference after the OpenAI call — around line 1500+), find a suitable location after `strategy` is first available and add:
+After `strategy` is first populated from the AI response (search `grep -n "strategy\.pageMap" server/routes/keyword-strategy.ts | head -5` to find the first assignment after the AI call), add:
 
 ```typescript
 // Post-generation: hard filter declined keywords from pageMap assignments
@@ -649,14 +699,14 @@ if (declinedKeywords.length > 0 && strategy.pageMap?.length) {
 }
 ```
 
-Note: `declinedSet` is defined in Step 3's scope. If this post-generation code is in a different scope, recompute: `const declinedSet = new Set(declinedKeywords.map(k => k.toLowerCase()));`.
+Note: `declinedSet` is declared in Step 3. If this post-generation code is outside that scope, recompute: `const declinedSet = new Set(declinedKeywords.map(k => k.toLowerCase()));` before using it.
 
 - [ ] **Step 5: Add post-generation filter on contentGaps**
 
-Find the `filterBrandedContentGaps` call in the file (search: `grep -n "filterBrandedContentGaps" server/routes/keyword-strategy.ts`). Add a declined filter immediately after it:
+Find the `filterBrandedContentGaps` call (`grep -n "filterBrandedContentGaps" server/routes/keyword-strategy.ts`). Add immediately after:
 
 ```typescript
-// Filter declined keywords from content gap targets (mirrors filterBrandedContentGaps)
+// Filter declined keywords from content gap targets (mirrors filterBrandedContentGaps pattern)
 if (declinedKeywords.length > 0 && strategy.contentGaps?.length) {
   strategy.contentGaps = strategy.contentGaps.filter(
     (cg: { targetKeyword?: string }) =>
@@ -682,23 +732,22 @@ git commit -m "feat(keyword-strategy): hard-filter declined keywords from pool a
 
 ---
 
-### Task 9 — Add concurrent generation guard (spec 2c)
+### Task 9 — Add concurrent generation guard (Model: sonnet)
 
-**Files:**
-- Modify: `server/routes/keyword-strategy.ts` (~line 65, ~line 230, ~line 901, ~line 2181, ~line 2182)
-- Create: `tests/integration/keyword-strategy-concurrent-guard.test.ts`
+**Owns:** `server/routes/keyword-strategy.ts` lines ~65 (new Set), ~230 (guard entry), ~901 (early-exit cleanup), ~2181 (success cleanup), catch block ~2182; `tests/integration/keyword-strategy-concurrent-guard.test.ts`  
+**Must not touch:** lines ~1383–1390 (Task 7), lines ~999/post-pageMap/contentGaps (Task 8)
 
 **Background:** Two simultaneous strategy generations for the same workspace race to `updateWorkspace` — whichever finishes last wins, possibly overwriting a more complete result. A module-level `Set<string>` guard (mirroring the existing `recsInFlight` at line 65) returns 409 on duplicate in-flight requests.
 
 - [ ] **Step 1: Write the failing test**
 
-Before creating the file, verify the next available port:
+Verify port is free:
 
 ```bash
 grep -r 'createTestContext(' tests/ --include="*.ts" | grep -o '1[0-9]\{4\}' | sort -n | tail -5
 ```
 
-Use the next port after the highest found. The plan assumes 13321 — adjust if taken.
+Expected: highest is 13320 (from Task 2's test). Use 13321.
 
 Create `tests/integration/keyword-strategy-concurrent-guard.test.ts`:
 
@@ -707,7 +756,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 
-const PORT = 13321; // verify free before using
+const PORT = 13321;
 
 describe('keyword strategy — concurrent generation guard', () => {
   let ctx: Awaited<ReturnType<typeof createTestContext>>;
@@ -733,7 +782,6 @@ describe('keyword strategy — concurrent generation guard', () => {
     };
     const body = JSON.stringify({});
 
-    // Fire both concurrently — one should get 409
     const [res1, res2] = await Promise.all([
       fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${workspaceId}`, {
         method: 'POST', headers, body,
@@ -777,7 +825,7 @@ const activeGenerations = new Set<string>();
 
 - [ ] **Step 4: Add guard at handler entry**
 
-In the POST handler, find the `getConfiguredProvider` call (~line 230). Immediately after it, add the guard:
+In the POST handler, find the `getConfiguredProvider` call (~line 230). Immediately after it:
 
 ```typescript
 const provider = getConfiguredProvider(ws.seoDataProvider);
@@ -788,18 +836,18 @@ if (activeGenerations.has(ws.id)) {
 activeGenerations.add(ws.id);
 ```
 
-All existing early returns before this point (usage limit, missing API key) fire before `activeGenerations.add` and do not need cleanup.
+All existing early returns before this point (usage limit, missing API key) fire before `activeGenerations.add` — they do not need cleanup.
 
 - [ ] **Step 5: Clean up on incremental early exit**
 
-In the early-exit block (~line 901–913, modified by Task 2 in PR1), add `activeGenerations.delete` before `return`:
+In the early-exit block at lines 901–913 (modified by PR1 Task 2), add `activeGenerations.delete` before `return`:
 
 ```typescript
 if (pagesToAnalyze.length === 0) {
   log.info({ workspaceId: ws.id }, 'Incremental mode: all pages already fresh, skipping re-analysis');
   sendProgress('complete', 'All pages are already up to date — no re-analysis needed.', 1.0);
   if (keepalive) clearInterval(keepalive);
-  activeGenerations.delete(ws.id);  // ← add this line
+  activeGenerations.delete(ws.id);
   if (wantsStream) {
     res.write(`data: ${JSON.stringify({ done: true, strategy: ws.keywordStrategy, upToDate: true })}\n\n`);
     res.end();
@@ -842,7 +890,7 @@ Add cleanup at the very top of the catch body:
 grep -n "activeGenerations.delete\|return res\.\|^    return;" server/routes/keyword-strategy.ts | head -30
 ```
 
-Confirm every `return` that fires after `activeGenerations.add(ws.id)` has a preceding `activeGenerations.delete(ws.id)`, or is reached only via the catch block (which now handles cleanup).
+Confirm every `return` that fires after `activeGenerations.add(ws.id)` either has a preceding `activeGenerations.delete(ws.id)` or routes through the catch block (which now handles cleanup).
 
 - [ ] **Step 9: Run the test to verify it passes**
 
@@ -875,23 +923,21 @@ git commit -m "feat(keyword-strategy): add concurrent generation guard — 409 o
 
 ### File Map
 
-| File | What changes |
-|------|-------------|
-| `server/routes/keyword-strategy.ts` | Tasks 3b, 3c, 3d |
-| `server/routes/content-briefs.ts` | Task 3a (flag rename) |
-| `shared/types/feature-flags.ts` | Task 3a (remove stale flag if registered) |
-| `tests/unit/question-keyword-matching.test.ts` | New — tests Task 3b logic |
+| File | Tasks |
+|------|-------|
+| `server/routes/keyword-strategy.ts` | Tasks 11, 12, 13 |
+| `server/routes/content-briefs.ts` | Task 10 |
+| `shared/types/feature-flags.ts` | Task 10 |
+| `tests/unit/question-keyword-matching.test.ts` | Task 11 (new) |
 
 ---
 
-### Task 10 — Consolidate dual feature flags (spec 3a)
+### Task 10 — Consolidate dual feature flags (Model: haiku)
 
-**Files:**
-- Modify: `server/routes/keyword-strategy.ts` (line 865)
-- Modify: `server/routes/content-briefs.ts` (confirm usage)
-- Modify: `shared/types/feature-flags.ts` (if `outcome-adaptive-pipeline` is registered)
+**Owns:** `server/routes/keyword-strategy.ts` line 865, `server/routes/content-briefs.ts` (flag line), `shared/types/feature-flags.ts`  
+**Must not touch:** lines 1710–1715 (Task 11), lines ~1388 (Task 12), line 881+ (Task 13)
 
-**Background:** `outcome-adaptive-pipeline` (in keyword-strategy.ts:865 and content-briefs.ts) and `outcome-ai-injection` (in seo-context.ts, content-brief.ts, workspace-intelligence.ts, monthly-digest.ts) gate the same behavior: loading workspace learnings and injecting into AI prompts. Keeping `outcome-ai-injection` (more widely used). `monthly-digest.ts` already uses `outcome-ai-injection` — confirmed.
+**Background:** `outcome-adaptive-pipeline` (in keyword-strategy.ts:865 and content-briefs.ts) and `outcome-ai-injection` (in seo-context.ts, content-brief.ts, workspace-intelligence.ts, monthly-digest.ts) gate the same behavior. Keeping `outcome-ai-injection` — it's more widely used and already used in monthly-digest.ts.
 
 - [ ] **Step 1: Audit all occurrences**
 
@@ -899,11 +945,11 @@ git commit -m "feat(keyword-strategy): add concurrent generation guard — 409 o
 grep -rn "outcome-adaptive-pipeline\|outcome-ai-injection" server/ --include="*.ts"
 ```
 
-Document every file and line. Expected: `outcome-adaptive-pipeline` in keyword-strategy.ts and possibly content-briefs.ts; `outcome-ai-injection` everywhere else.
+Document every file and line. Expected: `outcome-adaptive-pipeline` only in keyword-strategy.ts and content-briefs.ts; `outcome-ai-injection` everywhere else.
 
 - [ ] **Step 2: Replace all outcome-adaptive-pipeline occurrences**
 
-In every file from Step 1 that uses `outcome-adaptive-pipeline`, replace with `outcome-ai-injection`. Use Edit tool per file. For `server/routes/keyword-strategy.ts` at line 865:
+For each file identified in Step 1 using `outcome-adaptive-pipeline`, replace with `outcome-ai-injection`. In `server/routes/keyword-strategy.ts` at line 865:
 
 ```typescript
 // Before
@@ -915,7 +961,7 @@ if (isFeatureEnabled('outcome-adaptive-pipeline')) {
 if (isFeatureEnabled('outcome-ai-injection')) {
 ```
 
-Apply the same replacement to `server/routes/content-briefs.ts` at whatever line Step 1 identified.
+Apply the same replacement in `server/routes/content-briefs.ts`.
 
 - [ ] **Step 3: Verify no remaining occurrences**
 
@@ -950,13 +996,12 @@ git commit -m "refactor(feature-flags): consolidate outcome-adaptive-pipeline in
 
 ---
 
-### Task 11 — Improve question-keyword matching for content gaps (spec 3b)
+### Task 11 — Improve question-keyword matching for content gaps (Model: haiku)
 
-**Files:**
-- Modify: `server/routes/keyword-strategy.ts` (lines 1710–1715)
-- Create: `tests/unit/question-keyword-matching.test.ts`
+**Owns:** `server/routes/keyword-strategy.ts` lines 1710–1715, `tests/unit/question-keyword-matching.test.ts`  
+**Must not touch:** line 865 (Task 10), lines ~1388 (Task 12), line 881+ (Task 13)
 
-**Background:** The filter at line 1712 checks only the first word of the target keyword: `includes(...split(' ')[0])`. For a target like `"technical seo"`, it only checks `"technical"`, causing false positives. Multi-word overlap (require at least 2 matching words, or all words if target has only 1) is more precise.
+**Background:** The filter at line 1712 checks only the first word of the target keyword: `includes(...split(' ')[0])`. For `"technical seo"`, it only checks `"technical"`, causing false positives. Multi-word overlap (require ≥2 matching words, or all words if target has only 1) is more precise.
 
 - [ ] **Step 1: Write the test**
 
@@ -990,13 +1035,13 @@ describe('improved question-keyword matching', () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it passes (pure logic)**
+- [ ] **Step 2: Run the test to verify the logic**
 
 ```bash
 npx vitest run tests/unit/question-keyword-matching.test.ts
 ```
 
-Expected: PASS. Confirms the logic before wiring.
+Expected: PASS. Confirms logic before wiring.
 
 - [ ] **Step 3: Apply the fix**
 
@@ -1046,24 +1091,24 @@ git commit -m "fix(keyword-strategy): improve question-keyword matching to requi
 
 ---
 
-### Task 12 — Consume buildStrategySignals in strategy generation (spec 3c)
+### Task 12 — Consume buildStrategySignals in generation (Model: sonnet)
 
-**Files:**
-- Modify: `server/routes/keyword-strategy.ts` (~line 1388)
+**Owns:** `server/routes/keyword-strategy.ts` ~lines 1388–1395  
+**Must not touch:** line 865 (Task 10), lines 1710–1715 (Task 11), line 881+ (Task 13)
 
-**Background:** `buildStrategySignals` is imported at line 50 but never called during strategy generation. It returns `StrategySignal[]` where each has a `detail` field (not `summary` — do not use `s.summary`). The `insights` array is already in scope at the `buildStrategyIntelligenceBlock` call site.
+**Background:** `buildStrategySignals` is imported at line 50 but never called during strategy generation. It returns `StrategySignal[]` where each has a `detail` field (not `summary` — do not use `s.summary`). The `insights` array is already in scope at the `buildStrategyIntelligenceBlock` call site. `contentDecayDeltas` is also already in scope from Task 7 (PR2).
 
-- [ ] **Step 1: Verify the import and confirm it's unused**
+- [ ] **Step 1: Verify the import is unused**
 
 ```bash
 grep -n "buildStrategySignals" server/routes/keyword-strategy.ts
 ```
 
-Expected: one line (the import at line 50). If it already appears elsewhere, read that code before proceeding.
+Expected: one result (the import at line 50). If it already appears elsewhere in the file, read that code before proceeding.
 
 - [ ] **Step 2: Add the signals call after the intelligence block**
 
-Find the `buildStrategyIntelligenceBlock` call (~line 1383–1388) — now with the `contentDecayDeltas` from Task 7 (PR2). Immediately after the closing `});` of the `buildStrategyIntelligenceBlock` call, add:
+Find the `buildStrategyIntelligenceBlock` call (~lines 1383–1388). Immediately after its closing `});`, add:
 
 ```typescript
 // Append feedback-loop signals to give the AI real performance context
@@ -1072,8 +1117,6 @@ if (stratSignals.length > 0) {
   intelligenceBlock += `\n\nSTRATEGY SIGNALS (analytics feedback loop — use to prioritize recommendations):\n${stratSignals.slice(0, 10).map(s => `- [${s.type}] ${s.detail}`).join('\n')}`;
 }
 ```
-
-Note: `intelligenceBlock` is a `string` variable in scope. `insights` is already in scope from `getInsights(ws.id)` earlier in the same try block.
 
 - [ ] **Step 3: Typecheck + build**
 
@@ -1092,24 +1135,24 @@ git commit -m "feat(keyword-strategy): consume buildStrategySignals in intellige
 
 ---
 
-### Task 13 — Replace strategy: any with StrategyOutput type (spec 3d)
+### Task 13 — Replace strategy: any with StrategyOutput type (Model: opus)
 
-**Files:**
-- Modify: `server/routes/keyword-strategy.ts` (line 881 + downstream)
+**Owns:** `server/routes/keyword-strategy.ts` — new interface definitions (~line 128 area) + line 881 + all downstream usages  
+**Must not touch:** line 865 (Task 10), lines 1710–1715 (Task 11), lines ~1388–1395 (Task 12)
 
-**Background:** `let strategy: any` at line 881 hides all type errors in the AI response handling. Replacing it with a typed interface surfaces mismatches at compile time. All fields should start as optional to avoid breaking the large surface area of downstream usage.
+**Background:** `let strategy: any` at line 881 hides all type errors in the AI response handling. Replacing with a typed interface surfaces mismatches at compile time. All fields start optional to avoid breaking the large downstream surface area.
 
-- [ ] **Step 1: Find the StrategyIntelligenceInput type location**
+- [ ] **Step 1: Find the interface definition zone**
 
 ```bash
-grep -n "interface Strat\|type Strat\|StrategyIntelligenceInput" server/routes/keyword-strategy.ts | head -10
+grep -n "interface Strat\|interface.*Input\|StrategyIntelligenceInput" server/routes/keyword-strategy.ts | head -10
 ```
 
-Note the line number where similar types are defined (around line 128). This is where `StrategyOutput` will be added.
+Note the line where `StrategyIntelligenceInput` is defined (~line 128). This is where the new interfaces go.
 
 - [ ] **Step 2: Define StrategyOutput and nested interfaces**
 
-Immediately after the `StrategyIntelligenceInput` interface definition (or adjacent to it in the file), add these interfaces:
+Immediately after the `StrategyIntelligenceInput` interface definition, add:
 
 ```typescript
 interface StrategyPageMapEntry {
@@ -1175,13 +1218,11 @@ Find line 881:
 let strategy: any;
 ```
 
-Replace:
+Replace (remove the eslint-disable comment too):
 
 ```typescript
 let strategy: StrategyOutput;
 ```
-
-If the eslint-disable comment is only for this line, remove it too.
 
 - [ ] **Step 4: Fix downstream type errors iteratively**
 
@@ -1189,14 +1230,13 @@ If the eslint-disable comment is only for this line, remove it too.
 npm run typecheck 2>&1 | head -80
 ```
 
-For each error, apply the minimal fix:
+For each error:
+- **Property does not exist** → add the field (optional) to the relevant interface
+- **Type 'X' not assignable to 'Y'** → use optional chaining or cast the parsed JSON: `strategy = parsed as StrategyOutput`
+- **Object possibly undefined** → add `?.` or `?? []`
+- Array iterations like `strategy.pageMap.map(...)` → use `(strategy.pageMap ?? []).map(...)`
 
-- **Property does not exist** → add the field (as optional) to the relevant interface
-- **Type 'X' is not assignable to type 'Y'** → narrow with `?.` or add a cast where the field is set from the parsed JSON (e.g., `strategy = parsed as StrategyOutput`)
-- **Object is possibly undefined** → add `?.` optional chaining
-- For array iteration like `strategy.pageMap.map(...)` → use `strategy.pageMap?.map(...)` or `(strategy.pageMap ?? []).map(...)`
-
-Repeat until `npm run typecheck` returns zero errors.
+Repeat until zero errors.
 
 - [ ] **Step 5: Typecheck + build + full suite + pr-check**
 
@@ -1215,13 +1255,50 @@ git commit -m "refactor(keyword-strategy): replace strategy: any with typed Stra
 
 ---
 
-## Quality Gates (all three PRs)
+## Systemic Improvements
 
-Before opening each PR, all four must pass with zero errors:
+### Shared utilities
+- **`filterDeclinedFromPool`**: Task 8 inlines the declined-keyword filter loop. If a second call site emerges (e.g., a future quick-wins filter), extract to a named function alongside `filterBrandedKeywords` in `server/competitor-brand-filter.ts`. YAGNI for now — leave inline until the second use case appears.
+
+### pr-check rules to add
+- **Unwrapped `new URL()` in server files**: A rule that flags `new URL(` not followed within 2 lines by `} catch` or `// url-fetch-ok` would have caught Task 3's bug before it shipped. Authoring guide: `docs/rules/pr-check-rule-authoring.md`.
+- **Stale `ws.X` after `updateWorkspace`**: Mechanizing Task 4's bug class (reading `ws.competitorDomains` after already saving a new value to DB) is complex — skip for now.
+
+### New test coverage
+| Test file | What it covers |
+|-----------|---------------|
+| `tests/integration/keyword-strategy-incremental-sse.test.ts` | SSE done event on incremental no-op exit (Task 2) |
+| `tests/unit/keyword-strategy-declined-filter.test.ts` | Declined keyword pool filter logic (Task 8) |
+| `tests/integration/keyword-strategy-concurrent-guard.test.ts` | 409 on concurrent generation for same workspace (Task 9) |
+| `tests/unit/question-keyword-matching.test.ts` | Multi-word question-keyword overlap filter (Task 11) |
+
+---
+
+## Verification Strategy
+
+### Per-PR quality gate (run before opening each PR)
 
 ```bash
 npm run typecheck && npx vite build && npx vitest run && npx tsx scripts/pr-check.ts
 ```
+
+All four must pass with zero errors.
+
+### PR 1 specific
+- Task 2: `npx vitest run tests/integration/keyword-strategy-incremental-sse.test.ts --reporter=verbose` — verify `done: true` event appears in the SSE stream
+- Task 6: Run `grep -n "broadcastToWorkspace\|WS_EVENTS" server/routes/keyword-strategy.ts` — verify both imports and the call site appear
+
+### PR 2 specific
+- Task 8: `npx vitest run tests/unit/keyword-strategy-declined-filter.test.ts --reporter=verbose`
+- Task 9: `npx vitest run tests/integration/keyword-strategy-concurrent-guard.test.ts --reporter=verbose` — verify 409 appears in output
+- Task 9 exit-path coverage: `grep -n "activeGenerations.delete" server/routes/keyword-strategy.ts` — expect exactly 3 results (early exit, success path, catch block)
+
+### PR 3 specific
+- Task 10: `grep -rn "outcome-adaptive-pipeline" server/` — expect zero results
+- Task 13: `npm run typecheck` with zero errors is the primary gate — type safety is the whole point
+
+### Staging gate
+Each PR merges to `staging` first. After deploy verification on staging, merge `staging → main`. See `docs/workflows/deploy.md`.
 
 ---
 
@@ -1235,7 +1312,7 @@ npm run typecheck && npx vite build && npx vitest run && npx tsx scripts/pr-chec
 | 1d Fix stale competitorDomainsAtLastFetch | Task 4 | ✅ |
 | 1e Forward mode from job system | Task 5 | ✅ |
 | 1f WebSocket broadcast after strategy generation | Tasks 1 + 6 | ✅ |
-| 2a Wire performanceDeltas (content decay) | Task 7 | ✅ Note: position fields unavailable in ContentDecayData, set to 0 |
+| 2a Wire performanceDeltas (content decay) | Task 7 | ✅ Position fields unavailable in ContentDecayData — set to 0, click delta still useful |
 | 2b Hard-filter declined keywords | Task 8 | ✅ Pool + pageMap + contentGaps |
 | 2c Concurrent generation guard | Task 9 | ✅ |
 | 3a Consolidate feature flags | Task 10 | ✅ Keep `outcome-ai-injection` |
