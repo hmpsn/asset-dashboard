@@ -67,6 +67,10 @@ const log = createLogger('keyword-strategy');
 // avoids wasted work and redundant broadcasts.
 const recsInFlight = new Set<string>();
 
+// Concurrent generation guard: prevents two simultaneous strategy generations for the same
+// workspace from racing to the DB. The second request receives a 409 immediately.
+const activeGenerations = new Set<string>();
+
 // ── Incremental mode helpers ─────────────────────────────────────
 
 const INCREMENTAL_THRESHOLD_DAYS = 7;
@@ -216,10 +220,17 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (!ws.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
 
+  // Concurrent generation guard: reject duplicate in-flight requests immediately.
+  if (activeGenerations.has(ws.id)) {
+    return res.status(409).json({ error: 'A keyword strategy is already being generated for this workspace' });
+  }
+  activeGenerations.add(ws.id);
+
   // Usage limit check
   const tier = ws.tier || 'free';
   const strategyUsage = checkUsageLimit(ws.id, tier, 'strategy_generations');
   if (!strategyUsage.allowed) {
+    activeGenerations.delete(ws.id);
     return res.status(429).json({
       error: 'Strategy generation limit reached',
       message: `You've used all ${strategyUsage.limit} strategy generations this month. Upgrade for more.`,
@@ -228,7 +239,10 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
   }
 
   const openaiKey = process.env.OPENAI_API_KEY;
-  if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
+  if (!openaiKey) {
+    activeGenerations.delete(ws.id);
+    return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
+  }
 
   const provider = getConfiguredProvider(ws.seoDataProvider);
 
@@ -890,6 +904,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
         log.info({ workspaceId: ws.id }, 'Incremental mode: all pages already fresh, skipping re-analysis');
         sendProgress('complete', 'All pages are already up to date — no re-analysis needed.', 1.0);
         if (keepalive) clearInterval(keepalive); // prevent setInterval leak on early exit
+        activeGenerations.delete(ws.id);
         // Match the dual-response pattern used at the normal exit (line ~1999):
         // SSE callers already got progress events + the sendProgress('complete') above.
         // JSON callers need a proper response body — res.end() gives them an empty 200.
@@ -2221,8 +2236,10 @@ Rules:
         .catch(err => log.warn({ err, workspaceId: ws.id }, 'Failed to refresh recommendations after strategy update'))
         .finally(() => recsInFlight.delete(ws.id));
     }
+    activeGenerations.delete(ws.id);
     return;
   } catch (err) {
+    activeGenerations.delete(ws.id);
     if (keepalive) clearInterval(keepalive);
     const msg = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error ? err.stack : '';
