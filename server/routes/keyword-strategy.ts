@@ -43,8 +43,8 @@ import { createLogger } from '../logger.js';
 import db from '../db/index.js';
 import { parseJsonFallback } from '../db/json-validation.js';
 import { getInsights } from '../analytics-insights-store.js';
-import type { KeywordClusterData, CompetitorGapData, ConversionAttributionData } from '../../shared/types/analytics.js';
-import type { Workspace } from '../../shared/types/workspace.js';
+import type { KeywordClusterData, CompetitorGapData, ConversionAttributionData, ContentDecayData } from '../../shared/types/analytics.js';
+import type { Workspace, PageKeywordMap, KeywordStrategy } from '../../shared/types/workspace.js';
 import { METRICS_SOURCE } from '../../shared/types/keywords.js';
 import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
 import { buildStrategySignals } from '../insight-feedback.js';
@@ -59,6 +59,7 @@ import { getDeclinedKeywords, getRequestedKeywords } from '../keyword-feedback.j
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { requireWorkspaceAccess } from '../auth.js';
+import { filterDeclinedFromPool, matchesQuestionKeyword } from '../strategy-filters.js';
 
 const log = createLogger('keyword-strategy');
 
@@ -66,6 +67,10 @@ const log = createLogger('keyword-strategy');
 // (e.g. rapid strategy re-generations). Final write wins via SQLite upsert; this just
 // avoids wasted work and redundant broadcasts.
 const recsInFlight = new Set<string>();
+
+// Concurrent generation guard: prevents two simultaneous strategy generations for the same
+// workspace from racing to the DB. The second request receives a 409 immediately.
+const activeGenerations = new Set<string>();
 
 // ── Incremental mode helpers ─────────────────────────────────────
 
@@ -156,6 +161,76 @@ interface StrategyIntelligenceInput {
     conversionRate: number;
     sessions: number;
   }>;
+  contentDecay?: Array<{
+    pageId: string;
+    clicksDelta: number;
+    deltaPercent: number;
+  }>;
+}
+
+interface StrategyPageMapEntry {
+  pagePath: string;
+  pageTitle?: string;
+  primaryKeyword: string;
+  secondaryKeywords?: string[];
+  intent?: string;
+  searchIntent?: string;
+  rationale?: string;
+  impressions?: number;
+  clicks?: number;
+  currentPosition?: number;
+  previousPosition?: number;
+  trendDirection?: string;
+  serpFeatures?: string[];
+  serpTargeting?: string[];
+  questionKeywords?: string[];
+  validated?: boolean;
+  volume?: number;
+  difficulty?: number;
+  cpc?: number;
+  metricsSource?: string;
+  gscKeywords?: { query: string; clicks: number; impressions: number; position: number }[];
+  secondaryMetrics?: { keyword: string; volume: number; difficulty: number }[];
+  analysisGeneratedAt?: string;
+}
+
+interface StrategyContentGap {
+  topic?: string;
+  targetKeyword: string;
+  intent?: string;
+  priority?: string;
+  rationale?: string;
+  suggestedPageType?: string;
+  competitorProof?: string;
+  impressions?: number;
+  volume?: number;
+  difficulty?: number;
+  trendDirection?: string;
+  serpFeatures?: string[];
+  serpTargeting?: string[];
+  questionKeywords?: string[];
+}
+
+interface StrategyQuickWin {
+  pagePath: string;
+  action: string;
+  estimatedImpact?: string;
+  rationale?: string;
+  roiScore?: number;
+}
+
+interface StrategyKeywordFix {
+  pagePath: string;
+  newPrimaryKeyword: string;
+}
+
+interface StrategyOutput {
+  siteKeywords?: string[];
+  opportunities?: string[];
+  contentGaps?: StrategyContentGap[];
+  quickWins?: StrategyQuickWin[];
+  keywordFixes?: StrategyKeywordFix[];
+  pageMap?: StrategyPageMapEntry[];
 }
 
 /**
@@ -196,6 +271,15 @@ export function buildStrategyIntelligenceBlock(opts: StrategyIntelligenceInput):
     sections.push(`PERFORMANCE CHANGES (keywords with significant position/click changes — declining keywords need defensive strategy):\n${lines.join('\n')}`);
   }
 
+  // Content decay
+  if (opts.contentDecay && opts.contentDecay.length > 0) {
+    const lines = opts.contentDecay.slice(0, 10).map(d => {
+      const pctStr = d.deltaPercent != null ? ` (${d.deltaPercent > 0 ? '+' : ''}${Math.round(d.deltaPercent)}%)` : '';
+      return `  ${d.pageId}: ${d.clicksDelta > 0 ? '+' : ''}${d.clicksDelta} clicks${pctStr}`;
+    });
+    sections.push(`CONTENT DECAY (pages losing organic clicks — consider refreshing content or updating keyword targeting):\n${lines.join('\n')}`);
+  }
+
   // Conversion data
   if (opts.conversionPages && opts.conversionPages.length > 0) {
     const lines = opts.conversionPages.slice(0, 10).map(c => {
@@ -216,7 +300,12 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (!ws.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
 
-  // Usage limit check
+  // Concurrent generation guard: reject duplicate in-flight requests immediately.
+  if (activeGenerations.has(ws.id)) {
+    return res.status(409).json({ error: 'A keyword strategy is already being generated for this workspace' });
+  }
+
+  // Usage limit check (before activeGenerations.add — no cleanup needed on early exit)
   const tier = ws.tier || 'free';
   const strategyUsage = checkUsageLimit(ws.id, tier, 'strategy_generations');
   if (!strategyUsage.allowed) {
@@ -228,7 +317,9 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
   }
 
   const openaiKey = process.env.OPENAI_API_KEY;
-  if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
+  if (!openaiKey) {
+    return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
+  }
 
   const provider = getConfiguredProvider(ws.seoDataProvider);
 
@@ -264,6 +355,11 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
   // Keepalive pings to prevent Render proxy from killing idle SSE connection
   // Declared before outer try so it can be cleared in both success and error paths
   let keepalive: ReturnType<typeof setInterval> | null = null;
+
+  // Mark workspace in-progress AFTER all sync setup — any throw above (DB/parse errors)
+  // will propagate without polluting activeGenerations. The finally block below
+  // is the single cleanup point for all exit paths inside the try.
+  activeGenerations.add(ws.id);
 
   try {
     // 1. Resolve site base URL — auto-resolve liveDomain if missing
@@ -850,7 +946,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
     }
 
     // Adaptive pipeline: inject workspace learnings for difficulty range guidance
-    if (isFeatureEnabled('outcome-adaptive-pipeline')) {
+    if (isFeatureEnabled('outcome-ai-injection')) {
       try {
         const learnings = getWorkspaceLearnings(ws.id);
         if (learnings) {
@@ -865,8 +961,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
       }
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let strategy: any;
+    let strategy: StrategyOutput = {};
     // Hoisted out of the try-block so incremental-mode post-processing (below) can reference it.
     let pagesToAnalyze: typeof pageInfo = [];
     try {
@@ -889,7 +984,6 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
       if (pagesToAnalyze.length === 0) {
         log.info({ workspaceId: ws.id }, 'Incremental mode: all pages already fresh, skipping re-analysis');
         sendProgress('complete', 'All pages are already up to date — no re-analysis needed.', 1.0);
-        if (keepalive) clearInterval(keepalive); // prevent setInterval leak on early exit
         // Match the dual-response pattern used at the normal exit (line ~1999):
         // SSE callers already got progress events + the sendProgress('complete') above.
         // JSON callers need a proper response body — res.end() gives them an empty 200.
@@ -986,6 +1080,10 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
     }
     // Filter branded competitor keywords from the pool BEFORE feeding to AI
     const brandedRemoved = filterBrandedKeywords(keywordPool, competitorDomains);
+    // Hard filter: remove declined keywords before the AI sees the pool (prompt instruction is soft)
+    const declinedSet = new Set(declinedKeywords.map(k => k.toLowerCase()));
+    const declinedPoolRemoved = filterDeclinedFromPool(keywordPool, declinedKeywords);
+    if (declinedPoolRemoved > 0) log.info(`Removed ${declinedPoolRemoved} declined keywords from keyword pool`);
     log.info(`Keyword pool: ${keywordPool.size} unique terms (${semrushDomainData.length} domain + ${competitorKeywordData.length} competitor + ${keywordGaps.length} gaps + ${clientKeywordsAdded} client + GSC)${brandedRemoved > 0 ? ` — removed ${brandedRemoved} branded competitor keywords` : ''}`);
     if (keywordPool.size > 0) {
       // Sort by volume descending and include ALL keywords
@@ -1373,12 +1471,29 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
           .filter(i => i.insightType === 'conversion_attribution')
           .map(i => ({ pageUrl: i.pageId || '', ...(i.data as unknown as ConversionAttributionData) }))
           .sort((a, b) => b.conversionRate - a.conversionRate);
+        const contentDecaySignals = insights
+          .filter(i => i.insightType === 'content_decay' && i.pageId)
+          .map(i => {
+            const d = i.data as unknown as ContentDecayData;
+            return {
+              pageId: i.pageId!,
+              clicksDelta: d.currentClicks - d.baselineClicks,
+              deltaPercent: d.deltaPercent,
+            };
+          });
+
         intelligenceBlock = buildStrategyIntelligenceBlock({
           keywordClusters: keywordClusters.length > 0 ? keywordClusters : undefined,
           competitorGaps: competitorGaps.length > 0 ? competitorGaps : undefined,
           conversionPages: conversionPages.length > 0 ? conversionPages : undefined,
-          performanceDeltas: undefined,
+          contentDecay: contentDecaySignals.length > 0 ? contentDecaySignals : undefined,
         });
+
+        // Append feedback-loop signals to give the AI real performance context
+        const stratSignals = buildStrategySignals(insights);
+        if (stratSignals.length > 0) {
+          intelligenceBlock += `\n\nSTRATEGY SIGNALS (analytics feedback loop — use to prioritize recommendations):\n${stratSignals.slice(0, 10).map(s => `- [${s.type}] ${s.detail}`).join('\n')}`;
+        }
       }
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* non-critical — strategy works without intelligence data */ }
 
@@ -1462,6 +1577,19 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
       log.info(`Applied ${masterData.keywordFixes.length} keyword conflict fixes`);
     }
 
+    // Post-generation hard filter: remove declined keywords from siteKeywords.
+    // The AI prompt instructs this, but LLMs don't always comply — hard filter is the real defense.
+    if (declinedKeywords.length > 0 && masterData.siteKeywords?.length) {
+      const before = masterData.siteKeywords.length;
+      masterData.siteKeywords = masterData.siteKeywords.filter(
+        (kw: string) => !declinedSet.has(kw.toLowerCase())
+      );
+      const declinedSiteKwsRemoved = before - masterData.siteKeywords.length;
+      if (declinedSiteKwsRemoved > 0) {
+        log.info(`Stripped ${declinedSiteKwsRemoved} declined keywords from siteKeywords despite prompt instruction`);
+      }
+    }
+
     // Post-generation hard filter: remove any content gaps containing competitor brand names.
     // The AI prompt tells it not to suggest these, but LLMs don't always comply.
     // This filter is the real defense — the prompt is the soft guardrail.
@@ -1470,16 +1598,41 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
     if (brandedGaps.length > 0) {
       log.info(`Stripped ${brandedGaps.length} branded content gaps despite prompt instruction: ${brandedGaps.map((g: { targetKeyword: string }) => g.targetKeyword).join(', ')}`);
     }
+    // Filter declined keywords from content gap targets (mirrors filterBrandedContentGaps pattern)
+    let finalContentGaps = cleanContentGaps;
+    if (declinedKeywords.length > 0 && cleanContentGaps.length > 0) {
+      finalContentGaps = cleanContentGaps.filter(
+        (cg: { targetKeyword?: string }) =>
+          !cg.targetKeyword || !declinedSet.has(cg.targetKeyword.toLowerCase())
+      );
+      const declinedGapsRemoved = cleanContentGaps.length - finalContentGaps.length;
+      if (declinedGapsRemoved > 0) {
+        log.info(`Stripped ${declinedGapsRemoved} declined content gaps despite prompt instruction`);
+      }
+    }
 
     // Assemble final strategy: batch pageMap + master site-level data
     strategy = {
       siteKeywords: masterData.siteKeywords || [],
       pageMap: allPageMappings,
       opportunities: masterData.opportunities || [],
-      contentGaps: cleanContentGaps,
+      contentGaps: finalContentGaps,
       quickWins: masterData.quickWins || [],
     };
-    log.info(`Final strategy: ${strategy.pageMap.length} pages, ${strategy.siteKeywords.length} site keywords, ${strategy.contentGaps.length} content gaps, ${strategy.quickWins.length} quick wins`);
+    // Post-generation: hard filter declined keywords from pageMap assignments
+    if (declinedKeywords.length > 0 && strategy.pageMap?.length) {
+      for (const pm of strategy.pageMap) {
+        if (pm.primaryKeyword && declinedSet.has(pm.primaryKeyword.toLowerCase())) {
+          pm.primaryKeyword = '';
+        }
+        if (pm.secondaryKeywords?.length) {
+          pm.secondaryKeywords = pm.secondaryKeywords.filter(
+            (k: string) => !declinedSet.has(k.toLowerCase())
+          );
+        }
+      }
+    }
+    log.info(`Final strategy: ${strategy.pageMap?.length ?? 0} pages, ${strategy.siteKeywords?.length ?? 0} site keywords, ${strategy.contentGaps?.length ?? 0} content gaps, ${strategy.quickWins?.length ?? 0} quick wins`);
 
     } catch (batchErr) {
       if (keepalive) clearInterval(keepalive);
@@ -1500,9 +1653,11 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
           try { return new URL(r.page).pathname === pm.pagePath; } catch (err) { return false; }
         });
         if (matchingRows.length > 0) {
-          const kwMatch = matchingRows.find(r => r.query.toLowerCase().includes(pm.primaryKeyword.toLowerCase()));
-          if (kwMatch) {
-            pm.currentPosition = kwMatch.position;
+          if (pm.primaryKeyword) {
+            const kwMatch = matchingRows.find(r => r.query.toLowerCase().includes(pm.primaryKeyword.toLowerCase()));
+            if (kwMatch) {
+              pm.currentPosition = kwMatch.position;
+            }
           }
           // Don't set currentPosition from a non-matching query — it's misleading
 
@@ -1522,6 +1677,8 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
       // Build lookup: keyword → metrics
       const kwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k]));
       for (const pm of strategy.pageMap) {
+        // Skip pages with no primary keyword (declined filter may have cleared it, or AI omitted it)
+        if (!pm.primaryKeyword) continue;
         const match = kwLookup.get(pm.primaryKeyword.toLowerCase());
         if (match) {
           pm.volume = match.volume;
@@ -1702,7 +1859,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
         // Attach related question keywords to each gap
         if (allQuestionKws.length > 0) {
           const relatedQs = allQuestionKws.flatMap(q => q.questions)
-            .filter(q => q.keyword.toLowerCase().includes(cg.targetKeyword.toLowerCase().split(' ')[0]))
+            .filter(q => matchesQuestionKeyword(cg.targetKeyword, q.keyword))
             .slice(0, 3)
             .map(q => q.keyword);
           if (relatedQs.length > 0) cg.questionKeywords = relatedQs;
@@ -1749,6 +1906,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
     {
       const kwPages = new Map<string, Array<{ path: string; source: 'keyword_map' | 'gsc' }>>();
       for (const pm of strategy.pageMap) {
+        if (!pm.primaryKeyword) continue;
         const kw = pm.primaryKeyword.toLowerCase();
         if (!kwPages.has(kw)) kwPages.set(kw, []);
         kwPages.get(kw)!.push({ path: pm.pagePath, source: 'keyword_map' });
@@ -1991,14 +2149,14 @@ Rules:
       if (withVolume.length > 0) {
         // Sort by volume descending, then priority
         strategy.contentGaps = withVolume.sort(
-          (a: { volume?: number; priority: string }, b: { volume?: number; priority: string }) =>
-            (b.volume || 0) - (a.volume || 0) || prioWeight(b.priority) - prioWeight(a.priority)
+          (a: StrategyContentGap, b: StrategyContentGap) =>
+            (b.volume || 0) - (a.volume || 0) || prioWeight(b.priority ?? '') - prioWeight(a.priority ?? '')
         );
       } else {
         // No volume data available — keep all but sort by priority
         strategy.contentGaps = strategy.contentGaps.sort(
-          (a: { priority: string }, b: { priority: string }) =>
-            prioWeight(b.priority) - prioWeight(a.priority)
+          (a: StrategyContentGap, b: StrategyContentGap) =>
+            prioWeight(b.priority ?? '') - prioWeight(a.priority ?? '')
         );
       }
       log.info(`Content gaps: ${withVolume.length} with volume data, ${strategy.contentGaps.length} total kept`);
@@ -2048,15 +2206,15 @@ Rules:
     // incremental run re-analyzes everything (COALESCE preserves NULL, not the current time).
     const now = new Date().toISOString();
     if (strategyMode === 'full') {
-      const stampedMap = pageMap.map((pm: { pagePath: string }) => ({ ...pm, analysisGeneratedAt: now }));
+      const stampedMap = pageMap.map((pm) => ({ ...pm, analysisGeneratedAt: now })) as PageKeywordMap[];
       upsertAndCleanPageKeywords(ws.id, stampedMap);
     } else {
       // Only update the pages that were actually re-analyzed in this incremental run.
       // Pages with fresh analysis_generated_at are left untouched in the DB.
       const analyzedPaths = new Set(pagesToAnalyze.map(p => p.path));
       const analyzedMappings = pageMap
-        .filter((pm: { pagePath: string }) => analyzedPaths.has(pm.pagePath))
-        .map((pm: { pagePath: string }) => ({ ...pm, analysisGeneratedAt: now }));
+        .filter((pm) => analyzedPaths.has(pm.pagePath))
+        .map((pm) => ({ ...pm, analysisGeneratedAt: now })) as PageKeywordMap[];
       upsertPageKeywordsBatch(ws.id, analyzedMappings);
     }
     // Bridge #5: page keywords replaced — invalidate page caches
@@ -2112,7 +2270,7 @@ Rules:
       saveStrategyHistory();
     }
 
-    updateWorkspace(ws.id, { keywordStrategy });
+    updateWorkspace(ws.id, { keywordStrategy: keywordStrategy as KeywordStrategy });
     broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, {
       pageCount: pageMap.length,
       siteKeywords: keywordStrategy.siteKeywords?.length || 0,
@@ -2144,7 +2302,10 @@ Rules:
     // Auto-seed rank tracking with strategy keywords (deduplicates internally)
     try {
       const seedKeywords = new Set<string>();
-      for (const kw of keywordStrategy.siteKeywords || []) seedKeywords.add(kw.toLowerCase().trim());
+      for (const kw of keywordStrategy.siteKeywords || []) {
+        const normalized = kw.toLowerCase().trim();
+        if (normalized) seedKeywords.add(normalized); // skip empty strings
+      }
       for (const pm of pageMap) {
         if (pm.primaryKeyword) seedKeywords.add(pm.primaryKeyword.toLowerCase().trim());
       }
@@ -2178,7 +2339,6 @@ Rules:
     }
     return;
   } catch (err) {
-    if (keepalive) clearInterval(keepalive);
     const msg = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error ? err.stack : '';
     log.error({ detail: msg, stack }, 'Keyword strategy error');
@@ -2187,6 +2347,9 @@ Rules:
       return;
     }
     res.status(500).json({ error: msg });
+  } finally {
+    activeGenerations.delete(ws.id);
+    if (keepalive) clearInterval(keepalive);
   }
 });
 

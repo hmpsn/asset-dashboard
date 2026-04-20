@@ -137,12 +137,13 @@ describe('strategy generation pipeline — static wiring', () => {
     expect(keywordStrategySrc).toContain('ws.competitorDomains || []');
   });
 
-  it('uses the filtered content gaps (cleanContentGaps) in the final strategy — not the raw AI output', () => {
-    // contentGaps in the final strategy object must reference cleanContentGaps, not rawContentGaps
-    expect(keywordStrategySrc).toContain('contentGaps: cleanContentGaps');
-    // Raw gaps must NOT be used directly
+  it('uses the filtered content gaps in the final strategy — not the raw AI output', () => {
+    // contentGaps in the final strategy object must reference finalContentGaps (which is derived from
+    // cleanContentGaps after the declined-keyword hard filter), never rawContentGaps directly
+    expect(keywordStrategySrc).toContain('contentGaps: finalContentGaps');
+    // Raw gaps must NOT be used directly in the strategy assignment
     const rawUsageAfterFilter = keywordStrategySrc
-      .slice(keywordStrategySrc.indexOf('cleanContentGaps'))
+      .slice(keywordStrategySrc.indexOf('finalContentGaps'))
       .includes('contentGaps: rawContentGaps');
     expect(rawUsageAfterFilter).toBe(false);
   });
