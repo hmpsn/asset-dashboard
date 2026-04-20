@@ -2053,7 +2053,7 @@ function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerb
       if (configEntries.length > 0) {
         lines.push('Scoring thresholds:');
         for (const [type, cfg] of configEntries.slice(0, 5)) {
-          if (cfg) {
+          if (cfg?.thresholds) {
             lines.push(`  ${type}: win ≥ ${cfg.thresholds.win}%, strong win ≥ ${cfg.thresholds.strong_win}%`);
           }
         }
