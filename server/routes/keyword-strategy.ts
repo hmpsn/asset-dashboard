@@ -304,13 +304,11 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
   if (activeGenerations.has(ws.id)) {
     return res.status(409).json({ error: 'A keyword strategy is already being generated for this workspace' });
   }
-  activeGenerations.add(ws.id);
 
-  // Usage limit check
+  // Usage limit check (before activeGenerations.add — no cleanup needed on early exit)
   const tier = ws.tier || 'free';
   const strategyUsage = checkUsageLimit(ws.id, tier, 'strategy_generations');
   if (!strategyUsage.allowed) {
-    activeGenerations.delete(ws.id);
     return res.status(429).json({
       error: 'Strategy generation limit reached',
       message: `You've used all ${strategyUsage.limit} strategy generations this month. Upgrade for more.`,
@@ -320,7 +318,6 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
 
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) {
-    activeGenerations.delete(ws.id);
     return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
   }
 
@@ -358,6 +355,11 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
   // Keepalive pings to prevent Render proxy from killing idle SSE connection
   // Declared before outer try so it can be cleared in both success and error paths
   let keepalive: ReturnType<typeof setInterval> | null = null;
+
+  // Mark workspace in-progress AFTER all sync setup — any throw above (DB/parse errors)
+  // will propagate without polluting activeGenerations. The finally block below
+  // is the single cleanup point for all exit paths inside the try.
+  activeGenerations.add(ws.id);
 
   try {
     // 1. Resolve site base URL — auto-resolve liveDomain if missing
@@ -1577,6 +1579,19 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
       log.info(`Applied ${masterData.keywordFixes.length} keyword conflict fixes`);
     }
 
+    // Post-generation hard filter: remove declined keywords from siteKeywords.
+    // The AI prompt instructs this, but LLMs don't always comply — hard filter is the real defense.
+    if (declinedKeywords.length > 0 && masterData.siteKeywords?.length) {
+      const before = masterData.siteKeywords.length;
+      masterData.siteKeywords = masterData.siteKeywords.filter(
+        (kw: string) => !declinedSet.has(kw.toLowerCase())
+      );
+      const declinedSiteKwsRemoved = before - masterData.siteKeywords.length;
+      if (declinedSiteKwsRemoved > 0) {
+        log.info(`Stripped ${declinedSiteKwsRemoved} declined keywords from siteKeywords despite prompt instruction`);
+      }
+    }
+
     // Post-generation hard filter: remove any content gaps containing competitor brand names.
     // The AI prompt tells it not to suggest these, but LLMs don't always comply.
     // This filter is the real defense — the prompt is the soft guardrail.
@@ -1662,6 +1677,8 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
       // Build lookup: keyword → metrics
       const kwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k]));
       for (const pm of strategy.pageMap) {
+        // Skip pages with no primary keyword (declined filter may have cleared it, or AI omitted it)
+        if (!pm.primaryKeyword) continue;
         const match = kwLookup.get(pm.primaryKeyword.toLowerCase());
         if (match) {
           pm.volume = match.volume;
@@ -2284,7 +2301,10 @@ Rules:
     // Auto-seed rank tracking with strategy keywords (deduplicates internally)
     try {
       const seedKeywords = new Set<string>();
-      for (const kw of keywordStrategy.siteKeywords || []) seedKeywords.add(kw.toLowerCase().trim());
+      for (const kw of keywordStrategy.siteKeywords || []) {
+        const normalized = kw.toLowerCase().trim();
+        if (normalized) seedKeywords.add(normalized); // skip empty strings
+      }
       for (const pm of pageMap) {
         if (pm.primaryKeyword) seedKeywords.add(pm.primaryKeyword.toLowerCase().trim());
       }
