@@ -6,6 +6,7 @@ import { callOpenAI } from './openai-helpers.js';
 import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelligence.js';
 import { listWorkspaces, getBrandName } from './workspaces.js';
 import { createLogger } from './logger.js';
+import { parseJsonFallback } from './db/json-validation.js';
 import type { PageSeoResult } from './audit-page.js';
 
 const log = createLogger('seo-audit-ai-recs');
@@ -154,7 +155,7 @@ Respond in this exact JSON format (only include fields that need fixing):
           const jsonMatch = content.match(/\{[\s\S]*\}/);
           if (!jsonMatch) return;
 
-          const suggestions = JSON.parse(jsonMatch[0]) as { title?: string; metaDescription?: string; ogTitle?: string };
+          const suggestions = parseJsonFallback<{ title?: string; metaDescription?: string; ogTitle?: string }>(jsonMatch[0], {});
 
           if (suggestions.title && titleIssue) {
             titleIssue.suggestedFix = suggestions.title;

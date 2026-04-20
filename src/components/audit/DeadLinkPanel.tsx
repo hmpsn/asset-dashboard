@@ -7,12 +7,11 @@ import type { DeadLinkItem } from './types';
 
 interface DeadLinkPanelProps {
   deadLinkDetails: DeadLinkItem[];
-  deadLinkSummary: { total: number; internal: number; external: number; redirects: number };
   siteId: string;
   workspaceId?: string;
 }
 
-export function DeadLinkPanel({ deadLinkDetails, deadLinkSummary, siteId, workspaceId }: DeadLinkPanelProps) {
+export function DeadLinkPanel({ deadLinkDetails, siteId, workspaceId }: DeadLinkPanelProps) {
   const navigate = useNavigate();
   const [redirectFormUrl, setRedirectFormUrl] = useState<string | null>(null);
   const [redirectFormTo, setRedirectFormTo] = useState('');
