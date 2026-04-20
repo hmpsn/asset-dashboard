@@ -49,9 +49,16 @@ beforeAll(async () => {
 
   // Premium tier so strategy_generations limit doesn't block us.
   // Fake webflowSiteId so the "No Webflow site linked" check passes.
+  // Set a minimal keywordStrategy so ws.keywordStrategy is non-null on early exit.
   updateWorkspace(workspaceId, {
     webflowSiteId: 'fake-site-id-sse-early-exit-test',
     tier: 'premium',
+    keywordStrategy: {
+      siteKeywords: ['seo agency'],
+      pageMap: [],
+      opportunities: [],
+      generatedAt: new Date().toISOString(),
+    },
   });
 
   // Seed three fresh pages (< 7 days old) so getPagesNeedingAnalysis returns toAnalyze = [].
@@ -101,9 +108,11 @@ describe('keyword strategy — incremental early exit SSE', () => {
 
     expect(events.length).toBeGreaterThan(0);
 
-    // The done event must be present with upToDate: true
+    // The done event must be present with upToDate: true and a valid strategy
     const doneEvent = events.find((e: Record<string, unknown>) => e.done === true);
     expect(doneEvent).toBeDefined();
     expect(doneEvent?.upToDate).toBe(true);
+    // Validate strategy is non-null so frontend cache invalidation path triggers
+    expect(doneEvent?.strategy).toBeTruthy();
   });
 });
