@@ -16,6 +16,7 @@ export interface Annotation {
   category: string;
   createdBy: string | null;
   createdAt: string;
+  pageUrl?: string;
 }
 
 const stmts = createStmtCache(() => ({
@@ -24,7 +25,7 @@ const stmts = createStmtCache(() => ({
     VALUES (?, ?, ?, ?, ?, ?)
   `),
   select: db.prepare(`
-    SELECT id, workspace_id AS workspaceId, date, label, category, created_by AS createdBy, created_at AS createdAt
+    SELECT id, workspace_id AS workspaceId, date, label, category, created_by AS createdBy, created_at AS createdAt, page_url AS pageUrl
     FROM analytics_annotations
     WHERE workspace_id = ?
     ORDER BY date DESC
