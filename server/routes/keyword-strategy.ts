@@ -58,8 +58,6 @@ import { generateRecommendations } from '../recommendations.js';
 import { getDeclinedKeywords, getRequestedKeywords } from '../keyword-feedback.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
-import { requireWorkspaceAccess } from '../auth.js';
-import { filterDeclinedFromPool, matchesQuestionKeyword } from '../strategy-filters.js';
 
 const log = createLogger('keyword-strategy');
 
@@ -160,11 +158,6 @@ interface StrategyIntelligenceInput {
     conversions: number;
     conversionRate: number;
     sessions: number;
-  }>;
-  contentDecay?: Array<{
-    pageId: string;
-    clicksDelta: number;
-    deltaPercent: number;
   }>;
 }
 
@@ -271,15 +264,6 @@ export function buildStrategyIntelligenceBlock(opts: StrategyIntelligenceInput):
     sections.push(`PERFORMANCE CHANGES (keywords with significant position/click changes — declining keywords need defensive strategy):\n${lines.join('\n')}`);
   }
 
-  // Content decay
-  if (opts.contentDecay && opts.contentDecay.length > 0) {
-    const lines = opts.contentDecay.slice(0, 10).map(d => {
-      const pctStr = d.deltaPercent != null ? ` (${d.deltaPercent > 0 ? '+' : ''}${Math.round(d.deltaPercent)}%)` : '';
-      return `  ${d.pageId}: ${d.clicksDelta > 0 ? '+' : ''}${d.clicksDelta} clicks${pctStr}`;
-    });
-    sections.push(`CONTENT DECAY (pages losing organic clicks — consider refreshing content or updating keyword targeting):\n${lines.join('\n')}`);
-  }
-
   // Conversion data
   if (opts.conversionPages && opts.conversionPages.length > 0) {
     const lines = opts.conversionPages.slice(0, 10).map(c => {
@@ -295,7 +279,7 @@ export function buildStrategyIntelligenceBlock(opts: StrategyIntelligenceInput):
 }
 
 // --- Keyword Strategy Generation (SSE progress) ---
-router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (!ws.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
@@ -304,11 +288,13 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
   if (activeGenerations.has(ws.id)) {
     return res.status(409).json({ error: 'A keyword strategy is already being generated for this workspace' });
   }
+  activeGenerations.add(ws.id);
 
-  // Usage limit check (before activeGenerations.add — no cleanup needed on early exit)
+  // Usage limit check
   const tier = ws.tier || 'free';
   const strategyUsage = checkUsageLimit(ws.id, tier, 'strategy_generations');
   if (!strategyUsage.allowed) {
+    activeGenerations.delete(ws.id);
     return res.status(429).json({
       error: 'Strategy generation limit reached',
       message: `You've used all ${strategyUsage.limit} strategy generations this month. Upgrade for more.`,
@@ -318,6 +304,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
 
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) {
+    activeGenerations.delete(ws.id);
     return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
   }
 
@@ -355,11 +342,6 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
   // Keepalive pings to prevent Render proxy from killing idle SSE connection
   // Declared before outer try so it can be cleared in both success and error paths
   let keepalive: ReturnType<typeof setInterval> | null = null;
-
-  // Mark workspace in-progress AFTER all sync setup — any throw above (DB/parse errors)
-  // will propagate without polluting activeGenerations. The finally block below
-  // is the single cleanup point for all exit paths inside the try.
-  activeGenerations.add(ws.id);
 
   try {
     // 1. Resolve site base URL — auto-resolve liveDomain if missing
@@ -984,6 +966,8 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
       if (pagesToAnalyze.length === 0) {
         log.info({ workspaceId: ws.id }, 'Incremental mode: all pages already fresh, skipping re-analysis');
         sendProgress('complete', 'All pages are already up to date — no re-analysis needed.', 1.0);
+        if (keepalive) clearInterval(keepalive); // prevent setInterval leak on early exit
+        activeGenerations.delete(ws.id);
         // Match the dual-response pattern used at the normal exit (line ~1999):
         // SSE callers already got progress events + the sendProgress('complete') above.
         // JSON callers need a proper response body — res.end() gives them an empty 200.
@@ -1082,7 +1066,10 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
     const brandedRemoved = filterBrandedKeywords(keywordPool, competitorDomains);
     // Hard filter: remove declined keywords before the AI sees the pool (prompt instruction is soft)
     const declinedSet = new Set(declinedKeywords.map(k => k.toLowerCase()));
-    const declinedPoolRemoved = filterDeclinedFromPool(keywordPool, declinedKeywords);
+    let declinedPoolRemoved = 0;
+    for (const [kw] of keywordPool) {
+      if (declinedSet.has(kw)) { keywordPool.delete(kw); declinedPoolRemoved++; }
+    }
     if (declinedPoolRemoved > 0) log.info(`Removed ${declinedPoolRemoved} declined keywords from keyword pool`);
     log.info(`Keyword pool: ${keywordPool.size} unique terms (${semrushDomainData.length} domain + ${competitorKeywordData.length} competitor + ${keywordGaps.length} gaps + ${clientKeywordsAdded} client + GSC)${brandedRemoved > 0 ? ` — removed ${brandedRemoved} branded competitor keywords` : ''}`);
     if (keywordPool.size > 0) {
@@ -1471,22 +1458,24 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
           .filter(i => i.insightType === 'conversion_attribution')
           .map(i => ({ pageUrl: i.pageId || '', ...(i.data as unknown as ConversionAttributionData) }))
           .sort((a, b) => b.conversionRate - a.conversionRate);
-        const contentDecaySignals = insights
-          .filter(i => i.insightType === 'content_decay' && i.pageId)
+        const contentDecayDeltas = insights
+          .filter(i => i.insightType === 'content_decay')
           .map(i => {
             const d = i.data as unknown as ContentDecayData;
             return {
-              pageId: i.pageId!,
+              query: i.pageId || '',
+              positionDelta: 0,
               clicksDelta: d.currentClicks - d.baselineClicks,
-              deltaPercent: d.deltaPercent,
+              currentPosition: 0,
             };
-          });
+          })
+          .filter(d => d.query);
 
         intelligenceBlock = buildStrategyIntelligenceBlock({
           keywordClusters: keywordClusters.length > 0 ? keywordClusters : undefined,
           competitorGaps: competitorGaps.length > 0 ? competitorGaps : undefined,
           conversionPages: conversionPages.length > 0 ? conversionPages : undefined,
-          contentDecay: contentDecaySignals.length > 0 ? contentDecaySignals : undefined,
+          performanceDeltas: contentDecayDeltas.length > 0 ? contentDecayDeltas : undefined,
         });
 
         // Append feedback-loop signals to give the AI real performance context
@@ -1577,19 +1566,6 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
       log.info(`Applied ${masterData.keywordFixes.length} keyword conflict fixes`);
     }
 
-    // Post-generation hard filter: remove declined keywords from siteKeywords.
-    // The AI prompt instructs this, but LLMs don't always comply — hard filter is the real defense.
-    if (declinedKeywords.length > 0 && masterData.siteKeywords?.length) {
-      const before = masterData.siteKeywords.length;
-      masterData.siteKeywords = masterData.siteKeywords.filter(
-        (kw: string) => !declinedSet.has(kw.toLowerCase())
-      );
-      const declinedSiteKwsRemoved = before - masterData.siteKeywords.length;
-      if (declinedSiteKwsRemoved > 0) {
-        log.info(`Stripped ${declinedSiteKwsRemoved} declined keywords from siteKeywords despite prompt instruction`);
-      }
-    }
-
     // Post-generation hard filter: remove any content gaps containing competitor brand names.
     // The AI prompt tells it not to suggest these, but LLMs don't always comply.
     // This filter is the real defense — the prompt is the soft guardrail.
@@ -1653,11 +1629,9 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
           try { return new URL(r.page).pathname === pm.pagePath; } catch (err) { return false; }
         });
         if (matchingRows.length > 0) {
-          if (pm.primaryKeyword) {
-            const kwMatch = matchingRows.find(r => r.query.toLowerCase().includes(pm.primaryKeyword.toLowerCase()));
-            if (kwMatch) {
-              pm.currentPosition = kwMatch.position;
-            }
+          const kwMatch = matchingRows.find(r => r.query.toLowerCase().includes(pm.primaryKeyword.toLowerCase()));
+          if (kwMatch) {
+            pm.currentPosition = kwMatch.position;
           }
           // Don't set currentPosition from a non-matching query — it's misleading
 
@@ -1677,8 +1651,6 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
       // Build lookup: keyword → metrics
       const kwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k]));
       for (const pm of strategy.pageMap) {
-        // Skip pages with no primary keyword (declined filter may have cleared it, or AI omitted it)
-        if (!pm.primaryKeyword) continue;
         const match = kwLookup.get(pm.primaryKeyword.toLowerCase());
         if (match) {
           pm.volume = match.volume;
@@ -1858,8 +1830,13 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
         }
         // Attach related question keywords to each gap
         if (allQuestionKws.length > 0) {
+          const targetWords = cg.targetKeyword.toLowerCase().split(/\s+/);
           const relatedQs = allQuestionKws.flatMap(q => q.questions)
-            .filter(q => matchesQuestionKeyword(cg.targetKeyword, q.keyword))
+            .filter(q => {
+              const qLower = q.keyword.toLowerCase();
+              const matchCount = targetWords.filter((w: string) => qLower.includes(w)).length;
+              return matchCount >= Math.min(2, targetWords.length);
+            })
             .slice(0, 3)
             .map(q => q.keyword);
           if (relatedQs.length > 0) cg.questionKeywords = relatedQs;
@@ -1906,7 +1883,6 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
     {
       const kwPages = new Map<string, Array<{ path: string; source: 'keyword_map' | 'gsc' }>>();
       for (const pm of strategy.pageMap) {
-        if (!pm.primaryKeyword) continue;
         const kw = pm.primaryKeyword.toLowerCase();
         if (!kwPages.has(kw)) kwPages.set(kw, []);
         kwPages.get(kw)!.push({ path: pm.pagePath, source: 'keyword_map' });
@@ -2270,7 +2246,7 @@ Rules:
       saveStrategyHistory();
     }
 
-    updateWorkspace(ws.id, { keywordStrategy: keywordStrategy as KeywordStrategy });
+    updateWorkspace(ws.id, { keywordStrategy: keywordStrategy as unknown as KeywordStrategy });
     broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, {
       pageCount: pageMap.length,
       siteKeywords: keywordStrategy.siteKeywords?.length || 0,
@@ -2302,10 +2278,7 @@ Rules:
     // Auto-seed rank tracking with strategy keywords (deduplicates internally)
     try {
       const seedKeywords = new Set<string>();
-      for (const kw of keywordStrategy.siteKeywords || []) {
-        const normalized = kw.toLowerCase().trim();
-        if (normalized) seedKeywords.add(normalized); // skip empty strings
-      }
+      for (const kw of keywordStrategy.siteKeywords || []) seedKeywords.add(kw.toLowerCase().trim());
       for (const pm of pageMap) {
         if (pm.primaryKeyword) seedKeywords.add(pm.primaryKeyword.toLowerCase().trim());
       }
@@ -2337,8 +2310,11 @@ Rules:
         .catch(err => log.warn({ err, workspaceId: ws.id }, 'Failed to refresh recommendations after strategy update'))
         .finally(() => recsInFlight.delete(ws.id));
     }
+    activeGenerations.delete(ws.id);
     return;
   } catch (err) {
+    activeGenerations.delete(ws.id);
+    if (keepalive) clearInterval(keepalive);
     const msg = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error ? err.stack : '';
     log.error({ detail: msg, stack }, 'Keyword strategy error');
@@ -2347,9 +2323,6 @@ Rules:
       return;
     }
     res.status(500).json({ error: msg });
-  } finally {
-    activeGenerations.delete(ws.id);
-    if (keepalive) clearInterval(keepalive);
   }
 });
 
