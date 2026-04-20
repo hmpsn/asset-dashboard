@@ -3,25 +3,9 @@ import { randomUUID } from 'crypto';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { createLogger } from './logger.js';
-import { normalizePath } from './helpers.js';
+import { normalizePageUrl } from './helpers.js';
 import type { ROIHighlight } from '../shared/types/narrative.js';
 const log = createLogger('roi-attribution');
-
-// ── Path normalization ─────────────────────────────────────────────────────
-// Wraps the shared normalizePath helper (which ensures a leading slash and strips
-// trailing slashes) with full-URL support so callers can pass either a path or a
-// complete URL. Using the shared helper guarantees ROI page_url values are in the
-// same format as insight page_id values for reliable cross-referencing.
-function normalizePageUrl(url: string): string {
-  try {
-    if (url.startsWith('http')) {
-      return normalizePath(new URL(url).pathname);
-    }
-  } catch (err) {
-    // fall through to shared normalizePath on the raw string
-  }
-  return normalizePath(url);
-}
 
 // ── Prepared statement cache ───────────────────────────────────────────────
 interface ROIAttributionRow {

@@ -9,6 +9,7 @@ import { getWorkspace } from '../workspaces.js';
 import { getPageKeyword, upsertPageKeyword } from '../page-keywords.js';
 import { createLogger } from '../logger.js';
 import { parseJsonFallback } from '../db/json-validation.js';
+import { stripCodeFences } from '../helpers.js';
 import { debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { buildWorkspaceIntelligence, formatForPrompt, formatPageMapForPrompt, invalidateIntelligenceCache } from '../workspace-intelligence.js';
 
@@ -106,7 +107,7 @@ Return ONLY valid JSON, no markdown, no explanation.`;
       workspaceId,
     });
 
-    const cleaned = aiResult.text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+    const cleaned = stripCodeFences(aiResult.text);
     const analysis = parseJsonFallback(cleaned, null);
     if (analysis) {
       res.json(analysis);

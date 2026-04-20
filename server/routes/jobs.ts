@@ -12,7 +12,8 @@ import { recordSeoChange } from '../seo-change-tracker.js';
 import { generateAltText } from '../alttext.js';
 import { getDataDir } from '../data-dir.js';
 import { notifyClientRecommendationsReady, notifyClientAuditComplete } from '../email.js';
-import { applySuppressionsToAudit, buildSchemaContext, resolvePagePath } from '../helpers.js';
+import { applySuppressionsToAudit, buildSchemaContext, resolvePagePath, stripHtmlToText, stripCodeFences } from '../helpers.js';
+import { resolveBaseUrl } from '../url-helpers.js';
 import { getCachedArchitecture } from '../site-architecture.js';
 import {
   createJob,
@@ -402,15 +403,7 @@ router.post('/api/jobs', async (req, res) => {
 
             // Resolve base URL for page content fetching
             const bulkWs = bwsId ? getWorkspace(bwsId) : listWorkspaces().find(w => w.webflowSiteId === seoSiteId);
-            let bulkBaseUrl = '';
-            if (bulkWs?.liveDomain) {
-              bulkBaseUrl = bulkWs.liveDomain.startsWith('http') ? bulkWs.liveDomain : `https://${bulkWs.liveDomain}`;
-            } else {
-              try {
-                const sub = await getSiteSubdomain(seoSiteId, token);
-                if (sub) bulkBaseUrl = `https://${sub}.webflow.io`;
-              } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'jobs: programming error'); /* best-effort */ }
-            }
+            const bulkBaseUrl = await resolveBaseUrl({ liveDomain: bulkWs?.liveDomain, webflowSiteId: seoSiteId }, token);
             const bulkBrandName = getBrandName(bulkWs);
 
             const results: Array<{ pageId: string; text: string; applied: boolean; error?: string }> = [];
@@ -430,17 +423,7 @@ router.post('/api/jobs', async (req, res) => {
                     const htmlRes = await fetch(`${bulkBaseUrl}/${page.slug}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
                     if (htmlRes.ok) {
                       const html = await htmlRes.text();
-                      const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-                      const body = bodyMatch ? bodyMatch[1] : html;
-                      contentExcerpt = body
-                        .replace(/<script[\s\S]*?<\/script>/gi, '')
-                        .replace(/<style[\s\S]*?<\/style>/gi, '')
-                        .replace(/<nav[\s\S]*?<\/nav>/gi, '')
-                        .replace(/<footer[\s\S]*?<\/footer>/gi, '')
-                        .replace(/<[^>]+>/g, ' ')
-                        .replace(/\s+/g, ' ')
-                        .trim()
-                        .slice(0, 800);
+                      contentExcerpt = stripHtmlToText(html, { maxLength: 800 });
                     }
                   } catch { /* best-effort — fetch on external URL */ } // url-fetch-ok
                 }
@@ -653,13 +636,7 @@ router.post('/api/jobs', async (req, res) => {
 
             // Discover CMS pages from sitemap
             const paWs = getWorkspace(paWsId);
-            let baseUrl = '';
-            if (paWs?.liveDomain) {
-              baseUrl = paWs.liveDomain.startsWith('http') ? paWs.liveDomain : `https://${paWs.liveDomain}`;
-            } else {
-              const sub = await getSiteSubdomain(paSiteId, paToken);
-              if (sub) baseUrl = `https://${sub}.webflow.io`;
-            }
+            const baseUrl = await resolveBaseUrl({ liveDomain: paWs?.liveDomain, webflowSiteId: paSiteId }, paToken);
             if (baseUrl) {
               try {
                 const staticPaths = buildStaticPathSet(published);
@@ -751,18 +728,7 @@ router.post('/api/jobs', async (req, res) => {
                     || html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*name=["']description["']/i);
                   const htmlMeta = metaMatch ? metaMatch[1].trim() : undefined;
 
-                  const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-                  const body = bodyMatch ? bodyMatch[1] : html;
-                  const pageContent = body
-                    .replace(/<script[\s\S]*?<\/script>/gi, '')
-                    .replace(/<style[\s\S]*?<\/style>/gi, '')
-                    .replace(/<nav[\s\S]*?<\/nav>/gi, '')
-                    .replace(/<footer[\s\S]*?<\/footer>/gi, '')
-                    .replace(/<[^>]+>/g, ' ')
-                    .replace(/&[a-z]+;/gi, ' ')
-                    .replace(/\s+/g, ' ')
-                    .trim()
-                    .slice(0, 8000);
+                  const pageContent = stripHtmlToText(html, { maxLength: 8000 });
 
                   const effectiveTitle = page.seoTitle || htmlTitle || page.title;
                   const effectiveMeta = page.metaDesc || htmlMeta;
@@ -810,7 +776,7 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
                     workspaceId: paWsId,
                   });
 
-                  const analysis = JSON.parse(aiResult.text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
+                  const analysis = JSON.parse(stripCodeFences(aiResult.text));
                   applyBulkKeywordGuards(analysis, semrushBlock);
                   batchResults.push({ page, analysis });
                 } catch (err) {

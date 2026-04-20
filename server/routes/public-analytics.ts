@@ -35,7 +35,7 @@ import {
   getGA4PeriodComparison,
   getGA4NewVsReturning,
 } from '../google-analytics.js';
-import { parseDateRange, applySuppressionsToAudit, getAuditTrafficForWorkspace } from '../helpers.js';
+import { parseDateRange, applySuppressionsToAudit, getAuditTrafficForWorkspace, stripCodeFences } from '../helpers.js';
 import { callOpenAI } from '../openai-helpers.js';
 import { getLatestSnapshot } from '../reports.js';
 import {
@@ -110,7 +110,7 @@ Examples:
   });
 
   // Strip markdown fences if present, then parse with schema validation
-  const clean = result.text.trim().replace(/^```json\s*/i, '').replace(/```$/, '').trim();
+  const clean = stripCodeFences(result.text.trim()).trim();
   const intentSchema = z.object({ intent: z.enum(['service_interest', 'content_interest']).nullable() });
   const parsed = parseJsonSafe(clean, intentSchema, null, { field: 'intent-classification' });
   return parsed?.intent ?? null;

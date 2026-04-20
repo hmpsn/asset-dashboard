@@ -15,6 +15,7 @@ import { getInsights } from './analytics-insights-store.js';
 import type { PageHealthData } from '../shared/types/analytics.js';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
+import { CRITICAL_CHECKS, MODERATE_CHECKS, computePageScore } from '../shared/scoring.js';
 
 
 const log = createLogger('helpers');
@@ -40,6 +41,22 @@ export function findPageMapEntry<T extends { pagePath: string }>(pageMap: T[], p
 /** Resolve a Webflow page's canonical path from publishedPath or slug */
 export function resolvePagePath(page: { publishedPath?: string | null; slug?: string }): string {
   return page.publishedPath || (page.slug ? `/${page.slug}` : '/');
+}
+
+/**
+ * Normalize a URL or path for cross-referencing.
+ * Accepts full URLs (https://...) or bare paths. Strips origin, query,
+ * and hash; normalizes trailing slash via normalizePath.
+ * Used for reliable ROI page_url ↔ insight page_id matching.
+ */
+export function normalizePageUrl(url: string): string {
+  try {
+    if (url.startsWith('http')) {
+      return normalizePath(new URL(url).pathname);
+    }
+  } catch { // catch-ok: malformed URL string — fall through to path-only normalization
+  }
+  return normalizePath(url);
 }
 
 // ── Input Validation ──
@@ -73,16 +90,9 @@ function globToRegex(pattern: string): RegExp {
 
 // ── Audit Suppression Helpers ──
 
-// Scoring weights must mirror seo-audit.ts auditPage() exactly
-export const CRITICAL_CHECKS_SET = new Set([
-  'title', 'meta-description', 'canonical', 'h1', 'robots',
-  'duplicate-title', 'mixed-content', 'ssl', 'robots-txt',
-]);
-export const MODERATE_CHECKS_SET = new Set([
-  'content-length', 'heading-hierarchy', 'internal-links', 'img-alt',
-  'og-tags', 'og-image', 'link-text', 'url', 'lang', 'viewport',
-  'duplicate-description', 'img-filesize', 'html-size',
-]);
+// Re-export from shared/scoring.ts (single source of truth — copies to prevent external mutation)
+export const CRITICAL_CHECKS_SET = new Set(CRITICAL_CHECKS);
+export const MODERATE_CHECKS_SET = new Set(MODERATE_CHECKS);
 
 export interface AuditSuppression { check: string; pageSlug: string; pagePattern?: string; reason?: string; createdAt: string }
 
@@ -117,19 +127,7 @@ export function applySuppressionsToAudit(
     });
 
     // Recalculate page score with remaining issues
-    // Weights must mirror audit-page.ts: info=0, softer warning/error deductions
-    let score = 100;
-    for (const issue of filteredIssues) {
-      const isCritical = CRITICAL_CHECKS_SET.has(issue.check);
-      const isModerate = MODERATE_CHECKS_SET.has(issue.check);
-      if (issue.severity === 'error') {
-        score -= isCritical ? 15 : 10;
-      } else if (issue.severity === 'warning') {
-        score -= isCritical ? 5 : isModerate ? 3 : 2;
-      }
-      // info severity: no score impact (industry standard)
-    }
-    score = Math.max(0, Math.min(100, score));
+    const score = computePageScore(filteredIssues);
 
     for (const i of filteredIssues) {
       if (i.severity === 'error') totalErrors++;
@@ -361,4 +359,59 @@ export function readEnvFile(): Record<string, string> {
 export function writeEnvFile(vars: Record<string, string>) {
   const content = Object.entries(vars).map(([k, v]) => `${k}=${v.replace(/[\r\n]/g, '')}`).join('\n') + '\n';
   fs.writeFileSync(ENV_PATH, content);
+}
+
+/**
+ * Fetch the published HTML of a URL. Returns null on network failure or non-OK response.
+ * Lives here (not seo-audit.ts) to avoid a circular import:
+ * seo-audit.ts imports checkSiteLinks from link-checker.ts, so link-checker.ts
+ * cannot import from seo-audit.ts without creating a cycle.
+ */
+export async function fetchPublishedHtml(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, { redirect: 'follow' });
+    if (!res.ok) return null;
+    return await res.text();
+  } catch { return null; }
+}
+
+// ── HTML / AI-response string utilities ──────────────────────────────────────
+
+/**
+ * Extract readable text from an HTML document.
+ * Strips script, style, nav, footer, and optionally header. Collapses whitespace.
+ * NOTE: Not safe for untrusted external HTML. Use only on internal Webflow-fetched pages.
+ */
+export function stripHtmlToText(
+  html: string,
+  opts?: { maxLength?: number; stripHeader?: boolean },
+): string {
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  const body = bodyMatch ? bodyMatch[1] : html;
+  let cleaned = body
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<nav[\s\S]*?<\/nav>/gi, '')
+    .replace(/<footer[\s\S]*?<\/footer>/gi, '');
+  if (opts?.stripHeader) {
+    cleaned = cleaned.replace(/<header[\s\S]*?<\/header>/gi, '');
+  }
+  cleaned = cleaned
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&[a-z]+;/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return opts?.maxLength ? cleaned.slice(0, opts.maxLength) : cleaned;
+}
+
+/**
+ * Strip Markdown code fences from AI responses.
+ * Handles leading ```json, ```html, ```xml, or plain ``` fences.
+ * Only strips the trailing fence when a leading fence was present.
+ */
+export function stripCodeFences(text: string): string {
+  if (!/^```(?:json|html|xml)?\s*/i.test(text)) return text;
+  return text
+    .replace(/^```(?:json|html|xml)?\s*/i, '')
+    .replace(/\s*```\s*$/i, '');
 }

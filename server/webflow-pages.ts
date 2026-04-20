@@ -130,10 +130,16 @@ export async function publishSite(
 
 // --- Get site subdomain for published HTML scanning ---
 export async function getSiteSubdomain(siteId: string, tokenOverride?: string): Promise<string | null> {
-  const res = await webflowFetch(`/sites/${siteId}`, {}, tokenOverride);
-  if (!res.ok) return null;
-  const data = await res.json() as { shortName?: string };
-  return data.shortName || null;
+  // Guard: no token available — callers treat null as "no subdomain found"
+  if (!tokenOverride && !process.env.WEBFLOW_API_TOKEN) return null;
+  try {
+    const res = await webflowFetch(`/sites/${siteId}`, {}, tokenOverride);
+    if (!res.ok) return null;
+    const data = await res.json() as { shortName?: string };
+    return data.shortName || null;
+  } catch { // catch-ok: network failure or missing token → callers treat null as "no subdomain"
+    return null;
+  }
 }
 
 // --- Custom Code API: Register, Apply, and Manage inline scripts ---

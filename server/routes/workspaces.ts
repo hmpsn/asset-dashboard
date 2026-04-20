@@ -24,11 +24,11 @@ import {
 import { listContentRequests } from '../content-requests.js';
 import { notifyClientWelcome } from '../email.js';
 import { applySuppressionsToAudit, resolvePagePath } from '../helpers.js';
+import { resolveBaseUrl } from '../url-helpers.js';
 import { callOpenAI, parseAIJson } from '../openai-helpers.js';
 import { getLatestSnapshot } from '../reports.js';
 import { listRequests } from '../requests.js';
 import {
-  getSiteSubdomain,
   discoverSitemapUrls,
 } from '../webflow.js';
 import { getWorkspacePages, invalidatePageCache } from '../workspace-data.js';
@@ -248,10 +248,7 @@ async function scrapeWorkspaceSite(ws: Workspace): Promise<{ scraped: ScrapedPag
   const { scrapeUrls }: typeof WebScraper = await import('../web-scraper.js'); // dynamic-import-ok
 
   const token = getTokenForSite(ws.webflowSiteId!) || undefined;
-  const subdomain = await getSiteSubdomain(ws.webflowSiteId!, token);
-  const baseUrl = ws.liveDomain
-    ? (ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`)
-    : subdomain ? `https://${subdomain}.webflow.io` : '';
+  const baseUrl = await resolveBaseUrl({ liveDomain: ws.liveDomain, webflowSiteId: ws.webflowSiteId! }, token);
   if (!baseUrl) throw new Error('Could not determine site URL');
 
   const published = await getWorkspacePages(ws.id, ws.webflowSiteId!);

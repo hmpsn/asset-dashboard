@@ -6,6 +6,7 @@
  * GPT-4.1-mini for keyword clustering/assignment.
  */
 import { randomUUID } from 'node:crypto';
+import { stripCodeFences } from './helpers.js';
 import { callAnthropic } from './anthropic-helpers.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { getKeywordOverview, getDomainOrganicKeywords } from './semrush.js';
@@ -180,7 +181,7 @@ Return ONLY a JSON array of objects with these fields. No markdown, no explanati
   // ── 4. Parse AI response ───────────────────────────────────────────────────
   const text = aiResponse.text;
   // Strip markdown code fences if present — then use parseJsonFallback (bare JSON.parse fails pr-check)
-  const jsonStr = text.replace(/^```json?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+  const jsonStr = stripCodeFences(text).trim();
   const generatedEntries = parseJsonFallback<GeneratedBlueprintEntry[]>(jsonStr, []);
   if (generatedEntries.length === 0) {
     log.error({ workspaceId, raw: text.slice(0, 500) }, 'Blueprint AI response parsed to empty array');
