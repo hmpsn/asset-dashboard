@@ -1,23 +1,20 @@
-import { useState, useEffect, useMemo, useRef, Suspense } from 'react';
-import { lazyWithRetry } from '../lib/lazyWithRetry';
-import { get, post, patch, getOptional, getSafe } from '../api/client';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { get, post, patch, getOptional } from '../api/client';
 import { ApiError } from '../api/client';
 import { useNavigate } from 'react-router-dom';
 import { clientPath } from '../routes';
 import {
-  Loader2,
-  Sparkles, AlertTriangle,
+  AlertTriangle,
   Target, Zap, Shield, X,
-  CheckCircle2, LineChart, Lock, Trophy, Check, Layers,
-  Sun, Moon, FileText, Calendar, Clock, CreditCard, Building2,
+  CheckCircle2, LineChart, Trophy, Layers,
+  Clock, CreditCard, Building2, Sparkles,
 } from 'lucide-react';
-const LazyStripePaymentModal = lazyWithRetry(() => import('./StripePaymentForm').then(m => ({ default: m.StripePaymentModal })));
 import { type Tier, Skeleton, OverviewSkeleton, ScannerReveal } from './ui';
 import { STUDIO_NAME, STUDIO_URL } from '../constants';
 import { HealthTab } from './client/HealthTab';
 import { InsightsEngine } from './client/InsightsEngine';
 import { CartProvider } from './client/useCart';
-import { SeoCartButton, SeoCartDrawer } from './client/SeoCart';
+import { SeoCartDrawer } from './client/SeoCart';
 import { OnboardingWizard } from './client/OnboardingWizard';
 import { ClientOnboardingQuestionnaire, type OnboardingData } from './client/ClientOnboardingQuestionnaire';
 import { ROIDashboard } from './client/ROIDashboard';
@@ -43,16 +40,14 @@ import { BrandTab } from './client/BrandTab';
 import { ClientAuthGate } from './client/ClientAuthGate';
 import { EmailCaptureGate } from './client/EmailCaptureGate';
 import { ClientChatWidget, type ClientChatWidgetApi } from './client/ClientChatWidget';
+import { ClientHeader } from './client/ClientHeader';
+import { UpgradeModal } from './client/UpgradeModal';
+import { PricingConfirmationModal } from './client/PricingConfirmationModal';
 import {
   type BusinessProfile,
   type WorkspaceInfo,
   type ClientTab,
-  type ClientContentRequest,
 } from './client/types';
-
-// Module-level date defaults — computed once at import time (not during render)
-const MODULE_DEFAULT_START = new Date(Date.now() - 28 * 86400000).toISOString().split('T')[0];
-const MODULE_TODAY = new Date().toISOString().split('T')[0];
 
 export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: { workspaceId: string; betaMode?: boolean; initialTab?: string }) {
   const brandTabEnabled = useFeatureFlag('client-brand-section');
@@ -440,154 +435,49 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     ...(brandTabEnabled ? [{ id: 'brand' as ClientTab, label: 'Brand', icon: Building2, locked: false }] : []),
   ];
 
+  // hasData function passed to ClientHeader for tab indicator dots
+  const hasData = (tabId: ClientTab): boolean =>
+    tabId === 'overview' ||
+    (tabId === 'performance' && !!(overview || ga4Overview)) ||
+    (tabId === 'health' && !!audit) ||
+    tabId === 'inbox' ||
+    (tabId === 'content-plan' && !!contentPlanSummary && contentPlanSummary.totalCells > 0);
+
   return (
     <ErrorBoundary label="Client Dashboard">
     <BetaProvider value={betaMode}>
     <CartProvider>
     <div className={`min-h-screen bg-[#0f1219] text-zinc-200 ${theme === 'light' ? 'dashboard-light' : ''}`}>
       {!betaMode && <SeoCartDrawer workspaceId={workspaceId} tier={effectiveTier} />}
-      {/* Header */}
-      <header className="border-b border-zinc-800">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <img src="/logo.svg" alt={STUDIO_NAME} className="h-8 opacity-80" style={theme === 'light' ? { filter: 'invert(1) brightness(0.3)' } : undefined} />
-            <div className="w-px h-8 bg-zinc-800" />
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg font-semibold">{ws.name}</h1>
-                {!betaMode && ws.isTrial && (
-                  <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full bg-amber-500/15 text-amber-400/80 border border-amber-500/20">
-                    Growth Trial{ws.trialDaysRemaining ? ` · ${ws.trialDaysRemaining}d` : ''}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-zinc-500 mt-0.5">Insights Engine{(overview || audit || ga4Overview) && <span className="ml-2 text-zinc-500">· Updated {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            {/* Client user menu */}
-            {clientUser && (
-              <div className="flex items-center gap-2 pr-2 border-r border-zinc-800">
-                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center text-white text-[10px] font-bold">
-                  {clientUser.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-                </div>
-                <span className="text-xs text-zinc-400 hidden sm:block">{clientUser.name}</span>
-                <button onClick={handleClientLogout} title="Sign out"
-                  className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                </button>
-              </div>
-            )}
-            {!betaMode && <SeoCartButton />}
-            <button onClick={toggleTheme} title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              className="p-2 rounded-lg border border-zinc-800 hover:border-zinc-700 transition-colors">
-              {theme === 'dark' ? <Sun className="w-4 h-4 text-zinc-400" /> : <Moon className="w-4 h-4 text-zinc-400" />}
-            </button>
-            {(overview || ga4Overview) && (
-              <div className="relative flex items-center gap-1 bg-zinc-900 rounded-lg border border-zinc-800 p-0.5">
-                {[7, 28, 90, 180, 365].map(d => (
-                  <button key={d} onClick={() => changeDays(d, ws)}
-                    className={`px-3 py-2 min-h-[44px] rounded-md text-xs font-medium transition-colors ${!customDateRange && days === d ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'}`}
-                  >
-                    {d >= 365 ? '1y' : d >= 180 ? '6mo' : `${d}d`}
-                    {!customDateRange && days === d && <span className="block text-[9px] text-zinc-400 font-normal">vs prev {d >= 365 ? '1y' : d >= 180 ? '6mo' : `${d}d`}</span>}
-                  </button>
-                ))}
-                <button onClick={() => effectiveTier !== 'free' && setShowDatePicker(p => !p)}
-                  className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${effectiveTier === 'free' ? 'text-zinc-600 cursor-not-allowed' : customDateRange ? 'bg-teal-600/20 text-teal-300 border border-teal-500/30' : 'text-zinc-500 hover:text-zinc-300'}`}
-                  title={effectiveTier === 'free' ? 'Upgrade to Growth for custom date ranges' : 'Custom date range'}
-                >
-                  <Calendar className="w-3.5 h-3.5" />
-                  {customDateRange ? (
-                    <span className="text-[10px]">
-                      {new Date(customDateRange.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      {' – '}
-                      {new Date(customDateRange.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </span>
-                  ) : (
-                    <span className="hidden sm:inline">Custom</span>
-                  )}
-                </button>
-                {showDatePicker && (<>
-                  <div className="fixed inset-0 z-40 sm:bg-transparent bg-black/50" onClick={() => setShowDatePicker(false)} />
-                  <div className="fixed sm:absolute inset-x-0 bottom-0 sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:mt-2 z-50 bg-zinc-900 border-t sm:border border-zinc-700 rounded-t-2xl sm:rounded-xl shadow-2xl p-4 sm:w-72"
-                    onClick={e => e.stopPropagation()}>
-                    <div className="sm:hidden w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-3" />
-                    <p className="text-xs font-medium text-zinc-400 mb-3">Custom date range</p>
-                    <div className="space-y-2">
-                      <label className="block">
-                        <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Start date</span>
-                        <input type="date" ref={customStartRef}
-                          defaultValue={customDateRange?.startDate || MODULE_DEFAULT_START}
-                          max={MODULE_TODAY}
-                          className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm sm:text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
-                        />
-                      </label>
-                      <label className="block">
-                        <span className="text-[10px] text-zinc-500 uppercase tracking-wider">End date</span>
-                        <input type="date" ref={customEndRef}
-                          defaultValue={customDateRange?.endDate || MODULE_TODAY}
-                          max={MODULE_TODAY}
-                          className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm sm:text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
-                        />
-                      </label>
-                    </div>
-                    <div className="flex items-center gap-2 mt-3">
-                      <button onClick={() => setShowDatePicker(false)}
-                        className="flex-1 px-3 py-2.5 sm:py-1.5 text-sm sm:text-xs rounded-lg border border-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors">
-                        Cancel
-                      </button>
-                      <button onClick={() => {
-                        const s = customStartRef.current?.value;
-                        const e = customEndRef.current?.value;
-                        if (s && e && s <= e) applyCustomRange(s, e, ws);
-                      }}
-                        className="flex-1 px-3 py-2.5 sm:py-1.5 text-sm sm:text-xs rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-medium transition-colors">
-                        Apply
-                      </button>
-                    </div>
-                  </div>
-                </>)}
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="max-w-6xl mx-auto px-6">
-          <nav role="tablist" className="flex items-center gap-1 -mb-px overflow-x-auto scrollbar-none"
-            onKeyDown={(e) => {
-              const unlocked = NAV.filter(n => !n.locked);
-              const idx = unlocked.findIndex(n => n.id === tab);
-              if (e.key === 'ArrowRight' && idx < unlocked.length - 1) { setTab(unlocked[idx + 1].id); e.preventDefault(); }
-              if (e.key === 'ArrowLeft' && idx > 0) { setTab(unlocked[idx - 1].id); e.preventDefault(); }
-            }}>
-            {NAV.map(t => {
-              const Icon = t.icon;
-              const active = tab === t.id;
-              const hasData = (t.id === 'overview') ||
-                (t.id === 'performance' && !!(overview || ga4Overview)) ||
-                (t.id === 'health' && !!audit) ||
-                (t.id === 'inbox') ||
-                (t.id === 'content-plan' && !!contentPlanSummary && contentPlanSummary.totalCells > 0);
-              const pendingReviews = contentRequests.filter(r => r.status === 'client_review').length;
-              return (
-                <button key={t.id} role="tab" aria-selected={active} tabIndex={active ? 0 : -1}
-                  onClick={() => t.locked ? setShowUpgradeModal(true) : setTab(t.id)}
-                  className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
-                    t.locked ? 'border-transparent text-zinc-500 cursor-default' :
-                    active ? 'border-teal-500 text-teal-300' :
-                    'border-transparent text-zinc-500 hover:text-zinc-300 hover:border-zinc-700'
-                  }`}>
-                  <Icon className="w-3.5 h-3.5" /> {t.label}
-                  {t.locked && <Lock className="w-3 h-3 ml-0.5 text-zinc-500" />}
-                  {t.id === 'inbox' && (pendingApprovals + pendingReviews + unreadTeamNotes) > 0 && <span className="ml-1 px-1.5 py-0.5 text-[11px] font-bold rounded-full bg-teal-500 text-white flex-shrink-0 min-w-[20px] text-center leading-tight">{pendingApprovals + pendingReviews + unreadTeamNotes}</span>}
-                  {t.id === 'content-plan' && contentPlanSummary && contentPlanSummary.reviewCells > 0 && <span className="ml-1 px-1.5 py-0.5 text-[11px] font-bold rounded-full bg-blue-500 text-white flex-shrink-0 min-w-[20px] text-center leading-tight">{contentPlanSummary.reviewCells}</span>}
-                  {!t.locked && hasData && !active && t.id !== 'inbox' && <span className="w-2 h-2 rounded-full bg-emerald-400/60" title="Data available" />}
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-      </header>
+
+      <ClientHeader
+        ws={ws}
+        betaMode={betaMode}
+        theme={theme}
+        toggleTheme={toggleTheme}
+        tab={tab}
+        setTab={setTab}
+        NAV={NAV}
+        days={days}
+        customDateRange={customDateRange}
+        showDatePicker={showDatePicker}
+        setShowDatePicker={setShowDatePicker}
+        changeDays={changeDays}
+        applyCustomRange={applyCustomRange}
+        customStartRef={customStartRef}
+        customEndRef={customEndRef}
+        clientUser={clientUser}
+        handleClientLogout={handleClientLogout}
+        setShowUpgradeModal={setShowUpgradeModal}
+        pendingApprovals={pendingApprovals}
+        unreadTeamNotes={unreadTeamNotes}
+        contentPlanSummary={contentPlanSummary}
+        hasData={hasData}
+        contentRequests={contentRequests}
+        hasAnalytics={!!(overview || ga4Overview)}
+        hasAnyData={!!(overview || audit || ga4Overview)}
+        effectiveTier={effectiveTier}
+      />
 
       <main className="max-w-6xl mx-auto px-6 py-6">
         <ScannerReveal>
@@ -718,183 +608,30 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
       {/* ── SEO Upgrade Modal ── */}
       {!betaMode && showUpgradeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowUpgradeModal(false)}>
-          <div className="bg-zinc-900 border border-zinc-700 p-8 max-w-md w-full mx-4 text-center shadow-2xl" style={{ borderRadius: '10px 24px 10px 24px' }} onClick={e => e.stopPropagation()}>
-            <div className="w-14 h-14 rounded-full bg-teal-500/10 border border-teal-500/20 flex items-center justify-center mx-auto mb-4">
-              <Sparkles className="w-7 h-7 text-teal-400" />
-            </div>
-            <h3 className="text-lg font-semibold text-zinc-100 mb-2">SEO Strategy — Premium Feature</h3>
-            <p className="text-sm text-zinc-400 leading-relaxed mb-6">
-              Unlock your full keyword strategy with page-level keyword targets, competitor gap analysis, and growth opportunities tailored to your business.
-            </p>
-            <div className="space-y-2 text-left mb-6">
-              {['Target keywords mapped to every page', 'Competitor keyword gap analysis', 'Content opportunity recommendations', `Ongoing strategy refinement by ${STUDIO_NAME}`].map(f => (
-                <div key={f} className="flex items-center gap-2 text-xs text-zinc-300">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-teal-400 flex-shrink-0" />
-                  {f}
-                </div>
-              ))}
-            </div>
-            <button onClick={async () => {
-              try {
-                const data = await post<{ url?: string }>(`/api/public/upgrade-checkout/${workspaceId}`, { planId: 'premium' });
-                if (data.url) window.location.href = data.url;
-              } catch (err) {
-                setToast({ message: err instanceof Error ? err.message : 'Upgrade failed. Please try again.', type: 'error' });
-              }
-            }}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium transition-colors cursor-pointer">
-              <Sparkles className="w-4 h-4" /> Upgrade to Premium
-            </button>
-            <button onClick={() => setShowUpgradeModal(false)} className="block mx-auto mt-3 text-xs text-zinc-500 hover:text-zinc-400 transition-colors">
-              Maybe later
-            </button>
-          </div>
-        </div>
+        <UpgradeModal
+          workspaceId={workspaceId}
+          onClose={() => setShowUpgradeModal(false)}
+          onError={(msg) => setToast({ message: msg, type: 'error' })}
+        />
       )}
 
-      {/* Pricing confirmation modal */}
-      {!betaMode && pricingModal && (() => {
-        const pricing = ws?.contentPricing;
-        const isUpgrade = pricingModal.source === 'upgrade';
-        const isFull = pricingModal.serviceType === 'full_post';
-        const price = isFull ? fullPostPrice : briefPrice;
-        const upgradePrice = isUpgrade && briefPrice != null && fullPostPrice != null ? Math.max(0, fullPostPrice - briefPrice) : null;
-        const displayPrice = isUpgrade ? upgradePrice : price;
-        const fmt = fmtPrice;
-        return (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[70] flex items-center justify-center p-4" onClick={() => !pricingConfirming && setPricingModal(null)}>
-            <div className="relative bg-zinc-900 border border-zinc-700/50 shadow-2xl shadow-black/50 w-full max-w-md overflow-hidden animate-[scaleIn_0.2s_ease-out]" style={{ borderRadius: '10px 24px 10px 24px' }} onClick={e => e.stopPropagation()}>
-              {/* Close button */}
-              <button
-                onClick={() => !pricingConfirming && setPricingModal(null)}
-                className="absolute top-3 right-3 w-7 h-7 rounded-lg flex items-center justify-center bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors z-10"
-              >
-                <X className="w-4 h-4" />
-              </button>
-
-              {/* Header with gradient */}
-              <div className="relative px-6 pt-6 pb-5 overflow-hidden bg-gradient-to-br from-teal-600/15 via-emerald-600/10 to-transparent">
-                {/* Decorative glow */}
-                <div className="absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl opacity-20 bg-teal-500" />
-
-                <div className="relative flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-xl flex items-center justify-center ring-1 bg-gradient-to-br from-teal-500/25 to-emerald-500/25 ring-teal-500/20">
-                      {isFull ? <Sparkles className="w-5 h-5 text-teal-400" /> : <FileText className="w-5 h-5 text-teal-400" />}
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-zinc-100">
-                        {isUpgrade ? 'Upgrade to Full Blog Post' : isFull ? (pricing?.fullPostLabel || 'Full Blog Post') : (pricing?.briefLabel || 'Content Brief')}
-                      </div>
-                      <div className="text-[11px] text-zinc-500 mt-0.5">
-                        {isUpgrade ? 'Continue from your approved brief' : 'Confirm your content request'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Topic card */}
-                <div className="px-3.5 py-3 border bg-teal-950/30 border-teal-500/10" style={{ borderRadius: '6px 12px 6px 12px' }}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <Target className="w-3 h-3 text-teal-400/70" />
-                    <span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Topic</span>
-                  </div>
-                  <div className="text-xs text-zinc-200 font-medium leading-relaxed">{pricingModal.topic}</div>
-                  <div className="text-[11px] mt-1 text-teal-400/80">Keyword: &ldquo;{pricingModal.targetKeyword}&rdquo;</div>
-                </div>
-              </div>
-
-              {/* Price banner */}
-              {displayPrice != null && (
-                <div className="mx-6 flex items-center justify-between px-4 py-3 border bg-teal-500/5 border-teal-500/15" style={{ borderRadius: '6px 12px 6px 12px' }}>
-                  <div>
-                    <div className="text-2xl font-bold tracking-tight text-teal-300">{fmt(displayPrice)}</div>
-                    <div className="text-[10px] text-zinc-500 mt-0.5">{isUpgrade ? 'Upgrade difference' : 'One-time payment'}</div>
-                  </div>
-                  <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-teal-500/10">
-                    <Shield className="w-4 h-4 text-teal-400/60" />
-                  </div>
-                </div>
-              )}
-              {displayPrice == null && (
-                <div className="mx-6 mt-0 mb-0 text-[11px] text-zinc-500 bg-zinc-800/40 px-4 py-3 border border-zinc-700/30" style={{ borderRadius: '6px 12px 6px 12px' }}>
-                  <Lock className="w-3 h-3 inline mr-1.5 -mt-0.5" />
-                  Pricing will be confirmed by {STUDIO_NAME} after submission.
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="px-6 pb-5 space-y-3">
-                <button
-                  disabled={pricingConfirming}
-                  onClick={confirmPricingAndSubmit}
-                  className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 shadow-lg active:scale-[0.98] bg-gradient-to-r from-teal-600 to-emerald-600 text-white hover:from-teal-500 hover:to-emerald-500 shadow-teal-900/40"
-                >
-                  {pricingConfirming ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Processing…</span>
-                    </>
-                  ) : displayPrice != null ? (
-                    <>
-                      <Lock className="w-3.5 h-3.5" />
-                      <span>Pay {fmt(displayPrice)} securely</span>
-                    </>
-                  ) : (
-                    <>
-                      <Check className="w-4 h-4" />
-                      <span>Confirm Request</span>
-                    </>
-                  )}
-                </button>
-                <button
-                  disabled={pricingConfirming}
-                  onClick={() => setPricingModal(null)}
-                  className="w-full px-4 py-2 rounded-xl text-xs text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 transition-all"
-                >
-                  Cancel
-                </button>
-
-                {/* Trust footer */}
-                <div className="flex items-center justify-center gap-4 pt-1">
-                  <div className="flex items-center gap-1.5">
-                    <Shield className="w-3 h-3 text-zinc-600" />
-                    <span className="text-[10px] text-zinc-600">SSL Encrypted</span>
-                  </div>
-                  <div className="w-px h-3 bg-zinc-800" />
-                  <div className="flex items-center gap-1.5">
-                    <svg className="w-3 h-3 text-zinc-600" viewBox="0 0 24 24" fill="currentColor"><path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z"/></svg>
-                    <span className="text-[10px] text-zinc-600">Powered by Stripe</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Stripe Elements inline payment modal (lazy-loaded — Stripe SDK only fetched on payment) */}
-      {!betaMode && stripePayment && (
-        <Suspense fallback={<div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-teal-400" /></div>}>
-          <LazyStripePaymentModal
-            clientSecret={stripePayment.clientSecret}
-            publishableKey={stripePayment.publishableKey}
-            amount={stripePayment.amount}
-            productName={stripePayment.productName}
-            topic={stripePayment.topic}
-            targetKeyword={stripePayment.targetKeyword}
-            isFull={stripePayment.isFull}
-            onSuccess={() => {
-              setStripePayment(null);
-              setToast({ message: `Payment successful! Your ${stripePayment.productName.toLowerCase()} is being prepared.`, type: 'success' });
-              // Refresh content requests
-              getSafe<ClientContentRequest[]>(`/api/public/content-requests/${workspaceId}`, []).then(setContentRequests).catch((err) => { console.error('ClientDashboard operation failed:', err); });
-            }}
-            onClose={() => setStripePayment(null)}
-          />
-        </Suspense>
-      )}
+      {/* Pricing confirmation modal + Stripe Elements modal */}
+      <PricingConfirmationModal
+        betaMode={betaMode}
+        pricingModal={pricingModal}
+        setPricingModal={setPricingModal}
+        pricingConfirming={pricingConfirming}
+        confirmPricingAndSubmit={confirmPricingAndSubmit}
+        briefPrice={briefPrice}
+        fullPostPrice={fullPostPrice}
+        fmtPrice={fmtPrice}
+        contentPricing={ws?.contentPricing}
+        stripePayment={stripePayment}
+        setStripePayment={setStripePayment}
+        workspaceId={workspaceId}
+        setContentRequests={setContentRequests}
+        setToast={setToast}
+      />
 
       {/* Client onboarding questionnaire */}
       {showOnboarding && ws && (
