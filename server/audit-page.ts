@@ -49,7 +49,7 @@ export const CHECK_CATEGORY: Record<string, CheckCategory> = {
   'robots-txt': 'technical', 'sitemap': 'technical', 'response-time': 'technical',
   'structured-data': 'technical', 'html-size': 'technical',
   'orphan-pages': 'technical', 'indexability': 'technical',
-  'redirects': 'technical', 'redirect-chains': 'technical',
+  'redirects': 'technical', 'redirect-chains': 'technical', 'dead-links': 'technical',
   // Social
   'og-tags': 'social', 'og-image': 'social',
   // Performance
