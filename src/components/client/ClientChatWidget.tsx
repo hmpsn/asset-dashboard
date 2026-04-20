@@ -259,7 +259,7 @@ export function ClientChatWidget({
                         bookingUrl={ws?.bookingUrl}
                         onAction={(type) => {
                           clearIntent();
-                          if (type === 'content_interest') clientNavigate(clientPath(workspaceId, 'strategy', chatDeps.betaMode));
+                          if (type === 'content_interest') clientNavigate(clientPath(workspaceId, 'strategy', betaMode));
                         }}
                       />
                     )}
