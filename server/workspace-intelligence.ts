@@ -315,15 +315,14 @@ async function assembleSeoContext(
     };
   }
 
-  // Merge admin-set strategic goals into businessProfile.goals
+  // Merge admin-set strategic goals into businessProfile.goals (deduped against intelligenceProfile.goals)
   if (workspace?.businessPriorities?.length) {
     if (!base.businessProfile) {
       base.businessProfile = { industry: '', goals: [], targetAudience: '' };
     }
-    base.businessProfile.goals = [
-      ...(base.businessProfile.goals ?? []),
-      ...workspace.businessPriorities,
-    ];
+    const existingGoals = new Set((base.businessProfile.goals ?? []).map(g => g.trim().toLowerCase()));
+    const newGoals = workspace.businessPriorities.filter(g => !existingGoals.has(g.trim().toLowerCase()));
+    base.businessProfile.goals = [...(base.businessProfile.goals ?? []), ...newGoals];
   }
 
   // Merge verified contact info for local SEO context

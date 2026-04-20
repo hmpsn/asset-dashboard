@@ -3550,7 +3550,7 @@ Current feature count: **299**. Last updated: April 2026.
 - `intentSignals` (new/total count + types) rendered in `formatClientSignalsSection` at non-compact verbosity
 - `aeoReadiness` (pages checked + passing rate) rendered in `formatSiteHealthSection` at non-compact verbosity
 - `redirectDetails` (up to 5 chains with url/target/chainDepth/status) rendered in `formatSiteHealthSection` at detailed verbosity
-- Contact info (`phone`, `address`, `openingHours`) rendered in `formatSeoContextSection` at detailed verbosity
+- Contact info (`phone`, `email`, `address`, `openingHours`, `socialProfiles`) rendered in `formatSeoContextSection` at detailed verbosity
 - `contentPricing` rendered in `formatContentPipelineSection` at non-compact verbosity
 - `scoringConfig` thresholds (up to 5 action types) rendered in `formatLearningsSection` at detailed verbosity
 
