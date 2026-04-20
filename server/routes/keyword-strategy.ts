@@ -58,6 +58,8 @@ import { generateRecommendations } from '../recommendations.js';
 import { getDeclinedKeywords, getRequestedKeywords } from '../keyword-feedback.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
+import { requireWorkspaceAccess } from '../auth.js';
+import { filterDeclinedFromPool, matchesQuestionKeyword } from '../strategy-filters.js';
 
 const log = createLogger('keyword-strategy');
 
@@ -293,7 +295,7 @@ export function buildStrategyIntelligenceBlock(opts: StrategyIntelligenceInput):
 }
 
 // --- Keyword Strategy Generation (SSE progress) ---
-router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
+router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (!ws.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
@@ -1080,10 +1082,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     const brandedRemoved = filterBrandedKeywords(keywordPool, competitorDomains);
     // Hard filter: remove declined keywords before the AI sees the pool (prompt instruction is soft)
     const declinedSet = new Set(declinedKeywords.map(k => k.toLowerCase()));
-    let declinedPoolRemoved = 0;
-    for (const [kw] of keywordPool) {
-      if (declinedSet.has(kw)) { keywordPool.delete(kw); declinedPoolRemoved++; }
-    }
+    const declinedPoolRemoved = filterDeclinedFromPool(keywordPool, declinedKeywords);
     if (declinedPoolRemoved > 0) log.info(`Removed ${declinedPoolRemoved} declined keywords from keyword pool`);
     log.info(`Keyword pool: ${keywordPool.size} unique terms (${semrushDomainData.length} domain + ${competitorKeywordData.length} competitor + ${keywordGaps.length} gaps + ${clientKeywordsAdded} client + GSC)${brandedRemoved > 0 ? ` — removed ${brandedRemoved} branded competitor keywords` : ''}`);
     if (keywordPool.size > 0) {
@@ -1842,13 +1841,8 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
         }
         // Attach related question keywords to each gap
         if (allQuestionKws.length > 0) {
-          const targetWords = cg.targetKeyword.toLowerCase().split(/\s+/);
           const relatedQs = allQuestionKws.flatMap(q => q.questions)
-            .filter(q => {
-              const qLower = q.keyword.toLowerCase();
-              const matchCount = targetWords.filter((w: string) => qLower.includes(w)).length;
-              return matchCount >= Math.min(2, targetWords.length);
-            })
+            .filter(q => matchesQuestionKeyword(cg.targetKeyword, q.keyword))
             .slice(0, 3)
             .map(q => q.keyword);
           if (relatedQs.length > 0) cg.questionKeywords = relatedQs;
@@ -2258,7 +2252,7 @@ Rules:
       saveStrategyHistory();
     }
 
-    updateWorkspace(ws.id, { keywordStrategy: keywordStrategy as unknown as KeywordStrategy });
+    updateWorkspace(ws.id, { keywordStrategy: keywordStrategy as KeywordStrategy });
     broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, {
       pageCount: pageMap.length,
       siteKeywords: keywordStrategy.siteKeywords?.length || 0,
