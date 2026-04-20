@@ -1238,7 +1238,11 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
     if (gscData.length > 0) {
       const topGsc = [...gscData].sort((a, b) => b.impressions - a.impressions).slice(0, 30);
       gscSummary = `\n\nTop GSC queries (last 90 days):\n` +
-        topGsc.map(r => `- "${r.query}" → ${new URL(r.page).pathname} (pos: ${r.position.toFixed(1)}, clicks: ${r.clicks}, imp: ${r.impressions})`).join('\n');
+        topGsc.map(r => {
+          let pagePath: string;
+          try { pagePath = new URL(r.page).pathname; } catch { pagePath = r.page; }
+          return `- "${r.query}" → ${pagePath} (pos: ${r.position.toFixed(1)}, clicks: ${r.clicks}, imp: ${r.impressions})`;
+        }).join('\n');
     }
 
     // Device breakdown context
