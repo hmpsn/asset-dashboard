@@ -521,10 +521,11 @@ router.post('/api/jobs', async (req, res) => {
             const semrushMode = (params.semrushMode as string) || 'none';
             const competitorDomains = (params.competitorDomains as string[]) || stratWs.competitorDomains || [];
             const maxPages = params.maxPages != null ? Number(params.maxPages) : undefined;
+            const mode = (params.mode as string) || 'full';
             const stratRes = await fetch(stratUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', ...(APP_PASSWORD ? { 'x-auth-token': APP_PASSWORD } : {}) },
-              body: JSON.stringify({ businessContext, semrushMode, competitorDomains, maxPages }),
+              body: JSON.stringify({ businessContext, semrushMode, competitorDomains, maxPages, mode }),
             });
             if (!stratRes.ok) {
               const errText = await stratRes.text();

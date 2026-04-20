@@ -67,6 +67,9 @@ export const WS_EVENTS = {
 
   // Recommendations
   RECOMMENDATIONS_UPDATED: 'recommendations:updated',
+
+  // Keyword Strategy
+  STRATEGY_UPDATED: 'strategy:updated',
 } as const;
 
 export type WsEventName = typeof WS_EVENTS[keyof typeof WS_EVENTS];

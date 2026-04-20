@@ -494,9 +494,9 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   const saveEdit = async (page: UnifiedPage) => {
     if (!strategy || !page.strategy) return;
     setSaving(true);
-    const pageIdx = strategy.pageMap.indexOf(page.strategy);
+    const pageIdx = (strategy.pageMap ?? []).indexOf(page.strategy);
     if (pageIdx === -1) { setSaving(false); return; }
-    const updated = [...strategy.pageMap];
+    const updated = [...(strategy.pageMap ?? [])];
     updated[pageIdx] = {
       ...updated[pageIdx],
       primaryKeyword: editDraft.primary.trim(),

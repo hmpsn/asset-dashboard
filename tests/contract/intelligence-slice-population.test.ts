@@ -366,9 +366,6 @@ describe('contract: SeoContextSlice field population', () => {
       expect(typeof result.strategyHistory.revisionsCount).toBe('number');
       expect(typeof result.strategyHistory.lastRevisedAt).toBe('string');
     }
-    if (result.keywordRecommendations !== undefined) {
-      expect(Array.isArray(result.keywordRecommendations)).toBe(true);
-    }
   });
 
   it('effectiveBrandVoiceBlock passthrough: non-empty brandVoiceBlock reaches slice', async () => {

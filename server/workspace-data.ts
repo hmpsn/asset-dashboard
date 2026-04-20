@@ -167,6 +167,7 @@ export function getPageCacheStats(): { entries: number; maxEntries: number } {
 
 const pipelineStmts = createStmtCache(() => ({
   briefsTotal: db.prepare(`SELECT COUNT(*) as cnt FROM content_briefs WHERE workspace_id = ?`),
+  briefsByStatus: db.prepare(`SELECT status, COUNT(*) as cnt FROM content_briefs WHERE workspace_id = ? GROUP BY status`),
   postsTotal: db.prepare(`SELECT COUNT(*) as cnt FROM content_posts WHERE workspace_id = ?`),
   postsByStatus: db.prepare(`SELECT status, COUNT(*) as cnt FROM content_posts WHERE workspace_id = ? GROUP BY status`),
   matricesTotal: db.prepare(`SELECT COUNT(*) as cnt FROM content_matrices WHERE workspace_id = ?`),
@@ -219,6 +220,9 @@ export function invalidateContentPipelineCache(workspaceId: string): void {
 
 function computeContentPipelineSummary(workspaceId: string): ContentPipelineSummary {
   const briefsRow = pipelineStmts().briefsTotal.get(workspaceId) as { cnt: number } | undefined;
+  const briefsByStatusRows = pipelineStmts().briefsByStatus.all(workspaceId) as { status: string; cnt: number }[];
+  const briefsByStatus: Record<string, number> = {};
+  for (const r of briefsByStatusRows) briefsByStatus[r.status] = r.cnt;
   const postsRow = pipelineStmts().postsTotal.get(workspaceId) as { cnt: number } | undefined;
   const postsByStatusRows = pipelineStmts().postsByStatus.all(workspaceId) as { status: string; cnt: number }[];
   const postsByStatus: Record<string, number> = {};
@@ -245,7 +249,7 @@ function computeContentPipelineSummary(workspaceId: string): ContentPipelineSumm
   for (const r of seoRows) seoMap[r.status] = r.cnt;
 
   return {
-    briefs: { total: briefsRow?.cnt ?? 0, byStatus: {} },
+    briefs: { total: briefsRow?.cnt ?? 0, byStatus: briefsByStatus },
     posts: { total: postsRow?.cnt ?? 0, byStatus: postsByStatus },
     matrices: { total: matricesRow?.cnt ?? 0, cellsPlanned, cellsPublished },
     requests: {

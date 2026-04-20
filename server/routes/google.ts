@@ -263,6 +263,7 @@ const createAnnotationSchema = z.object({
   label: z.string().min(1, 'label is required'),
   category: z.string().min(1, 'category is required'),
   createdBy: z.string().optional(),
+  pageUrl: z.string().optional(),
 });
 
 router.get('/api/google/annotations/:workspaceId', (req, res) => {
@@ -276,9 +277,9 @@ router.get('/api/google/annotations/:workspaceId', (req, res) => {
 });
 
 router.post('/api/google/annotations/:workspaceId', validate(createAnnotationSchema), (req, res) => {
-  const { date, label, category, createdBy } = req.body;
+  const { date, label, category, createdBy, pageUrl } = req.body;
   try {
-    const result = createAnnotation({ workspaceId: req.params.workspaceId, date, label, category, createdBy });
+    const result = createAnnotation({ workspaceId: req.params.workspaceId, date, label, category, createdBy, pageUrl });
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
@@ -289,12 +290,13 @@ const updateAnnotationSchema = z.object({
   label: z.string().min(1).optional(),
   date: z.string().min(1).optional(),
   category: z.string().min(1).optional(),
+  pageUrl: z.string().optional(),
 });
 
 router.patch('/api/google/annotations/:workspaceId/:id', validate(updateAnnotationSchema), (req, res) => {
-  const { label, date, category } = req.body;
+  const { label, date, category, pageUrl } = req.body;
   try {
-    const updated = updateAnnotation(req.params.id, req.params.workspaceId, { label, date, category });
+    const updated = updateAnnotation(req.params.id, req.params.workspaceId, { label, date, category, pageUrl });
     if (!updated) return res.status(404).json({ error: 'Annotation not found' });
     res.json({ ok: true });
   } catch (err) {
