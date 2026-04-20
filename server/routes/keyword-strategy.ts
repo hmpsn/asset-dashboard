@@ -56,6 +56,8 @@ import { buildSystemPrompt } from '../prompt-assembly.js';
 import { isProgrammingError } from '../errors.js';
 import { generateRecommendations } from '../recommendations.js';
 import { getDeclinedKeywords, getRequestedKeywords } from '../keyword-feedback.js';
+import { broadcastToWorkspace } from '../broadcast.js';
+import { WS_EVENTS } from '../ws-events.js';
 
 const log = createLogger('keyword-strategy');
 
@@ -2110,6 +2112,10 @@ Rules:
     }
 
     updateWorkspace(ws.id, { keywordStrategy });
+    broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, {
+      pageCount: pageMap.length,
+      siteKeywords: keywordStrategy.siteKeywords?.length || 0,
+    });
     clearSeoContextCache(ws.id);
     invalidateIntelligenceCache(ws.id);
     // Bridge #3: strategy updated — debounced intelligence invalidation

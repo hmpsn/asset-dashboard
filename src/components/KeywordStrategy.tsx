@@ -82,6 +82,9 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     [WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED]: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.intelligenceSignals(workspaceId) });
     },
+    [WS_EVENTS.STRATEGY_UPDATED]: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
+    },
   });
 
   // Seed trackedKeywords from server on mount so buttons reflect actual state
