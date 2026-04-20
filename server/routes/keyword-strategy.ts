@@ -43,7 +43,7 @@ import { createLogger } from '../logger.js';
 import db from '../db/index.js';
 import { parseJsonFallback } from '../db/json-validation.js';
 import { getInsights } from '../analytics-insights-store.js';
-import type { KeywordClusterData, CompetitorGapData, ConversionAttributionData } from '../../shared/types/analytics.js';
+import type { KeywordClusterData, CompetitorGapData, ConversionAttributionData, ContentDecayData } from '../../shared/types/analytics.js';
 import type { Workspace } from '../../shared/types/workspace.js';
 import { METRICS_SOURCE } from '../../shared/types/keywords.js';
 import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
@@ -1373,11 +1373,24 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
           .filter(i => i.insightType === 'conversion_attribution')
           .map(i => ({ pageUrl: i.pageId || '', ...(i.data as unknown as ConversionAttributionData) }))
           .sort((a, b) => b.conversionRate - a.conversionRate);
+        const contentDecayDeltas = insights
+          .filter(i => i.insightType === 'content_decay')
+          .map(i => {
+            const d = i.data as unknown as ContentDecayData;
+            return {
+              query: i.pageId || '',
+              positionDelta: 0,
+              clicksDelta: d.currentClicks - d.baselineClicks,
+              currentPosition: 0,
+            };
+          })
+          .filter(d => d.query);
+
         intelligenceBlock = buildStrategyIntelligenceBlock({
           keywordClusters: keywordClusters.length > 0 ? keywordClusters : undefined,
           competitorGaps: competitorGaps.length > 0 ? competitorGaps : undefined,
           conversionPages: conversionPages.length > 0 ? conversionPages : undefined,
-          performanceDeltas: undefined,
+          performanceDeltas: contentDecayDeltas.length > 0 ? contentDecayDeltas : undefined,
         });
       }
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* non-critical — strategy works without intelligence data */ }
