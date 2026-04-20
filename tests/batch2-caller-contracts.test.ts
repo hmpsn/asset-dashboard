@@ -156,10 +156,12 @@ describe('webflow-seo.ts N+1 prevention contracts', () => {
   });
 });
 
-// ── seo-audit.ts ──────────────────────────────────────────────────────────────
+// ── seo-audit-ai-recs.ts ──────────────────────────────────────────────────────
+// AI recommendation logic was extracted from seo-audit.ts into this module.
+// These contracts guard the N+1 prevention and slice selection invariants.
 
 describe('seo-audit.ts migration contracts', () => {
-  const src = read('seo-audit.ts');
+  const src = read('seo-audit-ai-recs.ts');
 
   it('requests learnings slice alongside seoContext + pageProfile', () => {
     // Old buildSeoContext().fullContext included learnings — must be restored.
