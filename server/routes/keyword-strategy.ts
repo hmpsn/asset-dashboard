@@ -984,6 +984,8 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
       if (pagesToAnalyze.length === 0) {
         log.info({ workspaceId: ws.id }, 'Incremental mode: all pages already fresh, skipping re-analysis');
         sendProgress('complete', 'All pages are already up to date — no re-analysis needed.', 1.0);
+        if (keepalive) clearInterval(keepalive); // prevent setInterval leak on early exit
+        activeGenerations.delete(ws.id);
         // Match the dual-response pattern used at the normal exit (line ~1999):
         // SSE callers already got progress events + the sendProgress('complete') above.
         // JSON callers need a proper response body — res.end() gives them an empty 200.
@@ -1653,11 +1655,9 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
           try { return new URL(r.page).pathname === pm.pagePath; } catch (err) { return false; }
         });
         if (matchingRows.length > 0) {
-          if (pm.primaryKeyword) {
-            const kwMatch = matchingRows.find(r => r.query.toLowerCase().includes(pm.primaryKeyword.toLowerCase()));
-            if (kwMatch) {
-              pm.currentPosition = kwMatch.position;
-            }
+          const kwMatch = matchingRows.find(r => r.query.toLowerCase().includes(pm.primaryKeyword.toLowerCase()));
+          if (kwMatch) {
+            pm.currentPosition = kwMatch.position;
           }
           // Don't set currentPosition from a non-matching query — it's misleading
 
@@ -1906,7 +1906,6 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
     {
       const kwPages = new Map<string, Array<{ path: string; source: 'keyword_map' | 'gsc' }>>();
       for (const pm of strategy.pageMap) {
-        if (!pm.primaryKeyword) continue;
         const kw = pm.primaryKeyword.toLowerCase();
         if (!kwPages.has(kw)) kwPages.set(kw, []);
         kwPages.get(kw)!.push({ path: pm.pagePath, source: 'keyword_map' });
@@ -2337,8 +2336,11 @@ Rules:
         .catch(err => log.warn({ err, workspaceId: ws.id }, 'Failed to refresh recommendations after strategy update'))
         .finally(() => recsInFlight.delete(ws.id));
     }
+    activeGenerations.delete(ws.id);
     return;
   } catch (err) {
+    activeGenerations.delete(ws.id);
+    if (keepalive) clearInterval(keepalive);
     const msg = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error ? err.stack : '';
     log.error({ detail: msg, stack }, 'Keyword strategy error');
@@ -2347,9 +2349,6 @@ Rules:
       return;
     }
     res.status(500).json({ error: msg });
-  } finally {
-    activeGenerations.delete(ws.id);
-    if (keepalive) clearInterval(keepalive);
   }
 });
 
