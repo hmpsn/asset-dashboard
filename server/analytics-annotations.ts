@@ -69,7 +69,7 @@ export function getAnnotations(
 export function updateAnnotation(
   id: string,
   workspaceId: string,
-  opts: { label?: string; date?: string; category?: string },
+  opts: { label?: string; date?: string; category?: string; pageUrl?: string },
 ): boolean {
   const sets: string[] = [];
   const vals: unknown[] = [];
@@ -77,6 +77,7 @@ export function updateAnnotation(
   if (opts.label !== undefined) { sets.push('label = ?'); vals.push(opts.label); }
   if (opts.date !== undefined) { sets.push('date = ?'); vals.push(opts.date); }
   if (opts.category !== undefined) { sets.push('category = ?'); vals.push(opts.category); }
+  if (opts.pageUrl !== undefined) { sets.push('page_url = ?'); vals.push(opts.pageUrl); }
 
   if (sets.length === 0) return false;
 

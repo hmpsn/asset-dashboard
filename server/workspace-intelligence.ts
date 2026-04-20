@@ -2093,7 +2093,7 @@ function formatContentPipelineSection(pipeline: ContentPipelineSlice, verbosity:
     if (pipeline.seoEdits && (pipeline.seoEdits.pending > 0 || pipeline.seoEdits.applied > 0)) {
       lines.push(`SEO edits: ${pipeline.seoEdits.pending} pending, ${pipeline.seoEdits.applied} applied`);
     }
-    if (pipeline.contentPricing) {
+    if (pipeline.contentPricing && (pipeline.contentPricing.briefPrice > 0 || pipeline.contentPricing.fullPostPrice > 0)) {
       const cp = pipeline.contentPricing;
       lines.push(
         `Content pricing: ${cp.briefLabel ?? 'Brief'} ${cp.currency} ${cp.briefPrice}, ` +

@@ -303,6 +303,42 @@ describe('assembleContentPipeline — rewritePlaybook and contentPricing', () =>
     expect(result.contentPipeline).toBeDefined();
     expect(result.contentPipeline!.rewritePlaybook).toBeUndefined();
   });
+
+  it('populates contentPricing when workspace has pricing config', async () => {
+    mockGetWorkspace.mockReturnValue({
+      rewritePlaybook: undefined,
+      contentPricing: {
+        briefPrice: 49,
+        fullPostPrice: 199,
+        currency: 'USD',
+        briefLabel: 'Content Brief',
+        fullPostLabel: 'Full Article',
+      },
+      keywordStrategy: undefined,
+    } as any);
+
+    const result = await buildWorkspaceIntelligence('ws-cp-1', { slices: ['contentPipeline'] });
+
+    expect(result.contentPipeline?.contentPricing).toEqual({
+      briefPrice: 49,
+      fullPostPrice: 199,
+      currency: 'USD',
+      briefLabel: 'Content Brief',
+      fullPostLabel: 'Full Article',
+    });
+  });
+
+  it('leaves contentPricing undefined when not set on workspace', async () => {
+    mockGetWorkspace.mockReturnValue({
+      rewritePlaybook: undefined,
+      contentPricing: undefined,
+      keywordStrategy: undefined,
+    } as any);
+
+    const result = await buildWorkspaceIntelligence('ws-cp-2', { slices: ['contentPipeline'] });
+
+    expect(result.contentPipeline?.contentPricing).toBeUndefined();
+  });
 });
 
 describe('formatForPrompt — formatter rendering', () => {

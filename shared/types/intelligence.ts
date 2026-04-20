@@ -243,8 +243,7 @@ export interface ClientSignalsSlice {
 
 export interface OperationalSlice {
   recentActivity: { type: string; description: string; timestamp: string }[];
-  /** Note: analytics_annotations table does NOT have a pageUrl column.
-   *  pageUrl is optional — populated only if derivable from context. May need schema update in Phase 3. */
+  /** Migration 065 added page_url column. pageUrl is optional — present when annotation was scoped to a specific page. */
   annotations: { date: string; label: string; pageUrl?: string }[];
   pendingJobs: number;
   // New in 3A
