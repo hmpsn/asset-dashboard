@@ -1,4 +1,5 @@
-import { useRef, useCallback } from 'react';
+import { useCallback } from 'react';
+import type React from 'react';
 import { Loader2, Lock } from 'lucide-react';
 import { post } from '../../api/client';
 import TurnstileWidget from '../TurnstileWidget';
@@ -23,6 +24,7 @@ export interface ClientAuthGateProps {
   resetDone: boolean;
   passwordInput: string;
   turnstileReset: number;
+  tokenRef: React.MutableRefObject<string | undefined>;
   // Setters
   setLoginTab: (tab: 'password' | 'user') => void;
   setLoginEmail: (email: string) => void;
@@ -60,6 +62,7 @@ export function ClientAuthGate({
   resetDone,
   passwordInput,
   turnstileReset,
+  tokenRef,
   setLoginTab,
   setLoginEmail,
   setLoginPassword,
@@ -76,9 +79,6 @@ export function ClientAuthGate({
   handlePasswordSubmit,
   handleClientUserLogin,
 }: ClientAuthGateProps) {
-  // Turnstile state — local to this component
-  const turnstileTokenRef = useRef<string | undefined>(undefined);
-
   // Mode detection
   const showsUserLogin = authMode?.hasClientUsers;
   const showsPasswordLogin = authMode?.hasSharedPassword && !authMode?.hasClientUsers;
@@ -94,7 +94,7 @@ export function ClientAuthGate({
       try {
         await post(`/api/public/forgot-password/${workspaceId}`, {
           email: forgotEmail.trim(),
-          turnstileToken: turnstileTokenRef.current,
+          turnstileToken: tokenRef.current,
         });
         setForgotSent(true);
       } catch (err) {
@@ -214,7 +214,7 @@ export function ClientAuthGate({
                       autoFocus
                       className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors"
                     />
-                    <TurnstileWidget onToken={(t) => { turnstileTokenRef.current = t; }} resetTrigger={turnstileReset} />
+                    <TurnstileWidget onToken={(t) => { tokenRef.current = t; }} resetTrigger={turnstileReset} />
                     {authError && <p className="text-xs text-red-400/80">{authError}</p>}
                     <button
                       type="submit"
@@ -321,7 +321,7 @@ export function ClientAuthGate({
                     className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors"
                   />
                 </div>
-                <TurnstileWidget onToken={(t) => { turnstileTokenRef.current = t; }} resetTrigger={turnstileReset} />
+                <TurnstileWidget onToken={(t) => { tokenRef.current = t; }} resetTrigger={turnstileReset} />
                 {authError && <p className="text-xs text-red-400/80">{authError}</p>}
                 <button
                   type="submit"

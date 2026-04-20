@@ -395,6 +395,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       resetDone={resetDone}
       passwordInput={passwordInput}
       turnstileReset={turnstileReset}
+      tokenRef={turnstileTokenRef}
       setLoginTab={setLoginTab}
       setLoginEmail={setLoginEmail}
       setLoginPassword={setLoginPassword}
