@@ -50,8 +50,8 @@ const minimalData: SeoAuditResult = {
 const minimalDataWithFixes: SeoAuditResult = {
   siteScore: 60,
   totalPages: 1,
-  errors: 1,
-  warnings: 0,
+  errors: 0,
+  warnings: 1,
   infos: 0,
   pages: [{
     pageId: 'fixable-page-1',

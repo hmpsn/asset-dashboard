@@ -32,9 +32,8 @@ function wsId(suffix: string) {
 }
 
 afterAll(() => {
-  // Clean up all rows created by this suite
-  db.prepare(`DELETE FROM page_edit_states WHERE workspace_id LIKE '${WS_BASE}%'`).run();
-  db.prepare(`DELETE FROM workspaces WHERE id LIKE '${WS_BASE}%'`).run();
+  db.prepare(`DELETE FROM page_edit_states WHERE workspace_id LIKE ?`).run(`${WS_BASE}%`);
+  db.prepare(`DELETE FROM workspaces WHERE id LIKE ?`).run(`${WS_BASE}%`);
 });
 
 // ── updatePageState ──────────────────────────────────────────────────────────
