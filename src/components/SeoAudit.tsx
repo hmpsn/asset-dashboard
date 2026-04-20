@@ -1,23 +1,18 @@
 import { useState, useEffect, useCallback, useRef, useMemo, Suspense } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { adminPath, type Page } from '../routes';
-import { redirects as redirectsApi, jobs as jobsApi } from '../api/misc';
+import { adminPath } from '../routes';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { useQueryClient } from '@tanstack/react-query';
 import { post, put, del, getSafe, getOptional } from '../api/client';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
-import { useAuditTrafficMap, useAuditSuppressions, useAuditSchedule } from '../hooks/admin';
-import type { AuditSchedule } from '../hooks/admin/useAdminSeo';
-import { seoBulkJobs } from '../api/seo';
+import { useAuditTrafficMap, useAuditSuppressions } from '../hooks/admin';
 import { queryKeys } from '../lib/queryKeys';
-import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
-import { WS_EVENTS } from '../lib/wsEvents';
 import {
   ChevronDown, ChevronRight,
   CheckCircle, Globe, FileText,
   X, Clock, Share2, Copy, ExternalLink,
-  TrendingDown, Sparkles, EyeOff, AlertTriangle, Link2Off, Download,
-  Wrench, ArrowRight, Plus, BookOpen,
+  TrendingDown, Sparkles, EyeOff, AlertTriangle, Link2Off,
+  BookOpen,
 } from 'lucide-react';
 import { StatCard, scoreColorClass, scoreBgBarClass, ErrorState, LoadingState, NextStepsCard } from './ui';
 import { StatusBadge } from './ui/StatusBadge';
@@ -28,7 +23,7 @@ import { AuditHistory } from './audit/AuditHistory';
 import { SeoAuditGuide } from './audit/SeoAuditGuide';
 import {
   type Severity, type CheckCategory, type SeoIssue, type PageSeoResult,
-  type SeoAuditResult, type SnapshotSummary, type CwvStrategyResult,
+  type SeoAuditResult, type SnapshotSummary,
   SEVERITY_CONFIG,
 } from './audit/types';
 import { computePageScore } from '../../shared/scoring';
@@ -36,6 +31,10 @@ import { ReportModal, ReportViewer } from './audit/AuditReportExport';
 import { AuditIssueRow } from './audit/AuditIssueRow';
 import { AuditBatchActions } from './audit/AuditBatchActions';
 import { AuditToolbar, AuditCategoryFilter } from './audit/AuditFilters';
+import { CwvSummaryCard } from './audit/CwvSummaryCard';
+import { ScheduledAuditSettings } from './audit/ScheduledAuditSettings';
+import { BulkAcceptPanel } from './audit/BulkAcceptPanel';
+import { DeadLinkPanel } from './audit/DeadLinkPanel';
 
 // ── Lazy-loaded sub-tools ──
 const AeoReview = lazyWithRetry(() => import('./AeoReview'));
@@ -54,7 +53,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { startJob, jobs, cancelJob } = useBackgroundTasks();
+  const { startJob, jobs } = useBackgroundTasks();
   const auditJobId = useRef<string | null>(null);
   const [data, setData] = useState<SeoAuditResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -79,11 +78,6 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   const [auditError, setAuditError] = useState<string | null>(null);
   const [showNextSteps, setShowNextSteps] = useState(false);
 
-  // Dead link details — inline redirect form
-  const [redirectFormUrl, setRedirectFormUrl] = useState<string | null>(null);
-  const [redirectFormTo, setRedirectFormTo] = useState('');
-  const [pendingRedirects, setPendingRedirects] = useState<Map<string, string>>(new Map());
-  const [savingRedirect, setSavingRedirect] = useState(false);
   const [applyingFix, setApplyingFix] = useState<string | null>(null);
   const [appliedFixes, setAppliedFixes] = useState<Set<string>>(new Set());
   const [editedSuggestions, setEditedSuggestions] = useState<Record<string, string>>({});
@@ -287,131 +281,17 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     finally { setBatchCreating(false); }
   };
 
-  // Scheduled audit state — React Query
-  const { data: schedule = null } = useAuditSchedule(workspaceId);
-  const [showSchedule, setShowSchedule] = useState(false);
-  const [scheduleInterval, setScheduleInterval] = useState(7);
-  const [scheduleThreshold, setScheduleThreshold] = useState(5);
-  const [scheduleSaving, setScheduleSaving] = useState(false);
-
-  // Sync schedule form fields when query data arrives
-  useEffect(() => {
-    if (schedule) { setScheduleInterval(schedule.intervalDays); setScheduleThreshold(schedule.scoreDropThreshold); }
-  }, [schedule]);
-
-  const saveSchedule = async (enabled: boolean) => {
-    if (!workspaceId) return;
-    setScheduleSaving(true);
-    try {
-      const updated = await put<AuditSchedule>(`/api/audit-schedules/${workspaceId}`, { enabled, intervalDays: scheduleInterval, scoreDropThreshold: scheduleThreshold });
-      queryClient.setQueryData(queryKeys.admin.auditSchedule(workspaceId), updated);
-    } catch (err) { console.error('Failed to save schedule:', err); }
-    finally { setScheduleSaving(false); }
-  };
-
+  // Bulk accept state — lifted from BulkAcceptPanel via callbacks
   const [bulkApplying, setBulkApplying] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
-  const [bulkAcceptJobId, setBulkAcceptJobId] = useState<string | null>(() => {
-    try { return workspaceId ? sessionStorage.getItem(`seo-bulk-accept-job-${workspaceId}`) ?? null : null; } catch { return null; }
-  });
-  const [bulkError, setBulkError] = useState<string | null>(null);
-
-  // ── WebSocket handlers for background bulk accept ──
-  useWorkspaceEvents(workspaceId, {
-    [WS_EVENTS.BULK_OPERATION_PROGRESS]: (rawData: unknown) => {
-      const d = rawData as { jobId: string; operation: string; done: number; total: number; failed?: number; appliedKey?: string | null };
-      if (d.operation === 'bulk-accept-fixes' && d.jobId === bulkAcceptJobId) {
-        setBulkProgress({ done: d.done, total: d.total });
-        // Mark fix as applied in real-time via WS (one key per progress event)
-        if (d.appliedKey) {
-          setAppliedFixes(prev => new Set([...prev, d.appliedKey!]));
-        }
-      }
-    },
-    [WS_EVENTS.BULK_OPERATION_COMPLETE]: (rawData: unknown) => {
-      const d = rawData as { jobId: string; operation: string; applied: number; failed: number; total: number; appliedKeys?: string[] };
-      if (d.operation === 'bulk-accept-fixes' && d.jobId === bulkAcceptJobId) {
-        if (d.appliedKeys?.length) {
-          setAppliedFixes(prev => {
-            const next = new Set(prev);
-            for (const key of d.appliedKeys!) next.add(key);
-            return next;
-          });
-        }
-        setBulkApplying(false);
-        setBulkProgress(null);
-        setBulkAcceptJobId(null);
-        queryClient.invalidateQueries({ queryKey: queryKeys.admin.auditAll() });
-      }
-    },
-    [WS_EVENTS.BULK_OPERATION_FAILED]: (rawData: unknown) => {
-      const d = rawData as { jobId: string; operation: string; error: string };
-      if (d.operation === 'bulk-accept-fixes' && d.jobId === bulkAcceptJobId) {
-        setBulkApplying(false);
-        setBulkProgress(null);
-        setBulkAcceptJobId(null);
-        setBulkError('Bulk fix application failed: ' + d.error);
-        setTimeout(() => setBulkError(null), 8000);
-      }
-    },
-  });
-
-  // Persist active bulk accept job ID so it survives remount (nav away + back)
-  useEffect(() => {
-    if (!workspaceId) return;
-    try { bulkAcceptJobId ? sessionStorage.setItem(`seo-bulk-accept-job-${workspaceId}`, bulkAcceptJobId) : sessionStorage.removeItem(`seo-bulk-accept-job-${workspaceId}`); } catch { /* ignore */ }
-  }, [bulkAcceptJobId, workspaceId]);
-
-  // On remount, query server to recover progress UI for any restored job ID
-  const mountAcceptJobId = useRef(bulkAcceptJobId);
-  useEffect(() => {
-    const acceptId = mountAcceptJobId.current;
-    if (!acceptId) return;
-    const TERMINAL = new Set(['done', 'error', 'cancelled']);
-    jobsApi.get(acceptId)
-      .then(job => {
-        if (TERMINAL.has(job.status)) { setBulkAcceptJobId(null); }
-        else { setBulkApplying(true); setBulkProgress({ done: job.progress ?? 0, total: job.total ?? 0 }); }
-      })
-      .catch(() => setBulkAcceptJobId(null));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- mount-only recovery; ref captures initial value
+  const bulkHandlersRef = useRef<{ acceptAll: () => Promise<void>; cancel: () => void } | null>(null);
 
   const acceptAllSuggestions = async () => {
-    if (!data || !workspaceId) return;
-    // Collect all fixable issues across all pages
-    const fixes: { pageId: string; check: string; suggestedFix: string; message?: string; pageSlug?: string; pageName?: string }[] = [];
-    for (const page of data.pages) {
-      for (const issue of page.issues) {
-        const fixKey = `${page.pageId}-${issue.check}`;
-        if (issue.suggestedFix && !appliedFixes.has(fixKey)) {
-          const text = editedSuggestions[fixKey] || issue.suggestedFix;
-          fixes.push({ pageId: page.pageId, check: issue.check, suggestedFix: text, message: issue.message, pageSlug: page.slug, pageName: page.page });
-        }
-      }
-    }
-    if (fixes.length === 0) return;
-    setBulkApplying(true);
-    setBulkProgress({ done: 0, total: fixes.length });
-    try {
-      const { jobId } = await seoBulkJobs.bulkAcceptFixes(workspaceId, {
-        siteId,
-        fixes,
-      });
-      setBulkAcceptJobId(jobId);
-    } catch (err) {
-      console.error('Failed to start bulk accept:', err);
-      setBulkApplying(false);
-      setBulkProgress(null);
-    }
+    await bulkHandlersRef.current?.acceptAll();
   };
 
   const cancelBulkApply = () => {
-    if (bulkAcceptJobId) {
-      cancelJob(bulkAcceptJobId);
-    }
-    setBulkApplying(false);
-    setBulkProgress(null);
-    setBulkAcceptJobId(null);
+    bulkHandlersRef.current?.cancel();
   };
 
   const runAudit = async () => {
@@ -434,7 +314,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
       .catch(() => {});
   }, [siteId]);
 
-  // Watch for audit job completion via WebSocket-driven jobs array
+  // Watch for audit job completion via WebSocket-driven jobs array // effect-layout-ok — jobs is driven by WS events, state update is genuinely post-paint
   useEffect(() => {
     if (!auditJobId.current) return;
     const job = jobs.find(j => j.id === auditJobId.current);
@@ -519,42 +399,6 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     navigator.clipboard.writeText(shareUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  };
-
-  const exportDeadLinksCSV = () => {
-    const links = effectiveData?.deadLinkDetails;
-    if (!links || links.length === 0) return;
-    const rows = links.map(l => {
-      const redirectTo = pendingRedirects.get(l.url) || '';
-      return [l.url, String(l.status), l.statusText, l.type, l.foundOn, l.anchorText, redirectTo]
-        .map(v => `"${v.replace(/"/g, '""')}"`)
-        .join(',');
-    });
-    const csv = 'Broken URL,Status,Status Text,Type,Found On,Anchor Text,Redirect To\n' + rows.join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'dead-links.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const saveRedirect = async (fromUrl: string) => {
-    const toUrl = redirectFormTo.trim();
-    if (!toUrl) return;
-    setSavingRedirect(true);
-    try {
-      // Persist locally and attempt server save
-      setPendingRedirects(prev => new Map(prev).set(fromUrl, toUrl));
-      try {
-        await redirectsApi.save(siteId, { rules: [{ from: fromUrl, to: toUrl }] });
-      } catch { /* server save is best-effort */ }
-      setRedirectFormUrl(null);
-      setRedirectFormTo('');
-    } finally {
-      setSavingRedirect(false);
-    }
   };
 
   const toggleExpand = (page: string) => {
@@ -848,142 +692,12 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
       })()}
 
       {/* Scheduled Audit Settings */}
-      {workspaceId && (
-        <div className="bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-zinc-400" />
-              <span className="text-xs font-medium text-zinc-300">Scheduled Audits</span>
-              {schedule?.enabled && (
-                <span className="text-[11px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">Active</span>
-              )}
-              {schedule?.lastRunAt && (
-                <span className="text-[11px] text-zinc-500">Last: {new Date(schedule.lastRunAt).toLocaleDateString()}</span>
-              )}
-            </div>
-            <button onClick={() => setShowSchedule(!showSchedule)} className="text-[11px] text-teal-400 hover:text-teal-300">
-              {showSchedule ? 'Hide' : 'Configure'}
-            </button>
-          </div>
-          {showSchedule && (
-            <div className="mt-3 pt-3 border-t border-zinc-800 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] text-zinc-500 block mb-1">Run Every</label>
-                  <select value={scheduleInterval} onChange={e => setScheduleInterval(Number(e.target.value))}
-                    className="w-full px-2 py-1.5 bg-zinc-950 border border-zinc-800 rounded text-xs text-zinc-300">
-                    <option value={1}>Daily</option>
-                    <option value={7}>Weekly</option>
-                    <option value={14}>Every 2 Weeks</option>
-                    <option value={30}>Monthly</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[11px] text-zinc-500 block mb-1">Alert on Score Drop &gt;</label>
-                  <select value={scheduleThreshold} onChange={e => setScheduleThreshold(Number(e.target.value))}
-                    className="w-full px-2 py-1.5 bg-zinc-950 border border-zinc-800 rounded text-xs text-zinc-300">
-                    <option value={3}>3 points</option>
-                    <option value={5}>5 points</option>
-                    <option value={10}>10 points</option>
-                    <option value={15}>15 points</option>
-                  </select>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {!schedule?.enabled ? (
-                  <button onClick={() => saveSchedule(true)} disabled={scheduleSaving}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 transition-colors">
-                    {scheduleSaving ? 'Saving...' : 'Enable Schedule'}
-                  </button>
-                ) : (
-                  <>
-                    <button onClick={() => saveSchedule(true)} disabled={scheduleSaving}
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 transition-colors">
-                      {scheduleSaving ? 'Saving...' : 'Update'}
-                    </button>
-                    <button onClick={() => saveSchedule(false)} disabled={scheduleSaving}
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-400 disabled:opacity-50 transition-colors">
-                      Disable
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      {workspaceId && <ScheduledAuditSettings workspaceId={workspaceId} />}
 
       {/* Core Web Vitals Summary — the actual Google ranking signal */}
-      {data.cwvSummary && (data.cwvSummary.mobile || data.cwvSummary.desktop) && (() => {
-        const ratingColor = (r: CwvStrategyResult['metrics']['LCP']['rating']) =>
-          r === 'good' ? 'text-emerald-400' : r === 'needs-improvement' ? 'text-amber-400' : r === 'poor' ? 'text-red-400' : 'text-zinc-500';
-        const ratingBg = (r: CwvStrategyResult['metrics']['LCP']['rating']) =>
-          r === 'good' ? 'bg-emerald-500/10 border-emerald-500/30' : r === 'needs-improvement' ? 'bg-amber-500/10 border-amber-500/30' : r === 'poor' ? 'bg-red-500/10 border-red-500/30' : 'bg-zinc-800/50 border-zinc-700/30';
-        const assessBadge = (a: CwvStrategyResult['assessment']) =>
-          a === 'good' ? { text: 'Passed', cls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' }
-          : a === 'needs-improvement' ? { text: 'Needs Work', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/30' }
-          : a === 'poor' ? { text: 'Failed', cls: 'bg-red-500/15 text-red-400 border-red-500/30' }
-          : { text: 'No Data', cls: 'bg-zinc-800/50 text-zinc-500 border-zinc-700/30' };
-
-        const renderStrategy = (label: string, s: CwvStrategyResult) => {
-          const badge = assessBadge(s.assessment);
-          return (
-            <div key={label} className="flex-1 min-w-[260px]">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-medium text-zinc-400 tracking-wider">{label}</span>
-                <span className={`text-[11px] px-2 py-0.5 rounded border font-medium ${badge.cls}`}>{badge.text}</span>
-              </div>
-              {/* CWV Metrics */}
-              <div className="space-y-2">
-                {[
-                  { key: 'LCP' as const, label: 'LCP', fmt: (v: number) => `${(v / 1000).toFixed(1)}s`, desc: 'Largest Contentful Paint' },
-                  { key: 'INP' as const, label: 'INP', fmt: (v: number) => `${Math.round(v)}ms`, desc: 'Interaction to Next Paint' },
-                  { key: 'CLS' as const, label: 'CLS', fmt: (v: number) => v.toFixed(2), desc: 'Cumulative Layout Shift' },
-                ].map(m => {
-                  const metric = s.metrics[m.key];
-                  return (
-                    <div key={m.key} className={`flex items-center justify-between px-3 py-2 rounded-lg border ${ratingBg(metric.rating)}`}>
-                      <div>
-                        <span className="text-xs font-medium text-zinc-300">{m.label}</span>
-                        <span className="text-[11px] text-zinc-500 ml-1.5">{m.desc}</span>
-                      </div>
-                      <span className={`text-sm font-mono font-medium ${ratingColor(metric.rating)}`}>
-                        {metric.value !== null ? m.fmt(metric.value) : '—'}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-              {/* Lighthouse lab score — secondary */}
-              <div className="mt-2 flex items-center justify-between px-3 py-1.5 rounded-lg bg-zinc-950/50 border border-zinc-800/50">
-                <span className="text-[11px] text-zinc-500">Lighthouse Lab Score</span>
-                <span className={`text-xs font-mono font-medium ${s.lighthouseScore >= 90 ? 'text-emerald-400' : s.lighthouseScore >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
-                  {s.lighthouseScore}/100
-                </span>
-              </div>
-              {!s.fieldDataAvailable && (
-                <div className="mt-1.5 text-[11px] text-zinc-500 italic px-1">
-                  No real-user data (CrUX) — metrics are from lab simulation
-                </div>
-              )}
-            </div>
-          );
-        };
-
-        return (
-          <div className="bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
-            <div className="flex items-center gap-2 mb-4">
-              <Globe className="w-4 h-4 text-teal-400" />
-              <span className="text-sm font-medium text-zinc-300">Core Web Vitals</span>
-              <span className="text-[11px] text-zinc-500">— Google ranking signal (real-user data)</span>
-            </div>
-            <div className="flex gap-4 flex-wrap">
-              {data.cwvSummary!.mobile && renderStrategy('Mobile', data.cwvSummary!.mobile)}
-              {data.cwvSummary!.desktop && renderStrategy('Desktop', data.cwvSummary!.desktop)}
-            </div>
-          </div>
-        );
-      })()}
+      {data.cwvSummary && (data.cwvSummary.mobile || data.cwvSummary.desktop) && (
+        <CwvSummaryCard cwvSummary={data.cwvSummary} />
+      )}
 
       {/* Site-wide issues */}
       {data.siteWideIssues.length > 0 && (
@@ -1017,117 +731,11 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
 
       {/* Dead Link Details Panel */}
       {effectiveData!.deadLinkDetails && effectiveData!.deadLinkDetails.length > 0 && (
-        <div className="bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Link2Off className="w-4 h-4 text-red-400" />
-              <span className="text-sm font-medium text-zinc-300">Broken Links</span>
-              <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">
-                {effectiveData!.deadLinkDetails.length}
-              </span>
-              {pendingRedirects.size > 0 && (
-                <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                  {pendingRedirects.size} redirect{pendingRedirects.size !== 1 ? 's' : ''} queued
-                </span>
-              )}
-            </div>
-            <button
-              onClick={exportDeadLinksCSV}
-              className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 transition-colors"
-            >
-              <Download className="w-3 h-3" /> Export CSV
-            </button>
-          </div>
-          <div className="space-y-1.5">
-            {effectiveData!.deadLinkDetails.map((link, idx) => {
-              const isFormOpen = redirectFormUrl === link.url;
-              const hasRedirect = pendingRedirects.has(link.url);
-              return (
-                <div key={idx} className="rounded-lg border border-zinc-800 bg-zinc-950/40 overflow-hidden">
-                  <div className="flex items-start gap-2 px-3 py-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className={`text-[11px] px-1 py-px rounded border font-mono flex-shrink-0 ${link.status === 404 || link.status === '404' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>
-                          {link.status}
-                        </span>
-                        <span className={`text-[10px] px-1 py-px rounded border flex-shrink-0 ${link.type === 'internal' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' : 'bg-zinc-700/50 text-zinc-400 border-zinc-600/50'}`}>
-                          {link.type}
-                        </span>
-                        <span className="text-xs text-zinc-300 font-mono truncate">{link.url}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                        <span className="text-[11px] text-zinc-500">Found on:</span>
-                        <span className="text-[11px] text-zinc-400 truncate">{link.foundOn || link.foundOnSlug}</span>
-                        {link.anchorText && (
-                          <>
-                            <span className="text-[11px] text-zinc-600">·</span>
-                            <span className="text-[11px] text-zinc-500 italic truncate">"{link.anchorText}"</span>
-                          </>
-                        )}
-                      </div>
-                      {hasRedirect && !isFormOpen && (
-                        <div className="flex items-center gap-1 mt-0.5">
-                          <ArrowRight className="w-3 h-3 text-teal-400" />
-                          <span className="text-[11px] text-teal-400 font-mono">{pendingRedirects.get(link.url)}</span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      {workspaceId && link.type === 'internal' && (
-                        <button
-                          onClick={() => navigate(adminPath(workspaceId, 'seo-editor' as Page), {
-                            state: { fixContext: { targetRoute: 'seo-editor', pageSlug: link.foundOnSlug, pageName: link.foundOn, issueCheck: 'broken_link', issueMessage: `Broken link: ${link.url}` } },
-                          })}
-                          className="flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 transition-colors"
-                          title="Open source page in SEO Editor"
-                        >
-                          <Wrench className="w-2.5 h-2.5" /> Fix
-                        </button>
-                      )}
-                      <button
-                        onClick={() => {
-                          if (isFormOpen) { setRedirectFormUrl(null); setRedirectFormTo(''); }
-                          else { setRedirectFormUrl(link.url); setRedirectFormTo(hasRedirect ? pendingRedirects.get(link.url)! : ''); }
-                        }}
-                        className={`flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded border transition-colors ${hasRedirect ? 'bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border-blue-500/20' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400 border-zinc-700'}`}
-                        title="Create a redirect for this URL"
-                      >
-                        <Plus className="w-2.5 h-2.5" /> {hasRedirect ? 'Edit Redirect' : 'Add Redirect'}
-                      </button>
-                    </div>
-                  </div>
-                  {isFormOpen && (
-                    <div className="px-3 py-2 border-t border-zinc-800 bg-zinc-900/50 flex items-center gap-2">
-                      <ArrowRight className="w-3 h-3 text-zinc-500 flex-shrink-0" />
-                      <input
-                        type="text"
-                        value={redirectFormTo}
-                        onChange={e => setRedirectFormTo(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') saveRedirect(link.url); if (e.key === 'Escape') { setRedirectFormUrl(null); setRedirectFormTo(''); } }}
-                        placeholder="/new-path or https://example.com/new"
-                        className="flex-1 bg-zinc-950 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-teal-500"
-                        autoFocus
-                      />
-                      <button
-                        onClick={() => saveRedirect(link.url)}
-                        disabled={!redirectFormTo.trim() || savingRedirect}
-                        className="px-2.5 py-1 rounded text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 transition-colors"
-                      >
-                        {savingRedirect ? 'Saving...' : 'Save'}
-                      </button>
-                      <button
-                        onClick={() => { setRedirectFormUrl(null); setRedirectFormTo(''); }}
-                        className="p-1 rounded hover:bg-zinc-700 text-zinc-500"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <DeadLinkPanel
+          deadLinkDetails={effectiveData!.deadLinkDetails}
+          siteId={siteId}
+          workspaceId={workspaceId}
+        />
       )}
 
       {/* Toolbar */}
@@ -1146,15 +754,20 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         onRunAudit={runAudit}
       />
 
-      {/* Bulk operation error banner */}
-      {bulkError && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400">
-          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-          <span>{bulkError}</span>
-          <button onClick={() => setBulkError(null)} className="ml-auto p-0.5 rounded hover:bg-white/10">
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
+      {/* Bulk accept panel — manages WS progress, session-storage recovery, error banner */}
+      {workspaceId && data && (
+        <BulkAcceptPanel
+          workspaceId={workspaceId}
+          siteId={siteId}
+          data={data}
+          appliedFixes={appliedFixes}
+          setAppliedFixes={setAppliedFixes}
+          editedSuggestions={editedSuggestions}
+          onBulkApplyingChange={setBulkApplying}
+          onBulkProgressChange={setBulkProgress}
+          onBulkError={() => {}}
+          onRegisterHandlers={handlers => { bulkHandlersRef.current = handlers; }}
+        />
       )}
 
       {/* Share URL banner */}

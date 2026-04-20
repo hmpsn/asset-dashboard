@@ -67,9 +67,6 @@ interface OverviewTabProps {
   onOpenChat: () => void;
   // Auth
   clientUser: { id: string; name: string; email: string; role: string } | null;
-  // AI Insight
-  proactiveInsight: string | null;
-  proactiveInsightLoading: boolean;
   // Content Plan
   contentPlanSummary?: { totalCells: number; publishedCells: number; reviewCells: number; approvedCells: number; inProgressCells: number; matrixCount: number } | null;
 }
