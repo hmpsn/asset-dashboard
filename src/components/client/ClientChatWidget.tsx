@@ -14,8 +14,6 @@ import { type WorkspaceInfo, QUICK_QUESTIONS, LEARN_SEO_QUESTIONS } from './type
 export interface ClientChatWidgetApi {
   openChat: () => void;
   askAi: (q: string) => Promise<void>;
-  proactiveInsight: string | null;
-  proactiveInsightLoading: boolean;
 }
 
 export interface ClientChatWidgetProps {
@@ -23,7 +21,7 @@ export interface ClientChatWidgetProps {
   betaMode: boolean;
   workspaceId: string;
   ws: WorkspaceInfo | null;
-  /** Called whenever the API surface (openChat, askAi, proactiveInsight) changes. */
+  /** Called whenever the API surface (openChat, askAi) changes. */
   onApiChange?: (api: ClientChatWidgetApi) => void;
   /** Called when the expanded state changes — used by FeedbackWidget. */
   onExpandedChange?: (expanded: boolean) => void;
@@ -52,7 +50,6 @@ export function ClientChatWidget({
     chatUsage,
     roiValue,
     lastIntent, clearIntent,
-    proactiveInsight, proactiveInsightLoading,
     askAi,
   } = useChat(chatDeps);
 
@@ -64,10 +61,8 @@ export function ClientChatWidget({
     onApiChangeRef.current?.({
       openChat: () => setChatOpen(true),
       askAi,
-      proactiveInsight,
-      proactiveInsightLoading,
     });
-  }, [askAi, proactiveInsight, proactiveInsightLoading, setChatOpen]);
+  }, [askAi, setChatOpen]);
 
   // Bubble up expanded state for FeedbackWidget
   const onExpandedChangeRef = useRef(onExpandedChange);
