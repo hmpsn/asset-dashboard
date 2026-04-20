@@ -159,6 +159,11 @@ interface StrategyIntelligenceInput {
     conversionRate: number;
     sessions: number;
   }>;
+  contentDecay?: Array<{
+    pageId: string;
+    clicksDelta: number;
+    deltaPercent: number;
+  }>;
 }
 
 interface StrategyPageMapEntry {
@@ -262,6 +267,15 @@ export function buildStrategyIntelligenceBlock(opts: StrategyIntelligenceInput):
       return `  "${d.query}": ${posDir}, ${d.clicksDelta > 0 ? '+' : ''}${d.clicksDelta} clicks (now pos ${Math.round(d.currentPosition)})`;
     });
     sections.push(`PERFORMANCE CHANGES (keywords with significant position/click changes — declining keywords need defensive strategy):\n${lines.join('\n')}`);
+  }
+
+  // Content decay
+  if (opts.contentDecay && opts.contentDecay.length > 0) {
+    const lines = opts.contentDecay.slice(0, 10).map(d => {
+      const pctStr = d.deltaPercent != null ? ` (${d.deltaPercent > 0 ? '+' : ''}${Math.round(d.deltaPercent)}%)` : '';
+      return `  ${d.pageId}: ${d.clicksDelta > 0 ? '+' : ''}${d.clicksDelta} clicks${pctStr}`;
+    });
+    sections.push(`CONTENT DECAY (pages losing organic clicks — consider refreshing content or updating keyword targeting):\n${lines.join('\n')}`);
   }
 
   // Conversion data
@@ -1458,24 +1472,22 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
           .filter(i => i.insightType === 'conversion_attribution')
           .map(i => ({ pageUrl: i.pageId || '', ...(i.data as unknown as ConversionAttributionData) }))
           .sort((a, b) => b.conversionRate - a.conversionRate);
-        const contentDecayDeltas = insights
-          .filter(i => i.insightType === 'content_decay')
+        const contentDecaySignals = insights
+          .filter(i => i.insightType === 'content_decay' && i.pageId)
           .map(i => {
             const d = i.data as unknown as ContentDecayData;
             return {
-              query: i.pageId || '',
-              positionDelta: 0,
+              pageId: i.pageId!,
               clicksDelta: d.currentClicks - d.baselineClicks,
-              currentPosition: 0,
+              deltaPercent: d.deltaPercent,
             };
-          })
-          .filter(d => d.query);
+          });
 
         intelligenceBlock = buildStrategyIntelligenceBlock({
           keywordClusters: keywordClusters.length > 0 ? keywordClusters : undefined,
           competitorGaps: competitorGaps.length > 0 ? competitorGaps : undefined,
           conversionPages: conversionPages.length > 0 ? conversionPages : undefined,
-          performanceDeltas: contentDecayDeltas.length > 0 ? contentDecayDeltas : undefined,
+          contentDecay: contentDecaySignals.length > 0 ? contentDecaySignals : undefined,
         });
 
         // Append feedback-loop signals to give the AI real performance context
