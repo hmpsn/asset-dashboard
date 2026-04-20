@@ -1863,8 +1863,10 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
     }
     if (verbosity === 'detailed') {
       if (bp.phone) lines.push(`Phone: ${bp.phone}`);
+      if (bp.email) lines.push(`Email: ${bp.email}`);
       if (bp.address) lines.push(`Address: ${bp.address}`);
       if (bp.openingHours) lines.push(`Hours: ${bp.openingHours}`);
+      if (bp.socialProfiles?.length) lines.push(`Social: ${bp.socialProfiles.join(', ')}`);
     }
   }
 

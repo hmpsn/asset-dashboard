@@ -510,12 +510,7 @@ const KNOWN_UNRENDERED_FIELDS = new Set([
   'bySeverity',
   // LearningsSlice
   'forPage', 'winRateByActionType',
-  // ContentPipelineSlice
-  // rewritePlaybook: formatter exists in formatContentPipelineSection but assembler doesn't populate it yet
-  // (workspace.rewritePlaybook is a TEXT column, needs parsing into { patterns, lastUsedAt } shape)
-  'rewritePlaybook',
   // SiteHealthSlice
-  'aeoReadiness', 'redirectDetails',
   // PageProfileSlice
   // searchIntent: accessed via local pageKw.searchIntent variable, not profile.searchIntent
   'searchIntent',

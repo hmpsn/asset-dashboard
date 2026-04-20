@@ -21,8 +21,8 @@ export interface Annotation {
 
 const stmts = createStmtCache(() => ({
   insert: db.prepare(`
-    INSERT INTO analytics_annotations (id, workspace_id, date, label, category, created_by)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO analytics_annotations (id, workspace_id, date, label, category, created_by, page_url)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `),
   select: db.prepare(`
     SELECT id, workspace_id AS workspaceId, date, label, category, created_by AS createdBy, created_at AS createdAt, page_url AS pageUrl
@@ -41,9 +41,10 @@ export function createAnnotation(opts: {
   label: string;
   category: string;
   createdBy?: string;
+  pageUrl?: string;
 }): { id: string } {
   const id = randomUUID();
-  stmts().insert.run(id, opts.workspaceId, opts.date, opts.label, opts.category, opts.createdBy ?? null);
+  stmts().insert.run(id, opts.workspaceId, opts.date, opts.label, opts.category, opts.createdBy ?? null, opts.pageUrl ?? null);
   return { id };
 }
 

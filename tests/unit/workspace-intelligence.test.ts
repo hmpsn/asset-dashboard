@@ -363,14 +363,14 @@ describe('formatForPrompt — formatter rendering', () => {
         intentSignals: {
           newCount: 3,
           totalCount: 12,
-          recentTypes: ['pricing_inquiry', 'support_request'],
+          recentTypes: ['service_interest', 'content_interest'],
         },
       },
     };
 
     const output = formatForPrompt(intelligence as any, { sections: ['clientSignals'] });
     expect(output).toContain('Intent signals: 3 new of 12 total');
-    expect(output).toContain('pricing_inquiry');
+    expect(output).toContain('service_interest');
   });
 
   it('renders aeoReadiness at standard verbosity', () => {
