@@ -903,8 +903,6 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
       if (pagesToAnalyze.length === 0) {
         log.info({ workspaceId: ws.id }, 'Incremental mode: all pages already fresh, skipping re-analysis');
         sendProgress('complete', 'All pages are already up to date — no re-analysis needed.', 1.0);
-        if (keepalive) clearInterval(keepalive); // prevent setInterval leak on early exit
-        activeGenerations.delete(ws.id);
         // Match the dual-response pattern used at the normal exit (line ~1999):
         // SSE callers already got progress events + the sendProgress('complete') above.
         // JSON callers need a proper response body — res.end() gives them an empty 200.
@@ -2236,11 +2234,8 @@ Rules:
         .catch(err => log.warn({ err, workspaceId: ws.id }, 'Failed to refresh recommendations after strategy update'))
         .finally(() => recsInFlight.delete(ws.id));
     }
-    activeGenerations.delete(ws.id);
     return;
   } catch (err) {
-    activeGenerations.delete(ws.id);
-    if (keepalive) clearInterval(keepalive);
     const msg = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error ? err.stack : '';
     log.error({ detail: msg, stack }, 'Keyword strategy error');
@@ -2249,6 +2244,9 @@ Rules:
       return;
     }
     res.status(500).json({ error: msg });
+  } finally {
+    activeGenerations.delete(ws.id);
+    if (keepalive) clearInterval(keepalive);
   }
 });
 
