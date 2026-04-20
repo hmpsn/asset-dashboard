@@ -290,12 +290,13 @@ const updateAnnotationSchema = z.object({
   label: z.string().min(1).optional(),
   date: z.string().min(1).optional(),
   category: z.string().min(1).optional(),
+  pageUrl: z.string().optional(),
 });
 
 router.patch('/api/google/annotations/:workspaceId/:id', validate(updateAnnotationSchema), (req, res) => {
-  const { label, date, category } = req.body;
+  const { label, date, category, pageUrl } = req.body;
   try {
-    const updated = updateAnnotation(req.params.id, req.params.workspaceId, { label, date, category });
+    const updated = updateAnnotation(req.params.id, req.params.workspaceId, { label, date, category, pageUrl });
     if (!updated) return res.status(404).json({ error: 'Annotation not found' });
     res.json({ ok: true });
   } catch (err) {
