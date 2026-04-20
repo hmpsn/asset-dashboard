@@ -986,6 +986,13 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
     }
     // Filter branded competitor keywords from the pool BEFORE feeding to AI
     const brandedRemoved = filterBrandedKeywords(keywordPool, competitorDomains);
+    // Hard filter: remove declined keywords before the AI sees the pool (prompt instruction is soft)
+    const declinedSet = new Set(declinedKeywords.map(k => k.toLowerCase()));
+    let declinedPoolRemoved = 0;
+    for (const [kw] of keywordPool) {
+      if (declinedSet.has(kw)) { keywordPool.delete(kw); declinedPoolRemoved++; }
+    }
+    if (declinedPoolRemoved > 0) log.info(`Removed ${declinedPoolRemoved} declined keywords from keyword pool`);
     log.info(`Keyword pool: ${keywordPool.size} unique terms (${semrushDomainData.length} domain + ${competitorKeywordData.length} competitor + ${keywordGaps.length} gaps + ${clientKeywordsAdded} client + GSC)${brandedRemoved > 0 ? ` — removed ${brandedRemoved} branded competitor keywords` : ''}`);
     if (keywordPool.size > 0) {
       // Sort by volume descending and include ALL keywords
@@ -1483,15 +1490,40 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
     if (brandedGaps.length > 0) {
       log.info(`Stripped ${brandedGaps.length} branded content gaps despite prompt instruction: ${brandedGaps.map((g: { targetKeyword: string }) => g.targetKeyword).join(', ')}`);
     }
+    // Filter declined keywords from content gap targets (mirrors filterBrandedContentGaps pattern)
+    let finalContentGaps = cleanContentGaps;
+    if (declinedKeywords.length > 0 && cleanContentGaps.length > 0) {
+      finalContentGaps = cleanContentGaps.filter(
+        (cg: { targetKeyword?: string }) =>
+          !cg.targetKeyword || !declinedSet.has(cg.targetKeyword.toLowerCase())
+      );
+      const declinedGapsRemoved = cleanContentGaps.length - finalContentGaps.length;
+      if (declinedGapsRemoved > 0) {
+        log.info(`Stripped ${declinedGapsRemoved} declined content gaps despite prompt instruction`);
+      }
+    }
 
     // Assemble final strategy: batch pageMap + master site-level data
     strategy = {
       siteKeywords: masterData.siteKeywords || [],
       pageMap: allPageMappings,
       opportunities: masterData.opportunities || [],
-      contentGaps: cleanContentGaps,
+      contentGaps: finalContentGaps,
       quickWins: masterData.quickWins || [],
     };
+    // Post-generation: hard filter declined keywords from pageMap assignments
+    if (declinedKeywords.length > 0 && strategy.pageMap?.length) {
+      for (const pm of strategy.pageMap) {
+        if (pm.primaryKeyword && declinedSet.has(pm.primaryKeyword.toLowerCase())) {
+          pm.primaryKeyword = '';
+        }
+        if (pm.secondaryKeywords?.length) {
+          pm.secondaryKeywords = pm.secondaryKeywords.filter(
+            (k: string) => !declinedSet.has(k.toLowerCase())
+          );
+        }
+      }
+    }
     log.info(`Final strategy: ${strategy.pageMap.length} pages, ${strategy.siteKeywords.length} site keywords, ${strategy.contentGaps.length} content gaps, ${strategy.quickWins.length} quick wins`);
 
     } catch (batchErr) {
