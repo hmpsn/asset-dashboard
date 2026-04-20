@@ -6,7 +6,7 @@
  * restore in-progress UI. This test verifies both halves of that contract.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BulkAcceptPanel } from '../../../src/components/audit/BulkAcceptPanel';
 import { seoBulkJobs } from '../../../src/api/seo';
@@ -206,8 +206,8 @@ describe('BulkAcceptPanel — sessionStorage job recovery', () => {
 
     renderPanel();
 
-    // Wait a tick then assert no call was made
-    await new Promise(r => setTimeout(r, 20));
+    // Drain microtask queue — mount effect bails out before awaiting when no session entry
+    await Promise.resolve();
     expect(mockJobsGet).not.toHaveBeenCalled();
   });
 
