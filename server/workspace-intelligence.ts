@@ -315,6 +315,43 @@ async function assembleSeoContext(
     };
   }
 
+  // Merge admin-set strategic goals into businessProfile.goals
+  if (workspace?.businessPriorities?.length) {
+    if (!base.businessProfile) {
+      base.businessProfile = { industry: '', goals: [], targetAudience: '' };
+    }
+    base.businessProfile.goals = [
+      ...(base.businessProfile.goals ?? []),
+      ...workspace.businessPriorities,
+    ];
+  }
+
+  // Merge verified contact info for local SEO context
+  const contactProfile = workspace?.businessProfile;
+  const hasContactInfo = contactProfile && (
+    contactProfile.phone || contactProfile.email || contactProfile.address ||
+    contactProfile.socialProfiles?.length || contactProfile.openingHours
+  );
+  if (hasContactInfo) {
+    if (!base.businessProfile) {
+      base.businessProfile = { industry: '', goals: [], targetAudience: '' };
+    }
+    if (contactProfile!.phone) base.businessProfile.phone = contactProfile!.phone;
+    if (contactProfile!.email) base.businessProfile.email = contactProfile!.email;
+    if (contactProfile!.address) {
+      const a = contactProfile!.address;
+      base.businessProfile.address = [a.street, a.city, a.state, a.zip, a.country]
+        .filter(Boolean)
+        .join(', ');
+    }
+    if (contactProfile!.socialProfiles?.length) {
+      base.businessProfile.socialProfiles = contactProfile!.socialProfiles;
+    }
+    if (contactProfile!.openingHours) {
+      base.businessProfile.openingHours = contactProfile!.openingHours;
+    }
+  }
+
   // Strategy history
   try {
     const rows = stmts().strategyHistory.all(workspaceId) as Array<{ generated_at: string }>;
@@ -504,6 +541,15 @@ async function assembleLearnings(
     }
   }
 
+  let scoringConfig: LearningsSlice['scoringConfig'];
+  try {
+    const { getWorkspace } = await import('./workspaces.js');
+    const ws = getWorkspace(workspaceId);
+    scoringConfig = ws?.scoringConfig ?? undefined;
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleLearnings: scoringConfig optional, degrading gracefully');
+  }
+
   return {
     summary: summary ?? null,
     confidence: summary?.confidence ?? null,
@@ -517,6 +563,7 @@ async function assembleLearnings(
     winRateByActionType: Object.fromEntries(
       (summary?.overall.topActionTypes ?? []).map(t => [t.type, t.winRate]),
     ),
+    scoringConfig,
   };
 }
 
@@ -643,6 +690,29 @@ async function assembleContentPipeline(workspaceId: string): Promise<ContentPipe
     log.debug({ err, workspaceId }, 'assembleContentPipeline: copy pipeline optional, degrading gracefully');
   }
 
+  let rewritePlaybook: ContentPipelineSlice['rewritePlaybook'];
+  let contentPricing: ContentPipelineSlice['contentPricing'];
+  try {
+    const { getWorkspace } = await import('./workspaces.js');
+    const ws = getWorkspace(workspaceId);
+    const rawPlaybook = ws?.rewritePlaybook?.trim();
+    if (rawPlaybook) {
+      const patterns = rawPlaybook.split('\n').map((l: string) => l.trim()).filter(Boolean);
+      rewritePlaybook = { patterns, lastUsedAt: null };
+    }
+    if (ws?.contentPricing) {
+      contentPricing = {
+        briefPrice: ws.contentPricing.briefPrice,
+        fullPostPrice: ws.contentPricing.fullPostPrice,
+        currency: ws.contentPricing.currency,
+        briefLabel: ws.contentPricing.briefLabel,
+        fullPostLabel: ws.contentPricing.fullPostLabel,
+      };
+    }
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleContentPipeline: workspace enrichment optional, degrading gracefully');
+  }
+
   return {
     briefs: summary.briefs,
     posts: summary.posts,
@@ -657,6 +727,8 @@ async function assembleContentPipeline(workspaceId: string): Promise<ContentPipe
     decayAlerts,
     suggestedBriefs,
     copyPipeline,
+    rewritePlaybook,
+    contentPricing,
   };
 }
 
@@ -1341,6 +1413,7 @@ async function assembleOperational(
     annotations = analyticsAnnotations.slice(0, 20).map(a => ({
       date: a.date ?? '',
       label: a.label ?? '',
+      pageUrl: a.pageUrl ?? undefined,
     }));
   } catch (err) {
     log.debug({ err, workspaceId }, 'assembleOperational: analytics annotations optional, degrading gracefully');
@@ -1788,6 +1861,11 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
     if (bp.goals.length > 0 && verbosity === 'detailed') {
       lines.push(`Goals: ${bp.goals.join(', ')}`);
     }
+    if (verbosity === 'detailed') {
+      if (bp.phone) lines.push(`Phone: ${bp.phone}`);
+      if (bp.address) lines.push(`Address: ${bp.address}`);
+      if (bp.openingHours) lines.push(`Hours: ${bp.openingHours}`);
+    }
   }
 
   // Rank tracking — at standard+ verbosity
@@ -1970,6 +2048,17 @@ function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerb
     if (learnings.playbooks?.length > 0 && verbosity === 'detailed') {
       lines.push(`Playbooks: ${learnings.playbooks.slice(0, 3).map(p => p.name).join(', ')}`);
     }
+    if (learnings.scoringConfig && verbosity === 'detailed') {
+      const configEntries = Object.entries(learnings.scoringConfig);
+      if (configEntries.length > 0) {
+        lines.push('Scoring thresholds:');
+        for (const [type, cfg] of configEntries.slice(0, 5)) {
+          if (cfg) {
+            lines.push(`  ${type}: win ≥ ${cfg.thresholds.win}%, strong win ≥ ${cfg.thresholds.strong_win}%`);
+          }
+        }
+      }
+    }
   }
 
   // Cap at 25 content lines to stay within token budget
@@ -2003,6 +2092,13 @@ function formatContentPipelineSection(pipeline: ContentPipelineSlice, verbosity:
     }
     if (pipeline.seoEdits && (pipeline.seoEdits.pending > 0 || pipeline.seoEdits.applied > 0)) {
       lines.push(`SEO edits: ${pipeline.seoEdits.pending} pending, ${pipeline.seoEdits.applied} applied`);
+    }
+    if (pipeline.contentPricing) {
+      const cp = pipeline.contentPricing;
+      lines.push(
+        `Content pricing: ${cp.briefLabel ?? 'Brief'} ${cp.currency} ${cp.briefPrice}, ` +
+        `${cp.fullPostLabel ?? 'Full post'} ${cp.currency} ${cp.fullPostPrice}`
+      );
     }
   }
 
@@ -2079,6 +2175,11 @@ function formatSiteHealthSection(health: SiteHealthSlice, verbosity: PromptVerbo
     if (health.anomalyTypes && health.anomalyTypes.length > 0) {
       lines.push(`Anomaly types: ${health.anomalyTypes.join(', ')}`);
     }
+    if (health.aeoReadiness) {
+      lines.push(
+        `AEO readiness: ${health.aeoReadiness.pagesChecked} pages checked, ${pct(health.aeoReadiness.passingRate)} passing`
+      );
+    }
   }
 
   if (verbosity === 'detailed') {
@@ -2104,6 +2205,12 @@ function formatSiteHealthSection(health: SiteHealthSlice, verbosity: PromptVerbo
       if (health.performanceSummary.avgFid != null) perfParts.push(`FID: ${health.performanceSummary.avgFid}ms`);
       if (health.performanceSummary.avgCls != null) perfParts.push(`CLS: ${health.performanceSummary.avgCls.toFixed(2)}`);
       if (perfParts.length > 0) lines.push(`Core Web Vitals: ${perfParts.join(', ')}`);
+    }
+    if (health.redirectDetails && health.redirectDetails.length > 0) {
+      lines.push('Redirect chain details:');
+      for (const rd of health.redirectDetails.slice(0, 5)) {
+        lines.push(`  - ${rd.url} → ${rd.target} (${rd.chainDepth} hops, status ${rd.status})`);
+      }
     }
   }
 
@@ -2133,6 +2240,14 @@ function formatClientSignalsSection(signals: ClientSignalsSlice, verbosity: Prom
     }
     if (signals.serviceRequests) {
       lines.push(`Service requests: ${signals.serviceRequests.pending} pending, ${signals.serviceRequests.total} total`);
+    }
+    if (signals.intentSignals && signals.intentSignals.newCount > 0) {
+      lines.push(
+        `Intent signals: ${signals.intentSignals.newCount} new of ${signals.intentSignals.totalCount} total` +
+        (signals.intentSignals.recentTypes.length > 0
+          ? ` (${signals.intentSignals.recentTypes.join(', ')})`
+          : '')
+      );
     }
   }
 
