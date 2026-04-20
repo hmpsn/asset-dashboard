@@ -57,7 +57,9 @@ describe('keyword strategy — concurrent generation guard', () => {
     ]);
 
     const statuses = [res1.status, res2.status];
+    // One request must be rejected (409), the other must have proceeded (not 409)
     expect(statuses).toContain(409);
+    expect(statuses.some(s => s !== 409)).toBe(true);
 
     const failedRes = res1.status === 409 ? res1 : res2;
     const json = await failedRes.json();

@@ -44,7 +44,7 @@ import db from '../db/index.js';
 import { parseJsonFallback } from '../db/json-validation.js';
 import { getInsights } from '../analytics-insights-store.js';
 import type { KeywordClusterData, CompetitorGapData, ConversionAttributionData, ContentDecayData } from '../../shared/types/analytics.js';
-import type { Workspace } from '../../shared/types/workspace.js';
+import type { Workspace, PageKeywordMap, KeywordStrategy } from '../../shared/types/workspace.js';
 import { METRICS_SOURCE } from '../../shared/types/keywords.js';
 import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
 import { buildStrategySignals } from '../insight-feedback.js';
@@ -59,6 +59,7 @@ import { getDeclinedKeywords, getRequestedKeywords } from '../keyword-feedback.j
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { requireWorkspaceAccess } from '../auth.js';
+import { filterDeclinedFromPool, matchesQuestionKeyword } from '../strategy-filters.js';
 
 const log = createLogger('keyword-strategy');
 
@@ -165,6 +166,71 @@ interface StrategyIntelligenceInput {
     clicksDelta: number;
     deltaPercent: number;
   }>;
+}
+
+interface StrategyPageMapEntry {
+  pagePath: string;
+  pageTitle?: string;
+  primaryKeyword: string;
+  secondaryKeywords?: string[];
+  intent?: string;
+  searchIntent?: string;
+  rationale?: string;
+  impressions?: number;
+  clicks?: number;
+  currentPosition?: number;
+  previousPosition?: number;
+  trendDirection?: string;
+  serpFeatures?: string[];
+  serpTargeting?: string[];
+  questionKeywords?: string[];
+  validated?: boolean;
+  volume?: number;
+  difficulty?: number;
+  cpc?: number;
+  metricsSource?: string;
+  gscKeywords?: { query: string; clicks: number; impressions: number; position: number }[];
+  secondaryMetrics?: { keyword: string; volume: number; difficulty: number }[];
+  analysisGeneratedAt?: string;
+}
+
+interface StrategyContentGap {
+  topic?: string;
+  targetKeyword: string;
+  intent?: string;
+  priority?: string;
+  rationale?: string;
+  suggestedPageType?: string;
+  competitorProof?: string;
+  impressions?: number;
+  volume?: number;
+  difficulty?: number;
+  trendDirection?: string;
+  serpFeatures?: string[];
+  serpTargeting?: string[];
+  questionKeywords?: string[];
+}
+
+interface StrategyQuickWin {
+  pagePath: string;
+  action: string;
+  estimatedImpact?: string;
+  rationale?: string;
+  roiScore?: number;
+}
+
+interface StrategyKeywordFix {
+  pagePath: string;
+  newPrimaryKeyword: string;
+}
+
+interface StrategyOutput {
+  siteKeywords?: string[];
+  opportunities?: string[];
+  contentGaps?: StrategyContentGap[];
+  quickWins?: StrategyQuickWin[];
+  keywordFixes?: StrategyKeywordFix[];
+  pageMap?: StrategyPageMapEntry[];
 }
 
 /**
@@ -878,7 +944,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
     }
 
     // Adaptive pipeline: inject workspace learnings for difficulty range guidance
-    if (isFeatureEnabled('outcome-adaptive-pipeline')) {
+    if (isFeatureEnabled('outcome-ai-injection')) {
       try {
         const learnings = getWorkspaceLearnings(ws.id);
         if (learnings) {
@@ -893,8 +959,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
       }
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let strategy: any;
+    let strategy: StrategyOutput = {};
     // Hoisted out of the try-block so incremental-mode post-processing (below) can reference it.
     let pagesToAnalyze: typeof pageInfo = [];
     try {
@@ -1015,10 +1080,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
     const brandedRemoved = filterBrandedKeywords(keywordPool, competitorDomains);
     // Hard filter: remove declined keywords before the AI sees the pool (prompt instruction is soft)
     const declinedSet = new Set(declinedKeywords.map(k => k.toLowerCase()));
-    let declinedPoolRemoved = 0;
-    for (const [kw] of keywordPool) {
-      if (declinedSet.has(kw)) { keywordPool.delete(kw); declinedPoolRemoved++; }
-    }
+    const declinedPoolRemoved = filterDeclinedFromPool(keywordPool, declinedKeywords);
     if (declinedPoolRemoved > 0) log.info(`Removed ${declinedPoolRemoved} declined keywords from keyword pool`);
     log.info(`Keyword pool: ${keywordPool.size} unique terms (${semrushDomainData.length} domain + ${competitorKeywordData.length} competitor + ${keywordGaps.length} gaps + ${clientKeywordsAdded} client + GSC)${brandedRemoved > 0 ? ` — removed ${brandedRemoved} branded competitor keywords` : ''}`);
     if (keywordPool.size > 0) {
@@ -1424,6 +1486,12 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
           conversionPages: conversionPages.length > 0 ? conversionPages : undefined,
           contentDecay: contentDecaySignals.length > 0 ? contentDecaySignals : undefined,
         });
+
+        // Append feedback-loop signals to give the AI real performance context
+        const stratSignals = buildStrategySignals(insights);
+        if (stratSignals.length > 0) {
+          intelligenceBlock += `\n\nSTRATEGY SIGNALS (analytics feedback loop — use to prioritize recommendations):\n${stratSignals.slice(0, 10).map(s => `- [${s.type}] ${s.detail}`).join('\n')}`;
+        }
       }
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* non-critical — strategy works without intelligence data */ }
 
@@ -1549,7 +1617,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
         }
       }
     }
-    log.info(`Final strategy: ${strategy.pageMap.length} pages, ${strategy.siteKeywords.length} site keywords, ${strategy.contentGaps.length} content gaps, ${strategy.quickWins.length} quick wins`);
+    log.info(`Final strategy: ${strategy.pageMap?.length ?? 0} pages, ${strategy.siteKeywords?.length ?? 0} site keywords, ${strategy.contentGaps?.length ?? 0} content gaps, ${strategy.quickWins?.length ?? 0} quick wins`);
 
     } catch (batchErr) {
       if (keepalive) clearInterval(keepalive);
@@ -1774,7 +1842,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
         // Attach related question keywords to each gap
         if (allQuestionKws.length > 0) {
           const relatedQs = allQuestionKws.flatMap(q => q.questions)
-            .filter(q => q.keyword.toLowerCase().includes(cg.targetKeyword.toLowerCase().split(' ')[0]))
+            .filter(q => matchesQuestionKeyword(cg.targetKeyword, q.keyword))
             .slice(0, 3)
             .map(q => q.keyword);
           if (relatedQs.length > 0) cg.questionKeywords = relatedQs;
@@ -2064,14 +2132,14 @@ Rules:
       if (withVolume.length > 0) {
         // Sort by volume descending, then priority
         strategy.contentGaps = withVolume.sort(
-          (a: { volume?: number; priority: string }, b: { volume?: number; priority: string }) =>
-            (b.volume || 0) - (a.volume || 0) || prioWeight(b.priority) - prioWeight(a.priority)
+          (a: StrategyContentGap, b: StrategyContentGap) =>
+            (b.volume || 0) - (a.volume || 0) || prioWeight(b.priority ?? '') - prioWeight(a.priority ?? '')
         );
       } else {
         // No volume data available — keep all but sort by priority
         strategy.contentGaps = strategy.contentGaps.sort(
-          (a: { priority: string }, b: { priority: string }) =>
-            prioWeight(b.priority) - prioWeight(a.priority)
+          (a: StrategyContentGap, b: StrategyContentGap) =>
+            prioWeight(b.priority ?? '') - prioWeight(a.priority ?? '')
         );
       }
       log.info(`Content gaps: ${withVolume.length} with volume data, ${strategy.contentGaps.length} total kept`);
@@ -2121,15 +2189,15 @@ Rules:
     // incremental run re-analyzes everything (COALESCE preserves NULL, not the current time).
     const now = new Date().toISOString();
     if (strategyMode === 'full') {
-      const stampedMap = pageMap.map((pm: { pagePath: string }) => ({ ...pm, analysisGeneratedAt: now }));
+      const stampedMap = pageMap.map((pm) => ({ ...pm, analysisGeneratedAt: now })) as PageKeywordMap[];
       upsertAndCleanPageKeywords(ws.id, stampedMap);
     } else {
       // Only update the pages that were actually re-analyzed in this incremental run.
       // Pages with fresh analysis_generated_at are left untouched in the DB.
       const analyzedPaths = new Set(pagesToAnalyze.map(p => p.path));
       const analyzedMappings = pageMap
-        .filter((pm: { pagePath: string }) => analyzedPaths.has(pm.pagePath))
-        .map((pm: { pagePath: string }) => ({ ...pm, analysisGeneratedAt: now }));
+        .filter((pm) => analyzedPaths.has(pm.pagePath))
+        .map((pm) => ({ ...pm, analysisGeneratedAt: now })) as PageKeywordMap[];
       upsertPageKeywordsBatch(ws.id, analyzedMappings);
     }
     // Bridge #5: page keywords replaced — invalidate page caches
@@ -2185,7 +2253,7 @@ Rules:
       saveStrategyHistory();
     }
 
-    updateWorkspace(ws.id, { keywordStrategy });
+    updateWorkspace(ws.id, { keywordStrategy: keywordStrategy as KeywordStrategy });
     broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, {
       pageCount: pageMap.length,
       siteKeywords: keywordStrategy.siteKeywords?.length || 0,

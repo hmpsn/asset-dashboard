@@ -1,16 +1,5 @@
 import { describe, it, expect } from 'vitest';
-
-function filterDeclinedFromPool(
-  keywordPool: Map<string, unknown>,
-  declinedKeywords: string[]
-): number {
-  const declinedSet = new Set(declinedKeywords.map(k => k.toLowerCase()));
-  let removed = 0;
-  for (const [kw] of keywordPool) {
-    if (declinedSet.has(kw)) { keywordPool.delete(kw); removed++; }
-  }
-  return removed;
-}
+import { filterDeclinedFromPool } from '../../server/strategy-filters.js';
 
 describe('filterDeclinedFromPool', () => {
   it('removes exact case-insensitive matches', () => {
