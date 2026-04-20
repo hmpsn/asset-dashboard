@@ -145,11 +145,30 @@ export interface KeywordStrategy {
   semrushMode?: 'quick' | 'full' | 'none'; // which SEMRush mode was used
   /** Enriched search signals stored alongside strategy (not included in pageMap). */
   searchSignals?: {
-    deviceBreakdown?: { device: string; clicks: number; impressions: number }[];
-    periodComparison?: { label: string; clicks: number; impressions: number; position: number };
-    topCountries?: { country: string; clicks: number; impressions: number }[];
-    organicOverview?: { clicks: number; impressions: number; ctr: number; position: number };
-    organicLandingPages?: { page: string; clicks: number; impressions: number; position: number }[];
+    /** Matches DeviceBreakdown from server/search-console.ts */
+    deviceBreakdown?: { device: string; clicks: number; impressions: number; ctr: number; position: number }[];
+    /** Matches PeriodComparison from server/search-console.ts */
+    periodComparison?: {
+      current: { clicks: number; impressions: number; ctr: number; position: number };
+      previous: { clicks: number; impressions: number; ctr: number; position: number };
+      change: { clicks: number; impressions: number; ctr: number; position: number };
+      changePercent: { clicks: number; impressions: number; ctr: number; position: number };
+    };
+    /** Matches CountryBreakdown from server/search-console.ts */
+    topCountries?: { country: string; clicks: number; impressions: number; ctr: number; position: number }[];
+    /** Matches GA4OrganicOverview from server/google-analytics.ts */
+    organicOverview?: {
+      organicUsers: number;
+      organicSessions: number;
+      organicPageviews: number;
+      organicBounceRate: number;
+      engagementRate: number;
+      avgEngagementTime: number;
+      shareOfTotalUsers: number;
+      dateRange: { start: string; end: string };
+    };
+    /** Matches GA4LandingPage[] from server/google-analytics.ts */
+    organicLandingPages?: { landingPage: string; sessions: number; users: number; bounceRate: number; avgEngagementTime: number; conversions: number }[];
   };
   generatedAt: string;
 }
