@@ -56,6 +56,9 @@ import { buildSystemPrompt } from '../prompt-assembly.js';
 import { isProgrammingError } from '../errors.js';
 import { generateRecommendations } from '../recommendations.js';
 import { getDeclinedKeywords, getRequestedKeywords } from '../keyword-feedback.js';
+import { broadcastToWorkspace } from '../broadcast.js';
+import { WS_EVENTS } from '../ws-events.js';
+import { requireWorkspaceAccess } from '../auth.js';
 
 const log = createLogger('keyword-strategy');
 
@@ -208,7 +211,7 @@ export function buildStrategyIntelligenceBlock(opts: StrategyIntelligenceInput):
 }
 
 // --- Keyword Strategy Generation (SSE progress) ---
-router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
+router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (!ws.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
@@ -729,7 +732,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         if (fetchCompetitors && (competitorKeywordData.length > 0 || keywordGaps.length > 0)) {
           updateWorkspace(ws.id, {
             competitorLastFetchedAt: new Date().toISOString(),
-            competitorDomainsAtLastFetch: ws.competitorDomains ?? [],
+            competitorDomainsAtLastFetch: competitorDomains,
           });
         }
 
@@ -891,6 +894,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         // SSE callers already got progress events + the sendProgress('complete') above.
         // JSON callers need a proper response body — res.end() gives them an empty 200.
         if (wantsStream) {
+          res.write(`data: ${JSON.stringify({ done: true, strategy: ws.keywordStrategy, upToDate: true })}\n\n`);
           res.end();
         } else {
           res.json({ ok: true, upToDate: true, freshPageCount: pagesToPreserve.length });
@@ -1237,7 +1241,11 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
     if (gscData.length > 0) {
       const topGsc = [...gscData].sort((a, b) => b.impressions - a.impressions).slice(0, 30);
       gscSummary = `\n\nTop GSC queries (last 90 days):\n` +
-        topGsc.map(r => `- "${r.query}" → ${new URL(r.page).pathname} (pos: ${r.position.toFixed(1)}, clicks: ${r.clicks}, imp: ${r.impressions})`).join('\n');
+        topGsc.map(r => {
+          let pagePath: string;
+          try { pagePath = new URL(r.page).pathname; } catch { pagePath = r.page; }
+          return `- "${r.query}" → ${pagePath} (pos: ${r.position.toFixed(1)}, clicks: ${r.clicks}, imp: ${r.impressions})`;
+        }).join('\n');
     }
 
     // Device breakdown context
@@ -2105,6 +2113,10 @@ Rules:
     }
 
     updateWorkspace(ws.id, { keywordStrategy });
+    broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, {
+      pageCount: pageMap.length,
+      siteKeywords: keywordStrategy.siteKeywords?.length || 0,
+    });
     clearSeoContextCache(ws.id);
     invalidateIntelligenceCache(ws.id);
     // Bridge #3: strategy updated — debounced intelligence invalidation
