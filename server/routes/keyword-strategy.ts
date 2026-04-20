@@ -729,7 +729,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         if (fetchCompetitors && (competitorKeywordData.length > 0 || keywordGaps.length > 0)) {
           updateWorkspace(ws.id, {
             competitorLastFetchedAt: new Date().toISOString(),
-            competitorDomainsAtLastFetch: ws.competitorDomains ?? [],
+            competitorDomainsAtLastFetch: competitorDomains,
           });
         }
 
