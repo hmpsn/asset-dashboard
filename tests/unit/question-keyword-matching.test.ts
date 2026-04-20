@@ -16,4 +16,13 @@ describe('matchesQuestionKeyword', () => {
     expect(matchesQuestionKeyword('local seo strategy', 'local seo for small business')).toBe(true);
     expect(matchesQuestionKeyword('local seo strategy', 'some other content')).toBe(false);
   });
+
+  it('uses word-boundary matching — short words must match as whole tokens, not substrings', () => {
+    // "ai" must not match as a substring inside "email"
+    expect(matchesQuestionKeyword('ai seo', 'email seo tips')).toBe(false);
+    // "or" must not match inside "for" or "organic"
+    expect(matchesQuestionKeyword('or seo', 'organic seo guide')).toBe(false);
+    // Exact word match still works
+    expect(matchesQuestionKeyword('ai seo', 'best ai seo tools')).toBe(true);
+  });
 });
