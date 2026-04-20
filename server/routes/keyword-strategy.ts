@@ -891,6 +891,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         // SSE callers already got progress events + the sendProgress('complete') above.
         // JSON callers need a proper response body — res.end() gives them an empty 200.
         if (wantsStream) {
+          res.write(`data: ${JSON.stringify({ done: true, strategy: ws.keywordStrategy, upToDate: true })}\n\n`);
           res.end();
         } else {
           res.json({ ok: true, upToDate: true, freshPageCount: pagesToPreserve.length });
