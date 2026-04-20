@@ -475,6 +475,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         hasData={hasData}
         contentRequests={contentRequests}
         hasAnalytics={!!(overview || ga4Overview)}
+        hasAnyData={!!(overview || audit || ga4Overview)}
         effectiveTier={effectiveTier}
       />
 

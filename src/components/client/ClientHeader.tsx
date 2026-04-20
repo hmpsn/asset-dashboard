@@ -33,6 +33,7 @@ interface ClientHeaderProps {
   hasData: (tabId: ClientTab) => boolean;
   contentRequests: ClientContentRequest[];
   hasAnalytics: boolean;
+  hasAnyData: boolean;
   effectiveTier: 'free' | 'growth' | 'premium';
 }
 
@@ -61,6 +62,7 @@ export function ClientHeader({
   hasData,
   contentRequests,
   hasAnalytics,
+  hasAnyData,
   effectiveTier,
 }: ClientHeaderProps) {
   return (
@@ -78,7 +80,7 @@ export function ClientHeader({
                 </span>
               )}
             </div>
-            <p className="text-xs text-zinc-500 mt-0.5">Insights Engine{hasAnalytics && <span className="ml-2 text-zinc-500">· Updated {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}</p>
+            <p className="text-xs text-zinc-500 mt-0.5">Insights Engine{hasAnyData && <span className="ml-2 text-zinc-500">· Updated {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
