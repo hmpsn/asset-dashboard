@@ -319,25 +319,25 @@ body::after {
 }
 
 /* === Neutral Backgrounds === */
-.dashboard-light .bg-\[\#0f1219\] { background-color: #f8fafc !important; }
-.dashboard-light .bg-zinc-950 { background-color: #f8fafc !important; }
-.dashboard-light .bg-zinc-900 { background-color: #ffffff !important; }
+.dashboard-light .bg-\[\#0f1219\] { background-color: var(--brand-bg) !important; }
+.dashboard-light .bg-zinc-950 { background-color: var(--brand-bg) !important; }
+.dashboard-light .bg-zinc-900 { background-color: var(--brand-bg-surface) !important; }
 .dashboard-light .bg-zinc-900\/50 { background-color: rgba(255,255,255,0.8) !important; }
-.dashboard-light .bg-zinc-800 { background-color: #f1f5f9 !important; }
+.dashboard-light .bg-zinc-800 { background-color: var(--brand-bg-card) !important; }
 .dashboard-light .bg-zinc-800\/30 { background-color: rgba(241,245,249,0.5) !important; }
 .dashboard-light .bg-zinc-800\/50 { background-color: rgba(241,245,249,0.7) !important; }
 .dashboard-light .bg-zinc-800\/60 { background-color: rgba(241,245,249,0.8) !important; }
-.dashboard-light .bg-zinc-700 { background-color: #e2e8f0 !important; }
+.dashboard-light .bg-zinc-700 { background-color: var(--brand-bg-hover) !important; }
 .dashboard-light .bg-zinc-600 { background-color: var(--brand-bg-active) !important; }
 .dashboard-light .bg-zinc-500 { background-color: #94a3b8 !important; }
 
 /* === Neutral Borders === */
-.dashboard-light .border-zinc-800 { border-color: #e2e8f0 !important; }
+.dashboard-light .border-zinc-800 { border-color: var(--brand-bg-hover) !important; }
 .dashboard-light .border-zinc-800\/50 { border-color: rgba(226,232,240,0.6) !important; }
-.dashboard-light .border-zinc-700 { border-color: #cbd5e1 !important; }
+.dashboard-light .border-zinc-700 { border-color: var(--brand-border-strong) !important; }
 .dashboard-light .border-zinc-700\/50 { border-color: rgba(203,213,225,0.5) !important; }
 .dashboard-light .border-zinc-600 { border-color: #94a3b8 !important; }
-.dashboard-light .divide-zinc-800 > * + * { border-color: #e2e8f0 !important; }
+.dashboard-light .divide-zinc-800 > * + * { border-color: var(--brand-bg-hover) !important; }
 
 /* === Neutral Text — four distinct steps: heading → strong secondary → body → muted === */
 .dashboard-light .text-zinc-100 { color: var(--brand-text-bright) !important; }  /* #0f172a heading */
@@ -442,9 +442,9 @@ body::after {
 .dashboard-light .border-blue-500\/50 { border-color: rgba(37,99,235,0.35) !important; }
 
 /* === Hover: Backgrounds === */
-.dashboard-light .hover\:bg-zinc-700:hover { background-color: #e2e8f0 !important; }
-.dashboard-light .hover\:bg-zinc-600:hover { background-color: var(--brand-bg-hover) !important; }
-.dashboard-light .hover\:bg-zinc-800:hover { background-color: #f1f5f9 !important; }
+.dashboard-light .hover\:bg-zinc-700:hover { background-color: var(--brand-bg-hover) !important; }
+.dashboard-light .hover\:bg-zinc-600:hover { background-color: var(--brand-bg-active) !important; }
+.dashboard-light .hover\:bg-zinc-800:hover { background-color: var(--brand-bg-card) !important; }
 .dashboard-light .hover\:bg-zinc-800\/20:hover { background-color: rgba(241,245,249,0.35) !important; }
 .dashboard-light .hover\:bg-zinc-800\/30:hover { background-color: rgba(241,245,249,0.6) !important; }
 .dashboard-light .hover\:bg-zinc-800\/50:hover { background-color: rgba(241,245,249,0.8) !important; }
