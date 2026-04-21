@@ -441,7 +441,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                     const warns = page.issues.filter(i => i.severity === 'warning').length;
                     const isExpanded = expandedPages.has(page.pageId);
                     return (
-                      <div key={page.pageId} className={`rounded-lg border transition-all ${isExpanded ? 'bg-zinc-950/80 border-zinc-700' : 'bg-zinc-950/50 border-zinc-800/50 hover:border-zinc-700'}`}>
+                      <div key={page.pageId} className={`rounded-lg border transition-all ${isExpanded ? 'bg-zinc-950/50 border-zinc-700' : 'bg-zinc-950/50 border-zinc-800/50 hover:border-zinc-700'}`}>
                         <button
                           onClick={() => togglePage(page.pageId)}
                           className="w-full flex items-center gap-3 p-3 text-left"
@@ -578,7 +578,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
       {/* ── 6. ALL PAGES LIST ── */}
       <div ref={allPagesRef}>
         <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
-          <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2 flex-wrap bg-zinc-950/30">
+          <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2 flex-wrap bg-zinc-950/50">
             {/* View mode toggle */}
             <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-0.5">
               <button onClick={() => setViewMode('by-page')}

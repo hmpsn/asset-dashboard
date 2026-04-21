@@ -876,6 +876,16 @@ export const CHECKS: Check[] = [
     claudeMdRef: '#code-conventions',
   },
   {
+    name: 'window.confirm() in client components',
+    pattern: 'window\\.confirm\\(',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/components/client/',
+    message: 'Use <ConfirmDialog> from src/components/ui/ConfirmDialog.tsx instead of window.confirm() — the native dialog appears at the top of the screen, not centered.',
+    severity: 'error',
+    rationale: 'window.confirm() produces a browser-native dialog anchored to the top of the viewport, which disorients users working near the bottom of long pages. ConfirmDialog renders centered with teal CTA and keyboard support.',
+    claudeMdRef: '#uiux-rules-mandatory',
+  },
+  {
     name: 'Raw fetch() in components',
     // customCheck (was regex) — see Round 2 Task P1.5. The original pattern
     // `(?<![a-zA-Z])fetch\\(` uses a lookbehind assertion. BSD `grep -E`
