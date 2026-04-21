@@ -58,6 +58,34 @@ function dirSize(dirPath: string): { bytes: number; files: number } {
   return { bytes, files };
 }
 
+/** Async variant of dirSize — used by getStorageReport() to avoid blocking the event loop. */
+async function dirSizeAsync(dirPath: string): Promise<{ bytes: number; files: number }> {
+  let bytes = 0;
+  let files = 0;
+  try {
+    await fs.promises.access(dirPath);
+    const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
+    for (const entry of entries) {
+      const full = path.join(dirPath, entry.name);
+      try {
+        if (entry.isDirectory()) {
+          const sub = await dirSizeAsync(full);
+          bytes += sub.bytes;
+          files += sub.files;
+        } else if (entry.isFile()) {
+          bytes += (await fs.promises.stat(full)).size;
+          files++;
+        }
+      } catch (err) {
+        if (isProgrammingError(err)) log.warn({ err }, 'storage-stats/dirSizeAsync: programming error');
+      }
+    }
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'storage-stats/dirSizeAsync: programming error');
+  }
+  return { bytes, files };
+}
+
 /* ── Main report ── */
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -90,7 +118,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   optimized: 'Optimized Images',
 };
 
-export function getStorageReport(): StorageReport {
+export async function getStorageReport(): Promise<StorageReport> {
   const dataRoot = DATA_BASE || path.join(process.env.HOME || '', '.asset-dashboard');
   const breakdown: DirStats[] = [];
   let totalBytes = 0;
@@ -107,7 +135,7 @@ export function getStorageReport(): StorageReport {
 
   for (const sub of knownDirs) {
     const dirPath = path.join(dataRoot, sub);
-    const stats = dirSize(dirPath);
+    const stats = await dirSizeAsync(dirPath);
     if (stats.bytes > 0 || stats.files > 0) {
       breakdown.push({
         name: sub,
@@ -123,7 +151,7 @@ export function getStorageReport(): StorageReport {
   // Uploads root (may be separate from data root in dev)
   try {
     const uploadRoot = getUploadRoot();
-    const uploadStats = dirSize(uploadRoot);
+    const uploadStats = await dirSizeAsync(uploadRoot);
     if (uploadStats.bytes > 0) {
       breakdown.push({
         name: 'uploads',
@@ -139,7 +167,7 @@ export function getStorageReport(): StorageReport {
   // Optimized images
   try {
     const optRoot = getOptRoot();
-    const optStats = dirSize(optRoot);
+    const optStats = await dirSizeAsync(optRoot);
     if (optStats.bytes > 0) {
       breakdown.push({
         name: 'optimized',
@@ -160,23 +188,22 @@ export function getStorageReport(): StorageReport {
   let chatSessionCount = 0;
   let oldestChatSession: string | null = null;
   try {
-    if (fs.existsSync(chatDir)) {
-      const wsDirs = fs.readdirSync(chatDir, { withFileTypes: true }).filter(d => d.isDirectory());
-      for (const wsDir of wsDirs) {
-        const wsPath = path.join(chatDir, wsDir.name);
-        const files = fs.readdirSync(wsPath).filter(f => f.endsWith('.json'));
-        chatSessionCount += files.length;
-        for (const file of files) {
-          try {
-            const data = JSON.parse(fs.readFileSync(path.join(wsPath, file), 'utf-8'));
-            if (data.createdAt && (!oldestChatSession || data.createdAt < oldestChatSession)) {
-              oldestChatSession = data.createdAt;
-            }
-          } catch (err) { /* skip */ }
-        }
+    const wsDirs = (await fs.promises.readdir(chatDir, { withFileTypes: true }).catch(() => [])).filter(d => d.isDirectory());
+    for (const wsDir of wsDirs) {
+      const wsPath = path.join(chatDir, wsDir.name);
+      const files = (await fs.promises.readdir(wsPath).catch(() => [])).filter((f: string) => f.endsWith('.json'));
+      chatSessionCount += files.length;
+      for (const file of files) {
+        try {
+          const raw = await fs.promises.readFile(path.join(wsPath, file), 'utf-8');
+          const data = JSON.parse(raw);
+          if (data.createdAt && (!oldestChatSession || data.createdAt < oldestChatSession)) {
+            oldestChatSession = data.createdAt;
+          }
+        } catch { /* skip malformed session files */ } // catch-ok
       }
     }
-  } catch (err) { /* ignore */ }
+  } catch { /* chatDir not found or inaccessible */ } // catch-ok
 
   const retentionDays = parseInt(process.env.BACKUP_RETENTION_DAYS || '7', 10);
 

@@ -64,7 +64,9 @@ describe('Admin storage stats', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toHaveProperty('totalBytes');
-  }, 120_000);
+    expect(body).toHaveProperty('breakdown');
+    expect(body).toHaveProperty('timestamp');
+  }, 30_000);
 });
 
 describe('Admin storage pruning', () => {

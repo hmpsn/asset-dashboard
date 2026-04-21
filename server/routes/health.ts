@@ -112,9 +112,9 @@ router.get('/api/health', (_req, res) => {
 
 // ── Storage monitoring & pruning ──
 
-router.get('/api/admin/storage-stats', (_req, res) => {
+router.get('/api/admin/storage-stats', async (_req, res) => {
   try {
-    const report = getStorageReport();
+    const report = await getStorageReport();
     res.json(report);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to get storage stats' });
