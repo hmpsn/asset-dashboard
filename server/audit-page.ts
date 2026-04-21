@@ -27,6 +27,7 @@ export interface PageSeoResult {
   score: number;
   issues: SeoIssue[];
   noindex?: boolean;
+  publishedPath?: string | null;
 }
 
 interface PageMeta {
