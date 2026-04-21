@@ -3493,7 +3493,7 @@ export const CHECKS: Check[] = [
     name: 'Manual pageMap pairing outside shared helpers — use findPageMapEntry(ForPage) or usePageJoin',
     pattern: '',
     fileGlobs: ['*.ts', '*.tsx'],
-    pathFilter: 'src',
+    pathFilter: 'src/',
     message:
       'Use findPageMapEntry(ForPage) or usePageJoin instead of inline pageMap.find(). ' +
       'Direct .find() misses case-insensitive matching and legacy /${slug} fallbacks.',
