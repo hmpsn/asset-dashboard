@@ -4333,6 +4333,17 @@
           "status": "done",
           "shippedAt": "2026-04-16",
           "notes": "Shipped \u2014 PR #218. (1) serpFeatures carry: competitorKeywordData now includes optional serpFeatures field to preserve SERP feature data from both DFS and SEMRush (previously silently dropped). (2) Provider date normalization: normalizeProviderDate() helper converts raw Unix epoch timestamps and string dates from SEMRush and DataForSEO to ISO-8601 format at provider boundary \u2014 prevents 'Invalid Date' in referring-domain dates. (3) Competitor keyword limits: Full-mode fetch raised 100 \u2192 200; SEMRush overfetches 2\u00d7 + sorts by volume to match DFS ordering. (4) Regression guards: Two pr-check rules guard against provider date/serpFeatures loss. Feature #300."
+        },
+        {
+          "id": "slug-path-hardening",
+          "title": "Webflow Nested Page Path Hardening Sprint",
+          "source": "docs/superpowers/plans/2026-04-21-slug-path-hardening.md",
+          "est": "4-6h",
+          "priority": "P0",
+          "sprint": "G",
+          "status": "done",
+          "shippedAt": "2026-04-21",
+          "notes": "All 8 bugs fixed (BUG-0001 through BUG-0008). resolvePagePath adopted at 15+ sites. applyBulkKeywordGuards moved to helpers. GSC path-boundary matching. bare-slug-pagepath pr-check rule added."
         }
       ]
     }

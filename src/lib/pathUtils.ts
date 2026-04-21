@@ -18,3 +18,18 @@ export function matchPagePath(a: string, b: string): boolean {
 export function resolvePagePath(page: { publishedPath?: string | null; slug?: string }): string {
   return page.publishedPath || (page.slug ? `/${page.slug}` : '/');
 }
+
+/**
+ * Returns the resolved page path, or `undefined` when the page has no slug/publishedPath info at all.
+ * Use this anywhere "no meaningful path info" must be distinguishable from a real path (including the homepage).
+ * See server/helpers.ts:tryResolvePagePath for the authoritative doc.
+ *
+ * Webflow homepages are marked with `slug: ''` (empty string), NOT undefined. The guard below checks
+ * `=== undefined` / `=== null` rather than falsy, so `slug: ''` correctly resolves to `/`.
+ */
+export function tryResolvePagePath(page: { publishedPath?: string | null; slug?: string }): string | undefined {
+  const hasSlug = page.slug !== undefined && page.slug !== null;
+  const hasPublishedPath = page.publishedPath !== undefined && page.publishedPath !== null;
+  if (!hasSlug && !hasPublishedPath) return undefined;
+  return resolvePagePath(page);
+}

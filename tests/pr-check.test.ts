@@ -23,7 +23,7 @@
  * Fixtures never live in the real tree so they cannot pollute `pr-check --all`.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import { execFileSync } from 'child_process';
@@ -3888,6 +3888,205 @@ describe('Rule: Raw provider date passed to new Date()', () => {
   });
 });
 
+describe('Rule: Bare slug used in pagePath construction — use resolvePagePath(page)', () => {
+  const RULE = 'Bare slug used in pagePath construction — use resolvePagePath(page)';
+
+  it('flags bare `/${page.slug}` template literal', () => {
+    const file = write(
+      uniqPath('rule-bare-slug', 'server/webflow-seo.ts'),
+      lines(
+        'export function getPagePath(page: { slug: string }) {',
+        '  const pagePath = `/${page.slug}`;',
+        '  return pagePath;',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags bare `/${p.slug}` template literal', () => {
+    const file = write(
+      uniqPath('rule-bare-slug', 'server/routes/webflow-keywords.ts'),
+      lines(
+        'const urls = pages.map(p => ({',
+        '  url: `/${p.slug}`,',
+        '}));',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags `/${page.slug || ""}` (empty-fallback variant)', () => {
+    const file = write(
+      uniqPath('rule-bare-slug', 'src/components/SeoEditor.ts'),
+      lines(
+        'function getPath(page: { slug: string }) {',
+        '  return `/${page.slug || ""}`;',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('does NOT flag ternary startsWith normalization pattern', () => {
+    const file = write(
+      uniqPath('rule-bare-slug', 'server/routes/aeo-review.ts'),
+      lines(
+        'const slugKey = p.slug.startsWith(\'/\') ? p.slug : `/${p.slug}`;',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag lines that already check publishedPath', () => {
+    const file = write(
+      uniqPath('rule-bare-slug', 'src/components/KeywordAnalysis.ts'),
+      lines(
+        'const pagePath = page.publishedPath || (page.slug ? `/${page.slug}` : \'\');',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with inline // slug-path-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-bare-slug', 'server/webflow-seo-hatch-inline.ts'),
+      lines(
+        'const label = `/${page.slug}`; // slug-path-ok — display only, not a route lookup',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with above-line // slug-path-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-bare-slug', 'server/webflow-seo-hatch-above.ts'),
+      lines(
+        '// slug-path-ok — breadcrumb label, not used as a page lookup key',
+        'const label = `/${page.slug}`;',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag server/helpers.ts (canonical implementation)', () => {
+    const file = write(
+      uniqPath('rule-bare-slug', 'server/helpers.ts'),
+      lines(
+        'export function resolvePagePath(page: { publishedPath?: string | null; slug?: string }): string {',
+        '  return page.publishedPath || (page.slug ? `/${page.slug}` : \'/\');',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag src/lib/pathUtils.ts (canonical frontend implementation)', () => {
+    const file = write(
+      uniqPath('rule-bare-slug', 'src/lib/pathUtils.ts'),
+      lines(
+        'export function resolvePagePath(page: { publishedPath?: string | null; slug?: string }): string {',
+        '  return page.publishedPath || (page.slug ? `/${page.slug}` : \'/\');',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: resolvePagePath(...) with undefined fallback is dead code — use tryResolvePagePath', () => {
+  const RULE = 'resolvePagePath(...) with undefined fallback is dead code — use tryResolvePagePath';
+
+  it('flags `resolvePagePath(page) || undefined`', () => {
+    const file = write(
+      uniqPath('rule-resolve-dead-code', 'server/routes/webflow-seo.ts'),
+      lines(
+        'const basePath = resolvePagePath(page) || undefined;',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('flags `resolvePagePath(p) || undefined` with alternate variable name', () => {
+    const file = write(
+      uniqPath('rule-resolve-dead-code', 'server/routes/jobs.ts'),
+      lines(
+        'const pagePath = resolvePagePath(p) || undefined;',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('does NOT flag `tryResolvePagePath(page)` (the correct API)', () => {
+    const file = write(
+      uniqPath('rule-resolve-dead-code', 'server/routes/webflow-seo.ts'),
+      lines(
+        'const basePath = tryResolvePagePath(page);',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag `resolvePagePath(page)` without `|| undefined`', () => {
+    const file = write(
+      uniqPath('rule-resolve-dead-code', 'server/schema-plan.ts'),
+      lines(
+        'const pagePath = resolvePagePath(page);',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with inline // slug-path-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-resolve-dead-code', 'server/inline-hatch.ts'),
+      lines(
+        'const basePath = resolvePagePath(page) || undefined; // slug-path-ok — shim for legacy call site',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with above-line // slug-path-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-resolve-dead-code', 'server/above-hatch.ts'),
+      lines(
+        '// slug-path-ok — preserving dead pattern for contract compatibility',
+        'const basePath = resolvePagePath(page) || undefined;',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag server/helpers.ts (excluded — canonical implementation)', () => {
+    const file = write(
+      uniqPath('rule-resolve-dead-code', 'server/helpers.ts'),
+      lines(
+        'const basePath = resolvePagePath(page) || undefined;',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag src/lib/pathUtils.ts (excluded — canonical frontend implementation)', () => {
+    const file = write(
+      uniqPath('rule-resolve-dead-code', 'src/lib/pathUtils.ts'),
+      lines(
+        'const basePath = resolvePagePath(page) || undefined;',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
 describe('Meta: customCheck rule name registry', () => {
   const EXPECTED_CUSTOM_CHECK_RULES = [
     'Global keydown missing isContentEditable guard',
@@ -3935,6 +4134,9 @@ describe('Meta: customCheck rule name registry', () => {
     'Re-upsert without cloneInsightParams',
     // PR #218 A3/A4 bug pattern guards
     'Competitor keyword push missing serpFeatures',
+    // Slug-path hardening sprint (2026-04-21)
+    'Bare slug used in pagePath construction — use resolvePagePath(page)',
+    'resolvePagePath(...) with undefined fallback is dead code — use tryResolvePagePath',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -4039,7 +4241,16 @@ describe('Meta: pr-check --all status parity with verified-clean allowlist', () 
     } catch {
       repoRoot = process.cwd();
     }
-    const tsxBin = path.join(repoRoot, 'node_modules', '.bin', 'tsx');
+    // In worktree environments the node_modules is sparse; fall back to the
+    // parent project's node_modules (git worktrees share the main checkout's
+    // .git but have their own working tree without a full npm install).
+    let tsxBin = path.join(repoRoot, 'node_modules', '.bin', 'tsx');
+    if (!existsSync(tsxBin)) {
+      // Walk up to find node_modules — worktrees sit 3 levels deep under
+      // <main>/.claude/worktrees/<name>, so the main project is 3 dirs up.
+      const candidate = path.join(repoRoot, '..', '..', '..', 'node_modules', '.bin', 'tsx');
+      if (existsSync(candidate)) tsxBin = candidate;
+    }
     let out: string;
     try {
       // Invoke tsx directly via node_modules/.bin — vitest's child

@@ -27,6 +27,8 @@ export interface PageSeoResult {
   score: number;
   issues: SeoIssue[];
   noindex?: boolean;
+  /** Never set by auditPage() — `slug` stores the full relative path (e.g. `/services/seo`) without leading slash. Reserved for callers that enrich post-audit. */
+  publishedPath?: string | null;
 }
 
 interface PageMeta {

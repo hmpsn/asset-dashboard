@@ -86,7 +86,7 @@ function buildFixCategories(audit: AuditDetail, traffic: TrafficMap): FixCategor
   let manualIssues = 0;
 
   for (const page of audit.audit.pages) {
-    const slug = `/${page.slug}`;
+    const slug = page.slug.startsWith('/') ? page.slug : `/${page.slug}`;
     const t = traffic[slug] || { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
 
     for (const issue of page.issues) {

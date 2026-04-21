@@ -27,7 +27,7 @@ import { BulkOperations } from './editor/BulkOperations';
 import { ApprovalPanel } from './editor/ApprovalPanel';
 import { PendingApprovals } from './PendingApprovals';
 import { SeoSuggestionsPanel } from './editor/SeoSuggestionsPanel';
-import { matchPagePath, resolvePagePath } from '../lib/pathUtils';
+import { matchPagePath, resolvePagePath, tryResolvePagePath } from '../lib/pathUtils';
 
 interface EditState {
   seoTitle: string;
@@ -404,7 +404,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         currentDescription: edit?.seoDescription || page.seo?.description,
         field,
         workspaceId,
-        pagePath: `/${page.slug || ''}`,
+        pagePath: resolvePagePath(page),
       });
 
       if (field === 'both' && data.pairs && data.pairs.length > 0) {
@@ -442,7 +442,10 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     const analyzed = new Set<string>();
     for (const entry of strategyData.pageMap) {
       if (entry.analysisGeneratedAt) {
-        const match = pages.find(p => matchPagePath(entry.pagePath, resolvePagePath(p)));
+        const match = pages.find(p => {
+          const path = tryResolvePagePath(p);
+          return path !== undefined && matchPagePath(entry.pagePath, path);
+        });
         if (match) analyzed.add(match.id);
       }
     }
@@ -455,7 +458,10 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     if (!strategyData?.pageMap) return map;
     for (const entry of strategyData.pageMap) {
       if (!entry.primaryKeyword) continue;
-      const match = pages.find(p => matchPagePath(entry.pagePath, resolvePagePath(p)));
+      const match = pages.find(p => {
+        const path = tryResolvePagePath(p);
+        return path !== undefined && matchPagePath(entry.pagePath, path);
+      });
       if (match) {
         map.set(match.id, {
           primaryKeyword: entry.primaryKeyword,
@@ -478,7 +484,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         pageTitle: page.title,
         seoTitle: edit?.seoTitle || page.seo?.title || '',
         metaDescription: edit?.seoDescription || page.seo?.description || '',
-        slug: page.slug,
+        slug: resolvePagePath(page),
         workspaceId,
       }) as Record<string, unknown>;
 
@@ -513,6 +519,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
           pageId: p.id,
           title: p.title,
           slug: p.slug,
+          publishedPath: p.publishedPath,
           seoTitle: edits[p.id]?.seoTitle || p.seo?.title || '',
           seoDescription: edits[p.id]?.seoDescription || p.seo?.description || '',
         })),
@@ -643,6 +650,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
             pageId: id,
             title: page?.title || '',
             slug: page?.slug,
+            publishedPath: page?.publishedPath,
             currentSeoTitle: edit?.seoTitle || page?.seo?.title || '',
             currentDescription: edit?.seoDescription || page?.seo?.description || '',
           };
