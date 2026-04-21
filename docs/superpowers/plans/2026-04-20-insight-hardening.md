@@ -35,7 +35,7 @@ An integration test at `tests/integration/anomaly-boost-reversal.test.ts` (port 
 | File | Task | Change |
 |------|------|--------|
 | `server/scheduled-audits.ts` | Task 1 | Remove dedup-skip at line ~199 |
-| `tests/integration/scheduled-audits-dedup.test.ts` | Task 1 | New integration test (port 13320) |
+| `tests/integration/scheduled-audits-dedup.test.ts` | Task 1 | New integration test (port 13314) |
 | `server/insight-enrichment.ts` | Task 2 | Harden ~5 silent catch blocks (0 `isProgrammingError` uses currently) |
 | `server/sales-audit.ts` | Task 2 | Harden 6 silent catch blocks |
 | `server/webflow-assets.ts` | Task 3 | Harden 5 silent catch blocks |
@@ -79,7 +79,7 @@ An integration test at `tests/integration/anomaly-boost-reversal.test.ts` (port 
 
 - [ ] **Step 1: Write the failing test**
 
-Create `tests/integration/scheduled-audits-dedup.test.ts` (port 13320):
+Create `tests/integration/scheduled-audits-dedup.test.ts` (port 13314):
 
 ```typescript
 /**
@@ -90,14 +90,14 @@ Create `tests/integration/scheduled-audits-dedup.test.ts` (port 13320):
  * - Second audit with different issue data UPDATES the insight (not skips)
  * - A resolved insight keeps its resolution status after re-audit
  *
- * Port: 13320
+ * Port: 13314
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { upsertInsight, getInsights, resolveInsight } from '../../server/analytics-insights-store.js';
 
-const ctx = createTestContext(13320);
+const ctx = createTestContext(13314);
 
 let wsId = '';
 
