@@ -241,7 +241,7 @@ Filter state: `'all' | 'needs-action' | 'ready' | 'applied'` — default `'all'`
 Filter logic applied to `approvalBatches` before render:
 - **All** — no filter
 - **Needs Action** — `batch.items.some(i => i.status === 'pending' || !i.status)`
-- **Ready to Apply** — `batch.items.some(i => i.status === 'approved') && !batch.items.some(i => i.status === 'applied')`
+- **Ready to Apply** — `batch.items.length > 0 && !batch.items.some(i => i.status === 'pending' || !i.status) && batch.items.some(i => i.status === 'approved') && !batch.items.every(i => i.status === 'applied')` (all decisions made, has approvals, not yet fully applied — mutually exclusive with Needs Action and Applied)
 - **Applied** — `batch.items.every(i => i.status === 'applied')`
 
 Tab bar renders above the batch list, inside the existing header section. Each tab shows a live count (computed from `approvalBatches` before filter is applied). Active tab: teal text + bottom border. Style: pill-less tab bar consistent with `<TabBar>` primitive pattern.

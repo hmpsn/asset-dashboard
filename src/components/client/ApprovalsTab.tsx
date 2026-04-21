@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   ClipboardCheck, Check, CheckCircle2, Edit3, X, ChevronDown, ChevronRight, Loader2,
 } from 'lucide-react';
@@ -37,26 +37,35 @@ export function ApprovalsTab({
     open: boolean;
     title: string;
     message: string;
-    action: (() => Promise<void>) | null;
-  }>({ open: false, title: '', message: '', action: null });
+  }>({ open: false, title: '', message: '' });
+  // Action lives in a ref so handleConfirm/handleCancel can be stable useCallback references,
+  // preventing ConfirmDialog's keydown useEffect from re-attaching on every parent render.
+  const actionRef = useRef<(() => Promise<void>) | null>(null);
+  // Fresh ref to approvalBatches so async confirm callbacks re-derive pending items at
+  // confirm time rather than closing over a stale snapshot from when the dialog opened.
+  const approvalBatchesRef = useRef(approvalBatches);
+  useEffect(() => { approvalBatchesRef.current = approvalBatches; }, [approvalBatches]);
   const { getState } = usePageEditStates(workspaceId, true);
 
   const openConfirm = (title: string, message: string, action: () => Promise<void>) => {
-    setConfirmState({ open: true, title, message, action });
+    actionRef.current = action;
+    setConfirmState({ open: true, title, message });
   };
 
-  const handleConfirm = async () => {
-    const action = confirmState.action;
-    setConfirmState(s => ({ ...s, open: false, action: null }));
+  const handleConfirm = useCallback(async () => {
+    const action = actionRef.current;
+    actionRef.current = null;
+    setConfirmState(s => ({ ...s, open: false }));
     if (action) {
       try { await action(); }
       catch { setToast({ message: 'Something went wrong. Please try again.', type: 'error' }); }
     }
-  };
+  }, [setToast]);
 
-  const handleCancel = () => {
-    setConfirmState(s => ({ ...s, open: false, action: null }));
-  };
+  const handleCancel = useCallback(() => {
+    actionRef.current = null;
+    setConfirmState(s => ({ ...s, open: false }));
+  }, []);
 
   const [batchFilter, setBatchFilter] = useState<FilterState>('all');
 
@@ -91,13 +100,17 @@ export function ApprovalsTab({
   });
 
   const approveAllInBatch = (batch: ApprovalBatch) => {
-    const pending = batch.items.filter(i => i.status === 'pending');
+    const batchId = batch.id;
+    const batchName = batch.name;
+    const pendingCount = batch.items.filter(i => i.status === 'pending').length;
     openConfirm(
       'Approve all changes',
-      `Approve all ${pending.length} pending change${pending.length !== 1 ? 's' : ''} in "${batch.name}"?`,
+      `Approve all ${pendingCount} pending change${pendingCount !== 1 ? 's' : ''} in "${batchName}"?`,
       async () => {
+        const freshBatch = approvalBatchesRef.current.find(b => b.id === batchId);
+        const pending = freshBatch?.items.filter(i => i.status === 'pending') ?? [];
         for (const item of pending) {
-          await updateApprovalItem(batch.id, item.id, { status: 'approved' });
+          await updateApprovalItem(batchId, item.id, { status: 'approved' });
         }
         setToast({ message: `Approved ${pending.length} change${pending.length !== 1 ? 's' : ''}`, type: 'success' });
       }
@@ -105,11 +118,14 @@ export function ApprovalsTab({
   };
 
   const approveAllForPage = (batchId: string, items: ApprovalItem[]) => {
-    const pending = items.filter(i => i.status === 'pending');
+    const pageId = items[0]?.pageId;
+    const pendingCount = items.filter(i => i.status === 'pending').length;
     openConfirm(
       'Approve page changes',
-      `Approve all ${pending.length} pending change${pending.length !== 1 ? 's' : ''} for this page?`,
+      `Approve all ${pendingCount} pending change${pendingCount !== 1 ? 's' : ''} for this page?`,
       async () => {
+        const freshBatch = approvalBatchesRef.current.find(b => b.id === batchId);
+        const pending = freshBatch?.items.filter(i => i.status === 'pending' && i.pageId === pageId) ?? [];
         for (const item of pending) {
           await updateApprovalItem(batchId, item.id, { status: 'approved' });
         }
