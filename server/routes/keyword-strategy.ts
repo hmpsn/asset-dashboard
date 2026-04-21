@@ -2349,14 +2349,26 @@ Rules:
   }
 });
 
-// Get stored keyword strategy (reassembles pageMap from page_keywords table)
+// Get stored keyword strategy (reassembles pageMap from page_keywords table).
+// Returns a synthesized shell when ws.keywordStrategy is absent but page_keywords
+// has rows — the per-page SEO Editor "Analyze" flow writes only to page_keywords,
+// so Page Intelligence must be able to surface those rows without requiring a
+// full strategy generation run. Short-circuits to null only when both sources
+// are empty.
 router.get('/api/webflow/keyword-strategy/:workspaceId', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const strategy = ws.keywordStrategy;
-  if (!strategy) return res.json(null);
-  // Reassemble pageMap from dedicated table
   const pageMap = listPageKeywords(ws.id);
+  if (!strategy && pageMap.length === 0) return res.json(null);
+  if (!strategy) {
+    return res.json({
+      siteKeywords: [],
+      opportunities: [],
+      pageMap,
+      generatedAt: null,
+    });
+  }
   res.json({ ...strategy, pageMap });
 });
 
