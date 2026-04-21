@@ -324,7 +324,21 @@ Dashboard widget showing progress metrics for workspace health dimensions (SEO s
 - Accessibility: `role="progressbar"` on bar, `aria-valuenow/min/max`, `aria-label` on metric button
 - Props: `metrics: HealthMetric[]`, `recommendations?: { label, onClick, estimatedTime? }[]`
 
-### 14. Button
+### 14. ConfirmDialog
+
+Centered modal overlay for confirming destructive or irreversible actions. Replaces `window.confirm()` throughout the client portal.
+
+- Overlay: `fixed inset-0 z-50 flex items-center justify-center`, backdrop `var(--brand-overlay, rgba(15,23,42,0.35))`, click dismisses
+- Panel: `bg-zinc-900 border border-zinc-800 rounded-xl p-6 w-full max-w-sm mx-4 shadow-xl`
+- Title: `text-zinc-100 font-semibold text-base`
+- Message: `text-zinc-400 text-sm leading-relaxed`
+- Cancel button: `text-zinc-400 border border-zinc-700 hover:bg-zinc-800`
+- Confirm button (default variant): teal gradient (`from-teal-600 to-emerald-600`)
+- Confirm button (destructive variant): `bg-red-600 hover:bg-red-500`
+- Keyboard: Escape → cancel, Enter → confirm (skipped when a button already has focus to avoid double-fire)
+- Props: `open`, `title`, `message`, `confirmLabel?`, `cancelLabel?`, `onConfirm`, `onCancel`, `variant?: 'default' | 'destructive'`
+
+### 15. Button
 
 | Variant | Classes |
 |---------|---------|
