@@ -34,7 +34,7 @@ import { getInsights } from '../analytics-insights-store.js';
 import type * as AnalyticsInsightsStore from '../analytics-insights-store.js';
 import { buildKeywordMapContext } from '../seo-context.js';
 import { isProgrammingError } from '../errors.js';
-import { applySuppressionsToAudit, stripHtmlToText, stripCodeFences, resolvePagePath, applyBulkKeywordGuards } from '../helpers.js';
+import { applySuppressionsToAudit, stripHtmlToText, stripCodeFences, resolvePagePath, applyBulkKeywordGuards, normalizePath } from '../helpers.js';
 import { resolveBaseUrl } from '../url-helpers.js';
 import { createJob, updateJob, isJobCancelled, hasActiveJob, registerAbort } from '../jobs.js';
 import { broadcastToWorkspace } from '../broadcast.js';
@@ -559,7 +559,7 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery
   for (const page of pages) {
     try {
       // Derive per-page keywords from the pre-built pageMap — no extra DB call
-      const bulkPagePath = resolvePagePath(page) || undefined;
+      const bulkPagePath = page.slug ? resolvePagePath(page) : undefined;
       const bulkFixSeo = wsBulkSeo ? { ...wsBulkSeo } : undefined;
       if (bulkFixSeo && bulkPagePath && bulkFixSeo.strategy?.pageMap?.length) {
         const kw = bulkFixSeo.strategy.pageMap.find(p => p.pagePath.toLowerCase() === bulkPagePath.toLowerCase());
@@ -573,7 +573,7 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery
 
       // Fetch page content if not provided and we have a base URL
       let contentExcerpt = page.pageContent || '';
-      if (!contentExcerpt && baseUrl) {
+      if (!contentExcerpt && baseUrl && page.slug) {
         try {
           const htmlRes = await fetch(`${baseUrl}${resolvePagePath(page)}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
           if (htmlRes.ok) {
@@ -706,7 +706,7 @@ router.post('/api/webflow/seo-pattern-apply/:siteId', requireWorkspaceAccessFrom
 // --- Bulk AI Rewrite (generates 3 variations per page, persists to SQLite) ---
 router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   const { pages, field, workspaceId } = req.body as {
-    pages: Array<{ pageId: string; title: string; slug?: string; currentSeoTitle?: string; currentDescription?: string }>;
+    pages: Array<{ pageId: string; title: string; slug?: string; publishedPath?: string | null; currentSeoTitle?: string; currentDescription?: string }>;
     field: 'title' | 'description' | 'both';
     workspaceId?: string;
   };
@@ -766,7 +766,7 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
     const batch = pages.slice(i, i + CONCURRENCY);
     const batchResults = await Promise.allSettled(batch.map(async (page) => {
       // Derive per-page keywords from the pre-built pageMap — no extra DB call for seoContext
-      const rwPagePath = resolvePagePath(page) || undefined;
+      const rwPagePath = (page.slug || page.publishedPath) ? resolvePagePath(page) : undefined;
       const rwSeo = wsRwSeo ? { ...wsRwSeo } : undefined;
       if (rwSeo && rwPagePath && rwSeo.strategy?.pageMap?.length) {
         const kw = rwSeo.strategy.pageMap.find(p => p.pagePath.toLowerCase() === rwPagePath.toLowerCase());
@@ -783,7 +783,7 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
 
       // Fetch page content for context (best-effort)
       let contentExcerpt = '';
-      if (baseUrl) {
+      if (baseUrl && (page.slug || page.publishedPath)) {
         try {
           const htmlRes = await fetch(`${baseUrl}${resolvePagePath(page)}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
           if (htmlRes.ok) {
@@ -796,13 +796,13 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
       // Match GSC queries to this page by slug (top 15 by impressions)
       let gscBlock = '';
       let ctrFlag = '';
-      if (allGscData.length > 0) {
+      if (allGscData.length > 0 && (page.slug || page.publishedPath)) {
         const resolved = resolvePagePath(page);
         const pageQueries = allGscData
           .filter(r => {
             let rPath: string;
             try { rPath = new URL(r.page).pathname; } catch { rPath = r.page; }
-            rPath = rPath.startsWith('/') ? rPath : `/${rPath}`;
+            rPath = normalizePath(rPath.startsWith('/') ? rPath : `/${rPath}`);
             return resolved === '/' ? rPath === '/' || rPath === '' : rPath === resolved;
           })
           .sort((a, b) => b.impressions - a.impressions)
@@ -1558,7 +1558,7 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', requireWorkspaceAccess('worksp
               .filter(r => {
                 let rPath: string;
                 try { rPath = new URL(r.page).pathname; } catch { rPath = r.page; }
-                rPath = rPath.startsWith('/') ? rPath : `/${rPath}`;
+                rPath = normalizePath(rPath.startsWith('/') ? rPath : `/${rPath}`);
                 return resolved === '/' ? rPath === '/' || rPath === '' : rPath === resolved;
               })
               .sort((a, b) => b.impressions - a.impressions)

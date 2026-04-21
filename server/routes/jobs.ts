@@ -421,14 +421,14 @@ router.post('/api/jobs', async (req, res) => {
               const page = pages[i];
               try {
                 const bwsSlices = ['seoContext'] as const;
-                const bwsIntel = await buildWorkspaceIntelligence(bwsId || bulkWs?.id || '', { slices: bwsSlices, pagePath: resolvePagePath(page) || undefined });
+                const bwsIntel = await buildWorkspaceIntelligence(bwsId || bulkWs?.id || '', { slices: bwsSlices, pagePath: page.slug ? resolvePagePath(page) : undefined });
                 const kwb = formatKeywordsForPrompt(bwsIntel.seoContext);
                 // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
                 const bvb = bwsIntel.seoContext?.effectiveBrandVoiceBlock ?? '';
 
                 // Fetch page content for context (best-effort)
                 let contentExcerpt = '';
-                if (bulkBaseUrl) {
+                if (bulkBaseUrl && page.slug) {
                   try {
                     const bulkHtmlPath = resolvePagePath(page);
                     const htmlRes = await fetch(`${bulkBaseUrl}${bulkHtmlPath}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });

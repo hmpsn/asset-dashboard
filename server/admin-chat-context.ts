@@ -28,7 +28,7 @@ import type { DeadLink } from './link-checker.js';
 import { getSearchOverview, getSearchDeviceBreakdown, getSearchCountryBreakdown, getSearchPeriodComparison } from './search-console.js';
 import { getGA4Overview, getGA4TopPages, getGA4TopSources, getGA4OrganicOverview, getGA4NewVsReturning, getGA4Conversions, getGA4LandingPages, getGA4PeriodComparison } from './google-analytics.js';
 import { isGlobalConnected } from './google-auth.js';
-import { applySuppressionsToAudit, getAuditTrafficForWorkspace } from './helpers.js';
+import { applySuppressionsToAudit, getAuditTrafficForWorkspace, resolvePagePath } from './helpers.js';
 import { RICH_BLOCKS_PROMPT } from './seo-context.js';
 import { buildWorkspaceIntelligence, formatPageMapForPrompt, formatKeywordsForPrompt, formatPersonasForPrompt, formatKnowledgeBaseForPrompt } from './workspace-intelligence.js';
 import { scrapeUrl } from './web-scraper.js';
@@ -554,7 +554,7 @@ export async function assembleAdminContext(
               const pagesWithTraffic = pages
                 ?.filter(p => p.issues?.length > 0)
                 .map(p => {
-                  const resolvedPath = p.slug?.startsWith('/') ? p.slug : `/${p.slug}`;
+                  const resolvedPath = resolvePagePath(p);
                   const traffic = trafficMap[resolvedPath];
                   return { page: p.page, slug: resolvedPath, issues: p.issues.length, score: p.score, traffic };
                 })
