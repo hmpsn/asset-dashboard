@@ -27,7 +27,7 @@ export function ConfirmDialog({
       if (e.key === 'Escape') onCancel();
       if (e.key === 'Enter') onConfirm();
     };
-    document.addEventListener('keydown', handler);
+    document.addEventListener('keydown', handler); // keydown-ok — modal overlay, Escape/Enter are intentional regardless of focus state
     return () => document.removeEventListener('keydown', handler);
   }, [open, onConfirm, onCancel]);
 

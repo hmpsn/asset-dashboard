@@ -39,19 +39,19 @@ describe('ApprovalsTab filter logic', () => {
   it('needs-action: returns batches with pending items', () => {
     const result = filterBatches([pending, approved, applied, mixed], 'needs-action');
     expect(result).toHaveLength(2);
-    expect(result.every(b => b.items.some(i => i.status === 'pending'))).toBe(true);
+    expect(result.every(b => b.items.some(i => i.status === 'pending'))).toBe(true); // every-ok — length guarded by toHaveLength(2) above
   });
 
   it('ready: returns batches with approved items and no applied items', () => {
     const result = filterBatches([pending, approved, applied, mixed], 'ready');
     expect(result).toHaveLength(1);
-    expect(result[0].items.every(i => i.status === 'approved')).toBe(true);
+    expect(result[0].items.every(i => i.status === 'approved')).toBe(true); // every-ok — result[0] guaranteed by toHaveLength(1) above
   });
 
   it('applied: returns batches where all items are applied', () => {
     const result = filterBatches([pending, approved, applied, mixed], 'applied');
     expect(result).toHaveLength(1);
-    expect(result[0].items.every(i => i.status === 'applied')).toBe(true);
+    expect(result[0].items.every(i => i.status === 'applied')).toBe(true); // every-ok — result[0] guaranteed by toHaveLength(1) above
   });
 
   it('needs-action: does not return all-approved batches', () => {
