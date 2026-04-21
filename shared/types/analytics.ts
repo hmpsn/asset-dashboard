@@ -206,12 +206,12 @@ export type InsightDomain = 'search' | 'traffic' | 'cross';
 
 export type InsightSeverity = 'critical' | 'warning' | 'opportunity' | 'positive';
 
-export interface AnalyticsInsight {
+export interface AnalyticsInsight<T extends InsightType = InsightType> {
   id: string;
   workspaceId: string;
   pageId: string | null;
-  insightType: InsightType;
-  data: Record<string, unknown>;
+  insightType: T;
+  data: InsightDataMap[T];
   severity: InsightSeverity;
   computedAt: string;
   // Enrichment fields (Phase 1)
@@ -234,7 +234,16 @@ export interface AnalyticsInsight {
 
 // ── Insight data shapes (used in data JSON field) ─────────────────
 
-export interface PageHealthData {
+/**
+ * Base for all insight data shapes. The index signature allows these types
+ * to be used as `Record<string, unknown>` at call sites that need the wide
+ * form (e.g. applyScoreAdjustment, narrative builders).
+ */
+export interface InsightDataBase {
+  [key: string]: unknown;
+}
+
+export interface PageHealthData extends InsightDataBase {
   score: number;          // 0–100
   trend: 'improving' | 'declining' | 'stable';
   clicks: number;
@@ -252,7 +261,7 @@ export interface PageHealthData {
 }
 
 /** Data shape for ranking_opportunity insights (formerly quick_win) */
-export interface QuickWinData {
+export interface QuickWinData extends InsightDataBase {
   query: string;
   currentPosition: number;
   impressions: number;
@@ -260,7 +269,7 @@ export interface QuickWinData {
   pageUrl: string;
 }
 
-export interface ContentDecayData {
+export interface ContentDecayData extends InsightDataBase {
   baselineClicks: number;
   currentClicks: number;
   deltaPercent: number;
@@ -268,14 +277,14 @@ export interface ContentDecayData {
   currentPeriod: string;
 }
 
-export interface CannibalizationData {
+export interface CannibalizationData extends InsightDataBase {
   query: string;
   pages: string[];
   positions: number[];
   totalImpressions: number;
 }
 
-export interface KeywordClusterData {
+export interface KeywordClusterData extends InsightDataBase {
   label: string;
   queries: string[];
   totalImpressions: number;
@@ -283,7 +292,7 @@ export interface KeywordClusterData {
   pillarPage: string | null;
 }
 
-export interface CompetitorGapData {
+export interface CompetitorGapData extends InsightDataBase {
   keyword: string;
   competitorDomain: string;
   competitorPosition: number;
@@ -292,7 +301,7 @@ export interface CompetitorGapData {
   difficulty: number;
 }
 
-export interface ConversionAttributionData {
+export interface ConversionAttributionData extends InsightDataBase {
   sessions: number;
   conversions: number;
   /** Already a percentage (e.g., 4.0 for 4%). Do NOT multiply by 100. */
@@ -300,7 +309,7 @@ export interface ConversionAttributionData {
   estimatedRevenue: number | null;
 }
 
-export interface RankingMoverData {
+export interface RankingMoverData extends InsightDataBase {
   query: string;
   pageUrl: string;
   currentPosition: number;
@@ -312,7 +321,7 @@ export interface RankingMoverData {
   impressions: number;
 }
 
-export interface CtrOpportunityData {
+export interface CtrOpportunityData extends InsightDataBase {
   query: string;
   pageUrl: string;
   position: number;
@@ -325,7 +334,7 @@ export interface CtrOpportunityData {
   estimatedClickGap: number;
 }
 
-export interface SerpOpportunityData {
+export interface SerpOpportunityData extends InsightDataBase {
   pageUrl: string;
   impressions: number;
   clicks: number;
@@ -336,7 +345,7 @@ export interface SerpOpportunityData {
 }
 
 /** Data shape for anomaly_digest insights */
-export interface AnomalyDigestData {
+export interface AnomalyDigestData extends InsightDataBase {
   anomalyType: string;
   metric: string;
   currentValue: number;
@@ -356,7 +365,7 @@ export interface AnomalyDigestData {
 }
 
 /** Data shape for audit_finding insights (bridge-generated from scheduled audits) */
-export interface AuditFindingData {
+export interface AuditFindingData extends InsightDataBase {
   /** 'page' for per-page issues, 'site' for aggregate site-level findings */
   scope: 'page' | 'site';
   /** Number of issues found (per-page or total) */
@@ -370,7 +379,7 @@ export interface AuditFindingData {
 }
 
 /** Data shape for site_health insights (Bridge #15 — site-level audit health) */
-export interface SiteHealthInsightData {
+export interface SiteHealthInsightData extends InsightDataBase {
   auditSnapshotId: string;
   siteScore: number;
   previousScore: number | null;
@@ -382,7 +391,7 @@ export interface SiteHealthInsightData {
 }
 
 /** Data shape for strategy_alignment insights (workspace-level strategy vs reality) */
-export interface StrategyAlignmentData {
+export interface StrategyAlignmentData extends InsightDataBase {
   /** Number of pages aligned with their target strategy keyword */
   alignedCount: number;
   /** Number of pages misaligned with their target strategy keyword */

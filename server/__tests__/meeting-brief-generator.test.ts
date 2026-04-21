@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { assembleMeetingBriefMetrics, buildBriefPrompt } from '../meeting-brief-generator.js';
 import type { WorkspaceIntelligence } from '../../shared/types/intelligence.js';
-import type { AnalyticsInsight, InsightType, InsightSeverity } from '../../shared/types/analytics.js';
+import type { AnalyticsInsight, InsightType, InsightSeverity, InsightDataMap } from '../../shared/types/analytics.js';
 
 /** Factory for fully-typed AnalyticsInsight fixtures with sensible defaults. */
 function buildInsight(overrides: Partial<AnalyticsInsight> & Pick<AnalyticsInsight, 'id'>): AnalyticsInsight {
@@ -10,7 +10,7 @@ function buildInsight(overrides: Partial<AnalyticsInsight> & Pick<AnalyticsInsig
     workspaceId: 'test-ws',
     pageId: null,
     insightType: 'ranking_opportunity' as InsightType,
-    data: {},
+    data: {} as InsightDataMap[InsightType],
     severity: 'warning' as InsightSeverity,
     computedAt: '2026-04-07T12:00:00Z',
     ...overrides,
@@ -42,7 +42,7 @@ const MOCK_INTELLIGENCE: WorkspaceIntelligence = {
         id: 'top-1',
         pageId: 'page-1',
         insightType: 'ranking_opportunity',
-        data: { keyword: 'test keyword', position: 12 },
+        data: { keyword: 'test keyword', position: 12 } as unknown as InsightDataMap[InsightType],
         severity: 'critical',
         computedAt: '2026-04-07T12:00:00Z',
         pageTitle: 'About Us',

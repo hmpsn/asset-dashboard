@@ -101,7 +101,7 @@ function rowToInsight(row: InsightRow): AnalyticsInsight {
     workspaceId: row.workspace_id,
     pageId: row.page_id,
     insightType: row.insight_type as InsightType,
-    data: parseJsonFallback(row.data, {}),
+    data: parseJsonFallback(row.data, {} as InsightDataMap[InsightType]),
     severity: row.severity as InsightSeverity,
     computedAt: row.computed_at,
     pageTitle: row.page_title ?? undefined,
@@ -128,15 +128,12 @@ function rowToInsight(row: InsightRow): AnalyticsInsight {
  * changing. This prevents silently dropping fields like `resolutionSource` that
  * default to `null` when omitted from `upsertInsight()`.
  */
-export function cloneInsightParams(insight: AnalyticsInsight): UpsertInsightParams {
+export function cloneInsightParams<T extends InsightType>(insight: AnalyticsInsight<T>): UpsertInsightParams<T> {
   return {
     workspaceId: insight.workspaceId,
     pageId: insight.pageId,
     insightType: insight.insightType,
-    // Safe: insight.data was parsed from DB and matches the insightType. The
-    // AnalyticsInsight interface types it as Record<string, unknown> but
-    // UpsertInsightParams needs the mapped union. Callers override this anyway.
-    data: insight.data as never,
+    data: insight.data,
     severity: insight.severity,
     pageTitle: insight.pageTitle,
     strategyKeyword: insight.strategyKeyword,
@@ -151,11 +148,11 @@ export function cloneInsightParams(insight: AnalyticsInsight): UpsertInsightPara
   };
 }
 
-export interface UpsertInsightParams {
+export interface UpsertInsightParams<T extends InsightType = InsightType> {
   workspaceId: string;
   pageId: string | null;
-  insightType: InsightType;
-  data: InsightDataMap[InsightType];
+  insightType: T;
+  data: InsightDataMap[T];
   severity: InsightSeverity;
   // Enrichment fields (Phase 1)
   pageTitle?: string | null;
@@ -170,7 +167,7 @@ export interface UpsertInsightParams {
   bridgeSource?: string | null;
 }
 
-export function upsertInsight(params: UpsertInsightParams): AnalyticsInsight {
+export function upsertInsight<T extends InsightType>(params: UpsertInsightParams<T>): AnalyticsInsight<T> {
   const now = new Date().toISOString();
   const id = `ins_${randomUUID().slice(0, 8)}`;
 
@@ -196,7 +193,7 @@ export function upsertInsight(params: UpsertInsightParams): AnalyticsInsight {
 
   // Fetch back to get the actual row (id may differ on conflict-replace)
   const row = stmts().selectOne.get(params.workspaceId, params.pageId, params.insightType) as InsightRow;
-  return rowToInsight(row);
+  return rowToInsight(row) as AnalyticsInsight<T>;
 }
 
 export function getInsights(workspaceId: string, insightType?: InsightType): AnalyticsInsight[] {
