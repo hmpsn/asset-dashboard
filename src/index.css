@@ -275,15 +275,41 @@ body::after {
 
 /* === Base === */
 .dashboard-light {
+  /* Backgrounds */
   --brand-bg: #f8fafc;
   --brand-bg-surface: #ffffff;
   --brand-bg-elevated: #ffffff;
   --brand-bg-card: #f1f5f9;
+  --brand-bg-hover: #e8edf3;
+  --brand-bg-active: #dde4ee;
+  /* Text */
   --brand-text: #334155;
   --brand-text-bright: #0f172a;
-  --brand-text-muted: #64748b;
+  --brand-text-muted: #475569;
+  --brand-text-disabled: #94a3b8;
+  /* Borders */
   --brand-border: rgba(148, 163, 184, 0.2);
   --brand-border-hover: rgba(148, 163, 184, 0.35);
+  --brand-border-strong: #cbd5e1;
+  /* Shadows */
+  --brand-shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.08);
+  --brand-shadow-md: 0 4px 16px rgba(15, 23, 42, 0.10);
+  /* Scrollbar */
+  --scrollbar-thumb: rgba(148, 163, 184, 0.55);
+  --scrollbar-thumb-hover: rgba(100, 116, 139, 0.75);
+  /* Charts */
+  --chart-grid: #e2e8f0;
+  --chart-tooltip-bg: #ffffff;
+  --chart-tooltip-text: #0f172a;
+  /* Overlays */
+  --brand-overlay: rgba(15, 23, 42, 0.35);
+  /* Brand teal — deeper in light mode for contrast */
+  --brand-mint: #0d9488;
+  --brand-mint-hover: #0f766e;
+  --brand-mint-dim: rgba(13, 148, 136, 0.08);
+  /* Metric ring */
+  --metric-ring-track: #e2e8f0;
+  /* Layout defaults */
   background-color: #f8fafc !important;
   color: #1e293b !important;
 }
@@ -477,8 +503,8 @@ body::after {
 .dashboard-light .hover\:to-emerald-500:hover { --tw-gradient-to: #065f46 !important; }
 
 /* === Scrollbar === */
-.dashboard-light ::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.2); }
-.dashboard-light ::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 0.35); }
+.dashboard-light ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); }
+.dashboard-light ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
 
 /* === Shadows === */
 .dashboard-light .shadow-2xl { box-shadow: 0 25px 50px -12px rgba(0,0,0,0.08) !important; }
