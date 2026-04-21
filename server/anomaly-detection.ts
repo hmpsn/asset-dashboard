@@ -256,18 +256,17 @@ export function reverseAnomalyBoostIfNoneRemain(workspaceId: string): number {
 
   for (const insight of allInsights) {
     if (insight.resolutionStatus === 'resolved') continue;
-    const dataObj = (insight.data ?? {}) as Record<string, unknown>;
-    const adj = dataObj._scoreAdjustments as Record<string, number> | undefined;
+    const adj = insight.data._scoreAdjustments as Record<string, number> | undefined;
     if (!adj || typeof adj !== 'object' || !('anomaly' in adj)) continue;
 
     // Remove the anomaly boost (delta=0 deletes the key)
     const { data: newData, adjustedScore } = applyScoreAdjustment(
-      dataObj, insight.impactScore ?? 50, 'anomaly', 0,
+      insight.data, insight.impactScore ?? 50, 'anomaly', 0,
     );
     if (adjustedScore !== insight.impactScore) {
       upsertInsight({
         ...cloneInsightParams(insight),
-        data: newData as never,
+        data: newData,
         anomalyLinked: false,
         impactScore: adjustedScore,
       });
@@ -743,14 +742,13 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
               const insightDomain = insight.domain ?? 'cross';
               if (!affectedDomains.has(insightDomain)) continue;
 
-              const dataObj = (insight.data ?? {}) as Record<string, unknown>;
               const { data: newData, adjustedScore } = applyScoreAdjustment(
-                dataObj, insight.impactScore ?? 50, 'anomaly', 10,
+                insight.data, insight.impactScore ?? 50, 'anomaly', 10,
               );
               if (adjustedScore !== insight.impactScore) {
                 updateInsight({
                   ...cloneParams(insight),
-                  data: newData as never,
+                  data: newData,
                   anomalyLinked: true,
                   impactScore: adjustedScore,
                 });
@@ -762,9 +760,7 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
           return { modified: modifiedCount };
         });
       }
-    } catch (err) {
-      log.error({ err: err }, `Error scanning ${ws.name}:`);
-    }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, `anomaly-detection: workspace scan error for ${ws.name}: programming error`); else log.debug({ err }, `anomaly-detection: workspace scan error for ${ws.name}`); } // url-fetch-ok
   }
 
   if (allNew.length > 0) {
@@ -792,18 +788,17 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
       let reversed = 0;
       for (const insight of allInsights) {
         if (insight.resolutionStatus === 'resolved') continue;
-        const dataObj = (insight.data ?? {}) as Record<string, unknown>;
-        const adj = dataObj._scoreAdjustments as Record<string, number> | undefined;
+        const adj = insight.data._scoreAdjustments as Record<string, number> | undefined;
         if (!adj || typeof adj !== 'object' || !('anomaly' in adj)) continue;
 
         // Remove the anomaly boost (delta=0 deletes the key)
         const { data: newData, adjustedScore } = applyScoreAdjustment(
-          dataObj, insight.impactScore ?? 50, 'anomaly', 0,
+          insight.data, insight.impactScore ?? 50, 'anomaly', 0,
         );
         if (adjustedScore !== insight.impactScore) {
           updateInsight({
             ...cloneParams(insight),
-            data: newData as never,
+            data: newData,
             anomalyLinked: false,
             impactScore: adjustedScore,
           });

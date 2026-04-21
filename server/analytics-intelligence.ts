@@ -15,7 +15,6 @@ import type {
   InsightDataMap,
   PageHealthData,
   QuickWinData,
-  ContentDecayData,
   CannibalizationData,
   ConversionAttributionData,
   CompetitorGapData,
@@ -1020,21 +1019,21 @@ export function validateInsightBatch(workspaceId: string): number {
     if (toSuppress.has(insight.id) || protectedIds.has(insight.id)) continue;
 
     if (insight.insightType === 'ranking_opportunity') {
-      const d = insight.data as unknown as QuickWinData;
+      const d = (insight as AnalyticsInsight<'ranking_opportunity'>).data;
       if (d.impressions < MIN_RANKING_OPP_IMPRESSIONS || d.estimatedTrafficGain < MIN_RANKING_OPP_TRAFFIC_GAIN) {
         toSuppress.add(insight.id);
       }
     }
 
     if (insight.insightType === 'content_decay') {
-      const d = insight.data as unknown as ContentDecayData;
+      const d = (insight as AnalyticsInsight<'content_decay'>).data;
       if (Math.abs(d.baselineClicks - d.currentClicks) < MIN_DECAY_CLICK_LOSS) {
         toSuppress.add(insight.id);
       }
     }
 
     if (insight.insightType === 'ctr_opportunity') {
-      const d = insight.data as unknown as CtrOpportunityData;
+      const d = (insight as AnalyticsInsight<'ctr_opportunity'>).data;
       if (d.estimatedClickGap < MIN_CTR_OPP_CLICK_GAP) {
         toSuppress.add(insight.id);
       }
@@ -1138,7 +1137,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
     severity: InsightSeverity;
   }): void {
     const enrichment = enrichInsight(
-      { pageId: insight.pageId, insightType: insight.insightType, severity: insight.severity, data: insight.data as unknown as AnalyticsInsight['data'] },
+      { pageId: insight.pageId, insightType: insight.insightType, severity: insight.severity, data: insight.data },
       enrichCtx,
     );
     // `enrichment` is Partial<AnalyticsInsight> so spreading it can introduce

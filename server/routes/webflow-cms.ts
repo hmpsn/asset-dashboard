@@ -204,7 +204,7 @@ router.post('/api/webflow/collections/:collectionId/publish', async (req, res) =
     const result = await publishCollectionItems(req.params.collectionId, itemIds, token);
     res.json(result);
   } catch (err) {
-    if (isProgrammingError(err)) log.warn({ err }, 'webflow-cms: POST /api/webflow/collections/:collectionId/publish: programming error');
+    if (isProgrammingError(err)) log.warn({ err }, 'webflow-cms: POST /api/webflow/collections/:collectionId/publish: programming error'); else log.debug({ err }, 'webflow-cms: collection publish error');
     const msg = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: msg });
   }

@@ -5,6 +5,7 @@
 import { createLogger } from './logger.js';
 import { resolvePagePath } from './helpers.js';
 import { webflowFetch, getToken } from './webflow-client.js';
+import { isProgrammingError } from './errors.js';
 
 const log = createLogger('webflow-pages');
 
@@ -379,13 +380,12 @@ export async function discoverCmsUrls(
           const pageName = lastSegment.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
           cmsAll.push({ url: sitemapUrl, path: parsed.pathname, pageName });
         }
-      } catch (err) { /* skip malformed URLs */ }
+      } catch { /* skip malformed URLs */ } // catch-ok
     }
 
     log.info(`sitemap: ${allUrls.length} URLs total, ${cmsAll.length} are CMS pages`);
     return { cmsUrls: cmsAll.slice(0, limit), totalFound: cmsAll.length };
-  } catch (err) {
-    log.error({ err: err }, 'sitemap fetch failed');
+  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-pages: discoverCmsUrls: programming error'); else log.debug({ err }, 'webflow-pages: sitemap fetch failed'); // url-fetch-ok
     return { cmsUrls: [], totalFound: 0 };
   }
 }
@@ -415,12 +415,12 @@ export async function discoverSitemapUrls(baseUrl: string): Promise<string[]> {
             const subText = await subRes.text();
             urls.push(...extractLocs(subText));
           }
-        } catch (err) { /* skip failed sub-sitemap */ }
+        } catch { /* skip failed sub-sitemap */ } // catch-ok
       }
     } else {
       urls.push(...extractLocs(text));
     }
-  } catch (err) { /* sitemap fetch failed */ }
+  } catch { /* sitemap fetch failed */ } // catch-ok
   return urls;
 }
 

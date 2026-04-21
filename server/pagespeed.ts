@@ -4,6 +4,7 @@ import { createLogger } from './logger.js';
 import { getWorkspacePages } from './workspace-data.js';
 import { listWorkspaces, getWorkspace } from './workspaces.js';
 import { getSiteSubdomain } from './webflow-pages.js';
+import { isProgrammingError } from './errors.js';
 
 const log = createLogger('pagespeed');
 const PSI_API = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed';
@@ -80,10 +81,7 @@ async function runPageSpeed(url: string, strategy: 'mobile' | 'desktop'): Promis
       return null;
     }
     return await res.json() as Record<string, unknown>;
-  } catch (err) {
-    log.error({ err: err }, `PageSpeed fetch error for ${url}:`);
-    return null;
-  }
+  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, `pagespeed: fetch programming error for ${url}`); else log.debug({ err }, `pagespeed: fetch error for ${url}`); return null; } // url-fetch-ok
 }
 
 // CrUX field data metric keys in the PSI API response
