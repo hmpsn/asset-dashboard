@@ -46,12 +46,30 @@ describe('resolvePagePath', () => {
 });
 
 describe('tryResolvePagePath', () => {
-  it('returns undefined when both slug and publishedPath are absent', () => {
+  it('returns undefined when both slug and publishedPath are absent (truly orphan)', () => {
     expect(tryResolvePagePath({})).toBeUndefined();
   });
 
-  it('returns undefined when both are empty/null', () => {
-    expect(tryResolvePagePath({ slug: '', publishedPath: null })).toBeUndefined();
+  it('returns undefined when both fields are explicitly undefined', () => {
+    expect(tryResolvePagePath({ slug: undefined, publishedPath: undefined })).toBeUndefined();
+  });
+
+  // ── Webflow homepage contract ────────────────────────────────────────────
+  // Webflow homepages are marked by `slug: ''` (empty string) per
+  // `server/webflow-pages.ts:filterPublishedPages`. They are NOT orphan pages —
+  // they are real, fetchable pages at `/`. The old `!page.slug` guard mistakenly
+  // treated `slug: ''` as "no path info" and silently dropped homepage analysis.
+  it('returns "/" for homepage marker slug: ""', () => {
+    expect(tryResolvePagePath({ slug: '' })).toBe('/');
+  });
+
+  it('returns "/" for homepage marker publishedPath: ""', () => {
+    expect(tryResolvePagePath({ publishedPath: '' })).toBe('/');
+  });
+
+  it('returns "/" when slug is empty string and publishedPath is null', () => {
+    // Real Webflow homepage shape: slug exists (empty), publishedPath explicitly null.
+    expect(tryResolvePagePath({ slug: '', publishedPath: null })).toBe('/');
   });
 
   it('returns resolvePagePath output when slug present', () => {
@@ -67,7 +85,10 @@ describe('tryResolvePagePath', () => {
       { slug: 'seo', publishedPath: '/services/seo' },
       { slug: 'seo' },
       {},
-      { slug: '', publishedPath: null },
+      { slug: undefined, publishedPath: undefined },
+      { slug: '' },                          // homepage via empty slug
+      { slug: '', publishedPath: null },     // homepage via explicit null publishedPath
+      { publishedPath: '' },                 // homepage via empty publishedPath
       { publishedPath: '/about' },
     ];
     for (const c of cases) {

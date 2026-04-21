@@ -478,7 +478,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         pageTitle: page.title,
         seoTitle: edit?.seoTitle || page.seo?.title || '',
         metaDescription: edit?.seoDescription || page.seo?.description || '',
-        slug: page.slug,
+        slug: resolvePagePath(page),
         workspaceId,
       }) as Record<string, unknown>;
 

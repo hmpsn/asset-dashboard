@@ -68,15 +68,23 @@ export function resolvePagePath(page: { publishedPath?: string | null; slug?: st
 }
 
 /**
- * Returns the resolved page path, or `undefined` when the page has no slug or publishedPath.
+ * Returns the resolved page path, or `undefined` when the page has no slug/publishedPath info at all.
  *
- * Use this in any context that must distinguish "no meaningful path info" from "homepage".
- * `resolvePagePath` always returns a truthy string (`'/'` for empty input), so patterns like
- * `resolvePagePath(page) || undefined` or `if (baseUrl) fetch(\`${baseUrl}${resolvePagePath(page)}\`)`
- * silently fall through to the homepage for slug-less pages. Prefer `tryResolvePagePath`.
+ * Use this in any context that must distinguish "no meaningful path info" from a real path
+ * (including the homepage). `resolvePagePath` always returns a truthy string (`'/'` for empty
+ * input), so patterns like `resolvePagePath(page) || undefined` or
+ * `if (baseUrl) fetch(\`${baseUrl}${resolvePagePath(page)}\`)` silently fall through to the
+ * homepage for orphan pages. Prefer `tryResolvePagePath`.
+ *
+ * Important: Webflow homepages are marked with `slug: ''` (empty string, see
+ * `server/webflow-pages.ts` `filterPublishedPages`), NOT undefined. The guard below checks
+ * `=== undefined` / `=== null` rather than falsy, so `slug: ''` correctly resolves to `/`.
+ * Only pages with neither field (truly orphaned, no identifying path info) return `undefined`.
  */
 export function tryResolvePagePath(page: { publishedPath?: string | null; slug?: string }): string | undefined {
-  if (!page.slug && !page.publishedPath) return undefined;
+  const hasSlug = page.slug !== undefined && page.slug !== null;
+  const hasPublishedPath = page.publishedPath !== undefined && page.publishedPath !== null;
+  if (!hasSlug && !hasPublishedPath) return undefined;
   return resolvePagePath(page);
 }
 

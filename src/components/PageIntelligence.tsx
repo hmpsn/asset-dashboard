@@ -388,7 +388,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
           pageTitle: page.title,
           seoTitle: effectiveTitle,
           metaDescription: effectiveMeta,
-          slug: page.slug,
+          slug: resolvePagePath(page),
           pageContent,
         }),
         post<ContentScore & { error?: string }>('/api/webflow/content-score', {
