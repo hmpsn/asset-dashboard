@@ -428,9 +428,10 @@ router.post('/api/jobs', async (req, res) => {
 
                 // Fetch page content for context (best-effort)
                 let contentExcerpt = '';
-                if (bulkBaseUrl && page.slug) {
+                if (bulkBaseUrl) {
                   try {
-                    const htmlRes = await fetch(`${bulkBaseUrl}/${page.slug}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
+                    const bulkHtmlPath = resolvePagePath(page);
+                    const htmlRes = await fetch(`${bulkBaseUrl}${bulkHtmlPath}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
                     if (htmlRes.ok) {
                       const html = await htmlRes.text();
                       contentExcerpt = stripHtmlToText(html, { maxLength: 800 });
