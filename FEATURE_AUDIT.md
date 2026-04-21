@@ -3620,3 +3620,13 @@ Current feature count: **306**. Last updated: April 2026.
 **Files:** `server/scheduled-audits.ts`, `server/analytics-insights-store.ts`, `tests/integration/scheduled-audits-dedup.test.ts`
 
 **Agency value:** Prevents duplicate audit runs stacking up under slow network conditions or when the hourly check fires while a long audit is still in progress. Duplicate audits previously could write conflicting snapshots and double-count activity log entries.
+
+---
+
+## Nested Page Path Hardening (2026-04-21)
+
+### Nested Page Path Hardening (2026-04-21)
+- **resolvePagePath sweep** — 15+ locations across server routes and frontend components now use `resolvePagePath(page)` instead of bare `` `/${page.slug}` `` constructions. Nested Webflow pages (e.g., `/services/seo`) correctly use `publishedPath` instead of truncated slug.
+- **applyBulkKeywordGuards** — moved to `server/helpers.ts`; now also called in `webflow-seo.ts` bulk analyze path (BUG-0003: prevents AI-hallucinated keyword metrics from being persisted).
+- **GSC path-boundary matching** — replaced `.includes(page.slug)` substring matching with exact path + prefix matching in `webflow-seo.ts` (BUG-0004: eliminates false-positive query attribution).
+- **bare-slug-pagepath pr-check rule** — new rule flags any future `` `/${page.slug}` `` pagePath constructions across server and frontend files.
