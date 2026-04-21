@@ -800,7 +800,9 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
         const pageQueries = allGscData
           .filter(r => {
             const resolved = resolvePagePath(page);
-            const rPath = r.page.startsWith('/') ? r.page : `/${r.page}`;
+            let rPath: string;
+            try { rPath = new URL(r.page).pathname; } catch { rPath = r.page; }
+            rPath = rPath.startsWith('/') ? rPath : `/${rPath}`;
             return resolved === '/'
               ? rPath === '/' || rPath === ''
               : rPath === resolved || rPath.startsWith(resolved + '/');
@@ -1554,7 +1556,9 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', requireWorkspaceAccess('worksp
             const pageQueries = allGscData
               .filter(r => {
                 const resolved = resolvePagePath(page);
-                const rPath = r.page.startsWith('/') ? r.page : `/${r.page}`;
+                let rPath: string;
+                try { rPath = new URL(r.page).pathname; } catch { rPath = r.page; }
+                rPath = rPath.startsWith('/') ? rPath : `/${rPath}`;
                 return resolved === '/'
                   ? rPath === '/' || rPath === ''
                   : rPath === resolved || rPath.startsWith(resolved + '/');

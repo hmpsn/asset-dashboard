@@ -101,7 +101,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
   const analyzePage = async (page: PageMeta) => {
     setAnalyzing(prev => new Set(prev).add(page.id));
     try {
-      const slug = page.slug || '';
+      const slug = resolvePagePath(page);
 
       // Fetch actual published page HTML for content analysis
       let pageContent = '';

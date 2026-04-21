@@ -77,7 +77,7 @@ export async function generateSchemaPlan(ctx: PlanContext): Promise<SchemaSitePl
       const pagePath = resolvePagePath(p);
       const isHomepage = !p.slug || p.slug === '' || p.slug === 'home' || p.slug === 'index';
       const strategyMatch = strategy?.pageMap?.find(
-        (pm: PageKeywordMap) => pm.pagePath === pagePath || pm.pagePath === resolvePagePath(p),
+        (pm: PageKeywordMap) => pm.pagePath === pagePath,
       );
 
       return {
