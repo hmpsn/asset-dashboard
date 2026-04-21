@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircle2, Circle, Clock, ChevronDown, ChevronUp,
   Sparkles, BarChart3, Zap, Users, Wrench, Rocket, Map,
@@ -130,34 +131,28 @@ const STATUS_ICON = {
 
 export function Roadmap() {
   const [expanded, setExpanded] = useState<string | null>('sprint-1');
-  const [roadmap, setRoadmap] = useState<SprintData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: roadmap = [], isLoading: loading } = useQuery({
+    queryKey: ['admin-roadmap'],
+    queryFn: async () => {
+      const data = await roadmapApi.get();
+      const d = data as { sprints?: SprintData[] };
+      return (d?.sprints && Array.isArray(d.sprints)) ? d.sprints : [];
+    },
+  });
   const [filterPriority, setFilterPriority] = useState<string>('all');
-
-  // Load full roadmap from server
-  useEffect(() => {
-    roadmapApi.get()
-      .then(data => {
-        const d = data as { sprints?: SprintData[] };
-        if (d?.sprints && Array.isArray(d.sprints)) {
-          setRoadmap(d.sprints);
-        }
-      })
-      .catch((err) => { console.error('Roadmap operation failed:', err); })
-      .finally(() => setLoading(false));
-  }, []);
 
   const toggleStatus = async (itemId: number) => {
     const statusCycle: Array<'pending' | 'in_progress' | 'done'> = ['pending', 'in_progress', 'done'];
-    let newStatus = 'pending';
-    setRoadmap(prev => {
+    let newStatus: 'pending' | 'in_progress' | 'done' = 'pending';
+    queryClient.setQueryData(['admin-roadmap'], (prev: SprintData[] = []) => {
       return prev.map(sprint => ({
         ...sprint,
         items: sprint.items.map(item => {
           if (item.id !== itemId) return item;
           const idx = statusCycle.indexOf(item.status);
           newStatus = statusCycle[(idx + 1) % statusCycle.length];
-          return { ...item, status: newStatus as 'pending' | 'in_progress' | 'done' };
+          return { ...item, status: newStatus };
         }),
       }));
     });
