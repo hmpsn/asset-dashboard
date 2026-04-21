@@ -230,7 +230,7 @@ export function ApprovalsTab({
                                           {kw.primaryKeyword}
                                         </span>
                                         {kw.secondaryKeywords?.slice(0, 2).map(kw2 => (
-                                          <span key={kw2} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-700/60 border border-zinc-600/50 text-zinc-400">
+                                          <span key={kw2} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-700/60 border border-zinc-600 text-zinc-400">
                                             {kw2}
                                           </span>
                                         ))}

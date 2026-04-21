@@ -97,7 +97,7 @@ export function ServiceInterestCTA({ type, workspaceId, onAction, bookingUrl }: 
   // Network/server error — retry button resets mutation to idle
   if (mutation.isError) {
     return (
-      <div className="mt-3 flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-zinc-800/50 border border-zinc-700/40">
+      <div className="mt-3 flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-zinc-800/50 border border-zinc-700/50">
         <span className="text-xs text-zinc-400">Something went wrong.</span>
         <button
           onClick={() => mutation.reset()}

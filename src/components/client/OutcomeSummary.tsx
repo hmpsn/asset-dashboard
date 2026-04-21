@@ -162,7 +162,7 @@ function PremiumBreakdown({ scorecard }: { scorecard: OutcomeScorecard }) {
       <FullScorecard scorecard={scorecard} />
 
       {/* Detailed breakdown panel */}
-      <div className="border border-zinc-700/50 rounded-xl p-4 space-y-3 bg-zinc-900/30">
+      <div className="border border-zinc-700/50 rounded-xl p-4 space-y-3 bg-zinc-900/50">
         <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Detailed breakdown</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1">
