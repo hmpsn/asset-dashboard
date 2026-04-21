@@ -20,6 +20,8 @@ function countMatches(content: string, pattern: RegExp): number {
 }
 
 describe('Catch hardening — Tier 1 smoke tests', () => {
+  // Tier 1 = files where a silent catch would hide wrong AI answers or missing client data.
+  // Add a file here if it is a direct dependency of an admin-AI or public-portal response.
   const tier1Files = [
     'admin-chat-context.ts',
     'routes/public-analytics.ts',

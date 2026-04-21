@@ -29,7 +29,7 @@ const SENT_FILE = path.join(getUploadRoot(), '.report-sent.json');
 function loadSentReports(): Record<string, string> {
   try {
     if (fs.existsSync(SENT_FILE)) return JSON.parse(fs.readFileSync(SENT_FILE, 'utf-8'));
-  } catch (err) { /* fresh */ }
+  } catch { /* fresh start — expected */ }
   return {};
 }
 
@@ -367,7 +367,7 @@ export function listMonthlyReports(workspaceId: string): SavedMonthlyReport[] {
   for (const file of files) {
     try {
       reports.push(JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')));
-    } catch (err) { /* skip corrupt */ }
+    } catch { /* skip corrupt file */ }
   }
   return reports.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }

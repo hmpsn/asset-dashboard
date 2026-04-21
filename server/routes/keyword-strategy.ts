@@ -43,7 +43,7 @@ import { createLogger } from '../logger.js';
 import db from '../db/index.js';
 import { parseJsonFallback } from '../db/json-validation.js';
 import { getInsights } from '../analytics-insights-store.js';
-import type { KeywordClusterData, CompetitorGapData, ConversionAttributionData, ContentDecayData } from '../../shared/types/analytics.js';
+import type { AnalyticsInsight } from '../../shared/types/analytics.js';
 import type { Workspace, PageKeywordMap, KeywordStrategy } from '../../shared/types/workspace.js';
 import { METRICS_SOURCE } from '../../shared/types/keywords.js';
 import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
@@ -1462,27 +1462,24 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
       const insights = getInsights(ws.id);
       if (insights.length > 0) {
         const keywordClusters = insights
-          .filter(i => i.insightType === 'keyword_cluster')
-          .map(i => i.data as unknown as KeywordClusterData)
+          .filter((i): i is AnalyticsInsight<'keyword_cluster'> => i.insightType === 'keyword_cluster')
+          .map(i => i.data)
           .sort((a, b) => b.totalImpressions - a.totalImpressions);
         const competitorGaps = insights
-          .filter(i => i.insightType === 'competitor_gap')
-          .map(i => i.data as unknown as CompetitorGapData)
+          .filter((i): i is AnalyticsInsight<'competitor_gap'> => i.insightType === 'competitor_gap')
+          .map(i => i.data)
           .sort((a, b) => b.volume - a.volume);
         const conversionPages = insights
-          .filter(i => i.insightType === 'conversion_attribution')
-          .map(i => ({ pageUrl: i.pageId || '', ...(i.data as unknown as ConversionAttributionData) }))
+          .filter((i): i is AnalyticsInsight<'conversion_attribution'> => i.insightType === 'conversion_attribution')
+          .map(i => ({ pageUrl: i.pageId || '', ...i.data }))
           .sort((a, b) => b.conversionRate - a.conversionRate);
         const contentDecaySignals = insights
-          .filter(i => i.insightType === 'content_decay' && i.pageId)
-          .map(i => {
-            const d = i.data as unknown as ContentDecayData;
-            return {
-              pageId: i.pageId!,
-              clicksDelta: d.currentClicks - d.baselineClicks,
-              deltaPercent: d.deltaPercent,
-            };
-          });
+          .filter((i): i is AnalyticsInsight<'content_decay'> => i.insightType === 'content_decay' && i.pageId != null)
+          .map(i => ({
+            pageId: i.pageId!,
+            clicksDelta: i.data.currentClicks - i.data.baselineClicks,
+            deltaPercent: i.data.deltaPercent,
+          }));
 
         intelligenceBlock = buildStrategyIntelligenceBlock({
           keywordClusters: keywordClusters.length > 0 ? keywordClusters : undefined,

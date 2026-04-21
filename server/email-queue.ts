@@ -68,7 +68,7 @@ function loadQueue(): EmailEvent[] {
       const raw = fs.readFileSync(QUEUE_FILE, 'utf-8');
       return JSON.parse(raw) as EmailEvent[];
     }
-  } catch (err) { /* fresh start */ }
+  } catch { /* fresh start — expected */ }
   return [];
 }
 

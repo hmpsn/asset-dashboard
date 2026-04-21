@@ -92,7 +92,7 @@ router.get('/api/audit-traffic/:siteId', async (req, res) => {
             if (!trafficMap[path]) trafficMap[path] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
             trafficMap[path].clicks += p.clicks;
             trafficMap[path].impressions += p.impressions;
-          } catch (err) { /* skip malformed URLs */ }
+          } catch { /* skip malformed URLs */ }
         }
       } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'misc: GET /api/audit-traffic/:siteId: programming error'); /* GSC unavailable */ }
     }
@@ -112,6 +112,8 @@ router.get('/api/audit-traffic/:siteId', async (req, res) => {
 
     res.json(trafficMap);
   } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'misc: GET /api/audit-traffic/:siteId: top-level programming error');
+    else log.debug({ err }, 'misc: audit-traffic endpoint failed — degrading gracefully');
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });

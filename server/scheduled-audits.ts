@@ -180,8 +180,7 @@ async function runScheduledAudit(schedule: AuditSchedule) {
 
     // ── Bridge #12: Audit → page_health insights ──────────────────────
     fireBridge('bridge-audit-page-health', ws.id, async () => {
-      const { upsertInsight, getInsights }: typeof AnalyticsInsightsStore = await import('./analytics-insights-store.js'); // dynamic-import-ok
-      const existing = getInsights(ws.id);
+      const { upsertInsight, getInsight }: typeof AnalyticsInsightsStore = await import('./analytics-insights-store.js'); // dynamic-import-ok
 
       // Map critical/warning audit issues to audit_finding insights
       const criticalPages = effectiveAudit.pages
@@ -192,11 +191,29 @@ async function runScheduledAudit(schedule: AuditSchedule) {
         const pageIssues = page.issues?.filter(i => i.severity === 'error' || i.severity === 'warning') ?? [];
         if (pageIssues.length === 0) continue;
 
-        // Deduplicate: skip if identical audit_finding insight exists for this page
-        const existingForPage = existing.find(
-          i => i.insightType === 'audit_finding' && i.pageId === page.pageId && i.resolutionStatus !== 'resolved',
-        );
-        if (existingForPage) continue;
+        const baseScore = pageIssues.some(i => i.severity === 'error') ? 80 : 50;
+
+        // Base-score setter pattern — NOT applyScoreAdjustment().
+        // This bridge owns the raw audit-derived base score. It carries forward
+        // _scoreAdjustments written by other bridges (e.g. anomaly boosts) and rebases
+        // _originalBaseScore on each audit run (correct: the base genuinely changes).
+        // Unlike applyScoreAdjustment() which adds a named delta, this sets the base
+        // and applies stored deltas on top. Mirror: Bridge #15. If the delta math changes,
+        // replicate in both bridges. upsertInsight replaces `data` on conflict, so we
+        // must read-before-write to avoid clobbering cross-bridge adjustments.
+        const existing = getInsight(ws.id, page.pageId, 'audit_finding');
+        const prevAdj = existing?.data._scoreAdjustments as Record<string, number> | undefined;
+        const totalDelta = prevAdj
+          ? Object.values(prevAdj).reduce((s, d) => s + (Number.isFinite(d) ? d : 0), 0)
+          : 0;
+
+        const data = {
+          scope: 'page' as const,
+          issueCount: pageIssues.length,
+          issueMessages: pageIssues.map(i => i.message).join('; '),
+          source: 'bridge_12_audit_page_health',
+          ...(prevAdj ? { _originalBaseScore: baseScore, _scoreAdjustments: prevAdj } : {}),
+        };
 
         upsertInsight({
           workspaceId: ws.id,
@@ -204,13 +221,8 @@ async function runScheduledAudit(schedule: AuditSchedule) {
           pageId: page.pageId,
           pageTitle: page.page,
           severity: pageIssues.some(i => i.severity === 'error') ? 'critical' : 'warning',
-          data: {
-            scope: 'page',
-            issueCount: pageIssues.length,
-            issueMessages: pageIssues.map(i => i.message).join('; '),
-            source: 'bridge_12_audit_page_health',
-          },
-          impactScore: pageIssues.some(i => i.severity === 'error') ? 80 : 50,
+          data,
+          impactScore: prevAdj ? Math.max(0, Math.min(100, baseScore + totalDelta)) : baseScore,
           bridgeSource: 'bridge-audit-page-health',
         });
         created++;
@@ -221,25 +233,37 @@ async function runScheduledAudit(schedule: AuditSchedule) {
 
     // ── Bridge #15: Audit → site-level audit_finding insight ─────────
     fireBridge('bridge-audit-site-health', ws.id, async () => {
-      const { upsertInsight }: typeof AnalyticsInsightsStore = await import('./analytics-insights-store.js'); // dynamic-import-ok
+      const { upsertInsight, getInsight }: typeof AnalyticsInsightsStore = await import('./analytics-insights-store.js'); // dynamic-import-ok
 
       // Create site-level insight from aggregate audit findings
       const totalIssues = effectiveAudit.errors + effectiveAudit.warnings;
       const score = effectiveAudit.siteScore;
       if (totalIssues > 0 && score < 70) {
+        const baseScore = Math.max(0, 100 - score);
+
+        // Base-score setter pattern — same as Bridge #12 (see comment there). Mirror: Bridge #12.
+        const existing = getInsight(ws.id, null, 'audit_finding');
+        const prevAdj = existing?.data._scoreAdjustments as Record<string, number> | undefined;
+        const totalDelta = prevAdj
+          ? Object.values(prevAdj).reduce((s, d) => s + (Number.isFinite(d) ? d : 0), 0)
+          : 0;
+
+        const data = {
+          scope: 'site' as const,
+          issueCount: totalIssues,
+          issueMessages: `Audit found ${totalIssues} total issues across the site. Overall health score: ${score}/100.`,
+          siteScore: score,
+          source: 'bridge_15_audit_site_health',
+          ...(prevAdj ? { _originalBaseScore: baseScore, _scoreAdjustments: prevAdj } : {}),
+        };
+
         upsertInsight({
           workspaceId: ws.id,
           insightType: 'audit_finding',
           pageId: null,
           severity: score < 50 ? 'critical' : 'warning',
-          data: {
-            scope: 'site',
-            issueCount: totalIssues,
-            issueMessages: `Audit found ${totalIssues} total issues across the site. Overall health score: ${score}/100.`,
-            siteScore: score,
-            source: 'bridge_15_audit_site_health',
-          },
-          impactScore: Math.max(0, 100 - score),
+          data,
+          impactScore: prevAdj ? Math.max(0, Math.min(100, baseScore + totalDelta)) : baseScore,
           bridgeSource: 'bridge-audit-site-health',
         });
         return { modified: 1 };

@@ -331,14 +331,13 @@ export function recordOutcome(params: {
           for (const insight of nonResolved) {
             const scoreDelta = pageScoreMap.get(insight.pageId ?? '') ?? 0;
             if (scoreDelta !== 0) {
-              const dataObj = (insight.data ?? {}) as Record<string, unknown>;
               const { data: newData, adjustedScore } = applyScoreAdjustment(
-                dataObj, insight.impactScore ?? 50, 'outcome', scoreDelta,
+                insight.data, insight.impactScore ?? 50, 'outcome', scoreDelta,
               );
               if (adjustedScore !== insight.impactScore) {
                 upsertInsight({
                   ...cloneInsightParams(insight),
-                  data: newData as never,
+                  data: newData,
                   impactScore: adjustedScore,
                 });
                 modified++;

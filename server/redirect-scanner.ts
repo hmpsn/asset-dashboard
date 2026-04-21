@@ -92,7 +92,7 @@ async function traceRedirects(url: string, maxHops = 10): Promise<{ hops: Redire
         // Resolve relative redirects
         try {
           currentUrl = new URL(location, currentUrl).toString();
-        } catch (err) {
+        } catch { // catch-ok — malformed redirect URL from external server is expected degradation
           break;
         }
       } else {
@@ -100,6 +100,7 @@ async function traceRedirects(url: string, maxHops = 10): Promise<{ hops: Redire
         break;
       }
     } catch (err) {
+      log.debug({ err }, 'redirect-scanner/traceRedirects: network error following redirect chain');
       hops.push({ url: currentUrl, status: 0 });
       break;
     }
@@ -127,7 +128,7 @@ async function checkPageStatus(url: string): Promise<{ status: number | 'error';
       const location = res.headers.get('location');
       let resolvedLocation = location || undefined;
       if (location) {
-        try { resolvedLocation = new URL(location, url).toString(); } catch (err) { /* keep as-is */ }
+        try { resolvedLocation = new URL(location, url).toString(); } catch { /* keep as-is */ }
       }
       return { status: res.status, statusText: res.statusText, redirectsTo: resolvedLocation };
     }

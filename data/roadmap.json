@@ -600,8 +600,9 @@
           "source": "PR #162 typecheck cleanup",
           "est": "2-3h",
           "priority": "P2",
-          "notes": "shared/types/analytics.ts currently types AnalyticsInsight.data as Record<string, unknown>, forcing `as never` / `as unknown as` escape hatches at every write path (anomaly-detection.ts:639, outcome-tracking.ts:329, reports.ts). Narrow to InsightDataMap[InsightType] so TypeScript can verify new-insight shapes at the write site. Requires updating every call site that spreads into insight.data. Discovered during the 246\u21920 typecheck cleanup in PR #162.",
-          "status": "pending"
+          "notes": "Shipped \u2014 2026-04-20 insight-hardening sprint. Made AnalyticsInsight<T extends InsightType = InsightType> generic with insightType: T and data: InsightDataMap[T]. Added InsightDataBase interface (index signature) to all 14 insight data interfaces for backward compatibility. Made UpsertInsightParams<T>, upsertInsight<T>, cloneInsightParams<T>, applyScoreAdjustment<T> generic. Replaced `as never` casts in anomaly-detection.ts and outcome-tracking.ts. Replaced `as unknown as XData` read-site casts in admin-chat-context.ts and content-brief.ts with type predicates. Removed pr-check grandfather exception for shared/types/analytics.ts.",
+          "status": "done",
+          "shippedAt": "2026-04-20"
         },
         {
           "id": 581,
@@ -609,8 +610,9 @@
           "source": "PR #162 typecheck cleanup",
           "est": "1-2h",
           "priority": "P2",
-          "notes": "server/workspaces.ts uses a cast-through-unknown when loading KeywordStrategy rows because the Zod schema and the TS interface have drifted (e.g. pageMap fields, scoringConfig partial overrides). Reconcile by either: (a) generating the TS interface from the Zod schema via z.infer, or (b) adding missing fields to the interface and tightening the schema. Same pattern applies to the scoringConfig partial override in workspaces.ts. Both currently work via runtime fallbacks but bypass compile-time checks.",
-          "status": "pending"
+          "notes": "Shipped \u2014 2026-04-20 insight-hardening sprint. Added missing fields to keywordStrategySchema in server/schemas/workspace-schemas.ts: siteKeywordMetrics (array of {keyword, volume, difficulty}, optional) and generatedAt (string, optional). Added .passthrough() to tolerate future schema additions. Removed `as unknown as KeywordStrategy` cast in server/workspaces.ts.",
+          "status": "done",
+          "shippedAt": "2026-04-20"
         },
         {
           "id": 582,
@@ -676,6 +678,15 @@
           "est": "2-3h",
           "priority": "P2",
           "notes": "useWorkspaceEvents() creates a new WebSocket connection per call. SeoEditor + SeoAudit (and other multi-hook components) each open dedicated WS connections, scaling linearly with component count. Fix: lift workspace WS connection to a shared React context (or use the existing event bus pattern) so all hooks share one connection per workspaceId. Not urgent \u2014 connections close on unmount, but it's wasteful and could cause scaling issues with many concurrent users.",
+          "status": "pending"
+        },
+        {
+          "id": 592,
+          "title": "Harden rowToInsight: validate corrupt insight data at DB read boundary",
+          "source": "PR #244 Devin review \u2014 analytics-insights-store.ts:104",
+          "est": "4-6h",
+          "priority": "P2",
+          "notes": "parseJsonFallback(row.data, {} as InsightDataMap[InsightType]) at server/analytics-insights-store.ts:104 returns an empty object typed as the full insight data interface when stored JSON is corrupt or missing. Consumers accessing insight.data.score, insight.data.trend, etc. get undefined at runtime despite the TypeScript type saying the field is required. Fix: add Zod schemas for all 10+ insight data types and validate in rowToInsight(), either filtering out corrupt rows or returning typed fallbacks with sentinel values. Pre-existing issue confirmed by Devin review on PR #244.",
           "status": "pending"
         },
         {
@@ -4242,9 +4253,9 @@
           "est": "1-2h",
           "priority": "P2",
           "sprint": "E",
-          "notes": "Shipped \u2014 PR 3 Platform Health Sprint. Added bridge-audit-page-health trigger after on-demand audit completion. Creates new audit_finding insights for pages with critical/warning issues. Dedup skips pages with existing unresolved findings (does NOT refresh issue data for already-tracked pages \u2014 future enhancement).",
+          "notes": "Shipped \u2014 PR 3 Platform Health Sprint. Added bridge-audit-page-health trigger after on-demand audit completion. Creates new audit_finding insights for pages with critical/warning issues. Updated 2026-04-20 (insight-hardening): removed dedup-skip block from scheduled-audits.ts \u2014 upsertInsight() ON CONFLICT clause already preserves resolution_status, so skipping re-upsert was causing stale audit data to persist. Pages now get refreshed data on every re-audit regardless of existing insight status.",
           "status": "done",
-          "shippedAt": "2026-04-15"
+          "shippedAt": "2026-04-20"
         },
         {
           "id": "anomaly-boost-reversal-mechanism",

@@ -687,7 +687,7 @@ function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string,
             'itemListElement': items,
           });
         }
-      } catch (err) { /* skip if URL parsing fails */ }
+      } catch { /* skip if URL parsing fails */ }
     }
   }
 
@@ -1014,7 +1014,7 @@ function extractExistingSchemas(html: string): { types: string[]; json: Record<s
           if (item['@type']) types.push(item['@type']);
         }
       }
-    } catch (err) { /* malformed JSON-LD */ }
+    } catch { /* malformed JSON-LD */ }
   }
   return { types, json };
 }

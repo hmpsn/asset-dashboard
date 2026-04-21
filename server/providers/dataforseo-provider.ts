@@ -75,7 +75,7 @@ export function flushCreditsToDisk(): void {
   const today = new Date().toISOString().slice(0, 10);
   const filePath = path.join(CREDIT_DIR, `${today}.json`);
   let existing: CreditEntry[] = [];
-  try { existing = JSON.parse(fs.readFileSync(filePath, 'utf-8')); } catch (err) { /* new file */ }
+  try { existing = JSON.parse(fs.readFileSync(filePath, 'utf-8')); } catch { /* new file — expected */ }
   existing.push(...pendingCreditWrites);
   fs.writeFileSync(filePath, JSON.stringify(existing, null, 2));
   pendingCreditWrites = [];
@@ -137,7 +137,7 @@ function readProbeCache(): ProbeResult | null {
     const age = Date.now() - new Date(parsed.probedAt).getTime();
     if (age > BACKLINK_COOLDOWN_MS) return null;
     return parsed;
-  } catch (err) { return null; }
+  } catch { return null; }
 }
 
 function writeProbeCache(outcome: ProbeResult['outcome']): void {
@@ -181,7 +181,7 @@ function readCache<T>(workspaceId: string, key: string, maxAgeHours = 168): T | 
     const age = (Date.now() - new Date(raw.cachedAt).getTime()) / (1000 * 60 * 60);
     if (age > maxAgeHours) return null;
     return raw.data as T;
-  } catch (err) { return null; }
+  } catch { return null; }
 }
 
 function writeCache(workspaceId: string, key: string, data: unknown): void {
@@ -852,10 +852,10 @@ function loadCreditsFromDisk(since?: string, days?: number): CreditEntry[] {
       try {
         const data = JSON.parse(fs.readFileSync(path.join(CREDIT_DIR, f), 'utf-8'));
         if (Array.isArray(data)) entries.push(...data);
-      } catch (err) { /* skip corrupt file */ }
+      } catch { /* skip corrupt file */ }
     }
     return entries;
-  } catch (err) { return []; }
+  } catch { return []; }
 }
 
 export function getDataForSeoUsage(workspaceId?: string, since?: string): {

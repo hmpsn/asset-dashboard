@@ -44,7 +44,7 @@ export function flushToDisk(): void {
   const today = todayStr();
   const filePath = getUsageFilePath(today);
   let existing: TokenUsage[] = [];
-  try { existing = JSON.parse(fs.readFileSync(filePath, 'utf-8')); } catch (err) { /* new file */ }
+  try { existing = JSON.parse(fs.readFileSync(filePath, 'utf-8')); } catch { /* new file — expected */ }
   existing.push(...pendingWrites);
   fs.writeFileSync(filePath, JSON.stringify(existing, null, 2));
   pendingWrites = [];
@@ -82,10 +82,10 @@ function loadEntriesFromDisk(since?: string, days?: number): TokenUsage[] {
       try {
         const data = JSON.parse(fs.readFileSync(path.join(USAGE_DIR, f), 'utf-8'));
         if (Array.isArray(data)) entries.push(...data);
-      } catch (err) { /* skip corrupt file */ }
+      } catch { /* skip corrupt file */ }
     }
     return entries;
-  } catch (err) { return []; }
+  } catch { return []; }
 }
 
 // --- Cost estimation per model ---

@@ -80,10 +80,7 @@ async function runPageSpeed(url: string, strategy: 'mobile' | 'desktop'): Promis
       return null;
     }
     return await res.json() as Record<string, unknown>;
-  } catch (err) {
-    log.error({ err: err }, `PageSpeed fetch error for ${url}:`);
-    return null;
-  }
+  } catch (err) { log.warn({ err }, `pagespeed: fetch error for ${url}`); return null; } // catch-ok: network failure or timeout — expected but warn so API key/billing issues surface
 }
 
 // CrUX field data metric keys in the PSI API response

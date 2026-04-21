@@ -12,7 +12,7 @@ import { callOpenAI } from './openai-helpers.js';
 import { buildReferenceContext, buildSerpContext, buildStyleExampleContext } from './web-scraper.js';
 import type { ScrapedPage } from './web-scraper.js';
 import { getInsights } from './analytics-insights-store.js';
-import type { CannibalizationData, ContentDecayData, QuickWinData, PageHealthData } from '../shared/types/analytics.js';
+import type { AnalyticsInsight } from '../shared/types/analytics.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { getWorkspaceLearnings, formatLearningsForPrompt } from './workspace-learnings.js';
 import { isFeatureEnabled } from './feature-flags.js';
@@ -1071,18 +1071,17 @@ The outline sections MUST match the following template sections in order. You ma
         targetKeyword,
         workspaceId,
         cannibalizationInsights: allInsights
-          .filter(i => i.insightType === 'cannibalization')
-          .map(i => i.data as unknown as CannibalizationData),
+          .filter((i): i is AnalyticsInsight<'cannibalization'> => i.insightType === 'cannibalization')
+          .map(i => i.data),
         decayInsights: allInsights
-          .filter(i => i.insightType === 'content_decay')
-          .map(i => ({ pageId: i.pageId || '', ...(i.data as unknown as ContentDecayData) })),
+          .filter((i): i is AnalyticsInsight<'content_decay'> => i.insightType === 'content_decay')
+          .map(i => ({ pageId: i.pageId || '', ...i.data })),
         quickWins: allInsights
-          .filter(i => i.insightType === 'ranking_opportunity')
-          .map(i => i.data as unknown as QuickWinData)
-          .map(d => ({ pageUrl: d.pageUrl, query: d.query, currentPosition: d.currentPosition, estimatedTrafficGain: d.estimatedTrafficGain })),
+          .filter((i): i is AnalyticsInsight<'ranking_opportunity'> => i.insightType === 'ranking_opportunity')
+          .map(i => ({ pageUrl: i.data.pageUrl, query: i.data.query, currentPosition: i.data.currentPosition, estimatedTrafficGain: i.data.estimatedTrafficGain })),
         pageHealthScores: allInsights
-          .filter(i => i.insightType === 'page_health' && i.pageId)
-          .map(i => ({ pageId: i.pageId!, ...(i.data as unknown as PageHealthData) })),
+          .filter((i): i is AnalyticsInsight<'page_health'> => i.insightType === 'page_health' && i.pageId != null)
+          .map(i => ({ pageId: i.pageId!, ...i.data })),
       });
     }
   } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-brief: programming error'); /* intelligence layer not ready — skip */ }

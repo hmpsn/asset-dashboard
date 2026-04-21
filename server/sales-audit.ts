@@ -160,7 +160,7 @@ async function fetchHtml(url: string): Promise<string | null> {
     const contentType = res.headers.get('content-type') || '';
     if (!contentType.includes('text/html') && !contentType.includes('text/xml') && !contentType.includes('application/xml')) return null;
     return await res.text();
-  } catch (err) { /* network failure — expected */ return null; }
+  } catch (err) { log.debug({ url, err }, 'sales-audit/fetch: network failure — expected, returning null'); return null; }
 }
 
 export function normalizeUrl(base: string, href: string): string | null {
@@ -175,7 +175,7 @@ export function normalizeUrl(base: string, href: string): string | null {
     if (/\.(pdf|jpg|jpeg|png|gif|svg|webp|mp4|mp3|zip|css|js|ico|woff|woff2|ttf|eot)$/i.test(path)) return null;
     if (path.startsWith('/cdn-cgi/')) return null; // Cloudflare utility endpoints
     return u.toString();
-  } catch (err) { return null; }
+  } catch { return null; } // catch-ok: URL parse on user-supplied href — TypeError is expected
 }
 
 async function discoverPages(baseUrl: string, maxPages: number = 50): Promise<string[]> {
@@ -235,14 +235,14 @@ async function parseSitemap(baseUrl: string): Promise<string[]> {
             let sm;
             while ((sm = subLocRegex.exec(subText)) !== null) urls.push(sm[1]);
           }
-        } catch (err) { /* skip failed sub-sitemap */ }
+        } catch (err) { log.debug({ subSitemap: subSitemaps[0], err }, 'sales-audit/sitemap: sub-sitemap fetch failed — skipping'); }
       }
     } else {
       const locRegex = /<loc>([^<]+)<\/loc>/gi;
       let m;
       while ((m = locRegex.exec(text)) !== null) urls.push(m[1]);
     }
-  } catch (err) { /* sitemap fetch failed — skip */ }
+  } catch (err) { log.debug({ baseUrl, err }, 'sales-audit/sitemap: sitemap fetch failed — skipping'); }
   return urls;
 }
 
@@ -348,7 +348,7 @@ function auditPageFromHtml(url: string, html: string): SalesPageResult {
   const links = extractLinks(html);
   const baseOrigin = new URL(url).origin;
   const internalLinks = links.filter(l => {
-    try { return new URL(l.href, url).origin === baseOrigin; } catch (err) { return l.href.startsWith('/'); }
+    try { return new URL(l.href, url).origin === baseOrigin; } catch { return l.href.startsWith('/'); } // catch-ok: URL parse on link href — TypeError is expected
   });
   if (internalLinks.length === 0) {
     issues.push({ check: 'internal-links', severity: 'info', message: 'No internal links found', recommendation: 'Add internal links to distribute page authority.' });
@@ -504,7 +504,7 @@ async function siteWideChecks(baseUrl: string): Promise<SalesIssue[]> {
         }
       }
     }
-  } catch (err) { /* robots.txt fetch failed — skip */ }
+  } catch (err) { log.debug({ baseUrl, err }, 'sales-audit/site-check: robots.txt fetch failed — skipping'); }
 
   // Sitemap
   try {
@@ -523,7 +523,7 @@ async function siteWideChecks(baseUrl: string): Promise<SalesIssue[]> {
         }
       }
     }
-  } catch (err) { /* sitemap fetch failed — skip */ }
+  } catch (err) { log.debug({ baseUrl, err }, 'sales-audit/site-check: sitemap fetch failed — skipping'); }
 
   // Response time
   try {
@@ -535,7 +535,7 @@ async function siteWideChecks(baseUrl: string): Promise<SalesIssue[]> {
     } else if (responseTime > 1000) {
       issues.push({ check: 'response-time', severity: 'warning', message: `Server response ${(responseTime / 1000).toFixed(1)}s`, recommendation: 'Aim for under 600ms response time.', value: `${responseTime}ms` });
     }
-  } catch (err) { /* network failure — skip */ }
+  } catch (err) { log.debug({ baseUrl, err }, 'sales-audit/site-check: response time network failure — skipping'); }
 
   // Assign categories
   for (const issue of issues) {

@@ -51,7 +51,7 @@ async function fetchSitemapUrls(baseUrl: string): Promise<Array<{ url: string; p
           ? lastSegment.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
           : 'Home';
         urls.push({ url: loc, path, title });
-      } catch (err) { /* skip malformed URLs */ }
+      } catch { /* skip malformed URLs */ }
     }
 
     log.info(`Sitemap: found ${urls.length} URLs from ${sitemapUrl}`);
@@ -131,12 +131,13 @@ async function fetchPageContent(url: string): Promise<{ content: string; interna
         try {
           const parsed = new URL(href, url);
           internalLinks.push(parsed.pathname);
-        } catch (err) { /* skip malformed URL */ }
+        } catch { /* skip malformed URL */ }
       }
     }
 
     return { content: content.slice(0, 1200), internalLinks: [...new Set(internalLinks)], pageTitle };
   } catch (err) {
+    log.debug({ err }, 'internal-links/fetchPageContent: fetch failed — degrading gracefully');
     return null;
   }
 }
@@ -190,7 +191,9 @@ export async function analyzeInternalLinks(
       for (const cms of cmsUrls) {
         pageUrls.push({ url: cms.url, path: cms.path, title: cms.pageName });
       }
-    } catch (err) { /* CMS discovery failed — skip */ }
+    } catch (err) {
+      log.debug({ err }, 'internal-links/analyzeInternalLinks: CMS discovery failed — skipping');
+    }
   }
 
   // Cap at 100 pages to keep fetch + AI costs reasonable
