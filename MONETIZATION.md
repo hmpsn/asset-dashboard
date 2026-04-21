@@ -704,30 +704,38 @@ Each gated section uses the same visual treatment:
 
 ### AI Chatbot Rate Limiting
 
-Usage gating is implemented in `server/usage-tracking.ts` with a dedicated `usage_tracking` SQLite table (not `chat-memory.ts`). Limits are enforced via `checkUsageLimit(workspaceId, tier, feature)`.
+Two separate systems exist. Understanding both is critical before modifying chat endpoints:
 
-| Tier | `ai_chats` / month | `strategy_generations` / month |
-|------|--------------------|-------------------------------|
-| Free (Starter) | 3 | 0 |
-| Growth | 50 | 3 |
-| Premium | Unlimited | Unlimited |
+**`server/chat-memory.ts` — enforcement gate (currently free-tier only)**
+`checkChatRateLimit(workspaceId, tier, sessionId)` is called at the top of the chat handler in `server/routes/public-analytics.ts:261`. For any tier other than `'free'` it unconditionally returns `{ allowed: true }` — Growth and Premium users have unlimited chats today.
+
+**`server/usage-tracking.ts` — counting layer (all tiers)**
+`incrementUsage(ws.id, 'ai_chats')` is called at `public-analytics.ts:491` after each successful response. This populates the `usage_tracking` table with accurate monthly counts, but counts are never checked before generating a response (no `checkUsageLimit` call in chat routes).
+
+| Tier | `ai_chats` / month (defined) | Enforced? | `strategy_generations` / month | Enforced? |
+|------|------------------------------|-----------|-------------------------------|-----------|
+| Free | 3 | ✅ via `checkChatRateLimit` in `chat-memory.ts` | 0 | ✅ via `checkUsageLimit` in `usage-tracking.ts` |
+| Growth | 50 | ❌ counted only — enforcement not wired | 3 | ✅ via `checkUsageLimit` in `keyword-strategy.ts` |
+| Premium | Unlimited | n/a | Unlimited | n/a |
 
 - A "conversation" = a chat session with at least 1 user message
 - After the free-tier limit (3): chat input disabled, replaced with upgrade prompt
 - Counter shown in chat header: "2 of 3 free conversations remaining"
 - Proactive insights greeting disabled on free tier (saves tokens + creates upgrade incentive)
-- Growth tier strategy cap (3/month) prompts upgrade to Premium when exhausted
+- **Growth-tier chat enforcement** — to wire up, replace the `checkChatRateLimit` call in `public-analytics.ts:261` with `checkUsageLimit(ws.id, tier, 'ai_chats')`, then remove the growth/premium bypass from `chat-memory.ts:193`. The count data is already there.
 
 ### Implementation Status
 
 1. ✅ **`tier` on Workspace interface** — `tier: 'free' | 'growth' | 'premium'` in `server/workspaces.ts`
 2. ✅ **`<TierGate>` component** — blur overlay with upgrade CTA, used across Strategy and Content sections
 3. ✅ **Tab-level gating in NAV array** — `isPaid` / `isPremium` booleans control tab visibility
-4. ✅ **Usage rate limiting** — `checkUsageLimit()` in `server/usage-tracking.ts` (`usage_tracking` SQLite table). Free: 3 chats/0 strategies. Growth: 50 chats/3 strategies. Premium: unlimited.
-5. ✅ **Competitor gaps gated to Premium** — `TierGate required="premium"` on keyword gaps section
-6. 🟡 **Strategy & Implementation Hours system** — roadmapped (item #76). Requests tab returns when active.
-7. ✅ **Stripe subscription sync** — webhook updates `ws.tier` on subscription create/cancel/change
-8. ✅ **Admin tier management** — Workspace Settings dropdown to manually set tier
+4. ✅ **Free-tier chat limit (3/month)** — enforced via `checkChatRateLimit` in `server/chat-memory.ts`
+5. ✅ **Strategy generation limit (Growth: 3/month)** — enforced via `checkUsageLimit` in `server/routes/keyword-strategy.ts`
+6. 🟡 **Growth-tier chat limit (50/month)** — counts tracked in `usage_tracking` table but enforcement not yet wired (see note above)
+7. ✅ **Competitor gaps gated to Premium** — `TierGate required="premium"` on keyword gaps section
+8. 🟡 **Strategy & Implementation Hours system** — roadmapped (item #76). Requests tab returns when active.
+9. ✅ **Stripe subscription sync** — webhook updates `ws.tier` on subscription create/cancel/change
+10. ✅ **Admin tier management** — Workspace Settings dropdown to manually set tier
 
 ---
 
