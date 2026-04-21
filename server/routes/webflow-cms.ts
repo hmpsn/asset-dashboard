@@ -95,13 +95,17 @@ router.get('/api/webflow/cms-seo/:siteId', requireWorkspaceAccessFromQuery(), as
           const sitemapUrls = await discoverSitemapUrls(base);
           if (sitemapUrls.length > 0) {
             sitemapPaths = new Set(sitemapUrls.map(u => {
-              try { return new URL(u).pathname.replace(/\/$/, '').toLowerCase(); } catch (err) { return ''; }
+              try { return new URL(u).pathname.replace(/\/$/, '').toLowerCase(); } catch { return ''; }
             }).filter(Boolean));
             break; // use first successful sitemap
           }
-        } catch (err) { /* try next base URL */ }
+        } catch (err) {
+          log.debug({ err }, 'webflow-cms/cms-seo: sitemap fetch for base URL failed — trying next');
+        }
       }
-    } catch (err) { /* sitemap fetch is best-effort */ }
+    } catch (err) {
+      log.debug({ err }, 'webflow-cms/cms-seo: sitemap discovery failed — proceeding without filtering');
+    }
 
     const results: Array<{
       collectionId: string;
@@ -200,6 +204,7 @@ router.post('/api/webflow/collections/:collectionId/publish', async (req, res) =
     const result = await publishCollectionItems(req.params.collectionId, itemIds, token);
     res.json(result);
   } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'webflow-cms: POST /api/webflow/collections/:collectionId/publish: programming error'); else log.debug({ err }, 'webflow-cms: collection publish error');
     const msg = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: msg });
   }

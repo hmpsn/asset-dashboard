@@ -10,9 +10,9 @@
  *   upsertInsight({ ...cloneInsightParams(insight), data, impactScore: adjustedScore });
  */
 
-export interface ScoreAdjustmentResult {
+export interface ScoreAdjustmentResult<T extends Record<string, unknown> = Record<string, unknown>> {
   /** Updated data object with _originalBaseScore and _scoreAdjustments */
-  data: Record<string, unknown>;
+  data: T & { _originalBaseScore?: number; _scoreAdjustments?: Record<string, number> };
   /** Final clamped score: base + sum(adjustments) */
   adjustedScore: number;
 }
@@ -25,12 +25,12 @@ export interface ScoreAdjustmentResult {
  * @param bridgeKey - Unique key for this bridge's adjustment (e.g., 'outcome', 'anomaly')
  * @param delta - Score delta to apply (positive = boost, negative = penalty). 0 removes the adjustment.
  */
-export function applyScoreAdjustment(
-  currentData: Record<string, unknown>,
+export function applyScoreAdjustment<T extends Record<string, unknown>>(
+  currentData: T,
   currentImpactScore: number,
   bridgeKey: string,
   delta: number,
-): ScoreAdjustmentResult {
+): ScoreAdjustmentResult<T> {
   // Preserve the original base score — only set it on first adjustment.
   // Use Number.isFinite() instead of typeof to reject NaN from corrupt DB data.
   const originalBase = Number.isFinite(currentData._originalBaseScore as number)
@@ -65,7 +65,7 @@ export function applyScoreAdjustment(
       ...currentData,
       _originalBaseScore: originalBase,
       _scoreAdjustments: existingAdj,
-    },
+    } as T & { _originalBaseScore?: number; _scoreAdjustments?: Record<string, number> },
     adjustedScore,
   };
 }

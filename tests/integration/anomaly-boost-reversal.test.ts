@@ -15,6 +15,7 @@ import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { upsertInsight, getInsights } from '../../server/analytics-insights-store.js';
 import { applyScoreAdjustment } from '../../server/insight-score-adjustments.js';
+import type { CtrOpportunityData, ContentDecayData } from '../../shared/types/analytics.js';
 import db from '../../server/db/index.js';
 import { setFlagOverride } from '../../server/feature-flags.js';
 
@@ -85,7 +86,7 @@ describe('Anomaly boost reversal on dismiss', () => {
       workspaceId: testWsId,
       pageId: '/test/boost-reversal',
       insightType: 'page_health',
-      data: boostedData as never,
+      data: boostedData,
       severity: 'warning',
       impactScore: adjustedScore,
       domain: 'traffic',
@@ -134,21 +135,22 @@ describe('Anomaly boost reversal on dismiss', () => {
       workspaceId: testWsId,
       pageId: '/test/multi-anomaly',
       insightType: 'content_decay',
-      data: { decayRate: 0.5 },
+      data: { baselineClicks: 100, currentClicks: 50, deltaPercent: -50, baselinePeriod: '30d', currentPeriod: '7d' } satisfies ContentDecayData,
       severity: 'warning',
       impactScore: originalScore,
       domain: 'traffic',
     });
 
     // Apply anomaly boost
+    const decayFixture: ContentDecayData = { baselineClicks: 100, currentClicks: 50, deltaPercent: -50, baselinePeriod: '30d', currentPeriod: '7d' };
     const { data: boostedData, adjustedScore } = applyScoreAdjustment(
-      { decayRate: 0.5 }, originalScore, 'anomaly', 10,
+      decayFixture, originalScore, 'anomaly', 10,
     );
     upsertInsight({
       workspaceId: testWsId,
       pageId: '/test/multi-anomaly',
       insightType: 'content_decay',
-      data: boostedData as never,
+      data: boostedData,
       severity: 'warning',
       impactScore: adjustedScore,
       domain: 'traffic',
@@ -226,20 +228,21 @@ describe('Anomaly boost reversal on dismiss', () => {
       workspaceId: testWsId,
       pageId: '/test/resolved-insight',
       insightType: 'ctr_opportunity',
-      data: { impressions: 1000 },
+      data: { query: 'test query', pageUrl: '/test/resolved-insight', position: 5, actualCtr: 2.0, expectedCtr: 10.0, ctrRatio: 0.2, impressions: 1000, estimatedClickGap: 80 } satisfies CtrOpportunityData,
       severity: 'opportunity',
       impactScore: originalScore,
       domain: 'search',
     });
 
+    const ctrFixture: CtrOpportunityData = { query: 'test query', pageUrl: '/test/resolved-insight', position: 5, actualCtr: 2.0, expectedCtr: 10.0, ctrRatio: 0.2, impressions: 1000, estimatedClickGap: 80 };
     const { data: boostedData, adjustedScore } = applyScoreAdjustment(
-      { impressions: 1000 }, originalScore, 'anomaly', 10,
+      ctrFixture, originalScore, 'anomaly', 10,
     );
     const boosted = upsertInsight({
       workspaceId: testWsId,
       pageId: '/test/resolved-insight',
       insightType: 'ctr_opportunity',
-      data: boostedData as never,
+      data: boostedData,
       severity: 'opportunity',
       impactScore: adjustedScore,
       domain: 'search',

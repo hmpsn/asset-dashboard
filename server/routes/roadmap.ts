@@ -36,14 +36,20 @@ function loadRoadmap() {
         return repoData;
       }
     }
-  } catch (err) { /* fall through to normal load */ }
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'roadmap/loadRoadmap: programming error reading repo file');
+    else log.debug({ err }, 'roadmap/loadRoadmap: could not read repo file — falling through');
+  }
 
   if (!repoNewer) {
     try {
       if (fs.existsSync(ROADMAP_RUNTIME_FILE)) {
         return JSON.parse(fs.readFileSync(ROADMAP_RUNTIME_FILE, 'utf-8'));
       }
-    } catch (err) { /* fall through */ }
+    } catch (err) {
+      if (isProgrammingError(err)) log.warn({ err }, 'roadmap/loadRoadmap: programming error reading runtime file');
+      else log.debug({ err }, 'roadmap/loadRoadmap: could not read runtime file — falling through');
+    }
   }
 
   let data: ReturnType<typeof JSON.parse> | null = null;
@@ -51,7 +57,10 @@ function loadRoadmap() {
     if (fs.existsSync(ROADMAP_REPO_FILE)) {
       data = JSON.parse(fs.readFileSync(ROADMAP_REPO_FILE, 'utf-8'));
     }
-  } catch (err) { /* fall through */ }
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'roadmap/loadRoadmap: programming error parsing repo JSON');
+    else log.debug({ err }, 'roadmap/loadRoadmap: could not parse repo JSON — falling through');
+  }
 
   if (!data) {
     data = { sprints: [] };
@@ -65,7 +74,10 @@ function loadRoadmap() {
           if (statuses[String(item.id)]) item.status = statuses[String(item.id)];
         }
       }
-    } catch (err) { /* ignore */ }
+    } catch (err) {
+      if (isProgrammingError(err)) log.warn({ err }, 'roadmap/loadRoadmap: programming error in status merge');
+      else log.debug({ err }, 'roadmap/loadRoadmap: could not parse status file — skipping merge');
+    }
   }
 
   fs.writeFileSync(ROADMAP_RUNTIME_FILE, JSON.stringify(data, null, 2));
@@ -115,7 +127,11 @@ router.get('/api/roadmap-status', (_req, res) => {
       for (const item of sprint.items) statusMap[String(item.id)] = item.status;
     }
     res.json(statusMap);
-  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'roadmap: GET /api/roadmap-status: programming error'); res.json({}); }
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'roadmap: GET /api/roadmap-status: programming error');
+    else log.debug({ err }, 'roadmap: GET /api/roadmap-status: degrading gracefully');
+    res.json({});
+  }
 });
 
 export default router;

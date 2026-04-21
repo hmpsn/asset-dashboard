@@ -2,6 +2,7 @@
 // Extracted from seo-audit.ts for modularity.
 
 import { scanRedirects } from './redirect-scanner.js';
+import { isProgrammingError } from './errors.js';
 import { extractLinks } from './seo-audit-html.js';
 import { isExcludedPage, CHECK_CATEGORY } from './audit-page.js';
 import { runHomepageCwv } from './seo-audit-cwv.js';
@@ -77,7 +78,7 @@ export async function runSiteWideChecks(opts: SiteWideChecksOpts): Promise<SiteW
           }
         }
       }
-    } catch (err) { /* skip if fetch fails */ }
+    } catch (err) { log.debug({ err }, 'seo-audit-site-checks/robots-fetch: external fetch error — degrading gracefully'); }
 
     // XML Sitemap
     try {
@@ -99,7 +100,7 @@ export async function runSiteWideChecks(opts: SiteWideChecksOpts): Promise<SiteW
           }
         }
       }
-    } catch (err) { /* skip if fetch fails */ }
+    } catch (err) { log.debug({ err }, 'seo-audit-site-checks/sitemap-fetch: external fetch error — degrading gracefully'); }
 
     // Page response time (sample the homepage)
     try {
@@ -111,7 +112,7 @@ export async function runSiteWideChecks(opts: SiteWideChecksOpts): Promise<SiteW
       } else if (responseTime > 1000) {
         siteWideIssues.push({ check: 'response-time', severity: 'warning', message: `Server response time ${(responseTime / 1000).toFixed(1)}s`, recommendation: 'Aim for server response under 600ms. Consider caching, CDN, or server optimization.', value: `${responseTime}ms` });
       }
-    } catch (err) { /* network failure — skip */ }
+    } catch (err) { log.debug({ err }, 'seo-audit-site-checks/response-time: external fetch error — degrading gracefully'); }
 
     // SSL / HTTPS check
     if (!checkUrl.startsWith('https://')) {
@@ -158,7 +159,11 @@ export async function runSiteWideChecks(opts: SiteWideChecksOpts): Promise<SiteW
       });
     }
   } catch (err) {
-    log.error({ err: err }, 'Redirect scan failed (non-fatal)');
+    if (isProgrammingError(err)) {
+      log.warn({ err }, 'seo-audit-site-checks/redirect-scan: unexpected error');
+    } else {
+      log.debug({ err }, 'seo-audit-site-checks/redirect-scan: external network error — degrading gracefully');
+    }
   }
 
   // --- Homepage Core Web Vitals (mobile + desktop) ---
@@ -241,7 +246,7 @@ export async function runSiteWideChecks(opts: SiteWideChecksOpts): Promise<SiteW
         try {
           const p = new URL(link.href).pathname.replace(/\/$/, '').toLowerCase();
           if (!p.startsWith('/cdn-cgi/')) internalLinkTargets.add(p);
-        } catch (err) { /* skip malformed URL */ }
+        } catch (err) { log.debug({ err }, 'seo-audit-site-checks/url-parse: malformed URL — degrading gracefully'); }
       }
     }
   }

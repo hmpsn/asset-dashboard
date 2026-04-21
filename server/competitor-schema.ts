@@ -59,7 +59,7 @@ function extractJsonLdFromHtml(html: string): { types: string[]; count: number }
           if (item['@type']) types.push(String(item['@type']));
         }
       }
-    } catch (err) { /* malformed JSON-LD — skip */ }
+    } catch { /* malformed JSON-LD — skip */ } // catch-ok
   }
   return { types, count };
 }
@@ -78,7 +78,7 @@ function extractUrlsFromSitemap(xml: string, domain: string, maxUrls: number): s
       if (parsed.hostname === domain || parsed.hostname === `www.${domain}` || `www.${parsed.hostname}` === domain) {
         urls.push(url);
       }
-    } catch (err) { /* invalid URL — skip */ }
+    } catch { /* invalid URL — skip */ } // catch-ok
   }
   return urls;
 }

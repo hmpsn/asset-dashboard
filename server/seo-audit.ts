@@ -64,7 +64,10 @@ export async function fetchPageMeta(pageId: string, tokenOverride?: string): Pro
     const res = await webflowFetch(`/pages/${pageId}`, {}, tokenOverride);
     if (!res.ok) return null;
     return await res.json() as PageMeta;
-  } catch (err) { /* network failure — expected */ return null; }
+  } catch (err) {
+    log.debug({ err }, 'seo-audit/fetchPageMeta: network failure — degrading gracefully');
+    return null;
+  }
 }
 
 
@@ -95,10 +98,15 @@ async function getSiteInfo(siteId: string, tokenOverride?: string): Promise<Site
           customDomain = domains[0].url;
         }
       }
-    } catch (err) { /* custom domains fetch is best-effort */ }
+    } catch (err) {
+      log.debug({ err }, 'seo-audit/getSiteInfo: custom domains fetch failed — degrading gracefully');
+    }
 
     return { subdomain, customDomain };
-  } catch (err) { /* network failure — expected */ return { subdomain: null, customDomain: null }; }
+  } catch (err) {
+    log.debug({ err }, 'seo-audit/getSiteInfo: network failure — degrading gracefully');
+    return { subdomain: null, customDomain: null };
+  }
 }
 
 export async function runSeoAudit(siteId: string, tokenOverride?: string, workspaceId?: string, skipLinkCheck = false): Promise<SeoAuditResult> {

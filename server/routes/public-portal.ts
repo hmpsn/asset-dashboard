@@ -323,7 +323,7 @@ router.get('/api/public/audit-traffic/:workspaceId', async (req, res) => {
             if (!trafficMap[pagePath]) trafficMap[pagePath] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
             trafficMap[pagePath].clicks += p.clicks;
             trafficMap[pagePath].impressions += p.impressions;
-          } catch (err) { /* skip malformed URLs */ }
+          } catch { /* skip malformed URLs */ } // catch-ok
         }
       } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'public-portal: GET /api/public/audit-traffic/:workspaceId: programming error'); /* GSC unavailable */ }
     }
@@ -342,6 +342,8 @@ router.get('/api/public/audit-traffic/:workspaceId', async (req, res) => {
 
     res.json(trafficMap);
   } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'public-portal: GET /api/public/audit-traffic/:workspaceId: programming error');
+    else log.debug({ err }, 'public-portal: audit-traffic endpoint failed — degrading gracefully');
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });

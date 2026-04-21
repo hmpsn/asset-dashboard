@@ -61,7 +61,7 @@ export async function getAsset(
     if (!res.ok) return null;
     return await res.json() as WebflowAsset;
   } catch (err) {
-    /* network failure — expected */
+    log.debug({ err }, 'webflow-assets/get-asset: external API error — degrading gracefully');
     return null;
   }
 }
@@ -97,7 +97,7 @@ export async function updateAsset(
     return { success: true };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    log.error({ detail: msg }, 'Asset update error');
+    log.debug({ err }, 'webflow-assets/update-asset: external API error — degrading gracefully');
     return { success: false, error: msg };
   }
 }
@@ -141,6 +141,7 @@ export async function createAssetFolder(
     const data = await res.json() as { id?: string };
     return { success: true, folderId: data.id };
   } catch (err: unknown) {
+    log.debug({ err }, 'webflow-assets/create-folder: external API error — degrading gracefully');
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
@@ -178,6 +179,7 @@ export async function deleteAsset(assetId: string, tokenOverride?: string): Prom
     }
     return { success: true };
   } catch (err: unknown) {
+    log.debug({ err }, 'webflow-assets/delete-asset: external API error — degrading gracefully');
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
@@ -244,7 +246,7 @@ export async function scanAssetUsage(siteId: string, tokenOverride?: string): Pr
           offset += items.length;
           if (offset >= total || items.length === 0) break;
         }
-      } catch (err) { /* API call failed — skip collection */ }
+      } catch (err) { log.debug({ err }, 'webflow-assets/scan-cms-instances: external API error — degrading gracefully'); }
     }
 
     log.info(`Scanning ${pageUrls.length} page URLs for asset references (${assetIds.size} assets)`);
@@ -266,10 +268,10 @@ export async function scanAssetUsage(siteId: string, tokenOverride?: string): Pr
                 }
               }
             }
-          } catch (err) { /* CSS fetch failed — skip */ }
+          } catch (err) { log.debug({ err }, 'webflow-assets/scan-css: external fetch error — degrading gracefully'); }
         }
       }
-    } catch (err) { /* network failure — skip CSS scan */ }
+    } catch (err) { log.debug({ err }, 'webflow-assets/scan-css-home: external fetch error — degrading gracefully'); }
 
     // Fetch pages in parallel batches of 10
     const batchSize = 10;
@@ -287,7 +289,7 @@ export async function scanAssetUsage(siteId: string, tokenOverride?: string): Pr
                 addUsage(id, ref);
               }
             }
-          } catch (err) { /* network failure — skip page */ }
+          } catch (err) { log.debug({ err }, 'webflow-assets/scan-page: external fetch error — degrading gracefully'); }
         })
       );
       void results;
@@ -349,7 +351,7 @@ export async function scanAssetUsage(siteId: string, tokenOverride?: string): Pr
         offset += items.length;
         if (offset >= total || items.length === 0) break;
       }
-    } catch (err) { /* API call failed — skip collection */ }
+    } catch (err) { log.debug({ err }, 'webflow-assets/scan-cms-fields: external API error — degrading gracefully'); }
   }
 
   return usageMap;
@@ -441,7 +443,7 @@ export async function uploadAsset(
           log.error({ detail: errText }, `Failed to set alt text for ${fileName} (${patchRes.status}):`);
         }
       } catch (e) {
-        log.error({ err: e }, `Alt text PATCH error for ${fileName}:`);
+        log.debug({ err: e }, `webflow-assets/upload-alt-patch: external API error — degrading gracefully`);
       }
     }
 
@@ -450,6 +452,7 @@ export async function uploadAsset(
     return { success: true, assetId, hostedUrl };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
+    log.debug({ err }, 'webflow-assets/upload-asset: external API error — degrading gracefully');
     return { success: false, error: msg };
   }
 }

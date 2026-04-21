@@ -1,6 +1,6 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **298 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **306 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
@@ -3298,9 +3298,9 @@ When the user asks to update this document with recent features, follow this pro
 | Platform & UX | 25+ | Design system, command center, UX overhaul, navigation, cross-linking, roadmap, Recharts, mobile guard |
 | Architecture & Infrastructure | 30+ | Server refactor, React Query migration (5 phases), React Router, typed API client, Pino logging, Sentry, CI/CD, SQLite optimization |
 
-**299 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**306 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **299**. Last updated: April 2026.
+Current feature count: **306**. Last updated: April 2026.
 
 ---
 
@@ -3567,3 +3567,56 @@ Current feature count: **299**. Last updated: April 2026.
 **Agency value:** AI prompts now draw on the full workspace context — contact info for local SEO, scoring thresholds for learning framing, content pricing for pipeline briefings, and annotation page URLs for traffic event attribution. Prompt quality improves without structural changes.
 
 **Client value:** Client portal now correctly shows in-progress brief counts (was always 0). Copy pipeline status is surfaced in the Growth+ intelligence endpoint for client-facing dashboards.
+
+---
+
+## Insight Hardening (PR #244)
+
+### 302. Platform-Wide Catch Hardening
+**What it does:** Extends the `isProgrammingError()` pattern from `workspace-intelligence.ts` (Feature #279) to 20+ additional server files. Upgrades silent catch blocks across routes, helpers, and module boundaries to call `isProgrammingError(err)` — routing TypeErrors/ReferenceErrors/RangeErrors to `log.warn` (Sentry-visible) while expected degradation (network failures, missing data) stays at `log.debug`. Tier 1 files (`admin-chat-context.ts`, `routes/public-analytics.ts`, `routes/public-portal.ts`, `routes/public-content.ts`, `routes/public-auth.ts`) fully hardened with no bare `catch {` blocks. pr-check rule expanded from `workspace-intelligence.ts` only to the entire `server/` directory, with `// catch-ok` escape hatch for intentionally-silent catches. `url-fetch-ok` suppressor added for catches wrapping `fetch()` (where TypeError = network failure, not a bug).
+
+**Files:** `server/admin-chat-context.ts`, `server/anomaly-detection.ts`, `server/content-brief.ts`, `server/pagespeed.ts`, `server/sales-audit.ts`, `server/seo-audit.ts`, `server/seo-audit-site-checks.ts`, `server/webflow-pages.ts`, `server/webflow-assets.ts`, `server/routes/jobs.ts`, `server/routes/webflow-cms.ts`, `server/routes/webflow-seo.ts`, `server/routes/roadmap.ts`, `scripts/pr-check.ts`, `tests/unit/catch-hardening-smoke.test.ts`
+
+**Agency value:** Programming errors that previously silenced as empty-fallback responses (null dereferences, renamed exports, unexpected shapes) now fire Sentry alerts immediately. Eliminates the silent data-loss class of bugs across the entire server layer, not just the intelligence assembler.
+
+**Mutual:** CI enforcement — pr-check now catches bare `catch {` across all 70+ server files on every PR. Future contributors can't accidentally introduce silent swallowing without explicitly annotating intent.
+
+---
+
+### 303. Generic `AnalyticsInsight<T>` + `InsightDataMap`
+**What it does:** Converts `AnalyticsInsight.data` from `Record<string, unknown>` to a generic type parameter `T extends InsightDataBase`. Adds `InsightDataMap` in `shared/types/analytics.ts` mapping each `InsightType` discriminant to its typed `XData` interface (e.g. `'audit_finding' → AuditFindingData`, `'traffic_anomaly' → TrafficAnomalyData`). `UpsertInsightParams` similarly made generic. `getInsight<T>()` in `analytics-insights-store.ts` returns `AnalyticsInsight<T>` with a type-predicate cast enforced by a JSDoc comment explaining the soundness argument. Removes the `AnalyticsInsight.data Record<string,unknown>` grandfather exception from pr-check that previously allowed untyped insight data to pass CI. All existing insight write paths updated to pass typed `data` objects matching their `InsightDataMap` entry.
+
+**Files:** `shared/types/analytics.ts`, `server/analytics-insights-store.ts`, `server/admin-chat-context.ts`, `server/content-brief.ts`, `server/anomaly-detection.ts`, `server/scheduled-audits.ts`, `server/insight-enrichment.ts`, `scripts/pr-check.ts`
+
+**Agency value:** Insight data types are now compiler-enforced. Adding a new insight type without registering its `XData` interface in `InsightDataMap` is a type error. Silent runtime type mismatches (e.g. reading `data.pageUrl` when the field was renamed `data.url`) are caught at compile time instead of discovered in production.
+
+**Mutual:** Structural foundation for insight enrichment — typed `data` objects enable autocomplete, refactor-safety, and exhaustive type checking across all 10+ insight types.
+
+---
+
+### 304. Cross-Bridge Score Adjustment Preservation
+**What it does:** Fixes score clobbering in Bridge #12 (audit→page_health) and Bridge #15 (audit→site_health) in `scheduled-audits.ts`. When `upsertInsight()` is called with ON CONFLICT behavior, it replaces the entire `data` JSON blob — previously destroying `_scoreAdjustments` written by other bridges (e.g. anomaly detection boosting a page's impact score). Fix: before each upsert, read the existing insight via `getInsight()`, extract `_scoreAdjustments` and `_originalBaseScore`, carry them forward in the new `data` object, and recompute `impactScore` as `baseScore + totalDelta`. Both bridges now follow the same pattern.
+
+**Files:** `server/scheduled-audits.ts`, `tests/unit/score-preservation.test.ts`
+
+**Agency value:** Cross-bridge score adjustments (e.g. anomaly severity boosts, traffic-drop amplifiers) are now preserved across re-audit cycles. A page's composite insight score reflects all contributing signals, not just the last bridge to write — giving admins accurate priority ranking even after scheduled audits overwrite stale data.
+
+**Mutual:** Establishes the canonical pattern for all future bridges that re-upsert existing insights: read before write, carry forward `_scoreAdjustments`, recompute adjusted `impactScore`.
+
+---
+
+### 305. `dirSizeAsync` — Non-Blocking Storage Stats
+**What it does:** Adds `dirSizeAsync()` to `server/storage-stats.ts` — an async version of the existing `dirSize()` function using `fs.promises.readdir` and `fs.promises.stat` instead of synchronous `fs.readdirSync`/`fs.statSync`. Converts `getStorageReport()` to `async`, calling `dirSizeAsync()` for all directory size measurements. Eliminates blocking I/O in the storage stats endpoint, which previously held the Node.js event loop during directory traversal on large data directories.
+
+**Files:** `server/storage-stats.ts`
+
+**Agency value:** Storage stats endpoint no longer blocks the event loop during filesystem traversal. On production instances with large audit caches or content directories, synchronous directory traversal could stall all concurrent requests for hundreds of milliseconds.
+
+---
+
+### 306. Scheduled Audits Deduplication Guard
+**What it does:** Adds deduplication logic to the scheduled audit runner — if an audit for a workspace is already in-flight (`runningAudits` Set), the scheduler skips the workspace instead of launching a duplicate. Adds integration test `tests/integration/scheduled-audits-dedup.test.ts` covering: (1) concurrent audit prevention when already-running, (2) correct execution when idle, (3) cleanup on completion. Also adds the `getInsight()` function to `analytics-insights-store.ts` exports for cross-bridge score preservation lookups.
+
+**Files:** `server/scheduled-audits.ts`, `server/analytics-insights-store.ts`, `tests/integration/scheduled-audits-dedup.test.ts`
+
+**Agency value:** Prevents duplicate audit runs stacking up under slow network conditions or when the hourly check fires while a long audit is still in progress. Duplicate audits previously could write conflicting snapshots and double-count activity log entries.

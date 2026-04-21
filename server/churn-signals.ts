@@ -253,7 +253,7 @@ async function runChurnCheck() {
           });
         }
       }
-    } catch (err) { /* skip audit check if files aren't readable */ }
+    } catch { /* skip audit check if files aren't readable */ }
 
     // ── Trial Ending ──
     if (ws.trialEndsAt) {
