@@ -11,6 +11,7 @@ const STALE_DAYS = 3; // remind if pending > 3 days
 const CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000; // every 12 hours
 
 let reminderInterval: ReturnType<typeof setInterval> | null = null;
+let startupTimeout: ReturnType<typeof setTimeout> | null = null;
 const sentReminders = new Map<string, number>(); // batchId -> last reminder timestamp
 
 async function sendApprovalReminderEmail(
@@ -82,18 +83,21 @@ export function startApprovalReminders() {
   if (reminderInterval) return;
 
   // Check after 60s on startup, then every 12 hours
-  setTimeout(() => {
+  startupTimeout = setTimeout(() => {
     checkStaleApprovals().catch(err => log.error({ err }, 'Error'));
   }, 60000);
+  startupTimeout.unref?.();
 
   reminderInterval = setInterval(() => {
     checkStaleApprovals().catch(err => log.error({ err }, 'Error'));
   }, CHECK_INTERVAL_MS);
+  reminderInterval.unref?.();
 
   log.info('Stale approval checker started (checks every 12 hours)');
 }
 
 export function stopApprovalReminders() {
+  if (startupTimeout) { clearTimeout(startupTimeout); startupTimeout = null; }
   if (reminderInterval) {
     clearInterval(reminderInterval);
     reminderInterval = null;
