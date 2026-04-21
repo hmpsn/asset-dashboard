@@ -9,6 +9,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getDataDir } from '../data-dir.js';
+import { isProgrammingError } from '../errors.js';
 import { createLogger } from '../logger.js';
 
 
@@ -123,7 +124,8 @@ router.get('/api/roadmap-status', (_req, res) => {
     }
     res.json(statusMap);
   } catch (err) {
-    log.debug({ err }, 'roadmap: GET /api/roadmap-status: degrading gracefully');
+    if (isProgrammingError(err)) log.warn({ err }, 'roadmap: GET /api/roadmap-status: programming error');
+    else log.debug({ err }, 'roadmap: GET /api/roadmap-status: degrading gracefully');
     res.json({});
   }
 });

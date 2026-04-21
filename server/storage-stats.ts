@@ -34,7 +34,7 @@ export interface StorageReport {
 
 /* ── Helpers ── */
 
-/** Recursively sum file sizes in a directory. */
+/** Recursively sum file sizes in a directory (sync). Mirror of dirSizeAsync — bug fixes must be applied to both. */
 function dirSize(dirPath: string): { bytes: number; files: number } {
   let bytes = 0;
   let files = 0;
@@ -58,7 +58,7 @@ function dirSize(dirPath: string): { bytes: number; files: number } {
   return { bytes, files };
 }
 
-/** Async variant of dirSize — used by getStorageReport() to avoid blocking the event loop. */
+/** Async variant of dirSize — avoids blocking the event loop. Mirror of dirSize — bug fixes must be applied to both. */
 async function dirSizeAsync(dirPath: string): Promise<{ bytes: number; files: number }> {
   let bytes = 0;
   let files = 0;
