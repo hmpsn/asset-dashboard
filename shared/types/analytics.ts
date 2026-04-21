@@ -235,9 +235,8 @@ export interface AnalyticsInsight<T extends InsightType = InsightType> {
 // ── Insight data shapes (used in data JSON field) ─────────────────
 
 /**
- * Base for all insight data shapes. The index signature allows these types
- * to be used as `Record<string, unknown>` at call sites that need the wide
- * form (e.g. applyScoreAdjustment, narrative builders).
+ * Base for all insight data shapes. All insight data types share these core
+ * fields, with specific subtypes defined in InsightDataMap.
  */
 export interface InsightDataBase {
   [key: string]: unknown;

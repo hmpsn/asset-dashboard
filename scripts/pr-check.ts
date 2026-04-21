@@ -1690,10 +1690,6 @@ export const CHECKS: Check[] = [
     pattern: 'Record<\\s*string\\s*,\\s*unknown\\s*>',
     fileGlobs: ['*.ts'],
     pathFilter: 'shared/types/',
-    // Grandfather exception: AnalyticsInsight.data is the discriminated-union
-    // container (InsightDataMap narrows it at the read boundary). This is the
-    // one legitimate escape hatch and is documented in the insight rules.
-    exclude: ['shared/types/analytics.ts'],
     excludeLines: ['// record-unknown-ok'],
     message: 'Define typed interfaces at layer boundaries, not Record<string, unknown>. Untyped contracts are the #1 recurring bug pattern. See InsightDataMap for the discriminated-union pattern. Add // record-unknown-ok only for grandfathered escape-hatch fields (e.g. AnalyticsInsight.data).',
     severity: 'error',
