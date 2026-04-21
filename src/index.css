@@ -338,14 +338,14 @@ body::after {
 .dashboard-light .border-zinc-600 { border-color: #94a3b8 !important; }
 .dashboard-light .divide-zinc-800 > * + * { border-color: #e2e8f0 !important; }
 
-/* === Neutral Text — dark navy for authority on white === */
-.dashboard-light .text-zinc-100 { color: #0f172a !important; }  /* near-black navy */
-.dashboard-light .text-zinc-200 { color: #0f172a !important; }  /* primary → dark navy */
-.dashboard-light .text-zinc-300 { color: #1e293b !important; }  /* strong secondary */
-.dashboard-light .text-zinc-400 { color: #1e293b !important; }  /* secondary — darker for contrast */
-.dashboard-light .text-zinc-500 { color: #334155 !important; }  /* muted — darker for contrast */
-.dashboard-light .text-zinc-600 { color: #475569 !important; }  /* subtle — one notch darker */
-.dashboard-light .text-zinc-700 { color: #334155 !important; }
+/* === Neutral Text — four distinct steps: heading → strong secondary → body → muted === */
+.dashboard-light .text-zinc-100 { color: var(--brand-text-bright) !important; }  /* #0f172a heading */
+.dashboard-light .text-zinc-200 { color: var(--brand-text-bright) !important; }  /* #0f172a heading */
+.dashboard-light .text-zinc-300 { color: #1e293b !important; }                   /* strong secondary */
+.dashboard-light .text-zinc-400 { color: var(--brand-text) !important; }         /* #334155 body */
+.dashboard-light .text-zinc-500 { color: var(--brand-text-muted) !important; }   /* #475569 muted */
+.dashboard-light .text-zinc-600 { color: var(--brand-text-muted) !important; }   /* #475569 muted */
+.dashboard-light .text-zinc-700 { color: var(--brand-text) !important; }         /* #334155 body */
 /* .text-white stays white — used on teal/green button backgrounds in both modes */
 
 /* === Accent Text — accessible on white (≥4.5:1 WCAG AA) === */
@@ -452,11 +452,11 @@ body::after {
 .dashboard-light .hover\:border-zinc-600:hover { border-color: #64748b !important; }
 .dashboard-light .hover\:border-teal-500\/30:hover { border-color: rgba(13,148,136,0.28) !important; }
 /* === Hover: Text === */
-.dashboard-light .hover\:text-zinc-100:hover { color: #0f172a !important; }
-.dashboard-light .hover\:text-zinc-200:hover { color: #0f172a !important; }
-.dashboard-light .hover\:text-zinc-300:hover { color: #0f172a !important; }
-.dashboard-light .hover\:text-zinc-400:hover { color: #1e293b !important; }
-.dashboard-light .hover\:text-zinc-500:hover { color: #334155 !important; }
+.dashboard-light .hover\:text-zinc-100:hover { color: var(--brand-text-bright) !important; }
+.dashboard-light .hover\:text-zinc-200:hover { color: var(--brand-text-bright) !important; }
+.dashboard-light .hover\:text-zinc-300:hover { color: #1e293b !important; }
+.dashboard-light .hover\:text-zinc-400:hover { color: var(--brand-text) !important; }
+.dashboard-light .hover\:text-zinc-500:hover { color: var(--brand-text-muted) !important; }
 .dashboard-light .hover\:text-teal-300:hover { color: #0d9488 !important; }
 .dashboard-light .hover\:text-blue-300:hover { color: #2563eb !important; }
 .dashboard-light .hover\:text-emerald-300:hover { color: #047857 !important; }
