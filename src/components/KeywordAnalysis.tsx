@@ -106,7 +106,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
       // Fetch actual published page HTML for content analysis
       let pageContent = '';
       try {
-        const pagePath = page.publishedPath || (page.slug ? `/${page.slug}` : '');
+        const pagePath = (page.slug || page.publishedPath) ? resolvePagePath(page) : '';
         if (pagePath) {
           const result = await get<{ text?: string }>(`/api/webflow/page-html/${siteId}?path=${encodeURIComponent(pagePath)}`);
           pageContent = result.text || '';

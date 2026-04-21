@@ -573,7 +573,7 @@ export async function assembleAdminContext(
           if (pageContext) {
             const targetSlug = pageContext.url.replace(/^https?:\/\/[^/]+/, '');
             const pageAudit = pages?.find((p) => {
-              const pSlug = p.slug?.startsWith('/') ? p.slug : `/${p.slug}`;
+              const pSlug = resolvePagePath(p);
               return pSlug.toLowerCase() === targetSlug.toLowerCase() || pSlug.toLowerCase() === `${targetSlug}/`.toLowerCase() || targetSlug.toLowerCase().endsWith(pSlug.toLowerCase());
             });
             if (pageAudit) {

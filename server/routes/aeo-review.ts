@@ -147,7 +147,7 @@ router.post('/api/aeo-review/:workspaceId/site', requireWorkspaceAccess('workspa
       // Fallback: use audit snapshot pages
       if (snapshot) {
         for (const p of snapshot.audit.pages) {
-          allPageUrls.push({ url: p.url || `${baseUrl}/${p.slug}`, slug: p.slug, name: p.page });
+          allPageUrls.push({ url: p.url || `${baseUrl}${resolvePagePath(p)}`, slug: p.slug, name: p.page });
         }
       }
     }

@@ -1258,7 +1258,7 @@ router.post('/api/seo/:workspaceId/bulk-analyze', requireWorkspaceAccess('worksp
         try {
           // Fetch page HTML for content (best-effort)
           let pageContent = '';
-          if (baseUrl) {
+          if (baseUrl && (page.slug || page.publishedPath)) {
             try {
               const htmlRes = await fetch(`${baseUrl}${resolvePagePath(page)}`, {
                 redirect: 'follow',
@@ -1526,7 +1526,7 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', requireWorkspaceAccess('worksp
         const batchResults = await Promise.allSettled(batch.map(async (page: { pageId: string; title: string; slug?: string; publishedPath?: string | null; currentSeoTitle?: string; currentDescription?: string }) => {
           if (isJobCancelled(job.id)) return null;
 
-          const rwPagePath = resolvePagePath(page) || undefined;
+          const rwPagePath = (page.slug || page.publishedPath) ? resolvePagePath(page) : undefined;
           const rwSeo = wsRwSeo ? { ...wsRwSeo } : undefined;
           if (rwSeo && rwPagePath && rwSeo.strategy?.pageMap?.length) {
             const kw = rwSeo.strategy.pageMap.find(p => p.pagePath.toLowerCase() === rwPagePath.toLowerCase());
@@ -1539,7 +1539,7 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', requireWorkspaceAccess('worksp
 
           // Fetch page content (best-effort)
           let contentExcerpt = '';
-          if (baseUrl) {
+          if (baseUrl && (page.slug || page.publishedPath)) {
             try {
               const htmlRes = await fetch(`${baseUrl}${resolvePagePath(page)}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
               if (htmlRes.ok) {
@@ -1552,7 +1552,7 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', requireWorkspaceAccess('worksp
           // Match GSC queries to this page
           let gscBlock = '';
           let ctrFlag = '';
-          if (allGscData.length > 0) {
+          if (allGscData.length > 0 && (page.slug || page.publishedPath)) {
             const resolved = resolvePagePath(page);
             const pageQueries = allGscData
               .filter(r => {
