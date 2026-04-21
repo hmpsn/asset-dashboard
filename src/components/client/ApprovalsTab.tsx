@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   ClipboardCheck, Check, CheckCircle2, Edit3, X, ChevronDown, ChevronRight, Loader2,
 } from 'lucide-react';
-import { TierGate, EmptyState, LoadingState, type Tier } from '../ui';
+import { TierGate, EmptyState, LoadingState, ConfirmDialog, type Tier } from '../ui';
 import { StatusBadge } from '../ui/StatusBadge';
 import { usePageEditStates } from '../../hooks/usePageEditStates';
 import type { ApprovalBatch, ApprovalItem } from './types';
@@ -31,7 +31,27 @@ export function ApprovalsTab({
   const [rejectingItem, setRejectingItem] = useState<string | null>(null);
   const [rejectDraft, setRejectDraft] = useState('');
   const [collapsedPages, setCollapsedPages] = useState<Set<string>>(new Set());
+  const [confirmState, setConfirmState] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    action: (() => Promise<void>) | null;
+  }>({ open: false, title: '', message: '', action: null });
   const { getState } = usePageEditStates(workspaceId, true);
+
+  const openConfirm = (title: string, message: string, action: () => Promise<void>) => {
+    setConfirmState({ open: true, title, message, action });
+  };
+
+  const handleConfirm = async () => {
+    const action = confirmState.action;
+    setConfirmState(s => ({ ...s, open: false, action: null }));
+    if (action) await action();
+  };
+
+  const handleCancel = () => {
+    setConfirmState(s => ({ ...s, open: false, action: null }));
+  };
 
   const togglePage = (key: string) => setCollapsedPages(prev => {
     const next = new Set(prev);
@@ -39,21 +59,31 @@ export function ApprovalsTab({
     return next;
   });
 
-  const approveAllInBatch = async (batch: ApprovalBatch) => {
+  const approveAllInBatch = (batch: ApprovalBatch) => {
     const pending = batch.items.filter(i => i.status === 'pending');
-    if (!window.confirm(`Approve all ${pending.length} pending change${pending.length !== 1 ? 's' : ''} in "${batch.name}"?`)) return;
-    for (const item of pending) {
-      await updateApprovalItem(batch.id, item.id, { status: 'approved' });
-    }
-    setToast({ message: `Approved ${pending.length} change${pending.length !== 1 ? 's' : ''}`, type: 'success' });
+    openConfirm(
+      'Approve all changes',
+      `Approve all ${pending.length} pending change${pending.length !== 1 ? 's' : ''} in "${batch.name}"?`,
+      async () => {
+        for (const item of pending) {
+          await updateApprovalItem(batch.id, item.id, { status: 'approved' });
+        }
+        setToast({ message: `Approved ${pending.length} change${pending.length !== 1 ? 's' : ''}`, type: 'success' });
+      }
+    );
   };
 
-  const approveAllForPage = async (batchId: string, items: ApprovalItem[]) => {
+  const approveAllForPage = (batchId: string, items: ApprovalItem[]) => {
     const pending = items.filter(i => i.status === 'pending');
-    if (!window.confirm(`Approve all ${pending.length} pending change${pending.length !== 1 ? 's' : ''} for this page?`)) return;
-    for (const item of pending) {
-      await updateApprovalItem(batchId, item.id, { status: 'approved' });
-    }
+    openConfirm(
+      'Approve page changes',
+      `Approve all ${pending.length} pending change${pending.length !== 1 ? 's' : ''} for this page?`,
+      async () => {
+        for (const item of pending) {
+          await updateApprovalItem(batchId, item.id, { status: 'approved' });
+        }
+      }
+    );
   };
 
   const updateApprovalItem = async (batchId: string, itemId: string, update: { status?: string; clientValue?: string; clientNote?: string }) => {
@@ -67,16 +97,22 @@ export function ApprovalsTab({
     setEditDraft('');
   };
 
-  const applyApprovedBatch = async (batchId: string) => {
-    if (!window.confirm('This will update your live website with the approved changes. Continue?')) return;
-    setApplyingBatch(batchId);
-    try {
-      const data = await post<{ applied: number }>(`/api/public/approvals/${workspaceId}/${batchId}/apply`);
-      if (data.applied > 0) {
-        loadApprovals(workspaceId);
+  const applyApprovedBatch = (batchId: string) => {
+    openConfirm(
+      'Apply to live site?',
+      'This will update your live website with the approved changes. This cannot be undone from the dashboard.',
+      async () => {
+        setApplyingBatch(batchId);
+        try {
+          const data = await post<{ applied: number }>(`/api/public/approvals/${workspaceId}/${batchId}/apply`);
+          if (data.applied > 0) {
+            setToast({ message: `${data.applied} change${data.applied !== 1 ? 's' : ''} applied to your website`, type: 'success' });
+          }
+          loadApprovals(workspaceId);
+        } catch { setToast({ message: 'Failed to apply changes. Please try again.', type: 'error' }); }
+        finally { setApplyingBatch(null); }
       }
-    } catch { setToast({ message: 'Failed to apply changes. Please try again.', type: 'error' }); }
-    setApplyingBatch(null);
+    );
   };
 
   function findPageKeywords(pageSlug: string) {
@@ -446,6 +482,14 @@ export function ApprovalsTab({
           </div>
         );
       })}
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        confirmLabel="Confirm"
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </div>
   );
 }
