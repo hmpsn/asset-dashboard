@@ -8,6 +8,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { PageHeader, SectionCard, Badge, StatCard } from './ui';
 import { roadmap as roadmapApi } from '../api/misc';
+import { queryKeys } from '../lib/queryKeys';
 import { chartGridColor, chartDotFill } from './ui/constants';
 
 /* ── Roadmap data types (from shared types) ── */
@@ -133,7 +134,7 @@ export function Roadmap() {
   const [expanded, setExpanded] = useState<string | null>('sprint-1');
   const queryClient = useQueryClient();
   const { data: roadmap = [], isLoading: loading } = useQuery({
-    queryKey: ['admin-roadmap'],
+    queryKey: queryKeys.admin.roadmap(),
     queryFn: async () => {
       const data = await roadmapApi.get();
       const d = data as { sprints?: SprintData[] };
@@ -145,7 +146,7 @@ export function Roadmap() {
   const toggleStatus = async (itemId: number) => {
     const statusCycle: Array<'pending' | 'in_progress' | 'done'> = ['pending', 'in_progress', 'done'];
     let newStatus: 'pending' | 'in_progress' | 'done' = 'pending';
-    queryClient.setQueryData(['admin-roadmap'], (prev: SprintData[] = []) => {
+    queryClient.setQueryData(queryKeys.admin.roadmap(), (prev: SprintData[] = []) => {
       return prev.map(sprint => ({
         ...sprint,
         items: sprint.items.map(item => {

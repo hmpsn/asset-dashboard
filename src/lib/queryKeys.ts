@@ -130,6 +130,7 @@ export const queryKeys = {
     clientSignals: (wsId: string) => ['admin-client-signals', wsId] as const,
     notifications: () => ['admin-notifications'] as const,
     featureFlags: () => ['admin-feature-flags'] as const,
+    roadmap: () => ['admin-roadmap'] as const,
   },
 
   // ── Client ────────────────────────────────────────────────────────
