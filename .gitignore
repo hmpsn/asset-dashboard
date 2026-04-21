@@ -28,6 +28,7 @@ dist-ssr
 *.sln
 *.sw?
 .superpowers/
+.claude/scheduled_tasks.lock
 
 # Coverage reports
 coverage/
