@@ -193,9 +193,14 @@ async function runScheduledAudit(schedule: AuditSchedule) {
 
         const baseScore = pageIssues.some(i => i.severity === 'error') ? 80 : 50;
 
-        // Preserve cross-bridge score adjustments (e.g. anomaly boosts) written into the
-        // existing insight's data — upsertInsight replaces `data` on conflict, so we must
-        // carry forward any _scoreAdjustments before the re-upsert clobbers them.
+        // Base-score setter pattern — NOT applyScoreAdjustment().
+        // This bridge owns the raw audit-derived base score. It carries forward
+        // _scoreAdjustments written by other bridges (e.g. anomaly boosts) and rebases
+        // _originalBaseScore on each audit run (correct: the base genuinely changes).
+        // Unlike applyScoreAdjustment() which adds a named delta, this sets the base
+        // and applies stored deltas on top. Mirror: Bridge #15. If the delta math changes,
+        // replicate in both bridges. upsertInsight replaces `data` on conflict, so we
+        // must read-before-write to avoid clobbering cross-bridge adjustments.
         const existing = getInsight(ws.id, page.pageId, 'audit_finding');
         const prevAdj = existing?.data._scoreAdjustments as Record<string, number> | undefined;
         const totalDelta = prevAdj
@@ -236,7 +241,7 @@ async function runScheduledAudit(schedule: AuditSchedule) {
       if (totalIssues > 0 && score < 70) {
         const baseScore = Math.max(0, 100 - score);
 
-        // Preserve cross-bridge score adjustments — same pattern as Bridge #12.
+        // Base-score setter pattern — same as Bridge #12 (see comment there). Mirror: Bridge #12.
         const existing = getInsight(ws.id, null, 'audit_finding');
         const prevAdj = existing?.data._scoreAdjustments as Record<string, number> | undefined;
         const totalDelta = prevAdj

@@ -63,7 +63,7 @@ async function dirSizeAsync(dirPath: string): Promise<{ bytes: number; files: nu
   let bytes = 0;
   let files = 0;
   try {
-    await fs.promises.access(dirPath);
+    await fs.promises.stat(dirPath); // mirrors existsSync: checks existence only, not permissions
     const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
     for (const entry of entries) {
       const full = path.join(dirPath, entry.name);
