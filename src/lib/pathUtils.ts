@@ -14,9 +14,35 @@ export function matchPagePath(a: string, b: string): boolean {
   return normalizePath(a).toLowerCase() === normalizePath(b).toLowerCase();
 }
 
+/** Find a pageMap entry by path (exact match with normalization, case-insensitive) */
+export function findPageMapEntry<T extends { pagePath: string }>(pageMap: T[], path: string): T | undefined {
+  const norm = normalizePath(path).toLowerCase();
+  return pageMap.find(p => normalizePath(p.pagePath).toLowerCase() === norm);
+}
+
 /** Resolve a Webflow page's canonical path from publishedPath or slug */
 export function resolvePagePath(page: { publishedPath?: string | null; slug?: string }): string {
   return page.publishedPath || (page.slug ? `/${page.slug}` : '/');
+}
+
+/**
+ * Find a pageMap entry for a given Webflow page, with backward-compat fallback.
+ * Mirrors `server/helpers.ts:findPageMapEntryForPage`.
+ *
+ * Tries the resolved path first (`publishedPath` or `/${slug}`). If no match AND
+ * the page has both a slug and a publishedPath, falls back to `/${slug}` to catch
+ * legacy pageMap entries stored before the slug-path hardening migration.
+ */
+export function findPageMapEntryForPage<T extends { pagePath: string }>(
+  pageMap: T[],
+  page: { publishedPath?: string | null; slug?: string },
+): T | undefined {
+  const primary = findPageMapEntry(pageMap, resolvePagePath(page));
+  if (primary) return primary;
+  if (page.slug && page.publishedPath && page.publishedPath !== `/${page.slug}`) {
+    return findPageMapEntry(pageMap, `/${page.slug}`);
+  }
+  return undefined;
 }
 
 /**

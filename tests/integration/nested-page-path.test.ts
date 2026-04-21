@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { matchPagePath, resolvePagePath, tryResolvePagePath } from '../../src/lib/pathUtils.js';
-import { matchGscUrlToPath, resolvePagePath as serverResolvePagePath, tryResolvePagePath as serverTryResolvePagePath } from '../../server/helpers.js';
+import { matchPagePath, resolvePagePath, tryResolvePagePath, findPageMapEntry, findPageMapEntryForPage } from '../../src/lib/pathUtils.js';
+import {
+  matchGscUrlToPath,
+  resolvePagePath as serverResolvePagePath,
+  tryResolvePagePath as serverTryResolvePagePath,
+  findPageMapEntry as serverFindPageMapEntry,
+  findPageMapEntryForPage as serverFindPageMapEntryForPage,
+} from '../../server/helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { upsertPageKeyword, getPageKeyword } from '../../server/page-keywords.js';
 
@@ -133,6 +139,103 @@ describe('matchGscUrlToPath', () => {
   it('is case-insensitive at the path level? (case-sensitive per current contract)', () => {
     // Current contract: case-sensitive. Documenting, not enforcing a change.
     expect(matchGscUrlToPath('https://example.com/Services/SEO', '/services/seo')).toBe(false);
+  });
+});
+
+describe('findPageMapEntry — case-insensitive exact match', () => {
+  const pageMap = [
+    { pagePath: '/services/seo', pageTitle: 'SEO' },
+    { pagePath: '/About', pageTitle: 'About' },
+    { pagePath: '/', pageTitle: 'Home' },
+  ];
+
+  it('matches exact path', () => {
+    expect(findPageMapEntry(pageMap, '/services/seo')?.pageTitle).toBe('SEO');
+  });
+
+  it('matches case-insensitively (lookup upper, stored lower)', () => {
+    expect(findPageMapEntry(pageMap, '/Services/SEO')?.pageTitle).toBe('SEO');
+  });
+
+  it('matches case-insensitively (lookup lower, stored upper)', () => {
+    expect(findPageMapEntry(pageMap, '/about')?.pageTitle).toBe('About');
+  });
+
+  it('matches homepage', () => {
+    expect(findPageMapEntry(pageMap, '/')?.pageTitle).toBe('Home');
+  });
+
+  it('normalizes trailing slash', () => {
+    expect(findPageMapEntry(pageMap, '/services/seo/')?.pageTitle).toBe('SEO');
+  });
+
+  it('returns undefined when no match', () => {
+    expect(findPageMapEntry(pageMap, '/nope')).toBeUndefined();
+  });
+
+  it('frontend and backend implementations agree', () => {
+    const cases = ['/services/seo', '/Services/SEO', '/about', '/ABOUT', '/', '/services/seo/', '/nope'];
+    for (const c of cases) {
+      expect(findPageMapEntry(pageMap, c)?.pageTitle).toBe(serverFindPageMapEntry(pageMap, c)?.pageTitle);
+    }
+  });
+});
+
+describe('findPageMapEntryForPage — legacy /${slug} fallback', () => {
+  it('returns primary match via resolved path', () => {
+    const pageMap = [{ pagePath: '/services/seo', pageTitle: 'SEO' }];
+    const page = { slug: 'seo', publishedPath: '/services/seo' };
+    expect(findPageMapEntryForPage(pageMap, page)?.pageTitle).toBe('SEO');
+  });
+
+  it('falls back to /${slug} when resolved path misses (pre-hardening legacy entry)', () => {
+    // Legacy: entry stored under `/seo` before hardening; page now has publishedPath `/services/seo`
+    const pageMap = [{ pagePath: '/seo', pageTitle: 'SEO (legacy)' }];
+    const page = { slug: 'seo', publishedPath: '/services/seo' };
+    expect(findPageMapEntryForPage(pageMap, page)?.pageTitle).toBe('SEO (legacy)');
+  });
+
+  it('does NOT fall back when publishedPath === /${slug} (no legacy ambiguity)', () => {
+    const pageMap = [{ pagePath: '/about', pageTitle: 'About' }];
+    const page = { slug: 'about', publishedPath: '/about' };
+    expect(findPageMapEntryForPage(pageMap, page)?.pageTitle).toBe('About');
+  });
+
+  it('case-insensitive primary match', () => {
+    const pageMap = [{ pagePath: '/Services/SEO', pageTitle: 'SEO' }];
+    const page = { slug: 'seo', publishedPath: '/services/seo' };
+    expect(findPageMapEntryForPage(pageMap, page)?.pageTitle).toBe('SEO');
+  });
+
+  it('case-insensitive legacy fallback', () => {
+    const pageMap = [{ pagePath: '/SEO', pageTitle: 'SEO (legacy upper)' }];
+    const page = { slug: 'seo', publishedPath: '/services/seo' };
+    expect(findPageMapEntryForPage(pageMap, page)?.pageTitle).toBe('SEO (legacy upper)');
+  });
+
+  it('returns undefined when neither primary nor legacy path matches', () => {
+    const pageMap = [{ pagePath: '/contact', pageTitle: 'Contact' }];
+    const page = { slug: 'seo', publishedPath: '/services/seo' };
+    expect(findPageMapEntryForPage(pageMap, page)).toBeUndefined();
+  });
+
+  it('frontend and backend implementations agree', () => {
+    const pageMap = [
+      { pagePath: '/services/seo', pageTitle: 'SEO' },
+      { pagePath: '/seo', pageTitle: 'SEO (legacy)' },
+      { pagePath: '/Contact', pageTitle: 'Contact' },
+      { pagePath: '/', pageTitle: 'Home' },
+    ];
+    const cases = [
+      { slug: 'seo', publishedPath: '/services/seo' },
+      { slug: 'seo', publishedPath: '/SERVICES/seo' },
+      { slug: 'contact', publishedPath: '/contact' },
+      { slug: '', publishedPath: null },
+      { slug: 'nope' },
+    ];
+    for (const c of cases) {
+      expect(findPageMapEntryForPage(pageMap, c)?.pageTitle).toBe(serverFindPageMapEntryForPage(pageMap, c)?.pageTitle);
+    }
   });
 });
 

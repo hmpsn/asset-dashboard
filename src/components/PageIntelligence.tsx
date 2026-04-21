@@ -10,7 +10,7 @@ import { adminPath } from '../routes';
 import { scoreColorClass, scoreBgBarClass, MetricRing, TabBar, ErrorState, ProgressIndicator, NextStepsCard } from './ui';
 import { ErrorBoundary } from './ErrorBoundary';
 import { queryKeys } from '../lib/queryKeys';
-import { normalizePath, resolvePagePath } from '../lib/pathUtils';
+import { normalizePath, resolvePagePath, findPageMapEntryForPage } from '../lib/pathUtils';
 import { get, post } from '../api/client';
 import { keywords, rankTracking } from '../api/seo';
 import { useKeywordStrategy } from '../hooks/admin';
@@ -281,22 +281,17 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   }, [fixContext, allPages, strategy]);
 
   // ── Merge strategy data + all pages into unified list ──
+  // Matching uses `findPageMapEntryForPage` so it is case-insensitive AND includes
+  // the legacy `/${slug}` fallback — keeping this component aligned with SeoEditor
+  // and the backend. See `src/lib/pathUtils.ts` and `server/helpers.ts`.
   const unifiedPages: UnifiedPage[] = (() => {
     const pageMap = strategy?.pageMap || [];
     const result: UnifiedPage[] = [];
     const usedPaths = new Set<string>();
 
-    // Build a lookup map for strategy entries by normalized path
-    const strategyByPath = new Map<string, StrategyPage>();
-    for (const sp of pageMap) {
-      const norm = normalizePath(sp.pagePath);
-      if (!strategyByPath.has(norm)) strategyByPath.set(norm, sp);
-    }
-
-    // Start with all webflow pages, enriched with strategy data (exact match only)
     for (const page of allPages) {
       const pagePath = resolvePagePath(page);
-      const strategyMatch = strategyByPath.get(normalizePath(pagePath));
+      const strategyMatch = findPageMapEntryForPage(pageMap, page);
       result.push({
         id: page.id,
         title: strategyMatch?.pageTitle || page.title,
@@ -313,9 +308,8 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
     // Add any strategy pages that aren't in webflow pages (e.g., discovered via GSC)
     for (const sp of pageMap) {
       if (!usedPaths.has(sp.pagePath)) {
-        // Deduplicate: skip if a page with this normalized path already exists
-        const norm = normalizePath(sp.pagePath);
-        if (result.some(r => normalizePath(r.path) === norm)) continue;
+        const norm = normalizePath(sp.pagePath).toLowerCase();
+        if (result.some(r => normalizePath(r.path).toLowerCase() === norm)) continue;
         result.push({
           id: `strategy-${sp.pagePath}`,
           title: sp.pageTitle,
