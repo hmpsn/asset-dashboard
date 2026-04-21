@@ -69,7 +69,7 @@ router.post('/api/webflow/keyword-analysis', async (req, res) => {
 Page title: ${pageTitle}
 SEO title: ${seoTitle || '(same as page title)'}
 Meta description: ${metaDescription || '(none)'}
-URL slug: /${slug || ''}
+URL slug: ${slug ? (slug.startsWith('/') ? slug : `/${slug}`) : '/'}
 Site context: ${siteContext || 'N/A'}
 Page content excerpt: ${pageContent ? pageContent.slice(0, 3000) : 'N/A'}${fullContext}${kwMapContext}${kwBlock}
 

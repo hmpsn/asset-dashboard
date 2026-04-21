@@ -573,9 +573,9 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery
 
       // Fetch page content if not provided and we have a base URL
       let contentExcerpt = page.pageContent || '';
-      if (!contentExcerpt && baseUrl && page.slug) {
+      if (!contentExcerpt && baseUrl) {
         try {
-          const htmlRes = await fetch(`${baseUrl}/${page.slug}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
+          const htmlRes = await fetch(`${baseUrl}${resolvePagePath(page)}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
           if (htmlRes.ok) {
             const html = await htmlRes.text();
             contentExcerpt = stripHtmlToText(html, { maxLength: 800 });
@@ -783,9 +783,9 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
 
       // Fetch page content for context (best-effort)
       let contentExcerpt = '';
-      if (baseUrl && page.slug) {
+      if (baseUrl) {
         try {
-          const htmlRes = await fetch(`${baseUrl}/${page.slug}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
+          const htmlRes = await fetch(`${baseUrl}${resolvePagePath(page)}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
           if (htmlRes.ok) {
             const html = await htmlRes.text();
             contentExcerpt = stripHtmlToText(html, { maxLength: 800 });
@@ -797,15 +797,13 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
       let gscBlock = '';
       let ctrFlag = '';
       if (allGscData.length > 0) {
+        const resolved = resolvePagePath(page);
         const pageQueries = allGscData
           .filter(r => {
-            const resolved = resolvePagePath(page);
             let rPath: string;
             try { rPath = new URL(r.page).pathname; } catch { rPath = r.page; }
             rPath = rPath.startsWith('/') ? rPath : `/${rPath}`;
-            return resolved === '/'
-              ? rPath === '/' || rPath === ''
-              : rPath === resolved || rPath.startsWith(resolved + '/');
+            return resolved === '/' ? rPath === '/' || rPath === '' : rPath === resolved;
           })
           .sort((a, b) => b.impressions - a.impressions)
           .slice(0, 15);
@@ -1208,6 +1206,7 @@ const bulkAnalyzeSchema = z.object({
     pageId: z.string().min(1),
     title: z.string(),
     slug: z.string().optional(),
+    publishedPath: z.string().nullable().optional(),
     seoTitle: z.string().optional(),
     seoDescription: z.string().optional(),
   })).min(1).max(500),
@@ -1259,9 +1258,9 @@ router.post('/api/seo/:workspaceId/bulk-analyze', requireWorkspaceAccess('worksp
         try {
           // Fetch page HTML for content (best-effort)
           let pageContent = '';
-          if (baseUrl && page.slug) {
+          if (baseUrl) {
             try {
-              const htmlRes = await fetch(`${baseUrl}/${page.slug}`, {
+              const htmlRes = await fetch(`${baseUrl}${resolvePagePath(page)}`, {
                 redirect: 'follow',
                 headers: { 'User-Agent': 'Mozilla/5.0 (compatible; HmpsnStudioBot/1.0)' },
                 signal: AbortSignal.timeout(10_000),
@@ -1281,7 +1280,7 @@ router.post('/api/seo/:workspaceId/bulk-analyze', requireWorkspaceAccess('worksp
 Page title: ${page.title}
 SEO title: ${effectiveTitle || '(same as page title)'}
 Meta description: ${effectiveMeta || '(none)'}
-URL slug: /${page.slug || ''}
+URL slug: ${resolvePagePath(page)}
 Page content excerpt: ${pageContent ? pageContent.slice(0, 3000) : 'N/A'}${fullContext}${kwMapCtx}
 
 Provide your analysis as a JSON object:
@@ -1448,6 +1447,7 @@ const bulkRewriteSchema = z.object({
     pageId: z.string().min(1),
     title: z.string(),
     slug: z.string().optional(),
+    publishedPath: z.string().nullable().optional(),
     currentSeoTitle: z.string().optional(),
     currentDescription: z.string().optional(),
   })).min(1).max(500),
@@ -1539,9 +1539,9 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', requireWorkspaceAccess('worksp
 
           // Fetch page content (best-effort)
           let contentExcerpt = '';
-          if (baseUrl && page.slug) {
+          if (baseUrl) {
             try {
-              const htmlRes = await fetch(`${baseUrl}/${page.slug}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
+              const htmlRes = await fetch(`${baseUrl}${resolvePagePath(page)}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
               if (htmlRes.ok) {
                 const html = await htmlRes.text();
                 contentExcerpt = stripHtmlToText(html, { maxLength: 800 });
@@ -1553,15 +1553,13 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', requireWorkspaceAccess('worksp
           let gscBlock = '';
           let ctrFlag = '';
           if (allGscData.length > 0) {
+            const resolved = resolvePagePath(page);
             const pageQueries = allGscData
               .filter(r => {
-                const resolved = resolvePagePath(page);
                 let rPath: string;
                 try { rPath = new URL(r.page).pathname; } catch { rPath = r.page; }
                 rPath = rPath.startsWith('/') ? rPath : `/${rPath}`;
-                return resolved === '/'
-                  ? rPath === '/' || rPath === ''
-                  : rPath === resolved || rPath.startsWith(resolved + '/');
+                return resolved === '/' ? rPath === '/' || rPath === '' : rPath === resolved;
               })
               .sort((a, b) => b.impressions - a.impressions)
               .slice(0, 15);

@@ -513,6 +513,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
           pageId: p.id,
           title: p.title,
           slug: p.slug,
+          publishedPath: p.publishedPath,
           seoTitle: edits[p.id]?.seoTitle || p.seo?.title || '',
           seoDescription: edits[p.id]?.seoDescription || p.seo?.description || '',
         })),
@@ -643,6 +644,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
             pageId: id,
             title: page?.title || '',
             slug: page?.slug,
+            publishedPath: page?.publishedPath,
             currentSeoTitle: edit?.seoTitle || page?.seo?.title || '',
             currentDescription: edit?.seoDescription || page?.seo?.description || '',
           };
