@@ -146,7 +146,7 @@ export function ClientAuthGate({
   );
 
   return (
-    <div className="min-h-screen bg-[#0f1219] flex items-center justify-center">
+    <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
       <div className="w-full max-w-sm">
         <div className="bg-zinc-900 border border-zinc-800 p-8 shadow-2xl shadow-black/40" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <div className="flex flex-col items-center mb-6">

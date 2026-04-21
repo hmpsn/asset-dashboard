@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   ClipboardCheck, Check, CheckCircle2, Edit3, X, ChevronDown, ChevronRight, Loader2,
 } from 'lucide-react';
-import { TierGate, EmptyState, LoadingState, type Tier } from '../ui';
+import { TierGate, EmptyState, LoadingState, ConfirmDialog, type Tier } from '../ui';
 import { StatusBadge } from '../ui/StatusBadge';
 import { usePageEditStates } from '../../hooks/usePageEditStates';
 import type { ApprovalBatch, ApprovalItem } from './types';
 import type { ApprovalPageKeyword } from '../../hooks/useClientData';
 import { patch, post } from '../../api/client';
+
+type FilterState = 'all' | 'needs-action' | 'ready' | 'applied';
 
 interface ApprovalsTabProps {
   workspaceId: string;
@@ -31,7 +33,65 @@ export function ApprovalsTab({
   const [rejectingItem, setRejectingItem] = useState<string | null>(null);
   const [rejectDraft, setRejectDraft] = useState('');
   const [collapsedPages, setCollapsedPages] = useState<Set<string>>(new Set());
+  const [confirmState, setConfirmState] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+  }>({ open: false, title: '', message: '' });
+  // Action lives in a ref so handleConfirm/handleCancel can be stable useCallback references,
+  // preventing ConfirmDialog's keydown useEffect from re-attaching on every parent render.
+  const actionRef = useRef<(() => Promise<void>) | null>(null);
+  // Fresh ref to approvalBatches so async confirm callbacks re-derive pending items at
+  // confirm time rather than closing over a stale snapshot from when the dialog opened.
+  const approvalBatchesRef = useRef(approvalBatches);
+  useEffect(() => { approvalBatchesRef.current = approvalBatches; }, [approvalBatches]);
   const { getState } = usePageEditStates(workspaceId, true);
+
+  const openConfirm = (title: string, message: string, action: () => Promise<void>) => {
+    actionRef.current = action;
+    setConfirmState({ open: true, title, message });
+  };
+
+  const handleConfirm = useCallback(async () => {
+    const action = actionRef.current;
+    actionRef.current = null;
+    setConfirmState(s => ({ ...s, open: false }));
+    if (action) {
+      try { await action(); }
+      catch { setToast({ message: 'Something went wrong. Please try again.', type: 'error' }); }
+    }
+  }, [setToast]);
+
+  const handleCancel = useCallback(() => {
+    actionRef.current = null;
+    setConfirmState(s => ({ ...s, open: false }));
+  }, []);
+
+  const [batchFilter, setBatchFilter] = useState<FilterState>('all');
+
+  const needsActionCount = approvalBatches.filter(b =>
+    b.items.some(i => i.status === 'pending' || !i.status)
+  ).length;
+
+  // "ready" = all decisions made (no pending), has approvals, not yet fully applied
+  const isReady = (b: ApprovalBatch) =>
+    b.items.length > 0 &&
+    !b.items.some(i => i.status === 'pending' || !i.status) &&
+    b.items.some(i => i.status === 'approved') &&
+    !b.items.every(i => i.status === 'applied');
+
+  const readyCount = approvalBatches.filter(isReady).length;
+
+  const appliedCount = approvalBatches.filter(b =>
+    b.items.length > 0 && b.items.every(i => i.status === 'applied')
+  ).length;
+
+  const filteredBatches = approvalBatches.filter(batch => {
+    if (batchFilter === 'needs-action') return batch.items.some(i => i.status === 'pending' || !i.status);
+    if (batchFilter === 'ready') return isReady(batch);
+    if (batchFilter === 'applied') return batch.items.length > 0 && batch.items.every(i => i.status === 'applied');
+    return true;
+  });
 
   const togglePage = (key: string) => setCollapsedPages(prev => {
     const next = new Set(prev);
@@ -39,21 +99,39 @@ export function ApprovalsTab({
     return next;
   });
 
-  const approveAllInBatch = async (batch: ApprovalBatch) => {
-    const pending = batch.items.filter(i => i.status === 'pending');
-    if (!window.confirm(`Approve all ${pending.length} pending change${pending.length !== 1 ? 's' : ''} in "${batch.name}"?`)) return;
-    for (const item of pending) {
-      await updateApprovalItem(batch.id, item.id, { status: 'approved' });
-    }
-    setToast({ message: `Approved ${pending.length} change${pending.length !== 1 ? 's' : ''}`, type: 'success' });
+  const approveAllInBatch = (batch: ApprovalBatch) => {
+    const batchId = batch.id;
+    const batchName = batch.name;
+    const pendingCount = batch.items.filter(i => i.status === 'pending').length;
+    openConfirm(
+      'Approve all changes',
+      `Approve all ${pendingCount} pending change${pendingCount !== 1 ? 's' : ''} in "${batchName}"?`,
+      async () => {
+        const freshBatch = approvalBatchesRef.current.find(b => b.id === batchId);
+        const pending = freshBatch?.items.filter(i => i.status === 'pending') ?? [];
+        for (const item of pending) {
+          await updateApprovalItem(batchId, item.id, { status: 'approved' });
+        }
+        setToast({ message: `Approved ${pending.length} change${pending.length !== 1 ? 's' : ''}`, type: 'success' });
+      }
+    );
   };
 
-  const approveAllForPage = async (batchId: string, items: ApprovalItem[]) => {
-    const pending = items.filter(i => i.status === 'pending');
-    if (!window.confirm(`Approve all ${pending.length} pending change${pending.length !== 1 ? 's' : ''} for this page?`)) return;
-    for (const item of pending) {
-      await updateApprovalItem(batchId, item.id, { status: 'approved' });
-    }
+  const approveAllForPage = (batchId: string, items: ApprovalItem[]) => {
+    const pageId = items[0]?.pageId;
+    const pendingCount = items.filter(i => i.status === 'pending').length;
+    openConfirm(
+      'Approve page changes',
+      `Approve all ${pendingCount} pending change${pendingCount !== 1 ? 's' : ''} for this page?`,
+      async () => {
+        const freshBatch = approvalBatchesRef.current.find(b => b.id === batchId);
+        const pending = freshBatch?.items.filter(i => i.status === 'pending' && i.pageId === pageId) ?? [];
+        for (const item of pending) {
+          await updateApprovalItem(batchId, item.id, { status: 'approved' });
+        }
+        setToast({ message: `Approved ${pending.length} change${pending.length !== 1 ? 's' : ''}`, type: 'success' });
+      }
+    );
   };
 
   const updateApprovalItem = async (batchId: string, itemId: string, update: { status?: string; clientValue?: string; clientNote?: string }) => {
@@ -67,16 +145,22 @@ export function ApprovalsTab({
     setEditDraft('');
   };
 
-  const applyApprovedBatch = async (batchId: string) => {
-    if (!window.confirm('This will update your live website with the approved changes. Continue?')) return;
-    setApplyingBatch(batchId);
-    try {
-      const data = await post<{ applied: number }>(`/api/public/approvals/${workspaceId}/${batchId}/apply`);
-      if (data.applied > 0) {
-        loadApprovals(workspaceId);
+  const applyApprovedBatch = (batchId: string) => {
+    openConfirm(
+      'Apply to live site?',
+      'This will update your live website with the approved changes. This cannot be undone from the dashboard.',
+      async () => {
+        setApplyingBatch(batchId);
+        try {
+          const data = await post<{ applied: number }>(`/api/public/approvals/${workspaceId}/${batchId}/apply`);
+          if (data.applied > 0) {
+            setToast({ message: `${data.applied} change${data.applied !== 1 ? 's' : ''} applied to your website`, type: 'success' });
+          }
+          loadApprovals(workspaceId);
+        } catch { setToast({ message: 'Failed to apply changes. Please try again.', type: 'error' }); }
+        finally { setApplyingBatch(null); }
       }
-    } catch { setToast({ message: 'Failed to apply changes. Please try again.', type: 'error' }); }
-    setApplyingBatch(null);
+    );
   };
 
   function findPageKeywords(pageSlug: string) {
@@ -112,7 +196,40 @@ export function ApprovalsTab({
         <EmptyState icon={ClipboardCheck} title="No pending approvals" description="Your agency will send SEO changes here for your review." />
       )}
 
-      {approvalBatches.map(batch => {
+      {/* Filter bar */}
+      {approvalBatches.length > 0 && (
+        <div className="flex items-center gap-2 pb-4 border-b border-zinc-800 flex-wrap">
+          {(
+            [
+              { id: 'all', label: 'All', count: approvalBatches.length },
+              { id: 'needs-action', label: 'Needs Action', count: needsActionCount },
+              { id: 'ready', label: 'Ready to Apply', count: readyCount },
+              { id: 'applied', label: 'Applied', count: appliedCount },
+            ] as { id: FilterState; label: string; count: number }[]
+          ).map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setBatchFilter(tab.id)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                batchFilter === tab.id
+                  ? 'text-teal-400 bg-teal-500/10 border border-teal-500/20'
+                  : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 border border-transparent'
+              }`}
+            >
+              {tab.label}
+              {tab.count > 0 && (
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                  batchFilter === tab.id ? 'bg-teal-500/20 text-teal-300' : 'bg-zinc-700 text-zinc-400'
+                }`}>
+                  {tab.count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {filteredBatches.map(batch => {
         const batchPending = batch.items.filter(i => i.status === 'pending').length;
         const batchApproved = batch.items.filter(i => i.status === 'approved').length;
         const batchApplied = batch.items.filter(i => i.status === 'applied').length;
@@ -230,7 +347,7 @@ export function ApprovalsTab({
                                           {kw.primaryKeyword}
                                         </span>
                                         {kw.secondaryKeywords?.slice(0, 2).map(kw2 => (
-                                          <span key={kw2} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-700/60 border border-zinc-600/50 text-zinc-400">
+                                          <span key={kw2} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-700/60 border border-zinc-600 text-zinc-400">
                                             {kw2}
                                           </span>
                                         ))}
@@ -446,6 +563,14 @@ export function ApprovalsTab({
           </div>
         );
       })}
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        confirmLabel="Confirm"
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </div>
   );
 }

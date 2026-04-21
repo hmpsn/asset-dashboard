@@ -110,7 +110,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
     return (
       <button
         onClick={() => setOpen(true)}
-        className={`fixed bottom-6 left-6 flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-zinc-800/90 hover:bg-zinc-700/90 border border-zinc-700/50 text-zinc-300 hover:text-zinc-100 text-xs font-medium shadow-lg transition-all z-40 backdrop-blur-sm ${chatExpanded ? 'sm:flex hidden' : ''}`}
+        className={`fixed bottom-6 left-6 flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-zinc-800 hover:bg-zinc-700 border border-zinc-700/50 text-zinc-300 hover:text-zinc-100 text-xs font-medium shadow-lg transition-all z-40 backdrop-blur-sm ${chatExpanded ? 'sm:flex hidden' : ''}`}
       >
         <MessageSquarePlus className="w-3.5 h-3.5" />
         Feedback
@@ -239,7 +239,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
                 <div key={item.id} className="bg-zinc-800/50 border border-zinc-800 overflow-hidden" style={{ borderRadius: '6px 12px 6px 12px' }}>
                   <button
                     onClick={() => setExpandedId(isExpanded ? null : item.id)}
-                    className="w-full flex items-start gap-2.5 px-3 py-2.5 text-left hover:bg-zinc-800/80 transition-colors"
+                    className="w-full flex items-start gap-2.5 px-3 py-2.5 text-left hover:bg-zinc-800/60 transition-colors"
                   >
                     <div className={`w-6 h-6 rounded-lg ${cfg.bg} flex items-center justify-center flex-shrink-0 mt-0.5`}>
                       <Icon className={`w-3 h-3 ${cfg.color}`} />
@@ -265,7 +265,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
                       {item.replies.length > 0 && (
                         <div className="mt-3 space-y-2">
                           {item.replies.map(reply => (
-                            <div key={reply.id} className={`rounded-lg px-2.5 py-2 ${reply.author === 'team' ? 'bg-teal-500/5 border border-teal-500/10' : 'bg-zinc-800/80 border border-zinc-700/50'}`}>
+                            <div key={reply.id} className={`rounded-lg px-2.5 py-2 ${reply.author === 'team' ? 'bg-teal-500/5 border border-teal-500/10' : 'bg-zinc-800/60 border border-zinc-700/50'}`}>
                               <div className="flex items-center gap-1.5 mb-1">
                                 <span className={`text-[9px] font-medium ${reply.author === 'team' ? 'text-teal-400' : 'text-zinc-400'}`}>
                                   {reply.author === 'team' ? 'Team' : 'You'}

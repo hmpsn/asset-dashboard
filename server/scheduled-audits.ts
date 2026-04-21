@@ -312,6 +312,7 @@ async function runScheduledAudit(schedule: AuditSchedule) {
 const runningAudits = new Set<string>();
 
 let checkInterval: ReturnType<typeof setInterval> | null = null;
+let startupTimeout: ReturnType<typeof setTimeout> | null = null;
 
 export function startScheduler() {
   if (checkInterval) return;
@@ -343,18 +344,21 @@ export function startScheduler() {
   };
 
   // Run check on startup after 30s delay, then every hour
-  setTimeout(() => {
+  startupTimeout = setTimeout(() => {
     checkDue().catch(err => log.error({ err }, 'Error'));
   }, 30000);
+  startupTimeout.unref?.();
 
   checkInterval = setInterval(() => {
     checkDue().catch(err => log.error({ err }, 'Error'));
   }, CHECK_MS);
+  checkInterval.unref?.();
 
   log.info('Audit scheduler started (checks every hour)');
 }
 
 export function stopScheduler() {
+  if (startupTimeout) { clearTimeout(startupTimeout); startupTimeout = null; }
   if (checkInterval) {
     clearInterval(checkInterval);
     checkInterval = null;

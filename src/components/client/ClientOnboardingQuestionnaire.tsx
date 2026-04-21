@@ -137,7 +137,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
     onComplete({ business, audience, brand, competitors });
   };
 
-  const inputCls = 'w-full bg-zinc-800/60 border border-zinc-700/60 rounded-xl px-3.5 py-2.5 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/20 transition-all';
+  const inputCls = 'w-full bg-zinc-800/60 border border-zinc-700/50 rounded-xl px-3.5 py-2.5 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/20 transition-all';
   const textareaCls = `${inputCls} resize-none`;
   const labelCls = 'block text-xs font-medium text-zinc-300 mb-1.5';
   const hintCls = 'text-[11px] text-zinc-500 mt-1';

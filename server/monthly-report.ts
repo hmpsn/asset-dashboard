@@ -21,6 +21,7 @@ const log = createLogger('auto-report');
 
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // check every 6 hours
 let reportInterval: ReturnType<typeof setInterval> | null = null;
+let startupTimeout: ReturnType<typeof setTimeout> | null = null;
 
 // ── Persist sent-report timestamps to disk (survives restarts/deploys) ──
 const SENT_FILE = path.join(getUploadRoot(), '.report-sent.json');
@@ -254,18 +255,21 @@ export function startMonthlyReports() {
   if (reportInterval) return;
 
   // Check after 5 min on startup (avoids re-send during rapid restart cycles), then every 6 hours
-  setTimeout(() => {
+  startupTimeout = setTimeout(() => {
     checkAndSendReports().catch(err => log.error({ err }, 'Error'));
   }, 5 * 60 * 1000);
+  startupTimeout.unref?.();
 
   reportInterval = setInterval(() => {
     checkAndSendReports().catch(err => log.error({ err }, 'Error'));
   }, CHECK_INTERVAL_MS);
+  reportInterval.unref?.();
 
   log.info('Report scheduler started (checks every 6 hours)');
 }
 
 export function stopMonthlyReports() {
+  if (startupTimeout) { clearTimeout(startupTimeout); startupTimeout = null; }
   if (reportInterval) {
     clearInterval(reportInterval);
     reportInterval = null;

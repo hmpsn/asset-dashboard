@@ -50,9 +50,16 @@ export function themeColor(dark: string, light: string): string {
   return isLightMode() ? light : dark;
 }
 
+/** Read a CSS custom property from the active theme element. Falls back to `fallback` in SSR or when the var is unset. */
+function getCssVar(name: string, fallback: string): string {
+  if (typeof document === 'undefined') return fallback;
+  const el = document.querySelector('.dashboard-light') ?? document.body;
+  return getComputedStyle(el).getPropertyValue(name).trim() || fallback;
+}
+
 /** Chart grid line color — subtle separator. */
 export function chartGridColor(): string {
-  return themeColor('#27272a', '#e2e8f0');
+  return getCssVar('--chart-grid', '#27272a');
 }
 
 /** Chart axis label fill — muted text on axes. */
@@ -72,9 +79,13 @@ export function chartDotFill(): string {
 
 /** Chart tooltip style — full contentStyle object for Recharts <Tooltip>. */
 export function chartTooltipStyle(): CSSProperties {
-  return isLightMode()
-    ? { backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '0.5rem', fontSize: '11px', color: '#1e293b' }
-    : { backgroundColor: '#18181b', border: '1px solid #3f3f46', borderRadius: '0.5rem', fontSize: '11px' };
+  return {
+    backgroundColor: getCssVar('--chart-tooltip-bg', '#18181b'),
+    border: `1px solid ${getCssVar('--brand-border-hover', '#3f3f46')}`,
+    borderRadius: '0.5rem',
+    fontSize: '11px',
+    color: getCssVar('--chart-tooltip-text', '#e4e4e7'),
+  };
 }
 
 /** Chart tooltip label style. */
