@@ -3682,3 +3682,16 @@ Current feature count: **310**. Last updated: April 2026.
 - **applyBulkKeywordGuards** — moved to `server/helpers.ts`; now also called in `webflow-seo.ts` bulk analyze path (BUG-0003: prevents AI-hallucinated keyword metrics from being persisted).
 - **GSC path-boundary matching** — replaced `.includes(page.slug)` substring matching with exact path + prefix matching in `webflow-seo.ts` (BUG-0004: eliminates false-positive query attribution).
 - **bare-slug-pagepath pr-check rule** — new rule flags any future `` `/${page.slug}` `` pagePath constructions across server and frontend files.
+
+---
+
+### 307. usePageJoin — Unified Page-Join Shared Hook
+**What it does:** Canonical React Query hook `usePageJoin(workspaceId, siteId)` that joins Webflow pages with keyword strategy data, returning `UnifiedPage[]`. Replaces 3 independent ad-hoc join implementations across SeoEditor, PageIntelligence, and ApprovalsTab. Unified shape: `{ id, title, path, slug, source, seo, publishedPath, strategy }`. Matching uses `findPageMapEntryForPage` for case-insensitive + legacy slug fallback consistency.
+
+**Agency value:** Eliminates join logic duplication. All three admin tools now reference the same shared join implementation — prevents future drift where one component adds a field or changes matching logic without updating the others. New admin components requiring page+strategy joins immediately get the right shape without hand-rolling.
+
+**Client value:** Indirect — more consistent behavior across admin tools means fewer surprises when using different surfaces to work on the same pages.
+
+**Mutual:** Consolidates a complex, error-prone operation into a single canonical location. Enforced by pr-check rule forbidding manual `pageMap.find()/strategyByPath` patterns outside the hook — all future page-join code routes through the shared hook.
+
+**Files:** `src/hooks/admin/usePageJoin.ts`, `shared/types/page-join.ts`

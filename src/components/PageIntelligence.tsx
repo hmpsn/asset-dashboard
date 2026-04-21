@@ -398,6 +398,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   const saveEdit = async (page: UnifiedPage) => {
     if (!strategy || !page.strategy) return;
     setSaving(true);
+    // page.strategy is a direct reference into strategy.pageMap — indexOf depends on object identity
     const pageIdx = (strategy.pageMap ?? []).indexOf(page.strategy);
     if (pageIdx === -1) { setSaving(false); return; }
     const updated = [...(strategy.pageMap ?? [])];
