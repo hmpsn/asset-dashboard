@@ -7,6 +7,7 @@ import {
 import { scoreColorClass, scoreBgBarClass, MetricRing } from './ui';
 import { get, post } from '../api/client';
 import { keywords } from '../api/seo';
+import { resolvePagePath } from '../lib/pathUtils';
 
 interface PageMeta {
   id: string;
@@ -136,7 +137,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
           try {
             await keywords.persistAnalysis({
               workspaceId,
-              pagePath: `/${page.slug || ''}`,
+              pagePath: resolvePagePath(page),
               analysis: {
                 primaryKeyword: kwData.primaryKeyword,
                 secondaryKeywords: kwData.secondaryKeywords,

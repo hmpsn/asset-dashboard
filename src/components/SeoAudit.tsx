@@ -35,6 +35,7 @@ import { CwvSummaryCard } from './audit/CwvSummaryCard';
 import { ScheduledAuditSettings } from './audit/ScheduledAuditSettings';
 import { BulkAcceptPanel } from './audit/BulkAcceptPanel';
 import { DeadLinkPanel } from './audit/DeadLinkPanel';
+import { resolvePagePath } from '../lib/pathUtils';
 
 // ── Lazy-loaded sub-tools ──
 const AeoReview = lazyWithRetry(() => import('./AeoReview'));
@@ -595,10 +596,8 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     })
     .sort((a, b) => {
       if (sortMode === 'traffic') {
-        const aSlug = `/${a.slug}`;
-        const bSlug = `/${b.slug}`;
-        const aT = trafficMap[aSlug];
-        const bT = trafficMap[bSlug];
+        const aT = trafficMap[resolvePagePath(a)];
+        const bT = trafficMap[resolvePagePath(b)];
         const aScore = (aT?.clicks || 0) + (aT?.pageviews || 0);
         const bScore = (bT?.clicks || 0) + (bT?.pageviews || 0);
         if (bScore !== aScore) return bScore - aScore;
@@ -842,7 +841,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
           const isExpanded = expanded.has(page.page);
           const errorCount = page.issues.filter(i => i.severity === 'error').length;
           const warningCount = page.issues.filter(i => i.severity === 'warning').length;
-          const pageTraffic = trafficMap[`/${page.slug}`];
+          const pageTraffic = trafficMap[resolvePagePath(page)];
           const pageState = getState(page.pageId);
           const trackBorder = statusBorderClass(pageState?.status);
 
