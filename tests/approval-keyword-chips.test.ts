@@ -12,7 +12,7 @@ describe('ApprovalsTab keyword chips', () => {
     // The slug-to-path conversion moved into findPageMapEntryBySlug in pathUtils.ts,
     // which tries exact match then endsWith suffix fallback for nested pages.
     expect(src).toMatch(/findPageMapEntryBySlug/);
-    const helpers = readFileSync('src/lib/pathUtils.ts', 'utf-8');
+    const helpers = readFileSync('src/lib/pathUtils.ts', 'utf-8'); // readFile-ok — contract guard: verifies findPageMapEntryBySlug implements suffix fallback for nested Webflow page slugs
     expect(helpers).toMatch(/endsWith/);
   });
 
