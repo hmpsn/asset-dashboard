@@ -554,9 +554,9 @@ export async function assembleAdminContext(
               const pagesWithTraffic = pages
                 ?.filter(p => p.issues?.length > 0)
                 .map(p => {
-                  const slug = p.slug?.startsWith('/') ? p.slug : `/${p.slug}`;
-                  const traffic = trafficMap[slug] || trafficMap[p.slug];
-                  return { page: p.page, slug, issues: p.issues.length, score: p.score, traffic };
+                  const resolvedPath = p.slug?.startsWith('/') ? p.slug : `/${p.slug}`;
+                  const traffic = trafficMap[resolvedPath];
+                  return { page: p.page, slug: resolvedPath, issues: p.issues.length, score: p.score, traffic };
                 })
                 .filter(p => p.traffic && (p.traffic.clicks > 0 || p.traffic.pageviews > 0))
                 .sort((a, b) =>

@@ -27,7 +27,7 @@ router.post('/api/webflow/keyword-analysis', async (req, res) => {
   if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
 
   const slices = ['seoContext', 'learnings'] as const;
-  const intel = workspaceId ? await buildWorkspaceIntelligence(workspaceId, { slices, pagePath: slug ? `/${slug}` : undefined }) : null;
+  const intel = workspaceId ? await buildWorkspaceIntelligence(workspaceId, { slices, pagePath: slug ? (slug.startsWith('/') ? slug : `/${slug}`) : undefined }) : null;
   const fullContext = intel ? formatForPrompt(intel, { verbosity: 'detailed', sections: slices }) : '';
   // No pagePath filter — show full cross-page keyword map for cannibalization avoidance
   const kwMapContext = intel ? formatPageMapForPrompt(intel.seoContext) : '';

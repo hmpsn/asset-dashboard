@@ -421,7 +421,7 @@ router.post('/api/jobs', async (req, res) => {
               const page = pages[i];
               try {
                 const bwsSlices = ['seoContext'] as const;
-                const bwsIntel = await buildWorkspaceIntelligence(bwsId || bulkWs?.id || '', { slices: bwsSlices, pagePath: page.slug ? `/${page.slug}` : undefined });
+                const bwsIntel = await buildWorkspaceIntelligence(bwsId || bulkWs?.id || '', { slices: bwsSlices, pagePath: resolvePagePath(page) || undefined });
                 const kwb = formatKeywordsForPrompt(bwsIntel.seoContext);
                 // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
                 const bvb = bwsIntel.seoContext?.effectiveBrandVoiceBlock ?? '';

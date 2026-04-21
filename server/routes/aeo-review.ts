@@ -116,7 +116,8 @@ router.post('/api/aeo-review/:workspaceId/site', requireWorkspaceAccess('workspa
     const issueMap = new Map<string, SeoIssue[]>();
     if (snapshot) {
       for (const p of snapshot.audit.pages) {
-        issueMap.set(p.slug, p.issues);
+        const slugKey = p.slug.startsWith('/') ? p.slug : `/${p.slug}`;
+        issueMap.set(slugKey, p.issues);
       }
     }
 
@@ -160,7 +161,8 @@ router.post('/api/aeo-review/:workspaceId/site', requireWorkspaceAccess('workspa
     // Prioritize content pages (blog, articles, guides) then pages with AEO issues
     const scored = allPageUrls.map(p => {
       const isContent = isContentPage(p.slug) ? 2 : 0;
-      const aeoIssueCount = (issueMap.get(p.slug) || []).filter(i => i.check.startsWith('aeo-')).length;
+      const lookupKey = p.slug.startsWith('/') ? p.slug : `/${p.slug}`;
+      const aeoIssueCount = (issueMap.get(lookupKey) || []).filter(i => i.check.startsWith('aeo-')).length;
       return { ...p, priority: isContent + aeoIssueCount };
     });
     scored.sort((a, b) => b.priority - a.priority);
@@ -174,7 +176,8 @@ router.post('/api/aeo-review/:workspaceId/site', requireWorkspaceAccess('workspa
         if (htmlRes.ok) {
           const html = await htmlRes.text();
           const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() || page.name;
-          pagesToReview.push({ url: page.url, title, html, issues: issueMap.get(page.slug) || [] });
+          const pageKey = page.slug.startsWith('/') ? page.slug : `/${page.slug}`;
+          pagesToReview.push({ url: page.url, title, html, issues: issueMap.get(pageKey) || [] });
         }
       } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'aeo-review/aeoIssueCount: programming error'); /* skip unreachable / timed-out pages */ }
     }));
