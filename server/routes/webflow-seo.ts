@@ -1523,7 +1523,7 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', requireWorkspaceAccess('worksp
       for (let i = 0; i < pages.length; i += CONCURRENCY) {
         if (isJobCancelled(job.id) || ac.signal.aborted) break;
         const batch = pages.slice(i, i + CONCURRENCY);
-        const batchResults = await Promise.allSettled(batch.map(async (page: { pageId: string; title: string; slug?: string; currentSeoTitle?: string; currentDescription?: string }) => {
+        const batchResults = await Promise.allSettled(batch.map(async (page: { pageId: string; title: string; slug?: string; publishedPath?: string | null; currentSeoTitle?: string; currentDescription?: string }) => {
           if (isJobCancelled(job.id)) return null;
 
           const rwPagePath = resolvePagePath(page) || undefined;

@@ -1,5 +1,5 @@
 /**
- * Unit tests for the applyBulkKeywordGuards helper in server/routes/jobs.ts.
+ * Unit tests for the applyBulkKeywordGuards helper in server/helpers.ts.
  * Verifies that AI-hallucinated keyword metrics are zeroed out when SEMRush
  * data was not available during bulk page analysis.
  */
