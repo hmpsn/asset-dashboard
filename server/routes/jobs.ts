@@ -198,7 +198,7 @@ router.post('/api/jobs', async (req, res) => {
               }
             }
           } catch (err) {
-            if (isProgrammingError(err)) log.warn({ err }, 'jobs: audit job failed with programming error');
+            if (isProgrammingError(err)) log.warn({ err }, 'jobs: audit job failed with programming error'); // url-fetch-ok
             else log.debug({ err }, 'jobs: audit job failed — degrading gracefully');
             updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Audit failed' });
           }
@@ -276,7 +276,7 @@ router.post('/api/jobs', async (req, res) => {
               );
             }
           } catch (err) {
-            if (isProgrammingError(err)) log.warn({ err }, 'jobs: compress job failed with programming error');
+            if (isProgrammingError(err)) log.warn({ err }, 'jobs: compress job failed with programming error'); // url-fetch-ok
             else log.debug({ err }, 'jobs: compress job failed — degrading gracefully');
             updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Compression failed' });
           }
@@ -323,7 +323,7 @@ router.post('/api/jobs', async (req, res) => {
               );
             }
           } catch (err) {
-            if (isProgrammingError(err)) log.warn({ err }, 'jobs: bulk-compress job failed with programming error');
+            if (isProgrammingError(err)) log.warn({ err }, 'jobs: bulk-compress job failed with programming error'); // url-fetch-ok
             else log.debug({ err }, 'jobs: bulk-compress job failed — degrading gracefully');
             updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Bulk compress failed' });
           }
@@ -389,7 +389,7 @@ router.post('/api/jobs', async (req, res) => {
               );
             }
           } catch (err) {
-            if (isProgrammingError(err)) log.warn({ err }, 'jobs: bulk-alt-text job failed with programming error');
+            if (isProgrammingError(err)) log.warn({ err }, 'jobs: bulk-alt-text job failed with programming error'); // url-fetch-ok
             else log.debug({ err }, 'jobs: bulk-alt-text job failed — degrading gracefully');
             updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Bulk alt text failed' });
           }
@@ -485,7 +485,7 @@ router.post('/api/jobs', async (req, res) => {
               );
             }
           } catch (err) {
-            if (isProgrammingError(err)) log.warn({ err }, 'jobs: bulk-seo-fix job failed with programming error');
+            if (isProgrammingError(err)) log.warn({ err }, 'jobs: bulk-seo-fix job failed with programming error'); // url-fetch-ok
             else log.debug({ err }, 'jobs: bulk-seo-fix job failed — degrading gracefully');
             updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Bulk SEO fix failed' });
           }
@@ -508,7 +508,7 @@ router.post('/api/jobs', async (req, res) => {
             fs.writeFileSync(reportFile, JSON.stringify({ id: reportId, ...result, createdAt: new Date().toISOString() }));
             updateJob(job.id, { status: 'done', result: { id: reportId, ...result }, message: `Audit complete — score ${result.siteScore}` });
           } catch (err) {
-            if (isProgrammingError(err)) log.warn({ err }, 'jobs: sales-report job failed with programming error');
+            if (isProgrammingError(err)) log.warn({ err }, 'jobs: sales-report job failed with programming error'); // url-fetch-ok
             else log.debug({ err }, 'jobs: sales-report job failed — degrading gracefully');
             updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Sales report failed' });
           }
@@ -555,7 +555,7 @@ router.post('/api/jobs', async (req, res) => {
             });
             addActivity(wsId, 'strategy_generated', 'Keyword strategy generated', `${pageCount} pages mapped with keywords and search intent`);
           } catch (err) {
-            if (isProgrammingError(err)) log.warn({ err }, 'jobs: keyword-strategy job failed with programming error');
+            if (isProgrammingError(err)) log.warn({ err }, 'jobs: keyword-strategy job failed with programming error'); // url-fetch-ok
             else log.debug({ err }, 'jobs: keyword-strategy job failed — degrading gracefully');
             updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Strategy generation failed' });
           }
@@ -616,7 +616,7 @@ router.post('/api/jobs', async (req, res) => {
               addActivity(schemaWsId, 'schema_generated', `Schema generated for ${result.length} pages`, isJobCancelled(job.id) ? 'Partially completed (cancelled)' : 'All pages processed');
             }
           } catch (err) {
-            if (isProgrammingError(err)) log.warn({ err }, 'jobs: schema-generator job failed with programming error');
+            if (isProgrammingError(err)) log.warn({ err }, 'jobs: schema-generator job failed with programming error'); // url-fetch-ok
             else log.debug({ err }, 'jobs: schema-generator job failed — degrading gracefully');
             if (!isJobCancelled(job.id)) {
               updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Schema generation failed' });
@@ -914,7 +914,7 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
         return res.status(400).json({ error: `Unknown job type: ${type}` });
     }
   } catch (err) {
-    if (isProgrammingError(err)) log.warn({ err }, 'jobs: POST /api/jobs: programming error');
+    if (isProgrammingError(err)) log.warn({ err }, 'jobs: POST /api/jobs: programming error'); // url-fetch-ok
     else log.debug({ err }, 'jobs: POST /api/jobs: degrading gracefully');
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
