@@ -18,9 +18,17 @@ function makeBatch(statuses: ApprovalItem['status'][]): ApprovalBatch {
   };
 }
 
+// "ready" = all decisions made, has approvals, not yet fully applied (mirrors isReady in ApprovalsTab)
+function isReady(b: ApprovalBatch) {
+  return b.items.length > 0 &&
+    !b.items.some(i => i.status === 'pending' || !i.status) &&
+    b.items.some(i => i.status === 'approved') &&
+    !b.items.every(i => i.status === 'applied');
+}
+
 function filterBatches(batches: ApprovalBatch[], filter: string) {
   if (filter === 'needs-action') return batches.filter(b => b.items.some(i => i.status === 'pending' || !i.status));
-  if (filter === 'ready') return batches.filter(b => b.items.some(i => i.status === 'approved') && !b.items.some(i => i.status === 'applied'));
+  if (filter === 'ready') return batches.filter(isReady);
   if (filter === 'applied') return batches.filter(b => b.items.length > 0 && b.items.every(i => i.status === 'applied'));
   return batches;
 }
@@ -42,10 +50,16 @@ describe('ApprovalsTab filter logic', () => {
     expect(result.every(b => b.items.some(i => i.status === 'pending'))).toBe(true); // every-ok — length guarded by toHaveLength(2) above
   });
 
-  it('ready: returns batches with approved items and no applied items', () => {
+  it('ready: returns only fully-decided batches that have approvals', () => {
     const result = filterBatches([pending, approved, applied, mixed], 'ready');
     expect(result).toHaveLength(1);
     expect(result[0].items.every(i => i.status === 'approved')).toBe(true); // every-ok — result[0] guaranteed by toHaveLength(1) above
+  });
+
+  it('ready: does not return batches that still have pending items', () => {
+    const approvedPending = makeBatch(['approved', 'pending']);
+    const result = filterBatches([approvedPending], 'ready');
+    expect(result).toHaveLength(0);
   });
 
   it('applied: returns batches where all items are applied', () => {

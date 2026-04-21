@@ -532,8 +532,7 @@ body::after {
 /* ── Semi-transparent zinc backgrounds ── */
 .dashboard-light .bg-zinc-900\/60 { background-color: rgba(255,255,255,0.9) !important; }
 .dashboard-light .bg-zinc-900\/40 { background-color: rgba(255,255,255,0.7) !important; }
-.dashboard-light .bg-zinc-950\/50 { background-color: #f8fafc !important; }
-.dashboard-light .bg-zinc-950 { background-color: #f8fafc !important; }
+.dashboard-light .bg-zinc-950\/50 { background-color: var(--brand-bg-card) !important; }
 .dashboard-light .bg-zinc-700\/30 { background-color: rgba(226,232,240,0.5) !important; }
 .dashboard-light .bg-zinc-800\/80 { background-color: rgba(241,245,249,0.9) !important; }
 
@@ -568,7 +567,7 @@ body::after {
 .dashboard-light .border-amber-500\/20 { border-color: rgba(180,83,9,0.18) !important; }
 .dashboard-light .border-teal-500\/20 { border-color: rgba(13,148,136,0.18) !important; }
 .dashboard-light .border-orange-500\/20 { border-color: rgba(194,65,12,0.15) !important; }
-.dashboard-light .border-zinc-800\/80 { border-color: rgba(226,232,240,0.9) !important; }
+
 .dashboard-light .border-zinc-600\/20 { border-color: rgba(148,163,184,0.2) !important; }
 .dashboard-light .border-teal-500\/40 { border-color: rgba(13,148,136,0.3) !important; }
 

@@ -25,7 +25,8 @@ export function ConfirmDialog({
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onCancel();
-      if (e.key === 'Enter') onConfirm();
+      // Skip Enter if a button inside the dialog has focus — its onClick fires natively, avoiding a double-call.
+      if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement)) onConfirm();
     };
     document.addEventListener('keydown', handler); // keydown-ok — modal overlay, Escape/Enter are intentional regardless of focus state
     return () => document.removeEventListener('keydown', handler);

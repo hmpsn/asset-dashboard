@@ -9,6 +9,8 @@ import type { ApprovalBatch, ApprovalItem } from './types';
 import type { ApprovalPageKeyword } from '../../hooks/useClientData';
 import { patch, post } from '../../api/client';
 
+type FilterState = 'all' | 'needs-action' | 'ready' | 'applied';
+
 interface ApprovalsTabProps {
   workspaceId: string;
   approvalBatches: ApprovalBatch[];
@@ -46,23 +48,30 @@ export function ApprovalsTab({
   const handleConfirm = async () => {
     const action = confirmState.action;
     setConfirmState(s => ({ ...s, open: false, action: null }));
-    if (action) await action();
+    if (action) {
+      try { await action(); }
+      catch { setToast({ message: 'Something went wrong. Please try again.', type: 'error' }); }
+    }
   };
 
   const handleCancel = () => {
     setConfirmState(s => ({ ...s, open: false, action: null }));
   };
 
-  type FilterState = 'all' | 'needs-action' | 'ready' | 'applied';
   const [batchFilter, setBatchFilter] = useState<FilterState>('all');
 
   const needsActionCount = approvalBatches.filter(b =>
     b.items.some(i => i.status === 'pending' || !i.status)
   ).length;
 
-  const readyCount = approvalBatches.filter(b =>
-    b.items.some(i => i.status === 'approved') && !b.items.some(i => i.status === 'applied')
-  ).length;
+  // "ready" = all decisions made (no pending), has approvals, not yet fully applied
+  const isReady = (b: ApprovalBatch) =>
+    b.items.length > 0 &&
+    !b.items.some(i => i.status === 'pending' || !i.status) &&
+    b.items.some(i => i.status === 'approved') &&
+    !b.items.every(i => i.status === 'applied');
+
+  const readyCount = approvalBatches.filter(isReady).length;
 
   const appliedCount = approvalBatches.filter(b =>
     b.items.length > 0 && b.items.every(i => i.status === 'applied')
@@ -70,7 +79,7 @@ export function ApprovalsTab({
 
   const filteredBatches = approvalBatches.filter(batch => {
     if (batchFilter === 'needs-action') return batch.items.some(i => i.status === 'pending' || !i.status);
-    if (batchFilter === 'ready') return batch.items.some(i => i.status === 'approved') && !batch.items.some(i => i.status === 'applied');
+    if (batchFilter === 'ready') return isReady(batch);
     if (batchFilter === 'applied') return batch.items.length > 0 && batch.items.every(i => i.status === 'applied');
     return true;
   });
@@ -104,6 +113,7 @@ export function ApprovalsTab({
         for (const item of pending) {
           await updateApprovalItem(batchId, item.id, { status: 'approved' });
         }
+        setToast({ message: `Approved ${pending.length} change${pending.length !== 1 ? 's' : ''}`, type: 'success' });
       }
     );
   };
