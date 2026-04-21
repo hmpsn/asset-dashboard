@@ -12,7 +12,7 @@ import { getAllGscPages, getQueryPageData } from './search-console.js';
 import { getGA4TopPages } from './google-analytics.js';
 import { getRawKnowledge, buildPersonasContext } from './seo-context.js';
 import { getInsights } from './analytics-insights-store.js';
-import type { PageHealthData } from '../shared/types/analytics.js';
+import type { AnalyticsInsight } from '../shared/types/analytics.js';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
 import { CRITICAL_CHECKS, MODERATE_CHECKS, computePageScore } from '../shared/scoring.js';
@@ -283,17 +283,23 @@ export async function buildSchemaContext(
             .filter(i => i.insightType === 'ranking_opportunity' && i.pageId)
             .map(i => i.pageId!.split('::')[0]),
         );
-        for (const insight of allInsights) {
-          if (insight.insightType === 'page_health' && insight.pageId) {
-            const data = insight.data as unknown as PageHealthData;
-            insightsMap.set(insight.pageId, {
-              healthScore: data.score,
-              healthTrend: data.trend,
-              isQuickWin: quickWinPageUrls.has(insight.pageId),
-            });
-          }
+        const healthInsights = allInsights.filter(
+          (i): i is AnalyticsInsight<'page_health'> => i.insightType === 'page_health' && !!i.pageId,
+        );
+        for (const insight of healthInsights) {
+          insightsMap.set(insight.pageId!, {
+            healthScore: insight.data.score,
+            healthTrend: insight.data.trend,
+            isQuickWin: quickWinPageUrls.has(insight.pageId!),
+          });
         }
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'helpers/urlPath: programming error'); /* intelligence layer not ready — skip */ }
+      } catch (err) {
+        if (isProgrammingError(err)) {
+          log.warn({ err }, 'helpers/buildSchemaContext: unexpected error building insights map');
+        } else {
+          log.debug({ err }, 'helpers/buildSchemaContext: intelligence layer not ready — skipping insights');
+        }
+      }
 
       // Store in cache (even if empty — avoids hammering APIs on sites with no connections)
       analyticsCache[cacheKey] = { maps: { gscMap, ga4Map, queryPageData, insightsMap }, ts: Date.now() };

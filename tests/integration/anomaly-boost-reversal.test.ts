@@ -15,6 +15,7 @@ import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { upsertInsight, getInsights } from '../../server/analytics-insights-store.js';
 import { applyScoreAdjustment } from '../../server/insight-score-adjustments.js';
+import type { CtrOpportunityData, ContentDecayData } from '../../shared/types/analytics.js';
 import db from '../../server/db/index.js';
 import { setFlagOverride } from '../../server/feature-flags.js';
 
@@ -85,7 +86,7 @@ describe('Anomaly boost reversal on dismiss', () => {
       workspaceId: testWsId,
       pageId: '/test/boost-reversal',
       insightType: 'page_health',
-      data: boostedData as never,
+      data: boostedData,
       severity: 'warning',
       impactScore: adjustedScore,
       domain: 'traffic',
@@ -142,13 +143,13 @@ describe('Anomaly boost reversal on dismiss', () => {
 
     // Apply anomaly boost
     const { data: boostedData, adjustedScore } = applyScoreAdjustment(
-      { decayRate: 0.5 }, originalScore, 'anomaly', 10,
+      { decayRate: 0.5 } as unknown as ContentDecayData, originalScore, 'anomaly', 10,
     );
     upsertInsight({
       workspaceId: testWsId,
       pageId: '/test/multi-anomaly',
       insightType: 'content_decay',
-      data: boostedData as never,
+      data: boostedData,
       severity: 'warning',
       impactScore: adjustedScore,
       domain: 'traffic',
@@ -233,13 +234,13 @@ describe('Anomaly boost reversal on dismiss', () => {
     });
 
     const { data: boostedData, adjustedScore } = applyScoreAdjustment(
-      { impressions: 1000 }, originalScore, 'anomaly', 10,
+      { impressions: 1000 } as unknown as CtrOpportunityData, originalScore, 'anomaly', 10,
     );
     const boosted = upsertInsight({
       workspaceId: testWsId,
       pageId: '/test/resolved-insight',
       insightType: 'ctr_opportunity',
-      data: boostedData as never,
+      data: boostedData,
       severity: 'opportunity',
       impactScore: adjustedScore,
       domain: 'search',
