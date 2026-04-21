@@ -44,6 +44,20 @@ export function resolvePagePath(page: { publishedPath?: string | null; slug?: st
 }
 
 /**
+ * Zero out AI-hallucinated keyword metrics when no SEMRush data was available.
+ * Call after JSON.parse of any AI keyword analysis response.
+ */
+export function applyBulkKeywordGuards(
+  analysis: Record<string, unknown>,
+  semrushBlock: string,
+): void {
+  if (!semrushBlock) {
+    analysis.keywordDifficulty = 0;
+    analysis.monthlyVolume = 0;
+  }
+}
+
+/**
  * Normalize a URL or path for cross-referencing.
  * Accepts full URLs (https://...) or bare paths. Strips origin, query,
  * and hash; normalizes trailing slash via normalizePath.

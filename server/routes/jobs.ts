@@ -12,7 +12,7 @@ import { recordSeoChange } from '../seo-change-tracker.js';
 import { generateAltText } from '../alttext.js';
 import { getDataDir } from '../data-dir.js';
 import { notifyClientRecommendationsReady, notifyClientAuditComplete } from '../email.js';
-import { applySuppressionsToAudit, buildSchemaContext, resolvePagePath, stripHtmlToText, stripCodeFences } from '../helpers.js';
+import { applySuppressionsToAudit, applyBulkKeywordGuards, buildSchemaContext, resolvePagePath, stripHtmlToText, stripCodeFences } from '../helpers.js';
 import { resolveBaseUrl } from '../url-helpers.js';
 import { getCachedArchitecture } from '../site-architecture.js';
 import {
@@ -919,20 +919,5 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
-
-/**
- * Zero out AI-hallucinated keyword metrics when SEMRush data was not available
- * during bulk page analysis. Real data is fetched during individual page analysis.
- * @internal exported for unit testing
- */
-export function applyBulkKeywordGuards(
-  analysis: Record<string, unknown>,
-  semrushBlock: string,
-): void {
-  if (!semrushBlock) {
-    analysis.keywordDifficulty = 0;
-    analysis.monthlyVolume = 0;
-  }
-}
 
 export default router;

@@ -4,7 +4,7 @@
  * data was not available during bulk page analysis.
  */
 import { describe, it, expect } from 'vitest';
-import { applyBulkKeywordGuards } from '../../server/routes/jobs.js';
+import { applyBulkKeywordGuards } from '../../server/helpers.js';
 
 describe('applyBulkKeywordGuards', () => {
   it('zeros out keywordDifficulty and monthlyVolume when semrushBlock is empty string', () => {
