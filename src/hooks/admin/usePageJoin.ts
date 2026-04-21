@@ -97,12 +97,10 @@ export function usePageJoin(
         // Already matched to a Webflow page — skip
         continue;
       }
-      // Dedup by normalized path
-      if (resultPaths.has(norm)) continue;
       resultPaths.add(norm);
 
       results.push({
-        id: `strategy-${sp.pagePath}`,
+        id: `strategy-${normalizePath(sp.pagePath).toLowerCase()}`,
         title: sp.pageTitle,
         path: sp.pagePath,
         source: 'strategy-only',

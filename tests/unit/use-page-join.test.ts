@@ -232,6 +232,38 @@ describe('usePageJoin', () => {
     expect(result.current.webflowPages).toHaveLength(2);
   });
 
+  // ── Test 9: webflowPages excludes strategy-only entries ──────────────────
+  it('webflowPages → excludes strategy-only entries, includes real Webflow pages', async () => {
+    const pages = [makePage({ id: 'p-real', slug: 'real-page', publishedPath: '/real-page' })];
+    mockGet.mockResolvedValue(pages);
+    mockUseKeywordStrategy.mockReturnValue(
+      makeStrategyReturn([
+        { pagePath: '/real-page', pageTitle: 'Real Page', primaryKeyword: 'real', secondaryKeywords: [] },
+        { pagePath: '/strategy-only-page', pageTitle: 'Strategy Only', primaryKeyword: 'strategy', secondaryKeywords: [] },
+      ]),
+    );
+
+    const { result } = renderHook(
+      () => usePageJoin('ws1', 'site1'),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    // Total pages: 1 real Webflow page + 1 strategy-only entry
+    expect(result.current.pages).toHaveLength(2);
+
+    // webflowPages must exclude strategy-only entries
+    expect(result.current.webflowPages).toHaveLength(1);
+    expect(result.current.webflowPages[0].id).toBe('p-real');
+
+    // The strategy-only entry must NOT appear in webflowPages
+    const strategyOnlyInWebflow = result.current.webflowPages.find(
+      p => p.source === 'strategy-only',
+    );
+    expect(strategyOnlyInWebflow).toBeUndefined();
+  });
+
   // ── Test 8: Orphan page (no slug, no publishedPath) ───────────────────────
   it('orphan page → no slug and no publishedPath resolves to path "/" and analyzed: false', async () => {
     const pages = [
