@@ -109,7 +109,7 @@ function extractPageStructure(html: string): string {
           if (node['@type']) schemaTypes.push(node['@type']);
         }
       }
-    } catch (err) { /* skip */ }
+    } catch { /* skip malformed JSON-LD */ }
   }
   if (schemaTypes.length > 0) parts.push(`\nEXISTING SCHEMA TYPES: ${schemaTypes.join(', ')}`);
 

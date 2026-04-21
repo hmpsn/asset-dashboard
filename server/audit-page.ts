@@ -265,7 +265,7 @@ export function auditPage(
           if (canonRoot !== pageRoot && !canonicalHost.includes('webflow.io') && !pageHost.includes('webflow.io')) {
             issues.push({ check: 'canonical', severity: 'warning', message: 'Canonical points to different domain', recommendation: `The canonical URL (${canonicalHost}) differs from the page domain (${pageHost}). Verify this is intentional.`, value: canonicalUrl });
           }
-        } catch (err) { /* skip malformed URLs */ }
+        } catch { /* skip malformed URLs */ }
       }
     }
 
@@ -418,10 +418,10 @@ export function auditPage(
           const host = new URL(l.href).hostname;
           if (host.includes('webflow.io') || host.includes('facebook.') || host.includes('twitter.') || host.includes('instagram.') || host.includes('linkedin.') || host.includes('youtube.')) return false;
           return true;
-        } catch (err) { return false; }
+        } catch { return false; }
       });
       const authorityCitations = externalCitations.filter(l => {
-        try { return authorityDomains.test(new URL(l.href).hostname); } catch (err) { return false; }
+        try { return authorityDomains.test(new URL(l.href).hostname); } catch { return false; }
       });
       const wordCount2 = countWords(html);
       if (wordCount2 > 500 && externalCitations.length === 0) {
