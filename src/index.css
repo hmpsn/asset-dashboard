@@ -328,6 +328,7 @@ body::after {
 .dashboard-light .bg-zinc-800\/50 { background-color: rgba(241,245,249,0.7) !important; }
 .dashboard-light .bg-zinc-800\/60 { background-color: rgba(241,245,249,0.8) !important; }
 .dashboard-light .bg-zinc-700 { background-color: #e2e8f0 !important; }
+.dashboard-light .bg-zinc-600 { background-color: var(--brand-bg-active) !important; }
 .dashboard-light .bg-zinc-500 { background-color: #94a3b8 !important; }
 
 /* === Neutral Borders === */
@@ -442,6 +443,7 @@ body::after {
 
 /* === Hover: Backgrounds === */
 .dashboard-light .hover\:bg-zinc-700:hover { background-color: #e2e8f0 !important; }
+.dashboard-light .hover\:bg-zinc-600:hover { background-color: var(--brand-bg-hover) !important; }
 .dashboard-light .hover\:bg-zinc-800:hover { background-color: #f1f5f9 !important; }
 .dashboard-light .hover\:bg-zinc-800\/30:hover { background-color: rgba(241,245,249,0.6) !important; }
 .dashboard-light .hover\:bg-zinc-800\/50:hover { background-color: rgba(241,245,249,0.8) !important; }
