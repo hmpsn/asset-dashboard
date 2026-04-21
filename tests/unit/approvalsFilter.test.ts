@@ -23,7 +23,7 @@ function isReady(b: ApprovalBatch) {
   return b.items.length > 0 &&
     !b.items.some(i => i.status === 'pending' || !i.status) &&
     b.items.some(i => i.status === 'approved') &&
-    !b.items.every(i => i.status === 'applied');
+    !b.items.every(i => i.status === 'applied'); // every-ok — b.items.length > 0 guard on line above
 }
 
 function filterBatches(batches: ApprovalBatch[], filter: string) {

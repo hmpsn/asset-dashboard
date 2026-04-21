@@ -197,7 +197,7 @@ export function ApprovalsTab({
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 batchFilter === tab.id
                   ? 'text-teal-400 bg-teal-500/10 border border-teal-500/20'
-                  : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
+                  : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 border border-transparent'
               }`}
             >
               {tab.label}
