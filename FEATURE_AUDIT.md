@@ -3323,57 +3323,6 @@ Current feature count: **306**. Last updated: April 2026.
 
 ---
 
-### 280. Broad Server Catch Hardening (32 server files)
-**What it does:** Extends the `isProgrammingError()` pattern from `workspace-intelligence.ts` to 32 additional server files covering insight enrichment, sales audits, Webflow assets, SEO site checks, job runners, roadmap routes, and more. Network/URL-parse failures are downgraded to `log.debug` (expected degradation); structural failures (TypeError, ReferenceError) escalate to `log.warn` so Sentry fires. Intentionally-silent catches annotated with `// catch-ok`. `// url-fetch-ok` suppressor added for outer job-handler catches that wrap entire job executions including fetch calls. The `catch-hardening-smoke` unit test enforces that no new bare `} catch {` blocks slip in without annotation.
-
-**Files:** `server/insight-enrichment.ts`, `server/sales-audit.ts`, `server/webflow-assets.ts`, `server/seo-audit-site-checks.ts`, `server/routes/webflow-seo.ts`, `server/routes/jobs.ts`, `server/routes/roadmap.ts`, `server/helpers.ts`, `server/routes/public-portal.ts`, `tests/unit/catch-hardening-smoke.test.ts`
-
-**Agency value:** Programming errors across the broader server surface now reach Sentry instead of silently returning empty fallbacks. Previously, a null-dereference in the sales audit or a broken enrichment call would produce no log output and no alert — the agency would never know unless a client complained about missing data.
-
-**Mutual:** CI enforcement via smoke test — any new bare catch without `// catch-ok` fails the test suite before merge.
-
----
-
-### 281. AnalyticsInsight Generic Types
-**What it does:** Makes `AnalyticsInsight<T extends InsightType = InsightType>` a proper generic type with `insightType: T` and `data: InsightDataMap[T]`. Adds `InsightDataBase` interface (index signature) to all 14 insight data interfaces for backward-compatible narrowing. Makes `UpsertInsightParams<T>`, `upsertInsight<T>`, `cloneInsightParams<T>`, and `applyScoreAdjustment<T>` generic. Removes `as never` write-site casts in anomaly-detection and outcome-tracking. Replaces `as unknown as XData` read-site casts in admin-chat-context and content-brief with type-predicate filters (e.g. `.filter((i): i is AnalyticsInsight<'page_health'> => ...)`). Removes the `shared/types/analytics.ts` grandfather exception from the `Record<string,unknown>` pr-check rule.
-
-**Files:** `shared/types/analytics.ts`, `server/analytics-insights-store.ts`, `server/insight-score-adjustments.ts`, `server/anomaly-detection.ts`, `server/outcome-tracking.ts`, `server/admin-chat-context.ts`, `server/content-brief.ts`, `scripts/pr-check.ts`
-
-**Agency value:** TypeScript now verifies that new insight shapes are correct at the write site — a misnamed field on a new insight type is a compile error, not a silent data bug discovered in production. Type predicates at read sites eliminate hidden any-casts that bypass type checking entirely.
-
-**Mutual:** The pr-check grandfather exception removal ensures analytics.ts stays clean — any future regression back to `Record<string,unknown>` fails CI.
-
----
-
-### 282. KeywordStrategy Zod Schema Alignment
-**What it does:** Reconciles the `keywordStrategySchema` Zod definition with the `KeywordStrategy` TypeScript interface. Adds missing fields: `siteKeywordMetrics` (array of `{keyword, volume, difficulty}`, optional) and `generatedAt` (ISO timestamp, optional). Adds `.passthrough()` so unknown future fields don't cause parse failures. Removes the `as unknown as KeywordStrategy` cast in `server/workspaces.ts`.
-
-**Files:** `server/schemas/workspace-schemas.ts`, `server/workspaces.ts`
-
-**Agency value:** Eliminates a silent type-bypass that could hide data loss if the stored JSON shape diverges from what the app expects. Future additions to `KeywordStrategy` will be caught by the Zod parse step rather than silently passing through as untyped data.
-
-**Mutual:** `.passthrough()` means adding new fields to the interface won't silently drop them during parse.
-
----
-
-### 283. Bridge #12 Dedup-Skip Removal
-**What it does:** Removes the 5-line dedup-skip block from `scheduled-audits.ts` that prevented re-audited pages with existing `audit_finding` insights from getting refreshed data. The `upsertInsight()` ON CONFLICT SQL clause already preserves `resolution_status` on update, so the skip was causing stale audit data to persist across re-runs. Now every audit run refreshes the insight data for all pages regardless of existing insight status. Adds integration tests covering both the "data refresh" and "resolution status preserved" cases.
-
-**Files:** `server/scheduled-audits.ts`, `tests/integration/scheduled-audits-dedup.test.ts`
-
-**Agency value:** Re-running an audit on a page that already had a tracked finding now correctly updates the severity, issue list, and score — stale data from months ago no longer persists after a fresh audit.
-
----
-
-### 284. getStorageReport Async Conversion
-**What it does:** Adds `dirSizeAsync()` helper alongside the existing sync `dirSize()` (sync is retained for prune functions that run in non-async contexts). Converts `getStorageReport()` to `async function` using `fs.promises` for directory scans. Converts the chat-sessions scan to async. Updates the health route handler to `await getStorageReport()`. Reduces health check test timeout from 120s to 30s.
-
-**Files:** `server/storage-stats.ts`, `server/routes/health.ts`, `tests/integration/health-routes.test.ts`
-
-**Agency value:** The health endpoint no longer blocks the Node.js event loop during disk scans — large workspaces with many chat sessions or cached data won't cause momentary latency spikes during monitoring pings.
-
----
-
 ## Copy & Brand Engine — Phase 3: Full Copy Pipeline
 
 ### 280. Copy Generation Pipeline

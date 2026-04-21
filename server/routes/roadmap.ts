@@ -37,7 +37,8 @@ function loadRoadmap() {
       }
     }
   } catch (err) {
-    log.debug({ err }, 'roadmap/loadRoadmap: could not read repo file — falling through');
+    if (isProgrammingError(err)) log.warn({ err }, 'roadmap/loadRoadmap: programming error reading repo file');
+    else log.debug({ err }, 'roadmap/loadRoadmap: could not read repo file — falling through');
   }
 
   if (!repoNewer) {
@@ -46,7 +47,8 @@ function loadRoadmap() {
         return JSON.parse(fs.readFileSync(ROADMAP_RUNTIME_FILE, 'utf-8'));
       }
     } catch (err) {
-      log.debug({ err }, 'roadmap/loadRoadmap: could not read runtime file — falling through');
+      if (isProgrammingError(err)) log.warn({ err }, 'roadmap/loadRoadmap: programming error reading runtime file');
+      else log.debug({ err }, 'roadmap/loadRoadmap: could not read runtime file — falling through');
     }
   }
 
@@ -56,7 +58,8 @@ function loadRoadmap() {
       data = JSON.parse(fs.readFileSync(ROADMAP_REPO_FILE, 'utf-8'));
     }
   } catch (err) {
-    log.debug({ err }, 'roadmap/loadRoadmap: could not parse repo JSON — falling through');
+    if (isProgrammingError(err)) log.warn({ err }, 'roadmap/loadRoadmap: programming error parsing repo JSON');
+    else log.debug({ err }, 'roadmap/loadRoadmap: could not parse repo JSON — falling through');
   }
 
   if (!data) {
@@ -72,7 +75,8 @@ function loadRoadmap() {
         }
       }
     } catch (err) {
-      log.debug({ err }, 'roadmap/loadRoadmap: could not parse status file — skipping merge');
+      if (isProgrammingError(err)) log.warn({ err }, 'roadmap/loadRoadmap: programming error in status merge');
+      else log.debug({ err }, 'roadmap/loadRoadmap: could not parse status file — skipping merge');
     }
   }
 
