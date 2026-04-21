@@ -42,6 +42,12 @@ export const keywordStrategySchema = z.object({
   siteKeywords: z.array(z.string()),
   pageMap: z.array(pageKeywordMapSchema).optional(),
   opportunities: z.array(z.string()),
+  siteKeywordMetrics: z.array(z.object({
+    keyword: z.string(),
+    volume: z.number(),
+    difficulty: z.number(),
+  })).optional(),
+  generatedAt: z.string().optional(),
 }).passthrough();
 
 // ── Personas ──

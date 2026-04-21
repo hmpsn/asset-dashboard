@@ -12,7 +12,7 @@ export type {
   ContentGap, QuickWin, KeywordStrategy, PageEditStatus, PageEditState,
   AudiencePersona, Workspace,
 } from '../shared/types/workspace.ts';
-import type { PageEditStatus, PageEditState, Workspace, KeywordStrategy } from '../shared/types/workspace.ts';
+import type { PageEditStatus, PageEditState, Workspace } from '../shared/types/workspace.ts';
 import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import {
@@ -127,7 +127,8 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
   if (row.event_groups) ws.eventGroups = parseJsonSafeArray(row.event_groups, eventGroupSchema, { workspaceId: row.id, field: 'event_groups', table: 'workspaces' });
   if (row.keyword_strategy) {
     const ks = parseJsonSafe(row.keyword_strategy, keywordStrategySchema, null, { workspaceId: row.id, field: 'keyword_strategy', table: 'workspaces' });
-    ws.keywordStrategy = (ks ?? { siteKeywords: [], pageMap: [], opportunities: [], generatedAt: '' }) as unknown as KeywordStrategy;
+    const base = ks ?? { siteKeywords: [], pageMap: [], opportunities: [], generatedAt: '' };
+    ws.keywordStrategy = { ...base, generatedAt: base.generatedAt ?? '' };
   }
   if (row.competitor_domains) ws.competitorDomains = parseJsonSafeArray(row.competitor_domains, z.string(), { workspaceId: row.id, field: 'competitor_domains', table: 'workspaces' });
   ws.competitorLastFetchedAt = row.competitor_last_fetched_at ?? null;
