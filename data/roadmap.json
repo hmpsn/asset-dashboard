@@ -1,6 +1,33 @@
 {
   "sprints": [
     {
+      "id": "sprint-broadcast-invalidation-audit",
+      "name": "Broadcast Invalidation Audit (do next)",
+      "hours": "3-6",
+      "rationale": "Recurring UX symptom: components show stale/empty data on first mount and 'fix themselves' on hard refresh. Root cause pattern — long staleTime React Query hooks without a useWorkspaceEvents broadcast subscription (violates Data Flow Rule #2). PageIntelligence is the confirmed instance; likely a platform-wide class of bug.",
+      "items": [
+        {
+          "id": 596,
+          "title": "Fix PageIntelligence missing broadcast invalidation",
+          "source": "User report 2026-04-21 — 'page intelligence doesn't display data at first, but then on refresh it does'",
+          "est": "30m-1h",
+          "priority": "P0",
+          "notes": "Shipped 2026-04-21 alongside Devin-flag fixes for PR #249. Added useWorkspaceEvents subscription to src/components/PageIntelligence.tsx that invalidates queryKeys.admin.keywordStrategy on STRATEGY_UPDATED broadcasts. Resolves staleTime 10min cache-miss UX where users saw empty data until hard refresh. #597 (platform-wide audit) still pending.",
+          "status": "done",
+          "shippedAt": "2026-04-21"
+        },
+        {
+          "id": 597,
+          "title": "Platform-wide audit: useQuery hooks with staleTime but no broadcast subscription",
+          "source": "Post-PageIntelligence diagnosis 2026-04-21",
+          "est": "2-4h",
+          "priority": "P0",
+          "notes": "Audit every component using a long-staleTime React Query hook (staleTime > 1min) for a matching useWorkspaceEvents subscription that invalidates the cache. Deliverables: (1) table of every admin/client component with (hookName, staleTime, invalidation triggers observed, gaps). (2) fix list prioritized by user impact. (3) pr-check rule proposal — enforce that any useQuery with staleTime > 60000 inside src/components/ is accompanied by a useWorkspaceEvents call in the same component, OR inline escape-hatch comment documenting why (e.g. 'static-data-ok: provider status never changes during a session'). Method: grep for staleTime across src/hooks/ + src/components/, cross-reference against useWorkspaceEvents call sites, produce a gap matrix. Consider folding into backlog #593 (unified page-join hooks) if the shared hook subsumes most call sites. Likely existing offenders: any strategy/keyword/insights/approval hook used outside its home component.",
+          "status": "pending"
+        }
+      ]
+    },
+    {
       "id": "sprint-self-service",
       "name": "Self-Service & Growth",
       "hours": "26-37",
@@ -594,6 +621,15 @@
       "hours": "80+",
       "rationale": "Revisit quarterly. Prioritize when a specific client need, revenue opportunity, or scale threshold justifies it.",
       "items": [
+        {
+          "id": 595,
+          "title": "JSDoc @reads/@writes convention for read/write asymmetry prevention",
+          "source": "Devin review of PR #249 + recurring asymmetry bug pattern",
+          "est": "3-5h",
+          "priority": "P2",
+          "notes": "Recurring bug pattern: GET endpoint short-circuits on one data source (e.g. ws.keywordStrategy) while writes populate adjacent storage (e.g. page_keywords table). Examples: PR #248 (PageIntelligence case-sensitivity), PR #249 (synthesized shell for partial state). Proposed convention: every GET handler gets a `@reads: <table|blob>, <table|blob>, ...` JSDoc tag; every write handler gets a matching `@writes: ...` tag. Mechanize with a pr-check rule that parses these tags across all routes and flags tables that are written without a corresponding read endpoint (or vice versa). Deliverables: (1) tag convention documented in docs/rules/automated-rules.md, (2) pr-check rule that parses @reads/@writes from route files and builds a read/write graph, (3) initial annotation pass on the 10 most-touched routes. Audit pass to find existing asymmetry: grep for `if (!ws\\.\\w+) return.*json\\(null\\)` patterns across server/routes/.",
+          "status": "pending"
+        },
         {
           "id": 593,
           "title": "Unified page-join shared client hooks (Option 1)",

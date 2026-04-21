@@ -2453,20 +2453,58 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', validate(patchStrateg
       invalidateSubCachePrefix(ws.id, 'slice:pageProfile');
     });
   }
-  // Save non-pageMap fields to workspace blob
+  // Save non-pageMap fields to workspace blob.
+  // Guard: if the workspace has no existing strategy blob AND the patch only updates pageMap
+  // (no siteKeywords/opportunities/etc.), don't silently fabricate a blob with just a timestamp —
+  // that would promote a shell-state workspace to a "real" strategy without any AI-generated content.
+  // This matters for callers like PageIntelligence that only patch pageMap.
   const { pageMap: _pm, ...rest } = req.body;
-  const updated = { ...(ws.keywordStrategy || {}), ...rest, generatedAt: new Date().toISOString() };
-  updateWorkspace(ws.id, { keywordStrategy: updated });
+  const hasBlobFields = Object.keys(rest).length > 0;
+  const blobExists = ws.keywordStrategy != null;
+  let updated: KeywordStrategy | null = null;
+  if (hasBlobFields || blobExists) {
+    // Only bump generatedAt when strategy-level fields change. A pure-pageMap patch on an
+    // existing blob should preserve the original generation timestamp — otherwise the
+    // KeywordStrategy panel misleadingly shows "Generated [today]" for every per-page edit.
+    const preservedGeneratedAt = blobExists && !hasBlobFields
+      ? ws.keywordStrategy?.generatedAt
+      : undefined;
+    updated = {
+      ...(ws.keywordStrategy || {}),
+      ...rest,
+      generatedAt: preservedGeneratedAt ?? new Date().toISOString(),
+    } as KeywordStrategy;
+    updateWorkspace(ws.id, { keywordStrategy: updated });
+  }
   clearSeoContextCache(ws.id);
   invalidateIntelligenceCache(ws.id);
+  // Broadcast strategy update so other surfaces (PageIntelligence, SeoEditor, other tabs)
+  // invalidate their React Query caches. Without this, pageMap edits from PageIntelligence
+  // leave KeywordStrategy/SeoEditor showing stale pageMap until staleTime expires.
+  const responsePageMap = listPageKeywords(ws.id);
+  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, {
+    pageCount: responsePageMap.length,
+    siteKeywords: updated?.siteKeywords?.length ?? 0,
+    partial: !updated,
+  });
   // Bridge #3: strategy updated — debounced intelligence invalidation
   debouncedStrategyInvalidate(ws.id, () => {
     invalidateIntelligenceCache(ws.id);
     invalidateSubCachePrefix(ws.id, 'slice:seoContext');
   });
-  // Respond with reassembled strategy
-  const responsePageMap = listPageKeywords(ws.id);
-  res.json({ ...updated, pageMap: responsePageMap });
+  // Respond with reassembled strategy. When no blob was written and none previously existed,
+  // surface a synthesized shell (same shape as GET) so the client can render pageMap
+  // without assuming a real strategy.
+  if (updated) {
+    res.json({ ...updated, pageMap: responsePageMap });
+  } else {
+    res.json({
+      siteKeywords: [],
+      opportunities: [],
+      pageMap: responsePageMap,
+      generatedAt: null,
+    });
+  }
 });
 
 // ── Keyword Feedback (approve/decline) ──────────────────────────
