@@ -180,8 +180,7 @@ async function runScheduledAudit(schedule: AuditSchedule) {
 
     // ── Bridge #12: Audit → page_health insights ──────────────────────
     fireBridge('bridge-audit-page-health', ws.id, async () => {
-      const { upsertInsight, getInsights }: typeof AnalyticsInsightsStore = await import('./analytics-insights-store.js'); // dynamic-import-ok
-      const existing = getInsights(ws.id);
+      const { upsertInsight }: typeof AnalyticsInsightsStore = await import('./analytics-insights-store.js'); // dynamic-import-ok
 
       // Map critical/warning audit issues to audit_finding insights
       const criticalPages = effectiveAudit.pages
@@ -191,12 +190,6 @@ async function runScheduledAudit(schedule: AuditSchedule) {
       for (const page of criticalPages.slice(0, 20)) { // Cap at 20 to avoid flooding
         const pageIssues = page.issues?.filter(i => i.severity === 'error' || i.severity === 'warning') ?? [];
         if (pageIssues.length === 0) continue;
-
-        // Deduplicate: skip if identical audit_finding insight exists for this page
-        const existingForPage = existing.find(
-          i => i.insightType === 'audit_finding' && i.pageId === page.pageId && i.resolutionStatus !== 'resolved',
-        );
-        if (existingForPage) continue;
 
         upsertInsight({
           workspaceId: ws.id,
