@@ -3430,6 +3430,49 @@ export const CHECKS: Check[] = [
       return hits;
     },
   },
+  {
+    // ── resolvePagePath(...) || undefined is dead code ──
+    //
+    // `resolvePagePath(page)` always returns a truthy string (`page.publishedPath`
+    // OR `/${page.slug}` OR `/`), so `resolvePagePath(page) || undefined` can
+    // never evaluate to `undefined`. This is almost always a signal that the
+    // caller wanted `tryResolvePagePath(page)` — which returns `undefined` when
+    // the page has neither slug nor publishedPath, so downstream guards like
+    // `if (basePath)` actually work.
+    //
+    // Escape hatch: `// slug-path-ok` on the same line or preceding line.
+    name: 'resolvePagePath(...) with undefined fallback is dead code — use tryResolvePagePath',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    exclude: ['server/helpers.ts', 'src/lib/pathUtils.ts'],
+    excludeLines: ['// slug-path-ok'],
+    message:
+      'resolvePagePath(page) is always truthy (returns "/" as last resort), so ' +
+      '`resolvePagePath(page) || undefined` can never be undefined. Use ' +
+      'tryResolvePagePath(page) if you need undefined for path-less pages.',
+    severity: 'error',
+    rationale:
+      'The dead-code pattern silently neutralizes downstream guards like ' +
+      '`if (basePath)` that are meant to skip fetch/GSC-match for path-less pages.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const deadCodeRe = /resolvePagePath\([^)]*\)\s*\|\|\s*undefined\b/;
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        if (file.endsWith('server/helpers.ts') || file.endsWith('src/lib/pathUtils.ts')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!deadCodeRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// slug-path-ok')) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────

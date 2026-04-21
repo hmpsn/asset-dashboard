@@ -12,7 +12,7 @@ import { recordSeoChange } from '../seo-change-tracker.js';
 import { generateAltText } from '../alttext.js';
 import { getDataDir } from '../data-dir.js';
 import { notifyClientRecommendationsReady, notifyClientAuditComplete } from '../email.js';
-import { applySuppressionsToAudit, applyBulkKeywordGuards, buildSchemaContext, resolvePagePath, stripHtmlToText, stripCodeFences } from '../helpers.js';
+import { applySuppressionsToAudit, applyBulkKeywordGuards, buildSchemaContext, resolvePagePath, tryResolvePagePath, stripHtmlToText, stripCodeFences } from '../helpers.js';
 import { resolveBaseUrl } from '../url-helpers.js';
 import { getCachedArchitecture } from '../site-architecture.js';
 import {
@@ -398,7 +398,12 @@ router.post('/api/jobs', async (req, res) => {
       }
 
       case 'bulk-seo-fix': {
-        const { siteId: seoSiteId, pages, field, workspaceId: bwsId } = params as { siteId: string; pages: Array<{ pageId: string; title: string; slug?: string; currentSeoTitle?: string; currentDescription?: string }>; field: 'title' | 'description'; workspaceId?: string };
+        // Callers MUST include `publishedPath` on each page for nested Webflow pages —
+        // without it, tryResolvePagePath falls back to `/${slug}` which is wrong for
+        // nested routes (e.g. `/services/seo` becomes `/seo`). The live bulk-fix route
+        // in routes/webflow-seo.ts accepts publishedPath; any frontend caller of this
+        // job type must mirror that contract.
+        const { siteId: seoSiteId, pages, field, workspaceId: bwsId } = params as { siteId: string; pages: Array<{ pageId: string; title: string; slug?: string; publishedPath?: string | null; currentSeoTitle?: string; currentDescription?: string }>; field: 'title' | 'description'; workspaceId?: string };
         if (!seoSiteId || !pages?.length || !field) return res.status(400).json({ error: 'siteId, pages, field required' });
         const activeBulkSeo = hasActiveJob('bulk-seo-fix', bwsId);
         if (activeBulkSeo) return res.status(409).json({ error: 'A bulk SEO fix is already running', jobId: activeBulkSeo.id });
@@ -421,17 +426,17 @@ router.post('/api/jobs', async (req, res) => {
               const page = pages[i];
               try {
                 const bwsSlices = ['seoContext'] as const;
-                const bwsIntel = await buildWorkspaceIntelligence(bwsId || bulkWs?.id || '', { slices: bwsSlices, pagePath: page.slug ? resolvePagePath(page) : undefined });
+                const bulkJobPagePath = tryResolvePagePath(page);
+                const bwsIntel = await buildWorkspaceIntelligence(bwsId || bulkWs?.id || '', { slices: bwsSlices, pagePath: bulkJobPagePath });
                 const kwb = formatKeywordsForPrompt(bwsIntel.seoContext);
                 // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
                 const bvb = bwsIntel.seoContext?.effectiveBrandVoiceBlock ?? '';
 
                 // Fetch page content for context (best-effort)
                 let contentExcerpt = '';
-                if (bulkBaseUrl && page.slug) {
+                if (bulkBaseUrl && bulkJobPagePath) {
                   try {
-                    const bulkHtmlPath = resolvePagePath(page);
-                    const htmlRes = await fetch(`${bulkBaseUrl}${bulkHtmlPath}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
+                    const htmlRes = await fetch(`${bulkBaseUrl}${bulkJobPagePath}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
                     if (htmlRes.ok) {
                       const html = await htmlRes.text();
                       contentExcerpt = stripHtmlToText(html, { maxLength: 800 });

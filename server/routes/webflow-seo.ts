@@ -34,7 +34,7 @@ import { getInsights } from '../analytics-insights-store.js';
 import type * as AnalyticsInsightsStore from '../analytics-insights-store.js';
 import { buildKeywordMapContext } from '../seo-context.js';
 import { isProgrammingError } from '../errors.js';
-import { applySuppressionsToAudit, stripHtmlToText, stripCodeFences, resolvePagePath, applyBulkKeywordGuards, normalizePath } from '../helpers.js';
+import { applySuppressionsToAudit, stripHtmlToText, stripCodeFences, tryResolvePagePath, matchGscUrlToPath, applyBulkKeywordGuards, findPageMapEntryForPage } from '../helpers.js';
 import { resolveBaseUrl } from '../url-helpers.js';
 import { createJob, updateJob, isJobCancelled, hasActiveJob, registerAbort } from '../jobs.js';
 import { broadcastToWorkspace } from '../broadcast.js';
@@ -531,7 +531,7 @@ Return ONLY a JSON array of 3 strings. No explanation.`;
 
 // --- Bulk AI SEO Fix ---
 router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
-  const { pages: rawPages, field, workspaceId } = req.body as { pages: Array<{ pageId: string; title: string; slug?: string; currentSeoTitle?: string; currentDescription?: string; pageContent?: string }>; field: 'title' | 'description'; workspaceId?: string };
+  const { pages: rawPages, field, workspaceId } = req.body as { pages: Array<{ pageId: string; title: string; slug?: string; publishedPath?: string | null; currentSeoTitle?: string; currentDescription?: string; pageContent?: string }>; field: 'title' | 'description'; workspaceId?: string };
   // Strip synthetic CMS IDs at the boundary — they are not real Webflow page IDs
   const pages = (rawPages || []).filter(p => !p.pageId.startsWith('cms-'));
   if (!pages?.length) return res.status(400).json({ error: 'pages required' });
@@ -559,10 +559,11 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery
   for (const page of pages) {
     try {
       // Derive per-page keywords from the pre-built pageMap — no extra DB call
-      const bulkPagePath = page.slug ? resolvePagePath(page) : undefined;
+      const bulkPagePath = tryResolvePagePath(page);
       const bulkFixSeo = wsBulkSeo ? { ...wsBulkSeo } : undefined;
       if (bulkFixSeo && bulkPagePath && bulkFixSeo.strategy?.pageMap?.length) {
-        const kw = bulkFixSeo.strategy.pageMap.find(p => p.pagePath.toLowerCase() === bulkPagePath.toLowerCase());
+        // findPageMapEntryForPage handles legacy `/${slug}` entries for nested pages
+        const kw = findPageMapEntryForPage(bulkFixSeo.strategy.pageMap, page);
         if (kw) bulkFixSeo.pageKeywords = kw;
       }
       const keywordBlock = formatKeywordsForPrompt(bulkFixSeo);
@@ -573,9 +574,9 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery
 
       // Fetch page content if not provided and we have a base URL
       let contentExcerpt = page.pageContent || '';
-      if (!contentExcerpt && baseUrl && page.slug) {
+      if (!contentExcerpt && baseUrl && bulkPagePath) {
         try {
-          const htmlRes = await fetch(`${baseUrl}${resolvePagePath(page)}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
+          const htmlRes = await fetch(`${baseUrl}${bulkPagePath}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
           if (htmlRes.ok) {
             const html = await htmlRes.text();
             contentExcerpt = stripHtmlToText(html, { maxLength: 800 });
@@ -766,10 +767,11 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
     const batch = pages.slice(i, i + CONCURRENCY);
     const batchResults = await Promise.allSettled(batch.map(async (page) => {
       // Derive per-page keywords from the pre-built pageMap — no extra DB call for seoContext
-      const rwPagePath = (page.slug || page.publishedPath) ? resolvePagePath(page) : undefined;
+      const rwPagePath = tryResolvePagePath(page);
       const rwSeo = wsRwSeo ? { ...wsRwSeo } : undefined;
       if (rwSeo && rwPagePath && rwSeo.strategy?.pageMap?.length) {
-        const kw = rwSeo.strategy.pageMap.find(p => p.pagePath.toLowerCase() === rwPagePath.toLowerCase());
+        // findPageMapEntryForPage handles legacy `/${slug}` entries for nested pages
+        const kw = findPageMapEntryForPage(rwSeo.strategy.pageMap, page);
         if (kw) rwSeo.pageKeywords = kw;
       }
       const keywordBlock = formatKeywordsForPrompt(rwSeo);
@@ -783,9 +785,9 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
 
       // Fetch page content for context (best-effort)
       let contentExcerpt = '';
-      if (baseUrl && (page.slug || page.publishedPath)) {
+      if (baseUrl && rwPagePath) {
         try {
-          const htmlRes = await fetch(`${baseUrl}${resolvePagePath(page)}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
+          const htmlRes = await fetch(`${baseUrl}${rwPagePath}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
           if (htmlRes.ok) {
             const html = await htmlRes.text();
             contentExcerpt = stripHtmlToText(html, { maxLength: 800 });
@@ -796,15 +798,9 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
       // Match GSC queries to this page by slug (top 15 by impressions)
       let gscBlock = '';
       let ctrFlag = '';
-      if (allGscData.length > 0 && (page.slug || page.publishedPath)) {
-        const resolved = resolvePagePath(page);
+      if (allGscData.length > 0 && rwPagePath) {
         const pageQueries = allGscData
-          .filter(r => {
-            let rPath: string;
-            try { rPath = new URL(r.page).pathname; } catch { rPath = r.page; }
-            rPath = normalizePath(rPath.startsWith('/') ? rPath : `/${rPath}`);
-            return resolved === '/' ? rPath === '/' || rPath === '' : rPath === resolved;
-          })
+          .filter(r => matchGscUrlToPath(r.page, rwPagePath))
           .sort((a, b) => b.impressions - a.impressions)
           .slice(0, 15);
         if (pageQueries.length > 0) {
@@ -1257,10 +1253,11 @@ router.post('/api/seo/:workspaceId/bulk-analyze', requireWorkspaceAccess('worksp
 
         try {
           // Fetch page HTML for content (best-effort)
+          const analyzePagePath = tryResolvePagePath(page);
           let pageContent = '';
-          if (baseUrl && (page.slug || page.publishedPath)) {
+          if (baseUrl && analyzePagePath) {
             try {
-              const htmlRes = await fetch(`${baseUrl}${resolvePagePath(page)}`, {
+              const htmlRes = await fetch(`${baseUrl}${analyzePagePath}`, {
                 redirect: 'follow',
                 headers: { 'User-Agent': 'Mozilla/5.0 (compatible; HmpsnStudioBot/1.0)' },
                 signal: AbortSignal.timeout(10_000),
@@ -1280,7 +1277,7 @@ router.post('/api/seo/:workspaceId/bulk-analyze', requireWorkspaceAccess('worksp
 Page title: ${page.title}
 SEO title: ${effectiveTitle || '(same as page title)'}
 Meta description: ${effectiveMeta || '(none)'}
-URL slug: ${resolvePagePath(page)}
+URL slug: ${analyzePagePath ?? '(no path)'}
 Page content excerpt: ${pageContent ? pageContent.slice(0, 3000) : 'N/A'}${fullContext}${kwMapCtx}
 
 Provide your analysis as a JSON object:
@@ -1340,31 +1337,35 @@ IMPORTANT: Return ONLY valid JSON.`;
             continue;
           }
 
-          // Persist analysis to keyword strategy
-          const pagePath = resolvePagePath(page);
-          const existing = getPageKeyword(workspaceId, pagePath);
-          upsertPageKeyword(workspaceId, {
-            pagePath,
-            pageTitle: existing?.pageTitle || page.title,
-            primaryKeyword: (analysis.primaryKeyword as string) || existing?.primaryKeyword || '',
-            secondaryKeywords: (analysis.secondaryKeywords as string[]) || existing?.secondaryKeywords || [],
-            searchIntent: (analysis.searchIntent as string) || existing?.searchIntent,
-            optimizationIssues: (analysis.optimizationIssues as string[]) || [],
-            recommendations: (analysis.recommendations as string[]) || [],
-            contentGaps: (analysis.contentGaps as string[]) || [],
-            optimizationScore: analysis.optimizationScore as number | undefined,
-            analysisGeneratedAt: new Date().toISOString(),
-            primaryKeywordPresence: analysis.primaryKeywordPresence as { inTitle: boolean; inMeta: boolean; inContent: boolean; inSlug: boolean } | undefined,
-            longTailKeywords: (analysis.longTailKeywords as string[]) || [],
-            competitorKeywords: (analysis.competitorKeywords as string[]) || [],
-            estimatedDifficulty: analysis.estimatedDifficulty as string | undefined,
-            keywordDifficulty: analysis.keywordDifficulty as number | undefined,
-            monthlyVolume: analysis.monthlyVolume as number | undefined,
-            topicCluster: analysis.topicCluster as string | undefined,
-            searchIntentConfidence: analysis.searchIntentConfidence as number | undefined,
-            ...(existing?.currentPosition != null ? { currentPosition: existing.currentPosition } : {}),
-            ...(existing?.impressions != null ? { impressions: existing.impressions } : {}),
-          });
+          // Persist analysis to keyword strategy — skip pages with no slug/publishedPath
+          // to avoid collapsing every path-less page onto the "/" key.
+          if (!analyzePagePath) {
+            log.debug({ pageId: page.pageId }, 'bulk-analyze: skipping persist — no slug or publishedPath');
+          } else {
+            const existing = getPageKeyword(workspaceId, analyzePagePath);
+            upsertPageKeyword(workspaceId, {
+              pagePath: analyzePagePath,
+              pageTitle: existing?.pageTitle || page.title,
+              primaryKeyword: (analysis.primaryKeyword as string) || existing?.primaryKeyword || '',
+              secondaryKeywords: (analysis.secondaryKeywords as string[]) || existing?.secondaryKeywords || [],
+              searchIntent: (analysis.searchIntent as string) || existing?.searchIntent,
+              optimizationIssues: (analysis.optimizationIssues as string[]) || [],
+              recommendations: (analysis.recommendations as string[]) || [],
+              contentGaps: (analysis.contentGaps as string[]) || [],
+              optimizationScore: analysis.optimizationScore as number | undefined,
+              analysisGeneratedAt: new Date().toISOString(),
+              primaryKeywordPresence: analysis.primaryKeywordPresence as { inTitle: boolean; inMeta: boolean; inContent: boolean; inSlug: boolean } | undefined,
+              longTailKeywords: (analysis.longTailKeywords as string[]) || [],
+              competitorKeywords: (analysis.competitorKeywords as string[]) || [],
+              estimatedDifficulty: analysis.estimatedDifficulty as string | undefined,
+              keywordDifficulty: analysis.keywordDifficulty as number | undefined,
+              monthlyVolume: analysis.monthlyVolume as number | undefined,
+              topicCluster: analysis.topicCluster as string | undefined,
+              searchIntentConfidence: analysis.searchIntentConfidence as number | undefined,
+              ...(existing?.currentPosition != null ? { currentPosition: existing.currentPosition } : {}),
+              ...(existing?.impressions != null ? { impressions: existing.impressions } : {}),
+            });
+          }
 
           done++;
         } catch (err) {
@@ -1526,10 +1527,11 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', requireWorkspaceAccess('worksp
         const batchResults = await Promise.allSettled(batch.map(async (page: { pageId: string; title: string; slug?: string; publishedPath?: string | null; currentSeoTitle?: string; currentDescription?: string }) => {
           if (isJobCancelled(job.id)) return null;
 
-          const rwPagePath = (page.slug || page.publishedPath) ? resolvePagePath(page) : undefined;
+          const rwPagePath = tryResolvePagePath(page);
           const rwSeo = wsRwSeo ? { ...wsRwSeo } : undefined;
           if (rwSeo && rwPagePath && rwSeo.strategy?.pageMap?.length) {
-            const kw = rwSeo.strategy.pageMap.find(p => p.pagePath.toLowerCase() === rwPagePath.toLowerCase());
+            // findPageMapEntryForPage handles legacy `/${slug}` entries for nested pages
+            const kw = findPageMapEntryForPage(rwSeo.strategy.pageMap, page);
             if (kw) rwSeo.pageKeywords = kw;
           }
           const keywordBlock = formatKeywordsForPrompt(rwSeo);
@@ -1539,9 +1541,9 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', requireWorkspaceAccess('worksp
 
           // Fetch page content (best-effort)
           let contentExcerpt = '';
-          if (baseUrl && (page.slug || page.publishedPath)) {
+          if (baseUrl && rwPagePath) {
             try {
-              const htmlRes = await fetch(`${baseUrl}${resolvePagePath(page)}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
+              const htmlRes = await fetch(`${baseUrl}${rwPagePath}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
               if (htmlRes.ok) {
                 const html = await htmlRes.text();
                 contentExcerpt = stripHtmlToText(html, { maxLength: 800 });
@@ -1552,15 +1554,9 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', requireWorkspaceAccess('worksp
           // Match GSC queries to this page
           let gscBlock = '';
           let ctrFlag = '';
-          if (allGscData.length > 0 && (page.slug || page.publishedPath)) {
-            const resolved = resolvePagePath(page);
+          if (allGscData.length > 0 && rwPagePath) {
             const pageQueries = allGscData
-              .filter(r => {
-                let rPath: string;
-                try { rPath = new URL(r.page).pathname; } catch { rPath = r.page; }
-                rPath = normalizePath(rPath.startsWith('/') ? rPath : `/${rPath}`);
-                return resolved === '/' ? rPath === '/' || rPath === '' : rPath === resolved;
-              })
+              .filter(r => matchGscUrlToPath(r.page, rwPagePath))
               .sort((a, b) => b.impressions - a.impressions)
               .slice(0, 15);
             if (pageQueries.length > 0) {

@@ -18,3 +18,13 @@ export function matchPagePath(a: string, b: string): boolean {
 export function resolvePagePath(page: { publishedPath?: string | null; slug?: string }): string {
   return page.publishedPath || (page.slug ? `/${page.slug}` : '/');
 }
+
+/**
+ * Returns the resolved page path, or `undefined` when the page has no slug or publishedPath.
+ * Use this anywhere "no meaningful path info" must be distinguishable from "homepage".
+ * See server/helpers.ts:tryResolvePagePath for the authoritative doc.
+ */
+export function tryResolvePagePath(page: { publishedPath?: string | null; slug?: string }): string | undefined {
+  if (!page.slug && !page.publishedPath) return undefined;
+  return resolvePagePath(page);
+}

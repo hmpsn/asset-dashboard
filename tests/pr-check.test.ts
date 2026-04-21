@@ -4000,6 +4000,93 @@ describe('Rule: Bare slug used in pagePath construction — use resolvePagePath(
   });
 });
 
+describe('Rule: resolvePagePath(...) with undefined fallback is dead code — use tryResolvePagePath', () => {
+  const RULE = 'resolvePagePath(...) with undefined fallback is dead code — use tryResolvePagePath';
+
+  it('flags `resolvePagePath(page) || undefined`', () => {
+    const file = write(
+      uniqPath('rule-resolve-dead-code', 'server/routes/webflow-seo.ts'),
+      lines(
+        'const basePath = resolvePagePath(page) || undefined;',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('flags `resolvePagePath(p) || undefined` with alternate variable name', () => {
+    const file = write(
+      uniqPath('rule-resolve-dead-code', 'server/routes/jobs.ts'),
+      lines(
+        'const pagePath = resolvePagePath(p) || undefined;',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('does NOT flag `tryResolvePagePath(page)` (the correct API)', () => {
+    const file = write(
+      uniqPath('rule-resolve-dead-code', 'server/routes/webflow-seo.ts'),
+      lines(
+        'const basePath = tryResolvePagePath(page);',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag `resolvePagePath(page)` without `|| undefined`', () => {
+    const file = write(
+      uniqPath('rule-resolve-dead-code', 'server/schema-plan.ts'),
+      lines(
+        'const pagePath = resolvePagePath(page);',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with inline // slug-path-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-resolve-dead-code', 'server/inline-hatch.ts'),
+      lines(
+        'const basePath = resolvePagePath(page) || undefined; // slug-path-ok — shim for legacy call site',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with above-line // slug-path-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-resolve-dead-code', 'server/above-hatch.ts'),
+      lines(
+        '// slug-path-ok — preserving dead pattern for contract compatibility',
+        'const basePath = resolvePagePath(page) || undefined;',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag server/helpers.ts (excluded — canonical implementation)', () => {
+    const file = write(
+      uniqPath('rule-resolve-dead-code', 'server/helpers.ts'),
+      lines(
+        'const basePath = resolvePagePath(page) || undefined;',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag src/lib/pathUtils.ts (excluded — canonical frontend implementation)', () => {
+    const file = write(
+      uniqPath('rule-resolve-dead-code', 'src/lib/pathUtils.ts'),
+      lines(
+        'const basePath = resolvePagePath(page) || undefined;',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
 describe('Meta: customCheck rule name registry', () => {
   const EXPECTED_CUSTOM_CHECK_RULES = [
     'Global keydown missing isContentEditable guard',
@@ -4049,6 +4136,7 @@ describe('Meta: customCheck rule name registry', () => {
     'Competitor keyword push missing serpFeatures',
     // Slug-path hardening sprint (2026-04-21)
     'Bare slug used in pagePath construction — use resolvePagePath(page)',
+    'resolvePagePath(...) with undefined fallback is dead code — use tryResolvePagePath',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {

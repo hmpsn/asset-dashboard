@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { matchPagePath, resolvePagePath } from '../../src/lib/pathUtils.js';
+import { matchPagePath, resolvePagePath, tryResolvePagePath } from '../../src/lib/pathUtils.js';
+import { matchGscUrlToPath, resolvePagePath as serverResolvePagePath, tryResolvePagePath as serverTryResolvePagePath } from '../../server/helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { upsertPageKeyword, getPageKeyword } from '../../server/page-keywords.js';
 
@@ -18,6 +19,99 @@ describe('resolvePagePath', () => {
 
   it('handles null publishedPath', () => {
     expect(resolvePagePath({ slug: 'seo', publishedPath: null })).toBe('/seo');
+  });
+
+  it('ALWAYS returns a truthy string — contract that makes `|| undefined` dead code', () => {
+    // This is the contract that `tryResolvePagePath` exists to complement.
+    // Any caller that writes `resolvePagePath(page) || undefined` has dead code,
+    // enforced by scripts/pr-check.ts.
+    expect(resolvePagePath({})).toBeTruthy();
+    expect(resolvePagePath({ slug: '' })).toBeTruthy();
+    expect(resolvePagePath({ publishedPath: '' })).toBeTruthy();
+    expect(resolvePagePath({ publishedPath: null })).toBeTruthy();
+  });
+
+  it('frontend and backend implementations agree', () => {
+    const cases = [
+      { slug: 'seo', publishedPath: '/services/seo' },
+      { slug: 'seo' },
+      {},
+      { slug: 'seo', publishedPath: null },
+      { publishedPath: '/about' },
+    ];
+    for (const c of cases) {
+      expect(resolvePagePath(c)).toBe(serverResolvePagePath(c));
+    }
+  });
+});
+
+describe('tryResolvePagePath', () => {
+  it('returns undefined when both slug and publishedPath are absent', () => {
+    expect(tryResolvePagePath({})).toBeUndefined();
+  });
+
+  it('returns undefined when both are empty/null', () => {
+    expect(tryResolvePagePath({ slug: '', publishedPath: null })).toBeUndefined();
+  });
+
+  it('returns resolvePagePath output when slug present', () => {
+    expect(tryResolvePagePath({ slug: 'seo' })).toBe('/seo');
+  });
+
+  it('returns resolvePagePath output when publishedPath present', () => {
+    expect(tryResolvePagePath({ publishedPath: '/services/seo' })).toBe('/services/seo');
+  });
+
+  it('frontend and backend implementations agree', () => {
+    const cases = [
+      { slug: 'seo', publishedPath: '/services/seo' },
+      { slug: 'seo' },
+      {},
+      { slug: '', publishedPath: null },
+      { publishedPath: '/about' },
+    ];
+    for (const c of cases) {
+      expect(tryResolvePagePath(c)).toBe(serverTryResolvePagePath(c));
+    }
+  });
+});
+
+describe('matchGscUrlToPath', () => {
+  it('matches exact pathname', () => {
+    expect(matchGscUrlToPath('https://example.com/services/seo', '/services/seo')).toBe(true);
+  });
+
+  it('matches when GSC URL has trailing slash', () => {
+    expect(matchGscUrlToPath('https://example.com/services/seo/', '/services/seo')).toBe(true);
+  });
+
+  it('matches homepage with trailing slash', () => {
+    expect(matchGscUrlToPath('https://example.com/', '/')).toBe(true);
+  });
+
+  it('matches homepage with empty pathname', () => {
+    expect(matchGscUrlToPath('https://example.com', '/')).toBe(true);
+  });
+
+  it('does NOT match nested path when resolved is bare slug', () => {
+    expect(matchGscUrlToPath('https://example.com/services/seo', '/seo')).toBe(false);
+  });
+
+  it('does NOT match homepage when resolved is specific page', () => {
+    expect(matchGscUrlToPath('https://example.com/', '/services/seo')).toBe(false);
+  });
+
+  it('handles malformed URL by treating input as a path', () => {
+    expect(matchGscUrlToPath('/services/seo/', '/services/seo')).toBe(true);
+  });
+
+  it('handles malformed URL without leading slash', () => {
+    expect(matchGscUrlToPath('services/seo', '/services/seo')).toBe(true);
+  });
+
+  it('is case-insensitive at the path level? (case-sensitive per current contract)', () => {
+    // Current contract: case-sensitive. Documenting, not enforcing a change.
+    expect(matchGscUrlToPath('https://example.com/Services/SEO', '/services/seo')).toBe(false);
   });
 });
 
