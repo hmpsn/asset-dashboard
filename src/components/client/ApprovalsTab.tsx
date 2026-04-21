@@ -53,6 +53,28 @@ export function ApprovalsTab({
     setConfirmState(s => ({ ...s, open: false, action: null }));
   };
 
+  type FilterState = 'all' | 'needs-action' | 'ready' | 'applied';
+  const [batchFilter, setBatchFilter] = useState<FilterState>('all');
+
+  const needsActionCount = approvalBatches.filter(b =>
+    b.items.some(i => i.status === 'pending' || !i.status)
+  ).length;
+
+  const readyCount = approvalBatches.filter(b =>
+    b.items.some(i => i.status === 'approved') && !b.items.some(i => i.status === 'applied')
+  ).length;
+
+  const appliedCount = approvalBatches.filter(b =>
+    b.items.length > 0 && b.items.every(i => i.status === 'applied')
+  ).length;
+
+  const filteredBatches = approvalBatches.filter(batch => {
+    if (batchFilter === 'needs-action') return batch.items.some(i => i.status === 'pending' || !i.status);
+    if (batchFilter === 'ready') return batch.items.some(i => i.status === 'approved') && !batch.items.some(i => i.status === 'applied');
+    if (batchFilter === 'applied') return batch.items.length > 0 && batch.items.every(i => i.status === 'applied');
+    return true;
+  });
+
   const togglePage = (key: string) => setCollapsedPages(prev => {
     const next = new Set(prev);
     if (next.has(key)) next.delete(key); else next.add(key);
@@ -148,7 +170,40 @@ export function ApprovalsTab({
         <EmptyState icon={ClipboardCheck} title="No pending approvals" description="Your agency will send SEO changes here for your review." />
       )}
 
-      {approvalBatches.map(batch => {
+      {/* Filter bar */}
+      {approvalBatches.length > 0 && (
+        <div className="flex items-center gap-2 pb-4 border-b border-zinc-800 flex-wrap">
+          {(
+            [
+              { id: 'all', label: 'All', count: approvalBatches.length },
+              { id: 'needs-action', label: 'Needs Action', count: needsActionCount },
+              { id: 'ready', label: 'Ready to Apply', count: readyCount },
+              { id: 'applied', label: 'Applied', count: appliedCount },
+            ] as { id: FilterState; label: string; count: number }[]
+          ).map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setBatchFilter(tab.id)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                batchFilter === tab.id
+                  ? 'text-teal-400 bg-teal-500/10 border border-teal-500/20'
+                  : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
+              }`}
+            >
+              {tab.label}
+              {tab.count > 0 && (
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                  batchFilter === tab.id ? 'bg-teal-500/20 text-teal-300' : 'bg-zinc-700 text-zinc-400'
+                }`}>
+                  {tab.count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {filteredBatches.map(batch => {
         const batchPending = batch.items.filter(i => i.status === 'pending').length;
         const batchApproved = batch.items.filter(i => i.status === 'approved').length;
         const batchApplied = batch.items.filter(i => i.status === 'applied').length;
