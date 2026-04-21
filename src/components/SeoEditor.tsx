@@ -27,7 +27,7 @@ import { BulkOperations } from './editor/BulkOperations';
 import { ApprovalPanel } from './editor/ApprovalPanel';
 import { PendingApprovals } from './PendingApprovals';
 import { SeoSuggestionsPanel } from './editor/SeoSuggestionsPanel';
-import { matchPagePath, resolvePagePath } from '../lib/pathUtils';
+import { matchPagePath, resolvePagePath, tryResolvePagePath } from '../lib/pathUtils';
 
 interface EditState {
   seoTitle: string;
@@ -442,7 +442,10 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     const analyzed = new Set<string>();
     for (const entry of strategyData.pageMap) {
       if (entry.analysisGeneratedAt) {
-        const match = pages.find(p => p.slug != null && matchPagePath(entry.pagePath, resolvePagePath(p)));
+        const match = pages.find(p => {
+          const path = tryResolvePagePath(p);
+          return path !== undefined && matchPagePath(entry.pagePath, path);
+        });
         if (match) analyzed.add(match.id);
       }
     }
@@ -455,7 +458,10 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     if (!strategyData?.pageMap) return map;
     for (const entry of strategyData.pageMap) {
       if (!entry.primaryKeyword) continue;
-      const match = pages.find(p => p.slug != null && matchPagePath(entry.pagePath, resolvePagePath(p)));
+      const match = pages.find(p => {
+        const path = tryResolvePagePath(p);
+        return path !== undefined && matchPagePath(entry.pagePath, path);
+      });
       if (match) {
         map.set(match.id, {
           primaryKeyword: entry.primaryKeyword,

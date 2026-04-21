@@ -33,14 +33,14 @@ For every `broadcastToWorkspace()` event, there MUST be a corresponding handler 
 - `ClientDashboard.tsx` → `useWorkspaceEvents()` (for client dashboard)
 - `WorkspaceHome.tsx` or relevant admin component → `useWorkspaceEvents()` (for admin dashboard)
 
-**Current workspace-scoped events** (defined in `server/ws-events.ts`):
+**Workspace-scoped events** — the full list is maintained in `server/ws-events.ts` (`WS_EVENTS` constant). Always check that file before emitting a new event — reuse existing event names rather than inventing new string literals. As of the current codebase there are 40+ events covering approvals, requests, content, insights, intelligence, bridges, brand engine, copy pipeline, and more.
+
+Representative examples:
 - `workspace:updated` — refetch workspace info (tier, settings, branding)
-- `approval:update` / `approval:applied` — refetch approvals
-- `request:created` / `request:update` — refetch requests
-- `content-request:created` / `content-request:update` — refetch content requests
-- `activity:new` — refetch activity feed
-- `audit:complete` — refetch audit data
-- `anomalies:update` — refetch anomaly data
+- `insight:bridge_updated` — insight bridge modified one or more records; invalidate insight feeds
+- `strategy:updated` — keyword strategy was modified; invalidate strategy caches
+- `activity:new` — new activity log entry; refetch activity feed
+- `audit:complete` — site audit finished; refetch audit data
 
 ## Rule 3: Delete endpoints MUST capture workspaceId BEFORE deleting
 
