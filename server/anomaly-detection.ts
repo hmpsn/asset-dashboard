@@ -831,23 +831,27 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
 // --- Scheduler ---
 
 let anomalyInterval: ReturnType<typeof setInterval> | null = null;
+let startupTimeout: ReturnType<typeof setTimeout> | null = null;
 
 export function startAnomalyDetection() {
   if (anomalyInterval) return;
 
   // Run 2 minutes after startup, then every 12 hours
-  setTimeout(() => {
+  startupTimeout = setTimeout(() => {
     runAnomalyDetection().catch(err => log.error({ err }, 'Scan error'));
   }, 2 * 60 * 1000);
+  startupTimeout.unref?.();
 
   anomalyInterval = setInterval(() => {
     runAnomalyDetection().catch(err => log.error({ err }, 'Scan error'));
   }, CHECK_INTERVAL_MS);
+  anomalyInterval.unref?.();
 
   log.info('Detection scheduler started (every 12 hours)');
 }
 
 export function stopAnomalyDetection() {
+  if (startupTimeout) { clearTimeout(startupTimeout); startupTimeout = null; }
   if (anomalyInterval) {
     clearInterval(anomalyInterval);
     anomalyInterval = null;
