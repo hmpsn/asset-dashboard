@@ -103,6 +103,7 @@ export function usePageJoin(
         id: `strategy-${normalizePath(sp.pagePath).toLowerCase()}`,
         title: sp.pageTitle,
         path: sp.pagePath,
+        slug: sp.pagePath.replace(/^\//, ''),
         source: 'strategy-only',
         strategy: sp,
         analyzed: !!sp.analysisGeneratedAt,

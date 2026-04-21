@@ -8,7 +8,7 @@ import { usePageEditStates } from '../../hooks/usePageEditStates';
 import type { ApprovalBatch, ApprovalItem } from './types';
 import type { ApprovalPageKeyword } from '../../hooks/useClientData';
 import { patch, post } from '../../api/client';
-import { findPageMapEntry } from '../../lib/pathUtils';
+import { findPageMapEntryBySlug } from '../../lib/pathUtils';
 
 type FilterState = 'all' | 'needs-action' | 'ready' | 'applied';
 
@@ -329,9 +329,9 @@ export function ApprovalsTab({
                                     <span key={t} className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-300">{t}</span>
                                   ))}
                                   {(item.field === 'seoTitle' || item.field === 'seoDescription') && (() => {
-                                    // item.pageSlug is a bare slug; prepend '/' to form the canonical path
+                                    // item.pageSlug is a bare slug; use suffix fallback for nested pages
                                     const slug = item.pageSlug;
-                                    const kw = findPageMapEntry(pageMap ?? [], '/' + slug);
+                                    const kw = findPageMapEntryBySlug(pageMap ?? [], slug);
                                     if (!kw) return null;
                                     return (
                                       <>
