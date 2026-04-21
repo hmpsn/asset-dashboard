@@ -9,7 +9,6 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getDataDir } from '../data-dir.js';
-import { isProgrammingError } from '../errors.js';
 import { createLogger } from '../logger.js';
 
 
@@ -37,11 +36,7 @@ function loadRoadmap() {
       }
     }
   } catch (err) {
-    if (isProgrammingError(err)) {
-      log.warn({ err }, 'roadmap/loadRoadmap: unexpected error checking repo file');
-    } else {
-      log.debug({ err }, 'roadmap/loadRoadmap: could not read repo file — falling through');
-    }
+    log.debug({ err }, 'roadmap/loadRoadmap: could not read repo file — falling through');
   }
 
   if (!repoNewer) {
@@ -50,11 +45,7 @@ function loadRoadmap() {
         return JSON.parse(fs.readFileSync(ROADMAP_RUNTIME_FILE, 'utf-8'));
       }
     } catch (err) {
-      if (isProgrammingError(err)) {
-        log.warn({ err }, 'roadmap/loadRoadmap: unexpected error reading runtime file');
-      } else {
-        log.debug({ err }, 'roadmap/loadRoadmap: could not read runtime file — falling through');
-      }
+      log.debug({ err }, 'roadmap/loadRoadmap: could not read runtime file — falling through');
     }
   }
 
@@ -64,11 +55,7 @@ function loadRoadmap() {
       data = JSON.parse(fs.readFileSync(ROADMAP_REPO_FILE, 'utf-8'));
     }
   } catch (err) {
-    if (isProgrammingError(err)) {
-      log.warn({ err }, 'roadmap/loadRoadmap: unexpected error reading repo JSON');
-    } else {
-      log.debug({ err }, 'roadmap/loadRoadmap: could not parse repo JSON — falling through');
-    }
+    log.debug({ err }, 'roadmap/loadRoadmap: could not parse repo JSON — falling through');
   }
 
   if (!data) {
@@ -84,11 +71,7 @@ function loadRoadmap() {
         }
       }
     } catch (err) {
-      if (isProgrammingError(err)) {
-        log.warn({ err }, 'roadmap/loadRoadmap: unexpected error merging statuses');
-      } else {
-        log.debug({ err }, 'roadmap/loadRoadmap: could not parse status file — skipping merge');
-      }
+      log.debug({ err }, 'roadmap/loadRoadmap: could not parse status file — skipping merge');
     }
   }
 
@@ -140,11 +123,7 @@ router.get('/api/roadmap-status', (_req, res) => {
     }
     res.json(statusMap);
   } catch (err) {
-    if (isProgrammingError(err)) {
-      log.warn({ err }, 'roadmap: GET /api/roadmap-status: unexpected error');
-    } else {
-      log.debug({ err }, 'roadmap: GET /api/roadmap-status: degrading gracefully');
-    }
+    log.debug({ err }, 'roadmap: GET /api/roadmap-status: degrading gracefully');
     res.json({});
   }
 });

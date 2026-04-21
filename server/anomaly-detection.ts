@@ -760,7 +760,7 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
           return { modified: modifiedCount };
         });
       }
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, `anomaly-detection: workspace scan error for ${ws.name}: programming error`); else log.debug({ err }, `anomaly-detection: workspace scan error for ${ws.name}`); } // url-fetch-ok
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, `anomaly-detection: workspace scan error for ${ws.name}: programming error`); else log.warn({ err }, `anomaly-detection: workspace scan error for ${ws.name}`); } // url-fetch-ok
   }
 
   if (allNew.length > 0) {

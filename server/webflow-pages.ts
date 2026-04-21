@@ -5,7 +5,6 @@
 import { createLogger } from './logger.js';
 import { resolvePagePath } from './helpers.js';
 import { webflowFetch, getToken } from './webflow-client.js';
-import { isProgrammingError } from './errors.js';
 
 const log = createLogger('webflow-pages');
 
@@ -385,9 +384,7 @@ export async function discoverCmsUrls(
 
     log.info(`sitemap: ${allUrls.length} URLs total, ${cmsAll.length} are CMS pages`);
     return { cmsUrls: cmsAll.slice(0, limit), totalFound: cmsAll.length };
-  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-pages: discoverCmsUrls: programming error'); else log.debug({ err }, 'webflow-pages: sitemap fetch failed'); // url-fetch-ok
-    return { cmsUrls: [], totalFound: 0 };
-  }
+  } catch (err) { log.debug({ err }, 'webflow-pages: sitemap fetch failed'); return { cmsUrls: [], totalFound: 0 }; } // catch-ok: network failure — expected
 }
 
 export async function discoverSitemapUrls(baseUrl: string): Promise<string[]> {

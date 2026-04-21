@@ -193,6 +193,7 @@ export function upsertInsight<T extends InsightType>(params: UpsertInsightParams
 
   // Fetch back to get the actual row (id may differ on conflict-replace)
   const row = stmts().selectOne.get(params.workspaceId, params.pageId, params.insightType) as InsightRow;
+  // Cast is sound: selectOne filters by insight_type = params.insightType, so T is correct.
   return rowToInsight(row) as AnalyticsInsight<T>;
 }
 
