@@ -1360,7 +1360,11 @@ IMPORTANT: Return ONLY valid JSON.`;
 
           done++;
         } catch (err) {
-          log.error({ err, pageId: page.pageId }, 'bulk-analyze: page analysis failed');
+          if (isProgrammingError(err)) {
+            log.warn({ err, pageId: page.pageId }, 'webflow-seo/bulk-analyze: unexpected error in page analysis');
+          } else {
+            log.debug({ err, pageId: page.pageId }, 'webflow-seo/bulk-analyze: page analysis error — degrading gracefully');
+          }
           failed++;
           done++;
         }

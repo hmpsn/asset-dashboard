@@ -57,7 +57,7 @@ export function cleanSlugToTitle(urlOrPath: string): string {
     try {
       pathname = new URL(urlOrPath).pathname;
     } catch (err) {
-      // fall through with original value
+      log.debug({ urlOrPath, err }, 'insight-enrichment/url-parse: invalid URL in cleanSlugToTitle — using original value');
     }
   }
 
@@ -195,7 +195,7 @@ export function resolvePageTitle(
     try {
       pathname = new URL(pageId).pathname;
     } catch (err) {
-      // keep original
+      log.debug({ pageId, err }, 'insight-enrichment/url-parse: invalid URL in resolvePageTitle — using original value');
     }
   }
 
@@ -234,7 +234,7 @@ export function checkStrategyAlignment(
     try {
       pathname = new URL(pageId).pathname;
     } catch (err) {
-      // keep original
+      log.debug({ pageId, err }, 'insight-enrichment/url-parse: invalid URL in checkStrategyAlignment — using original value');
     }
   }
 
@@ -291,14 +291,14 @@ export function checkPipelineStatus(
     try {
       pathname = new URL(pageId).pathname;
     } catch (err) {
-      // keep original
+      log.debug({ pageId, err }, 'insight-enrichment/url-parse: invalid URL in checkPipelineStatus — using original value');
     }
   }
 
   const normalise = (s: string): string => {
     try {
       return new URL(s).pathname;
-    } catch (err) {
+    } catch { // catch-ok: URL parse on user-supplied data — TypeError is expected
       return s;
     }
   };
@@ -348,7 +348,7 @@ export function getSchemaGapsForPage(workspaceId: string, pageUrl: string): stri
         const pathname = new URL(pageUrl).pathname;
         validation = getValidation(workspaceId, pathname);
       } catch (err) {
-        // invalid URL, skip pathname fallback
+        log.debug({ pageUrl, err }, 'insight-enrichment/url-parse: invalid URL in getSchemaGapsForPage — skipping pathname fallback');
       }
     }
 
@@ -466,7 +466,7 @@ export function getAuditIssuesForPage(
     try {
       pathname = new URL(pageId).pathname;
     } catch (err) {
-      // keep original
+      log.debug({ pageId, err }, 'insight-enrichment/url-parse: invalid URL in getAuditIssuesForPage — using original value');
     }
   }
 
