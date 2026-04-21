@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **66** — 35 error, 31 warn.
+Total rules: **67** — 35 error, 32 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -89,6 +89,7 @@ advisory but tracked.
 | 29 | addActivity type not in CLIENT_VISIBLE_TYPES (public route) | warn | custom | `server/routes/` | `client-visibility-ok` | Public-portal mutations that log activity with a type absent from CLIENT_VISIBLE_TYPES create invisible entries — the activity is recorded but never shown to client-portal users. This is sometimes intentional (admin-only bookkeeping) but often an oversight when adding new activity types. |
 | 30 | Raw provider date passed to new Date() | warn | pattern | `server/` | `// provider-date-ok` | Prevents Invalid Date regressions after PR #218 A4 finding: SEMRush emits Unix epoch strings that new Date() cannot parse. |
 | 31 | Competitor keyword push missing serpFeatures | warn | custom | `server/` | `// compkw-serp-ok` | Prevents regression of PR #218 A3 finding: DomainKeyword.serpFeatures was silently dropped in the inline mapping. |
+| 32 | Bare slug used in pagePath construction — use resolvePagePath(page) | warn | custom | `*.ts, *.tsx` | `// slug-path-ok` | Webflow nested pages (`/services/seo`) have slug=`seo` — using `/${page.slug}` directly produces wrong short URLs that break GSC matching and pagePath lookups. |
 
 ---
 

@@ -3366,6 +3366,70 @@ export const CHECKS: Check[] = [
       return hits;
     },
   },
+  {
+    // Slug-path hardening sprint (2026-04-21).
+    //
+    // Webflow nested pages have a `publishedPath` like `/services/seo` and a
+    // `slug` like `seo` (only the final segment). Using `/${page.slug}` directly
+    // as a page path produces wrong URLs for nested pages. The correct helper is
+    // `resolvePagePath(page)` from `server/helpers.ts` (backend) or
+    // `src/lib/pathUtils.ts` (frontend), which prefers `publishedPath` and
+    // falls back to `/${slug}` only when publishedPath is absent.
+    //
+    // This rule flags the two bare-slug constructions that caused the regressions:
+    //   1. `/${page.slug}` or `/${p.slug}` (standalone template literal)
+    //   2. `/${page.slug || ''}` (empty-fallback variant from pagePath assignments)
+    //
+    // Excluded:
+    //   - server/helpers.ts and src/lib/pathUtils.ts — the canonical implementations
+    //     that define the correct fallback logic
+    //   - Lines containing `.startsWith('/')` — ternary slug-normalization patterns
+    //     (`p.slug.startsWith('/') ? p.slug : \`/${p.slug}\``) that are a safe
+    //     intermediate form, NOT a pagePath construction
+    //   - Lines containing `publishedPath` — already have the correct guard
+    //
+    // Escape hatch: add `// slug-path-ok` on the same line or the preceding line
+    // for display-only uses (e.g. breadcrumb labels) where the slug suffix is intentional.
+    name: 'Bare slug used in pagePath construction — use resolvePagePath(page)',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    exclude: ['server/helpers.ts', 'src/lib/pathUtils.ts'],
+    excludeLines: ['.startsWith(\'/\')', '.startsWith("/")', 'publishedPath', '// slug-path-ok'],
+    message:
+      'Use resolvePagePath(page) instead of `/${page.slug}` — slug is only the final URL segment ' +
+      'for nested Webflow pages. resolvePagePath() prefers publishedPath. ' +
+      'Suppress with // slug-path-ok for intentional display-only slug suffixes.',
+    severity: 'warn',
+    rationale:
+      'Webflow nested pages (`/services/seo`) have slug=`seo` — using `/${page.slug}` directly ' +
+      'produces wrong short URLs that break GSC matching and pagePath lookups.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Matches `/${page.slug}`, `/${p.slug}`, with optional `|| 'fallback'`
+      // INSIDE the template literal (e.g. `/${page.slug || ''}`) or as a
+      // standalone expression.
+      const bareSlugRe = /`\/\$\{(?:page|p)\.slug(?:\s*\|\|\s*['"].*?['"])?\}`/;
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        // Skip canonical implementation files
+        if (file.endsWith('server/helpers.ts') || file.endsWith('src/lib/pathUtils.ts')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!bareSlugRe.test(lines[i])) continue;
+          // Skip ternary slug-normalization: `p.slug.startsWith('/') ? p.slug : \`/${p.slug}\``
+          if (lines[i].includes(".startsWith('/')") || lines[i].includes('.startsWith("/")')) continue;
+          // Skip lines that already check publishedPath (safe guard pattern)
+          if (lines[i].includes('publishedPath')) continue;
+          if (hasHatch(lines, i, '// slug-path-ok')) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
