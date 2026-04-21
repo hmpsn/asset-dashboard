@@ -13,7 +13,7 @@
 > - `../specs/2026-03-27-page-strategy-engine-design.md`
 > - `../specs/2026-03-27-copy-pipeline-design.md`
 >
-> Rules: `.windsurf/rules/multi-agent-coordination.md`
+> Rules: `docs/rules/multi-agent-coordination.md`
 
 ---
 

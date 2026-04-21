@@ -8,9 +8,9 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 
 ## Architecture
 
-- **Frontend**: React 18 + Vite + TailwindCSS. Entry: `src/App.tsx`. Client portal: `src/components/ClientDashboard.tsx`. Admin tabs are lazy-loaded.
-- **Backend**: Express server in `server/index.ts` (~7100 lines). All API endpoints defined here. No database — JSON files on disk via `data/` and per-workspace upload folders.
-- **AI**: OpenAI GPT-4o/4o-mini via `server/openai-helpers.ts` (`callOpenAI` wrapper with retry, timeout, token tracking).
+- **Frontend**: React 19 + Vite 8 + TailwindCSS. Entry: `src/App.tsx`. Client portal: `src/components/ClientDashboard.tsx`. Admin tabs are lazy-loaded.
+- **Backend**: Express app configured in `server/app.ts` (`createApp()` factory) with 81 route modules under `server/routes/*.ts`, plus three route-group files in `server/route-groups/` (`webflow.js`, `public.js`, `content.js`). `server/index.ts` is the thin startup entry point: runs migrations, creates the HTTP server, wires WebSocket, and starts schedulers. Storage: SQLite (WAL mode, foreign keys ON) at `DATA_BASE/dashboard.db` — 66 migrations in `server/db/migrations/`.
+- **AI**: Dual provider system. OpenAI GPT-4.1/4.1-mini via `server/openai-helpers.ts` (`callOpenAI`) for structured/analytical tasks. Anthropic Claude via `server/anthropic-helpers.ts` (`callAnthropic`) for creative prose. Unified dispatcher `callAI()` in `server/ai.ts` routes to either provider — new code should prefer `callAI()` over importing provider helpers directly.
 
 ## Monetization Model
 
@@ -26,7 +26,9 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 
 | Module | Purpose |
 |--------|---------|
-| `server/index.ts` | All Express routes, chat endpoints, strategy generation |
+| `server/app.ts` | Express app factory (`createApp()`): all middleware, auth gates, rate limiters, and route mounts |
+| `server/index.ts` | Thin startup entry: runs SQLite migrations, creates HTTP server, wires WebSocket (`initWebSocket`), starts schedulers, handles graceful shutdown |
+| `server/ai.ts` | Unified AI dispatcher `callAI()` — routes to OpenAI or Anthropic via `provider` option |
 | `server/workspaces.ts` | Workspace CRUD, `Workspace` interface, `KeywordStrategy` types, `seoEditTracking` (per-page edit status) |
 | `server/seo-context.ts` | `buildSeoContext()`, `buildKeywordMapContext()`, `buildKnowledgeBase()`, `RICH_BLOCKS_PROMPT` — shared AI prompt builders + multi-modal chat instructions |
 | `server/chat-memory.ts` | Chat session persistence, `addMessage`, `buildConversationContext`, `generateSessionSummary` |
@@ -41,16 +43,18 @@ This is an SEO/web analytics platform (hmpsn studio) built with React + Express 
 | `server/google-analytics.ts` | GA4 API: overview, landing pages, organic, conversions, events, period comparison, new vs returning. Exports `CustomDateRange` type; all functions accept optional `dateRange` param |
 | `server/search-console.ts` | GSC API: queries, pages, devices, countries, period comparison, `getPageTrend` (per-page daily data with URL filter). All functions accept optional `dateRange?: CustomDateRange` param |
 | `server/semrush.ts` | SEMRush API: keyword overview, domain organic, keyword gaps, related keywords |
+| `server/seo-data-provider.ts` | `SeoDataProvider` interface + `registerProvider()` — pluggable SEO data backend. Two providers registered at startup: `SemrushProvider` and `DataForSeoProvider` |
 | `server/openai-helpers.ts` | `callOpenAI` with retry/backoff/timeout, `parseAIJson`, token usage tracking |
+| `server/anthropic-helpers.ts` | `callAnthropic` — Anthropic Messages API with retry/backoff/timeout. Used for creative prose (content generation) |
 | `server/schema-suggester.ts` | JSON-LD schema generation per page |
 | `server/rank-tracking.ts` | Keyword position tracking over time |
 | `server/stripe.ts` | Stripe SDK setup (lazy init from config), product config (14 types), checkout session creation, webhook handler (checkout.session.completed, payment_intent.payment_failed) |
 | `server/stripe-config.ts` | Encrypted on-disk persistence for Stripe keys + product Price IDs. AES-256-GCM encryption. Falls back to env vars for CI/Docker. |
 | `server/constants.ts` | `STUDIO_NAME` constant — single source of truth for studio/agency name in all server-side copy (emails, request notes, submittedBy). Future: per-workspace override for agency resale |
 | `server/payments.ts` | Payment record CRUD (JSON on disk), per-workspace payment history, lookup by session ID |
-| `server/users.ts` | Internal user model (owner/admin/member), bcrypt hashing (12 rounds), CRUD, `verifyPassword`, JSON-on-disk persistence in `auth/users.json` |
+| `server/users.ts` | Internal user model (owner/admin/member), bcrypt hashing (12 rounds), CRUD, `verifyPassword` — stored in SQLite `users` table |
 | `server/auth.ts` | JWT sign/verify (7-day expiry), Express middleware: `requireAuth`, `requireRole`, `requireWorkspaceAccess`, `optionalAuth`. Augments `Express.Request` with `user` and `jwtPayload` |
-| `server/client-users.ts` | Client user model (client_owner/client_member), per-workspace accounts, bcrypt hashing, JWT (24h expiry), CRUD, `verifyClientPassword`, `signClientToken`/`verifyClientToken` |
+| `server/client-users.ts` | Client user model (client_owner/client_member), per-workspace accounts, bcrypt hashing, JWT (24h expiry), CRUD, `verifyClientPassword`, `signClientToken`/`verifyClientToken` — stored in SQLite `client_users` table |
 
 ## Key Frontend Components
 

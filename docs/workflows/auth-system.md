@@ -14,7 +14,7 @@ The platform has a dual auth system for backward compatibility. Both internal (a
 |------|--------|
 | **Model** | `User { id, email, name, passwordHash, role, workspaceIds, lastLoginAt, createdAt, updatedAt }` |
 | **Roles** | `owner` (full access, bypasses workspace checks), `admin` (manages assigned workspaces), `member` (read + execute in assigned workspaces) |
-| **Storage** | `auth/users.json` via `getDataDir('auth')` |
+| **Storage** | SQLite `users` table |
 | **Password** | bcrypt, 12 rounds |
 | **Token** | JWT, 7-day expiry, signed with `JWT_SECRET` env or fallback |
 | **Cookie** | `token` (httpOnly, sameSite: lax, secure in prod) |
@@ -25,7 +25,7 @@ The platform has a dual auth system for backward compatibility. Both internal (a
 |------|--------|
 | **Model** | `ClientUser { id, email, name, passwordHash, role, workspaceId, invitedBy, lastLoginAt, createdAt, updatedAt }` |
 | **Roles** | `client_owner`, `client_member` |
-| **Storage** | `auth/client-users.json` via `getDataDir('auth')` |
+| **Storage** | SQLite `client_users` table |
 | **Password** | bcrypt, 12 rounds |
 | **Token** | JWT, 24h expiry, contains `clientUserId` + `workspaceId` |
 | **Cookie** | `client_user_token_<workspaceId>` (httpOnly, per-workspace) |
@@ -34,7 +34,7 @@ The platform has a dual auth system for backward compatibility. Both internal (a
 
 | System | How it works |
 |--------|-------------|
-| **Admin (APP_PASSWORD)** | Shared password → HMAC token in `auth_token` cookie. Global middleware in `server/index.ts` checks this first. |
+| **Admin (APP_PASSWORD)** | Shared password → HMAC token in `auth_token` cookie. Global middleware in `server/app.ts` checks this first. |
 | **Client (shared password)** | Per-workspace `clientPassword` → HMAC session in `client_session_<wsId>` cookie. |
 
 ## Middleware Stack
@@ -62,12 +62,16 @@ app.get('/api/workspaces/:id/my-data', requireWorkspaceAccess(), (req, res) => {
 
 ### How client session enforcement works
 
-The `/api/public/*` middleware in `server/index.ts` checks (in order):
+The `/api/public/*` middleware in `server/app.ts` checks (in order):
 1. Is the route an auth endpoint? (`auth`, `client-login`, `client-me`, `auth-mode`, `workspace`) → pass through
 2. Does the workspace have `clientPassword` set? If not → pass through (open access)
 3. Is there a valid `client_session_<wsId>` cookie? (legacy shared password) → pass through
 4. Is there a valid `client_user_token_<wsId>` cookie? (client user JWT) → pass through
 5. Otherwise → 401
+
+### WebSocket auth
+
+WebSocket `subscribe` actions are also JWT-scoped. When a client sends `{ action: 'authenticate', token }` over the WebSocket connection, the server verifies the JWT and stores the authenticated user's `workspaceIds`. Subsequent `subscribe` messages are then checked against that list — non-owner users can only subscribe to workspaces listed in their JWT. This is enforced in `server/websocket.ts`. Unauthenticated connections (e.g. client portal users authenticated via httpOnly cookies) are still allowed to subscribe, but they never pass a JWT token so no workspace restriction is applied at the WS layer — their restriction is enforced at the HTTP layer instead.
 
 ## API Endpoints
 
@@ -136,10 +140,13 @@ The `/api/public/*` middleware in `server/index.ts` checks (in order):
 3. Update `addActivity` signature to accept optional `userId`/`userName`
 4. Display attributed names in activity feed UI
 
-## Next Steps (from AUTH_ROADMAP.md)
+## Shipped Auth Features
 
-- **Frontend login UI** — Admin login screen, user context provider, route protection
-- **Frontend client login** — Client email login, team management section
-- **Phase 3**: Internal team management UI (invite flow, user list, workspace assignments)
+- **Frontend admin login UI** — Admin login screen, user context provider, route protection — shipped
+- **Frontend client login** — Client email + password login, auth-mode detection (shared password vs individual accounts), per-user welcome modal — shipped
+- **Client user management** — Admin invite flow, user list, workspace assignments, per-user password change — shipped
+
+## Remaining / In-Progress (from AUTH_ROADMAP.md)
+
 - **Phase 5**: Permission-based feature access (client_member restrictions, admin role limits)
 - **Phase 6**: Notification preferences (per-user email settings, digest frequency)

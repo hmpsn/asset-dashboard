@@ -41,6 +41,8 @@ The strategy endpoint has 3 phases where data is injected:
 - Pass data via the `context` parameter object
 - Uses `buildSeoContext()` and `buildKeywordMapContext()` from `seo-context.ts`
 - SEMRush metrics passed as `context.semrushMetrics` and `context.semrushRelated`
+- **Voice DNA injection (Layer 2)**: Brief generation calls `buildSystemPrompt(workspaceId, systemInstructions)` from `server/prompt-assembly.ts`. When a workspace has a calibrated voice profile, `buildSystemPrompt` automatically injects voice DNA and guardrails into the system message — no manual voice-context injection needed in the brief caller.
+- **Workspace learnings injection**: Brief generation also injects workspace learnings via `getWorkspaceLearnings(workspaceId)`, gated on the `outcome-ai-injection` feature flag. When the flag is enabled, learnings are appended to the system prompt via `formatLearningsForPrompt`.
 
 ## 4. Monthly Reports (`server/monthly-report.ts`)
 

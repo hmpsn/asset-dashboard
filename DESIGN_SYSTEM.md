@@ -377,22 +377,37 @@ Centered modal overlay for confirming destructive or irreversible actions. Repla
 
 ```
 src/components/ui/
-├── StatCard.tsx         # Default, hero, and compact stat displays
-├── MetricRing.tsx       # Unified score ring (replaces 3 implementations)
-├── PageHeader.tsx       # Consistent page header
-├── SectionCard.tsx      # Standard card container
-├── DateRangeSelector.tsx # Unified date/period picker
-├── DataList.tsx         # Ranked list display
-├── Badge.tsx            # Status/category pill
-├── EmptyState.tsx       # Placeholder for empty/unconfigured states
-├── TabBar.tsx           # Sub-navigation tabs
-├── Skeleton.tsx         # Shimmer/skeleton loading placeholders (5 variants)
-├── AIContextIndicator.tsx # AI data source completeness bar
-├── StatusBadge.tsx      # Unified status badges with statusConfig color map
-├── TierGate.tsx         # Tier lock overlay + TierBadge
-├── constants.ts         # scoreColor, scoreColorClass, scoreBgBarClass, DATE_PRESETS
-├── statusConfig.ts      # Status→color mapping for StatusBadge
-├── index.ts             # Barrel export
+├── StatCard.tsx            # Default, hero, and compact stat displays
+├── MetricRing.tsx          # Unified score ring (replaces 3 implementations)
+├── MetricRingSvg.tsx       # SVG-only sub-component used by MetricRing
+├── MetricToggleCard.tsx    # Toggleable stat card for chart series visibility (active/inactive states)
+├── PageHeader.tsx          # Consistent page header
+├── SectionCard.tsx         # Standard card container
+├── DateRangeSelector.tsx   # Unified date/period picker
+├── DataList.tsx            # Ranked list display
+├── Badge.tsx               # Status/category pill
+├── EmptyState.tsx          # Placeholder for empty/unconfigured states
+├── ErrorState.tsx          # Error display with retry action; includes NetworkError, DataError, PermissionError helpers
+├── LoadingState.tsx        # Spinner + contextual message; also exports Skeleton and TableSkeleton
+├── TabBar.tsx              # Sub-navigation tabs
+├── Skeleton.tsx            # Shimmer/skeleton loading placeholders (5 variants)
+├── AIContextIndicator.tsx  # AI data source completeness bar
+├── StatusBadge.tsx         # Unified status badges with statusConfig color map
+├── TierGate.tsx            # Tier lock overlay + TierBadge
+├── OnboardingChecklist.tsx # Full-screen modal guiding users through initial workspace setup
+├── WorkflowStepper.tsx     # Horizontal numbered step indicator for multi-step workflows
+├── WorkspaceHealthBar.tsx  # Dashboard widget showing workspace health metrics with recommendations
+├── ConfirmDialog.tsx       # Centered modal for confirming destructive/irreversible actions
+├── NextStepsCard.tsx       # Card listing actionable next steps with teal hover CTA rows
+├── ProgressIndicator.tsx   # Running/complete/idle progress bar with indeterminate support
+├── CharacterCounter.tsx    # Inline character count (current/max) with color thresholds at 80%/95%
+├── FeatureFlag.tsx         # Conditionally renders children based on a FeatureFlagKey
+├── ScannerReveal.tsx       # Page-transition overlay: teal beam sweeps content container on route change
+├── SerpPreview.tsx         # Google SERP result preview (title, URL, description) for SEO editors
+├── SocialPreview.tsx       # Social sharing card preview for Facebook and Twitter/X
+├── constants.ts            # scoreColor, scoreColorClass, scoreBgBarClass, DATE_PRESETS
+├── statusConfig.ts         # Status→color mapping for StatusBadge
+├── index.ts                # Barrel export
 ```
 
 ---

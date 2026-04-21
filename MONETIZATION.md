@@ -575,6 +575,8 @@ The platform already has the data to predict disengagement. Surface these as adm
 
 ## Credits System (Phase 3)
 
+> **Not yet implemented.** This section is a spec for future work. No credits fields or credit-purchase flows exist in the codebase yet.
+
 ### Prepaid Credit Packs
 
 An alternative to per-item checkout for higher-volume clients:
@@ -616,6 +618,8 @@ An alternative to per-item checkout for higher-volume clients:
 ---
 
 ## White-Label Resale (Future)
+
+> **Not yet implemented.** This section is a spec for future work. No white-label configuration, multi-tenant domain routing, or agency-tier billing exists in the codebase yet.
 
 ### Platform-as-a-Service for Other Agencies
 
@@ -698,20 +702,28 @@ Each gated section uses the same visual treatment:
 - Overlay: centered card with lock icon, tier name, value proposition, and CTA button
 - CTA links to in-portal pricing page or Stripe subscription checkout
 
-### AI Chatbot Rate Limiting (Free Tier)
+### AI Chatbot Rate Limiting
 
-- Track conversations per workspace per calendar month in `chat-memory.ts`
+Usage gating is implemented in `server/usage-tracking.ts` with a dedicated `usage_tracking` SQLite table (not `chat-memory.ts`). Limits are enforced via `checkUsageLimit(workspaceId, tier, feature)`.
+
+| Tier | `ai_chats` / month | `strategy_generations` / month |
+|------|--------------------|-------------------------------|
+| Free (Starter) | 3 | 0 |
+| Growth | 50 | 3 |
+| Premium | Unlimited | Unlimited |
+
 - A "conversation" = a chat session with at least 1 user message
-- After 3 conversations: chat input disabled, replaced with upgrade prompt
+- After the free-tier limit (3): chat input disabled, replaced with upgrade prompt
 - Counter shown in chat header: "2 of 3 free conversations remaining"
 - Proactive insights greeting disabled on free tier (saves tokens + creates upgrade incentive)
+- Growth tier strategy cap (3/month) prompts upgrade to Premium when exhausted
 
 ### Implementation Status
 
 1. ✅ **`tier` on Workspace interface** — `tier: 'free' | 'growth' | 'premium'` in `server/workspaces.ts`
 2. ✅ **`<TierGate>` component** — blur overlay with upgrade CTA, used across Strategy and Content sections
 3. ✅ **Tab-level gating in NAV array** — `isPaid` / `isPremium` booleans control tab visibility
-4. ✅ **Chat rate limiting** — `checkChatRateLimit()` in `chat-memory.ts`, 3 convos/month for free tier
+4. ✅ **Usage rate limiting** — `checkUsageLimit()` in `server/usage-tracking.ts` (`usage_tracking` SQLite table). Free: 3 chats/0 strategies. Growth: 50 chats/3 strategies. Premium: unlimited.
 5. ✅ **Competitor gaps gated to Premium** — `TierGate required="premium"` on keyword gaps section
 6. 🟡 **Strategy & Implementation Hours system** — roadmapped (item #76). Requests tab returns when active.
 7. ✅ **Stripe subscription sync** — webhook updates `ws.tier` on subscription create/cancel/change
@@ -744,10 +756,10 @@ GET    /api/stripe/payments/:wsId     — List payments for a workspace
 GET    /api/public/stripe/status/:id  — Client checks payment status
 ```
 
-### New Files
+### Implemented Files
 ```
 server/stripe.ts                      — Stripe SDK setup, checkout helpers, webhook handler
-server/payments.ts                    — Payment record persistence (JSON on disk)
+server/payments.ts                    — Payment record persistence (SQLite)
 ```
 
 ### Webhook Events to Handle
@@ -764,5 +776,5 @@ payment_intent.payment_failed → Flag order, notify admin
 
 ---
 
-*Last updated: March 7, 2026*
-*Status: Strategy approved, Phase 1 (Stripe) ready for implementation*
+*Last updated: April 21, 2026*
+*Status: Phase 1 (Stripe) fully implemented. Phase 2 (tier gating + usage tracking) implemented. Phases 3–4 (bundle pricing page, credits system) pending.*
