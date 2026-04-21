@@ -421,7 +421,7 @@ export function PageEditRow({
               <SerpPreview
                 title={edit?.seoTitle || page.title}
                 description={edit?.seoDescription || ''}
-                url={`/${page.slug}`}
+                url={page.publishedPath || `/${page.slug}`}
                 siteName="Your Site"
                 size="sm"
               />
