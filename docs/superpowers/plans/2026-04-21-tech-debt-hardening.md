@@ -185,18 +185,36 @@ Import (add to top of each file if not present):
 import { checkUsageLimit, incrementUsage } from '../usage-tracking.js';
 ```
 
-Use `'strategy_generations'` as the feature key. Get workspace tier from the workspace record loaded at the top of each handler (look for `ws.tier || 'free'`).
+Use `'strategy_generations'` as the feature key.
+
+**IMPORTANT — workspace access pattern varies per endpoint. Read carefully:**
 
 **Steps:**
 
 1. **`POST /api/webflow/generate-alt/:assetId`** (`webflow-alt-text.ts:34`):
-   Load the workspace, get `ws.tier`, add limit check before the OpenAI call, add `incrementUsage` after the alt text is successfully generated.
+   `workspaceId` is an **optional** request body field (`req.body.workspaceId`). The workspace is only resolved mid-handler at ~line 86 inside a try-catch for keyword context. The billing guard must be conditional:
+   ```ts
+   const resolvedWsId = /* existing logic to get wsId from body or siteId */;
+   const altWs = resolvedWsId ? getWorkspace(resolvedWsId) : null;
+   if (altWs) {
+     const usage = checkUsageLimit(altWs.id, altWs.tier || 'free', 'strategy_generations');
+     if (!usage.allowed) return res.status(429).json({ error: 'Monthly AI generation limit reached', used: usage.used, limit: usage.limit });
+   }
+   ```
+   Add `incrementUsage(altWs.id, 'strategy_generations')` after successful generation, also gated on `if (altWs)`.
 
 2. **`POST /api/webflow/bulk-generate-alt`** (`webflow-alt-text.ts:124`):
-   This generates alt text for multiple assets in a loop. Place `checkUsageLimit` once before the loop starts (guards the entire bulk operation). Place `incrementUsage` once after all assets are processed (count as one strategy generation, not N). If the check fails, return 429 immediately.
+   `bulkWsId` is resolved at line 143 (`const bulkWsId = bulkAltWsId || ...`) and `bulkWs = getWorkspace(bulkWsId)` is called at line 149 inside `if (bulkWsId)`. Place the limit check **inside that existing `if (bulkWsId)` block**, after `bulkWs` is available but before the asset processing loop. Count the entire bulk operation as one `strategy_generation`, not N. Return 429 if not allowed.
 
 3. **`POST /api/brand-identity/:workspaceId/generate`** (`brand-identity.ts:80`):
-   Same single-endpoint pattern as #1.
+   The route delegates to `generateDeliverable()` — no direct `callOpenAI` in the route. The workspace ID is in the URL (`req.params.workspaceId`) and `requireWorkspaceAccess('workspaceId')` is already applied. Load the workspace explicitly, then check:
+   ```ts
+   const ws = getWorkspace(req.params.workspaceId);
+   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+   const usage = checkUsageLimit(ws.id, ws.tier || 'free', 'strategy_generations');
+   if (!usage.allowed) return res.status(429).json({ error: 'Monthly AI generation limit reached', used: usage.used, limit: usage.limit });
+   ```
+   Add `incrementUsage(ws.id, 'strategy_generations')` after `generateDeliverable()` returns successfully (before `res.json(result)`).
 
 Run `npm run typecheck` after changes.
 
@@ -278,13 +296,13 @@ Run `npm run typecheck` after writing.
 
 **In `src/api/misc.ts`:**
 
-4. `exportPostPdf(workspaceId: string, postId: string): Promise<Blob>` — wraps `GET /api/content-posts/:workspaceId/:postId/export/pdf`. Returns blob for download.
+4. `exportPostPdf(workspaceId: string, postId: string): Promise<string>` — wraps `GET /api/content-posts/:workspaceId/:postId/export/pdf`. Returns HTML text (`r.text()`), **not a Blob** — the server returns rendered HTML that the caller writes into a `window.open()` tab.
 
-5. `exportBrief(workspaceId: string, briefId: string): Promise<Blob>` — wraps `GET /api/content-briefs/:workspaceId/:briefId/export`. Returns blob for download.
+5. `exportBrief(workspaceId: string, briefId: string): Promise<string>` — wraps `GET /api/content-briefs/:workspaceId/:briefId/export`. Same HTML-text pattern as above.
 
 **In `src/api/workspaces.ts`:**
 
-6. `uploadDropZoneFile(endpoint: string, formData: FormData): Promise<{ url: string }>` — wraps the generic `POST` file upload in `DropZone.tsx:34`. Check `DropZone.tsx` for the actual endpoint and response shape before writing.
+6. `uploadDropZoneFile(endpoint: string, formData: FormData): Promise<{ uploaded: number }>` — wraps the generic `POST` file upload in `DropZone.tsx:34`. Response shape is `{ uploaded: number }` (count of files uploaded), verified against `DropZone.tsx:35-36`.
 
 For functions 4, 5, 6: the auth header pattern (`x-auth-token` from localStorage) should match the existing helpers in `src/api/misc.ts` or `src/api/workspaces.ts`.
 
@@ -407,11 +425,11 @@ Four components use raw `fetch()` for file upload or blob export. Phase 1 (Task 
 
 1. **`DropZone.tsx:34`** — Replace `fetch(endpoint, { method: 'POST', body: formData })` with `uploadDropZoneFile(endpoint, formData)` from `src/api/workspaces.ts`. Handle the response/error the same way the current code does.
 
-2. **`PostEditor.tsx:211`** — Replace `fetch('/api/content-posts/${workspaceId}/${postId}/export/pdf')` with `exportPostPdf(workspaceId, postId)` from `src/api/misc.ts`. The download-to-browser pattern (creating a temporary `<a>` element) stays in the component — only the fetch call changes.
+2. **`PostEditor.tsx:211`** — The existing `exportPDF()` function opens `window.open('', '_blank')`, then fetches HTML and writes it into the new window via `w.document.write(html)`. Replace only the `fetch(...).then(r => r.text())` call with `exportPostPdf(workspaceId, postId)` from `src/api/misc.ts`. The window-open and document-write logic stays in the component unchanged.
 
-3. **`ContentBriefs.tsx:284`** — Replace `fetch('/api/content-briefs/${workspaceId}/${b.id}/export')` with `exportBrief(workspaceId, b.id)` from `src/api/misc.ts`. Same download-to-browser pattern.
+3. **`ContentBriefs.tsx:284`** — Same pattern as above. The `exportClientHTML()` function uses `fetch(...).then(r => r.text())` then writes into a new window. Replace the fetch call with `exportBrief(workspaceId, b.id)` from `src/api/misc.ts`. Window-open logic stays.
 
-4. **`ContentTab.tsx:485`** — Replace the inline `fetch('/api/content-briefs/${workspaceId}/${brief.id}/export').then(...).catch(...)` inside the `onClick` with `exportBrief(workspaceId, brief.id)`. Extract it from the inline arrow function — move to a handler function `handleExport(brief)` above the JSX return for readability.
+4. **`ContentTab.tsx:485`** — The inline `onClick` does the same window-open + `fetch(...).then(r => r.text()).then(html => w.document.write(html))` pattern. Extract it to a named handler `handleExportBrief(brief)` above the JSX return, and replace the raw `fetch(...)` with `exportBrief(workspaceId, brief.id)` from `src/api/misc.ts`.
 
 Run `npm run typecheck` after changes.
 
