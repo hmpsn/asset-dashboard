@@ -1,6 +1,6 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **306 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **310 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
@@ -20,7 +20,7 @@ A comprehensive value assessment of every feature in the platform — **306 feat
 ---
 
 ### 87. Admin Notification Center
-**What it does:** NotificationBell component integrated into sidebar utility bar that aggregates pending work across all workspaces. Shows counts for anomalies, content requests, approvals, and other attention items. Real-time polling every 5 minutes with click-to-navigate functionality. Dropdown shows categorized items with direct links to relevant workspace + tool combinations.
+**What it does:** NotificationBell component rendered inside the admin Sidebar (`src/components/layout/Sidebar.tsx`) that aggregates pending work across all workspaces. Shows counts for anomalies, content requests, approvals, and other attention items. Real-time polling every 5 minutes with click-to-navigate functionality. Opens a slide-out drawer showing categorized items with direct links to relevant workspace + tool combinations.
 
 **Agency value:** Centralized visibility reduces time spent checking individual workspaces. Proactive issue detection prevents client escalations. Faster response times to urgent items.
 
@@ -3298,9 +3298,9 @@ When the user asks to update this document with recent features, follow this pro
 | Platform & UX | 25+ | Design system, command center, UX overhaul, navigation, cross-linking, roadmap, Recharts, mobile guard |
 | Architecture & Infrastructure | 30+ | Server refactor, React Query migration (5 phases), React Router, typed API client, Pino logging, Sentry, CI/CD, SQLite optimization |
 
-**306 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**310 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **306**. Last updated: April 2026.
+Current feature count: **310**. Last updated: April 2026.
 
 ---
 
@@ -3320,6 +3320,58 @@ Current feature count: **306**. Last updated: April 2026.
 **Agency value:** Programming errors in assembler catch blocks previously silenced TypeErrors and ReferenceErrors as empty-fallback degradation. After hardening, any renamed export or null-dereference in a slice assembler fires a Sentry alert immediately instead of silently returning stale/empty data to the AI prompt. Eliminates the silent data-loss class of bugs in the intelligence engine.
 
 **Mutual:** CI enforcement — the new `pr-check` rule prevents future bare catches from being introduced in workspace-intelligence.ts. Any contributor who writes `} catch {` in that file will see an error before the PR merges.
+
+---
+
+## Copy & Brand Engine — Phase 1: Brand Foundation
+
+### 307. Brandscript Engine
+**What it does:** Structured brand narrative builder based on the StoryBrand framework (Donald Miller). Stores brand stories as a workspace-scoped `brandscripts` table with child `brandscript_sections` rows. Eight canonical section types: Hook, Character, Problem, Guide, Plan, Call to Action, Failure, Success. Full CRUD API: list, get, create (from template or blank), update name/framework, delete. Section batch-update via delete-all + reinsert with `created_at` / `sort_order` preservation. A seeded `brandscript_templates` table ships with the default StoryBrand template. `generateBrandscript()` uses GPT-4.1 with workspace intelligence context to pre-populate all sections from existing brand knowledge. `questionnaire → brandscript` auto-population maps onboarding questionnaire answers (about, services, differentiators, personas, competitors) into the 8 sections idempotently — returns existing brandscript if one already exists. Admin UI in `BrandscriptTab.tsx` with inline section editing, AI generation trigger, and live preview.
+
+**Files:** `server/brandscript.ts`, `server/routes/brandscript.ts`, `server/db/migrations/053-brandscript-engine.sql`, `shared/types/brand-engine.ts`, `src/components/brand/BrandscriptTab.tsx`
+
+**Agency value:** Captures the brand narrative in a structured, reusable format that feeds every downstream AI feature (copy generation, voice calibration, deliverable generation). Replaces unstructured brand docs with a queryable framework.
+
+**Client value:** A clear articulation of their brand story they can review, edit, and approve — not a black box.
+
+**Mutual:** The brandscript is the single source of truth for brand narrative across copy, voice, and identity deliverables.
+
+---
+
+### 308. Discovery Ingestion
+**What it does:** Ingestion pipeline for raw brand source material. Accepts uploads of transcripts, brand documents, competitor profiles, existing copy, and website crawl data (`source_type` enum). AI-powered extraction (GPT-4.1-mini) pulls structured signals from raw content: brand attributes, voice signals, audience insights, product details, competitive intelligence, and value propositions (`extraction_type` + `category` fields). Each extraction carries a confidence rating (`high`/`medium`/`low`) based on source type (transcripts → high; website crawl → low). Extractions include a `source_quote` anchoring them to specific passages. `SourceAlreadyProcessedError` guards against double-processing: re-processing requires explicit `{ force: true }` which deletes prior extractions and replaces them. Extractions can be reviewed, edited, approved, dismissed, or routed to specific brand tools (`routed_to` field). Admin UI in `DiscoveryTab.tsx` shows sources list with extraction status and per-source extraction review panel.
+
+**Files:** `server/discovery-ingestion.ts`, `server/routes/brandscript.ts`, `server/db/migrations/053-brandscript-engine.sql`, `shared/types/brand-engine.ts`, `src/components/brand/DiscoveryTab.tsx`
+
+**Agency value:** Turns unstructured brand assets (sales call transcripts, intake docs, old website copy) into structured brand intelligence without manual analysis. Source material automatically feeds voice calibration and brandscript generation.
+
+**Client value:** Existing brand materials are respected and incorporated rather than starting from scratch.
+
+---
+
+### 309. Voice Calibration
+**What it does:** Voice profile state machine (`draft → calibrating → calibrated`) that codifies a workspace's brand voice into AI-consumable structures. Three data layers: **Voice DNA** (tone dimensions with weights, vocabulary preferences, forbidden phrases, structural preferences), **Guardrails** (tone boundaries, anti-patterns, content rules, brand promises), and **Context Modifiers** (per-context adjustments for headline/body/cta/about copy). Calibration sessions generate 3 AI variations of a given copy type (`promptType` string — e.g., `hero_headline`, `service_cta`, `brand_story`). The agency selects the preferred variation; selection distills the chosen text into voice DNA dimensions via AI analysis using Claude (`callCreativeAI`). Voice samples (with `context_tag` labels: `headline`, `body`, `cta`, `about`) feed calibration context. `buildVoiceCalibrationContext()` assembles samples, DNA, and guardrails for injection into copy generation prompts. `INSERT OR IGNORE` on `voice_profiles(workspace_id)` prevents duplicate profile creation under concurrent requests. Admin UI in `VoiceTab.tsx`.
+
+**Files:** `server/voice-calibration.ts`, `server/voice-dna-render.ts`, `server/prompt-assembly.ts`, `server/routes/voice-calibration.ts`, `server/db/migrations/053-brandscript-engine.sql`, `shared/types/brand-engine.ts`, `src/components/brand/VoiceTab.tsx`
+
+**Agency value:** Replaces ad-hoc brand voice notes with a structured, versionable voice profile that feeds every AI generation in the platform. Once calibrated, every piece of AI-generated copy sounds like the client — not generic marketing language.
+
+**Client value:** Their brand voice is encoded, not just described. Generated copy consistently reflects their personality across all content types.
+
+**Mutual:** A calibrated voice profile is the highest-leverage input in the copy generation stack. It self-improves over time via the Voice Feedback Loop (feature #287).
+
+---
+
+### 310. Brand Identity Deliverables
+**What it does:** AI-generated brand identity document suite organized into three tiers — **Essentials** (mission, vision, values, tagline, elevator_pitch), **Professional** (archetypes, personality_traits, voice_guidelines, tone_examples, messaging_pillars, differentiators, positioning_matrix), **Premium** (brand_story, personas, customer_journey, objection_handling, emotional_triggers). 17 deliverable types total. Each deliverable is stored with version history (`brand_identity_versions` table). `generateDeliverable()` uses Claude (`callCreativeAI`) with full intelligence context (workspace intel + voice calibration context + brandscript sections + discovery extractions). Approved copy auto-adds a voice sample via `addVoiceSample()` so each approval strengthens the voice profile. Status machine: `draft → approved`. Steering notes accumulate across regenerations. `broadcastToWorkspace()` fires on every generation/approval for real-time UI sync. Admin UI in `IdentityTab.tsx` with tier grouping, deliverable cards, inline steering, and version history viewer.
+
+**Files:** `server/brand-identity.ts`, `server/routes/brand-identity.ts`, `server/db/migrations/053-brandscript-engine.sql`, `shared/types/brand-engine.ts`, `src/components/brand/IdentityTab.tsx`
+
+**Agency value:** Generates 17 brand identity documents in minutes from existing workspace intelligence. Tier grouping lets agencies deliver essentials quickly, then upsell professional and premium deliverables. Version history tracks every regeneration.
+
+**Client value:** A complete brand identity package — not just copy, but archetypes, personas, customer journey maps, and objection handling — all grounded in their actual business data.
+
+**Mutual:** Brand identity deliverables become context for every downstream feature: copy generation, voice calibration, AI chat, and content briefs all reference the approved deliverable suite.
 
 ---
 

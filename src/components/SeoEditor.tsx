@@ -27,7 +27,7 @@ import { BulkOperations } from './editor/BulkOperations';
 import { ApprovalPanel } from './editor/ApprovalPanel';
 import { PendingApprovals } from './PendingApprovals';
 import { SeoSuggestionsPanel } from './editor/SeoSuggestionsPanel';
-import { matchPagePath } from '../lib/pathUtils';
+import { matchPagePath, resolvePagePath } from '../lib/pathUtils';
 
 interface EditState {
   seoTitle: string;
@@ -442,7 +442,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     const analyzed = new Set<string>();
     for (const entry of strategyData.pageMap) {
       if (entry.analysisGeneratedAt) {
-        const match = pages.find(p => p.slug != null && matchPagePath(entry.pagePath, p.slug));
+        const match = pages.find(p => matchPagePath(entry.pagePath, resolvePagePath(p)));
         if (match) analyzed.add(match.id);
       }
     }
@@ -455,7 +455,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     if (!strategyData?.pageMap) return map;
     for (const entry of strategyData.pageMap) {
       if (!entry.primaryKeyword) continue;
-      const match = pages.find(p => p.slug != null && matchPagePath(entry.pagePath, p.slug));
+      const match = pages.find(p => matchPagePath(entry.pagePath, resolvePagePath(p)));
       if (match) {
         map.set(match.id, {
           primaryKeyword: entry.primaryKeyword,
@@ -486,7 +486,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         // Step 2: Persist analysis to workspace keyword strategy
         await keywords.persistAnalysis({
           workspaceId,
-          pagePath: `/${page.slug || ''}`,
+          pagePath: resolvePagePath(page),
           analysis,
         });
 

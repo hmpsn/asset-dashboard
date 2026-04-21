@@ -8,13 +8,13 @@
 
 **hmpsn.studio** is an SEO/web analytics agency platform. React 19 + Vite 8 + TailwindCSS 4 + React Router DOM 7 (frontend), Express + TypeScript (backend), SQLite via better-sqlite3 (storage).
 
-Integrations: Webflow, Google Search Console, GA4, SEMRush, Stripe, OpenAI (GPT-4.1), Anthropic (Claude for creative prose).
+Integrations: Webflow, Google Search Console, GA4, SEMRush, DataForSEO (both via `SeoDataProvider` interface in `server/seo-data-provider.ts`), Stripe, OpenAI (GPT-4.1), Anthropic (Claude for creative prose).
 
 - **Routing** — React Router DOM 7. `src/routes.ts` defines `Page` + `ClientTab` types, `adminPath()` + `clientPath()` helpers. Admin: `/ws/:workspaceId/:tab?`, Client: `/client/:workspaceId/:tab?`.
-- **API Client** — Typed fetch wrappers in `src/api/` (7 modules). No raw `fetch()` in components.
+- **API Client** — Typed fetch wrappers in `src/api/` (12 modules). No raw `fetch()` in components.
 - **Shared Types** — `shared/types/` (11 modules) shared between client and server.
 - **Storage** — SQLite (WAL mode, foreign keys ON) at `DATA_BASE/dashboard.db`. 21+ migrations in `server/db/migrations/`.
-- **AI** — OpenAI via `server/openai-helpers.ts` (`callOpenAI`), Anthropic via `server/anthropic-helpers.ts` (`callAnthropic`) for creative prose.
+- **AI** — Unified dispatcher: `callAI()` in `server/ai.ts` routes to either provider — new code should use this. Direct helpers: OpenAI via `server/openai-helpers.ts` (`callOpenAI`), Anthropic via `server/anthropic-helpers.ts` (`callAnthropic`) for creative prose.
 - **Auth** — Dual: internal JWT (7-day, admin) + client JWT (24h, per-workspace). Turnstile CAPTCHA optional.
 - **Payments** — Stripe Checkout (not Payment Intents). Config encrypted on disk (AES-256-GCM).
 - **Validation** — Zod v3 via `server/middleware/validate.ts`. Import as `import { validate, z } from '../middleware/validate.js'`.
@@ -118,7 +118,7 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
 
 ### UI Primitives — always check before hand-rolling
 
-`SectionCard`, `StatCard`, `CompactStatBar`, `PageHeader`, `MetricRing`, `MetricRingSvg`, `Badge`, `TabBar`, `DateRangeSelector`, `DataList`, `EmptyState`, `TierGate`, `TierBadge`, `AIContextIndicator`, `StatusBadge`, `Skeleton` — all from `src/components/ui/`.
+`SectionCard`, `StatCard`, `CompactStatBar`, `PageHeader`, `MetricRing`, `MetricRingSvg`, `Badge`, `TabBar`, `DateRangeSelector`, `DataList`, `EmptyState`, `ErrorState`, `LoadingState`, `TierGate`, `TierBadge`, `AIContextIndicator`, `StatusBadge`, `Skeleton`, `ConfirmDialog`, `WorkflowStepper`, `WorkspaceHealthBar`, `OnboardingChecklist`, `FeatureFlag` — all from `src/components/ui/`.
 
 ---
 
@@ -261,6 +261,7 @@ This project uses **two separate auth systems** that must never be mixed up:
 | `docs/rules/ai-dispatch-patterns.md` | AI-call-before-DB-write race, transaction guards, retry-on-unique patterns |
 | `docs/rules/development-patterns.md` | Operational patterns — React Query hooks, WebSocket wiring checklist, route templates, DB query patterns, auth decision tree, feature flag lifecycle, testing quick reference |
 | `docs/testing-plan.md` | Test strategy, failure mode catalog, coverage gaps, infrastructure |
+| `AI_CHATBOT_ROADMAP.md` | Client AI advisor roadmap — chat feature phases, upgrade hooks, proactive insights spec |
 
 ---
 
