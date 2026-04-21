@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
@@ -30,42 +31,23 @@ let broadcastFn: BroadcastFn | null = null;
 const MAX_JOBS = 200;
 const JOB_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
 
-// ── Lazy prepared statements ──
-
-let _insertStmt: ReturnType<typeof db.prepare> | null = null;
-function insertStmt() {
-  if (!_insertStmt) {
-    _insertStmt = db.prepare(`
-      INSERT INTO jobs (id, type, status, progress, total, message, result, error, workspace_id, created_at, updated_at)
-      VALUES (@id, @type, @status, @progress, @total, @message, @result, @error, @workspaceId, @createdAt, @updatedAt)
-    `);
-  }
-  return _insertStmt;
-}
-
-let _updateStmt: ReturnType<typeof db.prepare> | null = null;
-function updateStmt() {
-  if (!_updateStmt) {
-    // jobs.workspace_id is nullable (some jobs are global). The id is a
-    // randomUUID() (122-bit entropy), so cross-workspace collision is impossible.
-    // ws-scope-ok
-    _updateStmt = db.prepare(`
-      UPDATE jobs SET status = @status, progress = @progress, total = @total, message = @message, -- status-ok: job progress tracker
-        result = @result, error = @error, updated_at = @updatedAt
-      WHERE id = @id
-    `);
-  }
-  return _updateStmt;
-}
-
-let _deleteStmt: ReturnType<typeof db.prepare> | null = null;
-function deleteStmt() {
-  if (!_deleteStmt) {
-    // ws-scope-ok — jobs.id is a randomUUID() (122-bit entropy, globally unique).
-    _deleteStmt = db.prepare(`DELETE FROM jobs WHERE id = ?`);
-  }
-  return _deleteStmt;
-}
+// ── Prepared statements ──
+const stmts = createStmtCache(() => ({
+  insert: db.prepare(`
+    INSERT INTO jobs (id, type, status, progress, total, message, result, error, workspace_id, created_at, updated_at)
+    VALUES (@id, @type, @status, @progress, @total, @message, @result, @error, @workspaceId, @createdAt, @updatedAt)
+  `),
+  // jobs.workspace_id is nullable (some jobs are global). The id is a
+  // randomUUID() (122-bit entropy), so cross-workspace collision is impossible.
+  // ws-scope-ok
+  update: db.prepare(`
+    UPDATE jobs SET status = @status, progress = @progress, total = @total, message = @message, -- status-ok: job progress tracker
+      result = @result, error = @error, updated_at = @updatedAt
+    WHERE id = @id
+  `),
+  // ws-scope-ok — jobs.id is a randomUUID() (122-bit entropy, globally unique).
+  delete: db.prepare(`DELETE FROM jobs WHERE id = ?`),
+}));
 
 // ── Row ↔ Job mapping ──
 
@@ -146,7 +128,7 @@ function pruneOldJobs() {
   for (const [id, job] of jobs) {
     if (now - new Date(job.updatedAt).getTime() > JOB_TTL_MS) {
       jobs.delete(id);
-      try { deleteStmt().run(id); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'jobs/pruneOldJobs: programming error'); /* best effort */ }
+      try { stmts().delete.run(id); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'jobs/pruneOldJobs: programming error'); /* best effort */ }
     }
   }
   // If still over limit, remove oldest completed jobs
@@ -156,7 +138,7 @@ function pruneOldJobs() {
       .sort((a, b) => new Date(a[1].updatedAt).getTime() - new Date(b[1].updatedAt).getTime());
     for (const [id] of sorted) {
       jobs.delete(id);
-      try { deleteStmt().run(id); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'jobs: programming error'); /* best effort */ }
+      try { stmts().delete.run(id); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'jobs: programming error'); /* best effort */ }
       if (jobs.size <= MAX_JOBS) break;
     }
   }
@@ -184,7 +166,7 @@ export function createJob(type: string, opts?: { message?: string; total?: numbe
     workspaceId: opts?.workspaceId,
   };
   // Write to SQLite first, then cache
-  insertStmt().run(jobToParams(job));
+  stmts().insert.run(jobToParams(job));
   jobs.set(job.id, job);
   broadcastFn?.('job:created', job);
   return job;
@@ -195,7 +177,7 @@ export function updateJob(id: string, update: Partial<Omit<Job, 'id' | 'type' | 
   if (!job) return;
   Object.assign(job, update, { updatedAt: new Date().toISOString() });
   // Write through to SQLite
-  updateStmt().run({
+  stmts().update.run({
     id: job.id,
     status: job.status,
     progress: job.progress ?? null,
@@ -242,7 +224,7 @@ export function cancelJob(id: string): Job | undefined {
   const job = jobs.get(id);
   if (job && (job.status === 'pending' || job.status === 'running')) {
     Object.assign(job, { status: 'cancelled', message: 'Cancelled by user', updatedAt: new Date().toISOString() });
-    updateStmt().run({
+    stmts().update.run({
       id: job.id,
       status: job.status,
       progress: job.progress ?? null,
@@ -278,7 +260,7 @@ export function clearCompletedJobs(): number {
   for (const [id, job] of jobs) {
     if (job.status === 'done' || job.status === 'error' || job.status === 'cancelled') {
       jobs.delete(id);
-      try { deleteStmt().run(id); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'jobs/clearCompletedJobs: programming error'); /* best effort */ }
+      try { stmts().delete.run(id); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'jobs/clearCompletedJobs: programming error'); /* best effort */ }
       count++;
     }
   }
