@@ -52,9 +52,11 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
 
   // Unified page join: derives analyzedPages and pageKeywordMap from joined Webflow + strategy data
   const { pages: unified } = usePageJoin(workspaceId ?? '', siteId);
+  // Immediate feedback state for pages just analyzed in this session
+  const [localAnalyzedPages, setLocalAnalyzedPages] = useState<Set<string>>(new Set());
   const analyzedPages = useMemo(
-    () => new Set(unified.filter(p => p.analyzed).map(p => p.id)),
-    [unified],
+    () => new Set([...unified.filter(p => p.analyzed).map(p => p.id), ...localAnalyzedPages]),
+    [unified, localAnalyzedPages],
   );
   const pageKeywordMap = useMemo(() => {
     const map = new Map<string, { primaryKeyword: string; secondaryKeywords: string[] }>();
@@ -474,7 +476,9 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
           analysis,
         });
 
-        // Refresh strategy query so UI updates; analyzedPages is derived from usePageJoin
+        // Instant feedback: mark page as analyzed locally before async refetch completes
+        setLocalAnalyzedPages(prev => new Set(prev).add(pageId));
+        // Refresh strategy query so UI updates; analyzedPages overlay will persist until refetch
         queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId!) });
       }
     } catch (err) {
