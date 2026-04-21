@@ -2463,11 +2463,30 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', validate(patchStrateg
   const blobExists = ws.keywordStrategy != null;
   let updated: KeywordStrategy | null = null;
   if (hasBlobFields || blobExists) {
-    updated = { ...(ws.keywordStrategy || {}), ...rest, generatedAt: new Date().toISOString() } as KeywordStrategy;
+    // Only bump generatedAt when strategy-level fields change. A pure-pageMap patch on an
+    // existing blob should preserve the original generation timestamp — otherwise the
+    // KeywordStrategy panel misleadingly shows "Generated [today]" for every per-page edit.
+    const preservedGeneratedAt = blobExists && !hasBlobFields
+      ? ws.keywordStrategy?.generatedAt
+      : undefined;
+    updated = {
+      ...(ws.keywordStrategy || {}),
+      ...rest,
+      generatedAt: preservedGeneratedAt ?? new Date().toISOString(),
+    } as KeywordStrategy;
     updateWorkspace(ws.id, { keywordStrategy: updated });
   }
   clearSeoContextCache(ws.id);
   invalidateIntelligenceCache(ws.id);
+  // Broadcast strategy update so other surfaces (PageIntelligence, SeoEditor, other tabs)
+  // invalidate their React Query caches. Without this, pageMap edits from PageIntelligence
+  // leave KeywordStrategy/SeoEditor showing stale pageMap until staleTime expires.
+  const responsePageMap = listPageKeywords(ws.id);
+  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, {
+    pageCount: responsePageMap.length,
+    siteKeywords: updated?.siteKeywords?.length ?? 0,
+    partial: !updated,
+  });
   // Bridge #3: strategy updated — debounced intelligence invalidation
   debouncedStrategyInvalidate(ws.id, () => {
     invalidateIntelligenceCache(ws.id);
@@ -2476,7 +2495,6 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', validate(patchStrateg
   // Respond with reassembled strategy. When no blob was written and none previously existed,
   // surface a synthesized shell (same shape as GET) so the client can render pageMap
   // without assuming a real strategy.
-  const responsePageMap = listPageKeywords(ws.id);
   if (updated) {
     res.json({ ...updated, pageMap: responsePageMap });
   } else {

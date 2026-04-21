@@ -92,9 +92,31 @@ describe('GET /api/webflow/keyword-strategy/:wsId — partial state coverage', (
 });
 
 describe('PATCH /api/webflow/keyword-strategy/:wsId — shell promotion guard', () => {
+  // Each test owns its own workspace so state mutations do not leak between tests
+  // or back into the GET describe block above (which asserts generatedAt: null).
+  const createdPatchWsIds: string[] = [];
+
+  function freshShellWorkspace(label: string): string {
+    const wsId = createWorkspace(label).id;
+    createdPatchWsIds.push(wsId);
+    upsertPageKeyword(wsId, {
+      pagePath: '/services/seo',
+      pageTitle: 'SEO Services',
+      primaryKeyword: 'seo services',
+      secondaryKeywords: ['seo agency'],
+      analysisGeneratedAt: new Date().toISOString(),
+      optimizationScore: 70,
+    });
+    return wsId;
+  }
+
+  afterAll(() => {
+    for (const id of createdPatchWsIds) deleteWorkspace(id);
+  });
+
   it('pure-pageMap PATCH on shell-state workspace does NOT create a strategy blob', async () => {
-    // Patch only pageMap — no siteKeywords/opportunities/etc.
-    const patchRes = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${partialWsId}`, {
+    const wsId = freshShellWorkspace('PATCH pure-pageMap shell');
+    const patchRes = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -110,17 +132,16 @@ describe('PATCH /api/webflow/keyword-strategy/:wsId — shell promotion guard', 
     });
     expect(patchRes.status).toBe(200);
     const body = await patchRes.json();
-    // Response is still the shell shape, not a freshly-stamped "real" strategy
     expect(body.generatedAt).toBeNull();
     expect(body.siteKeywords).toEqual([]);
 
-    // And the workspace blob is still null — PATCH did not silently promote shell → real
-    const ws = getWorkspace(partialWsId);
+    const ws = getWorkspace(wsId);
     expect(ws?.keywordStrategy).toBeFalsy();
   });
 
   it('PATCH with non-pageMap fields DOES create/update the strategy blob', async () => {
-    const patchRes = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${partialWsId}`, {
+    const wsId = freshShellWorkspace('PATCH siteKeywords promote');
+    const patchRes = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -132,11 +153,50 @@ describe('PATCH /api/webflow/keyword-strategy/:wsId — shell promotion guard', 
     expect(body.generatedAt).toBeTruthy();
     expect(body.siteKeywords).toEqual(['primary keyword', 'secondary keyword']);
 
-    const ws = getWorkspace(partialWsId);
+    const ws = getWorkspace(wsId);
     expect(ws?.keywordStrategy).toBeTruthy();
     expect((ws!.keywordStrategy as { siteKeywords: string[] }).siteKeywords).toEqual([
       'primary keyword',
       'secondary keyword',
     ]);
+  });
+
+  it('pure-pageMap PATCH on workspace with existing blob PRESERVES original generatedAt', async () => {
+    // Seed the workspace with a real blob via a non-pageMap PATCH first.
+    const wsId = freshShellWorkspace('PATCH timestamp preservation');
+    const seedRes = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ siteKeywords: ['original'] }),
+    });
+    const seeded = await seedRes.json();
+    const originalGeneratedAt = seeded.generatedAt as string;
+    expect(originalGeneratedAt).toBeTruthy();
+
+    // Wait a beat so any timestamp bump would be observable.
+    await new Promise(r => setTimeout(r, 10));
+
+    // Pure-pageMap patch — must preserve the original timestamp.
+    const patchRes = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pageMap: [
+          { pagePath: '/services/seo', pageTitle: 'SEO Services', primaryKeyword: 'seo services', secondaryKeywords: [] },
+        ],
+      }),
+    });
+    const body = await patchRes.json();
+    expect(body.generatedAt).toBe(originalGeneratedAt);
+
+    // Non-pageMap patch — SHOULD bump the timestamp.
+    await new Promise(r => setTimeout(r, 10));
+    const bumpRes = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${wsId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ siteKeywords: ['updated'] }),
+    });
+    const bumped = await bumpRes.json();
+    expect(bumped.generatedAt).not.toBe(originalGeneratedAt);
   });
 });
