@@ -37,7 +37,7 @@ import { getInsights } from './analytics-insights-store.js';
 import { listBlueprints } from './page-strategy.js';
 import { getEntryCopyStatus } from './copy-review.js';
 import { getAllPatterns } from './copy-intelligence.js';
-import type { AnalyticsInsight, PageHealthData, QuickWinData, ContentDecayData, CannibalizationData, KeywordClusterData, CompetitorGapData, ConversionAttributionData } from '../shared/types/analytics.js';
+import type { AnalyticsInsight } from '../shared/types/analytics.js';
 import type { IntelligenceSlice } from '../shared/types/intelligence.js';
 import { STUDIO_NAME } from './constants.js';
 import { isProgrammingError } from './errors.js';
@@ -157,8 +157,8 @@ export function buildInsightsContext(insights: AnalyticsInsight[]): string {
 
   // Page Health summary — top 10 by score, worst first (enriched with titles + audit issues)
   const healthInsights = insights
-    .filter(i => i.insightType === 'page_health')
-    .map(i => ({ pageId: i.pageId, pageTitle: i.pageTitle, strategyAlignment: i.strategyAlignment, auditIssues: i.auditIssues, pipelineStatus: i.pipelineStatus, ...(i.data as unknown as PageHealthData), severity: i.severity }))
+    .filter((i): i is AnalyticsInsight<'page_health'> => i.insightType === 'page_health')
+    .map(i => ({ pageId: i.pageId, pageTitle: i.pageTitle, strategyAlignment: i.strategyAlignment, auditIssues: i.auditIssues, pipelineStatus: i.pipelineStatus, ...i.data, severity: i.severity }))
     .sort((a, b) => a.score - b.score);
   if (healthInsights.length > 0) {
     const lines = healthInsights.slice(0, 10).map(h => {
@@ -177,8 +177,8 @@ export function buildInsightsContext(insights: AnalyticsInsight[]): string {
 
   // Ranking opportunities
   const quickWins = insights
-    .filter(i => i.insightType === 'ranking_opportunity')
-    .map(i => ({ ...i.data as unknown as QuickWinData, pageTitle: i.pageTitle, strategyAlignment: i.strategyAlignment, pipelineStatus: i.pipelineStatus }))
+    .filter((i): i is AnalyticsInsight<'ranking_opportunity'> => i.insightType === 'ranking_opportunity')
+    .map(i => ({ ...i.data, pageTitle: i.pageTitle, strategyAlignment: i.strategyAlignment, pipelineStatus: i.pipelineStatus }))
     .sort((a, b) => b.estimatedTrafficGain - a.estimatedTrafficGain);
   if (quickWins.length > 0) {
     const lines = quickWins.slice(0, 10).map(q => {
@@ -193,8 +193,8 @@ export function buildInsightsContext(insights: AnalyticsInsight[]): string {
 
   // Content decay
   const decayInsights = insights
-    .filter(i => i.insightType === 'content_decay')
-    .map(i => ({ pageId: i.pageId, ...(i.data as unknown as ContentDecayData) }))
+    .filter((i): i is AnalyticsInsight<'content_decay'> => i.insightType === 'content_decay')
+    .map(i => ({ pageId: i.pageId, ...i.data }))
     .sort((a, b) => a.deltaPercent - b.deltaPercent);
   if (decayInsights.length > 0) {
     const lines = decayInsights.slice(0, 8).map(d => {
@@ -207,8 +207,8 @@ export function buildInsightsContext(insights: AnalyticsInsight[]): string {
 
   // Cannibalization
   const cannibalization = insights
-    .filter(i => i.insightType === 'cannibalization')
-    .map(i => i.data as unknown as CannibalizationData);
+    .filter((i): i is AnalyticsInsight<'cannibalization'> => i.insightType === 'cannibalization')
+    .map(i => i.data);
   if (cannibalization.length > 0) {
     const lines = cannibalization.slice(0, 8).map(c => {
       const pages = c.pages.map((p, i) => {
@@ -221,8 +221,8 @@ export function buildInsightsContext(insights: AnalyticsInsight[]): string {
 
   // Keyword clusters
   const clusters = insights
-    .filter(i => i.insightType === 'keyword_cluster')
-    .map(i => i.data as unknown as KeywordClusterData)
+    .filter((i): i is AnalyticsInsight<'keyword_cluster'> => i.insightType === 'keyword_cluster')
+    .map(i => i.data)
     .sort((a, b) => b.totalImpressions - a.totalImpressions);
   if (clusters.length > 0) {
     const lines = clusters.slice(0, 8).map(c => {
@@ -234,8 +234,8 @@ export function buildInsightsContext(insights: AnalyticsInsight[]): string {
 
   // Competitor gaps
   const gaps = insights
-    .filter(i => i.insightType === 'competitor_gap')
-    .map(i => i.data as unknown as CompetitorGapData)
+    .filter((i): i is AnalyticsInsight<'competitor_gap'> => i.insightType === 'competitor_gap')
+    .map(i => i.data)
     .sort((a, b) => b.volume - a.volume);
   if (gaps.length > 0) {
     const lines = gaps.slice(0, 10).map(g => {
@@ -247,8 +247,8 @@ export function buildInsightsContext(insights: AnalyticsInsight[]): string {
 
   // Conversion attribution
   const conversions = insights
-    .filter(i => i.insightType === 'conversion_attribution')
-    .map(i => ({ pageId: i.pageId, ...(i.data as unknown as ConversionAttributionData) }))
+    .filter((i): i is AnalyticsInsight<'conversion_attribution'> => i.insightType === 'conversion_attribution')
+    .map(i => ({ pageId: i.pageId, ...i.data }))
     .sort((a, b) => b.conversionRate - a.conversionRate);
   if (conversions.length > 0) {
     const lines = conversions.slice(0, 8).map(c => {
@@ -260,12 +260,11 @@ export function buildInsightsContext(insights: AnalyticsInsight[]): string {
   }
 
   // Anomaly digest insights
-  const anomalyInsights = insights.filter(i => i.insightType === 'anomaly_digest');
+  const anomalyInsights = insights.filter((i): i is AnalyticsInsight<'anomaly_digest'> => i.insightType === 'anomaly_digest');
   if (anomalyInsights.length > 0) {
     const lines = anomalyInsights.slice(0, 8).map(a => {
-      const data = a.data as Record<string, unknown>;
-      const pageSuffix = typeof data.affectedPage === 'string' ? ` (affected page: ${data.affectedPage})` : '';
-      return `  ${data.anomalyType}: ${data.metric} deviated ${data.deviationPercent}% (ongoing for ${data.durationDays} day(s))${pageSuffix}`;
+      const pageSuffix = a.data.affectedPage ? ` (affected page: ${a.data.affectedPage})` : '';
+      return `  ${a.data.anomalyType}: ${a.data.metric} deviated ${a.data.deviationPercent}% (ongoing for ${a.data.durationDays} day(s))${pageSuffix}`;
     });
     sections.push(`ANOMALY DIGEST (active anomalies tracked in insight feed):\n${lines.join('\n')}`);
   }
