@@ -12,7 +12,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
-import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { createWorkspace, deleteWorkspace, getWorkspace } from '../../server/workspaces.js';
 import { upsertPageKeyword } from '../../server/page-keywords.js';
 import type { PageKeywordMap } from '../../shared/types/workspace.js';
 
@@ -80,5 +80,63 @@ describe('GET /api/webflow/keyword-strategy/:wsId — partial state coverage', (
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toBeNull();
+  });
+
+  it('synthesized shell has generatedAt: null so client can distinguish from real strategy', async () => {
+    const res = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${partialWsId}`);
+    const body = await res.json();
+    expect(body.generatedAt).toBeNull();
+    expect(body.siteKeywords).toEqual([]);
+    expect(body.opportunities).toEqual([]);
+  });
+});
+
+describe('PATCH /api/webflow/keyword-strategy/:wsId — shell promotion guard', () => {
+  it('pure-pageMap PATCH on shell-state workspace does NOT create a strategy blob', async () => {
+    // Patch only pageMap — no siteKeywords/opportunities/etc.
+    const patchRes = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${partialWsId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pageMap: [
+          {
+            pagePath: '/services/seo',
+            pageTitle: 'SEO Services',
+            primaryKeyword: 'seo services',
+            secondaryKeywords: ['seo agency'],
+          },
+        ],
+      }),
+    });
+    expect(patchRes.status).toBe(200);
+    const body = await patchRes.json();
+    // Response is still the shell shape, not a freshly-stamped "real" strategy
+    expect(body.generatedAt).toBeNull();
+    expect(body.siteKeywords).toEqual([]);
+
+    // And the workspace blob is still null — PATCH did not silently promote shell → real
+    const ws = getWorkspace(partialWsId);
+    expect(ws?.keywordStrategy).toBeFalsy();
+  });
+
+  it('PATCH with non-pageMap fields DOES create/update the strategy blob', async () => {
+    const patchRes = await fetch(`http://localhost:${PORT}/api/webflow/keyword-strategy/${partialWsId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        siteKeywords: ['primary keyword', 'secondary keyword'],
+      }),
+    });
+    expect(patchRes.status).toBe(200);
+    const body = await patchRes.json();
+    expect(body.generatedAt).toBeTruthy();
+    expect(body.siteKeywords).toEqual(['primary keyword', 'secondary keyword']);
+
+    const ws = getWorkspace(partialWsId);
+    expect(ws?.keywordStrategy).toBeTruthy();
+    expect((ws!.keywordStrategy as { siteKeywords: string[] }).siteKeywords).toEqual([
+      'primary keyword',
+      'secondary keyword',
+    ]);
   });
 });
