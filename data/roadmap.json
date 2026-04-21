@@ -681,6 +681,15 @@
           "status": "pending"
         },
         {
+          "id": 592,
+          "title": "Harden rowToInsight: validate corrupt insight data at DB read boundary",
+          "source": "PR #244 Devin review \u2014 analytics-insights-store.ts:104",
+          "est": "4-6h",
+          "priority": "P2",
+          "notes": "parseJsonFallback(row.data, {} as InsightDataMap[InsightType]) at server/analytics-insights-store.ts:104 returns an empty object typed as the full insight data interface when stored JSON is corrupt or missing. Consumers accessing insight.data.score, insight.data.trend, etc. get undefined at runtime despite the TypeScript type saying the field is required. Fix: add Zod schemas for all 10+ insight data types and validate in rowToInsight(), either filtering out corrupt rows or returning typed fallbacks with sentinel values. Pre-existing issue confirmed by Devin review on PR #244.",
+          "status": "pending"
+        },
+        {
           "id": 537,
           "title": "Backfill addActivity() calls on all public-portal mutation endpoints",
           "source": "PIE Group 3 code review",
