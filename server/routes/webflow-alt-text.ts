@@ -210,6 +210,15 @@ router.post('/api/webflow/bulk-generate-alt', async (req, res) => {
 
   let done = 0;
   for (const asset of assets) {
+    // Per-asset billing check: prevents unbounded overshoot when batch size > remaining budget.
+    // One upfront check could let a 50-asset batch push a workspace from used=9 to used=59 against limit=10.
+    if (bulkWs) {
+      const usage = checkUsageLimit(bulkWs.id, bulkWs.tier || 'free', 'strategy_generations');
+      if (!usage.allowed) {
+        send({ type: 'status', message: `Monthly AI limit reached after ${done}/${assets.length} images`, done, total: assets.length });
+        break;
+      }
+    }
     try {
       const response = await fetch(asset.imageUrl);
       if (!response.ok) {
