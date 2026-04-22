@@ -139,6 +139,14 @@ router.post('/api/webflow/bulk-generate-alt', async (req, res) => {
 
   const token = siteId ? (getTokenForSite(siteId) || undefined) : undefined;
 
+  // Resolve workspace and check billing before any external API work
+  const bulkWsId = bulkAltWsId || (siteId ? listWorkspaces().find(w => w.webflowSiteId === siteId)?.id : undefined);
+  const bulkWs = bulkWsId ? getWorkspace(bulkWsId) : undefined;
+  if (bulkWs) {
+    const usage = checkUsageLimit(bulkWs.id, bulkWs.tier || 'free', 'strategy_generations');
+    if (!usage.allowed) return res.status(429).json({ error: 'Monthly AI generation limit reached', used: usage.used, limit: usage.limit });
+  }
+
   let siteContext = '';
   if (siteId) {
     try {
@@ -148,16 +156,7 @@ router.post('/api/webflow/bulk-generate-alt', async (req, res) => {
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-alt-text: POST /api/webflow/bulk-generate-alt: programming error'); /* proceed without context */ }
   }
 
-  const bulkWsId = bulkAltWsId || (siteId ? listWorkspaces().find(w => w.webflowSiteId === siteId)?.id : undefined);
   if (bulkWsId) {
-    const bulkWs = getWorkspace(bulkWsId);
-
-    // Usage limit check
-    if (bulkWs) {
-      const usage = checkUsageLimit(bulkWs.id, bulkWs.tier || 'free', 'strategy_generations');
-      if (!usage.allowed) return res.status(429).json({ error: 'Monthly AI generation limit reached', used: usage.used, limit: usage.limit });
-    }
-
     const bulkIntel = await buildWorkspaceIntelligence(bulkWsId, { slices: ['seoContext'] });
     const bulkBizCtx = bulkIntel.seoContext?.businessContext ?? '';
     // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
@@ -234,7 +233,7 @@ router.post('/api/webflow/bulk-generate-alt', async (req, res) => {
           log.error({ detail: writeResult.error }, `Bulk alt: generated but write-back failed for ${asset.assetId}:`);
           send({ type: 'result', assetId: asset.assetId, altText, updated: false, error: writeResult.error, done, total: assets.length });
         } else {
-          if (bulkWsId) incrementUsage(bulkWsId, 'strategy_generations');
+          if (bulkWs) incrementUsage(bulkWs.id, 'strategy_generations');
           send({ type: 'result', assetId: asset.assetId, altText, updated: true, done, total: assets.length });
         }
       } else {

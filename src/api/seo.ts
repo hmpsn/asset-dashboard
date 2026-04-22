@@ -478,6 +478,7 @@ export interface BulkAltTextNdjsonEvent {
   type: 'result' | 'status' | 'done';
   assetId?: string;
   altText?: string;
+  message?: string;
   error?: string;
   done?: number;
   total?: number;

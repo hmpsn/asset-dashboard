@@ -595,6 +595,15 @@
       "rationale": "Revisit quarterly. Prioritize when a specific client need, revenue opportunity, or scale threshold justifies it.",
       "items": [
         {
+          "id": 599,
+          "title": "Per-feature usage budgets (split strategy_generations pool)",
+          "source": "PR #255 code review — Devin comment on shared billing pool",
+          "est": "4-6h",
+          "priority": "P2",
+          "notes": "All AI generation endpoints (keyword strategy, brand voice, knowledge base, personas, alt-text, brand identity deliverables) share a single 'strategy_generations' pool (free=0, growth=3, premium=∞). A user who generates a knowledge base + brand voice + personas exhausts their limit and can no longer generate alt text or deliverables — surprising UX. Options: (1) split into named sub-pools per feature category (e.g. 'brand_generations', 'seo_generations') each with their own limits; (2) raise the shared pool limit; (3) tier-specific per-feature overrides. Requires migration to add new usage_tracking feature keys, updating checkUsageLimit/incrementUsage call sites across all guarded routes, and updating client-facing usage display (if any). Coordinate with MONETIZATION.md tier redesign if limits are revisited.",
+          "status": "pending"
+        },
+        {
           "id": 598,
           "title": "Extend useWorkspaceEvents centralization rule to catch string-literal duplicates",
           "source": "PR #254 code review flag 3",
