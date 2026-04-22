@@ -13,11 +13,12 @@ import type { AnalyticsInsight } from '../../shared/types/analytics.js';
 describe('upsertInsight', () => {
   it('creates a new insight and returns it', () => {
     const wsId = 'ws_ins_' + Date.now();
+    const pageHealthData = { score: 72, trend: 'improving' as const, clicks: 120, impressions: 1500, position: 8.2, ctr: 8.0, pageviews: 200, bounceRate: 42.5, avgEngagementTime: 95 };
     const insight = upsertInsight({
       workspaceId: wsId,
       pageId: '/blog/test',
       insightType: 'page_health',
-      data: { score: 72, trend: 'improving' },
+      data: pageHealthData,
       severity: 'opportunity',
     });
 
@@ -25,29 +26,31 @@ describe('upsertInsight', () => {
     expect(insight.workspaceId).toBe(wsId);
     expect(insight.pageId).toBe('/blog/test');
     expect(insight.insightType).toBe('page_health');
-    expect(insight.data).toEqual({ score: 72, trend: 'improving' });
+    expect((insight.data as typeof pageHealthData).score).toBe(72);
+    expect((insight.data as typeof pageHealthData).trend).toBe('improving');
     expect(insight.severity).toBe('opportunity');
     expect(insight.computedAt).toBeDefined();
   });
 
   it('replaces existing insight with same workspace+page+type key', () => {
     const wsId = 'ws_upsert_' + Date.now();
+    const makeRankData = (gain: number) => ({ query: 'test kw', currentPosition: 12, impressions: 1000, estimatedTrafficGain: gain, pageUrl: '/home' });
     upsertInsight({
       workspaceId: wsId,
       pageId: '/home',
       insightType: 'ranking_opportunity',
-      data: { estimatedGain: 100 },
+      data: makeRankData(100),
       severity: 'opportunity',
     });
     const updated = upsertInsight({
       workspaceId: wsId,
       pageId: '/home',
       insightType: 'ranking_opportunity',
-      data: { estimatedGain: 250 },
+      data: makeRankData(250),
       severity: 'positive',
     });
 
-    expect(updated.data).toEqual({ estimatedGain: 250 });
+    expect((updated.data as ReturnType<typeof makeRankData>).estimatedTrafficGain).toBe(250);
     expect(updated.severity).toBe('positive');
 
     const results = getInsights(wsId);
@@ -98,11 +101,12 @@ describe('getInsights', () => {
 describe('getInsight', () => {
   it('returns a specific insight by workspace+page+type', () => {
     const wsId = 'ws_get_' + Date.now();
-    upsertInsight({ workspaceId: wsId, pageId: '/services', insightType: 'ranking_opportunity', data: { pos: 7 }, severity: 'opportunity' });
+    const data = { query: 'test kw', currentPosition: 7, impressions: 500, estimatedTrafficGain: 50, pageUrl: '/services' };
+    upsertInsight({ workspaceId: wsId, pageId: '/services', insightType: 'ranking_opportunity', data, severity: 'opportunity' });
 
     const insight = getInsight(wsId, '/services', 'ranking_opportunity');
     expect(insight).toBeDefined();
-    expect(insight!.data).toEqual({ pos: 7 });
+    expect((insight!.data as typeof data).currentPosition).toBe(7);
   });
 
   it('returns undefined when no matching insight exists', () => {

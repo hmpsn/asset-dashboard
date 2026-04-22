@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { get, post, patch, del, getSafe } from '../api/client';
+import { get, post, patch, del, getSafe, getText } from '../api/client';
 import {
   Loader2, Trash2, AlertTriangle, PenLine, Clipboard, Search, X, ArrowUpDown,
 } from 'lucide-react';
@@ -281,8 +281,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
     const w = window.open('', '_blank');
     if (!w) return;
     w.document.write('<p style="font-family:sans-serif;padding:40px">Loading PDF preview…</p>');
-    fetch(`/api/content-briefs/${workspaceId}/${b.id}/export`)
-      .then(r => r.text())
+    getText(`/api/content-briefs/${workspaceId}/${b.id}/export`)
       .then(html => { w.document.open(); w.document.write(html); w.document.close(); })
       .catch(() => { w.location.href = `/api/content-briefs/${workspaceId}/${b.id}/export`; });
   };

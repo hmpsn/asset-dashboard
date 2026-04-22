@@ -392,7 +392,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
         <DiagnosticReportPage key={`diagnostics-${selected.id}`} workspaceId={selected.id} />
       </FeatureFlag>
     );
-    if (tab === 'media') return <MediaTab key={selected.folder} siteId={selected.webflowSiteId} workspaceFolder={selected.folder} queue={workspaceQueue} />;
+    if (tab === 'media') return <MediaTab key={selected.folder} siteId={selected.webflowSiteId} workspaceId={selected.id} workspaceFolder={selected.folder} queue={workspaceQueue} />;
     if (tab === 'seo-audit') return <SeoAudit key={`seo-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} siteName={selected.webflowSiteName || selected.name} />;
     if (tab === 'seo-editor') return <SeoEditorWrapper key={`editor-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} fixContext={fixContext} />;
     if (tab === 'seo-strategy') return <KeywordStrategyPanel key={`strategy-${selected.id}`} workspaceId={selected.id} siteId={selected.webflowSiteId!} />;
