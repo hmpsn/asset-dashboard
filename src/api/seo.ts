@@ -456,8 +456,6 @@ export const pageWeight = {
 };
 
 // ── Alt-text generation (single + bulk NDJSON stream) ───────────
-
-// ── Alt-text generation (single + bulk NDJSON stream) ───────────
 /**
  * Generate alt text for a single Webflow asset.
  * Wraps POST /api/webflow/generate-alt/:assetId.

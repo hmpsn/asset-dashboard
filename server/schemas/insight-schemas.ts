@@ -173,24 +173,28 @@ export const serpOpportunityDataSchema = z.object({
  * Maps each InsightType to its DB-stored Zod schema.
  * Used by rowToInsight to validate the data JSON column via parseJsonSafe.
  *
+ * All schemas use .partial() so missing fields in historical DB rows don't cause
+ * parseJsonSafe to return {} and silently destroy real data. Write paths enforce
+ * required fields through the original (non-partial) schemas above.
+ *
  * page_health uses a union because two write paths exist:
  *   - analytics generation writes full PageHealthData (score, trend, clicks, …)
  *   - Bridge #12 writes AuditPageHealthInsightData (auditSnapshotId, errorCount, …)
+ * z.union does not expose .passthrough() — apply .partial().passthrough() to each member.
  */
 export const INSIGHT_DATA_SCHEMA_MAP: Record<InsightType, ZodTypeAny> = {
-  // z.union does not expose .passthrough() — apply it to each member instead
-  page_health: z.union([pageHealthDataSchema.passthrough(), auditPageHealthInsightDataSchema.passthrough()]),
-  ranking_opportunity: rankingOpportunityDataSchema.passthrough(),
-  content_decay: contentDecayDataSchema.passthrough(),
-  cannibalization: cannibalizationDataSchema.passthrough(),
-  keyword_cluster: keywordClusterDataSchema.passthrough(),
-  competitor_gap: competitorGapDataSchema.passthrough(),
-  conversion_attribution: conversionAttributionDataSchema.passthrough(),
-  ranking_mover: rankingMoverDataSchema.passthrough(),
-  ctr_opportunity: ctrOpportunityDataSchema.passthrough(),
-  serp_opportunity: serpOpportunityDataSchema.passthrough(),
-  strategy_alignment: strategyAlignmentDataSchema.passthrough(),
-  anomaly_digest: anomalyDigestDataSchema.passthrough(),
-  audit_finding: auditFindingDataSchema.passthrough(),
-  site_health: siteHealthInsightDataSchema.passthrough(),
+  page_health: z.union([pageHealthDataSchema.partial().passthrough(), auditPageHealthInsightDataSchema.partial().passthrough()]),
+  ranking_opportunity: rankingOpportunityDataSchema.partial().passthrough(),
+  content_decay: contentDecayDataSchema.partial().passthrough(),
+  cannibalization: cannibalizationDataSchema.partial().passthrough(),
+  keyword_cluster: keywordClusterDataSchema.partial().passthrough(),
+  competitor_gap: competitorGapDataSchema.partial().passthrough(),
+  conversion_attribution: conversionAttributionDataSchema.partial().passthrough(),
+  ranking_mover: rankingMoverDataSchema.partial().passthrough(),
+  ctr_opportunity: ctrOpportunityDataSchema.partial().passthrough(),
+  serp_opportunity: serpOpportunityDataSchema.partial().passthrough(),
+  strategy_alignment: strategyAlignmentDataSchema.partial().passthrough(),
+  anomaly_digest: anomalyDigestDataSchema.partial().passthrough(),
+  audit_finding: auditFindingDataSchema.partial().passthrough(),
+  site_health: siteHealthInsightDataSchema.partial().passthrough(),
 };

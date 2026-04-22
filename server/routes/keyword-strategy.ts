@@ -359,6 +359,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
   // will propagate without polluting activeGenerations. The finally block below
   // is the single cleanup point for all exit paths inside the try.
   activeGenerations.add(ws.id);
+  let responseSent = false;
 
   try {
     // 1. Resolve site base URL — auto-resolve liveDomain if missing
@@ -2318,6 +2319,7 @@ Rules:
     } else {
       res.json(responseStrategy);
     }
+    responseSent = true;
 
     // Trigger background llms.txt regeneration after strategy update
     queueLlmsTxtRegeneration(ws.id, 'keyword_strategy_updated');
@@ -2335,7 +2337,7 @@ Rules:
   } catch (err) {
     activeGenerations.delete(ws.id);
     if (keepalive) clearInterval(keepalive);
-    decrementUsage(ws.id, 'strategy_generations'); // refund pre-reserved slot on failure
+    if (!responseSent) decrementUsage(ws.id, 'strategy_generations'); // refund pre-reserved slot on failure
     const msg = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error ? err.stack : '';
     log.error({ detail: msg, stack }, 'Keyword strategy error');
