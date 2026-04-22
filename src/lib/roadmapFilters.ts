@@ -51,18 +51,31 @@ const STATUS_ORDER: Record<Status, number> = { in_progress: 0, pending: 1, done:
 
 /**
  * Best-effort numeric estimate (hours) parsed from human-readable strings:
- *   "30m" → 0.5   "1h" → 1   "2-3h" → 2.5 (avg)   "10-14h" → 12
- * Unparseable values sort last (Infinity).
+ *   "30m" → 0.5   "1h" → 1   "2-3h" → 2.5   "10-14h" → 12   "30m-1h" → 0.75
+ * Each dash-separated segment carries its own unit; bare segments inherit the
+ * next segment's unit (so "2-3h" treats both as hours). Unparseable → Infinity.
  */
 export function estToHours(raw: string | undefined): number {
   if (!raw) return Infinity;
-  const s = raw.trim().toLowerCase();
-  const isMinutes = s.endsWith('m') && !s.endsWith('h');
-  const matches = s.match(/(\d+(?:\.\d+)?)/g);
-  if (!matches || matches.length === 0) return Infinity;
-  const nums = matches.map(Number);
-  const avg = nums.reduce((a, n) => a + n, 0) / nums.length;
-  return isMinutes ? avg / 60 : avg;
+  const segments = raw.trim().toLowerCase().split('-').map(s => s.trim()).filter(Boolean);
+  if (segments.length === 0) return Infinity;
+
+  type Parsed = { num: number; unit: 'm' | 'h' | null };
+  const parsed: Parsed[] = [];
+  for (const seg of segments) {
+    const m = seg.match(/^(\d+(?:\.\d+)?)\s*([mh])?$/);
+    if (!m) return Infinity;
+    parsed.push({ num: Number(m[1]), unit: (m[2] as 'm' | 'h' | undefined) ?? null });
+  }
+
+  let inherited: 'm' | 'h' = 'h';
+  for (let i = parsed.length - 1; i >= 0; i--) {
+    if (parsed[i].unit) inherited = parsed[i].unit!;
+    else parsed[i].unit = inherited;
+  }
+
+  const hours = parsed.map(p => (p.unit === 'm' ? p.num / 60 : p.num));
+  return hours.reduce((a, n) => a + n, 0) / hours.length;
 }
 
 function compareIds(a: number | string, b: number | string): number {

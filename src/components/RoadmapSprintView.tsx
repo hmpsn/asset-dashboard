@@ -54,7 +54,9 @@ export function RoadmapSprintView({ sprints, filters, featureMap, onToggleStatus
                   <p className="text-[11px] text-zinc-500 mt-0.5 truncate">{sprint.rationale}</p>
                 )}
               </div>
-              <span className="text-[11px] text-zinc-600 flex-shrink-0">{sprint.hours} hrs</span>
+              {sprint.hours && (
+                <span className="text-[11px] text-zinc-600 flex-shrink-0">{sprint.hours} hrs</span>
+              )}
             </div>
 
             {/* Item list */}

@@ -132,6 +132,10 @@ describe('estToHours', () => {
     expect(estToHours('2-3h')).toBe(2.5);
     expect(estToHours('10-14h')).toBe(12);
   });
+  it('handles mixed-unit ranges per segment', () => {
+    expect(estToHours('30m-1h')).toBeCloseTo(0.75, 5);
+    expect(estToHours('15m-45m')).toBeCloseTo(0.5, 5);
+  });
   it('returns Infinity for missing/unparseable values so they sort last', () => {
     expect(estToHours(undefined)).toBe(Infinity);
     expect(estToHours('')).toBe(Infinity);

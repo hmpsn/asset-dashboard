@@ -18,7 +18,9 @@ export interface RoadmapItem {
 export interface SprintData {
   id: string;
   name: string;
-  rationale: string;
-  hours: string;
+  /** Optional — shipped/archived sprints predate this field. */
+  rationale?: string;
+  /** Optional — shipped/archived sprints predate this field. */
+  hours?: string;
   items: RoadmapItem[];
 }
