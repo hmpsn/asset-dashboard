@@ -16,8 +16,6 @@ import { keywords, rankTracking } from '../api/seo';
 import { useKeywordStrategy } from '../hooks/admin';
 import { SeoCopyPanel } from './strategy/SeoCopyPanel';
 import { useQueryClient } from '@tanstack/react-query';
-import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
-import { WS_EVENTS } from '../lib/wsEvents';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 import type { FixContext } from '../App';
@@ -203,16 +201,6 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   const queryClient = useQueryClient();
   const { data: keywordData, isLoading: strategyLoading } = useKeywordStrategy(workspaceId);
   const strategy = keywordData?.strategy || null;
-
-  // Subscribe to strategy-update broadcasts so this tab refreshes when another
-  // surface (SEO Editor analyze, server-side bridges, other tabs/devices) mutates
-  // page_keywords or ws.keywordStrategy. Without this, staleTime: 10min on the
-  // underlying query means users see empty data until a hard refresh.
-  useWorkspaceEvents(workspaceId, {
-    [WS_EVENTS.STRATEGY_UPDATED]: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
-    },
-  });
 
   // Tab state
   const [activeTab, setActiveTab] = useState<'pages' | 'architecture' | 'guide'>('pages');

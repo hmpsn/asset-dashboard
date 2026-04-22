@@ -22,8 +22,6 @@ import { StrategyDiff } from './strategy/StrategyDiff';
 import { IntelligenceSignals } from './strategy/IntelligenceSignals';
 import { keywords, rankTracking } from '../api/seo';
 import { workspaces } from '../api';
-import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
-import { WS_EVENTS } from '../lib/wsEvents';
 import { queryKeys } from '../lib/queryKeys';
 
 /** Minimum monthly search volume to display a strategy card. Cards below this are noise. */
@@ -81,16 +79,6 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const [providerList, setProviderList] = useState<{ name: string; configured: boolean }[]>([]);
   const [activeProvider, setActiveProvider] = useState<string | undefined>(undefined);
   const [strategyTab, setStrategyTab] = useState<'analysis' | 'guide'>('analysis');
-
-  // Invalidate intelligence signals cache on WebSocket event
-  useWorkspaceEvents(workspaceId, {
-    [WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED]: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.intelligenceSignals(workspaceId) });
-    },
-    [WS_EVENTS.STRATEGY_UPDATED]: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
-    },
-  });
 
   // Seed trackedKeywords from server on mount so buttons reflect actual state
   useEffect(() => {
