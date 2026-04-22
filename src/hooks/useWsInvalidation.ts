@@ -231,9 +231,9 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.copyStatusAll(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.copySectionsAll(workspaceId) });
     },
-    [WS_EVENTS.SCHEMA_PLAN_SENT]: () => {
-      // SchemaPlanPanel fetches the plan directly (no React Query cache). No-op intentional.
-    },
+    // SCHEMA_PLAN_SENT is intentionally NOT registered here — SchemaPlanPanel
+    // fetches the plan directly (no React Query cache). Exemption is tracked
+    // in tests/contract/ws-invalidation-coverage.test.ts LOCAL_ONLY_EVENTS.
     [WS_EVENTS.POST_UPDATED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.posts(workspaceId) });

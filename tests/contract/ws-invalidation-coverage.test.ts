@@ -56,13 +56,6 @@ const LOCAL_ONLY_EVENTS = new Set<string>([
   // event locally to show a success toast. Task 1 investigation confirmed no
   // client-visible React Query query is gated on this event.
   'SCHEMA_PLAN_SENT',
-
-  // COPY_EXPORT_COMPLETE is handled locally in the copy pipeline export
-  // component (e.g. CopyExportPanel) to trigger a file download. There is no
-  // React Query cache that stores the export artifact — the component reacts
-  // to the event directly to initiate the browser download. No invalidation
-  // is needed or useful.
-  'COPY_EXPORT_COMPLETE',
 ]);
 
 // ---------------------------------------------------------------------------

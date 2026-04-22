@@ -325,6 +325,11 @@ const KNOWN_UNHANDLED_BROADCASTS = new Set<string>([
   'content-subscription:updated',
   'content-subscription:renewed',
 
+  // schema:plan_sent — admin-side fire-and-forget confirmation; SchemaPlanPanel
+  // fetches the plan directly rather than via React Query, so no central
+  // invalidation is needed. Cross-referenced with LOCAL_ONLY_EVENTS in
+  // tests/contract/ws-invalidation-coverage.test.ts.
+  'schema:plan_sent',
 ]);
 
 /**
