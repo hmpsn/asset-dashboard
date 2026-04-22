@@ -1,12 +1,10 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
 import { Sparkles, Check, Download, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { identity } from '../../api/brand-engine';
 import type { BrandDeliverable, DeliverableType, DeliverableTier } from '../../../shared/types/brand-engine';
 import { SectionCard, EmptyState, Skeleton } from '../ui';
 import { useToast } from '../Toast';
-import { WS_EVENTS } from '../../lib/wsEvents';
 import { queryKeys } from '../../lib/queryKeys';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -271,12 +269,6 @@ export function IdentityTab({ workspaceId }: { workspaceId: string }) {
   const { data: deliverables, isLoading, isError } = useQuery({
     queryKey: queryKeys.admin.brandIdentity(workspaceId),
     queryFn: () => identity.list(workspaceId),
-  });
-
-  useWorkspaceEvents(workspaceId, {
-    [WS_EVENTS.BRAND_IDENTITY_UPDATED]: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.brandIdentity(workspaceId) });
-    },
   });
 
   const invalidate = useCallback(() => {
