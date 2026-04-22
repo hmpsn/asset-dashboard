@@ -59,8 +59,11 @@ export function RoadmapSprintView({ sprints, filters, featureMap, onToggleStatus
               )}
             </div>
 
-            {/* Item list */}
-            <SectionCard variant="subtle" noPadding className="mt-2 divide-y divide-zinc-800/50">
+            {/* Item list. The divide-y must wrap the rows directly — putting it on
+                SectionCard's outer div is a no-op because SectionCard wraps all
+                children in a single inner padding div, leaving no siblings to divide. */}
+            <SectionCard variant="subtle" noPadding className="mt-2">
+              <div className="divide-y divide-zinc-800/50">
               {filteredItems.map(item => {
                 const pb = priorityBadge(item.priority);
                 const featureName = item.featureId != null ? featureMap.get(item.featureId) : undefined;
@@ -99,6 +102,7 @@ export function RoadmapSprintView({ sprints, filters, featureMap, onToggleStatus
                   </div>
                 );
               })}
+              </div>
             </SectionCard>
           </div>
         );
