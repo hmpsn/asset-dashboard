@@ -176,14 +176,9 @@ export const serpOpportunityDataSchema = z.object({
  * All schemas use .partial() so missing fields in historical DB rows don't cause
  * parseJsonSafe to return {} and silently destroy real data. Write paths enforce
  * required fields through the original (non-partial) schemas above.
- *
- * page_health uses a union because two write paths exist:
- *   - analytics generation writes full PageHealthData (score, trend, clicks, …)
- *   - Bridge #12 writes AuditPageHealthInsightData (auditSnapshotId, errorCount, …)
- * z.union does not expose .passthrough() — apply .partial().passthrough() to each member.
  */
 export const INSIGHT_DATA_SCHEMA_MAP: Record<InsightType, ZodTypeAny> = {
-  page_health: z.union([pageHealthDataSchema.partial().passthrough(), auditPageHealthInsightDataSchema.partial().passthrough()]),
+  page_health: pageHealthDataSchema.partial().passthrough(),
   ranking_opportunity: rankingOpportunityDataSchema.partial().passthrough(),
   content_decay: contentDecayDataSchema.partial().passthrough(),
   cannibalization: cannibalizationDataSchema.partial().passthrough(),

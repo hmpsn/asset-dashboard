@@ -1562,6 +1562,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
       log.debug({ err }, 'keyword-strategy: expected error — degrading gracefully');
       log.error({ detail: masterRaw.slice(0, 300) }, 'Master returned invalid JSON');
       const errMsg = 'AI returned invalid JSON in master synthesis';
+      decrementUsage(ws.id, 'strategy_generations');
       if (wantsStream) { try { res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`); res.end(); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* closed */ } return; }
       return res.status(500).json({ error: errMsg, raw: masterRaw.slice(0, 500) });
     }
@@ -1640,6 +1641,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
 
     if (!strategy?.pageMap) {
       const errMsg = 'Strategy generation produced no results';
+      decrementUsage(ws.id, 'strategy_generations');
       if (wantsStream) { try { res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`); res.end(); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* closed */ } return; }
       return res.status(500).json({ error: errMsg });
     }
