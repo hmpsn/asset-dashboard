@@ -1,6 +1,6 @@
 import { useSearchParams } from 'react-router-dom';
 import { X } from 'lucide-react';
-import type { SprintData } from '../../shared/types/roadmap.js';
+import type { SprintData } from '../../shared/types/roadmap';
 
 const PRIORITY_OPTIONS = [
   { value: 'all', label: 'All Priorities' },
@@ -56,15 +56,15 @@ export function RoadmapFilterBar({ sprints, featureMap, allTags }: Props) {
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <select value={priority} onChange={e => setParam('priority', e.target.value)} className={cls}>
+      <select aria-label="Filter by priority" value={priority} onChange={e => setParam('priority', e.target.value)} className={cls}>
         {PRIORITY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
 
-      <select value={status} onChange={e => setParam('status', e.target.value)} className={cls}>
+      <select aria-label="Filter by status" value={status} onChange={e => setParam('status', e.target.value)} className={cls}>
         {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
 
-      <select value={sprint} onChange={e => setParam('sprint', e.target.value)} className={cls}>
+      <select aria-label="Filter by sprint" value={sprint} onChange={e => setParam('sprint', e.target.value)} className={cls}>
         <option value="all">All Sprints</option>
         {sprints.map(s => (
           <option key={s.id} value={s.id}>{s.name}</option>
@@ -72,7 +72,7 @@ export function RoadmapFilterBar({ sprints, featureMap, allTags }: Props) {
       </select>
 
       {featureMap.size > 0 && (
-        <select value={feature} onChange={e => setParam('feature', e.target.value)} className={cls}>
+        <select aria-label="Filter by feature" value={feature} onChange={e => setParam('feature', e.target.value)} className={cls}>
           <option value="all">All Features</option>
           {Array.from(featureMap.entries()).map(([id, name]) => (
             <option key={id} value={String(id)}>{name}</option>
@@ -81,7 +81,7 @@ export function RoadmapFilterBar({ sprints, featureMap, allTags }: Props) {
       )}
 
       {allTags.length > 0 && (
-        <select value={tags} onChange={e => setParam('tags', e.target.value)} className={cls}>
+        <select aria-label="Filter by tag" value={tags} onChange={e => setParam('tags', e.target.value)} className={cls}>
           <option value="all">All Tags</option>
           {allTags.map(tag => (
             <option key={tag} value={tag}>{tag}</option>

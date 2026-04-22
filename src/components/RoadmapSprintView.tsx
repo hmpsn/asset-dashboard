@@ -1,22 +1,9 @@
-import { CheckCircle2, Circle, Clock } from 'lucide-react';
-import { Badge } from './ui/index.js';
-import type { SprintData } from '../../shared/types/roadmap.js';
-import type { RoadmapFilters } from '../lib/roadmapFilters.js';
-import { matchesFilters } from '../lib/roadmapFilters.js';
-
-const PRIORITY_BADGE: Record<string, { label: string; color: 'red' | 'orange' | 'amber' | 'green' | 'zinc' }> = {
-  P0: { label: 'P0', color: 'red' },
-  P1: { label: 'P1', color: 'orange' },
-  P2: { label: 'P2', color: 'amber' },
-  P3: { label: 'P3', color: 'green' },
-  P4: { label: 'P4', color: 'zinc' },
-};
-
-const STATUS_ICON = {
-  done: <CheckCircle2 className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />,
-  in_progress: <Clock className="w-3.5 h-3.5 text-teal-400 animate-pulse flex-shrink-0" />,
-  pending: <Circle className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" />,
-};
+import { CheckCircle2, FilterX } from 'lucide-react';
+import { Badge, EmptyState } from './ui/index';
+import type { SprintData } from '../../shared/types/roadmap';
+import type { RoadmapFilters } from '../lib/roadmapFilters';
+import { matchesFilters } from '../lib/roadmapFilters';
+import { PRIORITY_BADGE, STATUS_ICON, FeatureChip, TagChip } from '../lib/roadmapConstants';
 
 interface Props {
   sprints: SprintData[];
@@ -32,9 +19,11 @@ export function RoadmapSprintView({ sprints, filters, featureMap, onToggleStatus
 
   if (visibleSprints.length === 0) {
     return (
-      <div className="text-center py-16 text-zinc-500 text-sm">
-        No items match the current filters.
-      </div>
+      <EmptyState
+        icon={FilterX}
+        title="No items match the current filters"
+        description="Try clearing one or more filters to see more roadmap items."
+      />
     );
   }
 
@@ -98,18 +87,9 @@ export function RoadmapSprintView({ sprints, filters, featureMap, onToggleStatus
                           {item.title}
                         </span>
                         <Badge label={pb.label} color={pb.color} />
-                        {featureName && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-teal-500/10 text-teal-400 border border-teal-500/20">
-                            {featureName}
-                          </span>
-                        )}
+                        {featureName && <FeatureChip>{featureName}</FeatureChip>}
                         {item.tags?.map(tag => (
-                          <span
-                            key={tag}
-                            className="px-1.5 py-0.5 rounded text-[10px] bg-zinc-800 text-zinc-400 border border-zinc-700"
-                          >
-                            {tag}
-                          </span>
+                          <TagChip key={tag}>{tag}</TagChip>
                         ))}
                       </div>
                     </div>

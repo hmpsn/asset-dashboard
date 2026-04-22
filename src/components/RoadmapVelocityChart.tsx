@@ -1,6 +1,14 @@
 import { useMemo } from 'react';
-import type { RoadmapItem } from '../../shared/types/roadmap.js';
-import { chartGridColor, chartDotFill } from './ui/constants.js';
+import type { RoadmapItem } from '../../shared/types/roadmap';
+import { chartGridColor, chartDotFill } from './ui/constants';
+import { SectionCard } from './ui/index';
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function formatMonth(m: string): string {
+  const [, mo] = m.split('-');
+  return MONTH_NAMES[parseInt(mo, 10) - 1] || mo;
+}
 
 export function ShippingVelocityChart({ items }: { items: RoadmapItem[] }) {
   const data = useMemo(() => {
@@ -35,18 +43,11 @@ export function ShippingVelocityChart({ items }: { items: RoadmapItem[] }) {
   const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
   const areaPath = `${linePath} L${points[points.length - 1].x},${PAD_T + chartH} L${points[0].x},${PAD_T + chartH} Z`;
 
-  const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const formatMonth = (m: string) => {
-    const [, mo] = m.split('-');
-    return MONTH_NAMES[parseInt(mo, 10) - 1] || mo;
-  };
-
   return (
-    <div className="bg-zinc-900 border border-zinc-800 p-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-medium text-zinc-400">Shipping Velocity</span>
-        <span className="text-[11px] text-zinc-500">{data[data.length - 1].cumulative} features shipped</span>
-      </div>
+    <SectionCard
+      title="Shipping Velocity"
+      action={<span className="text-[11px] text-zinc-500">{data[data.length - 1].cumulative} features shipped</span>}
+    >
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 200 }}>
         <defs>
           <linearGradient id="vel-grad" x1="0" y1="0" x2="0" y2="1">
@@ -79,6 +80,6 @@ export function ShippingVelocityChart({ items }: { items: RoadmapItem[] }) {
           </g>
         ))}
       </svg>
-    </div>
+    </SectionCard>
   );
 }

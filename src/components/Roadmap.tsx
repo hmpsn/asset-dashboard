@@ -4,16 +4,16 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircle2, Clock, Rocket, Map as MapIcon, Loader2, LayoutList, Table2,
 } from 'lucide-react';
-import { PageHeader, StatCard, TabBar } from './ui/index.js';
-import { ShippingVelocityChart } from './RoadmapVelocityChart.js';
-import { RoadmapFilterBar } from './RoadmapFilterBar.js';
-import { RoadmapSprintView } from './RoadmapSprintView.js';
-import { RoadmapBacklogView } from './RoadmapBacklogView.js';
-import { roadmap as roadmapApi, features as featuresApi } from '../api/misc.js';
-import { queryKeys } from '../lib/queryKeys.js';
-import { filtersFromParams, deriveAllTags } from '../lib/roadmapFilters.js';
-import type { SprintData } from '../../shared/types/roadmap.js';
-import type { FeaturesData } from '../../shared/types/features.js';
+import { PageHeader, StatCard, TabBar, SectionCard } from './ui/index';
+import { ShippingVelocityChart } from './RoadmapVelocityChart';
+import { RoadmapFilterBar } from './RoadmapFilterBar';
+import { RoadmapSprintView } from './RoadmapSprintView';
+import { RoadmapBacklogView } from './RoadmapBacklogView';
+import { roadmap as roadmapApi, features as featuresApi } from '../api/misc';
+import { queryKeys } from '../lib/queryKeys';
+import { filtersFromParams, deriveAllTags } from '../lib/roadmapFilters';
+import type { SprintData } from '../../shared/types/roadmap';
+import type { FeaturesData } from '../../shared/types/features';
 
 const VIEW_TABS = [
   { id: 'sprint', label: 'Sprint View', icon: LayoutList },
@@ -53,6 +53,7 @@ export function Roadmap() {
   const toggleStatus = async (itemId: number) => {
     const cycle: Array<'pending' | 'in_progress' | 'done'> = ['pending', 'in_progress', 'done'];
     let newStatus: 'pending' | 'in_progress' | 'done' = 'pending';
+    const previousSnapshot = queryClient.getQueryData<SprintData[]>(queryKeys.admin.roadmap());
     queryClient.setQueryData(queryKeys.admin.roadmap(), (prev: SprintData[] = []) =>
       prev.map(sprint => ({
         ...sprint,
@@ -66,6 +67,9 @@ export function Roadmap() {
     );
     roadmapApi.updateItem(itemId, { status: newStatus }).catch(err => {
       console.error('Roadmap status update failed:', err);
+      if (previousSnapshot !== undefined) {
+        queryClient.setQueryData(queryKeys.admin.roadmap(), previousSnapshot);
+      }
     });
   };
 
@@ -109,21 +113,23 @@ export function Roadmap() {
 
       <ShippingVelocityChart items={allItems} />
 
-      <div className="bg-zinc-900 border border-zinc-800 px-4 py-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-medium text-zinc-400">Overall Progress</span>
-          {currentSprint && <span className="text-[11px] text-teal-400">Current: {currentSprint.name}</span>}
+      <SectionCard noPadding>
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-zinc-400">Overall Progress</span>
+            {currentSprint && <span className="text-[11px] text-teal-400">Current: {currentSprint.name}</span>}
+          </div>
+          <div className="h-2.5 bg-zinc-800 rounded-full overflow-hidden flex">
+            {done > 0 && <div className="h-full bg-green-500 transition-all" style={{ width: `${(done / total) * 100}%` }} />}
+            {inProgress > 0 && <div className="h-full bg-teal-400 transition-all" style={{ width: `${(inProgress / total) * 100}%` }} />}
+          </div>
+          <div className="flex items-center gap-4 mt-1.5 text-[11px] text-zinc-500">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" /> Done ({done})</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-teal-400" /> Active ({inProgress})</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-zinc-700" /> Pending ({pending})</span>
+          </div>
         </div>
-        <div className="h-2.5 bg-zinc-800 rounded-full overflow-hidden flex">
-          {done > 0 && <div className="h-full bg-green-500 transition-all" style={{ width: `${(done / total) * 100}%` }} />}
-          {inProgress > 0 && <div className="h-full bg-teal-400 transition-all" style={{ width: `${(inProgress / total) * 100}%` }} />}
-        </div>
-        <div className="flex items-center gap-4 mt-1.5 text-[11px] text-zinc-500">
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" /> Done ({done})</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-teal-400" /> Active ({inProgress})</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-zinc-700" /> Pending ({pending})</span>
-        </div>
-      </div>
+      </SectionCard>
 
       <div className="space-y-3">
         {/* tab-deeplink-ok — uses ?view= param (not ?tab=) which is read from useSearchParams above */}

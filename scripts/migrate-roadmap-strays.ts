@@ -3,7 +3,13 @@ import path from 'node:path';
 
 const filePath = path.resolve('data/roadmap.json');
 const raw = fs.readFileSync(filePath, 'utf-8');
-const data = JSON.parse(raw) as { sprints: Array<{ id: string; items: Array<{ status: string }> }> };
+
+let data: { sprints: Array<{ id: string; items: Array<{ status: string }> }> };
+try {
+  data = JSON.parse(raw);
+} catch (err) {
+  throw new Error(`Failed to parse ${filePath} as JSON: ${err instanceof Error ? err.message : String(err)}`);
+}
 
 const earlierIdx = data.sprints.findIndex(s => s.id === 'shipped-earlier');
 const backlogIdx = data.sprints.findIndex(s => s.id === 'backlog');

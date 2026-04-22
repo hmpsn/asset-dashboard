@@ -1,11 +1,19 @@
-import type { RoadmapItem } from '../../shared/types/roadmap.js';
+import type { RoadmapItem } from '../../shared/types/roadmap';
+
+export type Priority = 'P0' | 'P1' | 'P2' | 'P3' | 'P4';
+export type Status = 'done' | 'in_progress' | 'pending';
+
+export const PRIORITY_VALUES: readonly Priority[] = ['P0', 'P1', 'P2', 'P3', 'P4'];
+export const STATUS_VALUES: readonly Status[] = ['done', 'in_progress', 'pending'];
+
+export type FilterValue<T extends string> = 'all' | T;
 
 export interface RoadmapFilters {
-  priority: string;  // 'all' | 'P0' | 'P1' | 'P2' | 'P3' | 'P4'
-  status: string;    // 'all' | 'done' | 'in_progress' | 'pending'
-  sprint: string;    // 'all' | sprint id
-  feature: string;   // 'all' | feature id as string (matches String(item.featureId))
-  tags: string;      // 'all' | comma-separated tag values (OR semantics)
+  priority: FilterValue<Priority>;
+  status: FilterValue<Status>;
+  sprint: string;   // 'all' | sprint id (dynamic)
+  feature: string;  // 'all' | feature id as string (dynamic; matches String(item.featureId))
+  tags: string;     // 'all' | comma-separated tag values (OR semantics)
 }
 
 export const DEFAULT_FILTERS: RoadmapFilters = {
@@ -27,6 +35,7 @@ export function matchesFilters(
   if (filters.feature !== 'all' && String(item.featureId ?? '') !== filters.feature) return false;
   if (filters.tags !== 'all') {
     const selected = filters.tags.split(',').filter(Boolean);
+    if (selected.length === 0) return true;
     if (!item.tags || !selected.some(t => item.tags!.includes(t))) return false;
   }
   return true;
@@ -37,8 +46,8 @@ export type SortDir = 'asc' | 'desc';
 
 export type FlatRoadmapItem = RoadmapItem & { sprintId: string; sprintName: string };
 
-const PRIORITY_ORDER: Record<string, number> = { P0: 0, P1: 1, P2: 2, P3: 3, P4: 4 };
-const STATUS_ORDER: Record<string, number> = { in_progress: 0, pending: 1, done: 2 };
+const PRIORITY_ORDER: Record<Priority, number> = { P0: 0, P1: 1, P2: 2, P3: 3, P4: 4 };
+const STATUS_ORDER: Record<Status, number> = { in_progress: 0, pending: 1, done: 2 };
 
 export function sortItems(
   items: FlatRoadmapItem[],
@@ -58,7 +67,7 @@ export function sortItems(
         cmp = (a.createdAt ?? '').localeCompare(b.createdAt ?? '');
         break;
       case 'est':
-        cmp = a.est.localeCompare(b.est);
+        cmp = (a.est ?? '').localeCompare(b.est ?? '');
         break;
       default:
         cmp = a.id - b.id;
@@ -67,13 +76,23 @@ export function sortItems(
   });
 }
 
+function coerce<T extends string>(raw: string | null, allowed: readonly T[]): FilterValue<T> {
+  if (raw === null || raw === '') return 'all';
+  return (allowed as readonly string[]).includes(raw) ? (raw as T) : 'all';
+}
+
+function coerceFreeform(raw: string | null): string {
+  if (raw === null || raw === '') return 'all';
+  return raw;
+}
+
 export function filtersFromParams(params: URLSearchParams): RoadmapFilters {
   return {
-    priority: params.get('priority') ?? 'all',
-    status: params.get('status') ?? 'all',
-    sprint: params.get('sprint') ?? 'all',
-    feature: params.get('feature') ?? 'all',
-    tags: params.get('tags') ?? 'all',
+    priority: coerce(params.get('priority'), PRIORITY_VALUES),
+    status: coerce(params.get('status'), STATUS_VALUES),
+    sprint: coerceFreeform(params.get('sprint')),
+    feature: coerceFreeform(params.get('feature')),
+    tags: coerceFreeform(params.get('tags')),
   };
 }
 

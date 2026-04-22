@@ -1,29 +1,23 @@
 import { Fragment, useState } from 'react';
-import { ChevronDown, ChevronUp, CheckCircle2, Circle, Clock, ArrowUpDown } from 'lucide-react';
-import { Badge } from './ui/index.js';
-import type { SprintData } from '../../shared/types/roadmap.js';
-import type { RoadmapFilters, SortKey, SortDir, FlatRoadmapItem } from '../lib/roadmapFilters.js';
-import { matchesFilters, sortItems } from '../lib/roadmapFilters.js';
-
-const PRIORITY_BADGE: Record<string, { label: string; color: 'red' | 'orange' | 'amber' | 'green' | 'zinc' }> = {
-  P0: { label: 'P0', color: 'red' },
-  P1: { label: 'P1', color: 'orange' },
-  P2: { label: 'P2', color: 'amber' },
-  P3: { label: 'P3', color: 'green' },
-  P4: { label: 'P4', color: 'zinc' },
-};
-
-const STATUS_ICON = {
-  done: <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />,
-  in_progress: <Clock className="w-3.5 h-3.5 text-teal-400 animate-pulse" />,
-  pending: <Circle className="w-3.5 h-3.5 text-zinc-600" />,
-};
+import { ChevronDown, ChevronUp, ArrowUpDown, FilterX } from 'lucide-react';
+import { Badge, EmptyState } from './ui/index';
+import type { SprintData } from '../../shared/types/roadmap';
+import type { RoadmapFilters, SortKey, SortDir, FlatRoadmapItem } from '../lib/roadmapFilters';
+import { matchesFilters, sortItems } from '../lib/roadmapFilters';
+import { PRIORITY_BADGE, STATUS_ICON, FeatureChip, TagChip } from '../lib/roadmapConstants';
 
 interface Props {
   sprints: SprintData[];
   filters: RoadmapFilters;
   featureMap: Map<number, string>;
   onToggleStatus: (itemId: number) => void;
+}
+
+function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) {
+  if (sortKey !== col) return <ArrowUpDown className="w-3 h-3 text-zinc-600" />;
+  return sortDir === 'asc'
+    ? <ChevronUp className="w-3 h-3 text-teal-400" />
+    : <ChevronDown className="w-3 h-3 text-teal-400" />;
 }
 
 export function RoadmapBacklogView({ sprints, filters, featureMap, onToggleStatus }: Props) {
@@ -48,21 +42,16 @@ export function RoadmapBacklogView({ sprints, filters, featureMap, onToggleStatu
     }
   };
 
-  function SortIcon({ col }: { col: SortKey }) {
-    if (sortKey !== col) return <ArrowUpDown className="w-3 h-3 text-zinc-600" />;
-    return sortDir === 'asc'
-      ? <ChevronUp className="w-3 h-3 text-teal-400" />
-      : <ChevronDown className="w-3 h-3 text-teal-400" />;
-  }
-
   const th = 'px-3 py-2 text-left text-[10px] font-semibold text-zinc-500 uppercase tracking-wider cursor-pointer hover:text-zinc-300 select-none';
   const thStatic = 'px-3 py-2 text-left text-[10px] font-semibold text-zinc-500 uppercase tracking-wider';
 
   if (sorted.length === 0) {
     return (
-      <div className="text-center py-16 text-zinc-500 text-sm">
-        No items match the current filters.
-      </div>
+      <EmptyState
+        icon={FilterX}
+        title="No items match the current filters"
+        description="Try clearing one or more filters to see more roadmap items."
+      />
     );
   }
 
@@ -74,19 +63,19 @@ export function RoadmapBacklogView({ sprints, filters, featureMap, onToggleStatu
             <th className={thStatic} style={{ width: '52px' }}>#</th>
             <th className={thStatic} style={{ minWidth: '220px' }}>Title</th>
             <th className={th} onClick={() => handleSort('priority')}>
-              <span className="flex items-center gap-1">Priority <SortIcon col="priority" /></span>
+              <span className="flex items-center gap-1">Priority <SortIcon col="priority" sortKey={sortKey} sortDir={sortDir} /></span>
             </th>
             <th className={th} onClick={() => handleSort('status')}>
-              <span className="flex items-center gap-1">Status <SortIcon col="status" /></span>
+              <span className="flex items-center gap-1">Status <SortIcon col="status" sortKey={sortKey} sortDir={sortDir} /></span>
             </th>
             <th className={thStatic}>Sprint</th>
             <th className={thStatic}>Feature</th>
             <th className={thStatic}>Tags</th>
             <th className={th} onClick={() => handleSort('est')}>
-              <span className="flex items-center gap-1">Est <SortIcon col="est" /></span>
+              <span className="flex items-center gap-1">Est <SortIcon col="est" sortKey={sortKey} sortDir={sortDir} /></span>
             </th>
             <th className={th} onClick={() => handleSort('createdAt')}>
-              <span className="flex items-center gap-1">Added <SortIcon col="createdAt" /></span>
+              <span className="flex items-center gap-1">Added <SortIcon col="createdAt" sortKey={sortKey} sortDir={sortDir} /></span>
             </th>
           </tr>
         </thead>
@@ -127,21 +116,12 @@ export function RoadmapBacklogView({ sprints, filters, featureMap, onToggleStatu
                     {item.sprintName}
                   </td>
                   <td className="px-3 py-2.5">
-                    {featureName && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-teal-500/10 text-teal-400 border border-teal-500/20 whitespace-nowrap">
-                        {featureName}
-                      </span>
-                    )}
+                    {featureName && <FeatureChip nowrap>{featureName}</FeatureChip>}
                   </td>
                   <td className="px-3 py-2.5">
                     <div className="flex gap-1 flex-wrap">
                       {item.tags?.map(tag => (
-                        <span
-                          key={tag}
-                          className="px-1.5 py-0.5 rounded text-[10px] bg-zinc-800 text-zinc-400 border border-zinc-700 whitespace-nowrap"
-                        >
-                          {tag}
-                        </span>
+                        <TagChip key={tag} nowrap>{tag}</TagChip>
                       ))}
                     </div>
                   </td>

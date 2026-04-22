@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { matchesFilters, sortItems, DEFAULT_FILTERS } from '../../src/lib/roadmapFilters.js';
+import { matchesFilters, sortItems, DEFAULT_FILTERS, filtersFromParams } from '../../src/lib/roadmapFilters.js';
 import type { RoadmapItem } from '../../shared/types/roadmap.js';
 
 const base: RoadmapItem = {
@@ -75,5 +75,47 @@ describe('sortItems', () => {
     const original = items.map(i => i.id);
     sortItems(items, 'priority', 'asc');
     expect(items.map(i => i.id)).toEqual(original);
+  });
+
+  it('sorts by est without crashing when some items have undefined est', () => {
+    const mixed: FlatItem[] = [
+      { ...base, id: 1, est: '4h', sprintId: 'a', sprintName: 'A' },
+      { ...base, id: 2, est: undefined as unknown as string, sprintId: 'b', sprintName: 'B' },
+      { ...base, id: 3, est: '2h', sprintId: 'c', sprintName: 'C' },
+    ];
+    expect(() => sortItems(mixed, 'est', 'asc')).not.toThrow();
+  });
+});
+
+describe('filtersFromParams', () => {
+  it('coerces empty/missing params to "all"', () => {
+    const f = filtersFromParams(new URLSearchParams(''));
+    expect(f).toEqual(DEFAULT_FILTERS);
+  });
+
+  it('coerces malformed enum values to "all"', () => {
+    const f = filtersFromParams(new URLSearchParams('priority=BOGUS&status=invalid'));
+    expect(f.priority).toBe('all');
+    expect(f.status).toBe('all');
+  });
+
+  it('treats empty string params as "all"', () => {
+    const f = filtersFromParams(new URLSearchParams('priority=&status=&sprint=&feature=&tags='));
+    expect(f).toEqual(DEFAULT_FILTERS);
+  });
+
+  it('passes through valid enum and freeform values', () => {
+    const f = filtersFromParams(new URLSearchParams('priority=P0&status=done&sprint=s1&feature=42&tags=auth,infra'));
+    expect(f.priority).toBe('P0');
+    expect(f.status).toBe('done');
+    expect(f.sprint).toBe('s1');
+    expect(f.feature).toBe('42');
+    expect(f.tags).toBe('auth,infra');
+  });
+});
+
+describe('matchesFilters tag edge cases', () => {
+  it('treats empty selected tag list (just commas) as match-all', () => {
+    expect(matchesFilters(base, { ...DEFAULT_FILTERS, tags: ',,' }, 'backlog')).toBe(true);
   });
 });
