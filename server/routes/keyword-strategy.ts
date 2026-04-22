@@ -980,12 +980,13 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
     if (strategyMode === 'incremental') {
       log.info(`Incremental mode: ${pagesToAnalyze.length} stale pages to analyze, ${pagesToPreserve.length} fresh pages to preserve`);
       sendProgress('ai', `Incremental mode: ${pagesToAnalyze.length} pages need fresh analysis, ${pagesToPreserve.length} already fresh`, 0.54);
-      // Early exit: all pages are fresh — nothing to re-analyze, no usage credit burned.
+      // Early exit: all pages are fresh — nothing to re-analyze. Refund the pre-reserved slot.
       if (pagesToAnalyze.length === 0) {
         log.info({ workspaceId: ws.id }, 'Incremental mode: all pages already fresh, skipping re-analysis');
         sendProgress('complete', 'All pages are already up to date — no re-analysis needed.', 1.0);
         if (keepalive) clearInterval(keepalive); // prevent setInterval leak on early exit
         activeGenerations.delete(ws.id);
+        decrementUsage(ws.id, 'strategy_generations'); // no AI work done — refund pre-reserved slot
         // Match the dual-response pattern used at the normal exit (line ~1999):
         // SSE callers already got progress events + the sendProgress('complete') above.
         // JSON callers need a proper response body — res.end() gives them an empty 200.
@@ -1562,6 +1563,8 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
       log.debug({ err }, 'keyword-strategy: expected error — degrading gracefully');
       log.error({ detail: masterRaw.slice(0, 300) }, 'Master returned invalid JSON');
       const errMsg = 'AI returned invalid JSON in master synthesis';
+      activeGenerations.delete(ws.id);
+      if (keepalive) clearInterval(keepalive);
       decrementUsage(ws.id, 'strategy_generations');
       if (wantsStream) { try { res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`); res.end(); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* closed */ } return; }
       return res.status(500).json({ error: errMsg, raw: masterRaw.slice(0, 500) });
@@ -1641,6 +1644,8 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
 
     if (!strategy?.pageMap) {
       const errMsg = 'Strategy generation produced no results';
+      activeGenerations.delete(ws.id);
+      if (keepalive) clearInterval(keepalive);
       decrementUsage(ws.id, 'strategy_generations');
       if (wantsStream) { try { res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`); res.end(); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* closed */ } return; }
       return res.status(500).json({ error: errMsg });
