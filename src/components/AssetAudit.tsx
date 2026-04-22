@@ -29,6 +29,7 @@ interface AuditResult {
 
 interface Props {
   siteId: string;
+  workspaceId: string;
 }
 
 function formatSize(bytes: number): string {
@@ -50,7 +51,7 @@ const ISSUE_LABELS: Record<string, { label: string; color: string; bg: string; i
 
 type SortField = 'name' | 'size' | 'issues';
 
-function AssetAudit({ siteId }: Props) {
+function AssetAudit({ siteId, workspaceId }: Props) {
   const [audit, setAudit] = useState<AuditResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
@@ -83,7 +84,7 @@ function AssetAudit({ siteId }: Props) {
     if (!issue.url) return;
     setGeneratingAlt(prev => new Set(prev).add(issue.assetId));
     try {
-      const data = await post<{ altText?: string }>(`/api/webflow/generate-alt/${issue.assetId}`, { imageUrl: issue.url, siteId });
+      const data = await post<{ altText?: string }>(`/api/webflow/${workspaceId}/generate-alt/${issue.assetId}`, { imageUrl: issue.url, siteId });
       if (data.altText && audit) {
         setAudit({
           ...audit,

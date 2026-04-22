@@ -6,6 +6,7 @@ import {
   History,
 } from 'lucide-react';
 import { contentPosts } from '../api/content';
+import { getText } from '../api/client';
 import { useAdminPost, useAdminPostVersions, usePublishTarget } from '../hooks/admin';
 import { SectionEditor } from './post-editor/SectionEditor';
 import { PostPreview } from './post-editor/PostPreview';
@@ -208,8 +209,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
     const w = window.open('', '_blank');
     if (!w) return;
     w.document.write('<p style="font-family:sans-serif;padding:40px">Loading PDF preview…</p>');
-    fetch(`/api/content-posts/${workspaceId}/${postId}/export/pdf`)
-      .then(r => r.text())
+    getText(`/api/content-posts/${workspaceId}/${postId}/export/pdf`)
       .then(html => { w.document.open(); w.document.write(html); w.document.close(); })
       .catch(() => { w.location.href = `/api/content-posts/${workspaceId}/${postId}/export/pdf`; });
   };

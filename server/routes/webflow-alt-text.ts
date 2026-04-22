@@ -4,6 +4,7 @@
 import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
+import { requireWorkspaceAccess } from '../auth.js';
 import { generateAltText } from '../alttext.js';
 import type { default as SharpConstructor } from 'sharp';
 import type * as SvgoMod from 'svgo';
@@ -18,39 +19,35 @@ import {
 import { updateCollectionItem, getCollectionItem, publishCollectionItems } from '../webflow-cms.js';
 import type { CmsImageUsage } from '../../shared/types/cms-images.ts';
 import {
-  listWorkspaces,
   getWorkspace,
   getTokenForSite,
 } from '../workspaces.js';
 import { getWorkspacePages } from '../workspace-data.js';
 import { createLogger } from '../logger.js';
 import { isProgrammingError } from '../errors.js';
-import { checkUsageLimit, incrementUsage } from '../usage-tracking.js';
+import { checkUsageLimit, incrementIfAllowed, decrementUsage } from '../usage-tracking.js';
 
 const log = createLogger('webflow-alt-text');
 
 const router = Router();
 
 // --- AI Alt Text Generation for existing assets ---
-router.post('/api/webflow/generate-alt/:assetId', async (req, res) => {
-  const { imageUrl, siteId, workspaceId: altWsId } = req.body;
+router.post('/api/webflow/:workspaceId/generate-alt/:assetId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+  const { imageUrl, siteId } = req.body;
   if (!imageUrl) return res.status(400).json({ error: 'imageUrl required' });
 
-  // Resolve workspace and check billing before any expensive work (image download, intelligence build).
-  // Workspace is required — closes billing bypass when neither workspaceId nor a siteId that maps to one is provided.
-  const resolvedWsId = altWsId || (siteId ? listWorkspaces().find(w => w.webflowSiteId === siteId)?.id : undefined);
-  const ws = resolvedWsId ? getWorkspace(resolvedWsId) : undefined;
-  if (!ws) return res.status(400).json({ error: 'workspaceId (or a siteId that maps to a workspace) is required' });
-  const usage = checkUsageLimit(ws.id, ws.tier || 'free', 'strategy_generations');
-  if (!usage.allowed) return res.status(429).json({ error: 'Monthly AI generation limit reached', used: usage.used, limit: usage.limit });
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (!incrementIfAllowed(ws.id, ws.tier || 'free', 'strategy_generations')) {
+    return res.status(429).json({ error: 'Monthly AI generation limit reached' });
+  }
 
   try {
     let context = '';
     if (siteId) {
       try {
         const tkn = getTokenForSite(siteId) || undefined;
-        const altWs = listWorkspaces().find(w => w.webflowSiteId === siteId);
-        const pages = altWs ? await getWorkspacePages(altWs.id, siteId) : [];
+        const pages = await getWorkspacePages(req.params.workspaceId, siteId);
         const assetId = req.params.assetId;
         const contextParts: string[] = [];
 
@@ -88,8 +85,8 @@ router.post('/api/webflow/generate-alt/:assetId', async (req, res) => {
 
     let altText: string | null = null;
     try {
-      if (resolvedWsId) {
-        const altIntel = await buildWorkspaceIntelligence(resolvedWsId, { slices: ['seoContext'] });
+      {
+        const altIntel = await buildWorkspaceIntelligence(req.params.workspaceId, { slices: ['seoContext'] });
         const altBizCtx = altIntel.seoContext?.businessContext ?? '';
         // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
         const bvBlock = altIntel.seoContext?.effectiveBrandVoiceBlock ?? '';
@@ -116,38 +113,36 @@ router.post('/api/webflow/generate-alt/:assetId', async (req, res) => {
       const writeResult = await updateAsset(req.params.assetId, { altText }, altToken);
       if (!writeResult.success) {
         log.error({ detail: writeResult.error }, `Alt text generated but Webflow write-back failed for ${req.params.assetId}:`);
+        decrementUsage(ws.id, 'strategy_generations');
         res.json({ altText, updated: false, writeError: writeResult.error });
       } else {
         log.info(`Alt text generated and saved for ${req.params.assetId}: "${altText}"`);
-        incrementUsage(ws.id, 'strategy_generations');
         res.json({ altText, updated: true });
       }
     } else {
       log.warn(`Alt text generation returned null for ${req.params.assetId}`);
+      decrementUsage(ws.id, 'strategy_generations');
       res.json({ altText: null, updated: false });
     }
   } catch (e) {
     log.error({ err: e }, 'Generate alt error');
+    decrementUsage(ws.id, 'strategy_generations');
     res.status(500).json({ error: 'Failed to generate alt text' });
   }
 });
 
 // --- Bulk AI Alt Text Generation (fetches context once) ---
-router.post('/api/webflow/bulk-generate-alt', async (req, res) => {
-  const { assets, siteId, workspaceId: bulkAltWsId } = req.body as {
+router.post('/api/webflow/:workspaceId/bulk-generate-alt', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+  const { assets, siteId } = req.body as {
     assets: Array<{ assetId: string; imageUrl: string }>;
     siteId?: string;
-    workspaceId?: string;
   };
   if (!assets?.length) return res.status(400).json({ error: 'assets required' });
 
   const token = siteId ? (getTokenForSite(siteId) || undefined) : undefined;
 
-  // Resolve workspace and check billing before any external API work.
-  // Workspace is required — closes billing bypass when neither workspaceId nor a mappable siteId is provided.
-  const bulkWsId = bulkAltWsId || (siteId ? listWorkspaces().find(w => w.webflowSiteId === siteId)?.id : undefined);
-  const bulkWs = bulkWsId ? getWorkspace(bulkWsId) : undefined;
-  if (!bulkWs || !bulkWsId) return res.status(400).json({ error: 'workspaceId (or a siteId that maps to a workspace) is required' });
+  const bulkWs = getWorkspace(req.params.workspaceId);
+  if (!bulkWs) return res.status(404).json({ error: 'Workspace not found' });
   const usage = checkUsageLimit(bulkWs.id, bulkWs.tier || 'free', 'strategy_generations');
   if (!usage.allowed) return res.status(429).json({ error: 'Monthly AI generation limit reached', used: usage.used, limit: usage.limit });
 
@@ -160,14 +155,14 @@ router.post('/api/webflow/bulk-generate-alt', async (req, res) => {
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-alt-text: POST /api/webflow/bulk-generate-alt: programming error'); /* proceed without context */ }
   }
 
-  if (bulkWsId) {
-    const bulkIntel = await buildWorkspaceIntelligence(bulkWsId, { slices: ['seoContext'] });
+  {
+    const bulkIntel = await buildWorkspaceIntelligence(req.params.workspaceId, { slices: ['seoContext'] });
     const bulkBizCtx = bulkIntel.seoContext?.businessContext ?? '';
     // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
     const bvBlock = bulkIntel.seoContext?.effectiveBrandVoiceBlock ?? '';
     const kwParts: string[] = [];
     if (bulkBizCtx) kwParts.push(`Business: ${bulkBizCtx}`);
-    if (bulkWs?.keywordStrategy?.siteKeywords?.length) {
+    if (bulkWs.keywordStrategy?.siteKeywords?.length) {
       kwParts.push(`Site keywords: ${bulkWs.keywordStrategy.siteKeywords.slice(0, 5).join(', ')}`);
     }
     if (kwParts.length > 0) {
@@ -181,7 +176,7 @@ router.post('/api/webflow/bulk-generate-alt', async (req, res) => {
   const assetContextMap = new Map<string, string>();
   if (siteId) {
     try {
-      const pages = bulkWsId ? await getWorkspacePages(bulkWsId, siteId) : [];
+      const pages = await getWorkspacePages(req.params.workspaceId, siteId);
       for (const page of pages.slice(0, 15)) {
         try {
           const dom = await getPageDom(page.id, token);
@@ -214,10 +209,8 @@ router.post('/api/webflow/bulk-generate-alt', async (req, res) => {
 
   let done = 0;
   for (const asset of assets) {
-    // Per-asset billing check: prevents unbounded overshoot when batch size > remaining budget.
-    // One upfront check could let a 50-asset batch push a workspace from used=9 to used=59 against limit=10.
-    const usage = checkUsageLimit(bulkWs.id, bulkWs.tier || 'free', 'strategy_generations');
-    if (!usage.allowed) {
+    // Per-asset atomic check+increment prevents unbounded overshoot when batch size > remaining budget.
+    if (!incrementIfAllowed(bulkWs.id, bulkWs.tier || 'free', 'strategy_generations')) {
       send({ type: 'status', message: `Monthly AI limit reached after ${done}/${assets.length} images`, done, total: assets.length });
       break;
     }
@@ -225,6 +218,7 @@ router.post('/api/webflow/bulk-generate-alt', async (req, res) => {
       const response = await fetch(asset.imageUrl);
       if (!response.ok) {
         done++;
+        decrementUsage(bulkWs.id, 'strategy_generations');
         send({ type: 'result', assetId: asset.assetId, altText: null, updated: false, error: `Download failed: ${response.status}`, done, total: assets.length });
         continue;
       }
@@ -242,18 +236,20 @@ router.post('/api/webflow/bulk-generate-alt', async (req, res) => {
         const writeResult = await updateAsset(asset.assetId, { altText }, token);
         if (!writeResult.success) {
           log.error({ detail: writeResult.error }, `Bulk alt: generated but write-back failed for ${asset.assetId}:`);
+          decrementUsage(bulkWs.id, 'strategy_generations');
           send({ type: 'result', assetId: asset.assetId, altText, updated: false, error: writeResult.error, done, total: assets.length });
         } else {
-          incrementUsage(bulkWs.id, 'strategy_generations');
           send({ type: 'result', assetId: asset.assetId, altText, updated: true, done, total: assets.length });
         }
       } else {
+        decrementUsage(bulkWs.id, 'strategy_generations');
         send({ type: 'result', assetId: asset.assetId, altText: null, updated: false, error: 'Generation returned null', done, total: assets.length });
       }
     } catch (err) {
       done++;
       const msg = err instanceof Error ? err.message : String(err);
       log.error({ detail: msg }, `Bulk alt error for ${asset.assetId}:`);
+      decrementUsage(bulkWs.id, 'strategy_generations');
       send({ type: 'result', assetId: asset.assetId, altText: null, updated: false, error: msg, done, total: assets.length });
     }
   }

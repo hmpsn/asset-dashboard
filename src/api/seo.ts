@@ -2,6 +2,7 @@
 import { ApiError, get, post, put, patch, del, getSafe, getOptional } from './client';
 import type { SchemaSitePlan, PageRoleAssignment, CanonicalEntity } from '../../shared/types/schema-plan';
 import type { LatestRank, RankHistoryEntry } from '../hooks/useClientData';
+import { readNdjsonStream, readSseStream } from './streamUtils';
 
 export interface StrategyDiff {
   previousGeneratedAt: string;
@@ -247,8 +248,8 @@ export const webflow = {
   removeAsset: (assetId: string, siteId: string) =>
     del(`/api/webflow/assets/${assetId}?siteId=${siteId}`),
 
-  generateAlt: (assetId: string, body: Record<string, unknown>) =>
-    post<unknown>(`/api/webflow/generate-alt/${assetId}`, body),
+  generateAlt: (workspaceId: string, assetId: string, body: Record<string, unknown>) =>
+    post<unknown>(`/api/webflow/${workspaceId}/generate-alt/${assetId}`, body),
 
   compress: (assetId: string, body: Record<string, unknown>) =>
     post<unknown>(`/api/webflow/compress/${assetId}`, body),
@@ -455,16 +456,19 @@ export const pageWeight = {
 };
 
 // ── Alt-text generation (single + bulk NDJSON stream) ───────────
+
+// ── Alt-text generation (single + bulk NDJSON stream) ───────────
 /**
  * Generate alt text for a single Webflow asset.
  * Wraps POST /api/webflow/generate-alt/:assetId.
  */
 export function generateAltText(
+  workspaceId: string,
   assetId: string,
-  body: { imageUrl: string; siteId?: string; workspaceId?: string },
+  body: { imageUrl: string; siteId?: string },
 ): Promise<{ altText: string | null; updated: boolean; writeError?: string }> {
   return post<{ altText: string | null; updated: boolean; writeError?: string }>(
-    `/api/webflow/generate-alt/${assetId}`,
+    `/api/webflow/${workspaceId}/generate-alt/${assetId}`,
     body,
   );
 }
@@ -487,91 +491,42 @@ export interface BulkAltTextNdjsonEvent {
 
 /**
  * Bulk-generate alt text for selected Webflow assets. Wraps
- * POST /api/webflow/bulk-generate-alt, which streams NDJSON results
- * line-by-line as each image is processed.
+ * POST /api/webflow/:workspaceId/bulk-generate-alt, which streams NDJSON
+ * results line-by-line as each image is processed.
  *
- * Returns a cancel function (call on component unmount to abort the stream).
- * `onDone` fires when the stream ends normally; `onError` fires on failure
- * or a non-ok HTTP response. Abort errors are swallowed silently.
- *
- * The endpoint requires `{ siteId, assets: [{ assetId, imageUrl }] }` in the
- * body — the caller assembles this.
+ * `onProgress` fires per successfully generated alt text (truthy altText only).
+ * `onEvent` fires for every raw NDJSON event including status ticks.
+ * Rejects on non-ok HTTP response or network failure.
  */
-export function bulkGenerateAltText(
-  body: { siteId: string; workspaceId?: string; assets: Array<{ assetId: string; imageUrl: string }> },
+export async function bulkGenerateAltText(
+  workspaceId: string,
+  body: { siteId: string; assets: Array<{ assetId: string; imageUrl: string }> },
   onProgress: (assetId: string, altText: string) => void,
   onEvent?: (event: BulkAltTextNdjsonEvent) => void,
-  onDone?: () => void,
-  onError?: (err: Error) => void,
-): () => void {
-  const controller = new AbortController();
+): Promise<void> {
+  const res = await fetch(`/api/webflow/${workspaceId}/bulk-generate-alt`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 
-  (async () => {
-    try {
-      const res = await fetch('/api/webflow/bulk-generate-alt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
+  if (!res.ok) {
+    let errBody: unknown;
+    try { errBody = await res.json(); } catch { /* non-JSON error body */ }
+    const msg = (errBody && typeof errBody === 'object' && 'error' in errBody)
+      ? String((errBody as { error: unknown }).error)
+      : res.statusText || `HTTP ${res.status}`;
+    throw new ApiError(res.status, msg, errBody);
+  }
 
-      if (!res.ok) {
-        let errBody: unknown;
-        try { errBody = await res.json(); } catch { /* non-JSON error body */ }
-        const msg = (errBody && typeof errBody === 'object' && 'error' in errBody)
-          ? String((errBody as { error: unknown }).error)
-          : res.statusText || `HTTP ${res.status}`;
-        onError?.(new ApiError(res.status, msg, errBody));
-        return;
-      }
+  if (!res.body) throw new ApiError(0, 'Streaming not supported');
 
-      const reader = res.body?.getReader();
-      if (!reader) { onError?.(new ApiError(0, 'Streaming not supported')); return; }
-
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            const event = JSON.parse(line) as BulkAltTextNdjsonEvent;
-            onEvent?.(event);
-            if (event.type === 'result' && event.assetId && event.altText) {
-              onProgress(event.assetId, event.altText);
-            }
-          } catch (err) {
-            console.error('bulkGenerateAltText parse failed:', err);
-          }
-        }
-      }
-
-      // Flush any trailing incomplete line after stream ends
-      if (buffer.trim()) {
-        try {
-          const event = JSON.parse(buffer) as BulkAltTextNdjsonEvent;
-          onEvent?.(event);
-          if (event.type === 'result' && event.assetId && event.altText) {
-            onProgress(event.assetId, event.altText);
-          }
-        } catch { /* ignore malformed trailing fragment */ }
-      }
-
-      onDone?.();
-    } catch (err) {
-      if ((err as { name?: string })?.name === 'AbortError') return;
-      onError?.(err instanceof Error ? err : new Error(String(err)));
+  await readNdjsonStream<BulkAltTextNdjsonEvent>(res.body, (event) => {
+    onEvent?.(event);
+    if (event.type === 'result' && event.assetId && event.altText) {
+      onProgress(event.assetId, event.altText);
     }
-  })();
-
-  return () => controller.abort();
+  });
 }
 
 /**
@@ -628,27 +583,7 @@ export function streamKeywordStrategy(
         return;
       }
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          try {
-            const evt = JSON.parse(line.slice(6)) as KeywordStrategySseEvent;
-            onEvent(evt);
-          } catch (err) {
-            console.error('streamKeywordStrategy parse failed:', err);
-          }
-        }
-      }
+      await readSseStream<KeywordStrategySseEvent>(res.body, onEvent);
       onDone();
     } catch (err) {
       if ((err as { name?: string })?.name === 'AbortError') return;

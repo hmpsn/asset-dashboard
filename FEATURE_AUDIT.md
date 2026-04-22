@@ -3696,3 +3696,28 @@ Current feature count: **310**. Last updated: April 2026.
 **Mutual:** Consolidates a complex, error-prone operation into a single canonical location. Enforced by pr-check rule forbidding manual `pageMap.find()/strategyByPath` patterns outside the hook — all future page-join code routes through the shared hook.
 
 **Files:** `src/hooks/admin/usePageJoin.ts`, `shared/types/page-join.ts`
+
+---
+
+## Tech-Debt Hardening Sprint (PR #256, 2026-04-22)
+
+### 308. Atomic Usage-Tracking (TOCTOU Fix)
+**What it does:** Closes a concurrency race where two simultaneous AI requests (bulk alt-text, keyword strategy, etc.) could both pass the usage limit check before either incremented the counter, overshooting the tier limit by ~N concurrent requests. Adds `incrementIfAllowed(wsId, tier, feature)` in `server/usage-tracking.ts` that wraps check + increment in a single SQLite transaction. All 6 guarded AI routes migrated: keyword strategy, brand voice, knowledge base, personas, webflow alt-text (single + bulk), brand identity refine. Failure paths call `decrementUsage()` to refund atomically on AI errors.
+
+**Files:** `server/usage-tracking.ts`, `server/routes/keyword-strategy.ts`, `server/routes/brand-voice.ts`, `server/routes/knowledge-base.ts`, `server/routes/personas.ts`, `server/routes/webflow-alt-text.ts`, `server/routes/brand-identity.ts`
+
+### 309. Alt-Text Route Auth Hardening
+**What it does:** Moves `workspaceId` from request body to URL path param on alt-text generation routes and adds `requireWorkspaceAccess` middleware, closing a pre-existing gap where an authenticated admin could target a different workspace's quota by manipulating the request body. Routes renamed from `/api/webflow/generate-alt/:assetId` and `/api/webflow/bulk-generate-alt` to `/api/webflow/:workspaceId/generate-alt/:assetId` and `/api/webflow/:workspaceId/bulk-generate-alt`. Prop chain updated through `App.tsx → MediaTab → AssetBrowser/AssetAudit` to pass `workspaceId`.
+
+**Files:** `server/routes/webflow-alt-text.ts`, `src/api/seo.ts`, `src/components/AssetBrowser.tsx`, `src/components/AssetAudit.tsx`, `src/components/MediaTab.tsx`, `src/App.tsx`
+
+### 310. Stream Reader Deduplication (readNdjsonStream + readSseStream)
+**What it does:** Extracts two generic stream reader helpers into `src/api/streamUtils.ts` — `readNdjsonStream<T>` (splits on newlines, parses each as JSON) and `readSseStream<T>` (strips `data: ` prefix). Replaces two independent `while(true){reader.read()}` loops in `seo.ts` that had already diverged (NDJSON flushed trailing buffer; SSE did not). `AssetBrowser.tsx` refactored to use the typed `bulkGenerateAltText` wrapper from `src/api/seo.ts` instead of hand-rolling a raw fetch + stream loop.
+
+**Files:** `src/api/streamUtils.ts` (new), `src/api/seo.ts`, `src/components/AssetBrowser.tsx`
+
+### 311. rowToInsight Schema Hardening
+**What it does:** Adds Zod schemas for all 14 insight data types in `server/schemas/insight-schemas.ts` and an `INSIGHT_DATA_SCHEMA_MAP` mapping each `InsightType` to its schema. `rowToInsight()` in `analytics-insights-store.ts` now validates via `parseJsonSafe()` instead of bare `parseJsonFallback()`, so corrupt or missing stored JSON is caught at read time rather than silently producing `undefined` on required fields. All schemas use `.passthrough()` so cross-cutting `_originalBaseScore`/`_scoreAdjustments` fields added by `applyScoreAdjustment()` survive round-trip. Fixed 4 test files whose fixtures used incomplete or wrong-field data shapes.
+
+**Files:** `server/schemas/insight-schemas.ts`, `server/analytics-insights-store.ts`, `tests/unit/migration-data-preservation.test.ts`, `tests/integration/anomaly-boost-reversal.test.ts`, `tests/integration/public-analytics.test.ts`, `tests/contract/insight-data-shapes.test.ts`
+

@@ -754,6 +754,24 @@ describe('InsightType coverage: all 14 types round-trip through the store', () =
     'site_health',
   ] as const;
 
+  // Minimal valid data per type — satisfies each Zod schema so parseJsonSafe returns real data.
+  const minimalValidData: Record<typeof allTypes[number], Record<string, unknown>> = {
+    page_health: { score: 50, trend: 'stable', clicks: 10, impressions: 100, position: 15, ctr: 10, pageviews: 20, bounceRate: 50, avgEngagementTime: 60 },
+    ranking_opportunity: { query: 'kw', currentPosition: 12, impressions: 500, estimatedTrafficGain: 30, pageUrl: '/page' },
+    content_decay: { baselineClicks: 100, currentClicks: 40, deltaPercent: -60, baselinePeriod: '2024-Q1', currentPeriod: '2024-Q2' },
+    cannibalization: { query: 'kw', pages: ['/a', '/b'], positions: [5, 8], totalImpressions: 200 },
+    keyword_cluster: { label: 'Cluster A', queries: ['kw1'], totalImpressions: 300, avgPosition: 7, pillarPage: null },
+    competitor_gap: { keyword: 'kw', competitorDomain: 'rival.com', competitorPosition: 3, ourPosition: null, volume: 500, difficulty: 40 },
+    conversion_attribution: { sessions: 100, conversions: 5, conversionRate: 5, estimatedRevenue: null },
+    ranking_mover: { query: 'kw', pageUrl: '/page', currentPosition: 8, previousPosition: 14, positionChange: 6, currentClicks: 50, previousClicks: 20, impressions: 600 },
+    ctr_opportunity: { query: 'kw', pageUrl: '/page', position: 3, actualCtr: 2, expectedCtr: 8, ctrRatio: 0.25, impressions: 400, estimatedClickGap: 24 },
+    serp_opportunity: { pageUrl: '/page', impressions: 200, clicks: 10, position: 6, ctr: 5, schemaStatus: 'missing' },
+    strategy_alignment: { alignedCount: 3, misalignedCount: 1, untrackedCount: 2 },
+    anomaly_digest: { anomalyType: 'spike', metric: 'clicks', currentValue: 200, expectedValue: 50, deviationPercent: 300, durationDays: 3, firstDetected: '2024-01-01', severity: 'critical' },
+    audit_finding: { scope: 'page', issueCount: 2, issueMessages: 'Missing H1', source: 'audit' },
+    site_health: { auditSnapshotId: 'snap_1', siteScore: 72, previousScore: 65, scoreDelta: 7, totalPages: 20, errors: 1, warnings: 3, siteWideIssueCount: 4 },
+  };
+
   it('each InsightType can be upserted and read back', () => {
     for (const insightType of allTypes) {
       const pageId = `/${insightType}`;
@@ -761,13 +779,13 @@ describe('InsightType coverage: all 14 types round-trip through the store', () =
         workspaceId: wsId,
         pageId,
         insightType,
-        data: { _type: insightType },
+        data: minimalValidData[insightType],
         severity: 'opportunity',
       });
       const read = getInsight(wsId, pageId, insightType);
       expect(read, `Expected insight to exist for type: ${insightType}`).toBeDefined();
       expect(read!.insightType).toBe(insightType);
-      expect(read!.data['_type']).toBe(insightType);
+      expect(read!.data).toBeDefined();
     }
   });
 

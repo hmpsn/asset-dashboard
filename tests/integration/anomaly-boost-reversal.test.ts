@@ -68,7 +68,7 @@ describe('Anomaly boost reversal on dismiss', () => {
       workspaceId: testWsId,
       pageId: '/test/boost-reversal',
       insightType: 'page_health',
-      data: { score: 72, trend: 'declining' },
+      data: { score: 72, trend: 'declining' as const, clicks: 150, impressions: 2000, position: 9.1, ctr: 7.5, pageviews: 300, bounceRate: 45.0, avgEngagementTime: 80 },
       severity: 'warning',
       impactScore: originalScore,
       domain: 'traffic',

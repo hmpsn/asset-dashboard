@@ -600,8 +600,9 @@
           "source": "PR #255 scaled code review — security agent flag",
           "est": "2-3h",
           "priority": "P2",
-          "notes": "checkUsageLimit() reads used/limit, then the caller calls incrementUsage() after success. Two concurrent bulk-alt-text (or any streaming AI) requests for the same workspace can both see used=9, limit=10 and both proceed, overshooting by ~N where N is the number of concurrent requests. Fix: add atomic incrementIfAllowed(wsId, tier, feature) that performs the check + increment in a single SQLite transaction and returns allowed/denied. Callers become: `const ok = incrementIfAllowed(...); if (!ok) return 429;` then refund on failure (decrementUsage) only when the AI work itself succeeds and isn't gated by another condition. Migrate all 6 billing call sites (keyword strategy, brand voice, knowledge base, personas, alt-text single + bulk, brand identity generate/refine). Low attack severity today (admin-only HMAC gate), defense-in-depth fix.",
-          "status": "pending"
+          "notes": "Shipped — 2026-04-22 tech-debt-hardening PR #256. Added incrementIfAllowed() + decrementUsage() in server/usage-tracking.ts wrapping check+increment in db.transaction(). Migrated all 6 billing call sites (keyword-strategy.ts, brand-voice.ts, knowledge-base.ts, personas.ts, webflow-alt-text.ts single+bulk, brand-identity.ts refine).",
+          "status": "done",
+          "shippedAt": "2026-04-22"
         },
         {
           "id": 603,
@@ -609,8 +610,9 @@
           "source": "PR #255 scaled code review — code smells agent flag",
           "est": "1-2h",
           "priority": "P3",
-          "notes": "src/api/seo.ts has two streaming wrappers (bulkGenerateAltText lines ~528-570, streamKeywordStrategy lines ~634-680) that each implement a full `while(true){ reader.read() }` loop with TextDecoder, buffer splitting, and trailing-fragment flush. Subtle divergence already exists (NDJSON flushes trailing fragments; SSE does not). Extract `readNdjsonStream(reader, onLine)` and `readSseStream(reader, onEvent)` into src/api/streamUtils.ts. Prevents copy-paste drift on the next streaming endpoint.",
-          "status": "pending"
+          "notes": "Shipped — 2026-04-22 tech-debt-hardening PR #256. Extracted readNdjsonStream<T> + readSseStream<T> into src/api/streamUtils.ts. Replaced inline loops in seo.ts bulkGenerateAltText + streamKeywordStrategy. AssetBrowser.tsx refactored to use bulkGenerateAltText wrapper.",
+          "status": "done",
+          "shippedAt": "2026-04-22"
         },
         {
           "id": 604,
@@ -618,8 +620,9 @@
           "source": "PR #255 scaled code review — security agent flag (pre-existing, deferred from PR #255)",
           "est": "2-3h",
           "priority": "P3",
-          "notes": "POST /api/webflow/generate-alt/:assetId and /api/webflow/bulk-generate-alt currently accept workspaceId from the request body without routing it through requireWorkspaceAccess. HMAC gate covers admin auth, but an authenticated admin can target any workspace's quota by body manipulation. PR #255 closed the billing bypass (workspace now required, returns 400 if unresolvable) but did NOT move the param or add the workspace-access guard — this tack-on will finish the hardening. Change routes to /api/webflow/:workspaceId/generate-alt/:assetId and /api/webflow/:workspaceId/bulk-generate-alt, then add requireWorkspaceAccess('workspaceId'). Breaking API change — update AssetBrowser.tsx, AssetAudit.tsx, src/api/seo.ts generateAltText + bulkGenerateAltText wrappers. Low severity (admin-only), worth shipping in a minor follow-up PR.",
-          "status": "pending"
+          "notes": "Shipped — 2026-04-22 tech-debt-hardening PR #256. Routes renamed to /api/webflow/:workspaceId/generate-alt/:assetId + /api/webflow/:workspaceId/bulk-generate-alt with requireWorkspaceAccess('workspaceId'). Updated AssetBrowser.tsx, AssetAudit.tsx, MediaTab.tsx, App.tsx, and src/api/seo.ts wrappers.",
+          "status": "done",
+          "shippedAt": "2026-04-22"
         },
         {
           "id": 599,
@@ -758,8 +761,9 @@
           "source": "PR #244 Devin review — analytics-insights-store.ts:104",
           "est": "4-6h",
           "priority": "P2",
-          "notes": "parseJsonFallback(row.data, {} as InsightDataMap[InsightType]) at server/analytics-insights-store.ts:104 returns an empty object typed as the full insight data interface when stored JSON is corrupt or missing. Consumers accessing insight.data.score, insight.data.trend, etc. get undefined at runtime despite the TypeScript type saying the field is required. Fix: add Zod schemas for all 10+ insight data types and validate in rowToInsight(), either filtering out corrupt rows or returning typed fallbacks with sentinel values. Pre-existing issue confirmed by Devin review on PR #244.",
-          "status": "pending"
+          "notes": "Shipped — 2026-04-22 tech-debt-hardening PR #256. Added Zod schemas for all 14 insight data types in server/schemas/insight-schemas.ts. Added INSIGHT_DATA_SCHEMA_MAP + .passthrough() on all entries (so cross-cutting _originalBaseScore/_scoreAdjustments survive). rowToInsight() now uses parseJsonSafe() with schema validation. Fixed test fixtures in migration-data-preservation.test.ts, anomaly-boost-reversal.test.ts, insight-data-shapes.test.ts, and public-analytics.test.ts.",
+          "status": "done",
+          "shippedAt": "2026-04-22"
         },
         {
           "id": 537,

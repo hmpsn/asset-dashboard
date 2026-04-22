@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { get, post, patch } from '../api/client';
+import { bulkGenerateAltText, type BulkAltTextNdjsonEvent } from '../api/seo';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWebflowAssets, useAssetAudit, useCmsImages } from '../hooks/admin';
 import type { CmsImageUsage, CmsImageScanResult } from '../../shared/types/cms-images';
@@ -31,6 +32,7 @@ interface Asset {
 
 interface Props {
   siteId: string;
+  workspaceId: string;
 }
 
 function formatSize(bytes: number): string {
@@ -42,7 +44,7 @@ function formatSize(bytes: number): string {
 type SortField = 'fileName' | 'fileSize' | 'createdOn';
 type FilterType = 'all' | 'missing-alt' | 'oversized' | 'images' | 'svg' | 'unused' | 'used' | 'cms-images' | 'cms-missing-alt';
 
-function AssetBrowser({ siteId }: Props) {
+function AssetBrowser({ siteId, workspaceId }: Props) {
   const queryClient = useQueryClient();
   const { startJob, jobs } = useBackgroundTasks();
   const bulkCompressJobId = useRef<string | null>(null);
@@ -216,7 +218,7 @@ function AssetBrowser({ siteId }: Props) {
     setAltError(null);
     setGeneratingAlt(prev => new Set(prev).add(asset.id));
     try {
-      const data = await post<{ error?: string; altText?: string; writeError?: string }>(`/api/webflow/generate-alt/${asset.id}`, { imageUrl: url, siteId });
+      const data = await post<{ error?: string; altText?: string; writeError?: string }>(`/api/webflow/${workspaceId}/generate-alt/${asset.id}`, { imageUrl: url, siteId });
       if (data.error) {
         setAltError(`Alt text generation failed: ${data.error}`);
       } else if (data.altText) {
@@ -242,72 +244,28 @@ function AssetBrowser({ siteId }: Props) {
     setBulkProgress({ done: 0, total: toGenerate.length });
     setAltError(null);
 
+    let successCount = 0;
+    let failCount = 0;
+
     try {
-      const res = await fetch('/api/webflow/bulk-generate-alt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          siteId,
-          assets: toGenerate.map(a => ({
-            assetId: a.id,
-            imageUrl: a.hostedUrl || a.url,
-          })),
-        }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({ error: 'Unknown error' }));
-        setAltError(`Bulk alt text failed: ${data.error || res.statusText}`);
-        setBulkProgress(null);
-        return;
-      }
-
-      // Stream NDJSON: read line-by-line as server processes each image
-      const reader = res.body?.getReader();
-      if (!reader) { setAltError('Streaming not supported'); setBulkProgress(null); return; }
-
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let successCount = 0;
-      let failCount = 0;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        // Process complete lines
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; // keep incomplete last line in buffer
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            const event = JSON.parse(line);
-            if (event.type === 'result') {
-              // Update progress bar
-              setBulkProgress({ done: event.done, total: event.total });
-              // Apply alt text immediately as each image completes
-              if (event.altText) {
-                updateAssets(prev => prev.map(a =>
-                  a.id === event.assetId ? { ...a, altText: event.altText } : a
-                ));
-                updateCmsAssets(event.assetId, { altText: event.altText });
-                if (event.updated) successCount++;
-                else failCount++;
-              } else {
-                failCount++;
-              }
-            } else if (event.type === 'status') {
-              setBulkProgress({ done: event.done, total: event.total });
-            }
-          } catch (err) { console.error('AssetBrowser operation failed:', err); }
-        }
-      }
-
-      if (failCount > 0) {
-        setAltError(`${successCount} saved to Webflow, ${failCount} failed`);
-      }
+      await bulkGenerateAltText(
+        workspaceId,
+        { siteId, assets: toGenerate.map(a => ({ assetId: a.id, imageUrl: a.hostedUrl || a.url || '' })) },
+        (assetId, altText) => {
+          updateAssets(prev => prev.map(a => a.id === assetId ? { ...a, altText } : a));
+          updateCmsAssets(assetId, { altText });
+        },
+        (event: BulkAltTextNdjsonEvent) => {
+          if (event.type === 'result') {
+            setBulkProgress({ done: event.done ?? 0, total: event.total ?? 0 });
+            if (event.altText) { if (event.updated) successCount++; else failCount++; }
+            else { failCount++; }
+          } else if (event.type === 'status') {
+            setBulkProgress({ done: event.done ?? 0, total: event.total ?? 0 });
+          }
+        },
+      );
+      if (failCount > 0) setAltError(`${successCount} saved to Webflow, ${failCount} failed`);
     } catch (err) {
       console.error('AssetBrowser operation failed:', err);
       setAltError('Network error during bulk alt text generation');

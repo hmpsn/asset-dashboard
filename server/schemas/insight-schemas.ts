@@ -6,6 +6,8 @@
  */
 
 import { z } from '../middleware/validate.js';
+import type { InsightType } from '../../shared/types/analytics.js';
+import type { ZodTypeAny } from 'zod';
 
 // --- AuditFindingData (InsightDataMap['audit_finding']) ---
 export const auditFindingDataSchema = z.object({
@@ -166,3 +168,29 @@ export const serpOpportunityDataSchema = z.object({
   ctr: z.number(),
   schemaStatus: z.enum(['missing', 'partial', 'complete']),
 });
+
+/**
+ * Maps each InsightType to its DB-stored Zod schema.
+ * Used by rowToInsight to validate the data JSON column via parseJsonSafe.
+ *
+ * page_health uses a union because two write paths exist:
+ *   - analytics generation writes full PageHealthData (score, trend, clicks, …)
+ *   - Bridge #12 writes AuditPageHealthInsightData (auditSnapshotId, errorCount, …)
+ */
+export const INSIGHT_DATA_SCHEMA_MAP: Record<InsightType, ZodTypeAny> = {
+  // z.union does not expose .passthrough() — apply it to each member instead
+  page_health: z.union([pageHealthDataSchema.passthrough(), auditPageHealthInsightDataSchema.passthrough()]),
+  ranking_opportunity: rankingOpportunityDataSchema.passthrough(),
+  content_decay: contentDecayDataSchema.passthrough(),
+  cannibalization: cannibalizationDataSchema.passthrough(),
+  keyword_cluster: keywordClusterDataSchema.passthrough(),
+  competitor_gap: competitorGapDataSchema.passthrough(),
+  conversion_attribution: conversionAttributionDataSchema.passthrough(),
+  ranking_mover: rankingMoverDataSchema.passthrough(),
+  ctr_opportunity: ctrOpportunityDataSchema.passthrough(),
+  serp_opportunity: serpOpportunityDataSchema.passthrough(),
+  strategy_alignment: strategyAlignmentDataSchema.passthrough(),
+  anomaly_digest: anomalyDigestDataSchema.passthrough(),
+  audit_finding: auditFindingDataSchema.passthrough(),
+  site_health: siteHealthInsightDataSchema.passthrough(),
+};

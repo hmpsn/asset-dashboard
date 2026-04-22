@@ -28,7 +28,7 @@ import {
 } from '../semrush.js';
 import { getConfiguredProvider } from '../seo-data-provider.js';
 import type { DomainKeyword, KeywordGapEntry, RelatedKeyword } from '../seo-data-provider.js';
-import { checkUsageLimit, incrementUsage } from '../usage-tracking.js';
+import { incrementIfAllowed, decrementUsage } from '../usage-tracking.js';
 import {
   discoverSitemapUrls,
 } from '../webflow.js';
@@ -305,19 +305,18 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
     return res.status(409).json({ error: 'A keyword strategy is already being generated for this workspace' });
   }
 
-  // Usage limit check (before activeGenerations.add — no cleanup needed on early exit)
+  // Atomically reserve a usage slot before the async AI work begins (closes TOCTOU race).
   const tier = ws.tier || 'free';
-  const strategyUsage = checkUsageLimit(ws.id, tier, 'strategy_generations');
-  if (!strategyUsage.allowed) {
+  if (!incrementIfAllowed(ws.id, tier, 'strategy_generations')) {
     return res.status(429).json({
       error: 'Strategy generation limit reached',
-      message: `You've used all ${strategyUsage.limit} strategy generations this month. Upgrade for more.`,
-      used: strategyUsage.used, limit: strategyUsage.limit,
+      message: `You've reached your monthly strategy generation limit. Upgrade for more.`,
     });
   }
 
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) {
+    decrementUsage(ws.id, 'strategy_generations'); // refund pre-reserved slot — misconfiguration is not a user error
     return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
   }
 
@@ -2278,8 +2277,6 @@ Rules:
       invalidateIntelligenceCache(ws.id);
       invalidateSubCachePrefix(ws.id, 'slice:seoContext');
     });
-    incrementUsage(ws.id, 'strategy_generations');
-
     try {
       if (!getActionBySource('strategy', ws.id)) recordAction({ // recordAction-ok: ws.id is workspaceId
         workspaceId: ws.id,
@@ -2338,6 +2335,7 @@ Rules:
   } catch (err) {
     activeGenerations.delete(ws.id);
     if (keepalive) clearInterval(keepalive);
+    decrementUsage(ws.id, 'strategy_generations'); // refund pre-reserved slot on failure
     const msg = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error ? err.stack : '';
     log.error({ detail: msg, stack }, 'Keyword strategy error');
