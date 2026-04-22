@@ -46,6 +46,20 @@ export function findPageMapEntryForPage<T extends { pagePath: string }>(
 }
 
 /**
+ * Find a pageMap entry by bare Webflow slug (e.g. 'seo' → '/services/seo').
+ *
+ * Approval items only store the bare slug, not the full published path. For top-level pages
+ * the exact match `/${slug}` works fine. For nested pages (slug 'seo', path '/services/seo')
+ * the suffix fallback is required. Exact match is tried first for performance.
+ */
+export function findPageMapEntryBySlug<T extends { pagePath: string }>(pageMap: T[], slug: string): T | undefined {
+  const exact = findPageMapEntry(pageMap, `/${slug}`);
+  if (exact) return exact;
+  const lowerSlug = slug.toLowerCase();
+  return pageMap.find(p => normalizePath(p.pagePath).toLowerCase().endsWith(`/${lowerSlug}`));
+}
+
+/**
  * Returns the resolved page path, or `undefined` when the page has no slug/publishedPath info at all.
  * Use this anywhere "no meaningful path info" must be distinguishable from a real path (including the homepage).
  * See server/helpers.ts:tryResolvePagePath for the authoritative doc.

@@ -84,6 +84,10 @@ export function useUpdateMyData(wsId: string) {
 }
 ```
 
+### Admin Hooks Quick Reference
+
+- `usePageJoin(workspaceId, siteId)` — joins Webflow pages with keyword strategy data; returns `UnifiedPage[]`. Use this instead of inline `pageMap.find` loops in admin components.
+
 ---
 
 ## WebSocket Event Wiring (Complete Checklist)

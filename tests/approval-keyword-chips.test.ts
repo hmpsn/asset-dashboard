@@ -8,9 +8,12 @@ describe('ApprovalsTab keyword chips', () => {
     expect(src).toMatch(/pageMap\??\s*:/);
   });
 
-  it('findPageKeywords handles both /slug and slug formats', () => {
-    // Matches either the old pagePath === '/' + pageSlug or the refactored path === '/' + slug form
-    expect(src).toMatch(/['"]\/['"]\s*\+\s*slug/);
+  it('slug-to-path lookup delegates to findPageMapEntryBySlug (handles nested pages)', () => {
+    // The slug-to-path conversion moved into findPageMapEntryBySlug in pathUtils.ts,
+    // which tries exact match then endsWith suffix fallback for nested pages.
+    expect(src).toMatch(/findPageMapEntryBySlug/);
+    const helpers = readFileSync('src/lib/pathUtils.ts', 'utf-8'); // readFile-ok — contract guard: verifies findPageMapEntryBySlug implements suffix fallback for nested Webflow page slugs
+    expect(helpers).toMatch(/endsWith/);
   });
 
   it('keyword chips only render for seoTitle and seoDescription fields', () => {

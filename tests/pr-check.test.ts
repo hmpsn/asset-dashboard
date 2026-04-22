@@ -4087,6 +4087,84 @@ describe('Rule: resolvePagePath(...) with undefined fallback is dead code — us
   });
 });
 
+describe('Rule: Manual pageMap pairing outside shared helpers — use findPageMapEntry(ForPage) or usePageJoin', () => {
+  const RULE = 'Manual pageMap pairing outside shared helpers — use findPageMapEntry(ForPage) or usePageJoin';
+
+  it('flags pageMap.find( in a src component', () => {
+    const file = write(
+      uniqPath('rule-pagemap-find', 'src/components/SomeComponent.tsx'),
+      lines(
+        'export function SomeComponent({ pageMap }: { pageMap: PageMapEntry[] }) {',
+        '  const match = pageMap.find(p => p.pagePath === currentPath);',
+        '  return match?.pageTitle ?? null;',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags optional-chaining pageMap?.find( in a src component', () => {
+    const file = write(
+      uniqPath('rule-pagemap-find', 'src/components/OtherComponent.tsx'),
+      lines(
+        'function getEntry(pageMap?: PageMapEntry[]) {',
+        '  return pageMap?.find(e => e.pagePath === path);',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('does NOT flag src/hooks/admin/usePageJoin.ts (allowlisted)', () => {
+    const file = write(
+      uniqPath('rule-pagemap-find', 'src/hooks/admin/usePageJoin.ts'),
+      lines(
+        'export function findPageMapEntryForPage(pageMap: PageMapEntry[], page: Page) {',
+        '  return pageMap.find(e => e.pageId === page.id);',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag src/lib/pathUtils.ts (allowlisted)', () => {
+    const file = write(
+      uniqPath('rule-pagemap-find', 'src/lib/pathUtils.ts'),
+      lines(
+        'export function findPageMapEntry(pageMap: PageMapEntry[], pagePath: string) {',
+        '  return pageMap.find(e => e.pagePath.toLowerCase() === pagePath.toLowerCase());',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with inline // pagemap-find-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-pagemap-find', 'src/components/HatchInline.tsx'),
+      lines(
+        'const x = pageMap.find(e => e.pagePath === path); // pagemap-find-ok — legacy shim',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with above-line // pagemap-find-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-pagemap-find', 'src/components/HatchAbove.tsx'),
+      lines(
+        '// pagemap-find-ok — migration shim pending full hook adoption',
+        'const entry = pageMap.find(e => e.pagePath === slug);',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
 describe('Meta: customCheck rule name registry', () => {
   const EXPECTED_CUSTOM_CHECK_RULES = [
     'Global keydown missing isContentEditable guard',
@@ -4137,6 +4215,8 @@ describe('Meta: customCheck rule name registry', () => {
     // Slug-path hardening sprint (2026-04-21)
     'Bare slug used in pagePath construction — use resolvePagePath(page)',
     'resolvePagePath(...) with undefined fallback is dead code — use tryResolvePagePath',
+    // Unified page-join hooks sprint (2026-04-21)
+    'Manual pageMap pairing outside shared helpers — use findPageMapEntry(ForPage) or usePageJoin',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
