@@ -222,9 +222,6 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         setTimeout(() => setBulkResults(null), 5000);
       }
     },
-    [WS_EVENTS.STRATEGY_UPDATED]: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId!) });
-    },
   });
 
   // SEO Suggestions (persistent bulk rewrite variations)

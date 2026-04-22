@@ -132,6 +132,7 @@ function ClientCopyReviewInner({ workspaceId }: ClientCopyReviewProps) {
   // entry) so that when the user later expands a different entry, React Query doesn't
   // serve stale section data from before the WS event arrived.
   const wsHandlers = useMemo(() => ({
+    // ws-invalidation-ok — client keys (copyEntries, copySectionsAll) differ from admin keys in central hook
     [WS_EVENTS.COPY_SECTION_UPDATED]: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.client.copyEntries(workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.client.copySectionsAll(workspaceId) });

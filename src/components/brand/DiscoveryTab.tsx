@@ -1,6 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
 import { queryKeys } from '../../lib/queryKeys';
 import {
   Upload, FileText, Trash2, Cpu, CheckCircle, XCircle,
@@ -785,20 +784,11 @@ function SourcesList({ workspaceId, sources, onViewExtractions }: SourcesListPro
 // ─── Root component ───────────────────────────────────────────────────────────
 
 export function DiscoveryTab({ workspaceId }: Props) {
-  const queryClient = useQueryClient();
   const [selectedSource, setSelectedSource] = useState<DiscoverySource | null>(null);
 
   const { data: sources = [], isLoading } = useQuery({
     queryKey: queryKeys.admin.discoverySources(workspaceId),
     queryFn: () => discovery.listSources(workspaceId),
-  });
-
-  // Invalidate on server-pushed discovery events
-  useWorkspaceEvents(workspaceId, {
-    'discovery:updated': () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.discoverySources(workspaceId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.discoveryExtractionsAll(workspaceId) });
-    },
   });
 
   // Keep selectedSource in sync when sources list refreshes

@@ -24,7 +24,6 @@ import type { BlueprintEntry, BlueprintPageType } from '../../../shared/types/pa
 import { useToast } from '../Toast';
 import { useBlueprint } from '../../hooks/admin/useBlueprints';
 import { queryKeys } from '../../lib/queryKeys';
-import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { TabBar } from '../ui/TabBar';
 import { useCopyStatus, useGenerateCopy } from '../../hooks/admin/useCopyPipeline';
@@ -370,15 +369,6 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const { data: blueprint, isLoading, isError } = useBlueprint(workspaceId, blueprintId);
-
-  // Live invalidation on server push
-  useWorkspaceEvents(workspaceId, {
-    'blueprint:updated': () => {
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.admin.blueprint(workspaceId, blueprintId),
-      });
-    },
-  });
 
   // Copy generation mutation (safe to call unconditionally — only mutates on user click)
   const generateCopyMutation = useGenerateCopy(workspaceId, blueprintId);

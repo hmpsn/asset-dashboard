@@ -3524,6 +3524,111 @@ export const CHECKS: Check[] = [
       return hits;
     },
   },
+  {
+    // ── useWorkspaceEvents handler for an already-centralized event ──
+    //
+    // `src/hooks/useWsInvalidation.ts` is the single source of truth for
+    // workspace-scoped WS event → React Query cache invalidation. Any component
+    // or hook that also subscribes to one of those events with useWorkspaceEvents
+    // duplicates the invalidation logic and creates silent drift — the two
+    // handlers can disagree on which query keys to invalidate.
+    //
+    // The allowlist is derived dynamically by parsing useWsInvalidation.ts at
+    // rule startup (readFileSync once). This keeps the rule in sync automatically
+    // as new events are centralized without requiring manual CHECKS updates.
+    //
+    // Fail-closed: if useWsInvalidation.ts is missing or has zero handler keys,
+    // the rule throws so the overall pr-check exits non-zero rather than
+    // silently passing.
+    //
+    // Escape hatch: `// ws-invalidation-ok` on the same line or the line
+    // immediately above, for legitimate local side effects that truly cannot live
+    // in the central hook (e.g. BulkOperation progress keyed off component-local
+    // state that is not shared across the workspace).
+    name: 'useWorkspaceEvents handler for centralized event',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    exclude: [
+      'src/hooks/useWsInvalidation.ts',
+    ],
+    excludeLines: ['// ws-invalidation-ok'],
+    message:
+      'Inline useWorkspaceEvents subscriptions for events already handled in ' +
+      'src/hooks/useWsInvalidation.ts duplicate invalidation logic and create silent drift. ' +
+      'Move the cache invalidation to the central hook. ' +
+      'Use // ws-invalidation-ok on the [WS_EVENTS.X] line or the line immediately above ' +
+      'for legitimate local-only side effects (e.g. component-local state driven by bulk-op progress).',
+    severity: 'error',
+    rationale:
+      'Duplicated useWorkspaceEvents subscriptions diverge over time — one side gets ' +
+      'updated, the other silently misses cache keys — producing stale UI bugs ' +
+      'that are hard to reproduce because they depend on event ordering.',
+    claudeMdRef: '#data-flow-rules-mandatory',
+    customCheck: (files) => {
+      // ── Parse useWsInvalidation.ts to build the centralized-events allowlist ──
+      // Fail-closed: if the file is missing or has no handler keys, throw so the
+      // rule is not silently skipped (a missing/empty allowlist would pass every
+      // file, hiding real violations).
+      const wsInvalidationPath = path.join(ROOT, 'src', 'hooks', 'useWsInvalidation.ts');
+      let wsInvalidationContent: string;
+      try {
+        wsInvalidationContent = readFileSync(wsInvalidationPath, 'utf-8');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new Error(
+          `useWorkspaceEvents-centralization rule: cannot read src/hooks/useWsInvalidation.ts — ${msg}. ` +
+          'The file must exist; this rule is a guardrail, not a suggestion.'
+        );
+      }
+
+      // Extract every [WS_EVENTS.NAME] handler key present in the file.
+      // Pattern: `[WS_EVENTS.SOME_EVENT_NAME]` at computed-property position.
+      const keyRe = /\[WS_EVENTS\.([A-Z_]+)\]/g;
+      const centralizedEvents = new Set<string>();
+      let km: RegExpExecArray | null;
+      while ((km = keyRe.exec(wsInvalidationContent)) !== null) {
+        centralizedEvents.add(km[1]);
+      }
+
+      if (centralizedEvents.size === 0) {
+        throw new Error(
+          'useWorkspaceEvents-centralization rule: found zero [WS_EVENTS.*] handler keys in ' +
+          'src/hooks/useWsInvalidation.ts. The file may be malformed or the regex needs updating. ' +
+          'Expected pattern: `[WS_EVENTS.EVENT_NAME]: () => { ... }`'
+        );
+      }
+
+      // ── Scan src/ files for inline [WS_EVENTS.X] patterns whose event is centralized ──
+      const hits: CustomCheckMatch[] = [];
+      const lineRe = /\[WS_EVENTS\.([A-Z_]+)\]/;
+
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        // Never flag the central hook itself (it defines the handlers, not duplicates them).
+        if (file.endsWith('useWsInvalidation.ts')) continue;
+        // Skip test files — test mocks/fixtures may legitimately reference WS_EVENTS keys.
+        if (file.includes('.test.') || file.includes('.spec.')) continue;
+
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        // Quick pre-filter: skip files that don't reference WS_EVENTS at all.
+        if (!content.includes('WS_EVENTS.')) continue;
+
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const m = lines[i].match(lineRe);
+          if (!m) continue;
+          const eventName = m[1];
+          if (!centralizedEvents.has(eventName)) continue;
+          // Check escape hatch on this line or the line immediately above.
+          if (hasHatch(lines, i, '// ws-invalidation-ok')) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────

@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
 import {
   BookOpen, Plus, Trash2, Sparkles, ChevronDown, ChevronUp,
   Save, Loader2, FileText,
@@ -589,12 +588,6 @@ export function BrandscriptTab({ workspaceId }: Props) {
     queryKey: queryKeys.admin.brandscriptTemplates(),
     queryFn: () => brandscripts.templates(),
     staleTime: 5 * 60 * 1000,
-  });
-
-  useWorkspaceEvents(workspaceId, {
-    'brandscript:updated': () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.brandscripts(workspaceId) });
-    },
   });
 
   const handleCreated = (bs: Brandscript) => {
