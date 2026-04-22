@@ -126,6 +126,7 @@ export function Roadmap() {
       </div>
 
       <div className="space-y-3">
+        {/* tab-deeplink-ok — uses ?view= param (not ?tab=) which is read from useSearchParams above */}
         <TabBar tabs={VIEW_TABS} active={view} onChange={handleViewChange} />
         <RoadmapFilterBar sprints={roadmap} featureMap={featureMap} allTags={allTags} />
       </div>

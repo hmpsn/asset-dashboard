@@ -487,14 +487,11 @@ A comprehensive value assessment of every feature in the platform — **310 feat
 
 ---
 
-### 36. Roadmap Dashboard
-**What it does:** Interactive admin-side roadmap tracker with 34 items across 7 prioritized sprints. Each item shows title, effort estimate, source document, priority tier (P0–P4), and a click-to-cycle status toggle (pending → in_progress → done). Status persists to server via `/api/roadmap-status`. Priority filter dropdown. Overall + per-sprint progress bars. Collapsible sprint sections.
-
-**Agency value:** A single place to see what's next, what's in progress, and what's done — without digging through markdown files. Status tracking survives sessions.
-
-**Client value:** N/A — internal agency tool.
-
-**Mutual:** Keeps development focused and accountable. No lost context between work sessions.
+### Roadmap (Admin)
+- **Location:** `src/components/Roadmap.tsx` + `RoadmapSprintView.tsx` + `RoadmapBacklogView.tsx` + `RoadmapFilterBar.tsx`
+- **What it does:** Dual-mode roadmap. Sprint View = flat list grouped by sprint section headers. Backlog View = sortable table with inline detail drawer. Shared filter bar; all filter + view state is URL-param-driven and deep-linkable.
+- **Schema:** `RoadmapItem` now has `createdAt?` (forward-only), `featureId?` (soft ref to features.json), `tags?` (free-form)
+- **Filter params:** `?view=sprint|backlog&priority=P0&status=pending&sprint=backlog&feature=5&tags=auth`
 
 ---
 
