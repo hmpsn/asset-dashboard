@@ -7,14 +7,20 @@ interface ErrorStateProps {
     label: string;
     onClick: () => void;
   };
+  actions?: {
+    label: string;
+    onClick: () => void;
+    variant?: 'primary' | 'secondary';
+  }[];
   type?: 'network' | 'data' | 'permission' | 'general';
   className?: string;
 }
 
-export function ErrorState({ 
-  title = 'Something went wrong', 
+export function ErrorState({
+  title = 'Something went wrong',
   message = 'Please try again or contact support if the issue persists.',
   action,
+  actions,
   type = 'general',
   className = ''
 }: ErrorStateProps) {
@@ -33,6 +39,8 @@ export function ErrorState({
 
   const { Icon, color: iconColor, bg: bgColor } = getIconConfig();
 
+  const resolvedActions = actions ?? (action ? [{ ...action, variant: 'primary' as const }] : []);
+
   return (
     <div className={`flex flex-col items-center justify-center py-8 text-center ${className}`}>
       <div className={`w-12 h-12 rounded-xl ${bgColor} flex items-center justify-center mb-4`}>
@@ -40,14 +48,23 @@ export function ErrorState({
       </div>
       <h3 className="text-lg font-semibold text-zinc-200 mb-2">{title}</h3>
       <p className="text-sm text-zinc-500 mb-4 max-w-md">{message}</p>
-      {action && (
-        <button
-          onClick={action.onClick}
-          className="px-4 py-2 bg-teal-600 hover:bg-teal-500 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-        >
-          <RefreshCw className="w-3 h-3" />
-          {action.label}
-        </button>
+      {resolvedActions.length > 0 && (
+        <div className="flex items-center gap-2">
+          {resolvedActions.map((a, i) => (
+            <button
+              key={i}
+              onClick={a.onClick}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                a.variant === 'secondary'
+                  ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
+                  : 'bg-teal-600 hover:bg-teal-500 text-white'
+              }`}
+            >
+              {a.variant !== 'secondary' && <RefreshCw className="w-3 h-3" />}
+              {a.label}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );
