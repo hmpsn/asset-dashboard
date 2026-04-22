@@ -1,10 +1,10 @@
 import { useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  CheckCircle2, Clock, Rocket, Map as MapIcon, Loader2, LayoutList, Table2,
+  CheckCircle2, Clock, Rocket, Map as MapIcon, LayoutList, Table2,
 } from 'lucide-react';
-import { PageHeader, StatCard, TabBar, SectionCard } from './ui/index';
+import { PageHeader, StatCard, TabBar, SectionCard, StatCardSkeleton, SectionCardSkeleton } from './ui/index';
 import { ShippingVelocityChart } from './RoadmapVelocityChart';
 import { RoadmapFilterBar } from './RoadmapFilterBar';
 import { RoadmapSprintView } from './RoadmapSprintView';
@@ -29,7 +29,7 @@ export function Roadmap() {
   const { data: roadmap = [], isLoading } = useQuery({
     queryKey: queryKeys.admin.roadmap(),
     queryFn: async () => {
-      const data = await roadmapApi.get() as { sprints?: SprintData[] };
+      const data = await roadmapApi.get();
       return Array.isArray(data?.sprints) ? data.sprints : [];
     },
   });
@@ -50,30 +50,47 @@ export function Roadmap() {
   const allTags = useMemo(() => deriveAllTags(roadmap), [roadmap]);
   const filters = useMemo(() => filtersFromParams(params), [params]);
 
-  const toggleStatus = async (itemId: number | string, sprintId: string) => {
-    const cycle: Array<'pending' | 'in_progress' | 'done'> = ['pending', 'in_progress', 'done'];
-    let newStatus: 'pending' | 'in_progress' | 'done' = 'pending';
-    const previousSnapshot = queryClient.getQueryData<SprintData[]>(queryKeys.admin.roadmap());
-    queryClient.setQueryData(queryKeys.admin.roadmap(), (prev: SprintData[] = []) =>
-      prev.map(sprint => {
-        if (sprint.id !== sprintId) return sprint;
-        return {
-          ...sprint,
-          items: sprint.items.map(item => {
-            if (item.id !== itemId) return item;
-            const idx = cycle.indexOf(item.status);
-            newStatus = cycle[(idx + 1) % cycle.length];
-            return { ...item, status: newStatus };
-          }),
-        };
-      }),
-    );
-    roadmapApi.updateItem(itemId, sprintId, { status: newStatus }).catch(err => {
+  // Canonical optimistic-update pattern: snapshot in onMutate, revert in
+  // onError, invalidate in onSettled. See docs/rules/development-patterns.md.
+  const STATUS_CYCLE = ['pending', 'in_progress', 'done'] as const;
+  type RoadmapStatus = (typeof STATUS_CYCLE)[number];
+
+  const toggleMutation = useMutation({
+    mutationFn: ({ itemId, sprintId, newStatus }: { itemId: number | string; sprintId: string; newStatus: RoadmapStatus }) =>
+      roadmapApi.updateItem(itemId, sprintId, { status: newStatus }),
+    onMutate: async ({ itemId, sprintId, newStatus }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.admin.roadmap() });
+      const previousSnapshot = queryClient.getQueryData<SprintData[]>(queryKeys.admin.roadmap());
+      queryClient.setQueryData<SprintData[]>(queryKeys.admin.roadmap(), prev =>
+        (prev ?? []).map(sprint =>
+          sprint.id !== sprintId
+            ? sprint
+            : { ...sprint, items: sprint.items.map(item => (item.id !== itemId ? item : { ...item, status: newStatus })) },
+        ),
+      );
+      return { previousSnapshot };
+    },
+    onError: (err, _vars, ctx) => {
       console.error('Roadmap status update failed:', err);
-      if (previousSnapshot !== undefined) {
-        queryClient.setQueryData(queryKeys.admin.roadmap(), previousSnapshot);
+      if (ctx?.previousSnapshot !== undefined) {
+        queryClient.setQueryData(queryKeys.admin.roadmap(), ctx.previousSnapshot);
       }
-    });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.roadmap() });
+    },
+  });
+
+  const toggleStatus = (itemId: number | string, sprintId: string) => {
+    // Compute next status from the current cache snapshot so the mutation is
+    // deterministic — no closure-captured stale state.
+    const cache = queryClient.getQueryData<SprintData[]>(queryKeys.admin.roadmap()) ?? [];
+    const sprint = cache.find(s => s.id === sprintId);
+    const item = sprint?.items.find(i => i.id === itemId);
+    if (!item) return;
+    const idx = STATUS_CYCLE.indexOf(item.status);
+    const newStatus = STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length];
+    toggleMutation.mutate({ itemId, sprintId, newStatus });
   };
 
   const handleViewChange = (id: string) => {
@@ -86,8 +103,12 @@ export function Roadmap() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 className="w-5 h-5 animate-spin text-teal-400" />
+      <div className="space-y-6" aria-busy="true" aria-label="Loading roadmap">
+        <div className="grid grid-cols-4 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)}
+        </div>
+        <SectionCardSkeleton lines={2} />
+        <SectionCardSkeleton lines={5} />
       </div>
     );
   }

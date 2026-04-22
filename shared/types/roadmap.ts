@@ -4,7 +4,8 @@ export interface RoadmapItem {
   /** Numeric for items added via the auto-incrementing pipeline; string for hand-curated phase milestones (e.g. "meeting-brief-phase1"). */
   id: number | string;
   title: string;
-  source: string;
+  /** Optional — 263 historical items predate this field. */
+  source?: string;
   est?: string;
   priority?: 'P0' | 'P1' | 'P2' | 'P3' | 'P4';
   notes?: string;
@@ -22,5 +23,19 @@ export interface SprintData {
   rationale?: string;
   /** Optional — shipped/archived sprints predate this field. */
   hours?: string;
+  /** ISO date — set by `scripts/sort-roadmap.ts` when a sprint becomes fully shipped. */
+  shippedAt?: string;
   items: RoadmapItem[];
 }
+
+/** Top-level shape of `data/roadmap.json` and `GET /api/roadmap`. */
+export interface RoadmapData {
+  sprints: SprintData[];
+}
+
+/**
+ * Field-whitelist for `PATCH /api/roadmap/item/:id`.
+ * Mirrors the strict Zod schema in server/routes/roadmap.ts — adding fields
+ * here without updating the schema (and vice versa) is a contract drift bug.
+ */
+export type RoadmapItemPatch = Partial<Pick<RoadmapItem, 'status' | 'notes' | 'shippedAt'>>;

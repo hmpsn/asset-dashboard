@@ -2,6 +2,7 @@
 import { get, post, patch, del, getSafe, getOptional, getText, postForm } from './client';
 import type { ContentSubscription, ContentSubscriptionPlanConfig } from '../../shared/types/content';
 import type { FeaturesData } from '../../shared/types/features';
+import type { RoadmapData, RoadmapItem, RoadmapItemPatch } from '../../shared/types/roadmap';
 
 // ── Requests (client requests / support tickets) ────────────────
 export const requests = {
@@ -166,10 +167,10 @@ export const chat = {
 
 // ── Roadmap ─────────────────────────────────────────────────────
 export const roadmap = {
-  get: () => get<unknown>('/api/roadmap'),
+  get: () => get<RoadmapData>('/api/roadmap'),
 
-  updateItem: (itemId: number | string, sprintId: string, body: Record<string, unknown>) =>
-    patch<unknown>(
+  updateItem: (itemId: number | string, sprintId: string, body: RoadmapItemPatch) =>
+    patch<{ ok: true; item: RoadmapItem }>(
       `/api/roadmap/item/${encodeURIComponent(String(itemId))}?sprintId=${encodeURIComponent(sprintId)}`,
       body,
     ),

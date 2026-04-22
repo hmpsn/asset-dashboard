@@ -1,5 +1,5 @@
 import { Fragment, useState } from 'react';
-import { ChevronDown, ChevronUp, ArrowUpDown, FilterX } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronRight, ArrowUpDown, FilterX } from 'lucide-react';
 import { Badge, EmptyState } from './ui/index';
 import type { SprintData } from '../../shared/types/roadmap';
 import type { RoadmapFilters, SortKey, SortDir, FlatRoadmapItem } from '../lib/roadmapFilters';
@@ -45,8 +45,11 @@ export function RoadmapBacklogView({ sprints, filters, featureMap, onToggleStatu
     }
   };
 
-  const th = 'px-3 py-2 text-left text-[10px] font-semibold text-zinc-500 uppercase tracking-wider cursor-pointer hover:text-zinc-300 select-none';
   const thStatic = 'px-3 py-2 text-left text-[10px] font-semibold text-zinc-500 uppercase tracking-wider';
+  const sortBtn = 'flex items-center gap-1 text-left text-[10px] font-semibold text-zinc-500 uppercase tracking-wider hover:text-zinc-300 focus:outline-none focus:text-teal-400 select-none';
+
+  const ariaSortFor = (col: SortKey): 'ascending' | 'descending' | 'none' =>
+    sortKey === col ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none';
 
   if (sorted.length === 0) {
     return (
@@ -63,22 +66,31 @@ export function RoadmapBacklogView({ sprints, filters, featureMap, onToggleStatu
       <table className="w-full text-xs">
         <thead className="border-b border-zinc-800">
           <tr>
+            <th className={thStatic} style={{ width: '40px' }} aria-label="Expand row" />
             <th className={thStatic} style={{ width: '52px' }}>#</th>
             <th className={thStatic} style={{ minWidth: '220px' }}>Title</th>
-            <th className={th} onClick={() => handleSort('priority')}>
-              <span className="flex items-center gap-1">Priority <SortIcon col="priority" sortKey={sortKey} sortDir={sortDir} /></span>
+            <th className="px-3 py-2" aria-sort={ariaSortFor('priority')}>
+              <button type="button" className={sortBtn} onClick={() => handleSort('priority')}>
+                Priority <SortIcon col="priority" sortKey={sortKey} sortDir={sortDir} />
+              </button>
             </th>
-            <th className={th} onClick={() => handleSort('status')}>
-              <span className="flex items-center gap-1">Status <SortIcon col="status" sortKey={sortKey} sortDir={sortDir} /></span>
+            <th className="px-3 py-2" aria-sort={ariaSortFor('status')}>
+              <button type="button" className={sortBtn} onClick={() => handleSort('status')}>
+                Status <SortIcon col="status" sortKey={sortKey} sortDir={sortDir} />
+              </button>
             </th>
             <th className={thStatic}>Sprint</th>
             <th className={thStatic}>Feature</th>
             <th className={thStatic}>Tags</th>
-            <th className={th} onClick={() => handleSort('est')}>
-              <span className="flex items-center gap-1">Est <SortIcon col="est" sortKey={sortKey} sortDir={sortDir} /></span>
+            <th className="px-3 py-2" aria-sort={ariaSortFor('est')}>
+              <button type="button" className={sortBtn} onClick={() => handleSort('est')}>
+                Est <SortIcon col="est" sortKey={sortKey} sortDir={sortDir} />
+              </button>
             </th>
-            <th className={th} onClick={() => handleSort('createdAt')}>
-              <span className="flex items-center gap-1">Added <SortIcon col="createdAt" sortKey={sortKey} sortDir={sortDir} /></span>
+            <th className="px-3 py-2" aria-sort={ariaSortFor('createdAt')}>
+              <button type="button" className={sortBtn} onClick={() => handleSort('createdAt')}>
+                Added <SortIcon col="createdAt" sortKey={sortKey} sortDir={sortDir} />
+              </button>
             </th>
           </tr>
         </thead>
@@ -91,16 +103,28 @@ export function RoadmapBacklogView({ sprints, filters, featureMap, onToggleStatu
 
             return (
               <Fragment key={key}>
-                <tr
-                  onClick={() => setExpandedKey(isExpanded ? null : key)}
-                  className="hover:bg-zinc-800/30 transition-colors cursor-pointer"
-                >
+                <tr className="hover:bg-zinc-800/30 transition-colors">
+                  <td className="px-2 py-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedKey(isExpanded ? null : key)}
+                      aria-expanded={isExpanded}
+                      aria-label={isExpanded ? `Collapse details for ${item.title}` : `Expand details for ${item.title}`}
+                      className="p-1 rounded hover:bg-zinc-700/40 focus:outline-none focus:ring-1 focus:ring-teal-400/50"
+                    >
+                      {isExpanded
+                        ? <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
+                        : <ChevronRight className="w-3.5 h-3.5 text-zinc-500" />}
+                    </button>
+                  </td>
                   <td className="px-3 py-2.5 font-mono text-[10px] text-zinc-600">#{item.id}</td>
                   <td className="px-3 py-2.5">
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={e => { e.stopPropagation(); onToggleStatus(item.id, item.sprintId); }}
-                        className="hover:scale-110 transition-transform flex-shrink-0"
+                        type="button"
+                        onClick={() => onToggleStatus(item.id, item.sprintId)}
+                        className="hover:scale-110 transition-transform flex-shrink-0 focus:outline-none focus:ring-1 focus:ring-teal-400/50 rounded"
+                        aria-label={`Cycle status (currently ${item.status.replace('_', ' ')})`}
                         title={`Status: ${item.status} — click to cycle`}
                       >
                         {STATUS_ICON[item.status]}
@@ -136,13 +160,13 @@ export function RoadmapBacklogView({ sprints, filters, featureMap, onToggleStatu
                 </tr>
                 {isExpanded && (
                   <tr className="bg-zinc-800/20">
-                    <td colSpan={9} className="px-4 py-3">
+                    <td colSpan={10} className="px-4 py-3">
                       <div className="space-y-1.5">
                         {item.notes && (
                           <p className="text-[11px] text-zinc-300 leading-relaxed">{item.notes}</p>
                         )}
                         <div className="flex items-center gap-4 text-[10px] text-zinc-500">
-                          <span>Source: {item.source}</span>
+                          {item.source && <span>Source: {item.source}</span>}
                           {item.shippedAt && <span>Shipped: {item.shippedAt}</span>}
                         </div>
                       </div>

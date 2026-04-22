@@ -16,16 +16,13 @@
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import type { RoadmapData } from '../shared/types/roadmap.js';
 
 const ROOT = path.join(import.meta.dirname, '..');
 const FILE = path.join(ROOT, 'data', 'roadmap.json');
 const DRY = process.argv.includes('--dry-run');
 
-interface Item { id: number | string; title?: string; [k: string]: unknown }
-interface Sprint { id: string; items: Item[]; [k: string]: unknown }
-interface Roadmap { sprints: Sprint[]; [k: string]: unknown }
-
-const data = JSON.parse(readFileSync(FILE, 'utf8')) as Roadmap;
+const data = JSON.parse(readFileSync(FILE, 'utf8')) as RoadmapData;
 
 let maxNumeric = 0;
 for (const s of data.sprints) {
