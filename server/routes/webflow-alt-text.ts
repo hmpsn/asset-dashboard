@@ -25,6 +25,7 @@ import {
 import { getWorkspacePages } from '../workspace-data.js';
 import { createLogger } from '../logger.js';
 import { isProgrammingError } from '../errors.js';
+import { checkUsageLimit, incrementUsage } from '../usage-tracking.js';
 
 const log = createLogger('webflow-alt-text');
 
@@ -78,6 +79,11 @@ router.post('/api/webflow/generate-alt/:assetId', async (req, res) => {
     fs.writeFileSync(tmpPath, buffer);
 
     const resolvedWsId = altWsId || (siteId ? listWorkspaces().find(w => w.webflowSiteId === siteId)?.id : undefined);
+    const altWs = resolvedWsId ? getWorkspace(resolvedWsId) : null;
+    if (altWs) {
+      const altUsage = checkUsageLimit(altWs.id, altWs.tier || 'free', 'strategy_generations');
+      if (!altUsage.allowed) return res.status(429).json({ error: 'Monthly AI generation limit reached', used: altUsage.used, limit: altUsage.limit });
+    }
     if (resolvedWsId) {
       const altIntel = await buildWorkspaceIntelligence(resolvedWsId, { slices: ['seoContext'] });
       const altBizCtx = altIntel.seoContext?.businessContext ?? '';
@@ -103,6 +109,7 @@ router.post('/api/webflow/generate-alt/:assetId', async (req, res) => {
     if (altText) {
       const altToken = siteId ? (getTokenForSite(siteId) || undefined) : undefined;
       const writeResult = await updateAsset(req.params.assetId, { altText }, altToken);
+      if (altWs) incrementUsage(altWs.id, 'strategy_generations');
       if (!writeResult.success) {
         log.error({ detail: writeResult.error }, `Alt text generated but Webflow write-back failed for ${req.params.assetId}:`);
         res.json({ altText, updated: false, writeError: writeResult.error });
@@ -147,6 +154,10 @@ router.post('/api/webflow/bulk-generate-alt', async (req, res) => {
     // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
     const bvBlock = bulkIntel.seoContext?.effectiveBrandVoiceBlock ?? '';
     const bulkWs = getWorkspace(bulkWsId);
+    if (bulkWs) {
+      const bulkUsage = checkUsageLimit(bulkWs.id, bulkWs.tier || 'free', 'strategy_generations');
+      if (!bulkUsage.allowed) return res.status(429).json({ error: 'Monthly AI generation limit reached', used: bulkUsage.used, limit: bulkUsage.limit });
+    }
     const kwParts: string[] = [];
     if (bulkBizCtx) kwParts.push(`Business: ${bulkBizCtx}`);
     if (bulkWs?.keywordStrategy?.siteKeywords?.length) {
@@ -232,6 +243,7 @@ router.post('/api/webflow/bulk-generate-alt', async (req, res) => {
     }
   }
 
+  if (bulkWsId) incrementUsage(bulkWsId, 'strategy_generations');
   send({ type: 'done', done, total: assets.length });
   res.end();
 });

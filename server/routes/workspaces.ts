@@ -37,6 +37,7 @@ import { listWorkOrders } from '../work-orders.js';
 import { listMatrices } from '../content-matrices.js';
 import { listChurnSignals } from '../churn-signals.js';
 import { listClientSignals } from '../client-signals-store.js';
+import { checkUsageLimit, incrementUsage } from '../usage-tracking.js';
 import {
   listWorkspaces,
   createWorkspace,
@@ -397,6 +398,11 @@ router.post('/api/workspaces/:id/generate-knowledge-base', requireWorkspaceAcces
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (!ws.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
 
+  const kbUsage = checkUsageLimit(ws.id, ws.tier || 'free', 'strategy_generations');
+  if (!kbUsage.allowed) {
+    return res.status(429).json({ error: 'Monthly AI generation limit reached', used: kbUsage.used, limit: kbUsage.limit });
+  }
+
   try {
     const { scraped, pagesSummary } = await scrapeWorkspaceSite(ws);
 
@@ -456,6 +462,7 @@ Be concise but specific. Use bullet points. Only include information actually fo
       timeoutMs: 90_000,
     });
 
+    incrementUsage(ws.id, 'strategy_generations');
     res.json({ knowledgeBase: aiResult.text, pagesScraped: scraped.length });
   } catch (err) {
     log.error({ err: err }, 'Operation failed');
@@ -468,6 +475,11 @@ router.post('/api/workspaces/:id/generate-brand-voice', requireWorkspaceAccess()
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (!ws.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
+
+  const bvUsage = checkUsageLimit(ws.id, ws.tier || 'free', 'strategy_generations');
+  if (!bvUsage.allowed) {
+    return res.status(429).json({ error: 'Monthly AI generation limit reached', used: bvUsage.used, limit: bvUsage.limit });
+  }
 
   try {
     const { scraped, pagesSummary } = await scrapeWorkspaceSite(ws);
@@ -538,6 +550,7 @@ Be specific and actionable. An AI writer should be able to follow this guide to 
       log.warn({ err }, 'Failed to record outcome action for brand voice update');
     }
 
+    incrementUsage(ws.id, 'strategy_generations');
     res.json({ brandVoice: aiResult.text, pagesScraped: scraped.length });
   } catch (err) {
     log.error({ err: err }, 'Operation failed');
@@ -550,6 +563,11 @@ router.post('/api/workspaces/:id/generate-personas', requireWorkspaceAccess(), a
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (!ws.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
+
+  const personasUsage = checkUsageLimit(ws.id, ws.tier || 'free', 'strategy_generations');
+  if (!personasUsage.allowed) {
+    return res.status(429).json({ error: 'Monthly AI generation limit reached', used: personasUsage.used, limit: personasUsage.limit });
+  }
 
   try {
     const { scraped, pagesSummary } = await scrapeWorkspaceSite(ws);
@@ -624,6 +642,7 @@ Rules:
       buyingStage: (['awareness', 'consideration', 'decision'].includes(p.buyingStage || '') ? p.buyingStage : 'consideration') as 'awareness' | 'consideration' | 'decision',
     }));
 
+    incrementUsage(ws.id, 'strategy_generations');
     res.json({ personas: normalized, pagesScraped: scraped.length });
   } catch (err) {
     log.error({ err: err }, 'Operation failed');
