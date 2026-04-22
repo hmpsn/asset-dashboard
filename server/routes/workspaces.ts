@@ -57,7 +57,7 @@ import type { ScrapedPage } from '../web-scraper.js';
 import { createLogger } from '../logger.js';
 import { recordAction, getActionBySource } from '../outcome-tracking.js';
 import { isProgrammingError } from '../errors.js';
-import { checkUsageLimit, incrementUsage } from '../usage-tracking.js';
+import { incrementIfAllowed, decrementUsage } from '../usage-tracking.js';
 
 const log = createLogger('workspaces');
 
@@ -398,14 +398,8 @@ router.post('/api/workspaces/:id/generate-knowledge-base', requireWorkspaceAcces
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (!ws.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
 
-  // Usage limit check
-  const usage = checkUsageLimit(ws.id, ws.tier || 'free', 'strategy_generations');
-  if (!usage.allowed) {
-    return res.status(429).json({
-      error: 'Monthly AI generation limit reached',
-      used: usage.used,
-      limit: usage.limit,
-    });
+  if (!incrementIfAllowed(ws.id, ws.tier || 'free', 'strategy_generations')) {
+    return res.status(429).json({ error: 'Monthly AI generation limit reached' });
   }
 
   try {
@@ -467,9 +461,9 @@ Be concise but specific. Use bullet points. Only include information actually fo
       timeoutMs: 90_000,
     });
 
-    incrementUsage(ws.id, 'strategy_generations');
     res.json({ knowledgeBase: aiResult.text, pagesScraped: scraped.length });
   } catch (err) {
+    decrementUsage(ws.id, 'strategy_generations');
     log.error({ err: err }, 'Operation failed');
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate knowledge base' });
   }
@@ -481,14 +475,8 @@ router.post('/api/workspaces/:id/generate-brand-voice', requireWorkspaceAccess()
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (!ws.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
 
-  // Usage limit check
-  const usage = checkUsageLimit(ws.id, ws.tier || 'free', 'strategy_generations');
-  if (!usage.allowed) {
-    return res.status(429).json({
-      error: 'Monthly AI generation limit reached',
-      used: usage.used,
-      limit: usage.limit,
-    });
+  if (!incrementIfAllowed(ws.id, ws.tier || 'free', 'strategy_generations')) {
+    return res.status(429).json({ error: 'Monthly AI generation limit reached' });
   }
 
   try {
@@ -560,9 +548,9 @@ Be specific and actionable. An AI writer should be able to follow this guide to 
       log.warn({ err }, 'Failed to record outcome action for brand voice update');
     }
 
-    incrementUsage(ws.id, 'strategy_generations');
     res.json({ brandVoice: aiResult.text, pagesScraped: scraped.length });
   } catch (err) {
+    decrementUsage(ws.id, 'strategy_generations');
     log.error({ err: err }, 'Operation failed');
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate brand voice' });
   }
@@ -574,14 +562,8 @@ router.post('/api/workspaces/:id/generate-personas', requireWorkspaceAccess(), a
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (!ws.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
 
-  // Usage limit check
-  const usage = checkUsageLimit(ws.id, ws.tier || 'free', 'strategy_generations');
-  if (!usage.allowed) {
-    return res.status(429).json({
-      error: 'Monthly AI generation limit reached',
-      used: usage.used,
-      limit: usage.limit,
-    });
+  if (!incrementIfAllowed(ws.id, ws.tier || 'free', 'strategy_generations')) {
+    return res.status(429).json({ error: 'Monthly AI generation limit reached' });
   }
 
   try {
@@ -638,10 +620,12 @@ Rules:
       }>>(aiResult.text);
     } catch (err) {
       if (isProgrammingError(err)) log.warn({ err }, 'workspaces: programming error');
+      decrementUsage(ws.id, 'strategy_generations');
       return res.status(500).json({ error: 'AI returned invalid JSON — try again' });
     }
 
     if (!Array.isArray(personas) || personas.length === 0) {
+      decrementUsage(ws.id, 'strategy_generations');
       return res.status(500).json({ error: 'AI did not return valid personas — try again' });
     }
 
@@ -657,9 +641,9 @@ Rules:
       buyingStage: (['awareness', 'consideration', 'decision'].includes(p.buyingStage || '') ? p.buyingStage : 'consideration') as 'awareness' | 'consideration' | 'decision',
     }));
 
-    incrementUsage(ws.id, 'strategy_generations');
     res.json({ personas: normalized, pagesScraped: scraped.length });
   } catch (err) {
+    decrementUsage(ws.id, 'strategy_generations');
     log.error({ err: err }, 'Operation failed');
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate personas' });
   }

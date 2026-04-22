@@ -28,7 +28,7 @@ import {
 } from '../semrush.js';
 import { getConfiguredProvider } from '../seo-data-provider.js';
 import type { DomainKeyword, KeywordGapEntry, RelatedKeyword } from '../seo-data-provider.js';
-import { checkUsageLimit, incrementUsage } from '../usage-tracking.js';
+import { incrementIfAllowed, decrementUsage } from '../usage-tracking.js';
 import {
   discoverSitemapUrls,
 } from '../webflow.js';
@@ -305,19 +305,18 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
     return res.status(409).json({ error: 'A keyword strategy is already being generated for this workspace' });
   }
 
-  // Usage limit check (before activeGenerations.add — no cleanup needed on early exit)
+  // Atomically reserve a usage slot before the async AI work begins (closes TOCTOU race).
   const tier = ws.tier || 'free';
-  const strategyUsage = checkUsageLimit(ws.id, tier, 'strategy_generations');
-  if (!strategyUsage.allowed) {
+  if (!incrementIfAllowed(ws.id, tier, 'strategy_generations')) {
     return res.status(429).json({
       error: 'Strategy generation limit reached',
-      message: `You've used all ${strategyUsage.limit} strategy generations this month. Upgrade for more.`,
-      used: strategyUsage.used, limit: strategyUsage.limit,
+      message: `You've reached your monthly strategy generation limit. Upgrade for more.`,
     });
   }
 
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) {
+    decrementUsage(ws.id, 'strategy_generations'); // refund pre-reserved slot — misconfiguration is not a user error
     return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
   }
 
@@ -360,6 +359,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
   // will propagate without polluting activeGenerations. The finally block below
   // is the single cleanup point for all exit paths inside the try.
   activeGenerations.add(ws.id);
+  let responseSent = false;
 
   try {
     // 1. Resolve site base URL — auto-resolve liveDomain if missing
@@ -980,12 +980,13 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
     if (strategyMode === 'incremental') {
       log.info(`Incremental mode: ${pagesToAnalyze.length} stale pages to analyze, ${pagesToPreserve.length} fresh pages to preserve`);
       sendProgress('ai', `Incremental mode: ${pagesToAnalyze.length} pages need fresh analysis, ${pagesToPreserve.length} already fresh`, 0.54);
-      // Early exit: all pages are fresh — nothing to re-analyze, no usage credit burned.
+      // Early exit: all pages are fresh — nothing to re-analyze. Refund the pre-reserved slot.
       if (pagesToAnalyze.length === 0) {
         log.info({ workspaceId: ws.id }, 'Incremental mode: all pages already fresh, skipping re-analysis');
         sendProgress('complete', 'All pages are already up to date — no re-analysis needed.', 1.0);
         if (keepalive) clearInterval(keepalive); // prevent setInterval leak on early exit
         activeGenerations.delete(ws.id);
+        decrementUsage(ws.id, 'strategy_generations'); // no AI work done — refund pre-reserved slot
         // Match the dual-response pattern used at the normal exit (line ~1999):
         // SSE callers already got progress events + the sendProgress('complete') above.
         // JSON callers need a proper response body — res.end() gives them an empty 200.
@@ -1562,6 +1563,9 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
       log.debug({ err }, 'keyword-strategy: expected error — degrading gracefully');
       log.error({ detail: masterRaw.slice(0, 300) }, 'Master returned invalid JSON');
       const errMsg = 'AI returned invalid JSON in master synthesis';
+      activeGenerations.delete(ws.id);
+      if (keepalive) clearInterval(keepalive);
+      decrementUsage(ws.id, 'strategy_generations');
       if (wantsStream) { try { res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`); res.end(); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* closed */ } return; }
       return res.status(500).json({ error: errMsg, raw: masterRaw.slice(0, 500) });
     }
@@ -1640,6 +1644,9 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
 
     if (!strategy?.pageMap) {
       const errMsg = 'Strategy generation produced no results';
+      activeGenerations.delete(ws.id);
+      if (keepalive) clearInterval(keepalive);
+      decrementUsage(ws.id, 'strategy_generations');
       if (wantsStream) { try { res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`); res.end(); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* closed */ } return; }
       return res.status(500).json({ error: errMsg });
     }
@@ -2278,8 +2285,6 @@ Rules:
       invalidateIntelligenceCache(ws.id);
       invalidateSubCachePrefix(ws.id, 'slice:seoContext');
     });
-    incrementUsage(ws.id, 'strategy_generations');
-
     try {
       if (!getActionBySource('strategy', ws.id)) recordAction({ // recordAction-ok: ws.id is workspaceId
         workspaceId: ws.id,
@@ -2321,6 +2326,7 @@ Rules:
     } else {
       res.json(responseStrategy);
     }
+    responseSent = true;
 
     // Trigger background llms.txt regeneration after strategy update
     queueLlmsTxtRegeneration(ws.id, 'keyword_strategy_updated');
@@ -2338,6 +2344,7 @@ Rules:
   } catch (err) {
     activeGenerations.delete(ws.id);
     if (keepalive) clearInterval(keepalive);
+    if (!responseSent) decrementUsage(ws.id, 'strategy_generations'); // refund pre-reserved slot on failure
     const msg = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error ? err.stack : '';
     log.error({ detail: msg, stack }, 'Keyword strategy error');

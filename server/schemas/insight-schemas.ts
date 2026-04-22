@@ -6,6 +6,8 @@
  */
 
 import { z } from '../middleware/validate.js';
+import type { InsightType } from '../../shared/types/analytics.js';
+import type { ZodTypeAny } from 'zod';
 
 // --- AuditFindingData (InsightDataMap['audit_finding']) ---
 export const auditFindingDataSchema = z.object({
@@ -166,3 +168,28 @@ export const serpOpportunityDataSchema = z.object({
   ctr: z.number(),
   schemaStatus: z.enum(['missing', 'partial', 'complete']),
 });
+
+/**
+ * Maps each InsightType to its DB-stored Zod schema.
+ * Used by rowToInsight to validate the data JSON column via parseJsonSafe.
+ *
+ * All schemas use .partial() so missing fields in historical DB rows don't cause
+ * parseJsonSafe to return {} and silently destroy real data. Write paths enforce
+ * required fields through the original (non-partial) schemas above.
+ */
+export const INSIGHT_DATA_SCHEMA_MAP: Record<InsightType, ZodTypeAny> = {
+  page_health: pageHealthDataSchema.partial().passthrough(),
+  ranking_opportunity: rankingOpportunityDataSchema.partial().passthrough(),
+  content_decay: contentDecayDataSchema.partial().passthrough(),
+  cannibalization: cannibalizationDataSchema.partial().passthrough(),
+  keyword_cluster: keywordClusterDataSchema.partial().passthrough(),
+  competitor_gap: competitorGapDataSchema.partial().passthrough(),
+  conversion_attribution: conversionAttributionDataSchema.partial().passthrough(),
+  ranking_mover: rankingMoverDataSchema.partial().passthrough(),
+  ctr_opportunity: ctrOpportunityDataSchema.partial().passthrough(),
+  serp_opportunity: serpOpportunityDataSchema.partial().passthrough(),
+  strategy_alignment: strategyAlignmentDataSchema.partial().passthrough(),
+  anomaly_digest: anomalyDigestDataSchema.partial().passthrough(),
+  audit_finding: auditFindingDataSchema.partial().passthrough(),
+  site_health: siteHealthInsightDataSchema.partial().passthrough(),
+};

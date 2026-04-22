@@ -299,7 +299,7 @@ router.post('/api/jobs', async (req, res) => {
             for (let i = 0; i < assets.length; i++) {
               const asset = assets[i];
               try {
-                const compressRes = await fetch(`http://localhost:${PORT}/api/webflow/compress/${asset.assetId}`, {
+                const compressRes = await fetch(`http://localhost:${PORT}/api/webflow/${params.workspaceId}/compress/${asset.assetId}`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json', ...(APP_PASSWORD ? { 'x-auth-token': APP_PASSWORD } : {}) },
                   body: JSON.stringify({ imageUrl: asset.imageUrl, siteId, altText: asset.altText, fileName: asset.fileName, cmsUsages: asset.cmsUsages }),

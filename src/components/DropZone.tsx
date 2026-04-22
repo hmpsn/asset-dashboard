@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { Upload, Image, FileImage } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { themeColor } from './ui/constants';
+import { postForm } from '../api/client';
 
 interface Props {
   workspaceId: string;
@@ -31,8 +32,7 @@ export function DropZone({ workspaceId, type, disabled }: Props) {
       : `/api/upload/${workspaceId}`;
 
     try {
-      const res = await fetch(endpoint, { method: 'POST', body: formData });
-      const data = await res.json();
+      const data = await postForm<{ uploaded: number }>(endpoint, formData);
       setLastCount(data.uploaded);
       setTimeout(() => setLastCount(null), 3000);
     } catch (err) {

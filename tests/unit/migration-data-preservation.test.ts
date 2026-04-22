@@ -191,7 +191,7 @@ describe('CRUD preservation — analytics_insights', () => {
       workspaceId,
       pageId: '/blog/migration-test',
       insightType: 'page_health',
-      data: { score: 88, trend: 'stable' },
+      data: { score: 88, trend: 'stable' as const, clicks: 200, impressions: 3000, position: 7.5, ctr: 6.7, pageviews: 400, bounceRate: 38.0, avgEngagementTime: 110 },
       severity: 'opportunity',
       pageTitle: 'Migration Test Page',
       impactScore: 42,
@@ -219,7 +219,7 @@ describe('CRUD preservation — analytics_insights', () => {
       workspaceId,
       pageId: '/blog/upsert-test',
       insightType: 'content_decay',
-      data: { decayScore: 30 },
+      data: { baselineClicks: 100, currentClicks: 70, deltaPercent: -30, baselinePeriod: '30d', currentPeriod: '7d' },
       severity: 'warning',
       pageTitle: 'Upsert Test Page',
       impactScore: 10,
@@ -230,7 +230,7 @@ describe('CRUD preservation — analytics_insights', () => {
       workspaceId,
       pageId: '/blog/upsert-test',
       insightType: 'content_decay',
-      data: { decayScore: 60, reason: 'traffic drop' },
+      data: { baselineClicks: 100, currentClicks: 40, deltaPercent: -60, baselinePeriod: '30d', currentPeriod: '7d' },
       severity: 'critical',
       pageTitle: 'Upsert Test Page Updated',
       impactScore: 75,
@@ -241,7 +241,7 @@ describe('CRUD preservation — analytics_insights', () => {
 
     const found = list.find(i => i.id === updated.id);
     expect(found).toBeDefined();
-    expect(found!.data).toMatchObject({ decayScore: 60, reason: 'traffic drop' });
+    expect(found!.data).toMatchObject({ baselineClicks: 100, currentClicks: 40, deltaPercent: -60 });
     expect(found!.severity).toBe('critical');
     expect(found!.pageTitle).toBe('Upsert Test Page Updated');
     expect(found!.impactScore).toBe(75);
@@ -252,7 +252,7 @@ describe('CRUD preservation — analytics_insights', () => {
       workspaceId,
       pageId: '/blog/null-cols-test',
       insightType: 'ranking_opportunity',
-      data: { keyword: 'test kw' },
+      data: { query: 'test kw', currentPosition: 5, impressions: 1000, estimatedTrafficGain: 100, pageUrl: '/null-cols-test' },
       severity: 'opportunity',
     });
 

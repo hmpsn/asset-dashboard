@@ -39,6 +39,19 @@ const stmts = createStmtCache(() => ({
   `),
 }));
 
+// Wraps check+increment in a single synchronous transaction to eliminate the
+// TOCTOU race where two concurrent async handlers both read the same count
+// before either has a chance to increment.
+const atomicIncrementTxn = db.transaction(
+  (workspaceId: string, month: string, feature: string, limit: number): boolean => {
+    const row = stmts().getCount.get(workspaceId, month, feature) as { count: number } | undefined;
+    const current = row?.count || 0;
+    if (current >= limit) return false;
+    stmts().upsert.run({ workspace_id: workspaceId, month, feature, count: current + 1 });
+    return true;
+  },
+);
+
 function currentMonth(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -65,6 +78,47 @@ export function incrementUsage(workspaceId: string, feature: UsageFeature): numb
     count: newCount,
   });
   return newCount;
+}
+
+const atomicDecrementTxn = db.transaction(
+  (workspaceId: string, month: string, feature: string): void => {
+    const row = stmts().getCount.get(workspaceId, month, feature) as { count: number } | undefined;
+    const current = row?.count || 0;
+    if (current <= 0) return;
+    stmts().upsert.run({ workspace_id: workspaceId, month, feature, count: current - 1 });
+  },
+);
+
+/**
+ * Decrement the count by 1. Call to refund a pre-increment when the AI action
+ * fails after incrementIfAllowed() already reserved a slot.
+ */
+export function decrementUsage(workspaceId: string, feature: UsageFeature): void {
+  const month = currentMonth();
+  atomicDecrementTxn(workspaceId, month, feature);
+}
+
+/**
+ * Atomically check the limit and increment if allowed. Returns true if the
+ * slot was reserved, false if the limit is already reached.
+ *
+ * Use this instead of checkUsageLimit + incrementUsage to eliminate the TOCTOU
+ * race where two concurrent async handlers both pass the check before either
+ * increments. Pattern:
+ *
+ *   if (!incrementIfAllowed(wsId, tier, feature)) return res.status(429)...;
+ *   try { ...AI call... }
+ *   catch { decrementUsage(wsId, feature); throw; }
+ */
+export function incrementIfAllowed(workspaceId: string, tier: string, feature: UsageFeature): boolean {
+  const effectiveTier = tier || 'free';
+  const limit = getLimit(effectiveTier, feature);
+  if (limit === Infinity) {
+    incrementUsage(workspaceId, feature);
+    return true;
+  }
+  const month = currentMonth();
+  return atomicIncrementTxn(workspaceId, month, feature, limit) as boolean;
 }
 
 /** Check if a workspace can use a feature. Returns { allowed, used, limit, remaining }. */

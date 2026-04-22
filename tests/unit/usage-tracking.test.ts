@@ -9,6 +9,8 @@ import {
   incrementUsage,
   checkUsageLimit,
   getUsageSummary,
+  incrementIfAllowed,
+  decrementUsage,
 } from '../../server/usage-tracking.js';
 
 // ── getLimit ──
@@ -109,6 +111,71 @@ describe('checkUsageLimit', () => {
   it('defaults to free tier for empty string', () => {
     const result = checkUsageLimit(testWsId, '', 'ai_chats');
     expect(result.limit).toBe(3);
+  });
+});
+
+// ── incrementIfAllowed ──
+
+describe('incrementIfAllowed', () => {
+  const testWsId = 'ws_incr_allowed_' + Date.now();
+
+  afterEach(() => {
+    db.prepare('DELETE FROM usage_tracking WHERE workspace_id = ?').run(testWsId);
+  });
+
+  it('returns true and increments when under limit', () => {
+    const result = incrementIfAllowed(testWsId, 'growth', 'strategy_generations');
+    expect(result).toBe(true);
+    expect(getUsageCount(testWsId, 'strategy_generations')).toBe(1);
+  });
+
+  it('returns false when at limit (does not increment)', () => {
+    for (let i = 0; i < 3; i++) incrementUsage(testWsId, 'strategy_generations');
+    const result = incrementIfAllowed(testWsId, 'growth', 'strategy_generations');
+    expect(result).toBe(false);
+    expect(getUsageCount(testWsId, 'strategy_generations')).toBe(3);
+  });
+
+  it('returns false immediately for free tier (limit=0)', () => {
+    const result = incrementIfAllowed(testWsId, 'free', 'strategy_generations');
+    expect(result).toBe(false);
+    expect(getUsageCount(testWsId, 'strategy_generations')).toBe(0);
+  });
+
+  it('always returns true and increments for premium tier (Infinity)', () => {
+    const result = incrementIfAllowed(testWsId, 'premium', 'strategy_generations');
+    expect(result).toBe(true);
+    expect(getUsageCount(testWsId, 'strategy_generations')).toBe(1);
+  });
+});
+
+// ── decrementUsage ──
+
+describe('decrementUsage', () => {
+  const testWsId = 'ws_decr_' + Date.now();
+
+  afterEach(() => {
+    db.prepare('DELETE FROM usage_tracking WHERE workspace_id = ?').run(testWsId);
+  });
+
+  it('decrements count by 1', () => {
+    incrementUsage(testWsId, 'strategy_generations');
+    incrementUsage(testWsId, 'strategy_generations');
+    decrementUsage(testWsId, 'strategy_generations');
+    expect(getUsageCount(testWsId, 'strategy_generations')).toBe(1);
+  });
+
+  it('is a no-op when count is already 0 (no underflow)', () => {
+    decrementUsage(testWsId, 'strategy_generations');
+    expect(getUsageCount(testWsId, 'strategy_generations')).toBe(0);
+  });
+
+  it('refund pattern: increment then decrement returns to original', () => {
+    incrementUsage(testWsId, 'strategy_generations');
+    const before = getUsageCount(testWsId, 'strategy_generations');
+    incrementIfAllowed(testWsId, 'growth', 'strategy_generations');
+    decrementUsage(testWsId, 'strategy_generations');
+    expect(getUsageCount(testWsId, 'strategy_generations')).toBe(before);
   });
 });
 

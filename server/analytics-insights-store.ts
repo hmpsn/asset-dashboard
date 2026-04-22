@@ -2,7 +2,8 @@ import { randomUUID } from 'crypto';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import type { AnalyticsInsight, InsightType, InsightSeverity, InsightDomain, InsightDataMap, AnomalyDigestData } from '../shared/types/analytics.js';
-import { parseJsonFallback } from './db/json-validation.js';
+import { parseJsonFallback, parseJsonSafe } from './db/json-validation.js';
+import { INSIGHT_DATA_SCHEMA_MAP } from './schemas/insight-schemas.js';
 
 // ── SQLite row shape ──
 
@@ -96,12 +97,16 @@ const stmts = createStmtCache(() => ({
 }));
 
 function rowToInsight(row: InsightRow): AnalyticsInsight {
+  const insightType = row.insight_type as InsightType;
+  const schema = INSIGHT_DATA_SCHEMA_MAP[insightType];
   return {
     id: row.id,
     workspaceId: row.workspace_id,
     pageId: row.page_id,
-    insightType: row.insight_type as InsightType,
-    data: parseJsonFallback(row.data, {} as InsightDataMap[InsightType]),
+    insightType,
+    data: schema
+      ? parseJsonSafe(row.data, schema, {} as InsightDataMap[InsightType], { table: 'insights', field: 'data', workspaceId: row.workspace_id })
+      : parseJsonFallback(row.data, {} as InsightDataMap[InsightType]),
     severity: row.severity as InsightSeverity,
     computedAt: row.computed_at,
     pageTitle: row.page_title ?? undefined,
