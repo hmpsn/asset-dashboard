@@ -1194,6 +1194,231 @@
           "priority": "P1",
           "notes": "Shipped — Tier 1 (Tasks 1-19): 4 server modules (copy-generation, copy-review, copy-intelligence, copy-export), migration 058, Zod schemas, frontend API + hooks, 5 UI components (CopyReviewPanel, BatchGenerationPanel, CopyExportPanel, CopyIntelligenceManager, BlueprintDetail Copy tab). 21 integration tests. Tier 2 (Tasks 20-28): voice sample feedback loop, steering classification, pattern promotion, client copy review portal, questionnaire→brandscript, admin chat awareness, content decay→copy refresh, workspace intelligence wiring. Feature-flagged via copy-engine-pipeline. PR #173 (Tier 1) + PR for Tier 2.",
           "status": "done"
+        },
+        {
+          "id": 577,
+          "title": "Page Rewriter: applyToSection feedback when target heading not found",
+          "source": "PR #159 code review flag",
+          "est": "0.5h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "When AI sectionTarget slug doesn't match any data-section heading, show a toast (e.g. 'Section not found — content inserted at end') instead of silently appending to document end. Deferred from PR #159."
+        },
+        {
+          "id": 578,
+          "title": "Page Rewriter: expand HTML tokenizer to capture <div>, <li>, <blockquote> body text",
+          "source": "PR #159 code review flag",
+          "est": "1-2h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "extractPageSections() only tokenizes <h1-6> and <p> tags. Pages using <div> wrappers for body text (common in Webflow CMS templates) produce sections with empty body fields. Expand the two-pass tokenizer to also capture <li>, <blockquote>, and non-empty <div> text nodes. Deferred from PR #159."
+        },
+        {
+          "id": 579,
+          "title": "Page Rewriter: PDF export via print stylesheet",
+          "source": "User request Apr 2026",
+          "est": "1h",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "Add 'Download PDF' option to the Export brief menu. Cleanest approach: inject document content into a hidden print-only div with a styled print stylesheet and call window.print(). No new dependencies. DOCX export (#579 shipped) is the primary export; PDF is a lightweight complement for sharing/printing."
+        },
+        {
+          "id": 293,
+          "title": "AEO Review: Send to Client per-page changes",
+          "source": "Send to Client consistency initiative",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Add per-page Send to Client button to AEO Review change cards. Each recommended change (rewrite_intro, add_faq, add_section, etc.) should be sendable to the client approval queue with current→suggested diff as the approval payload.",
+          "status": "pending"
+        },
+        {
+          "id": 294,
+          "title": "Internal Links: Send to Client link suggestions",
+          "source": "Send to Client consistency initiative",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Add Send to Client button per page in Internal Links results. Sends suggested link insertions (anchor text, target URL, context snippet) to client approval queue so client can approve before agency implements.",
+          "status": "pending"
+        },
+        {
+          "id": 295,
+          "title": "Keyword Strategy: Send to Client strategy recommendations",
+          "source": "Send to Client consistency initiative",
+          "est": "1-2h",
+          "priority": "P3",
+          "notes": "Add bulk Send to Client for keyword strategy tabs (Quick Wins, Content Gaps, Low Hanging Fruit). Packages selected recommendations into approval batch for client review before implementation.",
+          "status": "pending"
+        },
+        {
+          "id": 296,
+          "title": "Redirect Manager: Send to Client redirect proposals",
+          "source": "Send to Client consistency initiative",
+          "est": "1-2h",
+          "priority": "P2",
+          "notes": "Add Send to Client for proposed redirects (broken links, chain fixes). Client reviews source→target mappings before agency publishes them to Webflow.",
+          "status": "pending"
+        },
+        {
+          "id": 297,
+          "title": "Content Decay: Send to Client refresh recommendations",
+          "source": "Send to Client consistency initiative",
+          "est": "1-2h",
+          "priority": "P3",
+          "notes": "Add Send to Client for decaying content pages. Sends page title, traffic decline data, and recommended action (refresh, merge, redirect) to client for awareness/approval.",
+          "status": "pending"
+        },
+        {
+          "id": 306,
+          "title": "Schema: Write generated schema to CMS collection field",
+          "source": "Schema bulk generation discussion",
+          "est": "3-4h",
+          "priority": "P1",
+          "notes": "Allow writing generated schema JSON to a designated CMS collection field (e.g. 'schema-markup' rich text or plain text field) via Webflow CMS API. Would enable CMS-driven schema injection without Webflow custom code embeds. Also consider: cap CMS pages in bulk gen, add overall timeout/token budget, skip CMS pages matching existing CMS template.",
+          "status": "pending"
+        },
+        {
+          "id": 570,
+          "title": "Competitor Content Monitoring (Scheduled Job)",
+          "source": "USER REQUEST",
+          "est": "4h",
+          "priority": "P2",
+          "notes": "Future — Scheduled job to periodically fetch new competitor keywords and alert when competitors gain new rankings.",
+          "status": "pending"
+        },
+        {
+          "id": 571,
+          "title": "Authority-Adjusted Difficulty Filtering",
+          "source": "USER REQUEST",
+          "est": "3h",
+          "priority": "P2",
+          "notes": "Future — Contextualize keyword difficulty (KD) by site's domain authority/rating. A KD of 40% means different things for a DR-20 site vs a DR-60 site.",
+          "status": "pending"
+        },
+        {
+          "id": 322,
+          "title": "URL-Level Keyword Intelligence (url_organic API)",
+          "source": "USER REQUEST",
+          "est": "3h",
+          "priority": "P2",
+          "notes": "Future — Use SEMRush url_organic API to get per-page keyword data instead of domain-level. More precise keyword assignments for individual pages.",
+          "status": "pending"
+        },
+        {
+          "id": 351,
+          "title": "Page Intelligence — Optimization Score History & Trending",
+          "source": "USER REQUEST",
+          "est": "3-4h",
+          "priority": "P2",
+          "notes": "Track optimization score snapshots over time (per page). Show sparkline trend in page list. Enable 'your average page health improved from X → Y this month' reporting. Requires new DB table or JSON snapshot storage.",
+          "status": "pending"
+        },
+        {
+          "id": 355,
+          "title": "AI Research Mode — Anti-Hallucination Prompt Blocks",
+          "source": "USER REQUEST (Reddit find: Anthropic docs anti-hallucination techniques)",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Add toggleable 'research mode' prompt blocks to AI features that make factual claims. Three techniques from Anthropic docs: (1) Allow 'I don't know' — stops confident-sounding fiction. (2) Verify with citations — retract unsourced claims. (3) Direct quotes for factual grounding — extract verbatim before analyzing. Apply to: content briefs (competitor insights, SERP analysis), SEO audit AI recommendations, content post generation, admin chat. Do NOT apply to creative features (SEO rewrites, keyword brainstorming) — research shows citation constraints reduce creative output. Implementation: add researchMode flag to callOpenAI opts, inject prompt blocks conditionally.",
+          "status": "pending"
+        },
+        {
+          "id": 356,
+          "title": "E-E-A-T Asset Library — Personalized Trust Signal Recommendations",
+          "source": "USER REQUEST",
+          "est": "4-6h",
+          "priority": "P2",
+          "notes": "Current E-E-A-T guidance in content briefs is generic per-pillar text ('include case studies'). Gap: no inventory of what assets a client ACTUALLY has. Build: (1) Workspace-level E-E-A-T profile in settings — admin tags existing client assets: testimonials (with quotes + attribution), case studies (with URLs + metrics), certifications/credentials, before/after galleries, team bios/expertise, awards/recognition, data/research, client logos. (2) Content briefs inject specific asset recommendations: 'Add the Dr. Smith testimonial from /reviews' or 'Include the Acme Corp case study showing 40% conversion lift'. (3) Page Intelligence flags pages missing trust signals based on page type (service pages need testimonials, product pages need reviews, etc.). (4) Schema generator uses asset library for author/credential structured data. New DB table: eeat_assets (workspace_id, type, title, url, content, metadata JSON). New UI: settings tab or workspace profile section.",
+          "status": "pending"
+        },
+        {
+          "id": 357,
+          "title": "SEO Editor — Convert Bulk Analyze to Background Job",
+          "source": "TECH DEBT",
+          "est": "1h",
+          "priority": "P1",
+          "notes": "SeoEditor.tsx line 351-358: sequential for-loop calling analyzePage() per page. Same bug PageIntelligence had — navigate away = lost progress. Convert to page-analysis background job or create seo-editor-analyze job type. Should reuse the page-analysis job infrastructure.",
+          "status": "pending"
+        },
+        {
+          "id": 358,
+          "title": "SEO Editor — Convert Bulk Rewrite Apply to Background Job",
+          "source": "TECH DEBT",
+          "est": "1.5h",
+          "priority": "P2",
+          "notes": "SeoEditor.tsx line 493-504: sequential for-loop pushing SEO changes to Webflow API one page at a time. Blocks UI during apply. Convert to server-side job that applies all previewed changes, reports progress via WebSocket. Lower priority than analyze — individual API calls are fast.",
+          "status": "pending"
+        },
+        {
+          "id": 359,
+          "title": "SEO Audit — Convert Accept All Fixes to Background Job",
+          "source": "TECH DEBT",
+          "est": "1h",
+          "priority": "P2",
+          "notes": "SeoAudit.tsx line 309-319: sequential for-loop pushing fixes to Webflow API. Similar to SeoEditor bulk apply — blocks UI, lose progress on navigation. Convert to server-side job. Uses AbortController currently which is good, but should be a proper cancellable background job.",
+          "status": "pending"
+        },
+        {
+          "id": 365,
+          "title": "Normalize contentGaps into dedicated SQLite table",
+          "source": "TECH DEBT",
+          "est": "2h",
+          "priority": "P2",
+          "notes": "Extract keywordStrategy.contentGaps[] into a content_gaps table keyed by (workspace_id, target_keyword). Enables per-gap voting/updates without rewriting the full strategy blob. Read by client portal (StrategyTab), briefs (anti-cannibalization), and content planner. Pattern: same as #364 (page_keywords). ~6 reader/writer call sites.",
+          "status": "pending"
+        },
+        {
+          "id": 366,
+          "title": "Normalize pageEditStates into dedicated SQLite table",
+          "source": "TECH DEBT",
+          "est": "2.5h",
+          "priority": "P1",
+          "notes": "Extract workspace pageEditStates JSON map into a page_edit_states table keyed by (workspace_id, page_id). Written on every SEO edit, approval, bulk operation, cart fix, and recommendation resolution. Currently full blob read-modify-write on each action. Enables SQL queries like 'all pages in review across workspaces' for future admin dashboard. Pattern: same as #364. High write frequency makes this the highest-impact normalization after pageMap.",
+          "status": "pending"
+        },
+        {
+          "id": 367,
+          "title": "Normalize quickWins into dedicated SQLite table",
+          "source": "TECH DEBT",
+          "est": "1.5h",
+          "priority": "P3",
+          "notes": "Extract keywordStrategy.quickWins[] into a quick_wins table keyed by (workspace_id, page_path). Read by client portal and strategy UI. Lower priority since these are regenerated wholesale (not individually updated). Pattern: same as #364. ~4 call sites.",
+          "status": "pending"
+        },
+        {
+          "id": 368,
+          "title": "Normalize keywordGaps into dedicated SQLite table",
+          "source": "TECH DEBT",
+          "est": "1.5h",
+          "priority": "P3",
+          "notes": "Extract keywordStrategy.keywordGaps[] into a keyword_gaps table keyed by (workspace_id, keyword). Read by client portal and strategy UI. Regenerated wholesale during strategy generation. Pattern: same as #364. ~4 call sites.",
+          "status": "pending"
+        },
+        {
+          "id": 369,
+          "title": "Normalize topicClusters into dedicated SQLite table",
+          "source": "TECH DEBT",
+          "est": "2h",
+          "priority": "P3",
+          "notes": "Extract keywordStrategy.topicClusters[] into a topic_clusters table keyed by (workspace_id, topic). Read by internal links (intra-cluster linking), cannibalization detection, and client portal. Grows proportionally with site size. Pattern: same as #364. ~5 call sites.",
+          "status": "pending"
+        },
+        {
+          "id": 370,
+          "title": "Normalize cannibalization into dedicated SQLite table",
+          "source": "TECH DEBT",
+          "est": "2h",
+          "priority": "P3",
+          "notes": "Extract keywordStrategy.cannibalization[] into a cannibalization_issues table keyed by (workspace_id, keyword). Enables historical tracking of cannibalization over time (currently overwritten each run). Already has its own detection module (cannibalization-detection.ts) but results stored in strategy blob. Pattern: same as #364. ~3 call sites.",
+          "status": "pending"
+        },
+        {
+          "id": 574,
+          "title": "JSON validation follow-up: schema coverage for high-value parseJsonFallback columns",
+          "source": "TECH DEBT",
+          "est": "1.5h",
+          "priority": "P2",
+          "notes": "Three deferred items from typed-contracts PR (#87) code review: (1) work-orders.ts has bare JSON.parse calls not migrated in the PR — add parseJsonFallback or parseJsonSafeArray. (2) recommendations.ts and reports.ts use parseJsonFallback for high-value recommendation/summary data — add Zod schemas (RecommendationSchema, SummarySchema) and switch to parseJsonSafe with typed fallback. (3) pageKeywordMapSchema missing ~16 optional fields from PageKeywordMap interface — harmless due to .passthrough() but represents schema drift; add optional fields to keep schema in sync for future required-field additions.",
+          "status": "pending"
         }
       ]
     },
@@ -3378,33 +3603,6 @@
           "shippedAt": "2026-04-09"
         },
         {
-          "id": 577,
-          "title": "Page Rewriter: applyToSection feedback when target heading not found",
-          "source": "PR #159 code review flag",
-          "est": "0.5h",
-          "priority": "P2",
-          "status": "pending",
-          "notes": "When AI sectionTarget slug doesn't match any data-section heading, show a toast (e.g. 'Section not found — content inserted at end') instead of silently appending to document end. Deferred from PR #159."
-        },
-        {
-          "id": 578,
-          "title": "Page Rewriter: expand HTML tokenizer to capture <div>, <li>, <blockquote> body text",
-          "source": "PR #159 code review flag",
-          "est": "1-2h",
-          "priority": "P2",
-          "status": "pending",
-          "notes": "extractPageSections() only tokenizes <h1-6> and <p> tags. Pages using <div> wrappers for body text (common in Webflow CMS templates) produce sections with empty body fields. Expand the two-pass tokenizer to also capture <li>, <blockquote>, and non-empty <div> text nodes. Deferred from PR #159."
-        },
-        {
-          "id": 579,
-          "title": "Page Rewriter: PDF export via print stylesheet",
-          "source": "User request Apr 2026",
-          "est": "1h",
-          "priority": "P3",
-          "status": "pending",
-          "notes": "Add 'Download PDF' option to the Export brief menu. Cleanest approach: inject document content into a hidden print-only div with a styled print stylesheet and call window.print(). No new dependencies. DOCX export (#579 shipped) is the primary export; PDF is a lightweight complement for sharing/printing."
-        },
-        {
           "id": 288,
           "title": "Schema generator: enhanced validation, auto-fix, and improved prompting",
           "status": "done",
@@ -3452,51 +3650,6 @@
           "status": "done",
           "notes": "Shipped — Pages auto-load on mount with page type dropdowns (13 types). Page type hint passed to AI prompt for tailored schema generation. Initial view replaced with full page list + type selectors + per-page generate buttons.",
           "shippedAt": "2026-03-16"
-        },
-        {
-          "id": 293,
-          "title": "AEO Review: Send to Client per-page changes",
-          "source": "Send to Client consistency initiative",
-          "est": "2-3h",
-          "priority": "P2",
-          "notes": "Add per-page Send to Client button to AEO Review change cards. Each recommended change (rewrite_intro, add_faq, add_section, etc.) should be sendable to the client approval queue with current→suggested diff as the approval payload.",
-          "status": "pending"
-        },
-        {
-          "id": 294,
-          "title": "Internal Links: Send to Client link suggestions",
-          "source": "Send to Client consistency initiative",
-          "est": "2-3h",
-          "priority": "P2",
-          "notes": "Add Send to Client button per page in Internal Links results. Sends suggested link insertions (anchor text, target URL, context snippet) to client approval queue so client can approve before agency implements.",
-          "status": "pending"
-        },
-        {
-          "id": 295,
-          "title": "Keyword Strategy: Send to Client strategy recommendations",
-          "source": "Send to Client consistency initiative",
-          "est": "1-2h",
-          "priority": "P3",
-          "notes": "Add bulk Send to Client for keyword strategy tabs (Quick Wins, Content Gaps, Low Hanging Fruit). Packages selected recommendations into approval batch for client review before implementation.",
-          "status": "pending"
-        },
-        {
-          "id": 296,
-          "title": "Redirect Manager: Send to Client redirect proposals",
-          "source": "Send to Client consistency initiative",
-          "est": "1-2h",
-          "priority": "P2",
-          "notes": "Add Send to Client for proposed redirects (broken links, chain fixes). Client reviews source→target mappings before agency publishes them to Webflow.",
-          "status": "pending"
-        },
-        {
-          "id": 297,
-          "title": "Content Decay: Send to Client refresh recommendations",
-          "source": "Send to Client consistency initiative",
-          "est": "1-2h",
-          "priority": "P3",
-          "notes": "Add Send to Client for decaying content pages. Sends page title, traffic decline data, and recommended action (refresh, merge, redirect) to client for awareness/approval.",
-          "status": "pending"
         },
         {
           "id": 298,
@@ -3575,15 +3728,6 @@
           "notes": "Shipped — Plan now discovers CMS collection pages from sitemap (up to 500). Unified 16 page types across plan + generator (added service, partnership, comparison, generic; renamed audience). Wildcard expansion for CMS collections. Page Type Guide index with descriptions + URL examples in both SchemaPlanPanel and SchemaSuggester.",
           "status": "done",
           "shippedAt": "2026-03-16"
-        },
-        {
-          "id": 306,
-          "title": "Schema: Write generated schema to CMS collection field",
-          "source": "Schema bulk generation discussion",
-          "est": "3-4h",
-          "priority": "P1",
-          "notes": "Allow writing generated schema JSON to a designated CMS collection field (e.g. 'schema-markup' rich text or plain text field) via Webflow CMS API. Would enable CMS-driven schema injection without Webflow custom code embeds. Also consider: cap CMS pages in bulk gen, add overall timeout/token budget, skip CMS pages matching existing CMS template.",
-          "status": "pending"
         },
         {
           "id": 307,
@@ -3714,33 +3858,6 @@
           "notes": "Shipped — v2: Canonical Recommender added. Cross-references keyword map + GSC data. Severity scoring. Now recommends specific action per conflict: canonical_tag, redirect_301, differentiate, or noindex based on page metrics. Includes canonical URL and action-specific guidance. UI shows action type badges with icons.",
           "status": "done",
           "shippedAt": "2026-03-23"
-        },
-        {
-          "id": 570,
-          "title": "Competitor Content Monitoring (Scheduled Job)",
-          "source": "USER REQUEST",
-          "est": "4h",
-          "priority": "P2",
-          "notes": "Future — Scheduled job to periodically fetch new competitor keywords and alert when competitors gain new rankings.",
-          "status": "pending"
-        },
-        {
-          "id": 571,
-          "title": "Authority-Adjusted Difficulty Filtering",
-          "source": "USER REQUEST",
-          "est": "3h",
-          "priority": "P2",
-          "notes": "Future — Contextualize keyword difficulty (KD) by site's domain authority/rating. A KD of 40% means different things for a DR-20 site vs a DR-60 site.",
-          "status": "pending"
-        },
-        {
-          "id": 322,
-          "title": "URL-Level Keyword Intelligence (url_organic API)",
-          "source": "USER REQUEST",
-          "est": "3h",
-          "priority": "P2",
-          "notes": "Future — Use SEMRush url_organic API to get per-page keyword data instead of domain-level. More precise keyword assignments for individual pages.",
-          "status": "pending"
         },
         {
           "id": 572,
@@ -4004,15 +4121,6 @@
           "status": "done"
         },
         {
-          "id": 351,
-          "title": "Page Intelligence — Optimization Score History & Trending",
-          "source": "USER REQUEST",
-          "est": "3-4h",
-          "priority": "P2",
-          "notes": "Track optimization score snapshots over time (per page). Show sparkline trend in page list. Enable 'your average page health improved from X → Y this month' reporting. Requires new DB table or JSON snapshot storage.",
-          "status": "pending"
-        },
-        {
           "id": 352,
           "title": "Page Analysis — CMS Title/Meta Extraction + Live Domain Fetch",
           "source": "BUG FIX",
@@ -4038,51 +4146,6 @@
           "priority": "P0",
           "notes": "Shipped — Webflow API caps at 100 items/request. cms-seo endpoint now paginates through ALL items with do/while loop. Sitemap discovery tries live domain first. CMS URL cap raised to 500. Feature #172.",
           "status": "done"
-        },
-        {
-          "id": 355,
-          "title": "AI Research Mode — Anti-Hallucination Prompt Blocks",
-          "source": "USER REQUEST (Reddit find: Anthropic docs anti-hallucination techniques)",
-          "est": "2-3h",
-          "priority": "P2",
-          "notes": "Add toggleable 'research mode' prompt blocks to AI features that make factual claims. Three techniques from Anthropic docs: (1) Allow 'I don't know' — stops confident-sounding fiction. (2) Verify with citations — retract unsourced claims. (3) Direct quotes for factual grounding — extract verbatim before analyzing. Apply to: content briefs (competitor insights, SERP analysis), SEO audit AI recommendations, content post generation, admin chat. Do NOT apply to creative features (SEO rewrites, keyword brainstorming) — research shows citation constraints reduce creative output. Implementation: add researchMode flag to callOpenAI opts, inject prompt blocks conditionally.",
-          "status": "pending"
-        },
-        {
-          "id": 356,
-          "title": "E-E-A-T Asset Library — Personalized Trust Signal Recommendations",
-          "source": "USER REQUEST",
-          "est": "4-6h",
-          "priority": "P2",
-          "notes": "Current E-E-A-T guidance in content briefs is generic per-pillar text ('include case studies'). Gap: no inventory of what assets a client ACTUALLY has. Build: (1) Workspace-level E-E-A-T profile in settings — admin tags existing client assets: testimonials (with quotes + attribution), case studies (with URLs + metrics), certifications/credentials, before/after galleries, team bios/expertise, awards/recognition, data/research, client logos. (2) Content briefs inject specific asset recommendations: 'Add the Dr. Smith testimonial from /reviews' or 'Include the Acme Corp case study showing 40% conversion lift'. (3) Page Intelligence flags pages missing trust signals based on page type (service pages need testimonials, product pages need reviews, etc.). (4) Schema generator uses asset library for author/credential structured data. New DB table: eeat_assets (workspace_id, type, title, url, content, metadata JSON). New UI: settings tab or workspace profile section.",
-          "status": "pending"
-        },
-        {
-          "id": 357,
-          "title": "SEO Editor — Convert Bulk Analyze to Background Job",
-          "source": "TECH DEBT",
-          "est": "1h",
-          "priority": "P1",
-          "notes": "SeoEditor.tsx line 351-358: sequential for-loop calling analyzePage() per page. Same bug PageIntelligence had — navigate away = lost progress. Convert to page-analysis background job or create seo-editor-analyze job type. Should reuse the page-analysis job infrastructure.",
-          "status": "pending"
-        },
-        {
-          "id": 358,
-          "title": "SEO Editor — Convert Bulk Rewrite Apply to Background Job",
-          "source": "TECH DEBT",
-          "est": "1.5h",
-          "priority": "P2",
-          "notes": "SeoEditor.tsx line 493-504: sequential for-loop pushing SEO changes to Webflow API one page at a time. Blocks UI during apply. Convert to server-side job that applies all previewed changes, reports progress via WebSocket. Lower priority than analyze — individual API calls are fast.",
-          "status": "pending"
-        },
-        {
-          "id": 359,
-          "title": "SEO Audit — Convert Accept All Fixes to Background Job",
-          "source": "TECH DEBT",
-          "est": "1h",
-          "priority": "P2",
-          "notes": "SeoAudit.tsx line 309-319: sequential for-loop pushing fixes to Webflow API. Similar to SeoEditor bulk apply — blocks UI, lose progress on navigation. Convert to server-side job. Uses AbortController currently which is good, but should be a proper cancellable background job.",
-          "status": "pending"
         },
         {
           "id": 360,
@@ -4119,69 +4182,6 @@
           "priority": "P1",
           "notes": "Shipped — Extracted keywordStrategy.pageMap from workspace JSON blob into indexed page_keywords table. O(1) per-page reads/writes instead of full blob deserialization. 13 reader/writer call sites updated. Migration function runs idempotently on startup. Feature #176.",
           "status": "done"
-        },
-        {
-          "id": 365,
-          "title": "Normalize contentGaps into dedicated SQLite table",
-          "source": "TECH DEBT",
-          "est": "2h",
-          "priority": "P2",
-          "notes": "Extract keywordStrategy.contentGaps[] into a content_gaps table keyed by (workspace_id, target_keyword). Enables per-gap voting/updates without rewriting the full strategy blob. Read by client portal (StrategyTab), briefs (anti-cannibalization), and content planner. Pattern: same as #364 (page_keywords). ~6 reader/writer call sites.",
-          "status": "pending"
-        },
-        {
-          "id": 366,
-          "title": "Normalize pageEditStates into dedicated SQLite table",
-          "source": "TECH DEBT",
-          "est": "2.5h",
-          "priority": "P1",
-          "notes": "Extract workspace pageEditStates JSON map into a page_edit_states table keyed by (workspace_id, page_id). Written on every SEO edit, approval, bulk operation, cart fix, and recommendation resolution. Currently full blob read-modify-write on each action. Enables SQL queries like 'all pages in review across workspaces' for future admin dashboard. Pattern: same as #364. High write frequency makes this the highest-impact normalization after pageMap.",
-          "status": "pending"
-        },
-        {
-          "id": 367,
-          "title": "Normalize quickWins into dedicated SQLite table",
-          "source": "TECH DEBT",
-          "est": "1.5h",
-          "priority": "P3",
-          "notes": "Extract keywordStrategy.quickWins[] into a quick_wins table keyed by (workspace_id, page_path). Read by client portal and strategy UI. Lower priority since these are regenerated wholesale (not individually updated). Pattern: same as #364. ~4 call sites.",
-          "status": "pending"
-        },
-        {
-          "id": 368,
-          "title": "Normalize keywordGaps into dedicated SQLite table",
-          "source": "TECH DEBT",
-          "est": "1.5h",
-          "priority": "P3",
-          "notes": "Extract keywordStrategy.keywordGaps[] into a keyword_gaps table keyed by (workspace_id, keyword). Read by client portal and strategy UI. Regenerated wholesale during strategy generation. Pattern: same as #364. ~4 call sites.",
-          "status": "pending"
-        },
-        {
-          "id": 369,
-          "title": "Normalize topicClusters into dedicated SQLite table",
-          "source": "TECH DEBT",
-          "est": "2h",
-          "priority": "P3",
-          "notes": "Extract keywordStrategy.topicClusters[] into a topic_clusters table keyed by (workspace_id, topic). Read by internal links (intra-cluster linking), cannibalization detection, and client portal. Grows proportionally with site size. Pattern: same as #364. ~5 call sites.",
-          "status": "pending"
-        },
-        {
-          "id": 370,
-          "title": "Normalize cannibalization into dedicated SQLite table",
-          "source": "TECH DEBT",
-          "est": "2h",
-          "priority": "P3",
-          "notes": "Extract keywordStrategy.cannibalization[] into a cannibalization_issues table keyed by (workspace_id, keyword). Enables historical tracking of cannibalization over time (currently overwritten each run). Already has its own detection module (cannibalization-detection.ts) but results stored in strategy blob. Pattern: same as #364. ~3 call sites.",
-          "status": "pending"
-        },
-        {
-          "id": 574,
-          "title": "JSON validation follow-up: schema coverage for high-value parseJsonFallback columns",
-          "source": "TECH DEBT",
-          "est": "1.5h",
-          "priority": "P2",
-          "notes": "Three deferred items from typed-contracts PR (#87) code review: (1) work-orders.ts has bare JSON.parse calls not migrated in the PR — add parseJsonFallback or parseJsonSafeArray. (2) recommendations.ts and reports.ts use parseJsonFallback for high-value recommendation/summary data — add Zod schemas (RecommendationSchema, SummarySchema) and switch to parseJsonSafe with typed fallback. (3) pageKeywordMapSchema missing ~16 optional fields from PageKeywordMap interface — harmless due to .passthrough() but represents schema drift; add optional fields to keep schema in sync for future required-field additions.",
-          "status": "pending"
         },
         {
           "id": 525,

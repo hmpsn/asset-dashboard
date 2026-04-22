@@ -19,6 +19,10 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+// When adding new items to roadmap.json manually, include:
+//   "createdAt": "YYYY-MM-DD"
+// Existing items intentionally omit this field (forward-only policy).
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROADMAP_PATH = path.resolve(__dirname, '../data/roadmap.json');
