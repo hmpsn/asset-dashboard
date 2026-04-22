@@ -278,7 +278,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
     if (!url) return;
     setCompressing(prev => new Set(prev).add(asset.id));
     try {
-      const data = await post<{ success?: boolean; skipped?: boolean; reason?: string; newAssetId?: string; newSize?: number; newHostedUrl?: string; newFileName?: string; savingsPercent?: number; savings?: number; cmsUpdates?: { succeeded: number; failed: number } }>(`/api/webflow/compress/${asset.id}`, {
+      const data = await post<{ success?: boolean; skipped?: boolean; reason?: string; newAssetId?: string; newSize?: number; newHostedUrl?: string; newFileName?: string; savingsPercent?: number; savings?: number; cmsUpdates?: { succeeded: number; failed: number } }>(`/api/webflow/${workspaceId}/compress/${asset.id}`, {
         imageUrl: url,
         siteId,
         altText: asset.altText,

@@ -353,7 +353,7 @@ async function repairCmsReferences(
 }
 
 // --- Image Compression ---
-router.post('/api/webflow/compress/:assetId', async (req, res) => {
+router.post('/api/webflow/:workspaceId/compress/:assetId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const { imageUrl, siteId, altText, fileName, cmsUsages } = req.body as {
     imageUrl: string;
     siteId: string;

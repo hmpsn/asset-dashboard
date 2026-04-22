@@ -119,7 +119,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
     for (let idx = 0; idx < compressible.length; idx++) {
       const issue = compressible[idx];
       try {
-        const data = await post<{ success?: boolean; savings?: number }>(`/api/webflow/compress/${issue.assetId}`, { imageUrl: issue.url, siteId, fileName: issue.fileName });
+        const data = await post<{ success?: boolean; savings?: number }>(`/api/webflow/${workspaceId}/compress/${issue.assetId}`, { imageUrl: issue.url, siteId, fileName: issue.fileName });
         if (data.success) totalSaved += (data.savings || 0);
       } catch (err) { console.error('AssetAudit operation failed:', err); }
       setBulkCompressProgress({ done: idx + 1, total: compressible.length, saved: totalSaved });
@@ -155,7 +155,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
     if (!issue.url) return;
     setCompressing(prev => new Set(prev).add(issue.assetId));
     try {
-      const data = await post<{ success?: boolean; newAssetId?: string; newSize?: number }>(`/api/webflow/compress/${issue.assetId}`, { imageUrl: issue.url, siteId, fileName: issue.fileName });
+      const data = await post<{ success?: boolean; newAssetId?: string; newSize?: number }>(`/api/webflow/${workspaceId}/compress/${issue.assetId}`, { imageUrl: issue.url, siteId, fileName: issue.fileName });
       if (data.success && audit && data.newAssetId) {
         const newAssetId = data.newAssetId;
         const newSize = data.newSize ?? issue.fileSize;

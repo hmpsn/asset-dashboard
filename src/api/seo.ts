@@ -251,8 +251,8 @@ export const webflow = {
   generateAlt: (workspaceId: string, assetId: string, body: Record<string, unknown>) =>
     post<unknown>(`/api/webflow/${workspaceId}/generate-alt/${assetId}`, body),
 
-  compress: (assetId: string, body: Record<string, unknown>) =>
-    post<unknown>(`/api/webflow/compress/${assetId}`, body),
+  compress: (workspaceId: string, assetId: string, body: Record<string, unknown>) =>
+    post<unknown>(`/api/webflow/${workspaceId}/compress/${assetId}`, body),
 
   rename: (assetId: string, body: Record<string, unknown>) =>
     patch<unknown>(`/api/webflow/rename/${assetId}`, body),
