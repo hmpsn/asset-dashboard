@@ -185,7 +185,6 @@ describe('broadcastToWorkspace() call sites', () => {
     const knownUnregisteredLiterals = new Set([
       'feedback:new',     // server/feedback.ts — not yet added to WS_EVENTS
       'feedback:update',  // server/feedback.ts — not yet added to WS_EVENTS
-      'post-updated',     // server/routes/content-posts.ts — not yet added to WS_EVENTS
     ]);
 
     const unregistered = allWsLiterals.filter(
@@ -205,7 +204,6 @@ describe('broadcastToWorkspace() call sites', () => {
     const knownUnregisteredLiterals = new Set([
       'feedback:new',
       'feedback:update',
-      'post-updated',
     ]);
 
     const trulyUnknown = allWsLiterals.filter(

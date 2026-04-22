@@ -41,7 +41,9 @@ export const siteHealthInsightDataSchema = z.object({
   siteWideIssueCount: z.number(),
 });
 
-/** Schema for PageHealthData — page-level health from analytics */
+/** Schema for PageHealthData — page-level health from analytics.
+ *  Includes optional audit-enrichment fields (shared/types/analytics.ts:256-259)
+ *  populated when the audit → page_health bridge adds error/warning context. */
 export const pageHealthDataSchema = z.object({
   score: z.number(),
   trend: z.enum(['improving', 'declining', 'stable']),
@@ -52,6 +54,10 @@ export const pageHealthDataSchema = z.object({
   pageviews: z.number(),
   bounceRate: z.number(),
   avgEngagementTime: z.number(),
+  auditSnapshotId: z.string().optional(),
+  errorCount: z.number().optional(),
+  warningCount: z.number().optional(),
+  topIssues: z.array(z.string()).optional(),
 });
 
 /**
@@ -72,4 +78,91 @@ export const strategyAlignmentDataSchema = z.object({
   misalignedCount: z.number(),
   untrackedCount: z.number(),
   summary: z.string().optional(),
+});
+
+// --- QuickWinData (InsightDataMap['ranking_opportunity']) ---
+export const rankingOpportunityDataSchema = z.object({
+  query: z.string(),
+  currentPosition: z.number(),
+  impressions: z.number(),
+  estimatedTrafficGain: z.number(),
+  pageUrl: z.string(),
+});
+
+// --- ContentDecayData (InsightDataMap['content_decay']) ---
+export const contentDecayDataSchema = z.object({
+  baselineClicks: z.number(),
+  currentClicks: z.number(),
+  deltaPercent: z.number(),
+  baselinePeriod: z.string(),
+  currentPeriod: z.string(),
+});
+
+// --- CannibalizationData (InsightDataMap['cannibalization']) ---
+export const cannibalizationDataSchema = z.object({
+  query: z.string(),
+  pages: z.array(z.string()),
+  positions: z.array(z.number()),
+  totalImpressions: z.number(),
+});
+
+// --- KeywordClusterData (InsightDataMap['keyword_cluster']) ---
+export const keywordClusterDataSchema = z.object({
+  label: z.string(),
+  queries: z.array(z.string()),
+  totalImpressions: z.number(),
+  avgPosition: z.number(),
+  pillarPage: z.string().nullable(),
+});
+
+// --- CompetitorGapData (InsightDataMap['competitor_gap']) ---
+export const competitorGapDataSchema = z.object({
+  keyword: z.string(),
+  competitorDomain: z.string(),
+  competitorPosition: z.number(),
+  ourPosition: z.number().nullable(),
+  volume: z.number(),
+  difficulty: z.number(),
+});
+
+// --- ConversionAttributionData (InsightDataMap['conversion_attribution']) ---
+export const conversionAttributionDataSchema = z.object({
+  sessions: z.number(),
+  conversions: z.number(),
+  conversionRate: z.number(),
+  estimatedRevenue: z.number().nullable(),
+});
+
+// --- RankingMoverData (InsightDataMap['ranking_mover']) ---
+export const rankingMoverDataSchema = z.object({
+  query: z.string(),
+  pageUrl: z.string(),
+  currentPosition: z.number(),
+  previousPosition: z.number(),
+  positionChange: z.number(),
+  currentClicks: z.number(),
+  previousClicks: z.number(),
+  impressions: z.number(),
+});
+
+// --- CtrOpportunityData (InsightDataMap['ctr_opportunity']) ---
+export const ctrOpportunityDataSchema = z.object({
+  query: z.string(),
+  pageUrl: z.string(),
+  position: z.number(),
+  actualCtr: z.number(),
+  expectedCtr: z.number(),
+  ctrRatio: z.number(),
+  impressions: z.number(),
+  estimatedClickGap: z.number(),
+});
+
+// --- SerpOpportunityData (InsightDataMap['serp_opportunity']) ---
+export const serpOpportunityDataSchema = z.object({
+  pageUrl: z.string(),
+  impressions: z.number(),
+  clicks: z.number(),
+  position: z.number(),
+  ctr: z.number(),
+  schemaStatus: z.enum(['missing', 'partial', 'complete']),
 });

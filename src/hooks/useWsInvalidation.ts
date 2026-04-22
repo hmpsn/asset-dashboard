@@ -226,8 +226,17 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.blueprints(workspaceId) });
     },
-    // SCHEMA_PLAN_SENT is intentionally not handled here — it's an admin-side
-    // confirmation event with no React Query cache to invalidate. If a future
-    // feature adds a schema-plan-status query, wire it here.
+    [WS_EVENTS.COPY_EXPORT_COMPLETE]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.copyStatusAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.copySectionsAll(workspaceId) });
+    },
+    // SCHEMA_PLAN_SENT is intentionally NOT registered here — SchemaPlanPanel
+    // fetches the plan directly (no React Query cache). Exemption is tracked
+    // in tests/contract/ws-invalidation-coverage.test.ts LOCAL_ONLY_EVENTS.
+    [WS_EVENTS.POST_UPDATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.posts(workspaceId) });
+    },
   });
 }

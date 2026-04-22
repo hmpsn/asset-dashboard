@@ -595,6 +595,42 @@
       "rationale": "Revisit quarterly. Prioritize when a specific client need, revenue opportunity, or scale threshold justifies it.",
       "items": [
         {
+          "id": 602,
+          "title": "Atomic increment-and-check in usage-tracking.ts (close TOCTOU race on concurrent bulk AI calls)",
+          "source": "PR #255 scaled code review — security agent flag",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "checkUsageLimit() reads used/limit, then the caller calls incrementUsage() after success. Two concurrent bulk-alt-text (or any streaming AI) requests for the same workspace can both see used=9, limit=10 and both proceed, overshooting by ~N where N is the number of concurrent requests. Fix: add atomic incrementIfAllowed(wsId, tier, feature) that performs the check + increment in a single SQLite transaction and returns allowed/denied. Callers become: `const ok = incrementIfAllowed(...); if (!ok) return 429;` then refund on failure (decrementUsage) only when the AI work itself succeeds and isn't gated by another condition. Migrate all 6 billing call sites (keyword strategy, brand voice, knowledge base, personas, alt-text single + bulk, brand identity generate/refine). Low attack severity today (admin-only HMAC gate), defense-in-depth fix.",
+          "status": "pending"
+        },
+        {
+          "id": 603,
+          "title": "Extract NDJSON/SSE stream reader helper (deduplicate bulkGenerateAltText + streamKeywordStrategy)",
+          "source": "PR #255 scaled code review — code smells agent flag",
+          "est": "1-2h",
+          "priority": "P3",
+          "notes": "src/api/seo.ts has two streaming wrappers (bulkGenerateAltText lines ~528-570, streamKeywordStrategy lines ~634-680) that each implement a full `while(true){ reader.read() }` loop with TextDecoder, buffer splitting, and trailing-fragment flush. Subtle divergence already exists (NDJSON flushes trailing fragments; SSE does not). Extract `readNdjsonStream(reader, onLine)` and `readSseStream(reader, onEvent)` into src/api/streamUtils.ts. Prevents copy-paste drift on the next streaming endpoint.",
+          "status": "pending"
+        },
+        {
+          "id": 604,
+          "title": "Move workspaceId to path param + requireWorkspaceAccess on alt-text routes (close pre-existing auth gap)",
+          "source": "PR #255 scaled code review — security agent flag (pre-existing, deferred from PR #255)",
+          "est": "2-3h",
+          "priority": "P3",
+          "notes": "POST /api/webflow/generate-alt/:assetId and /api/webflow/bulk-generate-alt currently accept workspaceId from the request body without routing it through requireWorkspaceAccess. HMAC gate covers admin auth, but an authenticated admin can target any workspace's quota by body manipulation. PR #255 closed the billing bypass (workspace now required, returns 400 if unresolvable) but did NOT move the param or add the workspace-access guard — this tack-on will finish the hardening. Change routes to /api/webflow/:workspaceId/generate-alt/:assetId and /api/webflow/:workspaceId/bulk-generate-alt, then add requireWorkspaceAccess('workspaceId'). Breaking API change — update AssetBrowser.tsx, AssetAudit.tsx, src/api/seo.ts generateAltText + bulkGenerateAltText wrappers. Low severity (admin-only), worth shipping in a minor follow-up PR.",
+          "status": "pending"
+        },
+        {
+          "id": 599,
+          "title": "Per-feature usage budgets (split strategy_generations pool)",
+          "source": "PR #255 code review — Devin comment on shared billing pool",
+          "est": "4-6h",
+          "priority": "P2",
+          "notes": "All AI generation endpoints (keyword strategy, brand voice, knowledge base, personas, alt-text, brand identity deliverables) share a single 'strategy_generations' pool (free=0, growth=3, premium=∞). A user who generates a knowledge base + brand voice + personas exhausts their limit and can no longer generate alt text or deliverables — surprising UX. Options: (1) split into named sub-pools per feature category (e.g. 'brand_generations', 'seo_generations') each with their own limits; (2) raise the shared pool limit; (3) tier-specific per-feature overrides. Requires migration to add new usage_tracking feature keys, updating checkUsageLimit/incrementUsage call sites across all guarded routes, and updating client-facing usage display (if any). Coordinate with MONETIZATION.md tier redesign if limits are revisited.",
+          "status": "pending"
+        },
+        {
           "id": 598,
           "title": "Extend useWorkspaceEvents centralization rule to catch string-literal duplicates",
           "source": "PR #254 code review flag 3",

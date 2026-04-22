@@ -1,5 +1,5 @@
 // ── Miscellaneous API endpoints ────────────────────────────────────
-import { get, post, patch, del, getSafe, getOptional, postForm } from './client';
+import { get, post, patch, del, getSafe, getOptional, getText, postForm } from './client';
 import type { ContentSubscription, ContentSubscriptionPlanConfig } from '../../shared/types/content';
 import type { FeaturesData } from '../../shared/types/features';
 
@@ -378,3 +378,22 @@ export const businessPriorities = {
       { priorities: [] },
     ),
 };
+
+// ── Content exports (HTML strings for client-side PDF print flow) ──
+/**
+ * Export a content post as HTML (pre-rendered for browser print-to-PDF).
+ * Wraps GET /api/content-posts/:workspaceId/:postId/export/pdf. Returns the
+ * raw HTML text — callers are responsible for piping it into a new window or
+ * iframe for `window.print()`.
+ */
+export function exportPostPdf(workspaceId: string, postId: string): Promise<string> {
+  return getText(`/api/content-posts/${workspaceId}/${postId}/export/pdf`);
+}
+
+/**
+ * Export a content brief as HTML. Same pattern as exportPostPdf — returns raw
+ * HTML text, NOT a Blob.
+ */
+export function exportBrief(workspaceId: string, briefId: string): Promise<string> {
+  return getText(`/api/content-briefs/${workspaceId}/${briefId}/export`);
+}
