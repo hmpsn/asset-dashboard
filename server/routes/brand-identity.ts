@@ -12,6 +12,8 @@ import {
 import type { DeliverableTier } from '../../shared/types/brand-engine.js';
 import { clearSeoContextCache } from '../seo-context.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { getWorkspace } from '../workspaces.js';
+import { checkUsageLimit, incrementUsage } from '../usage-tracking.js';
 
 const router = Router();
 
@@ -80,7 +82,13 @@ router.get('/api/brand-identity/:workspaceId/:id', requireWorkspaceAccess('works
 router.post('/api/brand-identity/:workspaceId/generate', requireWorkspaceAccess('workspaceId'), validate(generateDeliverableSchema), async (req, res) => {
   const { deliverableType } = req.body;
   try {
+    const ws = getWorkspace(req.params.workspaceId);
+    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+    const usage = checkUsageLimit(ws.id, ws.tier || 'free', 'strategy_generations');
+    if (!usage.allowed) return res.status(429).json({ error: 'Monthly AI generation limit reached', used: usage.used, limit: usage.limit });
+
     const result = await generateDeliverable(req.params.workspaceId, deliverableType);
+    incrementUsage(ws.id, 'strategy_generations');
     addActivity(req.params.workspaceId, 'brand_deliverable_generated', `Generated ${deliverableType.replace(/_/g, ' ')} deliverable`);
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, { deliverableType });
     clearSeoContextCache(req.params.workspaceId);

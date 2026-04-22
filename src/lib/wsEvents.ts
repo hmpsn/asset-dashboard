@@ -22,6 +22,7 @@ export const WS_EVENTS = {
   WORK_ORDER_UPDATE: 'work-order:update',
   ANOMALIES_UPDATE: 'anomalies:update',
   CONTENT_PUBLISHED: 'content:published',
+  POST_UPDATED: 'post:updated',
   INSIGHT_RESOLVED: 'insight:resolved',
   INTELLIGENCE_SIGNALS_UPDATED: 'intelligence:signals_updated',
   SCHEMA_PLAN_SENT: 'schema:plan_sent',

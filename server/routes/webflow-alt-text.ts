@@ -25,6 +25,7 @@ import {
 import { getWorkspacePages } from '../workspace-data.js';
 import { createLogger } from '../logger.js';
 import { isProgrammingError } from '../errors.js';
+import { checkUsageLimit, incrementUsage } from '../usage-tracking.js';
 
 const log = createLogger('webflow-alt-text');
 
@@ -84,6 +85,13 @@ router.post('/api/webflow/generate-alt/:assetId', async (req, res) => {
       // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
       const bvBlock = altIntel.seoContext?.effectiveBrandVoiceBlock ?? '';
       const ws = getWorkspace(resolvedWsId);
+
+      // Usage limit check
+      const altWs = ws;
+      if (altWs) {
+        const usage = checkUsageLimit(altWs.id, altWs.tier || 'free', 'strategy_generations');
+        if (!usage.allowed) return res.status(429).json({ error: 'Monthly AI generation limit reached', used: usage.used, limit: usage.limit });
+      }
       const kwParts: string[] = [];
       if (altBizCtx) kwParts.push(`Business: ${altBizCtx}`);
       if (ws?.keywordStrategy?.siteKeywords?.length) {
@@ -108,6 +116,9 @@ router.post('/api/webflow/generate-alt/:assetId', async (req, res) => {
         res.json({ altText, updated: false, writeError: writeResult.error });
       } else {
         log.info(`Alt text generated and saved for ${req.params.assetId}: "${altText}"`);
+        if (resolvedWsId) {
+          incrementUsage(resolvedWsId, 'strategy_generations');
+        }
         res.json({ altText, updated: true });
       }
     } else {
@@ -142,11 +153,18 @@ router.post('/api/webflow/bulk-generate-alt', async (req, res) => {
 
   const bulkWsId = bulkAltWsId || (siteId ? listWorkspaces().find(w => w.webflowSiteId === siteId)?.id : undefined);
   if (bulkWsId) {
+    const bulkWs = getWorkspace(bulkWsId);
+
+    // Usage limit check
+    if (bulkWs) {
+      const usage = checkUsageLimit(bulkWs.id, bulkWs.tier || 'free', 'strategy_generations');
+      if (!usage.allowed) return res.status(429).json({ error: 'Monthly AI generation limit reached', used: usage.used, limit: usage.limit });
+    }
+
     const bulkIntel = await buildWorkspaceIntelligence(bulkWsId, { slices: ['seoContext'] });
     const bulkBizCtx = bulkIntel.seoContext?.businessContext ?? '';
     // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
     const bvBlock = bulkIntel.seoContext?.effectiveBrandVoiceBlock ?? '';
-    const bulkWs = getWorkspace(bulkWsId);
     const kwParts: string[] = [];
     if (bulkBizCtx) kwParts.push(`Business: ${bulkBizCtx}`);
     if (bulkWs?.keywordStrategy?.siteKeywords?.length) {
@@ -233,6 +251,9 @@ router.post('/api/webflow/bulk-generate-alt', async (req, res) => {
   }
 
   send({ type: 'done', done, total: assets.length });
+  if (bulkWsId) {
+    incrementUsage(bulkWsId, 'strategy_generations');
+  }
   res.end();
 });
 

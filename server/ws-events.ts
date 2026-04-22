@@ -41,6 +41,7 @@ export const WS_EVENTS = {
 
   // Content publishing
   CONTENT_PUBLISHED: 'content:published',
+  POST_UPDATED: 'post:updated',
 
   // Insights / action queue
   INSIGHT_RESOLVED: 'insight:resolved',

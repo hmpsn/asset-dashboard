@@ -1,5 +1,5 @@
 // ── SEO API (audit, schema, keywords, webflow, etc.) ──────────────
-import { get, post, put, patch, del, getSafe, getOptional } from './client';
+import { ApiError, get, post, put, patch, del, getSafe, getOptional } from './client';
 import type { SchemaSitePlan, PageRoleAssignment, CanonicalEntity } from '../../shared/types/schema-plan';
 import type { LatestRank, RankHistoryEntry } from '../hooks/useClientData';
 
@@ -453,3 +453,177 @@ export const pageWeight = {
   pagespeedSnapshot: (siteId: string) =>
     getOptional<unknown>(`/api/webflow/pagespeed-snapshot/${siteId}`),
 };
+
+// ── Alt-text generation (single + bulk NDJSON stream) ───────────
+/**
+ * Generate alt text for a single Webflow asset.
+ * Wraps POST /api/webflow/generate-alt/:assetId.
+ */
+export function generateAltText(assetId: string): Promise<{ altText: string }> {
+  return post<{ altText: string }>(`/api/webflow/generate-alt/${assetId}`);
+}
+
+/**
+ * NDJSON event shape emitted by the bulk alt-text stream. Exported so callers
+ * can narrow on `type` in their onEvent handler when they need progress
+ * counters in addition to per-asset results.
+ */
+export interface BulkAltTextNdjsonEvent {
+  type: 'result' | 'status';
+  assetId?: string;
+  altText?: string;
+  done?: number;
+  total?: number;
+  updated?: boolean;
+}
+
+/**
+ * Bulk-generate alt text for selected Webflow assets. Wraps
+ * POST /api/webflow/bulk-generate-alt, which streams NDJSON results
+ * line-by-line as each image is processed.
+ *
+ * Parsing is extracted verbatim from AssetBrowser.tsx:266-306 — line-buffered
+ * JSON.parse with an incomplete-trailing-line buffer. For each `result` event
+ * that includes an `altText`, `onProgress(assetId, altText)` is invoked; the
+ * full event (including `status` events carrying progress counters) is passed
+ * through `onEvent` when provided.
+ *
+ * Resolves when the stream ends. Rejects via ApiError on a non-ok response.
+ *
+ * The endpoint requires `{ siteId, assets: [{ assetId, imageUrl }] }` in the
+ * body — the caller assembles this (Phase 2 will pass the component's
+ * selection through).
+ */
+export async function bulkGenerateAltText(
+  body: { siteId: string; assets: Array<{ assetId: string; imageUrl: string }> },
+  onProgress: (assetId: string, altText: string) => void,
+  onEvent?: (event: BulkAltTextNdjsonEvent) => void,
+): Promise<void> {
+  const res = await fetch('/api/webflow/bulk-generate-alt', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    let errBody: unknown;
+    try { errBody = await res.json(); } catch { /* non-JSON error body */ }
+    const msg = (errBody && typeof errBody === 'object' && 'error' in errBody)
+      ? String((errBody as { error: unknown }).error)
+      : res.statusText || `HTTP ${res.status}`;
+    throw new ApiError(res.status, msg, errBody);
+  }
+
+  const reader = res.body?.getReader();
+  if (!reader) throw new ApiError(0, 'Streaming not supported');
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const event = JSON.parse(line) as BulkAltTextNdjsonEvent;
+        onEvent?.(event);
+        if (event.type === 'result' && event.assetId && event.altText) {
+          onProgress(event.assetId, event.altText);
+        }
+      } catch (err) {
+        console.error('bulkGenerateAltText parse failed:', err);
+      }
+    }
+  }
+}
+
+/**
+ * SSE event emitted by the keyword-strategy generation stream. Mirrors the
+ * shape parsed in KeywordStrategy.tsx.
+ */
+interface KeywordStrategySseEvent {
+  error?: string;
+  done?: boolean;
+  strategy?: unknown;
+  step?: string;
+  detail?: string;
+  progress?: number;
+  message?: string;
+}
+
+/**
+ * Stream the POST /api/webflow/keyword-strategy/:workspaceId SSE endpoint.
+ * Returns a cleanup function that aborts the in-flight fetch — callers
+ * should invoke it on unmount.
+ *
+ * Parsing mirrors KeywordStrategy.tsx:156 verbatim: split buffer on '\n',
+ * keep incomplete trailing line, parse `data: ` prefixed lines as JSON, and
+ * forward parsed events to onEvent (the caller decides which fields to react
+ * to — progress, done+strategy, or error).
+ */
+export function streamKeywordStrategy(
+  workspaceId: string,
+  body: Record<string, unknown>,
+  onEvent: (event: KeywordStrategySseEvent) => void,
+  onError: (err: Error) => void,
+  onDone: () => void,
+): () => void {
+  const controller = new AbortController();
+
+  (async () => {
+    try {
+      const res = await fetch(`/api/webflow/keyword-strategy/${workspaceId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+
+      if (!res.ok || !res.body) {
+        // Non-streaming error response (429, 400, 500, etc.) — parse JSON body.
+        let data: KeywordStrategySseEvent = {};
+        try { data = await res.json() as KeywordStrategySseEvent; } catch { /* non-JSON error body */ }
+        if (!res.ok || data.error) {
+          onError(new Error(data.message || data.error || 'Request failed'));
+          return;
+        }
+        onDone();
+        return;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const evt = JSON.parse(line.slice(6)) as KeywordStrategySseEvent;
+            onEvent(evt);
+          } catch (err) {
+            console.error('streamKeywordStrategy parse failed:', err);
+          }
+        }
+      }
+      onDone();
+    } catch (err) {
+      if ((err as { name?: string })?.name === 'AbortError') return;
+      onError(err instanceof Error ? err : new Error(String(err)));
+    }
+  })();
+
+  return () => controller.abort();
+}
