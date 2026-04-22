@@ -10,60 +10,24 @@ import { adminPath } from '../routes';
 import { scoreColorClass, scoreBgBarClass, MetricRing, TabBar, ErrorState, ProgressIndicator, NextStepsCard } from './ui';
 import { ErrorBoundary } from './ErrorBoundary';
 import { queryKeys } from '../lib/queryKeys';
-import { normalizePath, resolvePagePath, findPageMapEntryForPage } from '../lib/pathUtils';
+import { resolvePagePath } from '../lib/pathUtils';
 import { get, post } from '../api/client';
 import { keywords, rankTracking } from '../api/seo';
-import { useKeywordStrategy } from '../hooks/admin';
+import { useKeywordStrategy, usePageJoin } from '../hooks/admin';
 import { SeoCopyPanel } from './strategy/SeoCopyPanel';
+import type { UnifiedPage } from '../../shared/types/page-join';
 import { useQueryClient } from '@tanstack/react-query';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 import type { FixContext } from '../App';
-import type { MetricsSource } from '../../shared/types/keywords.js';
 import { PageIntelligenceGuide } from './PageIntelligenceGuide';
+import type { PageKeywordMap } from '../../shared/types/workspace.js';
+// MetricsSource is the shared type used by PageKeywordMap.metricsSource
+import type { MetricsSource } from '../../shared/types/keywords.js';
 
 const SiteArchitecture = lazyWithRetry(() => import('./SiteArchitecture').then(m => ({ default: m.SiteArchitecture })));
 
 // ── Types ──
-
-interface PageMeta {
-  id: string;
-  title: string;
-  slug: string;
-  publishedPath?: string | null;
-  seo?: { title?: string | null; description?: string | null };
-  source?: 'static' | 'cms';
-}
-
-interface StrategyPage {
-  pagePath: string;
-  pageTitle: string;
-  primaryKeyword: string;
-  secondaryKeywords: string[];
-  searchIntent?: string;
-  currentPosition?: number;
-  impressions?: number;
-  clicks?: number;
-  volume?: number;
-  difficulty?: number;
-  cpc?: number;
-  metricsSource?: MetricsSource;
-  validated?: boolean;
-  secondaryMetrics?: { keyword: string; volume: number; difficulty: number }[];
-  optimizationScore?: number;
-  optimizationIssues?: string[];
-  recommendations?: string[];
-  contentGaps?: string[];
-  analysisGeneratedAt?: string;
-  primaryKeywordPresence?: { inTitle: boolean; inMeta: boolean; inContent: boolean; inSlug: boolean };
-  longTailKeywords?: string[];
-  competitorKeywords?: string[];
-  estimatedDifficulty?: string;
-  keywordDifficulty?: number;
-  monthlyVolume?: number;
-  topicCluster?: string;
-  searchIntentConfidence?: number;
-}
 
 interface KeywordPresence {
   inTitle: boolean;
@@ -88,6 +52,7 @@ interface KeywordData {
   keywordDifficulty: number;
   monthlyVolume: number;
   topicCluster: string;
+  metricsSource?: MetricsSource;
 }
 
 interface ContentScore {
@@ -111,19 +76,6 @@ interface SeoCopy {
   introParagraph: string;
   internalLinkSuggestions?: { targetPath: string; anchorText: string; context: string }[];
   changes?: string[];
-}
-
-// Merged page row combining strategy + webflow page data
-interface UnifiedPage {
-  id: string; // webflow page id or synthesized from path
-  title: string;
-  path: string;
-  slug: string;
-  source: 'static' | 'cms';
-  seo?: { title?: string | null; description?: string | null };
-  publishedPath?: string | null;
-  // Strategy data (may be null if page not in strategy)
-  strategy?: StrategyPage;
 }
 
 interface Props {
@@ -183,7 +135,7 @@ function difficultyTextColor(d: string): string {
   return 'text-red-400';
 }
 
-function opportunityScore(p: StrategyPage) {
+function opportunityScore(p: PageKeywordMap) {
   const pos = p.currentPosition || 999;
   const imp = p.impressions || 0;
   const vol = p.volume || 0;
@@ -199,15 +151,14 @@ function opportunityScore(p: StrategyPage) {
 export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { data: keywordData, isLoading: strategyLoading } = useKeywordStrategy(workspaceId);
+  const { data: keywordData } = useKeywordStrategy(workspaceId);
   const strategy = keywordData?.strategy || null;
 
   // Tab state
   const [activeTab, setActiveTab] = useState<'pages' | 'architecture' | 'guide'>('pages');
 
-  // All pages from webflow (static + CMS)
-  const [allPages, setAllPages] = useState<PageMeta[]>([]);
-  const [pagesLoading, setPagesLoading] = useState(true);
+  // Unified page list (Webflow pages + strategy data)
+  const { pages: unifiedPages, isLoading: pagesLoading } = usePageJoin(workspaceId, siteId);
 
   // AI analysis state
   const [analyses, setAnalyses] = useState<Record<string, KeywordData>>({});
@@ -253,15 +204,6 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   };
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
-  // Fetch all pages
-  useEffect(() => {
-    setPagesLoading(true);
-    get<PageMeta[]>(`/api/webflow/all-pages/${siteId}`)
-      .then(setAllPages)
-      .catch(() => get<PageMeta[]>(`/api/webflow/pages/${siteId}`).then(setAllPages).catch(() => setAllPages([])))
-      .finally(() => setPagesLoading(false));
-  }, [siteId]);
-
   // Auto-expand target page from fixContext.
   // Caller: AuditIssueRow "Page" button sets targetRoute='page-intelligence'.
   // Guard on targetRoute so stale fixContext from other tabs doesn't auto-expand.
@@ -278,51 +220,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fixContext, allPages, strategy]);
-
-  // ── Merge strategy data + all pages into unified list ──
-  // Matching uses `findPageMapEntryForPage` so it is case-insensitive AND includes
-  // the legacy `/${slug}` fallback — keeping this component aligned with SeoEditor
-  // and the backend. See `src/lib/pathUtils.ts` and `server/helpers.ts`.
-  const unifiedPages: UnifiedPage[] = (() => {
-    const pageMap = strategy?.pageMap || [];
-    const result: UnifiedPage[] = [];
-    const usedPaths = new Set<string>();
-
-    for (const page of allPages) {
-      const pagePath = resolvePagePath(page);
-      const strategyMatch = findPageMapEntryForPage(pageMap, page);
-      result.push({
-        id: page.id,
-        title: strategyMatch?.pageTitle || page.title,
-        path: pagePath,
-        slug: page.slug,
-        source: page.source || 'static',
-        seo: page.seo,
-        publishedPath: page.publishedPath,
-        strategy: strategyMatch || undefined,
-      });
-      if (strategyMatch) usedPaths.add(strategyMatch.pagePath);
-    }
-
-    // Add any strategy pages that aren't in webflow pages (e.g., discovered via GSC)
-    for (const sp of pageMap) {
-      if (!usedPaths.has(sp.pagePath)) {
-        const norm = normalizePath(sp.pagePath).toLowerCase();
-        if (result.some(r => normalizePath(r.path).toLowerCase() === norm)) continue;
-        result.push({
-          id: `strategy-${sp.pagePath}`,
-          title: sp.pageTitle,
-          path: sp.pagePath,
-          slug: sp.pagePath.replace(/^\//, ''),
-          source: 'static',
-          strategy: sp,
-        });
-      }
-    }
-
-    return result;
-  })();
+  }, [fixContext, unifiedPages]);
 
   // Derive effective analyses: always hydrate from persisted strategy data (keyed by
   // current page IDs), then overlay any fresh in-session analyses on top.
@@ -488,6 +386,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   const saveEdit = async (page: UnifiedPage) => {
     if (!strategy || !page.strategy) return;
     setSaving(true);
+    // page.strategy is a direct reference into strategy.pageMap — indexOf depends on object identity
     const pageIdx = (strategy.pageMap ?? []).indexOf(page.strategy);
     if (pageIdx === -1) { setSaving(false); return; }
     const updated = [...(strategy.pageMap ?? [])];
@@ -585,7 +484,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
     .sort((a, b) => b.impact - a.impact)
     .slice(0, 5);
 
-  const loading = strategyLoading || pagesLoading;
+  const loading = pagesLoading;
 
   if (loading) {
     return (

@@ -3474,6 +3474,57 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // ── Manual pageMap pairing outside shared helpers ──
+    //
+    // Three components (SeoEditor, PageIntelligence, ApprovalsTab) independently
+    // reimplemented `pageMap.find(...)` with divergent semantics — each missed
+    // case-insensitive matching and/or legacy `/${slug}` fallbacks. The shared
+    // helpers in `src/lib/pathUtils.ts` (`findPageMapEntry`, `findPageMapEntryForPage`)
+    // and the `usePageJoin` hook in `src/hooks/admin/usePageJoin.ts` normalize
+    // all matching. Direct `.find()` calls bypass these guards.
+    //
+    // Excluded:
+    //   - src/hooks/admin/usePageJoin.ts — canonical hook (authorized usage via
+    //     findPageMapEntryForPage internally)
+    //   - src/lib/pathUtils.ts — the canonical helpers themselves
+    //
+    // Escape hatch: add `// pagemap-find-ok` on the same line or the preceding line
+    // for any use that genuinely cannot use the shared helpers.
+    name: 'Manual pageMap pairing outside shared helpers — use findPageMapEntry(ForPage) or usePageJoin',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    message:
+      'Use findPageMapEntry(ForPage) or usePageJoin instead of inline pageMap.find(). ' +
+      'Direct .find() misses case-insensitive matching and legacy /${slug} fallbacks.',
+    severity: 'error',
+    rationale:
+      'Three components independently reimplemented pageMap.find with divergent semantics ' +
+      '(SeoEditor, PageIntelligence, ApprovalsTab). The shared helpers in pathUtils.ts and ' +
+      'the usePageJoin hook normalize all matching. Direct .find() silently breaks case ' +
+      'variants and legacy paths.',
+    claudeMdRef: '#data-flow-rules',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const pageMapFindRe = /pageMap(\?)?.find\(/;
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        // Skip canonical implementation files
+        if (file.endsWith('src/hooks/admin/usePageJoin.ts')) continue;
+        if (file.endsWith('src/lib/pathUtils.ts')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!pageMapFindRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// pagemap-find-ok')) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
     // ── useWorkspaceEvents handler for an already-centralized event ──
     //
     // `src/hooks/useWsInvalidation.ts` is the single source of truth for

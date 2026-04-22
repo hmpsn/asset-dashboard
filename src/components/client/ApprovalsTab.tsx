@@ -8,6 +8,7 @@ import { usePageEditStates } from '../../hooks/usePageEditStates';
 import type { ApprovalBatch, ApprovalItem } from './types';
 import type { ApprovalPageKeyword } from '../../hooks/useClientData';
 import { patch, post } from '../../api/client';
+import { findPageMapEntryBySlug } from '../../lib/pathUtils';
 
 type FilterState = 'all' | 'needs-action' | 'ready' | 'applied';
 
@@ -162,16 +163,6 @@ export function ApprovalsTab({
       }
     );
   };
-
-  function findPageKeywords(pageSlug: string) {
-    if (!pageMap || !pageSlug) return null;
-    const slug = pageSlug.toLowerCase();
-    // Exact match first (top-level pages), then suffix match for nested paths (/services/seo → slug 'seo')
-    return pageMap.find(p => {
-      const path = p.pagePath.toLowerCase();
-      return path === '/' + slug || path === slug;
-    }) ?? pageMap.find(p => p.pagePath.toLowerCase().endsWith('/' + slug)) ?? null;
-  }
 
   return (
     <div className="space-y-6">
@@ -338,7 +329,9 @@ export function ApprovalsTab({
                                     <span key={t} className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-300">{t}</span>
                                   ))}
                                   {(item.field === 'seoTitle' || item.field === 'seoDescription') && (() => {
-                                    const kw = findPageKeywords(item.pageSlug);
+                                    // item.pageSlug is a bare slug; use suffix fallback for nested pages
+                                    const slug = item.pageSlug;
+                                    const kw = findPageMapEntryBySlug(pageMap ?? [], slug);
                                     if (!kw) return null;
                                     return (
                                       <>
