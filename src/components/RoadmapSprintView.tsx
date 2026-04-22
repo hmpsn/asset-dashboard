@@ -3,13 +3,13 @@ import { Badge, EmptyState } from './ui/index';
 import type { SprintData } from '../../shared/types/roadmap';
 import type { RoadmapFilters } from '../lib/roadmapFilters';
 import { matchesFilters } from '../lib/roadmapFilters';
-import { PRIORITY_BADGE, STATUS_ICON, FeatureChip, TagChip } from '../lib/roadmapConstants';
+import { priorityBadge, STATUS_ICON, FeatureChip, TagChip } from '../lib/roadmapConstants';
 
 interface Props {
   sprints: SprintData[];
   filters: RoadmapFilters;
   featureMap: Map<number, string>;
-  onToggleStatus: (itemId: number) => void;
+  onToggleStatus: (itemId: number | string) => void;
 }
 
 export function RoadmapSprintView({ sprints, filters, featureMap, onToggleStatus }: Props) {
@@ -60,7 +60,7 @@ export function RoadmapSprintView({ sprints, filters, featureMap, onToggleStatus
             {/* Item list */}
             <div className="mt-2 bg-zinc-900/40 border border-zinc-800 rounded-lg divide-y divide-zinc-800/50">
               {filteredItems.map(item => {
-                const pb = PRIORITY_BADGE[item.priority];
+                const pb = priorityBadge(item.priority);
                 const featureName = item.featureId != null ? featureMap.get(item.featureId) : undefined;
                 return (
                   <div

@@ -4,13 +4,13 @@ import { Badge, EmptyState } from './ui/index';
 import type { SprintData } from '../../shared/types/roadmap';
 import type { RoadmapFilters, SortKey, SortDir, FlatRoadmapItem } from '../lib/roadmapFilters';
 import { matchesFilters, sortItems } from '../lib/roadmapFilters';
-import { PRIORITY_BADGE, STATUS_ICON, FeatureChip, TagChip } from '../lib/roadmapConstants';
+import { priorityBadge, STATUS_ICON, FeatureChip, TagChip } from '../lib/roadmapConstants';
 
 interface Props {
   sprints: SprintData[];
   filters: RoadmapFilters;
   featureMap: Map<number, string>;
-  onToggleStatus: (itemId: number) => void;
+  onToggleStatus: (itemId: number | string) => void;
 }
 
 function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) {
@@ -23,7 +23,7 @@ function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; s
 export function RoadmapBacklogView({ sprints, filters, featureMap, onToggleStatus }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>('priority');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<number | string | null>(null);
 
   const flatItems: FlatRoadmapItem[] = sprints.flatMap(sprint =>
     sprint.items
@@ -81,7 +81,7 @@ export function RoadmapBacklogView({ sprints, filters, featureMap, onToggleStatu
         </thead>
         <tbody className="divide-y divide-zinc-800/50">
           {sorted.map(item => {
-            const pb = PRIORITY_BADGE[item.priority];
+            const pb = priorityBadge(item.priority);
             const featureName = item.featureId != null ? featureMap.get(item.featureId) : undefined;
             const isExpanded = expandedId === item.id;
 

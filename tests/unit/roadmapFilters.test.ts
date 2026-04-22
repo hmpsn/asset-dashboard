@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { matchesFilters, sortItems, DEFAULT_FILTERS, filtersFromParams } from '../../src/lib/roadmapFilters.js';
+import { matchesFilters, sortItems, DEFAULT_FILTERS, filtersFromParams, estToHours } from '../../src/lib/roadmapFilters.js';
 import type { RoadmapItem } from '../../shared/types/roadmap.js';
 
 const base: RoadmapItem = {
@@ -80,7 +80,7 @@ describe('sortItems', () => {
   it('sorts by est without crashing when some items have undefined est', () => {
     const mixed: FlatItem[] = [
       { ...base, id: 1, est: '4h', sprintId: 'a', sprintName: 'A' },
-      { ...base, id: 2, est: undefined as unknown as string, sprintId: 'b', sprintName: 'B' },
+      { ...base, id: 2, est: undefined, sprintId: 'b', sprintName: 'B' },
       { ...base, id: 3, est: '2h', sprintId: 'c', sprintName: 'C' },
     ];
     expect(() => sortItems(mixed, 'est', 'asc')).not.toThrow();
@@ -117,5 +117,47 @@ describe('filtersFromParams', () => {
 describe('matchesFilters tag edge cases', () => {
   it('treats empty selected tag list (just commas) as match-all', () => {
     expect(matchesFilters(base, { ...DEFAULT_FILTERS, tags: ',,' }, 'backlog')).toBe(true);
+  });
+});
+
+describe('estToHours', () => {
+  it('parses minutes', () => {
+    expect(estToHours('30m')).toBe(0.5);
+  });
+  it('parses single hours', () => {
+    expect(estToHours('1h')).toBe(1);
+    expect(estToHours('15h')).toBe(15);
+  });
+  it('averages ranges', () => {
+    expect(estToHours('2-3h')).toBe(2.5);
+    expect(estToHours('10-14h')).toBe(12);
+  });
+  it('returns Infinity for missing/unparseable values so they sort last', () => {
+    expect(estToHours(undefined)).toBe(Infinity);
+    expect(estToHours('')).toBe(Infinity);
+    expect(estToHours('TBD')).toBe(Infinity);
+  });
+  it('produces numerically correct ordering when used in sort', () => {
+    type FlatItem = RoadmapItem & { sprintId: string; sprintName: string };
+    const items: FlatItem[] = [
+      { ...base, id: 1, est: '15-20h', sprintId: 's', sprintName: 's' },
+      { ...base, id: 2, est: '1h', sprintId: 's', sprintName: 's' },
+      { ...base, id: 3, est: '30m', sprintId: 's', sprintName: 's' },
+      { ...base, id: 4, est: '2-3h', sprintId: 's', sprintName: 's' },
+    ];
+    const sorted = sortItems(items, 'est', 'asc');
+    expect(sorted.map(i => i.id)).toEqual([3, 2, 4, 1]);
+  });
+});
+
+describe('sortItems with mixed string/number IDs', () => {
+  it('handles default id sort without producing NaN for string IDs', () => {
+    type FlatItem = RoadmapItem & { sprintId: string; sprintName: string };
+    const items: FlatItem[] = [
+      { ...base, id: 'meeting-brief-phase1', sprintId: 's', sprintName: 's' },
+      { ...base, id: 5, sprintId: 's', sprintName: 's' },
+      { ...base, id: 'brandscript-engine-phase1', sprintId: 's', sprintName: 's' },
+    ];
+    expect(() => sortItems(items, 'id', 'asc')).not.toThrow();
   });
 });

@@ -171,8 +171,8 @@ export const roadmap = {
   update: (itemId: number, body: Record<string, unknown>) =>
     patch<unknown>(`/api/roadmap/${itemId}`, body),
 
-  updateItem: (itemId: number, body: Record<string, unknown>) =>
-    patch<unknown>(`/api/roadmap/item/${itemId}`, body),
+  updateItem: (itemId: number | string, body: Record<string, unknown>) =>
+    patch<unknown>(`/api/roadmap/item/${encodeURIComponent(String(itemId))}`, body),
 };
 
 // ── Features ─────────────────────────────────────────────────────

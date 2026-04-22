@@ -103,9 +103,10 @@ router.put('/api/roadmap', (req, res) => {
 router.patch('/api/roadmap/item/:id', (req, res) => {
   try {
     const data = loadRoadmap();
-    const itemId = parseInt(req.params.id, 10);
+    // Items have either numeric or string IDs (e.g. "meeting-brief-phase1"); compare as string.
+    const itemId = req.params.id;
     for (const sprint of data.sprints) {
-      const item = sprint.items.find((i: { id: number }) => i.id === itemId);
+      const item = sprint.items.find((i: { id: number | string }) => String(i.id) === itemId);
       if (item) {
         Object.assign(item, req.body);
         fs.writeFileSync(ROADMAP_RUNTIME_FILE, JSON.stringify(data, null, 2));

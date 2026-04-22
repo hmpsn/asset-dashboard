@@ -49,6 +49,27 @@ export type FlatRoadmapItem = RoadmapItem & { sprintId: string; sprintName: stri
 const PRIORITY_ORDER: Record<Priority, number> = { P0: 0, P1: 1, P2: 2, P3: 3, P4: 4 };
 const STATUS_ORDER: Record<Status, number> = { in_progress: 0, pending: 1, done: 2 };
 
+/**
+ * Best-effort numeric estimate (hours) parsed from human-readable strings:
+ *   "30m" → 0.5   "1h" → 1   "2-3h" → 2.5 (avg)   "10-14h" → 12
+ * Unparseable values sort last (Infinity).
+ */
+export function estToHours(raw: string | undefined): number {
+  if (!raw) return Infinity;
+  const s = raw.trim().toLowerCase();
+  const isMinutes = s.endsWith('m') && !s.endsWith('h');
+  const matches = s.match(/(\d+(?:\.\d+)?)/g);
+  if (!matches || matches.length === 0) return Infinity;
+  const nums = matches.map(Number);
+  const avg = nums.reduce((a, n) => a + n, 0) / nums.length;
+  return isMinutes ? avg / 60 : avg;
+}
+
+function compareIds(a: number | string, b: number | string): number {
+  if (typeof a === 'number' && typeof b === 'number') return a - b;
+  return String(a).localeCompare(String(b));
+}
+
 export function sortItems(
   items: FlatRoadmapItem[],
   sortKey: SortKey,
@@ -58,7 +79,7 @@ export function sortItems(
     let cmp = 0;
     switch (sortKey) {
       case 'priority':
-        cmp = (PRIORITY_ORDER[a.priority] ?? 99) - (PRIORITY_ORDER[b.priority] ?? 99);
+        cmp = (a.priority ? PRIORITY_ORDER[a.priority] : 99) - (b.priority ? PRIORITY_ORDER[b.priority] : 99);
         break;
       case 'status':
         cmp = (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99);
@@ -67,10 +88,10 @@ export function sortItems(
         cmp = (a.createdAt ?? '').localeCompare(b.createdAt ?? '');
         break;
       case 'est':
-        cmp = (a.est ?? '').localeCompare(b.est ?? '');
+        cmp = estToHours(a.est) - estToHours(b.est);
         break;
       default:
-        cmp = a.id - b.id;
+        cmp = compareIds(a.id, b.id);
     }
     return sortDir === 'asc' ? cmp : -cmp;
   });

@@ -12,6 +12,13 @@ export const PRIORITY_BADGE: Record<Priority, { label: string; color: BadgeColor
   P4: { label: 'P4', color: 'zinc' },
 };
 
+const UNKNOWN_PRIORITY_BADGE: { label: string; color: BadgeColor } = { label: '—', color: 'zinc' };
+
+/** Safe lookup that tolerates legacy items without a priority field. */
+export function priorityBadge(priority: Priority | undefined): { label: string; color: BadgeColor } {
+  return priority ? (PRIORITY_BADGE[priority] ?? UNKNOWN_PRIORITY_BADGE) : UNKNOWN_PRIORITY_BADGE;
+}
+
 export const STATUS_ICON: Record<Status, ReactNode> = {
   done: <CheckCircle2 className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />,
   in_progress: <Clock className="w-3.5 h-3.5 text-teal-400 animate-pulse flex-shrink-0" />,

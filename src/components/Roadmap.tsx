@@ -50,7 +50,7 @@ export function Roadmap() {
   const allTags = useMemo(() => deriveAllTags(roadmap), [roadmap]);
   const filters = useMemo(() => filtersFromParams(params), [params]);
 
-  const toggleStatus = async (itemId: number) => {
+  const toggleStatus = async (itemId: number | string) => {
     const cycle: Array<'pending' | 'in_progress' | 'done'> = ['pending', 'in_progress', 'done'];
     let newStatus: 'pending' | 'in_progress' | 'done' = 'pending';
     const previousSnapshot = queryClient.getQueryData<SprintData[]>(queryKeys.admin.roadmap());
