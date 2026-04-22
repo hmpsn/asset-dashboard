@@ -14,7 +14,6 @@ import { CartProvider } from './client/useCart';
 import { ErrorBoundary } from './ErrorBoundary';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useAuditSummary } from '../hooks/useAuditSummary';
-import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { AnomalyAlerts } from './AnomalyAlerts';
 import { SeoWorkStatus, ActivityFeed, RankingsSnapshot, ActiveRequestsAnnotations, SeoChangeImpact, WeeklyAccomplishments } from './workspace-home';
 import { type Page, adminPath } from '../routes';
@@ -100,19 +99,6 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
     const t = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(t);
   }, []);
-
-  // Real-time workspace events — invalidate the single query
-  const invalidateHome = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
-  useWorkspaceEvents(workspaceId, {
-    'activity:new': invalidateHome,
-    'approval:update': invalidateHome,
-    'approval:applied': invalidateHome,
-    'request:created': invalidateHome,
-    'request:update': invalidateHome,
-    'content-request:created': invalidateHome,
-    'content-request:update': invalidateHome,
-    'audit:complete': invalidateHome,
-  });
 
   // Derive data from query result
   const d = homeData;
