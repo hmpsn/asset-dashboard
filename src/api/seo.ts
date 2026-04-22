@@ -1,7 +1,8 @@
 // ── SEO API (audit, schema, keywords, webflow, etc.) ──────────────
-import { get, post, put, patch, del, getSafe, getOptional } from './client';
+import { ApiError, get, post, put, patch, del, getSafe, getOptional } from './client';
 import type { SchemaSitePlan, PageRoleAssignment, CanonicalEntity } from '../../shared/types/schema-plan';
 import type { LatestRank, RankHistoryEntry } from '../hooks/useClientData';
+import { readNdjsonStream, readSseStream } from './streamUtils';
 
 export interface StrategyDiff {
   previousGeneratedAt: string;
@@ -247,11 +248,11 @@ export const webflow = {
   removeAsset: (assetId: string, siteId: string) =>
     del(`/api/webflow/assets/${assetId}?siteId=${siteId}`),
 
-  generateAlt: (assetId: string, body: Record<string, unknown>) =>
-    post<unknown>(`/api/webflow/generate-alt/${assetId}`, body),
+  generateAlt: (workspaceId: string, assetId: string, body: Record<string, unknown>) =>
+    post<unknown>(`/api/webflow/${workspaceId}/generate-alt/${assetId}`, body),
 
-  compress: (assetId: string, body: Record<string, unknown>) =>
-    post<unknown>(`/api/webflow/compress/${assetId}`, body),
+  compress: (workspaceId: string, assetId: string, body: Record<string, unknown>) =>
+    post<unknown>(`/api/webflow/${workspaceId}/compress/${assetId}`, body),
 
   rename: (assetId: string, body: Record<string, unknown>) =>
     patch<unknown>(`/api/webflow/rename/${assetId}`, body),
@@ -453,3 +454,140 @@ export const pageWeight = {
   pagespeedSnapshot: (siteId: string) =>
     getOptional<unknown>(`/api/webflow/pagespeed-snapshot/${siteId}`),
 };
+
+// ── Alt-text generation (single + bulk NDJSON stream) ───────────
+/**
+ * Generate alt text for a single Webflow asset.
+ * Wraps POST /api/webflow/generate-alt/:assetId.
+ */
+export function generateAltText(
+  workspaceId: string,
+  assetId: string,
+  body: { imageUrl: string; siteId?: string },
+): Promise<{ altText: string | null; updated: boolean; writeError?: string }> {
+  return post<{ altText: string | null; updated: boolean; writeError?: string }>(
+    `/api/webflow/${workspaceId}/generate-alt/${assetId}`,
+    body,
+  );
+}
+
+/**
+ * NDJSON event shape emitted by the bulk alt-text stream. Exported so callers
+ * can narrow on `type` in their onEvent handler when they need progress
+ * counters in addition to per-asset results.
+ */
+export interface BulkAltTextNdjsonEvent {
+  type: 'result' | 'status' | 'done';
+  assetId?: string;
+  altText?: string;
+  message?: string;
+  error?: string;
+  done?: number;
+  total?: number;
+  updated?: boolean;
+}
+
+/**
+ * Bulk-generate alt text for selected Webflow assets. Wraps
+ * POST /api/webflow/:workspaceId/bulk-generate-alt, which streams NDJSON
+ * results line-by-line as each image is processed.
+ *
+ * `onProgress` fires per successfully generated alt text (truthy altText only).
+ * `onEvent` fires for every raw NDJSON event including status ticks.
+ * Rejects on non-ok HTTP response or network failure.
+ */
+export async function bulkGenerateAltText(
+  workspaceId: string,
+  body: { siteId: string; assets: Array<{ assetId: string; imageUrl: string }> },
+  onProgress: (assetId: string, altText: string) => void,
+  onEvent?: (event: BulkAltTextNdjsonEvent) => void,
+): Promise<void> {
+  const res = await fetch(`/api/webflow/${workspaceId}/bulk-generate-alt`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    let errBody: unknown;
+    try { errBody = await res.json(); } catch { /* non-JSON error body */ }
+    const msg = (errBody && typeof errBody === 'object' && 'error' in errBody)
+      ? String((errBody as { error: unknown }).error)
+      : res.statusText || `HTTP ${res.status}`;
+    throw new ApiError(res.status, msg, errBody);
+  }
+
+  if (!res.body) throw new ApiError(0, 'Streaming not supported');
+
+  await readNdjsonStream<BulkAltTextNdjsonEvent>(res.body, (event) => {
+    onEvent?.(event);
+    if (event.type === 'result' && event.assetId && event.altText) {
+      onProgress(event.assetId, event.altText);
+    }
+  });
+}
+
+/**
+ * SSE event emitted by the keyword-strategy generation stream. Mirrors the
+ * shape parsed in KeywordStrategy.tsx.
+ */
+interface KeywordStrategySseEvent {
+  error?: string;
+  done?: boolean;
+  strategy?: unknown;
+  step?: string;
+  detail?: string;
+  progress?: number;
+  message?: string;
+}
+
+/**
+ * Stream the POST /api/webflow/keyword-strategy/:workspaceId SSE endpoint.
+ * Returns a cleanup function that aborts the in-flight fetch — callers
+ * should invoke it on unmount.
+ *
+ * Parsing mirrors KeywordStrategy.tsx:156 verbatim: split buffer on '\n',
+ * keep incomplete trailing line, parse `data: ` prefixed lines as JSON, and
+ * forward parsed events to onEvent (the caller decides which fields to react
+ * to — progress, done+strategy, or error).
+ */
+export function streamKeywordStrategy(
+  workspaceId: string,
+  body: Record<string, unknown>,
+  onEvent: (event: KeywordStrategySseEvent) => void,
+  onError: (err: Error) => void,
+  onDone: () => void,
+): () => void {
+  const controller = new AbortController();
+
+  (async () => {
+    try {
+      const res = await fetch(`/api/webflow/keyword-strategy/${workspaceId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+
+      if (!res.ok || !res.body) {
+        // Non-streaming error response (429, 400, 500, etc.) — parse JSON body.
+        let data: KeywordStrategySseEvent = {};
+        try { data = await res.json() as KeywordStrategySseEvent; } catch { /* non-JSON error body */ }
+        if (!res.ok || data.error) {
+          onError(new Error(data.message || data.error || 'Request failed'));
+          return;
+        }
+        onDone();
+        return;
+      }
+
+      await readSseStream<KeywordStrategySseEvent>(res.body, onEvent);
+      onDone();
+    } catch (err) {
+      if ((err as { name?: string })?.name === 'AbortError') return;
+      onError(err instanceof Error ? err : new Error(String(err)));
+    }
+  })();
+
+  return () => controller.abort();
+}

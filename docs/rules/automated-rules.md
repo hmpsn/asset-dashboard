@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **66** — 35 error, 31 warn.
+Total rules: **71** — 39 error, 32 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -51,6 +51,10 @@ advisory but tracked.
 | 33 | useGlobalAdminEvents called with workspace-scoped event name | error | custom | `src/` | `// global-events-ok` | Silent dead broadcast handlers: useGlobalAdminEvents never subscribes to a workspace room, so workspace-scoped events (WS_EVENTS.*) are silently dropped by the server's broadcastToWorkspace filter. The UI appears stale with no error message. |
 | 34 | Discarded updatePageSeo return value | error | pattern | `server/` | `// seo-ok` | updatePageSeo() returns rather than throws on Webflow API errors. Discarding the return value silently treats failures as success, causing incorrect "applied" counts and phantom successful operations. PR #1 Platform Health Sprint fixed 4 such sites; this rule prevents recurrence. |
 | 35 | Re-upsert without cloneInsightParams | error | custom | `server/` | — | upsertInsight defaults omitted optional fields to null. When re-upserting from an existing AnalyticsInsight record, manually copying fields one-by-one silently drops any field the author does not think to include. cloneInsightParams maps all fields in one place. |
+| 36 | resolvePagePath(...) with undefined fallback is dead code — use tryResolvePagePath | error | custom | `*.ts, *.tsx` | `// slug-path-ok` | The dead-code pattern silently neutralizes downstream guards like `if (basePath)` that are meant to skip fetch/GSC-match for path-less pages. |
+| 37 | Manual pageMap pairing outside shared helpers — use findPageMapEntry(ForPage) or usePageJoin | error | custom | `src/` | — | Three components independently reimplemented pageMap.find with divergent semantics (SeoEditor, PageIntelligence, ApprovalsTab). The shared helpers in pathUtils.ts and the usePageJoin hook normalize all matching. Direct .find() silently breaks case variants and legacy paths. |
+| 38 | useWorkspaceEvents handler for centralized event | error | custom | `src/` | `// ws-invalidation-ok` | Duplicated useWorkspaceEvents subscriptions diverge over time — one side gets updated, the other silently misses cache keys — producing stale UI bugs that are hard to reproduce because they depend on event ordering. |
+| 39 | roadmap.json item ID uniqueness | error | custom | `data/roadmap.json` | — | Cross-sprint duplicate IDs caused PR #258 round-4: clicking expand on one row toggled both, and the server PATCH updated whichever sprint came first. |
 
 ---
 
@@ -89,6 +93,7 @@ advisory but tracked.
 | 29 | addActivity type not in CLIENT_VISIBLE_TYPES (public route) | warn | custom | `server/routes/` | `client-visibility-ok` | Public-portal mutations that log activity with a type absent from CLIENT_VISIBLE_TYPES create invisible entries — the activity is recorded but never shown to client-portal users. This is sometimes intentional (admin-only bookkeeping) but often an oversight when adding new activity types. |
 | 30 | Raw provider date passed to new Date() | warn | pattern | `server/` | `// provider-date-ok` | Prevents Invalid Date regressions after PR #218 A4 finding: SEMRush emits Unix epoch strings that new Date() cannot parse. |
 | 31 | Competitor keyword push missing serpFeatures | warn | custom | `server/` | `// compkw-serp-ok` | Prevents regression of PR #218 A3 finding: DomainKeyword.serpFeatures was silently dropped in the inline mapping. |
+| 32 | Bare slug used in pagePath construction — use resolvePagePath(page) | warn | custom | `*.ts, *.tsx` | `// slug-path-ok` | Webflow nested pages (`/services/seo`) have slug=`seo` — using `/${page.slug}` directly produces wrong short URLs that break GSC matching and pagePath lookups. |
 
 ---
 

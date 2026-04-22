@@ -23,7 +23,7 @@
  * Fixtures never live in the real tree so they cannot pollute `pr-check --all`.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import { execFileSync } from 'child_process';
@@ -3888,6 +3888,283 @@ describe('Rule: Raw provider date passed to new Date()', () => {
   });
 });
 
+describe('Rule: Bare slug used in pagePath construction — use resolvePagePath(page)', () => {
+  const RULE = 'Bare slug used in pagePath construction — use resolvePagePath(page)';
+
+  it('flags bare `/${page.slug}` template literal', () => {
+    const file = write(
+      uniqPath('rule-bare-slug', 'server/webflow-seo.ts'),
+      lines(
+        'export function getPagePath(page: { slug: string }) {',
+        '  const pagePath = `/${page.slug}`;',
+        '  return pagePath;',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags bare `/${p.slug}` template literal', () => {
+    const file = write(
+      uniqPath('rule-bare-slug', 'server/routes/webflow-keywords.ts'),
+      lines(
+        'const urls = pages.map(p => ({',
+        '  url: `/${p.slug}`,',
+        '}));',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags `/${page.slug || ""}` (empty-fallback variant)', () => {
+    const file = write(
+      uniqPath('rule-bare-slug', 'src/components/SeoEditor.ts'),
+      lines(
+        'function getPath(page: { slug: string }) {',
+        '  return `/${page.slug || ""}`;',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('does NOT flag ternary startsWith normalization pattern', () => {
+    const file = write(
+      uniqPath('rule-bare-slug', 'server/routes/aeo-review.ts'),
+      lines(
+        'const slugKey = p.slug.startsWith(\'/\') ? p.slug : `/${p.slug}`;',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag lines that already check publishedPath', () => {
+    const file = write(
+      uniqPath('rule-bare-slug', 'src/components/KeywordAnalysis.ts'),
+      lines(
+        'const pagePath = page.publishedPath || (page.slug ? `/${page.slug}` : \'\');',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with inline // slug-path-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-bare-slug', 'server/webflow-seo-hatch-inline.ts'),
+      lines(
+        'const label = `/${page.slug}`; // slug-path-ok — display only, not a route lookup',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with above-line // slug-path-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-bare-slug', 'server/webflow-seo-hatch-above.ts'),
+      lines(
+        '// slug-path-ok — breadcrumb label, not used as a page lookup key',
+        'const label = `/${page.slug}`;',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag server/helpers.ts (canonical implementation)', () => {
+    const file = write(
+      uniqPath('rule-bare-slug', 'server/helpers.ts'),
+      lines(
+        'export function resolvePagePath(page: { publishedPath?: string | null; slug?: string }): string {',
+        '  return page.publishedPath || (page.slug ? `/${page.slug}` : \'/\');',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag src/lib/pathUtils.ts (canonical frontend implementation)', () => {
+    const file = write(
+      uniqPath('rule-bare-slug', 'src/lib/pathUtils.ts'),
+      lines(
+        'export function resolvePagePath(page: { publishedPath?: string | null; slug?: string }): string {',
+        '  return page.publishedPath || (page.slug ? `/${page.slug}` : \'/\');',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: resolvePagePath(...) with undefined fallback is dead code — use tryResolvePagePath', () => {
+  const RULE = 'resolvePagePath(...) with undefined fallback is dead code — use tryResolvePagePath';
+
+  it('flags `resolvePagePath(page) || undefined`', () => {
+    const file = write(
+      uniqPath('rule-resolve-dead-code', 'server/routes/webflow-seo.ts'),
+      lines(
+        'const basePath = resolvePagePath(page) || undefined;',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('flags `resolvePagePath(p) || undefined` with alternate variable name', () => {
+    const file = write(
+      uniqPath('rule-resolve-dead-code', 'server/routes/jobs.ts'),
+      lines(
+        'const pagePath = resolvePagePath(p) || undefined;',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('does NOT flag `tryResolvePagePath(page)` (the correct API)', () => {
+    const file = write(
+      uniqPath('rule-resolve-dead-code', 'server/routes/webflow-seo.ts'),
+      lines(
+        'const basePath = tryResolvePagePath(page);',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag `resolvePagePath(page)` without `|| undefined`', () => {
+    const file = write(
+      uniqPath('rule-resolve-dead-code', 'server/schema-plan.ts'),
+      lines(
+        'const pagePath = resolvePagePath(page);',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with inline // slug-path-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-resolve-dead-code', 'server/inline-hatch.ts'),
+      lines(
+        'const basePath = resolvePagePath(page) || undefined; // slug-path-ok — shim for legacy call site',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with above-line // slug-path-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-resolve-dead-code', 'server/above-hatch.ts'),
+      lines(
+        '// slug-path-ok — preserving dead pattern for contract compatibility',
+        'const basePath = resolvePagePath(page) || undefined;',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag server/helpers.ts (excluded — canonical implementation)', () => {
+    const file = write(
+      uniqPath('rule-resolve-dead-code', 'server/helpers.ts'),
+      lines(
+        'const basePath = resolvePagePath(page) || undefined;',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag src/lib/pathUtils.ts (excluded — canonical frontend implementation)', () => {
+    const file = write(
+      uniqPath('rule-resolve-dead-code', 'src/lib/pathUtils.ts'),
+      lines(
+        'const basePath = resolvePagePath(page) || undefined;',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: Manual pageMap pairing outside shared helpers — use findPageMapEntry(ForPage) or usePageJoin', () => {
+  const RULE = 'Manual pageMap pairing outside shared helpers — use findPageMapEntry(ForPage) or usePageJoin';
+
+  it('flags pageMap.find( in a src component', () => {
+    const file = write(
+      uniqPath('rule-pagemap-find', 'src/components/SomeComponent.tsx'),
+      lines(
+        'export function SomeComponent({ pageMap }: { pageMap: PageMapEntry[] }) {',
+        '  const match = pageMap.find(p => p.pagePath === currentPath);',
+        '  return match?.pageTitle ?? null;',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags optional-chaining pageMap?.find( in a src component', () => {
+    const file = write(
+      uniqPath('rule-pagemap-find', 'src/components/OtherComponent.tsx'),
+      lines(
+        'function getEntry(pageMap?: PageMapEntry[]) {',
+        '  return pageMap?.find(e => e.pagePath === path);',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('does NOT flag src/hooks/admin/usePageJoin.ts (allowlisted)', () => {
+    const file = write(
+      uniqPath('rule-pagemap-find', 'src/hooks/admin/usePageJoin.ts'),
+      lines(
+        'export function findPageMapEntryForPage(pageMap: PageMapEntry[], page: Page) {',
+        '  return pageMap.find(e => e.pageId === page.id);',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag src/lib/pathUtils.ts (allowlisted)', () => {
+    const file = write(
+      uniqPath('rule-pagemap-find', 'src/lib/pathUtils.ts'),
+      lines(
+        'export function findPageMapEntry(pageMap: PageMapEntry[], pagePath: string) {',
+        '  return pageMap.find(e => e.pagePath.toLowerCase() === pagePath.toLowerCase());',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with inline // pagemap-find-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-pagemap-find', 'src/components/HatchInline.tsx'),
+      lines(
+        'const x = pageMap.find(e => e.pagePath === path); // pagemap-find-ok — legacy shim',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with above-line // pagemap-find-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-pagemap-find', 'src/components/HatchAbove.tsx'),
+      lines(
+        '// pagemap-find-ok — migration shim pending full hook adoption',
+        'const entry = pageMap.find(e => e.pagePath === slug);',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
 describe('Meta: customCheck rule name registry', () => {
   const EXPECTED_CUSTOM_CHECK_RULES = [
     'Global keydown missing isContentEditable guard',
@@ -3935,6 +4212,15 @@ describe('Meta: customCheck rule name registry', () => {
     'Re-upsert without cloneInsightParams',
     // PR #218 A3/A4 bug pattern guards
     'Competitor keyword push missing serpFeatures',
+    // Slug-path hardening sprint (2026-04-21)
+    'Bare slug used in pagePath construction — use resolvePagePath(page)',
+    'resolvePagePath(...) with undefined fallback is dead code — use tryResolvePagePath',
+    // Unified page-join hooks sprint (2026-04-21)
+    'Manual pageMap pairing outside shared helpers — use findPageMapEntry(ForPage) or usePageJoin',
+    // Broadcast-invalidation centralization sprint (2026-04-21)
+    'useWorkspaceEvents handler for centralized event',
+    // Roadmap-redesign sprint (2026-04-22) — round 4 of PR #258
+    'roadmap.json item ID uniqueness',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -4039,7 +4325,16 @@ describe('Meta: pr-check --all status parity with verified-clean allowlist', () 
     } catch {
       repoRoot = process.cwd();
     }
-    const tsxBin = path.join(repoRoot, 'node_modules', '.bin', 'tsx');
+    // In worktree environments the node_modules is sparse; fall back to the
+    // parent project's node_modules (git worktrees share the main checkout's
+    // .git but have their own working tree without a full npm install).
+    let tsxBin = path.join(repoRoot, 'node_modules', '.bin', 'tsx');
+    if (!existsSync(tsxBin)) {
+      // Walk up to find node_modules — worktrees sit 3 levels deep under
+      // <main>/.claude/worktrees/<name>, so the main project is 3 dirs up.
+      const candidate = path.join(repoRoot, '..', '..', '..', 'node_modules', '.bin', 'tsx');
+      if (existsSync(candidate)) tsxBin = candidate;
+    }
     let out: string;
     try {
       // Invoke tsx directly via node_modules/.bin — vitest's child
@@ -4168,4 +4463,181 @@ describe('Meta: pr-check --all status parity with verified-clean allowlist', () 
       throw new Error(errors.join('\n\n─────\n\n'));
     }
   }, 130_000);
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: useWorkspaceEvents handler for centralized event
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: useWorkspaceEvents handler for centralized event', () => {
+  const RULE = 'useWorkspaceEvents handler for centralized event';
+
+  // The rule parses the real src/hooks/useWsInvalidation.ts to build its
+  // allowlist of centralized events. Fixtures written to tmpdir satisfy the
+  // path filter (src/) and use an event name (STRATEGY_UPDATED) that is
+  // known to be in useWsInvalidation.ts from Task 1 of #597.
+
+  it('flags an inline [WS_EVENTS.STRATEGY_UPDATED] handler in a src/ component', () => {
+    const file = write(
+      uniqPath('rule-ws-central', 'src/components/SomeComponent.tsx'),
+      lines(
+        "import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';",
+        "import { WS_EVENTS } from '../lib/wsEvents';",
+        'function SomeComponent({ workspaceId }: { workspaceId: string }) {',
+        '  useWorkspaceEvents(workspaceId, {',
+        '    [WS_EVENTS.STRATEGY_UPDATED]: () => {',
+        '      // duplicate invalidation',
+        '    },',
+        '  });',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(5);
+  });
+
+  it('does NOT flag an event not in useWsInvalidation.ts allowlist', () => {
+    const file = write(
+      uniqPath('rule-ws-central', 'src/components/SomeComponent.tsx'),
+      lines(
+        "import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';",
+        "import { WS_EVENTS } from '../lib/wsEvents';",
+        'function SomeComponent({ workspaceId }: { workspaceId: string }) {',
+        '  useWorkspaceEvents(workspaceId, {',
+        '    [WS_EVENTS.BULK_OPERATION_PROGRESS]: () => {',
+        '      // not centralized — local state only',
+        '    },',
+        '  });',
+        '}',
+      )
+    );
+    // BULK_OPERATION_PROGRESS is intentionally NOT in useWsInvalidation.ts
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with inline // ws-invalidation-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-ws-central', 'src/components/SomeComponent.tsx'),
+      lines(
+        "import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';",
+        "import { WS_EVENTS } from '../lib/wsEvents';",
+        'function SomeComponent({ workspaceId }: { workspaceId: string }) {',
+        '  useWorkspaceEvents(workspaceId, {',
+        '    [WS_EVENTS.STRATEGY_UPDATED]: () => { // ws-invalidation-ok — local progress state',
+        '    },',
+        '  });',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with above-line // ws-invalidation-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-ws-central', 'src/components/SomeComponent.tsx'),
+      lines(
+        "import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';",
+        "import { WS_EVENTS } from '../lib/wsEvents';",
+        'function SomeComponent({ workspaceId }: { workspaceId: string }) {',
+        '  useWorkspaceEvents(workspaceId, {',
+        '    // ws-invalidation-ok — needs local component state side effect too',
+        '    [WS_EVENTS.STRATEGY_UPDATED]: () => {',
+        '    },',
+        '  });',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag useWsInvalidation.ts itself (excluded)', () => {
+    const file = write(
+      uniqPath('rule-ws-central', 'src/hooks/useWsInvalidation.ts'),
+      lines(
+        "import { WS_EVENTS } from '../lib/wsEvents';",
+        'export function useWsInvalidation(workspaceId: string) {',
+        '  useWorkspaceEvents(workspaceId, {',
+        '    [WS_EVENTS.STRATEGY_UPDATED]: () => {',
+        '    },',
+        '  });',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag .test. files (test mocks may reference WS_EVENTS keys)', () => {
+    const file = write(
+      uniqPath('rule-ws-central', 'src/hooks/useSomething.test.tsx'),
+      lines(
+        "import { WS_EVENTS } from '../lib/wsEvents';",
+        "it('handles STRATEGY_UPDATED', () => {",
+        '  useWorkspaceEvents(ws, {',
+        '    [WS_EVENTS.STRATEGY_UPDATED]: () => {},',
+        '  });',
+        '});',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: roadmap.json item ID uniqueness', () => {
+  const RULE = 'roadmap.json item ID uniqueness';
+
+  // The customCheck reads roadmap.json from the file path passed in `files`
+  // (or falls back to data/roadmap.json in production). Fixtures write a
+  // controlled JSON to tmpdir so tests don't depend on the live data.
+
+  it('flags duplicate numeric IDs across sprints', () => {
+    const file = write(
+      uniqPath('rule-roadmap-uniq', 'data/roadmap.json'),
+      JSON.stringify({
+        sprints: [
+          { id: 'backlog', items: [{ id: 100, title: 'A' }] },
+          { id: 'sprint-x', items: [{ id: 100, title: 'B' }] },
+        ],
+      })
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('id 100 duplicated');
+  });
+
+  it('does NOT flag a roadmap with all unique IDs', () => {
+    const file = write(
+      uniqPath('rule-roadmap-uniq', 'data/roadmap.json'),
+      JSON.stringify({
+        sprints: [
+          { id: 'a', items: [{ id: 1, title: 'A' }, { id: 2, title: 'B' }] },
+          { id: 'b', items: [{ id: 'phase-1', title: 'C' }] },
+        ],
+      })
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags malformed JSON as a parse error', () => {
+    const file = write(
+      uniqPath('rule-roadmap-uniq', 'data/roadmap.json'),
+      '{ this is not valid json',
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toBe('JSON parse error');
+  });
+
+  it('treats string-id and numeric-id collisions as duplicates (cross-type)', () => {
+    const file = write(
+      uniqPath('rule-roadmap-uniq', 'data/roadmap.json'),
+      JSON.stringify({
+        sprints: [
+          { id: 'a', items: [{ id: 5, title: 'numeric' }] },
+          { id: 'b', items: [{ id: '5', title: 'string-five' }] },
+        ],
+      })
+    );
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
 });

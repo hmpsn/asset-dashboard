@@ -1,7 +1,8 @@
 // ── Miscellaneous API endpoints ────────────────────────────────────
-import { get, post, patch, del, getSafe, getOptional, postForm } from './client';
+import { get, post, patch, del, getSafe, getOptional, getText, postForm } from './client';
 import type { ContentSubscription, ContentSubscriptionPlanConfig } from '../../shared/types/content';
 import type { FeaturesData } from '../../shared/types/features';
+import type { RoadmapData, RoadmapItem, RoadmapItemPatch } from '../../shared/types/roadmap';
 
 // ── Requests (client requests / support tickets) ────────────────
 export const requests = {
@@ -166,13 +167,13 @@ export const chat = {
 
 // ── Roadmap ─────────────────────────────────────────────────────
 export const roadmap = {
-  get: () => get<unknown>('/api/roadmap'),
+  get: () => get<RoadmapData>('/api/roadmap'),
 
-  update: (itemId: number, body: Record<string, unknown>) =>
-    patch<unknown>(`/api/roadmap/${itemId}`, body),
-
-  updateItem: (itemId: number, body: Record<string, unknown>) =>
-    patch<unknown>(`/api/roadmap/item/${itemId}`, body),
+  updateItem: (itemId: number | string, sprintId: string, body: RoadmapItemPatch) =>
+    patch<{ ok: true; item: RoadmapItem }>(
+      `/api/roadmap/item/${encodeURIComponent(String(itemId))}?sprintId=${encodeURIComponent(sprintId)}`,
+      body,
+    ),
 };
 
 // ── Features ─────────────────────────────────────────────────────
@@ -378,3 +379,22 @@ export const businessPriorities = {
       { priorities: [] },
     ),
 };
+
+// ── Content exports (HTML strings for client-side PDF print flow) ──
+/**
+ * Export a content post as HTML (pre-rendered for browser print-to-PDF).
+ * Wraps GET /api/content-posts/:workspaceId/:postId/export/pdf. Returns the
+ * raw HTML text — callers are responsible for piping it into a new window or
+ * iframe for `window.print()`.
+ */
+export function exportPostPdf(workspaceId: string, postId: string): Promise<string> {
+  return getText(`/api/content-posts/${workspaceId}/${postId}/export/pdf`);
+}
+
+/**
+ * Export a content brief as HTML. Same pattern as exportPostPdf — returns raw
+ * HTML text, NOT a Blob.
+ */
+export function exportBrief(workspaceId: string, briefId: string): Promise<string> {
+  return getText(`/api/content-briefs/${workspaceId}/${briefId}/export`);
+}

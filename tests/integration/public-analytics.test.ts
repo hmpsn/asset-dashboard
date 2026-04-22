@@ -52,7 +52,7 @@ beforeAll(async () => {
     workspaceId: wsAId,
     pageId: '/blog/seo-automation',
     insightType: 'ranking_opportunity',
-    data: { query: 'seo automation tools', currentPosition: 6, impressions: 2400, estimatedTrafficGain: 300 },
+    data: { query: 'seo automation tools', currentPosition: 6, impressions: 2400, estimatedTrafficGain: 300, pageUrl: '/blog/seo-automation' },
     severity: 'opportunity',
     impactScore: 75,
     domain: 'search',

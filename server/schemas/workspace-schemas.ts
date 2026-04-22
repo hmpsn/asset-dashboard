@@ -38,10 +38,13 @@ export const pageKeywordMapSchema = z.object({
 // NOTE: pageMap is stored in a separate page_keywords table and stripped from this
 // column before saving. It is reassembled at the route layer. Mark optional so
 // parseJsonSafe does not reject the stored blob and silently return the empty fallback.
+// siteKeywords / opportunities are also optional because the PATCH endpoint supports
+// partial updates — a blob with only { siteKeywords, generatedAt } must round-trip
+// through parseJsonSafe without being rejected.
 export const keywordStrategySchema = z.object({
-  siteKeywords: z.array(z.string()),
+  siteKeywords: z.array(z.string()).optional(),
   pageMap: z.array(pageKeywordMapSchema).optional(),
-  opportunities: z.array(z.string()),
+  opportunities: z.array(z.string()).optional(),
   siteKeywordMetrics: z.array(z.object({
     keyword: z.string(),
     volume: z.number(),

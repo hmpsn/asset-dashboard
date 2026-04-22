@@ -398,7 +398,7 @@ router.post('/api/content-posts/:workspaceId/:postId/score-voice', requireWorksp
     }
     const updated = updatePostField(req.params.workspaceId, req.params.postId, { voiceScore, voiceFeedback });
 
-    broadcastToWorkspace(req.params.workspaceId, 'post-updated', { postId: req.params.postId });
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: req.params.postId });
     res.json(updated);
   } catch (err) {
     log.error({ err }, `Voice scoring failed for post ${req.params.postId}`);

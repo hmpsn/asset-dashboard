@@ -128,7 +128,14 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
   if (row.keyword_strategy) {
     const ks = parseJsonSafe(row.keyword_strategy, keywordStrategySchema, null, { workspaceId: row.id, field: 'keyword_strategy', table: 'workspaces' });
     const base = ks ?? { siteKeywords: [], pageMap: [], opportunities: [], generatedAt: '' };
-    ws.keywordStrategy = { ...base, generatedAt: base.generatedAt ?? '' };
+    // Schema marks siteKeywords/opportunities optional to tolerate partial PATCH blobs,
+    // but the Workspace type exposes them as required arrays — default here at the read boundary.
+    ws.keywordStrategy = {
+      ...base,
+      siteKeywords: base.siteKeywords ?? [],
+      opportunities: base.opportunities ?? [],
+      generatedAt: base.generatedAt ?? '',
+    };
   }
   if (row.competitor_domains) ws.competitorDomains = parseJsonSafeArray(row.competitor_domains, z.string(), { workspaceId: row.id, field: 'competitor_domains', table: 'workspaces' });
   ws.competitorLastFetchedAt = row.competitor_last_fetched_at ?? null;

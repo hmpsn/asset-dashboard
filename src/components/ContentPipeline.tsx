@@ -1,13 +1,9 @@
 import { useState, useRef, useEffect, Suspense } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { Clipboard, FileText, RefreshCw, Download, ChevronDown, Layers, HelpCircle, X, TrendingDown, CalendarDays } from 'lucide-react';
 import { LoadingState } from './ui';
 import { useContentPipeline, useWorkspaces } from '../hooks/admin';
-import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
-import { WS_EVENTS } from '../lib/wsEvents';
-import { queryKeys } from '../lib/queryKeys';
 import { ContentBriefs } from './ContentBriefs';
 import { ContentManager } from './ContentManager';
 import { ContentSubscriptions } from './ContentSubscriptions';
@@ -69,8 +65,6 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
   const [decayDismissed, setDecayDismissed] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
 
-  const queryClient = useQueryClient();
-
   // React Query hook replaces manual data fetching
   const { data: pipelineData } = useContentPipeline(workspaceId);
 
@@ -81,13 +75,6 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
   // Intelligence layer — cannibalization warnings
   const { data: intel } = useWorkspaceIntelligence(workspaceId, ['contentPipeline']);
 
-  // Invalidate AI suggested briefs when intelligence signals update
-  useWorkspaceEvents(workspaceId, {
-    [WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED]: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.aiSuggestedBriefs(workspaceId) });
-    },
-  });
-  
   const summary = pipelineData?.summary;
   const decay = pipelineData?.decay;
 

@@ -3366,6 +3366,314 @@ export const CHECKS: Check[] = [
       return hits;
     },
   },
+  {
+    // Slug-path hardening sprint (2026-04-21).
+    //
+    // Webflow nested pages have a `publishedPath` like `/services/seo` and a
+    // `slug` like `seo` (only the final segment). Using `/${page.slug}` directly
+    // as a page path produces wrong URLs for nested pages. The correct helper is
+    // `resolvePagePath(page)` from `server/helpers.ts` (backend) or
+    // `src/lib/pathUtils.ts` (frontend), which prefers `publishedPath` and
+    // falls back to `/${slug}` only when publishedPath is absent.
+    //
+    // This rule flags the two bare-slug constructions that caused the regressions:
+    //   1. `/${page.slug}` or `/${p.slug}` (standalone template literal)
+    //   2. `/${page.slug || ''}` (empty-fallback variant from pagePath assignments)
+    //
+    // Excluded:
+    //   - server/helpers.ts and src/lib/pathUtils.ts — the canonical implementations
+    //     that define the correct fallback logic
+    //   - Lines containing `.startsWith('/')` — ternary slug-normalization patterns
+    //     (`p.slug.startsWith('/') ? p.slug : \`/${p.slug}\``) that are a safe
+    //     intermediate form, NOT a pagePath construction
+    //   - Lines containing `publishedPath` — already have the correct guard
+    //
+    // Escape hatch: add `// slug-path-ok` on the same line or the preceding line
+    // for display-only uses (e.g. breadcrumb labels) where the slug suffix is intentional.
+    name: 'Bare slug used in pagePath construction — use resolvePagePath(page)',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    exclude: ['server/helpers.ts', 'src/lib/pathUtils.ts'],
+    excludeLines: ['.startsWith(\'/\')', '.startsWith("/")', 'publishedPath', '// slug-path-ok'],
+    message:
+      'Use resolvePagePath(page) instead of `/${page.slug}` — slug is only the final URL segment ' +
+      'for nested Webflow pages. resolvePagePath() prefers publishedPath. ' +
+      'Suppress with // slug-path-ok for intentional display-only slug suffixes.',
+    severity: 'warn',
+    rationale:
+      'Webflow nested pages (`/services/seo`) have slug=`seo` — using `/${page.slug}` directly ' +
+      'produces wrong short URLs that break GSC matching and pagePath lookups.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Matches `/${page.slug}`, `/${p.slug}`, with optional `|| 'fallback'`
+      // INSIDE the template literal (e.g. `/${page.slug || ''}`) or as a
+      // standalone expression.
+      const bareSlugRe = /`\/\$\{(?:page|p)\.slug(?:\s*\|\|\s*['"].*?['"])?\}`/;
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        // Skip canonical implementation files
+        if (file.endsWith('server/helpers.ts') || file.endsWith('src/lib/pathUtils.ts')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!bareSlugRe.test(lines[i])) continue;
+          // Skip ternary slug-normalization: `p.slug.startsWith('/') ? p.slug : \`/${p.slug}\``
+          if (lines[i].includes(".startsWith('/')") || lines[i].includes('.startsWith("/")')) continue;
+          // Skip lines that already check publishedPath (safe guard pattern)
+          if (lines[i].includes('publishedPath')) continue;
+          if (hasHatch(lines, i, '// slug-path-ok')) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // ── resolvePagePath(...) || undefined is dead code ──
+    //
+    // `resolvePagePath(page)` always returns a truthy string (`page.publishedPath`
+    // OR `/${page.slug}` OR `/`), so `resolvePagePath(page) || undefined` can
+    // never evaluate to `undefined`. This is almost always a signal that the
+    // caller wanted `tryResolvePagePath(page)` — which returns `undefined` when
+    // the page has neither slug nor publishedPath, so downstream guards like
+    // `if (basePath)` actually work.
+    //
+    // Escape hatch: `// slug-path-ok` on the same line or preceding line.
+    name: 'resolvePagePath(...) with undefined fallback is dead code — use tryResolvePagePath',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    exclude: ['server/helpers.ts', 'src/lib/pathUtils.ts'],
+    excludeLines: ['// slug-path-ok'],
+    message:
+      'resolvePagePath(page) is always truthy (returns "/" as last resort), so ' +
+      '`resolvePagePath(page) || undefined` can never be undefined. Use ' +
+      'tryResolvePagePath(page) if you need undefined for path-less pages.',
+    severity: 'error',
+    rationale:
+      'The dead-code pattern silently neutralizes downstream guards like ' +
+      '`if (basePath)` that are meant to skip fetch/GSC-match for path-less pages.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const deadCodeRe = /resolvePagePath\([^)]*\)\s*\|\|\s*undefined\b/;
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        if (file.endsWith('server/helpers.ts') || file.endsWith('src/lib/pathUtils.ts')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!deadCodeRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// slug-path-ok')) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // ── Manual pageMap pairing outside shared helpers ──
+    //
+    // Three components (SeoEditor, PageIntelligence, ApprovalsTab) independently
+    // reimplemented `pageMap.find(...)` with divergent semantics — each missed
+    // case-insensitive matching and/or legacy `/${slug}` fallbacks. The shared
+    // helpers in `src/lib/pathUtils.ts` (`findPageMapEntry`, `findPageMapEntryForPage`)
+    // and the `usePageJoin` hook in `src/hooks/admin/usePageJoin.ts` normalize
+    // all matching. Direct `.find()` calls bypass these guards.
+    //
+    // Excluded:
+    //   - src/hooks/admin/usePageJoin.ts — canonical hook (authorized usage via
+    //     findPageMapEntryForPage internally)
+    //   - src/lib/pathUtils.ts — the canonical helpers themselves
+    //
+    // Escape hatch: add `// pagemap-find-ok` on the same line or the preceding line
+    // for any use that genuinely cannot use the shared helpers.
+    name: 'Manual pageMap pairing outside shared helpers — use findPageMapEntry(ForPage) or usePageJoin',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    message:
+      'Use findPageMapEntry(ForPage) or usePageJoin instead of inline pageMap.find(). ' +
+      'Direct .find() misses case-insensitive matching and legacy /${slug} fallbacks.',
+    severity: 'error',
+    rationale:
+      'Three components independently reimplemented pageMap.find with divergent semantics ' +
+      '(SeoEditor, PageIntelligence, ApprovalsTab). The shared helpers in pathUtils.ts and ' +
+      'the usePageJoin hook normalize all matching. Direct .find() silently breaks case ' +
+      'variants and legacy paths.',
+    claudeMdRef: '#data-flow-rules',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const pageMapFindRe = /pageMap(\?)?.find\(/;
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        // Skip canonical implementation files
+        if (file.endsWith('src/hooks/admin/usePageJoin.ts')) continue;
+        if (file.endsWith('src/lib/pathUtils.ts')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!pageMapFindRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// pagemap-find-ok')) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // ── useWorkspaceEvents handler for an already-centralized event ──
+    //
+    // `src/hooks/useWsInvalidation.ts` is the single source of truth for
+    // workspace-scoped WS event → React Query cache invalidation. Any component
+    // or hook that also subscribes to one of those events with useWorkspaceEvents
+    // duplicates the invalidation logic and creates silent drift — the two
+    // handlers can disagree on which query keys to invalidate.
+    //
+    // The allowlist is derived dynamically by parsing useWsInvalidation.ts at
+    // rule startup (readFileSync once). This keeps the rule in sync automatically
+    // as new events are centralized without requiring manual CHECKS updates.
+    //
+    // Fail-closed: if useWsInvalidation.ts is missing or has zero handler keys,
+    // the rule throws so the overall pr-check exits non-zero rather than
+    // silently passing.
+    //
+    // Escape hatch: `// ws-invalidation-ok` on the same line or the line
+    // immediately above, for legitimate local side effects that truly cannot live
+    // in the central hook (e.g. BulkOperation progress keyed off component-local
+    // state that is not shared across the workspace).
+    name: 'useWorkspaceEvents handler for centralized event',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    exclude: [
+      'src/hooks/useWsInvalidation.ts',
+    ],
+    excludeLines: ['// ws-invalidation-ok'],
+    message:
+      'Inline useWorkspaceEvents subscriptions for events already handled in ' +
+      'src/hooks/useWsInvalidation.ts duplicate invalidation logic and create silent drift. ' +
+      'Move the cache invalidation to the central hook. ' +
+      'Use // ws-invalidation-ok on the [WS_EVENTS.X] line or the line immediately above ' +
+      'for legitimate local-only side effects (e.g. component-local state driven by bulk-op progress).',
+    severity: 'error',
+    rationale:
+      'Duplicated useWorkspaceEvents subscriptions diverge over time — one side gets ' +
+      'updated, the other silently misses cache keys — producing stale UI bugs ' +
+      'that are hard to reproduce because they depend on event ordering.',
+    claudeMdRef: '#data-flow-rules-mandatory',
+    customCheck: (files) => {
+      // ── Parse useWsInvalidation.ts to build the centralized-events allowlist ──
+      // Fail-closed: if the file is missing or has no handler keys, throw so the
+      // rule is not silently skipped (a missing/empty allowlist would pass every
+      // file, hiding real violations).
+      const wsInvalidationPath = path.join(ROOT, 'src', 'hooks', 'useWsInvalidation.ts');
+      let wsInvalidationContent: string;
+      try {
+        wsInvalidationContent = readFileSync(wsInvalidationPath, 'utf-8');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new Error(
+          `useWorkspaceEvents-centralization rule: cannot read src/hooks/useWsInvalidation.ts — ${msg}. ` +
+          'The file must exist; this rule is a guardrail, not a suggestion.'
+        );
+      }
+
+      // Extract every [WS_EVENTS.NAME] handler key present in the file.
+      // Pattern: `[WS_EVENTS.SOME_EVENT_NAME]` at computed-property position.
+      const keyRe = /\[WS_EVENTS\.([A-Z_]+)\]/g;
+      const centralizedEvents = new Set<string>();
+      let km: RegExpExecArray | null;
+      while ((km = keyRe.exec(wsInvalidationContent)) !== null) {
+        centralizedEvents.add(km[1]);
+      }
+
+      if (centralizedEvents.size === 0) {
+        throw new Error(
+          'useWorkspaceEvents-centralization rule: found zero [WS_EVENTS.*] handler keys in ' +
+          'src/hooks/useWsInvalidation.ts. The file may be malformed or the regex needs updating. ' +
+          'Expected pattern: `[WS_EVENTS.EVENT_NAME]: () => { ... }`'
+        );
+      }
+
+      // ── Scan src/ files for inline [WS_EVENTS.X] patterns whose event is centralized ──
+      const hits: CustomCheckMatch[] = [];
+      const lineRe = /\[WS_EVENTS\.([A-Z_]+)\]/;
+
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        // Never flag the central hook itself (it defines the handlers, not duplicates them).
+        if (file.endsWith('useWsInvalidation.ts')) continue;
+        // Skip test files — test mocks/fixtures may legitimately reference WS_EVENTS keys.
+        if (file.includes('.test.') || file.includes('.spec.')) continue;
+
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        // Quick pre-filter: skip files that don't reference WS_EVENTS at all.
+        if (!content.includes('WS_EVENTS.')) continue;
+
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const m = lines[i].match(lineRe);
+          if (!m) continue;
+          const eventName = m[1];
+          if (!centralizedEvents.has(eventName)) continue;
+          // Check escape hatch on this line or the line immediately above.
+          if (hasHatch(lines, i, '// ws-invalidation-ok')) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'roadmap.json item ID uniqueness',
+    pattern: '',
+    fileGlobs: ['*.json'],
+    pathFilter: 'data/',
+    displayScope: 'data/roadmap.json',
+    severity: 'error',
+    message: 'data/roadmap.json contains duplicate item IDs across sprints. Run `npx tsx scripts/dedupe-roadmap-ids.ts` to renumber the later occurrences. Item IDs are addressed by `(sprintId, id)` everywhere they\'re used as identity (React keys, expand state, PATCH lookups), and a duplicate id silently routes status toggles to the wrong row.',
+    rationale: 'Cross-sprint duplicate IDs caused PR #258 round-4: clicking expand on one row toggled both, and the server PATCH updated whichever sprint came first.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      // Prefer a roadmap.json passed via `files` (lets fixture tests swap in
+      // a controlled JSON); fall back to the real repo file so the integrity
+      // check ALWAYS runs, even on commits that don't touch roadmap.json.
+      const target = files.find(f => /(?:^|\/)roadmap\.json$/.test(f))
+        ?? path.join(ROOT, 'data', 'roadmap.json');
+      let raw: string;
+      try { raw = readFileSync(target, 'utf-8'); }
+      catch { return []; }
+      let data: { sprints?: Array<{ id?: string; items?: Array<{ id?: number | string; title?: string }> }> };
+      try { data = JSON.parse(raw); }
+      catch { return [{ file: target, line: 1, text: 'JSON parse error' }]; }
+      const sprints = Array.isArray(data.sprints) ? data.sprints : [];
+      const seen = new Map<string, { sprint: string; title: string }>();
+      const hits: CustomCheckMatch[] = [];
+      for (const sprint of sprints) {
+        const sprintId = String(sprint.id ?? '');
+        for (const item of sprint.items ?? []) {
+          if (item.id == null) continue;
+          const key = String(item.id);
+          const prior = seen.get(key);
+          if (prior) {
+            hits.push({
+              file: target,
+              line: 1,
+              text: `id ${key} duplicated: "${prior.title}" (sprint=${prior.sprint}) ↔ "${String(item.title ?? '')}" (sprint=${sprintId})`,
+            });
+          } else {
+            seen.set(key, { sprint: sprintId, title: String(item.title ?? '') });
+          }
+        }
+      }
+      return hits;
+    },
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────

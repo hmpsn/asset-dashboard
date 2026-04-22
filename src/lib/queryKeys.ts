@@ -97,6 +97,9 @@ export const queryKeys = {
     copyBatch: (wsId: string, batchId: string) => ['admin-copy-batch', wsId, batchId] as const,
     copyBatchAll: (wsId: string) => ['admin-copy-batch', wsId] as const,
 
+    // Page join
+    pageJoinPages: (siteId: string) => ['admin-page-join-pages', siteId] as const,
+
     // Diagnostics
     diagnostics: (wsId: string) => ['admin-diagnostics', wsId] as const,
     diagnosticDetail: (wsId: string, reportId: string) => ['admin-diagnostics', wsId, reportId] as const,

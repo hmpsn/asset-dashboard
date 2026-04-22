@@ -7,6 +7,7 @@ import {
 import { scoreColorClass, scoreBgBarClass, MetricRing } from './ui';
 import { get, post } from '../api/client';
 import { keywords } from '../api/seo';
+import { resolvePagePath } from '../lib/pathUtils';
 
 interface PageMeta {
   id: string;
@@ -100,12 +101,12 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
   const analyzePage = async (page: PageMeta) => {
     setAnalyzing(prev => new Set(prev).add(page.id));
     try {
-      const slug = page.slug || '';
+      const slug = resolvePagePath(page);
 
       // Fetch actual published page HTML for content analysis
       let pageContent = '';
       try {
-        const pagePath = page.publishedPath || (page.slug ? `/${page.slug}` : '');
+        const pagePath = (page.slug || page.publishedPath) ? resolvePagePath(page) : '';
         if (pagePath) {
           const result = await get<{ text?: string }>(`/api/webflow/page-html/${siteId}?path=${encodeURIComponent(pagePath)}`);
           pageContent = result.text || '';
@@ -136,7 +137,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
           try {
             await keywords.persistAnalysis({
               workspaceId,
-              pagePath: `/${page.slug || ''}`,
+              pagePath: resolvePagePath(page),
               analysis: {
                 primaryKeyword: kwData.primaryKeyword,
                 secondaryKeywords: kwData.secondaryKeywords,

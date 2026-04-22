@@ -9,6 +9,7 @@ type SubTab = 'upload' | 'browse' | 'audit';
 
 interface Props {
   siteId?: string;
+  workspaceId: string;
   workspaceFolder: string;
   queue: QueueItem[];
 }
@@ -19,7 +20,7 @@ const subTabs: { id: SubTab; label: string; icon: typeof Upload }[] = [
   { id: 'browse', label: 'Browse', icon: FolderSearch },
 ];
 
-export function MediaTab({ siteId, workspaceFolder, queue }: Props) {
+export function MediaTab({ siteId, workspaceId, workspaceFolder, queue }: Props) {
   const [sub, setSub] = useState<SubTab>('audit');
 
   return (
@@ -61,7 +62,7 @@ export function MediaTab({ siteId, workspaceFolder, queue }: Props) {
 
       {/* Browse sub-tab */}
       {sub === 'browse' && siteId && (
-        <AssetBrowser key={siteId} siteId={siteId} />
+        <AssetBrowser key={siteId} siteId={siteId} workspaceId={workspaceId} />
       )}
       {sub === 'browse' && !siteId && (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
@@ -74,7 +75,7 @@ export function MediaTab({ siteId, workspaceFolder, queue }: Props) {
 
       {/* Audit sub-tab */}
       {sub === 'audit' && siteId && (
-        <AssetAudit key={siteId} siteId={siteId} />
+        <AssetAudit key={siteId} siteId={siteId} workspaceId={workspaceId} />
       )}
       {sub === 'audit' && !siteId && (
         <div className="flex flex-col items-center justify-center py-20 gap-3">

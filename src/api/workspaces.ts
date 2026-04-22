@@ -1,5 +1,5 @@
 // ── Workspaces API ─────────────────────────────────────────────────
-import { get, post, patch, del, getOptional } from './client';
+import { get, post, patch, del, getOptional, postForm } from './client';
 
 export const workspaces = {
   list: () => get<unknown[]>('/api/workspaces'),
@@ -50,3 +50,19 @@ export const publicWorkspaces = {
   getInfo: (wsId: string) =>
     getOptional<unknown>(`/api/public/workspace/${wsId}`),
 };
+
+// ── DropZone upload (workspace-scoped asset / meta upload) ────────
+/**
+ * Upload one or more files to a workspace-scoped endpoint. Used by DropZone,
+ * which computes the endpoint itself (`/api/upload/:workspaceId` or
+ * `/api/upload/:workspaceId/meta`) and passes it directly.
+ *
+ * Response matches the server contract observed at DropZone.tsx:35-36:
+ * `{ uploaded: number }` — the count of files accepted by the pipeline.
+ */
+export function uploadDropZoneFile(
+  endpoint: string,
+  formData: FormData,
+): Promise<{ uploaded: number }> {
+  return postForm<{ uploaded: number }>(endpoint, formData);
+}

@@ -75,14 +75,22 @@ describe('keywordStrategySchema', () => {
     expect(result.pageMap).toHaveLength(1);
   });
 
-  it('returns fallback when required fields are missing (siteKeywords)', () => {
-    const result = parseJsonSafe(JSON.stringify({ opportunities: [] }), keywordStrategySchema, fallback);
-    expect(result).toBe(fallback);
+  // NOTE: siteKeywords and opportunities are optional in the schema to support partial
+  // PATCH blobs (e.g. a patch that only updates siteKeywords). The read-boundary in
+  // rowToWorkspace() defaults these to [] when absent. Tests below confirm that partial
+  // blobs are preserved rather than discarded via fallback.
+  it('accepts partial blob with only opportunities (siteKeywords omitted)', () => {
+    const result = parseJsonSafe(JSON.stringify({ opportunities: ['growth'] }), keywordStrategySchema, fallback);
+    expect(result).not.toBe(fallback);
+    expect(result.opportunities).toEqual(['growth']);
+    expect(result.siteKeywords).toBeUndefined();
   });
 
-  it('returns fallback when required fields are missing (opportunities)', () => {
-    const result = parseJsonSafe(JSON.stringify({ siteKeywords: [] }), keywordStrategySchema, fallback);
-    expect(result).toBe(fallback);
+  it('accepts partial blob with only siteKeywords (opportunities omitted)', () => {
+    const result = parseJsonSafe(JSON.stringify({ siteKeywords: ['seo'] }), keywordStrategySchema, fallback);
+    expect(result).not.toBe(fallback);
+    expect(result.siteKeywords).toEqual(['seo']);
+    expect(result.opportunities).toBeUndefined();
   });
 
   it('allows extra fields via passthrough', () => {

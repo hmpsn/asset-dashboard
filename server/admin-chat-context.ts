@@ -28,7 +28,7 @@ import type { DeadLink } from './link-checker.js';
 import { getSearchOverview, getSearchDeviceBreakdown, getSearchCountryBreakdown, getSearchPeriodComparison } from './search-console.js';
 import { getGA4Overview, getGA4TopPages, getGA4TopSources, getGA4OrganicOverview, getGA4NewVsReturning, getGA4Conversions, getGA4LandingPages, getGA4PeriodComparison } from './google-analytics.js';
 import { isGlobalConnected } from './google-auth.js';
-import { applySuppressionsToAudit, getAuditTrafficForWorkspace } from './helpers.js';
+import { applySuppressionsToAudit, getAuditTrafficForWorkspace, resolvePagePath } from './helpers.js';
 import { RICH_BLOCKS_PROMPT } from './seo-context.js';
 import { buildWorkspaceIntelligence, formatPageMapForPrompt, formatKeywordsForPrompt, formatPersonasForPrompt, formatKnowledgeBaseForPrompt } from './workspace-intelligence.js';
 import { scrapeUrl } from './web-scraper.js';
@@ -554,9 +554,9 @@ export async function assembleAdminContext(
               const pagesWithTraffic = pages
                 ?.filter(p => p.issues?.length > 0)
                 .map(p => {
-                  const slug = p.slug?.startsWith('/') ? p.slug : `/${p.slug}`;
-                  const traffic = trafficMap[slug] || trafficMap[p.slug];
-                  return { page: p.page, slug, issues: p.issues.length, score: p.score, traffic };
+                  const resolvedPath = resolvePagePath(p);
+                  const traffic = trafficMap[resolvedPath];
+                  return { page: p.page, slug: resolvedPath, issues: p.issues.length, score: p.score, traffic };
                 })
                 .filter(p => p.traffic && (p.traffic.clicks > 0 || p.traffic.pageviews > 0))
                 .sort((a, b) =>
@@ -573,7 +573,7 @@ export async function assembleAdminContext(
           if (pageContext) {
             const targetSlug = pageContext.url.replace(/^https?:\/\/[^/]+/, '');
             const pageAudit = pages?.find((p) => {
-              const pSlug = p.slug?.startsWith('/') ? p.slug : `/${p.slug}`;
+              const pSlug = resolvePagePath(p);
               return pSlug.toLowerCase() === targetSlug.toLowerCase() || pSlug.toLowerCase() === `${targetSlug}/`.toLowerCase() || targetSlug.toLowerCase().endsWith(pSlug.toLowerCase());
             });
             if (pageAudit) {

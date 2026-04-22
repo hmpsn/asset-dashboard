@@ -195,5 +195,48 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.shared.recommendations(workspaceId) });
     },
+    [WS_EVENTS.STRATEGY_UPDATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
+    },
+    [WS_EVENTS.BRANDSCRIPT_UPDATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.brandscripts(workspaceId) });
+    },
+    [WS_EVENTS.DISCOVERY_UPDATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.discoverySources(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.discoveryExtractionsAll(workspaceId) });
+    },
+    [WS_EVENTS.VOICE_PROFILE_UPDATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.voiceProfile(workspaceId) });
+    },
+    [WS_EVENTS.BRAND_IDENTITY_UPDATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.brandIdentity(workspaceId) });
+    },
+    [WS_EVENTS.BLUEPRINT_UPDATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.blueprints(workspaceId) });
+      qc.invalidateQueries({ queryKey: ['admin-blueprint', workspaceId] }); // querykey-ok: prefix invalidation (per-blueprint caches)
+      qc.invalidateQueries({ queryKey: ['admin-blueprint-versions', workspaceId] }); // querykey-ok: prefix invalidation (version histories)
+    },
+    [WS_EVENTS.BLUEPRINT_GENERATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.blueprints(workspaceId) });
+    },
+    [WS_EVENTS.COPY_EXPORT_COMPLETE]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.copyStatusAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.copySectionsAll(workspaceId) });
+    },
+    // SCHEMA_PLAN_SENT is intentionally NOT registered here — SchemaPlanPanel
+    // fetches the plan directly (no React Query cache). Exemption is tracked
+    // in tests/contract/ws-invalidation-coverage.test.ts LOCAL_ONLY_EVENTS.
+    [WS_EVENTS.POST_UPDATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.posts(workspaceId) });
+    },
   });
 }

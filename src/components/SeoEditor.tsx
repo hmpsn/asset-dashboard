@@ -13,7 +13,7 @@ import { WS_EVENTS } from '../lib/wsEvents';
 import { queryKeys } from '../lib/queryKeys';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { usePageEditStates } from '../hooks/usePageEditStates';
-import { useSeoEditor } from '../hooks/admin';
+import { useSeoEditor, usePageJoin } from '../hooks/admin';
 import {
   filterWritableItems,
   filterWritableIds,
@@ -27,7 +27,7 @@ import { BulkOperations } from './editor/BulkOperations';
 import { ApprovalPanel } from './editor/ApprovalPanel';
 import { PendingApprovals } from './PendingApprovals';
 import { SeoSuggestionsPanel } from './editor/SeoSuggestionsPanel';
-import { matchPagePath, resolvePagePath } from '../lib/pathUtils';
+import { resolvePagePath } from '../lib/pathUtils';
 
 interface EditState {
   seoTitle: string;
@@ -49,6 +49,27 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   
   // React Query hook replaces manual data fetching
   const { data: pages = [], isLoading: loading } = useSeoEditor(siteId, workspaceId);
+
+  // Unified page join: derives analyzedPages and pageKeywordMap from joined Webflow + strategy data
+  const { pages: unified } = usePageJoin(workspaceId ?? '', siteId);
+  // Immediate feedback state for pages just analyzed in this session
+  const [localAnalyzedPages, setLocalAnalyzedPages] = useState<Set<string>>(new Set());
+  const analyzedPages = useMemo(
+    () => new Set([...unified.filter(p => p.analyzed).map(p => p.id), ...localAnalyzedPages]),
+    [unified, localAnalyzedPages],
+  );
+  const pageKeywordMap = useMemo(() => {
+    const map = new Map<string, { primaryKeyword: string; secondaryKeywords: string[] }>();
+    for (const p of unified) {
+      if (p.strategy?.primaryKeyword) {
+        map.set(p.id, {
+          primaryKeyword: p.strategy.primaryKeyword,
+          secondaryKeywords: p.strategy.secondaryKeywords ?? [],
+        });
+      }
+    }
+    return map;
+  }, [unified]);
   
   // Session persistence: restore edits/variations/expanded from sessionStorage (survives tab switches + refresh)
   const restoredFromCache = useRef(false);
@@ -94,7 +115,6 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const [errorStates, setErrorStates] = useState<Record<string, { type: string; message: string }>>({});
   const [previewExpanded, setPreviewExpanded] = useState<Set<string>>(new Set());
   const [analyzing, setAnalyzing] = useState<Set<string>>(new Set());
-  const [analyzedPages, setAnalyzedPages] = useState<Set<string>>(new Set());
   const [bulkAnalyzeProgress, setBulkAnalyzeProgress] = useState<{ done: number; total: number } | null>(null);
   const [bulkAnalyzeJobId, setBulkAnalyzeJobId] = useState<string | null>(() => {
     try { return workspaceId ? sessionStorage.getItem(`seo-bulk-analyze-job-${workspaceId}`) ?? null : null; } catch { return null; }
@@ -404,7 +424,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         currentDescription: edit?.seoDescription || page.seo?.description,
         field,
         workspaceId,
-        pagePath: `/${page.slug || ''}`,
+        pagePath: resolvePagePath(page),
       });
 
       if (field === 'both' && data.pairs && data.pairs.length > 0) {
@@ -428,43 +448,6 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     }
   };
 
-  // Fetch keyword strategy to know which pages already have persisted analysis
-  const { data: strategyData } = useQuery({
-    queryKey: queryKeys.admin.keywordStrategy(workspaceId!),
-    queryFn: () => keywords.webflowStrategy(workspaceId!) as Promise<{ pageMap?: Array<{ pagePath: string; analysisGeneratedAt?: string; primaryKeyword?: string; secondaryKeywords?: string[] }> }>,
-    enabled: !!workspaceId,
-    staleTime: 60_000,
-  });
-
-  // Build set of page slugs that have persisted analysis
-  useEffect(() => {
-    if (!strategyData?.pageMap) return;
-    const analyzed = new Set<string>();
-    for (const entry of strategyData.pageMap) {
-      if (entry.analysisGeneratedAt) {
-        const match = pages.find(p => matchPagePath(entry.pagePath, resolvePagePath(p)));
-        if (match) analyzed.add(match.id);
-      }
-    }
-    setAnalyzedPages(analyzed);
-  }, [strategyData, pages]);
-
-  // Map pageId → { primaryKeyword, secondaryKeywords } for displaying targeting context on each page card
-  const pageKeywordMap = useMemo(() => {
-    const map = new Map<string, { primaryKeyword: string; secondaryKeywords: string[] }>();
-    if (!strategyData?.pageMap) return map;
-    for (const entry of strategyData.pageMap) {
-      if (!entry.primaryKeyword) continue;
-      const match = pages.find(p => matchPagePath(entry.pagePath, resolvePagePath(p)));
-      if (match) {
-        map.set(match.id, {
-          primaryKeyword: entry.primaryKeyword,
-          secondaryKeywords: entry.secondaryKeywords ?? [],
-        });
-      }
-    }
-    return map;
-  }, [strategyData, pages]);
 
   const analyzePage = async (pageId: string) => {
     const page = pages.find(p => p.id === pageId);
@@ -478,7 +461,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         pageTitle: page.title,
         seoTitle: edit?.seoTitle || page.seo?.title || '',
         metaDescription: edit?.seoDescription || page.seo?.description || '',
-        slug: page.slug,
+        slug: resolvePagePath(page),
         workspaceId,
       }) as Record<string, unknown>;
 
@@ -490,9 +473,9 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
           analysis,
         });
 
-        // Mark page as analyzed
-        setAnalyzedPages(prev => new Set(prev).add(pageId));
-        // Refresh strategy query so UI updates
+        // Instant feedback: mark page as analyzed locally before async refetch completes
+        setLocalAnalyzedPages(prev => new Set(prev).add(pageId));
+        // Refresh strategy query so UI updates; analyzedPages overlay will persist until refetch
         queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId!) });
       }
     } catch (err) {
@@ -513,6 +496,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
           pageId: p.id,
           title: p.title,
           slug: p.slug,
+          publishedPath: p.publishedPath,
           seoTitle: edits[p.id]?.seoTitle || p.seo?.title || '',
           seoDescription: edits[p.id]?.seoDescription || p.seo?.description || '',
         })),
@@ -643,6 +627,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
             pageId: id,
             title: page?.title || '',
             slug: page?.slug,
+            publishedPath: page?.publishedPath,
             currentSeoTitle: edit?.seoTitle || page?.seo?.title || '',
             currentDescription: edit?.seoDescription || page?.seo?.description || '',
           };

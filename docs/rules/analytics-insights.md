@@ -43,6 +43,8 @@ Expect hits in all 8 locations.
 | `serp_opportunity` | `SerpOpportunityData` | needs schema | Phase 1 |
 | `strategy_alignment` | ⚠️ `Record<string,unknown>` — needs typed interface | needs schema | Phase 1 |
 | `anomaly_digest` | `AnomalyDigestData` | needs schema | Phase 2 |
+| `audit_finding` | `AuditFindingData` | needs schema | existing (bridge-generated per-page and site-level audit issues) |
+| `site_health` | `SiteHealthInsightData` | needs schema | existing (Bridge #15 — site-level audit health summary) |
 
 ---
 
@@ -59,6 +61,11 @@ in the same commit. TypeScript will not catch a mapper that silently ignores a n
 Current `analytics_insights` columns added in Phase 1:
 `page_title`, `strategy_keyword`, `strategy_alignment`, `audit_issues` (JSON),
 `pipeline_status`, `anomaly_linked`, `impact_score`, `domain`
+
+Phase 3 resolution columns (added alongside `resolveInsight()` / admin action queue):
+`resolution_status`, `resolution_note`, `resolved_at`, `resolution_source`, `bridge_source`
+
+Note: `resolution_status`, `resolution_note`, and `resolved_at` are intentionally **omitted** from the `upsertInsight()` ON CONFLICT UPDATE clause — background recomputation must not overwrite admin resolution decisions.
 
 ---
 
@@ -212,7 +219,7 @@ const issues = JSON.parse(insight.auditIssues);
 The quality gate for Phase 3 is `npx vitest run` (full suite, not just the new test files). A passing build does not mean tests pass. Run the full suite and verify zero failures before marking complete.
 
 ```bash
-npx tsc --noEmit --skipLibCheck && npx vite build && npx vitest run
+npm run typecheck && npx vite build && npx vitest run
 ```
 
 ### 7.6 Subagent Diff Review After Parallel Tasks
@@ -237,7 +244,7 @@ Before marking Phase 1 complete, verify ALL of the following:
 - [ ] `computeContentDecayInsights()` removed from `analytics-intelligence.ts`; content-decay.ts delegation is the only path; grep confirms no dead calls
 - [ ] `INSIGHT_FILTER_KEYS` constant used for all filter key string literals — no bare string literals like `'drops'` in component files
 - [ ] `AnnotatedTrendChart` max-3 active lines enforced — adding a 4th deactivates the oldest
-- [ ] `npx tsc --noEmit --skipLibCheck` — zero errors
+- [ ] `npm run typecheck` — zero errors
 - [ ] `npx vite build` — clean
 
 ### Phase 2 Gate
@@ -249,7 +256,7 @@ Before marking Phase 2 complete, verify ALL of the following:
 - [ ] Anomaly deduplication: inserting the same `(workspaceId, anomaly_type, metric)` twice produces one feed entry, not two — verify with a test or manual check (Section 5)
 - [ ] Dedicated `upsertAnomalyDigestInsight()` used for anomaly inserts — standard `upsertInsight()` not used for anomaly type
 - [ ] Admin Chat `buildInsightsContext()` includes `pageTitle`, `strategyAlignment`, `pipelineStatus` in its output
-- [ ] `npx tsc --noEmit --skipLibCheck` — zero errors
+- [ ] `npm run typecheck` — zero errors
 - [ ] `npx vite build` — clean
 
 ### Phase 3 Gate
@@ -288,5 +295,5 @@ Before marking Phase 3 complete, verify ALL of the following:
 - [ ] `/narrative` and `/digest` routes in `public-analytics.ts` registered before any `/:workspaceId/:param` catch-all (Section 7.3)
 - [ ] `parseJsonSafe`/`parseJsonFallback` used wherever `insight.auditIssues` or other JSON columns are parsed (Section 7.4)
 - [ ] `npx vitest run` — zero failures (full suite, not just new tests — Section 7.5)
-- [ ] `npx tsc --noEmit --skipLibCheck` — zero errors
+- [ ] `npm run typecheck` — zero errors
 - [ ] `npx vite build` — clean

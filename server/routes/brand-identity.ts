@@ -12,6 +12,8 @@ import {
 import type { DeliverableTier } from '../../shared/types/brand-engine.js';
 import { clearSeoContextCache } from '../seo-context.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { getWorkspace } from '../workspaces.js';
+import { incrementIfAllowed, decrementUsage } from '../usage-tracking.js';
 
 const router = Router();
 
@@ -79,6 +81,11 @@ router.get('/api/brand-identity/:workspaceId/:id', requireWorkspaceAccess('works
 // Generate a deliverable
 router.post('/api/brand-identity/:workspaceId/generate', requireWorkspaceAccess('workspaceId'), validate(generateDeliverableSchema), async (req, res) => {
   const { deliverableType } = req.body;
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (!incrementIfAllowed(ws.id, ws.tier || 'free', 'strategy_generations')) {
+    return res.status(429).json({ error: 'Monthly AI generation limit reached' });
+  }
   try {
     const result = await generateDeliverable(req.params.workspaceId, deliverableType);
     addActivity(req.params.workspaceId, 'brand_deliverable_generated', `Generated ${deliverableType.replace(/_/g, ' ')} deliverable`);
@@ -87,6 +94,7 @@ router.post('/api/brand-identity/:workspaceId/generate', requireWorkspaceAccess(
     invalidateIntelligenceCache(req.params.workspaceId);
     res.json(result);
   } catch (err) {
+    decrementUsage(ws.id, 'strategy_generations');
     res.status(500).json({ error: err instanceof Error ? err.message : 'Generation failed' });
   }
 });
@@ -94,15 +102,24 @@ router.post('/api/brand-identity/:workspaceId/generate', requireWorkspaceAccess(
 // Refine a deliverable with steering direction
 router.post('/api/brand-identity/:workspaceId/:id/refine', requireWorkspaceAccess('workspaceId'), validate(refineDeliverableSchema), async (req, res) => {
   const { direction } = req.body;
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (!incrementIfAllowed(ws.id, ws.tier || 'free', 'strategy_generations')) {
+    return res.status(429).json({ error: 'Monthly AI generation limit reached' });
+  }
   try {
     const result = await refineDeliverable(req.params.workspaceId, req.params.id, direction);
-    if (!result) return res.status(404).json({ error: 'Not found' });
+    if (!result) {
+      decrementUsage(ws.id, 'strategy_generations');
+      return res.status(404).json({ error: 'Not found' });
+    }
     addActivity(req.params.workspaceId, 'brand_deliverable_refined', `Refined ${result.deliverableType.replace(/_/g, ' ')} deliverable`);
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, { deliverableId: req.params.id });
     clearSeoContextCache(req.params.workspaceId);
     invalidateIntelligenceCache(req.params.workspaceId);
     res.json(result);
   } catch (err) {
+    decrementUsage(ws.id, 'strategy_generations');
     res.status(500).json({ error: err instanceof Error ? err.message : 'Refinement failed' });
   }
 });

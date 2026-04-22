@@ -317,16 +317,6 @@ const KNOWN_UNHANDLED_BROADCASTS = new Set<string>([
   'feedback:new',
   'feedback:update',
 
-  // post-updated — legacy string literal used in content-posts.ts for a draft
-  // save flow that predates WS_EVENTS.  No frontend component subscribes to
-  // this event; it should be migrated to WS_EVENTS.CONTENT_PUBLISHED.
-  'post-updated',
-
-  // schema:plan_sent — the server emits this after sending a schema plan email,
-  // but there is no real-time UI reaction needed; the admin navigates away
-  // before the event fires.  The constant is defined in WS_EVENTS for future use.
-  'schema:plan_sent',
-
   // content-subscription:* — Stripe webhook events broadcast by stripe.ts via the
   // _broadcastFn alias.  These signal content subscription lifecycle changes but
   // the frontend does not yet subscribe to them; they are candidates for future
@@ -335,11 +325,11 @@ const KNOWN_UNHANDLED_BROADCASTS = new Set<string>([
   'content-subscription:updated',
   'content-subscription:renewed',
 
-  // copy:export_complete — the server emits this after export, but there is
-  // no real-time UI reaction needed (the response body contains the result).
-  // A future enhancement could show a toast notification.
-  'copy:export_complete',
-
+  // schema:plan_sent — admin-side fire-and-forget confirmation; SchemaPlanPanel
+  // fetches the plan directly rather than via React Query, so no central
+  // invalidation is needed. Cross-referenced with LOCAL_ONLY_EVENTS in
+  // tests/contract/ws-invalidation-coverage.test.ts.
+  'schema:plan_sent',
 ]);
 
 /**

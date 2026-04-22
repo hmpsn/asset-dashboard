@@ -2026,7 +2026,7 @@ export async function generateSchemaSuggestions(
         const { types: existingSchemas, json: existingSchemaJson } = html ? extractExistingSchemas(html) : { types: [], json: [] };
 
         // Build page-specific context (use full path for nested pages)
-        const lookupPath = pagePath || `/${page.slug}`;
+        const lookupPath = pagePath; // resolvePagePath always returns a non-empty string
         const normalizedPath = (isHomepage ? '/' : lookupPath).replace(/\/$/, '') || '/';
         const planContext = sitePlan ? buildPlanContextForPage(sitePlan, isHomepage ? '/' : lookupPath) : '';
         const fullPageUrl = isHomepage ? baseUrl : `${baseUrl}${lookupPath}`;

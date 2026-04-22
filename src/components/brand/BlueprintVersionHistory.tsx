@@ -1,9 +1,6 @@
 import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import { Clock, ChevronDown, ChevronRight } from 'lucide-react';
 import { useBlueprintVersions } from '../../hooks/admin/useBlueprints';
-import { queryKeys } from '../../lib/queryKeys';
-import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
 import type { BlueprintVersion } from '../../../shared/types/page-strategy';
 
 interface Props {
@@ -12,18 +9,9 @@ interface Props {
 }
 
 export function BlueprintVersionHistory({ workspaceId, blueprintId }: Props) {
-  const queryClient = useQueryClient();
   const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
 
   const { data: versions, isLoading } = useBlueprintVersions(workspaceId, blueprintId);
-
-  useWorkspaceEvents(workspaceId, {
-    'blueprint:updated': () => {
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.admin.blueprintVersions(workspaceId, blueprintId),
-      });
-    },
-  });
 
   function formatVersionDate(createdAt: string): string {
     const date = new Date(createdAt);

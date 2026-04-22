@@ -57,6 +57,7 @@ import type { ScrapedPage } from '../web-scraper.js';
 import { createLogger } from '../logger.js';
 import { recordAction, getActionBySource } from '../outcome-tracking.js';
 import { isProgrammingError } from '../errors.js';
+import { incrementIfAllowed, decrementUsage } from '../usage-tracking.js';
 
 const log = createLogger('workspaces');
 
@@ -397,6 +398,10 @@ router.post('/api/workspaces/:id/generate-knowledge-base', requireWorkspaceAcces
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (!ws.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
 
+  if (!incrementIfAllowed(ws.id, ws.tier || 'free', 'strategy_generations')) {
+    return res.status(429).json({ error: 'Monthly AI generation limit reached' });
+  }
+
   try {
     const { scraped, pagesSummary } = await scrapeWorkspaceSite(ws);
 
@@ -458,6 +463,7 @@ Be concise but specific. Use bullet points. Only include information actually fo
 
     res.json({ knowledgeBase: aiResult.text, pagesScraped: scraped.length });
   } catch (err) {
+    decrementUsage(ws.id, 'strategy_generations');
     log.error({ err: err }, 'Operation failed');
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate knowledge base' });
   }
@@ -468,6 +474,10 @@ router.post('/api/workspaces/:id/generate-brand-voice', requireWorkspaceAccess()
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (!ws.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
+
+  if (!incrementIfAllowed(ws.id, ws.tier || 'free', 'strategy_generations')) {
+    return res.status(429).json({ error: 'Monthly AI generation limit reached' });
+  }
 
   try {
     const { scraped, pagesSummary } = await scrapeWorkspaceSite(ws);
@@ -540,6 +550,7 @@ Be specific and actionable. An AI writer should be able to follow this guide to 
 
     res.json({ brandVoice: aiResult.text, pagesScraped: scraped.length });
   } catch (err) {
+    decrementUsage(ws.id, 'strategy_generations');
     log.error({ err: err }, 'Operation failed');
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate brand voice' });
   }
@@ -550,6 +561,10 @@ router.post('/api/workspaces/:id/generate-personas', requireWorkspaceAccess(), a
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (!ws.webflowSiteId) return res.status(400).json({ error: 'No Webflow site linked' });
+
+  if (!incrementIfAllowed(ws.id, ws.tier || 'free', 'strategy_generations')) {
+    return res.status(429).json({ error: 'Monthly AI generation limit reached' });
+  }
 
   try {
     const { scraped, pagesSummary } = await scrapeWorkspaceSite(ws);
@@ -605,10 +620,12 @@ Rules:
       }>>(aiResult.text);
     } catch (err) {
       if (isProgrammingError(err)) log.warn({ err }, 'workspaces: programming error');
+      decrementUsage(ws.id, 'strategy_generations');
       return res.status(500).json({ error: 'AI returned invalid JSON — try again' });
     }
 
     if (!Array.isArray(personas) || personas.length === 0) {
+      decrementUsage(ws.id, 'strategy_generations');
       return res.status(500).json({ error: 'AI did not return valid personas — try again' });
     }
 
@@ -626,6 +643,7 @@ Rules:
 
     res.json({ personas: normalized, pagesScraped: scraped.length });
   } catch (err) {
+    decrementUsage(ws.id, 'strategy_generations');
     log.error({ err: err }, 'Operation failed');
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate personas' });
   }

@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
 import { Map, Plus, Sparkles, ChevronRight, Trash2, Loader2 } from 'lucide-react';
 import { blueprints as blueprintsApi } from '../../api/brand-engine';
 import type { SiteBlueprint, BlueprintGenerationInput } from '../../../shared/types/page-strategy';
@@ -23,16 +22,6 @@ export function PageStrategyTab({ workspaceId, onSelectBlueprint }: Props) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const { data: blueprintList, isLoading } = useBlueprints(workspaceId);
-
-  // Invalidate blueprints list when server broadcasts updates
-  useWorkspaceEvents(workspaceId, {
-    'blueprint:updated': () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.blueprints(workspaceId) });
-    },
-    'blueprint:generated': () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.blueprints(workspaceId) });
-    },
-  });
 
   const createMutation = useMutation({
     mutationFn: (body: { name: string; industryType?: string }) =>

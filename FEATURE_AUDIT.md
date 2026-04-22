@@ -1,6 +1,6 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **306 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **310 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
@@ -20,7 +20,7 @@ A comprehensive value assessment of every feature in the platform — **306 feat
 ---
 
 ### 87. Admin Notification Center
-**What it does:** NotificationBell component integrated into sidebar utility bar that aggregates pending work across all workspaces. Shows counts for anomalies, content requests, approvals, and other attention items. Real-time polling every 5 minutes with click-to-navigate functionality. Dropdown shows categorized items with direct links to relevant workspace + tool combinations.
+**What it does:** NotificationBell component rendered inside the admin Sidebar (`src/components/layout/Sidebar.tsx`) that aggregates pending work across all workspaces. Shows counts for anomalies, content requests, approvals, and other attention items. Real-time polling every 5 minutes with click-to-navigate functionality. Opens a slide-out drawer showing categorized items with direct links to relevant workspace + tool combinations.
 
 **Agency value:** Centralized visibility reduces time spent checking individual workspaces. Proactive issue detection prevents client escalations. Faster response times to urgent items.
 
@@ -487,14 +487,11 @@ A comprehensive value assessment of every feature in the platform — **306 feat
 
 ---
 
-### 36. Roadmap Dashboard
-**What it does:** Interactive admin-side roadmap tracker with 34 items across 7 prioritized sprints. Each item shows title, effort estimate, source document, priority tier (P0–P4), and a click-to-cycle status toggle (pending → in_progress → done). Status persists to server via `/api/roadmap-status`. Priority filter dropdown. Overall + per-sprint progress bars. Collapsible sprint sections.
-
-**Agency value:** A single place to see what's next, what's in progress, and what's done — without digging through markdown files. Status tracking survives sessions.
-
-**Client value:** N/A — internal agency tool.
-
-**Mutual:** Keeps development focused and accountable. No lost context between work sessions.
+### Roadmap (Admin)
+- **Location:** `src/components/Roadmap.tsx` + `RoadmapSprintView.tsx` + `RoadmapBacklogView.tsx` + `RoadmapFilterBar.tsx`
+- **What it does:** Dual-mode roadmap. Sprint View = flat list grouped by sprint section headers. Backlog View = sortable table with inline detail drawer. Shared filter bar; all filter + view state is URL-param-driven and deep-linkable.
+- **Schema:** `RoadmapItem` now has `createdAt?` (forward-only), `featureId?` (soft ref to features.json), `tags?` (free-form)
+- **Filter params:** `?view=sprint|backlog&priority=P0&status=pending&sprint=backlog&feature=5&tags=auth`
 
 ---
 
@@ -1126,6 +1123,7 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - ~~SEO edit tracking (teal=live, purple=in-review, yellow=flagged)~~: ✅ Shipped — seoEditTracking on Workspace model with trackSeoEdit() helper. Auto-wired into SEO save→live, CMS save→live, approval→in-review, audit→flagged. Colored borders + badge pills in SeoEditor, CmsEditor, and SeoAudit page cards. Optimistic local state updates.
 - ~~Hide non-sitemap collection pages~~: ✅ Shipped — Server fetches sitemap.xml, filters collection items to sitemap matches (falls back to all). Frontend shows full path with parent collection slug (e.g., /locations/houston-midtown).
 - ~~Real-time data updates~~: ✅ Shipped — WebSocket workspace subscriptions with `broadcastToWorkspace()`. Events: activity:new, approval:update, request:created, content-request:update, audit:complete. `useWorkspaceEvents` hook on frontend.
+- ~~Broadcast → React Query invalidation centralization~~: ✅ Shipped 2026-04-21 (#597) — Single `useWsInvalidation` hook (mounted once in App.tsx) handles 43 workspace-scoped WS events with matching React Query cache invalidations. Added 7 events (STRATEGY_UPDATED, BRANDSCRIPT_UPDATED, DISCOVERY_UPDATED, VOICE_PROFILE_UPDATED, BRAND_IDENTITY_UPDATED, BLUEPRINT_UPDATED, BLUEPRINT_GENERATED) and removed duplicate inline subscriptions from 10 components. Two-layer regression guard: pr-check rule blocks inline-handler drift (auto-syncs allowlist from `useWsInvalidation.ts`, escape hatch `// ws-invalidation-ok`); contract test `tests/contract/ws-invalidation-coverage.test.ts` blocks absence-of-handler drift when new WS_EVENTS entries are added.
 - ~~Unified Performance tab~~: ✅ Shipped — `PerformanceTab.tsx` merges Search + Analytics into single tab with sub-tabs. Backward-compatible URL params. See Feature #74.
 
 ### Content Pipeline
@@ -3298,9 +3296,9 @@ When the user asks to update this document with recent features, follow this pro
 | Platform & UX | 25+ | Design system, command center, UX overhaul, navigation, cross-linking, roadmap, Recharts, mobile guard |
 | Architecture & Infrastructure | 30+ | Server refactor, React Query migration (5 phases), React Router, typed API client, Pino logging, Sentry, CI/CD, SQLite optimization |
 
-**306 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**310 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **306**. Last updated: April 2026.
+Current feature count: **310**. Last updated: April 2026.
 
 ---
 
@@ -3320,6 +3318,58 @@ Current feature count: **306**. Last updated: April 2026.
 **Agency value:** Programming errors in assembler catch blocks previously silenced TypeErrors and ReferenceErrors as empty-fallback degradation. After hardening, any renamed export or null-dereference in a slice assembler fires a Sentry alert immediately instead of silently returning stale/empty data to the AI prompt. Eliminates the silent data-loss class of bugs in the intelligence engine.
 
 **Mutual:** CI enforcement — the new `pr-check` rule prevents future bare catches from being introduced in workspace-intelligence.ts. Any contributor who writes `} catch {` in that file will see an error before the PR merges.
+
+---
+
+## Copy & Brand Engine — Phase 1: Brand Foundation
+
+### 307. Brandscript Engine
+**What it does:** Structured brand narrative builder based on the StoryBrand framework (Donald Miller). Stores brand stories as a workspace-scoped `brandscripts` table with child `brandscript_sections` rows. Eight canonical section types: Hook, Character, Problem, Guide, Plan, Call to Action, Failure, Success. Full CRUD API: list, get, create (from template or blank), update name/framework, delete. Section batch-update via delete-all + reinsert with `created_at` / `sort_order` preservation. A seeded `brandscript_templates` table ships with the default StoryBrand template. `generateBrandscript()` uses GPT-4.1 with workspace intelligence context to pre-populate all sections from existing brand knowledge. `questionnaire → brandscript` auto-population maps onboarding questionnaire answers (about, services, differentiators, personas, competitors) into the 8 sections idempotently — returns existing brandscript if one already exists. Admin UI in `BrandscriptTab.tsx` with inline section editing, AI generation trigger, and live preview.
+
+**Files:** `server/brandscript.ts`, `server/routes/brandscript.ts`, `server/db/migrations/053-brandscript-engine.sql`, `shared/types/brand-engine.ts`, `src/components/brand/BrandscriptTab.tsx`
+
+**Agency value:** Captures the brand narrative in a structured, reusable format that feeds every downstream AI feature (copy generation, voice calibration, deliverable generation). Replaces unstructured brand docs with a queryable framework.
+
+**Client value:** A clear articulation of their brand story they can review, edit, and approve — not a black box.
+
+**Mutual:** The brandscript is the single source of truth for brand narrative across copy, voice, and identity deliverables.
+
+---
+
+### 308. Discovery Ingestion
+**What it does:** Ingestion pipeline for raw brand source material. Accepts uploads of transcripts, brand documents, competitor profiles, existing copy, and website crawl data (`source_type` enum). AI-powered extraction (GPT-4.1-mini) pulls structured signals from raw content: brand attributes, voice signals, audience insights, product details, competitive intelligence, and value propositions (`extraction_type` + `category` fields). Each extraction carries a confidence rating (`high`/`medium`/`low`) based on source type (transcripts → high; website crawl → low). Extractions include a `source_quote` anchoring them to specific passages. `SourceAlreadyProcessedError` guards against double-processing: re-processing requires explicit `{ force: true }` which deletes prior extractions and replaces them. Extractions can be reviewed, edited, approved, dismissed, or routed to specific brand tools (`routed_to` field). Admin UI in `DiscoveryTab.tsx` shows sources list with extraction status and per-source extraction review panel.
+
+**Files:** `server/discovery-ingestion.ts`, `server/routes/brandscript.ts`, `server/db/migrations/053-brandscript-engine.sql`, `shared/types/brand-engine.ts`, `src/components/brand/DiscoveryTab.tsx`
+
+**Agency value:** Turns unstructured brand assets (sales call transcripts, intake docs, old website copy) into structured brand intelligence without manual analysis. Source material automatically feeds voice calibration and brandscript generation.
+
+**Client value:** Existing brand materials are respected and incorporated rather than starting from scratch.
+
+---
+
+### 309. Voice Calibration
+**What it does:** Voice profile state machine (`draft → calibrating → calibrated`) that codifies a workspace's brand voice into AI-consumable structures. Three data layers: **Voice DNA** (tone dimensions with weights, vocabulary preferences, forbidden phrases, structural preferences), **Guardrails** (tone boundaries, anti-patterns, content rules, brand promises), and **Context Modifiers** (per-context adjustments for headline/body/cta/about copy). Calibration sessions generate 3 AI variations of a given copy type (`promptType` string — e.g., `hero_headline`, `service_cta`, `brand_story`). The agency selects the preferred variation; selection distills the chosen text into voice DNA dimensions via AI analysis using Claude (`callCreativeAI`). Voice samples (with `context_tag` labels: `headline`, `body`, `cta`, `about`) feed calibration context. `buildVoiceCalibrationContext()` assembles samples, DNA, and guardrails for injection into copy generation prompts. `INSERT OR IGNORE` on `voice_profiles(workspace_id)` prevents duplicate profile creation under concurrent requests. Admin UI in `VoiceTab.tsx`.
+
+**Files:** `server/voice-calibration.ts`, `server/voice-dna-render.ts`, `server/prompt-assembly.ts`, `server/routes/voice-calibration.ts`, `server/db/migrations/053-brandscript-engine.sql`, `shared/types/brand-engine.ts`, `src/components/brand/VoiceTab.tsx`
+
+**Agency value:** Replaces ad-hoc brand voice notes with a structured, versionable voice profile that feeds every AI generation in the platform. Once calibrated, every piece of AI-generated copy sounds like the client — not generic marketing language.
+
+**Client value:** Their brand voice is encoded, not just described. Generated copy consistently reflects their personality across all content types.
+
+**Mutual:** A calibrated voice profile is the highest-leverage input in the copy generation stack. It self-improves over time via the Voice Feedback Loop (feature #287).
+
+---
+
+### 310. Brand Identity Deliverables
+**What it does:** AI-generated brand identity document suite organized into three tiers — **Essentials** (mission, vision, values, tagline, elevator_pitch), **Professional** (archetypes, personality_traits, voice_guidelines, tone_examples, messaging_pillars, differentiators, positioning_matrix), **Premium** (brand_story, personas, customer_journey, objection_handling, emotional_triggers). 17 deliverable types total. Each deliverable is stored with version history (`brand_identity_versions` table). `generateDeliverable()` uses Claude (`callCreativeAI`) with full intelligence context (workspace intel + voice calibration context + brandscript sections + discovery extractions). Approved copy auto-adds a voice sample via `addVoiceSample()` so each approval strengthens the voice profile. Status machine: `draft → approved`. Steering notes accumulate across regenerations. `broadcastToWorkspace()` fires on every generation/approval for real-time UI sync. Admin UI in `IdentityTab.tsx` with tier grouping, deliverable cards, inline steering, and version history viewer.
+
+**Files:** `server/brand-identity.ts`, `server/routes/brand-identity.ts`, `server/db/migrations/053-brandscript-engine.sql`, `shared/types/brand-engine.ts`, `src/components/brand/IdentityTab.tsx`
+
+**Agency value:** Generates 17 brand identity documents in minutes from existing workspace intelligence. Tier grouping lets agencies deliver essentials quickly, then upsell professional and premium deliverables. Version history tracks every regeneration.
+
+**Client value:** A complete brand identity package — not just copy, but archetypes, personas, customer journey maps, and objection handling — all grounded in their actual business data.
+
+**Mutual:** Brand identity deliverables become context for every downstream feature: copy generation, voice calibration, AI chat, and content briefs all reference the approved deliverable suite.
 
 ---
 
@@ -3620,3 +3670,51 @@ Current feature count: **306**. Last updated: April 2026.
 **Files:** `server/scheduled-audits.ts`, `server/analytics-insights-store.ts`, `tests/integration/scheduled-audits-dedup.test.ts`
 
 **Agency value:** Prevents duplicate audit runs stacking up under slow network conditions or when the hourly check fires while a long audit is still in progress. Duplicate audits previously could write conflicting snapshots and double-count activity log entries.
+
+---
+
+## Nested Page Path Hardening (2026-04-21)
+
+### Nested Page Path Hardening (2026-04-21)
+- **resolvePagePath sweep** — 15+ locations across server routes and frontend components now use `resolvePagePath(page)` instead of bare `` `/${page.slug}` `` constructions. Nested Webflow pages (e.g., `/services/seo`) correctly use `publishedPath` instead of truncated slug.
+- **applyBulkKeywordGuards** — moved to `server/helpers.ts`; now also called in `webflow-seo.ts` bulk analyze path (BUG-0003: prevents AI-hallucinated keyword metrics from being persisted).
+- **GSC path-boundary matching** — replaced `.includes(page.slug)` substring matching with exact path + prefix matching in `webflow-seo.ts` (BUG-0004: eliminates false-positive query attribution).
+- **bare-slug-pagepath pr-check rule** — new rule flags any future `` `/${page.slug}` `` pagePath constructions across server and frontend files.
+
+---
+
+### 307. usePageJoin — Unified Page-Join Shared Hook
+**What it does:** Canonical React Query hook `usePageJoin(workspaceId, siteId)` that joins Webflow pages with keyword strategy data, returning `UnifiedPage[]`. Replaces 3 independent ad-hoc join implementations across SeoEditor, PageIntelligence, and ApprovalsTab. Unified shape: `{ id, title, path, slug, source, seo, publishedPath, strategy }`. Matching uses `findPageMapEntryForPage` for case-insensitive + legacy slug fallback consistency.
+
+**Agency value:** Eliminates join logic duplication. All three admin tools now reference the same shared join implementation — prevents future drift where one component adds a field or changes matching logic without updating the others. New admin components requiring page+strategy joins immediately get the right shape without hand-rolling.
+
+**Client value:** Indirect — more consistent behavior across admin tools means fewer surprises when using different surfaces to work on the same pages.
+
+**Mutual:** Consolidates a complex, error-prone operation into a single canonical location. Enforced by pr-check rule forbidding manual `pageMap.find()/strategyByPath` patterns outside the hook — all future page-join code routes through the shared hook.
+
+**Files:** `src/hooks/admin/usePageJoin.ts`, `shared/types/page-join.ts`
+
+---
+
+## Tech-Debt Hardening Sprint (PR #256, 2026-04-22)
+
+### 308. Atomic Usage-Tracking (TOCTOU Fix)
+**What it does:** Closes a concurrency race where two simultaneous AI requests (bulk alt-text, keyword strategy, etc.) could both pass the usage limit check before either incremented the counter, overshooting the tier limit by ~N concurrent requests. Adds `incrementIfAllowed(wsId, tier, feature)` in `server/usage-tracking.ts` that wraps check + increment in a single SQLite transaction. All 6 guarded AI routes migrated: keyword strategy, brand voice, knowledge base, personas, webflow alt-text (single + bulk), brand identity refine. Failure paths call `decrementUsage()` to refund atomically on AI errors.
+
+**Files:** `server/usage-tracking.ts`, `server/routes/keyword-strategy.ts`, `server/routes/brand-voice.ts`, `server/routes/knowledge-base.ts`, `server/routes/personas.ts`, `server/routes/webflow-alt-text.ts`, `server/routes/brand-identity.ts`
+
+### 309. Alt-Text Route Auth Hardening
+**What it does:** Moves `workspaceId` from request body to URL path param on alt-text generation routes and adds `requireWorkspaceAccess` middleware, closing a pre-existing gap where an authenticated admin could target a different workspace's quota by manipulating the request body. Routes renamed from `/api/webflow/generate-alt/:assetId` and `/api/webflow/bulk-generate-alt` to `/api/webflow/:workspaceId/generate-alt/:assetId` and `/api/webflow/:workspaceId/bulk-generate-alt`. Prop chain updated through `App.tsx → MediaTab → AssetBrowser/AssetAudit` to pass `workspaceId`.
+
+**Files:** `server/routes/webflow-alt-text.ts`, `src/api/seo.ts`, `src/components/AssetBrowser.tsx`, `src/components/AssetAudit.tsx`, `src/components/MediaTab.tsx`, `src/App.tsx`
+
+### 310. Stream Reader Deduplication (readNdjsonStream + readSseStream)
+**What it does:** Extracts two generic stream reader helpers into `src/api/streamUtils.ts` — `readNdjsonStream<T>` (splits on newlines, parses each as JSON) and `readSseStream<T>` (strips `data: ` prefix). Replaces two independent `while(true){reader.read()}` loops in `seo.ts` that had already diverged (NDJSON flushed trailing buffer; SSE did not). `AssetBrowser.tsx` refactored to use the typed `bulkGenerateAltText` wrapper from `src/api/seo.ts` instead of hand-rolling a raw fetch + stream loop.
+
+**Files:** `src/api/streamUtils.ts` (new), `src/api/seo.ts`, `src/components/AssetBrowser.tsx`
+
+### 311. rowToInsight Schema Hardening
+**What it does:** Adds Zod schemas for all 14 insight data types in `server/schemas/insight-schemas.ts` and an `INSIGHT_DATA_SCHEMA_MAP` mapping each `InsightType` to its schema. `rowToInsight()` in `analytics-insights-store.ts` now validates via `parseJsonSafe()` instead of bare `parseJsonFallback()`, so corrupt or missing stored JSON is caught at read time rather than silently producing `undefined` on required fields. All schemas use `.passthrough()` so cross-cutting `_originalBaseScore`/`_scoreAdjustments` fields added by `applyScoreAdjustment()` survive round-trip. Fixed 4 test files whose fixtures used incomplete or wrong-field data shapes.
+
+**Files:** `server/schemas/insight-schemas.ts`, `server/analytics-insights-store.ts`, `tests/unit/migration-data-preservation.test.ts`, `tests/integration/anomaly-boost-reversal.test.ts`, `tests/integration/public-analytics.test.ts`, `tests/contract/insight-data-shapes.test.ts`
+

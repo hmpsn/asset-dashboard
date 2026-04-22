@@ -38,9 +38,80 @@ export function findPageMapEntry<T extends { pagePath: string }>(pageMap: T[], p
   return pageMap.find(p => normalizePath(p.pagePath).toLowerCase() === norm);
 }
 
+/**
+ * Find a pageMap entry for a given Webflow page, with backward-compat fallback.
+ *
+ * Tries the resolved path first (`publishedPath` or `/${slug}`). If no match AND
+ * the page has both a slug and a publishedPath, falls back to `/${slug}` to catch
+ * legacy pageMap entries stored before the slug-path hardening migration — those
+ * entries have `pagePath: '/seo'` for pages whose correct path is `/services/seo`.
+ *
+ * Self-heals: once the workspace is re-analyzed, pageMap entries get re-keyed to
+ * the new full path and the fallback stops being reached.
+ */
+export function findPageMapEntryForPage<T extends { pagePath: string }>(
+  pageMap: T[],
+  page: { publishedPath?: string | null; slug?: string },
+): T | undefined {
+  const primary = findPageMapEntry(pageMap, resolvePagePath(page));
+  if (primary) return primary;
+  // Legacy fallback: pre-hardening entries stored under `/${slug}` for nested pages.
+  if (page.slug && page.publishedPath && page.publishedPath !== `/${page.slug}`) {
+    return findPageMapEntry(pageMap, `/${page.slug}`);
+  }
+  return undefined;
+}
+
 /** Resolve a Webflow page's canonical path from publishedPath or slug */
 export function resolvePagePath(page: { publishedPath?: string | null; slug?: string }): string {
   return page.publishedPath || (page.slug ? `/${page.slug}` : '/');
+}
+
+/**
+ * Returns the resolved page path, or `undefined` when the page has no slug/publishedPath info at all.
+ *
+ * Use this in any context that must distinguish "no meaningful path info" from a real path
+ * (including the homepage). `resolvePagePath` always returns a truthy string (`'/'` for empty
+ * input), so patterns like `resolvePagePath(page) || undefined` or
+ * `if (baseUrl) fetch(\`${baseUrl}${resolvePagePath(page)}\`)` silently fall through to the
+ * homepage for orphan pages. Prefer `tryResolvePagePath`.
+ *
+ * Important: Webflow homepages are marked with `slug: ''` (empty string, see
+ * `server/webflow-pages.ts` `filterPublishedPages`), NOT undefined. The guard below checks
+ * `=== undefined` / `=== null` rather than falsy, so `slug: ''` correctly resolves to `/`.
+ * Only pages with neither field (truly orphaned, no identifying path info) return `undefined`.
+ */
+export function tryResolvePagePath(page: { publishedPath?: string | null; slug?: string }): string | undefined {
+  const hasSlug = page.slug !== undefined && page.slug !== null;
+  const hasPublishedPath = page.publishedPath !== undefined && page.publishedPath !== null;
+  if (!hasSlug && !hasPublishedPath) return undefined;
+  return resolvePagePath(page);
+}
+
+/**
+ * Match a GSC-reported URL (full URL or path) against a resolved page path.
+ * Extracts pathname, normalizes trailing slash, and handles homepage edge case.
+ */
+export function matchGscUrlToPath(gscUrl: string, resolvedPath: string): boolean {
+  let rPath: string;
+  try { rPath = new URL(gscUrl).pathname; } catch { rPath = gscUrl; }
+  rPath = normalizePath(rPath.startsWith('/') ? rPath : `/${rPath}`);
+  return resolvedPath === '/' ? rPath === '/' || rPath === '' : rPath === resolvedPath;
+}
+
+/**
+ * Zero out AI-hallucinated keyword metrics when no SEMRush data was available.
+ * Call after JSON.parse of any AI keyword analysis response.
+ */
+export function applyBulkKeywordGuards(
+  analysis: Record<string, unknown>,
+  semrushBlock: string,
+): void {
+  if (!analysis || typeof analysis !== 'object' || Array.isArray(analysis)) return;
+  if (!semrushBlock) {
+    analysis.keywordDifficulty = 0;
+    analysis.monthlyVolume = 0;
+  }
 }
 
 /**
