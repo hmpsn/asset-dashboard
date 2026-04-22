@@ -4087,6 +4087,124 @@ describe('Rule: resolvePagePath(...) with undefined fallback is dead code — us
   });
 });
 
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: useWorkspaceEvents handler for centralized event
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: useWorkspaceEvents handler for centralized event', () => {
+  const RULE = 'useWorkspaceEvents handler for centralized event';
+
+  // The rule parses the real src/hooks/useWsInvalidation.ts to build its
+  // allowlist of centralized events. Fixtures written to tmpdir satisfy the
+  // path filter (src/) and use an event name (STRATEGY_UPDATED) that is
+  // known to be in useWsInvalidation.ts from Task 1 of #597.
+
+  it('flags an inline [WS_EVENTS.STRATEGY_UPDATED] handler in a src/ component', () => {
+    const file = write(
+      uniqPath('rule-ws-central', 'src/components/SomeComponent.tsx'),
+      lines(
+        "import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';",
+        "import { WS_EVENTS } from '../lib/wsEvents';",
+        'function SomeComponent({ workspaceId }: { workspaceId: string }) {',
+        '  useWorkspaceEvents(workspaceId, {',
+        '    [WS_EVENTS.STRATEGY_UPDATED]: () => {',
+        '      // duplicate invalidation',
+        '    },',
+        '  });',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(5);
+  });
+
+  it('does NOT flag an event not in useWsInvalidation.ts allowlist', () => {
+    const file = write(
+      uniqPath('rule-ws-central', 'src/components/SomeComponent.tsx'),
+      lines(
+        "import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';",
+        "import { WS_EVENTS } from '../lib/wsEvents';",
+        'function SomeComponent({ workspaceId }: { workspaceId: string }) {',
+        '  useWorkspaceEvents(workspaceId, {',
+        '    [WS_EVENTS.BULK_OPERATION_PROGRESS]: () => {',
+        '      // not centralized — local state only',
+        '    },',
+        '  });',
+        '}',
+      )
+    );
+    // BULK_OPERATION_PROGRESS is intentionally NOT in useWsInvalidation.ts
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with inline // ws-invalidation-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-ws-central', 'src/components/SomeComponent.tsx'),
+      lines(
+        "import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';",
+        "import { WS_EVENTS } from '../lib/wsEvents';",
+        'function SomeComponent({ workspaceId }: { workspaceId: string }) {',
+        '  useWorkspaceEvents(workspaceId, {',
+        '    [WS_EVENTS.STRATEGY_UPDATED]: () => { // ws-invalidation-ok — local progress state',
+        '    },',
+        '  });',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with above-line // ws-invalidation-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-ws-central', 'src/components/SomeComponent.tsx'),
+      lines(
+        "import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';",
+        "import { WS_EVENTS } from '../lib/wsEvents';",
+        'function SomeComponent({ workspaceId }: { workspaceId: string }) {',
+        '  useWorkspaceEvents(workspaceId, {',
+        '    // ws-invalidation-ok — needs local component state side effect too',
+        '    [WS_EVENTS.STRATEGY_UPDATED]: () => {',
+        '    },',
+        '  });',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag useWsInvalidation.ts itself (excluded)', () => {
+    const file = write(
+      uniqPath('rule-ws-central', 'src/hooks/useWsInvalidation.ts'),
+      lines(
+        "import { WS_EVENTS } from '../lib/wsEvents';",
+        'export function useWsInvalidation(workspaceId: string) {',
+        '  useWorkspaceEvents(workspaceId, {',
+        '    [WS_EVENTS.STRATEGY_UPDATED]: () => {',
+        '    },',
+        '  });',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag .test. files (test mocks may reference WS_EVENTS keys)', () => {
+    const file = write(
+      uniqPath('rule-ws-central', 'src/hooks/useSomething.test.tsx'),
+      lines(
+        "import { WS_EVENTS } from '../lib/wsEvents';",
+        "it('handles STRATEGY_UPDATED', () => {",
+        '  useWorkspaceEvents(ws, {',
+        '    [WS_EVENTS.STRATEGY_UPDATED]: () => {},',
+        '  });',
+        '});',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
 describe('Meta: customCheck rule name registry', () => {
   const EXPECTED_CUSTOM_CHECK_RULES = [
     'Global keydown missing isContentEditable guard',
@@ -4137,6 +4255,8 @@ describe('Meta: customCheck rule name registry', () => {
     // Slug-path hardening sprint (2026-04-21)
     'Bare slug used in pagePath construction — use resolvePagePath(page)',
     'resolvePagePath(...) with undefined fallback is dead code — use tryResolvePagePath',
+    // Broadcast-invalidation centralization (#597)
+    'useWorkspaceEvents handler for centralized event',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
