@@ -11,6 +11,15 @@ import { fileURLToPath } from 'url';
 import { getDataDir } from '../data-dir.js';
 import { isProgrammingError } from '../errors.js';
 import { createLogger } from '../logger.js';
+import { validate, z } from '../middleware/validate.js';
+
+const patchItemSchema = z
+  .object({
+    status: z.enum(['done', 'in_progress', 'pending']).optional(),
+    notes: z.string().optional(),
+    shippedAt: z.string().optional(),
+  })
+  .strict();
 
 
 const log = createLogger('roadmap');
@@ -104,7 +113,7 @@ router.put('/api/roadmap', (req, res) => {
 // lookup would match by-id-only and would silently update the wrong item if
 // IDs ever collide across sprints (see scripts/dedupe-roadmap-ids.ts and the
 // roadmap-id-uniqueness pr-check rule).
-router.patch('/api/roadmap/item/:id', (req, res) => {
+router.patch('/api/roadmap/item/:id', validate(patchItemSchema), (req, res) => {
   try {
     const itemId = req.params.id;
     const sprintId = typeof req.query.sprintId === 'string' ? req.query.sprintId : '';
@@ -116,14 +125,8 @@ router.patch('/api/roadmap/item/:id', (req, res) => {
     if (!sprint) return res.status(404).json({ error: 'Sprint not found' });
     const item = sprint.items.find((i: { id: number | string }) => String(i.id) === itemId);
     if (!item) return res.status(404).json({ error: 'Item not found' });
-    // Whitelist mutable fields — never let callers overwrite id/title/source/etc.
-    // The id uniqueness invariant is enforced by the roadmap-id-uniqueness pr-check rule.
-    const body = req.body ?? {};
-    const patch: Record<string, unknown> = {};
-    if (typeof body.status === 'string') patch.status = body.status;
-    if (typeof body.notes === 'string') patch.notes = body.notes;
-    if (typeof body.shippedAt === 'string') patch.shippedAt = body.shippedAt;
-    Object.assign(item, patch);
+    // Schema enforces field whitelist + status enum; id/title/source cannot be overwritten.
+    Object.assign(item, req.body);
     fs.writeFileSync(ROADMAP_RUNTIME_FILE, JSON.stringify(data, null, 2));
     res.json({ ok: true, item });
   } catch (err) {
