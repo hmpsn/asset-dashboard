@@ -475,9 +475,10 @@ export function generateAltText(
  * counters in addition to per-asset results.
  */
 export interface BulkAltTextNdjsonEvent {
-  type: 'result' | 'status';
+  type: 'result' | 'status' | 'done';
   assetId?: string;
   altText?: string;
+  error?: string;
   done?: number;
   total?: number;
   updated?: boolean;

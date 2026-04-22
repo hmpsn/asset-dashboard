@@ -210,7 +210,6 @@ router.post('/api/webflow/bulk-generate-alt', async (req, res) => {
   send({ type: 'status', message: 'Processing images...', done: 0, total: assets.length });
 
   let done = 0;
-  let successCount = 0;
   for (const asset of assets) {
     try {
       const response = await fetch(asset.imageUrl);
@@ -235,7 +234,7 @@ router.post('/api/webflow/bulk-generate-alt', async (req, res) => {
           log.error({ detail: writeResult.error }, `Bulk alt: generated but write-back failed for ${asset.assetId}:`);
           send({ type: 'result', assetId: asset.assetId, altText, updated: false, error: writeResult.error, done, total: assets.length });
         } else {
-          successCount++;
+          if (bulkWsId) incrementUsage(bulkWsId, 'strategy_generations');
           send({ type: 'result', assetId: asset.assetId, altText, updated: true, done, total: assets.length });
         }
       } else {
@@ -250,9 +249,6 @@ router.post('/api/webflow/bulk-generate-alt', async (req, res) => {
   }
 
   send({ type: 'done', done, total: assets.length });
-  if (bulkWsId && successCount > 0) {
-    incrementUsage(bulkWsId, 'strategy_generations');
-  }
   res.end();
 });
 
