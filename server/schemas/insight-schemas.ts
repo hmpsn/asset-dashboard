@@ -41,7 +41,9 @@ export const siteHealthInsightDataSchema = z.object({
   siteWideIssueCount: z.number(),
 });
 
-/** Schema for PageHealthData — page-level health from analytics */
+/** Schema for PageHealthData — page-level health from analytics.
+ *  Includes optional audit-enrichment fields (shared/types/analytics.ts:256-259)
+ *  populated when the audit → page_health bridge adds error/warning context. */
 export const pageHealthDataSchema = z.object({
   score: z.number(),
   trend: z.enum(['improving', 'declining', 'stable']),
@@ -52,6 +54,10 @@ export const pageHealthDataSchema = z.object({
   pageviews: z.number(),
   bounceRate: z.number(),
   avgEngagementTime: z.number(),
+  auditSnapshotId: z.string().optional(),
+  errorCount: z.number().optional(),
+  warningCount: z.number().optional(),
+  topIssues: z.array(z.string()).optional(),
 });
 
 /**
