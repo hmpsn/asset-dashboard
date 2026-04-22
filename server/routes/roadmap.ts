@@ -134,13 +134,25 @@ router.patch('/api/roadmap/item/:id', validate(patchItemSchema), (req, res) => {
   }
 });
 
-// Legacy compat: GET /api/roadmap-status returns flat status map
+// Legacy compat: GET /api/roadmap-status returns a flat status map.
+//
+// Keys are compound `${sprintId}::${itemId}` rather than bare item ids — the
+// previous bare-id form silently dropped statuses when an id appeared in two
+// sprints (the cross-sprint collision problem fixed by
+// scripts/dedupe-roadmap-ids.ts and the roadmap-id-uniqueness pr-check rule).
+// The compound key matches the identity used by PATCH /api/roadmap/item/:id
+// (which requires `?sprintId=`) and by `compoundKey()` in the frontend views.
+//
+// No in-repo consumers exist; this endpoint is preserved only for any external
+// scripts still polling it. Treat as deprecated — prefer GET /api/roadmap.
 router.get('/api/roadmap-status', (_req, res) => {
   try {
     const data = loadRoadmap();
     const statusMap: Record<string, string> = {};
     for (const sprint of data.sprints) {
-      for (const item of sprint.items) statusMap[String(item.id)] = item.status;
+      for (const item of sprint.items) {
+        statusMap[`${sprint.id}::${item.id}`] = item.status;
+      }
     }
     res.json(statusMap);
   } catch (err) {

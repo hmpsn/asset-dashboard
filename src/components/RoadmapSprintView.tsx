@@ -1,5 +1,5 @@
 import { CheckCircle2, FilterX } from 'lucide-react';
-import { Badge, EmptyState } from './ui/index';
+import { Badge, EmptyState, SectionCard } from './ui/index';
 import type { SprintData } from '../../shared/types/roadmap';
 import type { RoadmapFilters } from '../lib/roadmapFilters';
 import { matchesFilters } from '../lib/roadmapFilters';
@@ -60,7 +60,7 @@ export function RoadmapSprintView({ sprints, filters, featureMap, onToggleStatus
             </div>
 
             {/* Item list */}
-            <div className="mt-2 bg-zinc-900/40 border border-zinc-800 rounded-lg divide-y divide-zinc-800/50">
+            <SectionCard variant="subtle" noPadding className="mt-2 divide-y divide-zinc-800/50">
               {filteredItems.map(item => {
                 const pb = priorityBadge(item.priority);
                 const featureName = item.featureId != null ? featureMap.get(item.featureId) : undefined;
@@ -99,7 +99,7 @@ export function RoadmapSprintView({ sprints, filters, featureMap, onToggleStatus
                   </div>
                 );
               })}
-            </div>
+            </SectionCard>
           </div>
         );
       })}

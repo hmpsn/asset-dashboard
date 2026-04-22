@@ -1,6 +1,6 @@
 import { Fragment, useState } from 'react';
 import { ChevronDown, ChevronUp, ChevronRight, ArrowUpDown, FilterX } from 'lucide-react';
-import { Badge, EmptyState } from './ui/index';
+import { Badge, EmptyState, SectionCard } from './ui/index';
 import type { SprintData } from '../../shared/types/roadmap';
 import type { RoadmapFilters, SortKey, SortDir, FlatRoadmapItem } from '../lib/roadmapFilters';
 import { matchesFilters, sortItems } from '../lib/roadmapFilters';
@@ -62,7 +62,7 @@ export function RoadmapBacklogView({ sprints, filters, featureMap, onToggleStatu
   }
 
   return (
-    <div className="bg-zinc-900/40 border border-zinc-800 rounded-lg overflow-hidden">
+    <SectionCard variant="subtle" noPadding>
       <table className="w-full text-xs">
         <thead className="border-b border-zinc-800">
           <tr>
@@ -178,6 +178,6 @@ export function RoadmapBacklogView({ sprints, filters, featureMap, onToggleStatu
           })}
         </tbody>
       </table>
-    </div>
+    </SectionCard>
   );
 }
