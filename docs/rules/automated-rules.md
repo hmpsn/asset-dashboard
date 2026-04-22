@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **70** — 38 error, 32 warn.
+Total rules: **71** — 39 error, 32 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -54,6 +54,7 @@ advisory but tracked.
 | 36 | resolvePagePath(...) with undefined fallback is dead code — use tryResolvePagePath | error | custom | `*.ts, *.tsx` | `// slug-path-ok` | The dead-code pattern silently neutralizes downstream guards like `if (basePath)` that are meant to skip fetch/GSC-match for path-less pages. |
 | 37 | Manual pageMap pairing outside shared helpers — use findPageMapEntry(ForPage) or usePageJoin | error | custom | `src/` | — | Three components independently reimplemented pageMap.find with divergent semantics (SeoEditor, PageIntelligence, ApprovalsTab). The shared helpers in pathUtils.ts and the usePageJoin hook normalize all matching. Direct .find() silently breaks case variants and legacy paths. |
 | 38 | useWorkspaceEvents handler for centralized event | error | custom | `src/` | `// ws-invalidation-ok` | Duplicated useWorkspaceEvents subscriptions diverge over time — one side gets updated, the other silently misses cache keys — producing stale UI bugs that are hard to reproduce because they depend on event ordering. |
+| 39 | roadmap.json item ID uniqueness | error | custom | `data/roadmap.json` | — | Cross-sprint duplicate IDs caused PR #258 round-4: clicking expand on one row toggled both, and the server PATCH updated whichever sprint came first. |
 
 ---
 
