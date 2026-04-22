@@ -11,6 +11,15 @@ import { fileURLToPath } from 'url';
 import { getDataDir } from '../data-dir.js';
 import { isProgrammingError } from '../errors.js';
 import { createLogger } from '../logger.js';
+import { validate, z } from '../middleware/validate.js';
+
+const patchItemSchema = z
+  .object({
+    status: z.enum(['done', 'in_progress', 'pending']).optional(),
+    notes: z.string().optional(),
+    shippedAt: z.string().optional(),
+  })
+  .strict();
 
 
 const log = createLogger('roadmap');
@@ -99,39 +108,36 @@ router.put('/api/roadmap', (req, res) => {
   }
 });
 
-// PATCH single item status (lightweight update)
-router.patch('/api/roadmap/item/:id', (req, res) => {
+// PATCH single item status (lightweight update).
+// Requires `?sprintId=X` so the find is scoped to one sprint — without it the
+// lookup would match by-id-only and would silently update the wrong item if
+// IDs ever collide across sprints (see scripts/dedupe-roadmap-ids.ts and the
+// roadmap-id-uniqueness pr-check rule).
+router.patch('/api/roadmap/item/:id', validate(patchItemSchema), (req, res) => {
   try {
-    const data = loadRoadmap();
-    const itemId = parseInt(req.params.id, 10);
-    for (const sprint of data.sprints) {
-      const item = sprint.items.find((i: { id: number }) => i.id === itemId);
-      if (item) {
-        Object.assign(item, req.body);
-        fs.writeFileSync(ROADMAP_RUNTIME_FILE, JSON.stringify(data, null, 2));
-        return res.json({ ok: true, item });
-      }
+    const itemId = req.params.id;
+    const sprintId = typeof req.query.sprintId === 'string' ? req.query.sprintId : '';
+    if (!sprintId) {
+      return res.status(400).json({ error: 'sprintId query param is required' });
     }
-    res.status(404).json({ error: 'Item not found' });
+    const data = loadRoadmap();
+    const sprint = data.sprints.find((s: { id: string }) => s.id === sprintId);
+    if (!sprint) return res.status(404).json({ error: 'Sprint not found' });
+    const item = sprint.items.find((i: { id: number | string }) => String(i.id) === itemId);
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+    // Schema enforces field whitelist + status enum; id/title/source cannot be overwritten.
+    Object.assign(item, req.body);
+    fs.writeFileSync(ROADMAP_RUNTIME_FILE, JSON.stringify(data, null, 2));
+    res.json({ ok: true, item });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 
-// Legacy compat: GET /api/roadmap-status returns flat status map
-router.get('/api/roadmap-status', (_req, res) => {
-  try {
-    const data = loadRoadmap();
-    const statusMap: Record<string, string> = {};
-    for (const sprint of data.sprints) {
-      for (const item of sprint.items) statusMap[String(item.id)] = item.status;
-    }
-    res.json(statusMap);
-  } catch (err) {
-    if (isProgrammingError(err)) log.warn({ err }, 'roadmap: GET /api/roadmap-status: programming error');
-    else log.debug({ err }, 'roadmap: GET /api/roadmap-status: degrading gracefully');
-    res.json({});
-  }
-});
+// Note: a previous GET /api/roadmap-status endpoint returned a flat
+// `Record<id, status>` map. It was removed in PR #258 — the bare-id keying
+// silently dropped statuses on cross-sprint id collisions, and a grep
+// (server/, src/, tests/, scripts/) found zero callers. Use GET /api/roadmap
+// and read item.status directly; the canonical identity is (sprintId, itemId).
 
 export default router;

@@ -17,7 +17,7 @@ import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
 const ctx = createTestContext(13209);
-const { api, postJson, del } = ctx;
+const { api, postJson, patchJson, del } = ctx;
 
 let testWsId = '';
 
@@ -39,7 +39,73 @@ describe('Miscellaneous read-only endpoints', () => {
     const body = await res.json();
     expect(body).toBeDefined();
   });
+});
 
+describe('PATCH /api/roadmap/item/:id — Zod validation, sprint scoping, field whitelist', () => {
+  // Pick the first sprint+item from the live roadmap as the test target. The
+  // PATCH route mutates data/roadmap.json — we restore the original status at
+  // the end so the test is idempotent across runs.
+  let sprintId = '';
+  let itemId: number | string = 0;
+  let originalStatus: 'pending' | 'in_progress' | 'done' = 'pending';
+
+  beforeAll(async () => {
+    const res = await api('/api/roadmap');
+    const body = await res.json() as { sprints: Array<{ id: string; items: Array<{ id: number | string; status: 'pending' | 'in_progress' | 'done' }> }> };
+    const sprint = body.sprints.find(s => s.items.length > 0);
+    if (!sprint) throw new Error('No sprint with items found in roadmap.json — cannot run PATCH integration tests');
+    sprintId = sprint.id;
+    itemId = sprint.items[0].id;
+    originalStatus = sprint.items[0].status;
+  });
+
+  afterAll(async () => {
+    // Restore so re-runs see the same baseline.
+    await patchJson(`/api/roadmap/item/${encodeURIComponent(String(itemId))}?sprintId=${encodeURIComponent(sprintId)}`, { status: originalStatus });
+  });
+
+  it('PATCH with valid status updates the item', async () => {
+    const newStatus = originalStatus === 'done' ? 'pending' : 'done';
+    const res = await patchJson(`/api/roadmap/item/${encodeURIComponent(String(itemId))}?sprintId=${encodeURIComponent(sprintId)}`, { status: newStatus });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { ok: boolean; item: { id: number | string; status: string } };
+    expect(body.ok).toBe(true);
+    expect(body.item.status).toBe(newStatus);
+  });
+
+  it('PATCH without sprintId query param returns 400', async () => {
+    const res = await patchJson(`/api/roadmap/item/${encodeURIComponent(String(itemId))}`, { status: 'pending' });
+    expect(res.status).toBe(400);
+    const body = await res.json() as { error: string };
+    expect(body.error).toMatch(/sprintId/);
+  });
+
+  it('PATCH with invalid status enum returns 400 (Zod)', async () => {
+    const res = await patchJson(`/api/roadmap/item/${encodeURIComponent(String(itemId))}?sprintId=${encodeURIComponent(sprintId)}`, { status: 'bogus' });
+    expect(res.status).toBe(400);
+  });
+
+  it('PATCH with unknown field returns 400 (strict schema)', async () => {
+    const res = await patchJson(`/api/roadmap/item/${encodeURIComponent(String(itemId))}?sprintId=${encodeURIComponent(sprintId)}`, { id: 999, status: 'done' });
+    expect(res.status).toBe(400);
+  });
+
+  it('PATCH with unknown sprintId returns 404', async () => {
+    const res = await patchJson(`/api/roadmap/item/${encodeURIComponent(String(itemId))}?sprintId=does-not-exist`, { status: 'pending' });
+    expect(res.status).toBe(404);
+    const body = await res.json() as { error: string };
+    expect(body.error).toMatch(/Sprint not found/);
+  });
+
+  it('PATCH with unknown itemId returns 404', async () => {
+    const res = await patchJson(`/api/roadmap/item/9999999?sprintId=${encodeURIComponent(sprintId)}`, { status: 'pending' });
+    expect(res.status).toBe(404);
+    const body = await res.json() as { error: string };
+    expect(body.error).toMatch(/Item not found/);
+  });
+});
+
+describe('Miscellaneous read-only endpoints (cont.)', () => {
   it('GET /api/jobs returns 200', async () => {
     const res = await api('/api/jobs');
     expect(res.status).toBe(200);

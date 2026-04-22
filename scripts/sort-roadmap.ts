@@ -18,31 +18,19 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import type { SprintData, RoadmapData } from '../shared/types/roadmap.js';
+
+// When adding new items to roadmap.json manually, include:
+//   "createdAt": "YYYY-MM-DD"
+// Existing items intentionally omit this field (forward-only policy).
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROADMAP_PATH = path.resolve(__dirname, '../data/roadmap.json');
 const dryRun = process.argv.includes('--dry-run');
 
-interface RoadmapItem {
-  id: number;
-  title: string;
-  status: string;
-  shippedAt?: string;
-  [key: string]: unknown;
-}
-
-interface Sprint {
-  id: string;
-  name: string;
-  items: RoadmapItem[];
-  shippedAt?: string;
-  [key: string]: unknown;
-}
-
-interface Roadmap {
-  sprints: Sprint[];
-}
+type Sprint = SprintData;
+type Roadmap = RoadmapData;
 
 function isFullyShipped(sprint: Sprint): boolean {
   return sprint.items.length > 0 && sprint.items.every(i => i.status === 'done');
