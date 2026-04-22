@@ -620,10 +620,12 @@ Rules:
       }>>(aiResult.text);
     } catch (err) {
       if (isProgrammingError(err)) log.warn({ err }, 'workspaces: programming error');
+      decrementUsage(ws.id, 'strategy_generations');
       return res.status(500).json({ error: 'AI returned invalid JSON — try again' });
     }
 
     if (!Array.isArray(personas) || personas.length === 0) {
+      decrementUsage(ws.id, 'strategy_generations');
       return res.status(500).json({ error: 'AI did not return valid personas — try again' });
     }
 
