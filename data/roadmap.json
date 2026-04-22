@@ -21,7 +21,7 @@
           "source": "PRODUCT_ROADMAP Month 1",
           "est": "4-6h",
           "priority": "P0",
-          "notes": "Client connects Google Search Console and GA4 via OAuth consent screen. Phase 2 of self-service (Phase 1 = Webflow).",
+          "notes": "Client connects Google Search Console and GA4 via OAuth consent screen. Phase 2 of self-service (Phase 1 = Webflow).\n[Audit 2026-04-22 partial] Google OAuth backend + admin Settings UI fully shipped; missing only the client-facing onboarding surface (OnboardingWizard reads hasGSC/hasGA4 but never triggers the connect flow).",
           "status": "pending"
         },
         {
@@ -75,7 +75,7 @@
           "source": "AUTH_ROADMAP Phase 3",
           "est": "4-5h",
           "priority": "P2",
-          "notes": "Invite team members, manage roles, assign workspaces.",
+          "notes": "Invite team members, manage roles, assign workspaces.\n[Audit 2026-04-22 partial] Internal-user backend (roles, invite, workspace assignment) fully shipped via /api/users; admin frontend UI to invite/manage internal team members is not built.",
           "status": "pending"
         },
         {
@@ -84,7 +84,7 @@
           "source": "AUTH_ROADMAP Phase 5",
           "est": "3-4h",
           "priority": "P2",
-          "notes": "Fine-grained: client_member view-only on approvals, member can't delete workspaces.",
+          "notes": "Fine-grained: client_member view-only on approvals, member can't delete workspaces.\n[Audit 2026-04-22 partial] Role enum (owner/admin/member, client_owner/client_member) and requireRole middleware shipped; per-action gating (client_member view-only on approvals, member-can't-delete-workspace) is not implemented in routes.",
           "status": "pending"
         },
         {
@@ -93,7 +93,7 @@
           "source": "FEATURE_AUDIT",
           "est": "2-3h",
           "priority": "P2",
-          "notes": "Assign content briefs to specific writers with notifications.",
+          "notes": "Assign content briefs to specific writers with notifications.\n[Audit 2026-04-22 partial] Adjacent infrastructure exists on work_orders (assigned_to column + mapper); content briefs lack any writer-assignment field and no notification flow is wired.",
           "status": "pending"
         },
         {
@@ -111,7 +111,7 @@
           "source": "AUTH_ROADMAP Phase 6",
           "est": "2-3h",
           "priority": "P3",
-          "notes": "Per-user email settings, digest frequency.",
+          "notes": "Per-user email settings, digest frequency.\n[Audit 2026-04-22 partial] In-app notification feed shipped (NotificationBell + useNotifications); per-user email/digest frequency preferences are not built.",
           "status": "pending"
         }
       ]
@@ -311,7 +311,7 @@
           "source": "TOOL_AUDIT §2b",
           "est": "30m",
           "priority": "P4",
-          "notes": "Add 'Create Content Template', 'Build Content Matrix', 'View Content Plan' to CommandPalette.",
+          "notes": "Add 'Create Content Template', 'Build Content Matrix', 'View Content Plan' to CommandPalette.\n[Audit 2026-04-22 partial] Two of three quick actions already shipped in CommandPalette.tsx (Create Content Template, Build Content Matrix); only \"View Content Plan\" remains.",
           "status": "pending"
         }
       ]
@@ -358,7 +358,7 @@
           "source": "UI_UX_AUDIT §7",
           "est": "3-4h",
           "priority": "P1",
-          "notes": "Current fragmentation: NotificationBell (top right), TaskPanel (processing queue), inline toasts, email queue. Create unified notification center with categories: Actions Needed (approvals, requests), System Events (audits complete), Alerts (score drops). Add notification preferences per workspace.",
+          "notes": "Current fragmentation: NotificationBell (top right), TaskPanel (processing queue), inline toasts, email queue. Create unified notification center with categories: Actions Needed (approvals, requests), System Events (audits complete), Alerts (score drops). Add notification preferences per workspace.\n[Audit 2026-04-22 partial] NotificationBell and TaskPanel both ship as separate components rendered side-by-side; no unified hub merges their categories.",
           "status": "pending"
         },
         {
@@ -496,7 +496,7 @@
           "source": "UI_UX_AUDIT §Long-Term",
           "est": "4-6h",
           "priority": "P3",
-          "notes": "Swipeable insight cards: 'LCP improved 23%', '3 pages need schema', 'Competitor published 5 articles'. Auto-generated from anomaly detection + audit + strategy data.",
+          "notes": "Swipeable insight cards: 'LCP improved 23%', '3 pages need schema', 'Competitor published 5 articles'. Auto-generated from anomaly detection + audit + strategy data.\n[Audit 2026-04-22 partial] Filterable insight feed UI shipped (src/components/insights/InsightFeed + InsightFeedItem + filter chips); swipeable vertical-feed presentation not built.",
           "status": "pending"
         },
         {
@@ -505,7 +505,7 @@
           "source": "UI_UX_AUDIT §Long-Term",
           "est": "4-6h",
           "priority": "P3",
-          "notes": "Expand from navigation to actions: 'Generate schema for [page]', 'Create brief for [keyword]', 'Run audit'. Natural language: 'Show thin content pages'.",
+          "notes": "Expand from navigation to actions: 'Generate schema for [page]', 'Create brief for [keyword]', 'Run audit'. Natural language: 'Show thin content pages'.\n[Audit 2026-04-22 partial] CommandPalette.tsx scaffolds an \"action\" item type alongside nav/workspace/recent, but no natural-language action handlers are wired (no LLM call, no parameterised \"Generate schema for [page]\").",
           "status": "pending"
         },
         {
@@ -514,7 +514,7 @@
           "source": "UI_UX_AUDIT §Long-Term",
           "est": "3-4h",
           "priority": "P3",
-          "notes": "Contextual tooltips with 'Why this matters'. 'Learn more' links to SeoGlossary. Video explanations for complex features. Education tip cards in empty states.",
+          "notes": "Contextual tooltips with 'Why this matters'. 'Learn more' links to SeoGlossary. Video explanations for complex features. Education tip cards in empty states.\n[Audit 2026-04-22 partial] SeoGlossary.tsx + SeoEducationTip.tsx (tab-keyed learnMore content for overview/performance/health/strategy/content/roi) ship; \"Why this matters\" framing, video embeds, and Glossary cross-links from tips are not wired.",
           "status": "pending"
         },
         {
@@ -523,7 +523,7 @@
           "source": "UI_UX_AUDIT §Long-Term",
           "est": "3-4h",
           "priority": "P3",
-          "notes": "Show page weight over time per workspace. Alert on regressions. Recommendations: 'Homepage grew 400KB, consider image optimization'.",
+          "notes": "Show page weight over time per workspace. Alert on regressions. Recommendations: 'Homepage grew 400KB, consider image optimization'.\n[Audit 2026-04-22 partial] PageWeight + PageSpeedPanel + server/performance-store ship point-in-time data; historical weight trend per workspace + regression alerts are not built.",
           "status": "pending"
         },
         {
@@ -532,7 +532,7 @@
           "source": "UI_UX_AUDIT §10",
           "est": "4-6h",
           "priority": "P2",
-          "notes": "Add ARIA landmarks, focus management for modals, keyboard navigation for complex widgets. Skip links. Test with screen reader (NVDA/VoiceOver).",
+          "notes": "Add ARIA landmarks, focus management for modals, keyboard navigation for complex widgets. Skip links. Test with screen reader (NVDA/VoiceOver).\n[Audit 2026-04-22 partial] 63 aria-label usages across 20 components ship; ARIA landmark roles, skip-links, and modal focus-management are not implemented.",
           "status": "pending"
         },
         {
@@ -550,7 +550,7 @@
           "source": "UI_UX_AUDIT §3",
           "est": "2-3h",
           "priority": "P2",
-          "notes": "Standardize loading patterns: route-level (keep ChunkFallback), data fetching (skeleton screens), actions (button loading + optimistic UI), background jobs (progress panel).",
+          "notes": "Standardize loading patterns: route-level (keep ChunkFallback), data fetching (skeleton screens), actions (button loading + optimistic UI), background jobs (progress panel).\n[Audit 2026-04-22 partial] Skeleton primitive widely adopted (169 usages across 34 files including Roadmap, ClientDashboard, AdminInbox, brand/*, client/*); no formal standardization rule, lint, or codified loading-pattern doc.",
           "status": "pending"
         },
         {
@@ -559,7 +559,7 @@
           "source": "PR #138 review / manual testing",
           "est": "3-5h",
           "priority": "P1",
-          "notes": "CmsEditor UI/UX is noticeably rougher than the clean static-page SeoEditor. Redesign to match: consistent card layout, inline field editing, clear save/publish flow, per-collection grouping with search/filter. Consider shared editing primitives between CmsEditor and SeoEditor to prevent future drift.",
+          "notes": "CmsEditor UI/UX is noticeably rougher than the clean static-page SeoEditor. Redesign to match: consistent card layout, inline field editing, clear save/publish flow, per-collection grouping with search/filter. Consider shared editing primitives between CmsEditor and SeoEditor to prevent future drift.\n[Audit 2026-04-22 partial] CmsEditor.tsx already shares SeoEditor primitives (CharacterCounter, SerpPreview, SocialPreview, StatusBadge, statusBorderClass) and the PendingApprovals panel; full layout-parity redesign vs SeoEditor is unverified.",
           "status": "pending"
         },
         {
