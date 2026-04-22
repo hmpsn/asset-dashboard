@@ -17,7 +17,12 @@ if (SENTRY_DSN) {
   });
 }
 
-// Auto-inject auth token into all /api/ requests
+// Auto-inject auth token into all /api/ requests. Load-bearing for every
+// call site that uses raw `fetch('/api/...')` instead of the typed helpers
+// in src/api/client.ts — including streaming wrappers in src/api/seo.ts
+// (bulkGenerateAltText, streamKeywordStrategy) that can't use post()/getText()
+// because those consume the full response body. Do not remove without
+// updating those wrappers to set x-auth-token themselves.
 const _fetch = window.fetch;
 window.fetch = function (input: RequestInfo | URL, init?: RequestInit) {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;

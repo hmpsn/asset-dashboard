@@ -498,7 +498,7 @@ export interface BulkAltTextNdjsonEvent {
  * body — the caller assembles this.
  */
 export function bulkGenerateAltText(
-  body: { siteId: string; assets: Array<{ assetId: string; imageUrl: string }> },
+  body: { siteId: string; workspaceId?: string; assets: Array<{ assetId: string; imageUrl: string }> },
   onProgress: (assetId: string, altText: string) => void,
   onEvent?: (event: BulkAltTextNdjsonEvent) => void,
   onDone?: () => void,
