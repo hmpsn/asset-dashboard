@@ -213,6 +213,17 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
         type: 'action',
         action: () => { navigate(adminPath(selectedWorkspace!.id, 'content-pipeline')); addRecent('action:build-matrix'); },
       });
+      result.push({
+        id: 'action:view-content-plan',
+        label: 'View Content Plan',
+        sub: 'Open the planner overview',
+        icon: Layers,
+        type: 'action',
+        // ContentPipeline reads ?tab= via useSearchParams (TABS includes 'planner').
+        // adminPath() returns just the path; ?tab= is appended here to honor the
+        // two-halves deep-link contract.
+        action: () => { navigate(`${adminPath(selectedWorkspace!.id, 'content-pipeline')}?tab=planner`); addRecent('action:view-content-plan'); },
+      });
     }
 
     return result;
