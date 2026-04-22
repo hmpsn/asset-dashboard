@@ -50,22 +50,25 @@ export function Roadmap() {
   const allTags = useMemo(() => deriveAllTags(roadmap), [roadmap]);
   const filters = useMemo(() => filtersFromParams(params), [params]);
 
-  const toggleStatus = async (itemId: number | string) => {
+  const toggleStatus = async (itemId: number | string, sprintId: string) => {
     const cycle: Array<'pending' | 'in_progress' | 'done'> = ['pending', 'in_progress', 'done'];
     let newStatus: 'pending' | 'in_progress' | 'done' = 'pending';
     const previousSnapshot = queryClient.getQueryData<SprintData[]>(queryKeys.admin.roadmap());
     queryClient.setQueryData(queryKeys.admin.roadmap(), (prev: SprintData[] = []) =>
-      prev.map(sprint => ({
-        ...sprint,
-        items: sprint.items.map(item => {
-          if (item.id !== itemId) return item;
-          const idx = cycle.indexOf(item.status);
-          newStatus = cycle[(idx + 1) % cycle.length];
-          return { ...item, status: newStatus };
-        }),
-      })),
+      prev.map(sprint => {
+        if (sprint.id !== sprintId) return sprint;
+        return {
+          ...sprint,
+          items: sprint.items.map(item => {
+            if (item.id !== itemId) return item;
+            const idx = cycle.indexOf(item.status);
+            newStatus = cycle[(idx + 1) % cycle.length];
+            return { ...item, status: newStatus };
+          }),
+        };
+      }),
     );
-    roadmapApi.updateItem(itemId, { status: newStatus }).catch(err => {
+    roadmapApi.updateItem(itemId, sprintId, { status: newStatus }).catch(err => {
       console.error('Roadmap status update failed:', err);
       if (previousSnapshot !== undefined) {
         queryClient.setQueryData(queryKeys.admin.roadmap(), previousSnapshot);

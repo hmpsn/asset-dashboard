@@ -99,21 +99,26 @@ router.put('/api/roadmap', (req, res) => {
   }
 });
 
-// PATCH single item status (lightweight update)
+// PATCH single item status (lightweight update).
+// Requires `?sprintId=X` so the find is scoped to one sprint — without it the
+// lookup would match by-id-only and would silently update the wrong item if
+// IDs ever collide across sprints (see scripts/dedupe-roadmap-ids.ts and the
+// roadmap-id-uniqueness pr-check rule).
 router.patch('/api/roadmap/item/:id', (req, res) => {
   try {
-    const data = loadRoadmap();
-    // Items have either numeric or string IDs (e.g. "meeting-brief-phase1"); compare as string.
     const itemId = req.params.id;
-    for (const sprint of data.sprints) {
-      const item = sprint.items.find((i: { id: number | string }) => String(i.id) === itemId);
-      if (item) {
-        Object.assign(item, req.body);
-        fs.writeFileSync(ROADMAP_RUNTIME_FILE, JSON.stringify(data, null, 2));
-        return res.json({ ok: true, item });
-      }
+    const sprintId = typeof req.query.sprintId === 'string' ? req.query.sprintId : '';
+    if (!sprintId) {
+      return res.status(400).json({ error: 'sprintId query param is required' });
     }
-    res.status(404).json({ error: 'Item not found' });
+    const data = loadRoadmap();
+    const sprint = data.sprints.find((s: { id: string }) => s.id === sprintId);
+    if (!sprint) return res.status(404).json({ error: 'Sprint not found' });
+    const item = sprint.items.find((i: { id: number | string }) => String(i.id) === itemId);
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+    Object.assign(item, req.body);
+    fs.writeFileSync(ROADMAP_RUNTIME_FILE, JSON.stringify(data, null, 2));
+    res.json({ ok: true, item });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }

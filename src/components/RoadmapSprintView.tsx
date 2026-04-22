@@ -9,7 +9,7 @@ interface Props {
   sprints: SprintData[];
   filters: RoadmapFilters;
   featureMap: Map<number, string>;
-  onToggleStatus: (itemId: number | string) => void;
+  onToggleStatus: (itemId: number | string, sprintId: string) => void;
 }
 
 export function RoadmapSprintView({ sprints, filters, featureMap, onToggleStatus }: Props) {
@@ -73,7 +73,7 @@ export function RoadmapSprintView({ sprints, filters, featureMap, onToggleStatus
                       #{item.id}
                     </span>
                     <button
-                      onClick={() => onToggleStatus(item.id)}
+                      onClick={() => onToggleStatus(item.id, sprint.id)}
                       className="flex-shrink-0 hover:scale-110 transition-transform"
                       title={`Status: ${item.status} — click to cycle`}
                     >

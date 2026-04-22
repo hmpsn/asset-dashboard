@@ -10,8 +10,11 @@ interface Props {
   sprints: SprintData[];
   filters: RoadmapFilters;
   featureMap: Map<number, string>;
-  onToggleStatus: (itemId: number | string) => void;
+  onToggleStatus: (itemId: number | string, sprintId: string) => void;
 }
+
+/** Compound identifier — item.id alone is not unique across sprints. */
+const compoundKey = (sprintId: string, itemId: number | string) => `${sprintId}::${itemId}`;
 
 function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) {
   if (sortKey !== col) return <ArrowUpDown className="w-3 h-3 text-zinc-600" />;
@@ -23,7 +26,7 @@ function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; s
 export function RoadmapBacklogView({ sprints, filters, featureMap, onToggleStatus }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>('priority');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
-  const [expandedId, setExpandedId] = useState<number | string | null>(null);
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
   const flatItems: FlatRoadmapItem[] = sprints.flatMap(sprint =>
     sprint.items
@@ -83,19 +86,20 @@ export function RoadmapBacklogView({ sprints, filters, featureMap, onToggleStatu
           {sorted.map(item => {
             const pb = priorityBadge(item.priority);
             const featureName = item.featureId != null ? featureMap.get(item.featureId) : undefined;
-            const isExpanded = expandedId === item.id;
+            const key = compoundKey(item.sprintId, item.id);
+            const isExpanded = expandedKey === key;
 
             return (
-              <Fragment key={item.id}>
+              <Fragment key={key}>
                 <tr
-                  onClick={() => setExpandedId(isExpanded ? null : item.id)}
+                  onClick={() => setExpandedKey(isExpanded ? null : key)}
                   className="hover:bg-zinc-800/30 transition-colors cursor-pointer"
                 >
                   <td className="px-3 py-2.5 font-mono text-[10px] text-zinc-600">#{item.id}</td>
                   <td className="px-3 py-2.5">
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={e => { e.stopPropagation(); onToggleStatus(item.id); }}
+                        onClick={e => { e.stopPropagation(); onToggleStatus(item.id, item.sprintId); }}
                         className="hover:scale-110 transition-transform flex-shrink-0"
                         title={`Status: ${item.status} — click to cycle`}
                       >

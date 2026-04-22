@@ -1580,7 +1580,7 @@
           "shippedAt": "2026-04-13"
         },
         {
-          "id": 293,
+          "id": 605,
           "title": "WorkspaceHealthBar — multi-metric health + recommended next action",
           "source": "feat/admin-ux-pr4-onboarding",
           "est": "2h",
@@ -1590,7 +1590,7 @@
           "shippedAt": "2026-04-13"
         },
         {
-          "id": 294,
+          "id": 606,
           "title": "SeoAuditGuide — in-app guide tab for SeoAudit",
           "source": "feat/admin-ux-pr4-onboarding",
           "est": "1h",
@@ -1600,7 +1600,7 @@
           "shippedAt": "2026-04-13"
         },
         {
-          "id": 295,
+          "id": 607,
           "title": "KeywordStrategyGuide — in-app guide tab for KeywordStrategy",
           "source": "feat/admin-ux-pr4-onboarding",
           "est": "1h",
@@ -1610,7 +1610,7 @@
           "shippedAt": "2026-04-13"
         },
         {
-          "id": 296,
+          "id": 608,
           "title": "PageIntelligenceGuide — in-app guide tab for PageIntelligence",
           "source": "feat/admin-ux-pr4-onboarding",
           "est": "1h",
@@ -3638,14 +3638,14 @@
           "shippedAt": "2026-03-16"
         },
         {
-          "id": 291,
+          "id": 609,
           "title": "Editable workspace name in Workspace Settings",
           "status": "done",
           "notes": "Shipped — Inline-editable workspace name with pencil icon, Enter/Escape support, PATCH /api/workspaces/:id",
           "shippedAt": "2026-03-16"
         },
         {
-          "id": 292,
+          "id": 610,
           "title": "Schema Generator: page type selector + auto-load pages on mount",
           "status": "done",
           "notes": "Shipped — Pages auto-load on mount with page type dropdowns (13 types). Page type hint passed to AI prompt for tailored schema generation. Initial view replaced with full page list + type selectors + per-page generate buttons.",

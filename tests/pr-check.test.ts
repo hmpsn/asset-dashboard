@@ -4219,6 +4219,8 @@ describe('Meta: customCheck rule name registry', () => {
     'Manual pageMap pairing outside shared helpers — use findPageMapEntry(ForPage) or usePageJoin',
     // Broadcast-invalidation centralization sprint (2026-04-21)
     'useWorkspaceEvents handler for centralized event',
+    // Roadmap-redesign sprint (2026-04-22) — round 4 of PR #258
+    'roadmap.json item ID uniqueness',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -4578,5 +4580,64 @@ describe('Rule: useWorkspaceEvents handler for centralized event', () => {
       )
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: roadmap.json item ID uniqueness', () => {
+  const RULE = 'roadmap.json item ID uniqueness';
+
+  // The customCheck reads roadmap.json from the file path passed in `files`
+  // (or falls back to data/roadmap.json in production). Fixtures write a
+  // controlled JSON to tmpdir so tests don't depend on the live data.
+
+  it('flags duplicate numeric IDs across sprints', () => {
+    const file = write(
+      uniqPath('rule-roadmap-uniq', 'data/roadmap.json'),
+      JSON.stringify({
+        sprints: [
+          { id: 'backlog', items: [{ id: 100, title: 'A' }] },
+          { id: 'sprint-x', items: [{ id: 100, title: 'B' }] },
+        ],
+      })
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('id 100 duplicated');
+  });
+
+  it('does NOT flag a roadmap with all unique IDs', () => {
+    const file = write(
+      uniqPath('rule-roadmap-uniq', 'data/roadmap.json'),
+      JSON.stringify({
+        sprints: [
+          { id: 'a', items: [{ id: 1, title: 'A' }, { id: 2, title: 'B' }] },
+          { id: 'b', items: [{ id: 'phase-1', title: 'C' }] },
+        ],
+      })
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags malformed JSON as a parse error', () => {
+    const file = write(
+      uniqPath('rule-roadmap-uniq', 'data/roadmap.json'),
+      '{ this is not valid json',
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toBe('JSON parse error');
+  });
+
+  it('treats string-id and numeric-id collisions as duplicates (cross-type)', () => {
+    const file = write(
+      uniqPath('rule-roadmap-uniq', 'data/roadmap.json'),
+      JSON.stringify({
+        sprints: [
+          { id: 'a', items: [{ id: 5, title: 'numeric' }] },
+          { id: 'b', items: [{ id: '5', title: 'string-five' }] },
+        ],
+      })
+    );
+    expect(runRule(RULE, [file])).toHaveLength(1);
   });
 });

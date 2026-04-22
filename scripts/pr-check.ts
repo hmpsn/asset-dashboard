@@ -3629,6 +3629,51 @@ export const CHECKS: Check[] = [
       return hits;
     },
   },
+  {
+    name: 'roadmap.json item ID uniqueness',
+    pattern: '',
+    fileGlobs: ['*.json'],
+    pathFilter: 'data/',
+    displayScope: 'data/roadmap.json',
+    severity: 'error',
+    message: 'data/roadmap.json contains duplicate item IDs across sprints. Run `npx tsx scripts/dedupe-roadmap-ids.ts` to renumber the later occurrences. Item IDs are addressed by `(sprintId, id)` everywhere they\'re used as identity (React keys, expand state, PATCH lookups), and a duplicate id silently routes status toggles to the wrong row.',
+    rationale: 'Cross-sprint duplicate IDs caused PR #258 round-4: clicking expand on one row toggled both, and the server PATCH updated whichever sprint came first.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      // Prefer a roadmap.json passed via `files` (lets fixture tests swap in
+      // a controlled JSON); fall back to the real repo file so the integrity
+      // check ALWAYS runs, even on commits that don't touch roadmap.json.
+      const target = files.find(f => /(?:^|\/)roadmap\.json$/.test(f))
+        ?? path.join(ROOT, 'data', 'roadmap.json');
+      let raw: string;
+      try { raw = readFileSync(target, 'utf-8'); }
+      catch { return []; }
+      let data: { sprints?: Array<{ id?: string; items?: Array<{ id?: number | string; title?: string }> }> };
+      try { data = JSON.parse(raw); }
+      catch { return [{ file: target, line: 1, text: 'JSON parse error' }]; }
+      const sprints = Array.isArray(data.sprints) ? data.sprints : [];
+      const seen = new Map<string, { sprint: string; title: string }>();
+      const hits: CustomCheckMatch[] = [];
+      for (const sprint of sprints) {
+        const sprintId = String(sprint.id ?? '');
+        for (const item of sprint.items ?? []) {
+          if (item.id == null) continue;
+          const key = String(item.id);
+          const prior = seen.get(key);
+          if (prior) {
+            hits.push({
+              file: target,
+              line: 1,
+              text: `id ${key} duplicated: "${prior.title}" (sprint=${prior.sprint}) ↔ "${String(item.title ?? '')}" (sprint=${sprintId})`,
+            });
+          } else {
+            seen.set(key, { sprint: sprintId, title: String(item.title ?? '') });
+          }
+        }
+      }
+      return hits;
+    },
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
