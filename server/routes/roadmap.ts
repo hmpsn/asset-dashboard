@@ -116,7 +116,14 @@ router.patch('/api/roadmap/item/:id', (req, res) => {
     if (!sprint) return res.status(404).json({ error: 'Sprint not found' });
     const item = sprint.items.find((i: { id: number | string }) => String(i.id) === itemId);
     if (!item) return res.status(404).json({ error: 'Item not found' });
-    Object.assign(item, req.body);
+    // Whitelist mutable fields — never let callers overwrite id/title/source/etc.
+    // The id uniqueness invariant is enforced by the roadmap-id-uniqueness pr-check rule.
+    const body = req.body ?? {};
+    const patch: Record<string, unknown> = {};
+    if (typeof body.status === 'string') patch.status = body.status;
+    if (typeof body.notes === 'string') patch.notes = body.notes;
+    if (typeof body.shippedAt === 'string') patch.shippedAt = body.shippedAt;
+    Object.assign(item, patch);
     fs.writeFileSync(ROADMAP_RUNTIME_FILE, JSON.stringify(data, null, 2));
     res.json({ ok: true, item });
   } catch (err) {

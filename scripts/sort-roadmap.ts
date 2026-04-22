@@ -29,7 +29,7 @@ const ROADMAP_PATH = path.resolve(__dirname, '../data/roadmap.json');
 const dryRun = process.argv.includes('--dry-run');
 
 interface RoadmapItem {
-  id: number;
+  id: number | string;
   title: string;
   status: string;
   shippedAt?: string;
