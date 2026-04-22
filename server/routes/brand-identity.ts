@@ -81,12 +81,11 @@ router.get('/api/brand-identity/:workspaceId/:id', requireWorkspaceAccess('works
 // Generate a deliverable
 router.post('/api/brand-identity/:workspaceId/generate', requireWorkspaceAccess('workspaceId'), validate(generateDeliverableSchema), async (req, res) => {
   const { deliverableType } = req.body;
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  const usage = checkUsageLimit(ws.id, ws.tier || 'free', 'strategy_generations');
+  if (!usage.allowed) return res.status(429).json({ error: 'Monthly AI generation limit reached', used: usage.used, limit: usage.limit });
   try {
-    const ws = getWorkspace(req.params.workspaceId);
-    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-    const usage = checkUsageLimit(ws.id, ws.tier || 'free', 'strategy_generations');
-    if (!usage.allowed) return res.status(429).json({ error: 'Monthly AI generation limit reached', used: usage.used, limit: usage.limit });
-
     const result = await generateDeliverable(req.params.workspaceId, deliverableType);
     incrementUsage(ws.id, 'strategy_generations');
     addActivity(req.params.workspaceId, 'brand_deliverable_generated', `Generated ${deliverableType.replace(/_/g, ' ')} deliverable`);

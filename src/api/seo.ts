@@ -459,8 +459,14 @@ export const pageWeight = {
  * Generate alt text for a single Webflow asset.
  * Wraps POST /api/webflow/generate-alt/:assetId.
  */
-export function generateAltText(assetId: string): Promise<{ altText: string }> {
-  return post<{ altText: string }>(`/api/webflow/generate-alt/${assetId}`);
+export function generateAltText(
+  assetId: string,
+  body: { imageUrl: string; siteId?: string; workspaceId?: string },
+): Promise<{ altText: string | null; updated: boolean; writeError?: string }> {
+  return post<{ altText: string | null; updated: boolean; writeError?: string }>(
+    `/api/webflow/generate-alt/${assetId}`,
+    body,
+  );
 }
 
 /**
@@ -482,65 +488,88 @@ export interface BulkAltTextNdjsonEvent {
  * POST /api/webflow/bulk-generate-alt, which streams NDJSON results
  * line-by-line as each image is processed.
  *
- * Parsing is extracted verbatim from AssetBrowser.tsx:266-306 — line-buffered
- * JSON.parse with an incomplete-trailing-line buffer. For each `result` event
- * that includes an `altText`, `onProgress(assetId, altText)` is invoked; the
- * full event (including `status` events carrying progress counters) is passed
- * through `onEvent` when provided.
- *
- * Resolves when the stream ends. Rejects via ApiError on a non-ok response.
+ * Returns a cancel function (call on component unmount to abort the stream).
+ * `onDone` fires when the stream ends normally; `onError` fires on failure
+ * or a non-ok HTTP response. Abort errors are swallowed silently.
  *
  * The endpoint requires `{ siteId, assets: [{ assetId, imageUrl }] }` in the
- * body — the caller assembles this (Phase 2 will pass the component's
- * selection through).
+ * body — the caller assembles this.
  */
-export async function bulkGenerateAltText(
+export function bulkGenerateAltText(
   body: { siteId: string; assets: Array<{ assetId: string; imageUrl: string }> },
   onProgress: (assetId: string, altText: string) => void,
   onEvent?: (event: BulkAltTextNdjsonEvent) => void,
-): Promise<void> {
-  const res = await fetch('/api/webflow/bulk-generate-alt', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  onDone?: () => void,
+  onError?: (err: Error) => void,
+): () => void {
+  const controller = new AbortController();
 
-  if (!res.ok) {
-    let errBody: unknown;
-    try { errBody = await res.json(); } catch { /* non-JSON error body */ }
-    const msg = (errBody && typeof errBody === 'object' && 'error' in errBody)
-      ? String((errBody as { error: unknown }).error)
-      : res.statusText || `HTTP ${res.status}`;
-    throw new ApiError(res.status, msg, errBody);
-  }
+  (async () => {
+    try {
+      const res = await fetch('/api/webflow/bulk-generate-alt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
 
-  const reader = res.body?.getReader();
-  if (!reader) throw new ApiError(0, 'Streaming not supported');
-
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-
-    const lines = buffer.split('\n');
-    buffer = lines.pop() || '';
-
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      try {
-        const event = JSON.parse(line) as BulkAltTextNdjsonEvent;
-        onEvent?.(event);
-        if (event.type === 'result' && event.assetId && event.altText) {
-          onProgress(event.assetId, event.altText);
-        }
-      } catch (err) {
-        console.error('bulkGenerateAltText parse failed:', err);
+      if (!res.ok) {
+        let errBody: unknown;
+        try { errBody = await res.json(); } catch { /* non-JSON error body */ }
+        const msg = (errBody && typeof errBody === 'object' && 'error' in errBody)
+          ? String((errBody as { error: unknown }).error)
+          : res.statusText || `HTTP ${res.status}`;
+        onError?.(new ApiError(res.status, msg, errBody));
+        return;
       }
+
+      const reader = res.body?.getReader();
+      if (!reader) { onError?.(new ApiError(0, 'Streaming not supported')); return; }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const event = JSON.parse(line) as BulkAltTextNdjsonEvent;
+            onEvent?.(event);
+            if (event.type === 'result' && event.assetId && event.altText) {
+              onProgress(event.assetId, event.altText);
+            }
+          } catch (err) {
+            console.error('bulkGenerateAltText parse failed:', err);
+          }
+        }
+      }
+
+      // Flush any trailing incomplete line after stream ends
+      if (buffer.trim()) {
+        try {
+          const event = JSON.parse(buffer) as BulkAltTextNdjsonEvent;
+          onEvent?.(event);
+          if (event.type === 'result' && event.assetId && event.altText) {
+            onProgress(event.assetId, event.altText);
+          }
+        } catch { /* ignore malformed trailing fragment */ }
+      }
+
+      onDone?.();
+    } catch (err) {
+      if ((err as { name?: string })?.name === 'AbortError') return;
+      onError?.(err instanceof Error ? err : new Error(String(err)));
     }
-  }
+  })();
+
+  return () => controller.abort();
 }
 
 /**

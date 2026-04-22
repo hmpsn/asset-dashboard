@@ -232,8 +232,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.copySectionsAll(workspaceId) });
     },
     [WS_EVENTS.SCHEMA_PLAN_SENT]: () => {
-      if (!workspaceId) return;
-      qc.invalidateQueries({ queryKey: queryKeys.admin.blueprints(workspaceId) });
+      // SchemaPlanPanel fetches the plan directly (no React Query cache). No-op intentional.
     },
     [WS_EVENTS.POST_UPDATED]: () => {
       if (!workspaceId) return;
