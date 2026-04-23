@@ -200,7 +200,10 @@ export type InsightType =
   | 'strategy_alignment'     // new: strategy vs reality
   | 'anomaly_digest'         // new: surfaced anomalies
   | 'audit_finding'          // new: bridge-generated audit issues (page-level + site-level)
-  | 'site_health';           // new: site-level audit health (Bridge #15)
+  | 'site_health'            // new: site-level audit health (Bridge #15)
+  | 'emerging_keyword'       // Tier 2: SEMRush trend-rising keyword opportunity
+  | 'competitor_alert'       // Tier 2: weekly competitor position change
+  | 'freshness_alert';       // Tier 2: stale content detected via page_keywords age
 
 export type InsightDomain = 'search' | 'traffic' | 'cross';
 
@@ -401,6 +404,38 @@ export interface StrategyAlignmentData extends InsightDataBase {
   summary?: string;
 }
 
+// ── Tier 2 insight data shapes ────────────────────────────────
+
+export interface EmergingKeywordData extends InsightDataBase {
+  keyword: string;
+  volume: number;
+  difficulty: number;
+  trendData?: number[];          // raw 12-month volume trend from SEMRush
+  currentPosition?: number;      // our GSC position for this keyword (if any)
+  rankingUrl?: string;           // URL currently ranking (may be a competitor)
+  suggestedAngle?: string;       // one-line content opportunity description
+}
+
+export interface CompetitorAlertData extends InsightDataBase {
+  competitorDomain: string;
+  alertType: 'keyword_gained' | 'keyword_lost' | 'authority_change' | 'new_keyword';
+  keyword?: string;              // keyword involved (for keyword_gained/lost)
+  previousPosition?: number;
+  currentPosition?: number;
+  positionChange?: number;       // positive = improving for competitor (bad for us)
+  volume?: number;               // monthly search volume for the keyword
+  snapshotDate: string;          // ISO date of the current snapshot
+}
+
+export interface FreshnessAlertData extends InsightDataBase {
+  pagePath: string;
+  lastAnalyzedAt: string;        // ISO timestamp of most recent keyword analysis
+  daysSinceLastAnalysis: number;
+  /** Already a percentage if present. */
+  impressions?: number;          // 28d GSC impressions (proxy for traffic at risk)
+  clicks?: number;               // 28d GSC clicks
+}
+
 // ── Insight Data Map (discriminated union) ────────────────────────
 // Use this to get type-safe access to insight data by type.
 
@@ -419,6 +454,9 @@ export interface InsightDataMap {
   anomaly_digest: AnomalyDigestData;
   audit_finding: AuditFindingData;
   site_health: SiteHealthInsightData;
+  emerging_keyword: EmergingKeywordData;
+  competitor_alert: CompetitorAlertData;
+  freshness_alert: FreshnessAlertData;
 }
 
 // ── Insight Feed Filter Keys ──────────────────────────────────────

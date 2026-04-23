@@ -84,6 +84,8 @@ export interface ContentGap {
   questionKeywords?: string[];
   // SERP feature targeting recommendations
   serpTargeting?: string[];
+  // Composite opportunity score (0–100): volume × ease × GSC signal × trend
+  opportunityScore?: number;
 }
 
 export interface QuickWin {
