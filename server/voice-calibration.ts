@@ -11,7 +11,7 @@ import { randomUUID } from 'crypto';
 import type {
   VoiceProfile, VoiceSample, CalibrationSession, CalibrationVariation,
   VoiceDNA, VoiceGuardrails, ContextModifier, VoiceProfileStatus,
-  VoiceSampleContext, VoiceSampleSource, VoiceCalibrationVariationFeedback,
+  VoiceSampleContext, VoiceSampleSource,
 } from '../shared/types/brand-engine.js';
 
 const log = createLogger('voice-calibration');
@@ -82,7 +82,7 @@ function rowToSample(row: SampleRow): VoiceSample {
   };
 }
 
-function rowToSession(row: SessionRow): CalibrationSession & { variationFeedback: VoiceCalibrationVariationFeedback[] } {
+function rowToSession(row: SessionRow): CalibrationSession {
   return {
     id: row.id, voiceProfileId: row.voice_profile_id,
     promptType: row.prompt_type,

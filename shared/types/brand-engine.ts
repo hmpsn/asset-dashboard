@@ -173,6 +173,8 @@ export interface CalibrationSession {
   variations: CalibrationVariation[];
   steeringNotes?: string;
   createdAt: string;
+  /** Per-variation feedback entries; present when migration 069 column is populated. */
+  variationFeedback?: VoiceCalibrationVariationFeedback[];
 }
 
 // ═══ BRAND IDENTITY ═══
