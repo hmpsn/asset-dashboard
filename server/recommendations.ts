@@ -1057,7 +1057,10 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
 
     for (const insight of topCtr) {
       const d = insight.data as CtrOpportunityData;
-      const pageSlug = (d.pageUrl ?? insight.pageId ?? '').replace(/^\//, '');
+      const rawPageUrl = d.pageUrl ?? insight.pageId ?? '';
+      const pageSlug = rawPageUrl.startsWith('http')
+        ? new URL(rawPageUrl).pathname.replace(/^\//, '')
+        : rawPageUrl.replace(/^\//, '');
       const gap = d.estimatedClickGap ?? 0;
       if (gap <= 0) continue;
       const product = mapToProduct('metadata', 1);
