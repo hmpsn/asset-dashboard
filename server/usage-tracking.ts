@@ -12,13 +12,17 @@ import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 
 // ── Feature keys ──
-export type UsageFeature = 'ai_chats' | 'strategy_generations';
+export type UsageFeature =
+  | 'ai_chats'
+  | 'strategy_generations'
+  | 'brandscript_generations'
+  | 'voice_calibrations';
 
 // ── Per-tier monthly limits (Infinity = unlimited) ──
 const LIMITS: Record<string, Record<UsageFeature, number>> = {
-  free:    { ai_chats: 3,        strategy_generations: 0 },
-  growth:  { ai_chats: 50,       strategy_generations: 3 },
-  premium: { ai_chats: Infinity, strategy_generations: Infinity },
+  free:    { ai_chats: 3,        strategy_generations: 0, brandscript_generations: 0,        voice_calibrations: 0        },
+  growth:  { ai_chats: 50,       strategy_generations: 3, brandscript_generations: 5,        voice_calibrations: 10       },
+  premium: { ai_chats: Infinity, strategy_generations: Infinity, brandscript_generations: Infinity, voice_calibrations: Infinity },
 };
 
 export function getLimit(tier: string, feature: UsageFeature): number {
@@ -139,7 +143,7 @@ export function getUsageSummary(
   workspaceId: string,
   tier: string,
 ): Record<UsageFeature, { used: number; limit: number; remaining: number }> {
-  const features: UsageFeature[] = ['ai_chats', 'strategy_generations'];
+  const features: UsageFeature[] = ['ai_chats', 'strategy_generations', 'brandscript_generations', 'voice_calibrations'];
   const result = {} as Record<UsageFeature, { used: number; limit: number; remaining: number }>;
   for (const f of features) {
     const { used, limit, remaining } = checkUsageLimit(workspaceId, tier, f);

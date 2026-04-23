@@ -60,7 +60,10 @@ export const discovery = {
 // ═══ VOICE CALIBRATION ═══
 
 export const voice = {
-  getProfile: (wsId: string) => get<VoiceProfile & { samples: VoiceSample[] }>(`/api/voice/${wsId}`),
+  /** Returns null when no profile exists yet — call createProfile to initialise. */
+  getProfile: (wsId: string) => get<(VoiceProfile & { samples: VoiceSample[] }) | null>(`/api/voice/${wsId}`),
+  /** Explicitly create a new draft voice profile. Throws on 409 if one already exists. */
+  createProfile: (wsId: string) => post<VoiceProfile>(`/api/voice/${wsId}`, {}),
   updateProfile: (wsId: string, body: Partial<Pick<VoiceProfile, 'voiceDNA' | 'guardrails' | 'contextModifiers'>>) => patch<VoiceProfile>(`/api/voice/${wsId}`, body),
   addSample: (wsId: string, body: { content: string; contextTag?: string; source?: string }) =>
     post<VoiceSample>(`/api/voice/${wsId}/samples`, body),
@@ -69,6 +72,9 @@ export const voice = {
     post<CalibrationSession>(`/api/voice/${wsId}/calibrate`, body),
   refine: (wsId: string, sessionId: string, body: { variationIndex: number; direction: string }) =>
     post<CalibrationSession>(`/api/voice/${wsId}/calibrate/${sessionId}/refine`, body),
+  /** Persist per-variation feedback for a calibration session. Returns 204. */
+  saveVariationFeedback: (wsId: string, sessionId: string, variationIndex: number, feedback: string) =>
+    post<void>(`/api/voice/${wsId}/calibration-feedback`, { sessionId, variationIndex, feedback }),
 };
 
 // ═══ BRAND IDENTITY ═══
