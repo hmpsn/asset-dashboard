@@ -1,8 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import { createTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 
-const ctx = createTestContext(13326); // port-ok: 13201-13325 fully allocated; extending range
 let capturedPrompt = '';
 
 vi.doMock('../../server/openai-helpers.js', async (orig) => {
@@ -27,14 +25,14 @@ vi.doMock('../../server/copy-review.js', async (orig) => {
 });
 
 describe('suggestCopyRefresh — topQueries in prompt', () => {
+  let wsId: string;
   let cleanup: () => void;
-  beforeAll(async () => { await ctx.startServer(); const s = seedWorkspace({}); cleanup = s.cleanup; });
-  afterAll(async () => { cleanup(); await ctx.stopServer(); vi.resetModules(); });
+  beforeAll(() => { const s = seedWorkspace({}); wsId = s.workspaceId; cleanup = s.cleanup; });
+  afterAll(() => { cleanup(); vi.resetModules(); });
 
   it('includes topQueries in the AI prompt when provided', async () => {
     const { suggestCopyRefresh } = await import('../../server/copy-refresh.js');
-    const s = seedWorkspace({});
-    await suggestCopyRefresh(s.workspaceId, 'entry_x', {
+    await suggestCopyRefresh(wsId, 'entry_x', {
       url: '/plumbing',
       decayType: 'click_decline',
       severity: 'critical',
@@ -47,6 +45,5 @@ describe('suggestCopyRefresh — topQueries in prompt', () => {
     expect(capturedPrompt).toContain('Top search queries for this page');
     expect(capturedPrompt).toContain('best plumber near me');
     expect(capturedPrompt).toContain('pos 15.2');
-    s.cleanup();
   });
 });

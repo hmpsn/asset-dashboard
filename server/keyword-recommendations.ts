@@ -13,6 +13,7 @@ import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelli
 import { createLogger } from './logger.js';
 import type { KeywordCandidate } from '../shared/types/content.ts';
 import { isProgrammingError } from './errors.js';
+import { sanitizeQueryForPrompt } from './helpers.js';
 import type * as WorkspaceLearnings from './workspace-learnings.js';
 
 const log = createLogger('keyword-recommendations');
@@ -154,15 +155,19 @@ export async function getKeywordRecommendations(
       const relevantQueries = gscRows
         .filter(r => {
           const qWords = r.query.toLowerCase().split(/\s+/);
-          return qWords.some(w => seedWords.has(w)) && r.impressions >= 10 && r.query.split(' ').length >= 2;
+          const hasOverlap = seedWords.size > 0
+            ? qWords.some(w => seedWords.has(w))
+            : r.query.toLowerCase().includes(seedKeyword.toLowerCase());
+          return hasOverlap && r.impressions >= 10 && r.query.split(' ').length >= 2;
         })
         .sort((a, b) => b.impressions - a.impressions)
         .slice(0, 10);
 
       for (const r of relevantQueries) {
-        if (!candidates.some(c => c.keyword.toLowerCase() === r.query.toLowerCase())) {
+        const sanitizedQuery = sanitizeQueryForPrompt(r.query);
+        if (!candidates.some(c => c.keyword.toLowerCase() === sanitizedQuery.toLowerCase())) {
           candidates.push({
-            keyword: r.query,
+            keyword: sanitizedQuery,
             volume: r.impressions,
             difficulty: 0,
             cpc: 0,

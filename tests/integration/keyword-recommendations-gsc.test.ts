@@ -44,6 +44,7 @@ describe('getKeywordRecommendations — GSC candidate enrichment', () => {
   beforeAll(() => {
     const seed = seedWorkspace({
       gscPropertyUrl: 'https://example.com/',
+      seoDataProvider: 'semrush',
     });
     wsId = seed.workspaceId;
     cleanup = seed.cleanup;

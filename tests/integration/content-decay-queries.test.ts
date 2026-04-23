@@ -3,7 +3,7 @@ import { seedWorkspace } from '../fixtures/workspace-seed.js';
 
 let capturedPrompt = '';
 
-vi.doMock('../../server/openai-helpers.js', async (orig) => {
+vi.mock('../../server/openai-helpers.js', async (orig) => {
   const actual = await orig<typeof import('../../server/openai-helpers.js')>();
   return {
     ...actual,
@@ -14,7 +14,7 @@ vi.doMock('../../server/openai-helpers.js', async (orig) => {
   };
 });
 
-vi.doMock('../../server/search-console.js', async (orig) => {
+vi.mock('../../server/search-console.js', async (orig) => {
   const actual = await orig<typeof import('../../server/search-console.js')>();
   return {
     ...actual,

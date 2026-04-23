@@ -14,6 +14,7 @@ import type { Workspace } from './workspaces.js';
 import { createLogger } from './logger.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { isProgrammingError } from './errors.js';
+import { sanitizeQueryForPrompt } from './helpers.js';
 import type * as OutcomeTracking from './outcome-tracking.js';
 
 const log = createLogger('content-decay');
@@ -273,7 +274,7 @@ export async function generateRefreshRecommendation(
       if (pageQueries.length > 0) {
         queryBreakdownBlock = `\n\nTOP SEARCH QUERIES FOR THIS PAGE (from Google Search Console — last 90 days):\n`;
         queryBreakdownBlock += pageQueries.map(q =>
-          `- "${q.query}": ${q.clicks} clicks, ${q.impressions} impressions, pos ${q.position.toFixed(1)}, CTR ${q.ctr}%`,
+          `- "${sanitizeQueryForPrompt(q.query)}": ${q.clicks} clicks, ${q.impressions} impressions, pos ${q.position.toFixed(1)}, CTR ${q.ctr}%`,
         ).join('\n');
         queryBreakdownBlock += `\n\nUse these queries to understand what users are searching for when they find this page. Focus your refresh recommendations on improving relevance for the highest-impression queries.`;
       }

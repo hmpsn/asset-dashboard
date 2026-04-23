@@ -183,6 +183,22 @@ export function sanitizeForPromptInjection(untrusted: string): string {
   return `<untrusted_user_content>\n${cleaned}\n</untrusted_user_content>`;
 }
 
+/**
+ * Sanitize a user-sourced query string (e.g. from Google Search Console) for safe
+ * inline embedding as a list item in an LLM prompt. Strips newlines — the primary
+ * injection vector that can break prompt formatting — control tokens, and other
+ * non-printing chars. Truncates to maxLen to bound prompt size.
+ */
+export function sanitizeQueryForPrompt(q: string, maxLen = 150): string {
+  return q
+    .replace(/[\r\n]/g, ' ')
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
+    .replace(/<\|[^|]*\|>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLen);
+}
+
 /** Validate that a value is one of the allowed options */
 export function validateEnum<T extends string>(val: unknown, allowed: T[], fallback: T): T {
   return allowed.includes(val as T) ? (val as T) : fallback;

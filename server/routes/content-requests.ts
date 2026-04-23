@@ -29,7 +29,7 @@ import {
 } from '../webflow.js';
 import { getWorkspacePages } from '../workspace-data.js';
 import { getWorkspace, getTokenForSite, updatePageState } from '../workspaces.js';
-import { resolvePagePath } from '../helpers.js';
+import { resolvePagePath, sanitizeQueryForPrompt } from '../helpers.js';
 import { listPageKeywords } from '../page-keywords.js';
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
@@ -197,7 +197,7 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
         relatedQueries = gscData
           .filter(r => { const q = r.query.toLowerCase(); return request.targetKeyword.toLowerCase().split(' ').some(w => w.length > 2 && q.includes(w)); })
           .slice(0, 20)
-          .map(r => ({ query: r.query, position: r.position, clicks: r.clicks, impressions: r.impressions }));
+          .map(r => ({ query: sanitizeQueryForPrompt(r.query), position: r.position, clicks: r.clicks, impressions: r.impressions }));
       } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-requests: POST /api/content-requests/:workspaceId/:id/generate-brief: programming error'); /* GSC unavailable */ }
     }
 
@@ -252,7 +252,7 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
             .slice(0, 15);
           if (pageQueries.length > 0) {
             decayQueryContext = `DECAY CONTEXT: This page has lost ${Math.abs(decayPage.clickDeclinePct)}% of search clicks. Top queries:\n` +
-              pageQueries.map(q => `- "${q.query}": ${q.clicks} clicks, ${q.impressions} impressions, pos ${q.position.toFixed(1)}`).join('\n');
+              pageQueries.map(q => `- "${sanitizeQueryForPrompt(q.query)}": ${q.clicks} clicks, ${q.impressions} impressions, pos ${q.position.toFixed(1)}`).join('\n');
           }
         }
       } catch (err) {
@@ -279,6 +279,7 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
       briefId: brief.id,
     });
 
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: request.id, status: 'brief_generated' });
     addActivity(req.params.workspaceId, 'brief_generated', `Content brief generated for "${request.targetKeyword}"`, `Title: ${brief.suggestedTitle}`, { requestId: request.id, briefId: brief.id });
     res.json(brief);
   } catch (err: unknown) {

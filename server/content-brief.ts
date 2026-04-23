@@ -16,7 +16,7 @@ import type { AnalyticsInsight } from '../shared/types/analytics.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { getWorkspaceLearnings, formatLearningsForPrompt } from './workspace-learnings.js';
 import { isFeatureEnabled } from './feature-flags.js';
-import { stripCodeFences } from './helpers.js';
+import { stripCodeFences, sanitizeQueryForPrompt } from './helpers.js';
 
 export type { ContentBrief } from '../shared/types/content.ts';
 import type { ContentBrief, StrategyCardContext } from '../shared/types/content.ts';
@@ -875,7 +875,7 @@ export async function generateBrief(
   if (!openaiKey) throw new Error('OPENAI_API_KEY not configured');
 
   const relatedStr = context.relatedQueries?.slice(0, 20)
-    .map(q => `"${q.query}" (pos #${q.position}, ${q.clicks} clicks, ${q.impressions} imp)`)
+    .map(q => `"${sanitizeQueryForPrompt(q.query)}" (pos #${q.position}, ${q.clicks} clicks, ${q.impressions} imp)`)
     .join('\n') || 'No related query data available';
 
   const pagesStr = context.existingPages?.slice(0, 50).join('\n') || 'No existing pages provided';

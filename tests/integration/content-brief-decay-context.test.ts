@@ -99,9 +99,11 @@ describe('generateBrief — decay query context', () => {
 
     const calls = getCapturedOpenAICalls();
     expect(calls.length).toBeGreaterThan(0);
-    const userMsg = calls[calls.length - 1].messages.find((m) => m.role === 'user');
-    expect(userMsg?.content).toContain('DECAY CONTEXT: This page has lost 50%');
-    expect(userMsg?.content).toContain('best plumber denver');
+    const allUserContent = calls.flatMap(c =>
+      c.messages.filter((m: { role: string; content?: string }) => m.role === 'user').map((m: { content?: string }) => m.content ?? ''),
+    );
+    expect(allUserContent.some(c => c.includes('DECAY CONTEXT: This page has lost 50%'))).toBe(true);
+    expect(allUserContent.some(c => c.includes('best plumber denver'))).toBe(true);
   });
 
   it('does NOT inject DECAY CONTEXT block when decayQueryContext is absent', async () => {
@@ -109,7 +111,9 @@ describe('generateBrief — decay query context', () => {
 
     const calls = getCapturedOpenAICalls();
     expect(calls.length).toBeGreaterThan(0);
-    const userMsg = calls[calls.length - 1].messages.find((m) => m.role === 'user');
-    expect(userMsg?.content).not.toContain('DECAY CONTEXT');
+    const allUserContent = calls.flatMap(c =>
+      c.messages.filter((m: { role: string; content?: string }) => m.role === 'user').map((m: { content?: string }) => m.content ?? ''),
+    );
+    expect(allUserContent.every(c => !c.includes('DECAY CONTEXT'))).toBe(true); // every-ok: empty means no user messages, which is also passing (no decay context injected)
   });
 });

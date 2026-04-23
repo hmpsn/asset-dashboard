@@ -14,6 +14,7 @@ import { callOpenAI, parseAIJson } from './openai-helpers.js';
 import { createLogger } from './logger.js';
 import { getWorkspace } from './workspaces.js';
 import { getQueryPageData } from './search-console.js';
+import { sanitizeQueryForPrompt } from './helpers.js';
 import type { BlueprintEntry } from '../shared/types/page-strategy.js';
 import type { CopySection } from '../shared/types/copy-pipeline.js';
 const log = createLogger('copy-refresh');
@@ -178,7 +179,7 @@ export async function suggestCopyRefresh(
 
   const queryStr = decayContext.topQueries?.length
     ? `\nTop search queries for this page:\n${decayContext.topQueries.map(q =>
-        `- "${q.query}": ${q.clicks} clicks, ${q.impressions} impressions, pos ${q.position.toFixed(1)}`,
+        `- "${sanitizeQueryForPrompt(q.query)}": ${q.clicks} clicks, ${q.impressions} impressions, pos ${q.position.toFixed(1)}`,
       ).join('\n')}`
     : '';
 
@@ -323,7 +324,9 @@ export async function analyzeDecayForCopyRefresh(
 
     const decayContext: DecayContext = {
       url: page.page,
-      decayType: page.clickDeclinePct <= -50 ? 'severe_click_decline' : 'click_decline',
+      decayType: page.clickDeclinePct <= -50 ? 'severe_click_decline'
+        : page.impressionChangePct < -20 && Math.abs(page.impressionChangePct) > Math.abs(page.clickDeclinePct) ? 'impression_decline'
+        : 'click_decline',
       severity: page.severity,
       metrics: {
         clickDeclinePct: page.clickDeclinePct,
