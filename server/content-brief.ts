@@ -867,6 +867,8 @@ export async function generateBrief(
     blueprintEntryId?: string;
     /** Strategy card context threaded from the content request. */
     strategyCardContext?: StrategyCardContext;
+    /** If this brief is being generated for a decaying page, the pre-formatted decay query breakdown block to inject into the prompt. */
+    decayQueryContext?: string;
   }
 ): Promise<ContentBrief> {
   const openaiKey = process.env.OPENAI_API_KEY;
@@ -1103,6 +1105,9 @@ The outline sections MUST match the following template sections in order. You ma
   // Strategy card context from content request
   const strategyCardBlock = buildStrategyCardBlock(context.strategyCardContext);
 
+  // Decay context — injected when this brief targets a page with declining search traffic
+  const decayBlock = context.decayQueryContext ? `\n\n${context.decayQueryContext}` : '';
+
   const prompt = `Generate a comprehensive, production-ready content brief for a new piece of content targeting the keyword "${targetKeyword}".${pageTypeBlock}
 
 ${bizCtx ? `Business context: ${bizCtx}` : ''}
@@ -1111,7 +1116,7 @@ Related search queries from Google Search Console:
 ${relatedStr}
 
 Existing pages on the site:
-${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${personasBlock}${providerMetricsBlock}${ga4Block}${pageAnalysisBlock}${serpFeaturesDirectiveBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}${strategyCardBlock}${intelligenceBlock}${learningsBlock}
+${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${personasBlock}${providerMetricsBlock}${ga4Block}${pageAnalysisBlock}${decayBlock}${serpFeaturesDirectiveBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}${strategyCardBlock}${intelligenceBlock}${learningsBlock}
 
 Generate a content brief in the following JSON format:
 {
