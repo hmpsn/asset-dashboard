@@ -415,6 +415,26 @@ function toPageSlug(url: string): string {
   return url.replace(/^\//, '');
 }
 
+// Source prefixes whose slug portion may have been stored as an absolute URL
+// in recs generated before the toPageSlug normalisation was introduced.
+const URL_SLUG_PREFIXES = ['insight:ctr_opportunity:', 'decay:'] as const;
+
+/**
+ * Migrate a stored source key that may embed a full URL slug to its normalised
+ * form. Safe to call on already-normalised keys — returns them unchanged.
+ * Used only during the merge phase to match old recs against new ones.
+ */
+function migrateSourceKey(source: string): string {
+  for (const prefix of URL_SLUG_PREFIXES) {
+    if (source.startsWith(prefix)) {
+      const slug = source.slice(prefix.length);
+      const normalized = toPageSlug(slug);
+      return normalized !== slug ? `${prefix}${normalized}` : source;
+    }
+  }
+  return source;
+}
+
 /** Weight impact score based on page type (homepage/service pages matter more) */
 function pageImportanceMultiplier(slug: string): number {
   const s = slug.toLowerCase().replace(/^\//, '');
@@ -1168,10 +1188,12 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     // For strategy recs, use source + first affected page as key
     const existingByKey = new Map<string, Recommendation>();
     for (const oldRec of existing.recommendations) {
-      const key = oldRec.source.startsWith('strategy:')
+      const rawKey = oldRec.source.startsWith('strategy:')
         ? `${oldRec.source}::${oldRec.affectedPages[0] || oldRec.title}`
         : oldRec.source;
-      existingByKey.set(key, oldRec);
+      // Migrate old recs whose source embeds a full URL slug (pre-toPageSlug)
+      // so they match newly-generated normalised keys and statuses are preserved.
+      existingByKey.set(migrateSourceKey(rawKey), oldRec);
     }
 
     const newSources = new Set<string>();
@@ -1207,10 +1229,10 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       if (oldRec.status === 'completed' || oldRec.status === 'dismissed') continue;
       const category = getRecSourceCategory(oldRec.source);
       if (category && failedCategories.has(category)) continue;
-      const key = oldRec.source.startsWith('strategy:')
+      const rawKey = oldRec.source.startsWith('strategy:')
         ? `${oldRec.source}::${oldRec.affectedPages[0] || oldRec.title}`
         : oldRec.source;
-      if (!newSources.has(key)) {
+      if (!newSources.has(migrateSourceKey(rawKey))) {
         // Issue no longer detected — auto-resolve
         recs.push({
           ...oldRec,
