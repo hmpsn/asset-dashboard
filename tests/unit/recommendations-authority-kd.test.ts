@@ -12,6 +12,10 @@ describe('adjustKdImpactScore', () => {
   it('penalizes by 20% when KD is 15-30 points above domain strength', () => {
     expect(adjustKdImpactScore(65, 50, 30)).toBe(Math.round(65 * 0.8));
   });
+  it('penalizes by 20% at the exact lower boundary (kdGap = 15)', () => {
+    // difficulty=45, domainStrength=30 → kdGap exactly 15 → inclusive boundary
+    expect(adjustKdImpactScore(65, 45, 30)).toBe(Math.round(65 * 0.8));
+  });
   it('boosts by 20% (capped 100) when KD is 20+ points below domain strength', () => {
     expect(adjustKdImpactScore(65, 10, 50)).toBe(Math.min(100, Math.round(65 * 1.2)));
   });

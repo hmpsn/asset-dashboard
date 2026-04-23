@@ -98,7 +98,7 @@ export function adjustKdImpactScore(baseScore: number, difficulty: number, domai
   if (!domainStrength) return baseScore;
   const kdGap = difficulty - domainStrength;
   if (kdGap >= 30)  return Math.round(baseScore * 0.6);
-  if (kdGap > 15)   return Math.round(baseScore * 0.8);
+  if (kdGap >= 15)  return Math.round(baseScore * 0.8);
   if (kdGap <= -20) return Math.min(100, Math.round(baseScore * 1.2));
   return baseScore;
 }
