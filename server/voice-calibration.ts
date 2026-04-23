@@ -411,16 +411,19 @@ export function saveVariationFeedback(
   variationIndex: number,
   feedback: string,
 ): void {
-  const raw = stmts().getSessionFeedback.get(sessionId, workspaceId) as
-    | { variation_feedback_json: string | null }
-    | undefined;
-  if (!raw) throw new Error('Session not found');
+  const doSave = db.transaction((): void => {
+    const raw = stmts().getSessionFeedback.get(sessionId, workspaceId) as
+      | { variation_feedback_json: string | null }
+      | undefined;
+    if (!raw) throw new Error('Session not found');
 
-  const existing = parseJsonSafeArray(
-    raw.variation_feedback_json,
-    variationFeedbackItemSchema,
-    { field: 'variation_feedback_json', table: 'voice_calibration_sessions' },
-  );
-  existing.push({ variationIndex, feedback, createdAt: new Date().toISOString() });
-  stmts().updateSessionFeedback.run(JSON.stringify(existing), sessionId, workspaceId);
+    const existing = parseJsonSafeArray(
+      raw.variation_feedback_json,
+      variationFeedbackItemSchema,
+      { field: 'variation_feedback_json', table: 'voice_calibration_sessions' },
+    );
+    existing.push({ variationIndex, feedback, createdAt: new Date().toISOString() });
+    stmts().updateSessionFeedback.run(JSON.stringify(existing), sessionId, workspaceId);
+  });
+  doSave();
 }

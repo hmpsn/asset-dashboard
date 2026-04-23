@@ -120,6 +120,9 @@ router.patch('/api/voice/:workspaceId', requireWorkspaceAccess('workspaceId'), v
     invalidateIntelligenceCache(req.params.workspaceId);
     res.json(result);
   } catch (err) {
+    if (err instanceof Error && err.message === 'No voice profile exists for this workspace') {
+      return res.status(404).json({ error: 'Voice profile not found. Create one first via POST /api/voice/:workspaceId' });
+    }
     // Illegal status transitions (e.g. draft → calibrated) are user-input errors,
     // not server failures. Return 400 with a descriptive message so the client
     // can surface "finish calibration first" rather than a generic 500.
@@ -138,12 +141,19 @@ router.get('/api/voice/:workspaceId/sessions', requireWorkspaceAccess('workspace
 // Add voice sample
 router.post('/api/voice/:workspaceId/samples', requireWorkspaceAccess('workspaceId'), validate(addSampleSchema), (req, res) => {
   const { content, contextTag, source } = req.body;
-  const sample = addVoiceSample(req.params.workspaceId, content, contextTag, source);
-  addActivity(req.params.workspaceId, 'voice_sample_added', `Added voice sample${contextTag ? ` (${contextTag})` : ''}`);
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { sampleId: sample.id });
-  clearSeoContextCache(req.params.workspaceId);
-  invalidateIntelligenceCache(req.params.workspaceId);
-  res.json(sample);
+  try {
+    const sample = addVoiceSample(req.params.workspaceId, content, contextTag, source);
+    addActivity(req.params.workspaceId, 'voice_sample_added', `Added voice sample${contextTag ? ` (${contextTag})` : ''}`);
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { sampleId: sample.id });
+    clearSeoContextCache(req.params.workspaceId);
+    invalidateIntelligenceCache(req.params.workspaceId);
+    res.json(sample);
+  } catch (err) {
+    if (err instanceof Error && err.message === 'No voice profile exists for this workspace') {
+      return res.status(404).json({ error: 'Voice profile not found. Create one first via POST /api/voice/:workspaceId' });
+    }
+    throw err;
+  }
 });
 
 // Delete voice sample
@@ -178,6 +188,9 @@ router.post('/api/voice/:workspaceId/calibrate',
       res.json(session);
     } catch (err) {
       decrementUsage(req.params.workspaceId, 'voice_calibrations');
+      if (err instanceof Error && err.message === 'No voice profile exists for this workspace') {
+        return res.status(404).json({ error: 'Voice profile not found. Create one first via POST /api/voice/:workspaceId' });
+      }
       res.status(500).json({ error: sanitizeErrorMessage(err, 'Calibration failed') });
     }
   },
@@ -208,6 +221,9 @@ router.post('/api/voice/:workspaceId/calibrate/:sessionId/refine',
       res.json(session);
     } catch (err) {
       decrementUsage(req.params.workspaceId, 'voice_calibrations');
+      if (err instanceof Error && err.message === 'No voice profile exists for this workspace') {
+        return res.status(404).json({ error: 'Voice profile not found. Create one first via POST /api/voice/:workspaceId' });
+      }
       res.status(500).json({ error: sanitizeErrorMessage(err, 'Refinement failed') });
     }
   },
