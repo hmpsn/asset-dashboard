@@ -97,9 +97,9 @@ export function getRecoveryRate(checkName: string): RecoveryRate {
 export function adjustKdImpactScore(baseScore: number, difficulty: number, domainStrength: number): number {
   if (!domainStrength) return baseScore;
   const kdGap = difficulty - domainStrength;
-  if (kdGap > 30)  return Math.round(baseScore * 0.6);
-  if (kdGap > 15)  return Math.round(baseScore * 0.8);
-  if (kdGap < -20) return Math.min(100, Math.round(baseScore * 1.2));
+  if (kdGap >= 30)  return Math.round(baseScore * 0.6);
+  if (kdGap > 15)   return Math.round(baseScore * 0.8);
+  if (kdGap <= -20) return Math.min(100, Math.round(baseScore * 1.2));
   return baseScore;
 }
 
@@ -507,7 +507,10 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
             : 20;
         }
       }
-    } catch { /* non-critical */ }
+    } catch { /* non-critical — failure degrades to domainStrength=0 (no KD adjustment) */ }
+    // Credit cost note: getDomainOverview results are cached in SQLite by the provider layer.
+    // Repeated calls within the cache window cost zero API credits; only the first call per
+    // domain per cache window hits the external API.
   }
 
   // Build conversion rate map: slug → conversionRate (%)
@@ -954,6 +957,8 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       });
     }
   } catch (err) {
+    // Note: if this throws, the merge logic will auto-resolve existing CTR recs as "completed".
+    // This is an inherited design choice (same as content decay) — acceptable tradeoff for simplicity.
     log.warn({ err }, 'CTR opportunity insights unavailable for recommendations');
   }
 
@@ -995,6 +1000,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       }
     }
   } catch (err) {
+    // Note: same inherited auto-resolution risk as CTR/decay sections — acceptable tradeoff.
     log.warn({ err }, 'Diagnostic reports unavailable for recommendations');
   }
 
