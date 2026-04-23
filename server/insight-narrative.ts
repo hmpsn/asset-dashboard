@@ -136,6 +136,52 @@ function toClientInsight(insight: AnalyticsInsight): ClientInsight {
         impact: data.durationDays ? `Ongoing for ${data.durationDays} days` : undefined,
       };
     },
+
+    competitor_alert: () => {
+      const d = data as import('../shared/types/analytics.js').CompetitorAlertData;
+      const domain = d.competitorDomain ?? 'a competitor';
+      const kw = d.keyword ? `"${d.keyword}"` : 'a keyword';
+      if (d.alertType === 'keyword_gained') {
+        return {
+          headline: `Competitor gaining ground on ${kw}`,
+          narrative: `${domain} moved from position ${d.previousPosition} to position ${d.currentPosition} for ${kw}. We're reviewing whether to target this keyword more aggressively.`,
+          impact: d.volume ? `${Number(d.volume).toLocaleString()} monthly searches at stake` : undefined,
+        };
+      }
+      if (d.alertType === 'new_keyword') {
+        return {
+          headline: `Competitor entered top results for ${kw}`,
+          narrative: `${domain} now ranks in the top 10 for ${kw}, a keyword relevant to your site. We're evaluating a content response.`,
+          impact: d.volume ? `${Number(d.volume).toLocaleString()} monthly searches` : undefined,
+        };
+      }
+      return {
+        headline: `Competitor activity detected`,
+        narrative: `We noticed a change in ${domain}'s search rankings and are monitoring the situation.`,
+        impact: undefined,
+      };
+    },
+
+    emerging_keyword: () => {
+      const d = data as import('../shared/types/analytics.js').EmergingKeywordData;
+      return {
+        headline: `Rising search trend: "${d.keyword}"`,
+        narrative: `"${d.keyword}" is gaining search momentum${d.volume ? ` (${Number(d.volume).toLocaleString()} monthly searches)` : ''}. Getting ahead of this trend now could secure a strong ranking before competition increases.`,
+        impact: d.currentPosition
+          ? `You currently rank at position ${Math.round(d.currentPosition)} — there's room to improve`
+          : `Your site doesn't yet rank for this keyword — a dedicated page could capture this traffic`,
+      };
+    },
+
+    freshness_alert: () => {
+      const d = data as import('../shared/types/analytics.js').FreshnessAlertData;
+      const days = d.daysSinceLastAnalysis;
+      return {
+        headline: `Content on ${d.pagePath} may need a refresh`,
+        narrative: `This page hasn't been updated in ${days} days. Search engines tend to favor recently-updated content${d.impressions ? `, and this page still receives ${Number(d.impressions).toLocaleString()} monthly impressions that could be protected with a refresh` : ''}.`,
+        impact: days > 180 ? `Over 6 months since last update — elevated risk of ranking decline` : `Over 3 months since last update`,
+      };
+    },
   };
 
   const generator = narrativeMap[insight.insightType];
