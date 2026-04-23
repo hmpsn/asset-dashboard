@@ -973,7 +973,8 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     const diagImpactMap: Record<string, number> = { high: 75, medium: 55, low: 35 };
 
     for (const report of completedReports) {
-      for (const action of report.remediationActions.slice(0, 5)) {
+      for (let actionIdx = 0; actionIdx < Math.min(report.remediationActions.length, 5); actionIdx++) {
+        const action = report.remediationActions[actionIdx];
         const recType: RecType = action.owner === 'content' ? 'content' : 'technical';
         recs.push({
           id: `rec_${crypto.randomBytes(6).toString('hex')}`,
@@ -986,7 +987,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           impact: action.impact,
           effort: action.effort,
           impactScore: diagImpactMap[action.impact] ?? 55,
-          source: `diagnostic:${report.id}:${action.title.slice(0, 30)}`,
+          source: `diagnostic:${report.id}:${actionIdx}:${action.title.slice(0, 20)}`,
           affectedPages: action.pageUrls?.map((u: string) => u.replace(/^\//, '')) ?? [],
           trafficAtRisk: 0,
           impressionsAtRisk: 0,
