@@ -12,6 +12,10 @@ import {
 } from '../brandscript.js';
 import { clearSeoContextCache } from '../seo-context.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { aiLimiter } from '../middleware.js';
+import { incrementIfAllowed, decrementUsage } from '../usage-tracking.js';
+import { sanitizeErrorMessage } from '../helpers.js';
+import { getWorkspace } from '../workspaces.js';
 
 const router = Router();
 
@@ -114,6 +118,11 @@ router.put('/api/brandscripts/:workspaceId/:id/sections', requireWorkspaceAccess
 
   const result = updateBrandscriptSections(req.params.workspaceId, req.params.id, sections);
   if (!result) return res.status(404).json({ error: 'Not found' });
+  addActivity(
+    req.params.workspaceId,
+    'brandscript_sections_updated',
+    `Updated sections for brandscript "${result.name}"`,
+  );
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRANDSCRIPT_UPDATED, { brandscriptId: req.params.id });
   clearSeoContextCache(req.params.workspaceId);
   invalidateIntelligenceCache(req.params.workspaceId);
@@ -137,18 +146,37 @@ router.delete('/api/brandscripts/:workspaceId/:id', requireWorkspaceAccess('work
 });
 
 // AI: Complete empty sections
-router.post('/api/brandscripts/:workspaceId/:id/complete', requireWorkspaceAccess('workspaceId'), async (req, res) => {
-  try {
-    const bs = await completeBrandscript(req.params.workspaceId, req.params.id);
-    if (!bs) return res.status(404).json({ error: 'Not found' });
-    addActivity(req.params.workspaceId, 'brandscript_completed', `AI completed sections in brandscript "${bs.name}"`);
-    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRANDSCRIPT_UPDATED, { brandscriptId: req.params.id });
-    clearSeoContextCache(req.params.workspaceId);
-    invalidateIntelligenceCache(req.params.workspaceId);
-    res.json(bs);
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Completion failed' });
-  }
-});
+router.post(
+  '/api/brandscripts/:workspaceId/:id/complete',
+  requireWorkspaceAccess('workspaceId'),
+  aiLimiter,
+  async (req, res) => {
+    const ws = getWorkspace(req.params.workspaceId);
+    const tier = (ws?.tier ?? 'free') as string;
+
+    if (!incrementIfAllowed(req.params.workspaceId, tier, 'brandscript_generations')) {
+      return res.status(429).json({
+        error: 'Monthly limit reached for your tier',
+        code: 'usage_limit',
+      });
+    }
+
+    try {
+      const bs = await completeBrandscript(req.params.workspaceId, req.params.id);
+      if (!bs) {
+        decrementUsage(req.params.workspaceId, 'brandscript_generations');
+        return res.status(404).json({ error: 'Not found' });
+      }
+      addActivity(req.params.workspaceId, 'brandscript_completed', `AI completed sections in brandscript "${bs.name}"`);
+      broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRANDSCRIPT_UPDATED, { brandscriptId: req.params.id });
+      clearSeoContextCache(req.params.workspaceId);
+      invalidateIntelligenceCache(req.params.workspaceId);
+      res.json(bs);
+    } catch (err) {
+      decrementUsage(req.params.workspaceId, 'brandscript_generations');
+      res.status(500).json({ error: sanitizeErrorMessage(err, 'Completion failed') });
+    }
+  },
+);
 
 export default router;

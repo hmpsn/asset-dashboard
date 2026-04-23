@@ -25,7 +25,7 @@ import { randomUUID } from 'crypto';
 import db from '../../server/db/index.js';
 import { buildSeoContext, clearSeoContextCache } from '../../server/seo-context.js';
 import {
-  getOrCreateVoiceProfile,
+  createVoiceProfile,
   addVoiceSample,
   updateVoiceProfile,
   VoiceProfileStateTransitionError,
@@ -92,13 +92,12 @@ describe('buildSeoContext — voice profile authority vs legacy brand voice', ()
     seeded = null;
   });
 
-  it('preserves legacy brand voice when only a draft profile exists (auto-created on GET)', () => {
-    // Simulates: admin has workspace.brandVoice set, visits Voice tab, which
-    // triggers GET /api/voice/:id → getOrCreateVoiceProfile inserts a draft row.
-    // Pre-fix, the mere existence of that draft row caused the legacy brand
-    // voice to be silently dropped from every subsequent prompt.
+  it('preserves legacy brand voice when only a draft profile exists (explicitly created)', () => {
+    // Simulates: admin has workspace.brandVoice set, creates a voice profile via
+    // POST /api/voice/:id. Pre-fix, the mere existence of that draft row caused
+    // the legacy brand voice to be silently dropped from every subsequent prompt.
     seeded = seedWorkspaceWithLegacyVoice();
-    const profile = getOrCreateVoiceProfile(seeded.workspaceId);
+    const profile = createVoiceProfile(seeded.workspaceId);
     expect(profile.status).toBe('draft');
     expect(profile.samples).toHaveLength(0);
     clearSeoContextCache(seeded.workspaceId);
@@ -111,7 +110,7 @@ describe('buildSeoContext — voice profile authority vs legacy brand voice', ()
 
   it('uses voice profile and drops legacy when profile is calibrated with ≥1 sample', () => {
     seeded = seedWorkspaceWithLegacyVoice();
-    getOrCreateVoiceProfile(seeded.workspaceId);
+    createVoiceProfile(seeded.workspaceId);
     addVoiceSample(seeded.workspaceId, SAMPLE_TEXT, 'body', 'manual');
     // State machine enforces draft → calibrating → calibrated — cannot skip calibrating.
     updateVoiceProfile(seeded.workspaceId, { status: 'calibrating' });
@@ -141,7 +140,7 @@ describe('buildSeoContext — voice profile authority vs legacy brand voice', ()
     // into the SYSTEM prompt), preventing the model from seeing a contradictory
     // legacy block in the USER prompt alongside calibrated Layer 2 content.
     seeded = seedWorkspaceWithLegacyVoice();
-    getOrCreateVoiceProfile(seeded.workspaceId);
+    createVoiceProfile(seeded.workspaceId);
     // State machine enforces draft → calibrating → calibrated — cannot skip calibrating.
     updateVoiceProfile(seeded.workspaceId, { status: 'calibrating' });
     updateVoiceProfile(seeded.workspaceId, {
@@ -170,7 +169,7 @@ describe('buildSeoContext — voice profile authority vs legacy brand voice', ()
     // Post-fix: only calibrated OR explicit DNA/guardrails activate the
     // override. Samples-only drafts keep the legacy block in the prompt.
     seeded = seedWorkspaceWithLegacyVoice();
-    getOrCreateVoiceProfile(seeded.workspaceId);
+    createVoiceProfile(seeded.workspaceId);
     addVoiceSample(seeded.workspaceId, SAMPLE_TEXT, 'body', 'manual');
     // No DNA, no guardrails, no status change — pure "uploaded one sample".
     clearSeoContextCache(seeded.workspaceId);
@@ -188,7 +187,7 @@ describe('buildSeoContext — voice profile authority vs legacy brand voice', ()
     // wizard that persists DNA mid-flow), the override DOES activate and
     // the legacy block is dropped. Same for guardrails.
     seeded = seedWorkspaceWithLegacyVoice();
-    getOrCreateVoiceProfile(seeded.workspaceId);
+    createVoiceProfile(seeded.workspaceId);
     addVoiceSample(seeded.workspaceId, SAMPLE_TEXT, 'body', 'manual');
     updateVoiceProfile(seeded.workspaceId, { voiceDNA: SENTINEL_DNA });
     clearSeoContextCache(seeded.workspaceId);
@@ -223,7 +222,7 @@ describe('updateVoiceProfile — state machine guard', () => {
 
   it('rejects illegal draft → calibrated transition', () => {
     seeded = seedWorkspaceWithLegacyVoice();
-    getOrCreateVoiceProfile(seeded.workspaceId); // creates draft
+    createVoiceProfile(seeded.workspaceId); // creates draft
 
     expect(() =>
       updateVoiceProfile(seeded!.workspaceId, {
@@ -236,7 +235,7 @@ describe('updateVoiceProfile — state machine guard', () => {
 
   it('error carries structured from/to fields for 400 response mapping', () => {
     seeded = seedWorkspaceWithLegacyVoice();
-    getOrCreateVoiceProfile(seeded.workspaceId);
+    createVoiceProfile(seeded.workspaceId);
 
     try {
       updateVoiceProfile(seeded.workspaceId, { status: 'calibrated' });
@@ -251,7 +250,7 @@ describe('updateVoiceProfile — state machine guard', () => {
 
   it('allows legal draft → calibrating', () => {
     seeded = seedWorkspaceWithLegacyVoice();
-    getOrCreateVoiceProfile(seeded.workspaceId);
+    createVoiceProfile(seeded.workspaceId);
 
     const result = updateVoiceProfile(seeded.workspaceId, { status: 'calibrating' });
     expect(result.status).toBe('calibrating');
@@ -259,7 +258,7 @@ describe('updateVoiceProfile — state machine guard', () => {
 
   it('allows legal calibrating → calibrated', () => {
     seeded = seedWorkspaceWithLegacyVoice();
-    getOrCreateVoiceProfile(seeded.workspaceId);
+    createVoiceProfile(seeded.workspaceId);
     updateVoiceProfile(seeded.workspaceId, { status: 'calibrating' });
 
     const result = updateVoiceProfile(seeded.workspaceId, {
@@ -272,7 +271,7 @@ describe('updateVoiceProfile — state machine guard', () => {
 
   it('allows calibrated → draft reset', () => {
     seeded = seedWorkspaceWithLegacyVoice();
-    getOrCreateVoiceProfile(seeded.workspaceId);
+    createVoiceProfile(seeded.workspaceId);
     updateVoiceProfile(seeded.workspaceId, { status: 'calibrating' });
     updateVoiceProfile(seeded.workspaceId, {
       status: 'calibrated',
@@ -286,7 +285,7 @@ describe('updateVoiceProfile — state machine guard', () => {
 
   it('allows same-state no-op updates (no status change)', () => {
     seeded = seedWorkspaceWithLegacyVoice();
-    getOrCreateVoiceProfile(seeded.workspaceId);
+    createVoiceProfile(seeded.workspaceId);
 
     // No status in the update — pure field edit. Must not throw.
     const result = updateVoiceProfile(seeded.workspaceId, { voiceDNA: SENTINEL_DNA });
@@ -296,7 +295,7 @@ describe('updateVoiceProfile — state machine guard', () => {
 
   it('allows redundant same-status update (draft → draft)', () => {
     seeded = seedWorkspaceWithLegacyVoice();
-    getOrCreateVoiceProfile(seeded.workspaceId);
+    createVoiceProfile(seeded.workspaceId);
 
     // Admin UI may send the current status unchanged — must be a legal no-op.
     const result = updateVoiceProfile(seeded.workspaceId, { status: 'draft' });

@@ -4,13 +4,14 @@ import { callCreativeAI } from './content-posts-ai.js';
 import { buildIntelPrompt } from './workspace-intelligence.js';
 import { buildSystemPrompt, guardrailsToPromptInstructions } from './prompt-assembly.js';
 import { renderVoiceDNAForPrompt } from './voice-dna-render.js';
-import { parseJsonFallback } from './db/json-validation.js';
+import { parseJsonFallback, parseJsonSafeArray } from './db/json-validation.js';
+import { variationFeedbackItemSchema } from './schemas/voice-calibration.js';
 import { createLogger } from './logger.js';
 import { randomUUID } from 'crypto';
 import type {
   VoiceProfile, VoiceSample, CalibrationSession, CalibrationVariation,
   VoiceDNA, VoiceGuardrails, ContextModifier, VoiceProfileStatus,
-  VoiceSampleContext, VoiceSampleSource,
+  VoiceSampleContext, VoiceSampleSource, VoiceCalibrationVariationFeedback,
 } from '../shared/types/brand-engine.js';
 
 const log = createLogger('voice-calibration');
@@ -28,13 +29,14 @@ interface SampleRow {
 interface SessionRow {
   id: string; voice_profile_id: string; prompt_type: string;
   variations_json: string; steering_notes: string | null; created_at: string;
+  variation_feedback_json: string | null;
 }
 
 const stmts = createStmtCache(() => ({
   getProfileByWorkspace: db.prepare(`SELECT * FROM voice_profiles WHERE workspace_id = ? ORDER BY updated_at DESC LIMIT 1`),
-  // INSERT OR IGNORE so concurrent getOrCreateVoiceProfile() calls don't trip the
-  // UNIQUE(workspace_id) constraint — whichever inserts first wins, the loser falls
-  // through and re-selects the committed row.
+  // INSERT OR IGNORE so concurrent createVoiceProfile() calls don't trip the
+  // UNIQUE(workspace_id) constraint — whichever inserts first wins, the loser
+  // gets changes=0 and the caller throws/returns 409.
   insertProfile: db.prepare(`INSERT OR IGNORE INTO voice_profiles (id, workspace_id, status, voice_dna_json, guardrails_json, context_modifiers_json, created_at, updated_at) VALUES (@id, @workspace_id, @status, @voice_dna_json, @guardrails_json, @context_modifiers_json, @created_at, @updated_at)`),
   updateProfile: db.prepare(`UPDATE voice_profiles SET status = @status, voice_dna_json = @voice_dna_json, guardrails_json = @guardrails_json, context_modifiers_json = @context_modifiers_json, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`), // status-ok: voice profile status is not a platform state machine column
   listSamples: db.prepare(`SELECT * FROM voice_samples WHERE voice_profile_id = ? ORDER BY sort_order`),
@@ -53,6 +55,11 @@ const stmts = createStmtCache(() => ({
   // one. The calling function already re-verifies ownership via getSession, but
   // defense in depth — every write gets the scope in its WHERE clause.
   updateSession: db.prepare(`UPDATE voice_calibration_sessions SET variations_json = @variations_json, steering_notes = @steering_notes WHERE id = @id AND voice_profile_id = @voice_profile_id`),
+  // Feedback is scoped by workspace_id via a JOIN on voice_profiles to prevent
+  // cross-workspace access — reading / writing by session id alone would allow
+  // a misrouted request to access another workspace's session data.
+  getSessionFeedback: db.prepare(`SELECT vcs.variation_feedback_json FROM voice_calibration_sessions vcs JOIN voice_profiles vp ON vcs.voice_profile_id = vp.id WHERE vcs.id = ? AND vp.workspace_id = ?`),
+  updateSessionFeedback: db.prepare(`UPDATE voice_calibration_sessions SET variation_feedback_json = ? WHERE id = ? AND voice_profile_id IN (SELECT id FROM voice_profiles WHERE workspace_id = ?)`),
 }));
 
 function rowToProfile(row: ProfileRow): Omit<VoiceProfile, 'samples'> {
@@ -75,13 +82,18 @@ function rowToSample(row: SampleRow): VoiceSample {
   };
 }
 
-function rowToSession(row: SessionRow): CalibrationSession {
+function rowToSession(row: SessionRow): CalibrationSession & { variationFeedback: VoiceCalibrationVariationFeedback[] } {
   return {
     id: row.id, voiceProfileId: row.voice_profile_id,
     promptType: row.prompt_type,
     variations: parseJsonFallback<CalibrationVariation[]>(row.variations_json, []),
     steeringNotes: row.steering_notes ?? undefined,
     createdAt: row.created_at,
+    variationFeedback: parseJsonSafeArray(
+      row.variation_feedback_json,
+      variationFeedbackItemSchema,
+      { field: 'variation_feedback_json', table: 'voice_calibration_sessions' },
+    ),
   };
 }
 
@@ -94,11 +106,16 @@ export function getVoiceProfile(workspaceId: string): (VoiceProfile & { samples:
   return { ...profile, samples };
 }
 
-// Gets or creates the voice profile for a workspace, always includes samples
-export function getOrCreateVoiceProfile(workspaceId: string): VoiceProfile & { samples: VoiceSample[] } {
-  const existing = getVoiceProfile(workspaceId);
-  if (existing) return existing;
-
+/**
+ * Explicitly creates a new voice profile for a workspace.
+ * Throws an error if a profile already exists (caller translates to 409).
+ * Use this from the explicit POST /api/voice/:workspaceId route.
+ *
+ * Uses a transaction with a pre-insert existence check to guard against
+ * duplicate creation. INSERT OR IGNORE alone is not sufficient for DBs where
+ * the UNIQUE(workspace_id) constraint may not be present (schema drift).
+ */
+export function createVoiceProfile(workspaceId: string): VoiceProfile & { samples: VoiceSample[] } {
   const id = `vp_${randomUUID().slice(0, 8)}`;
   const now = new Date().toISOString();
   const defaultModifiers: ContextModifier[] = [
@@ -109,24 +126,21 @@ export function getOrCreateVoiceProfile(workspaceId: string): VoiceProfile & { s
     { context: 'FAQ / educational', description: 'Accessible, helpful. Expertise without condescension.' },
   ];
 
-  const result = stmts().insertProfile.run({
-    id, workspace_id: workspaceId, status: 'draft',
-    voice_dna_json: null, guardrails_json: null,
-    context_modifiers_json: JSON.stringify(defaultModifiers),
-    created_at: now, updated_at: now,
+  // Wrap the existence check + insert in a transaction so concurrent creates
+  // can't both pass the existence check before either inserts.
+  const doCreate = db.transaction((): void => {
+    const existing = stmts().getProfileByWorkspace.get(workspaceId);
+    if (existing) throw new Error(`Voice profile already exists for workspace ${workspaceId}`);
+
+    stmts().insertProfile.run({
+      id, workspace_id: workspaceId, status: 'draft',
+      voice_dna_json: null, guardrails_json: null,
+      context_modifiers_json: JSON.stringify(defaultModifiers),
+      created_at: now, updated_at: now,
+    });
   });
 
-  // If another request inserted first, IGNORE returns 0 changes — re-read the committed row.
-  if (result.changes === 0) {
-    const winner = getVoiceProfile(workspaceId);
-    if (winner) return winner;
-    // Re-read after a lost race also returned null — the row we expected to
-    // exist is gone. Something external (manual delete, test teardown, FK
-    // cascade) is modifying the table. Throw rather than returning a ghost
-    // in-memory object that was never persisted — CLAUDE.md requires
-    // getOrCreate* to return a non-nullable value or throw.
-    throw new Error(`getOrCreateVoiceProfile: lost race and re-read also failed for workspace ${workspaceId}`);
-  }
+  doCreate();
 
   log.info({ workspaceId, profileId: id }, 'created voice profile');
   return { id, workspaceId, status: 'draft', contextModifiers: defaultModifiers, samples: [], createdAt: now, updatedAt: now };
@@ -162,14 +176,12 @@ export class VoiceProfileStateTransitionError extends Error {
   }
 }
 
-// Always returns a profile — `getOrCreateVoiceProfile` creates one if missing,
-// so there is no null path. Typed as non-nullable so callers don't need a
-// dead-code guard.
 export function updateVoiceProfile(
   workspaceId: string,
   updates: { status?: VoiceProfileStatus; voiceDNA?: VoiceDNA; guardrails?: VoiceGuardrails; contextModifiers?: ContextModifier[] },
 ): VoiceProfile & { samples: VoiceSample[] } {
-  const profile = getOrCreateVoiceProfile(workspaceId);
+  const profile = getVoiceProfile(workspaceId);
+  if (!profile) throw new Error('No voice profile exists for this workspace');
   // Enforce state-machine at the write boundary. Any caller — route handler,
   // internal flow, test harness — flows through here, so the guard catches
   // every path without depending on Zod-schema discipline at the edge.
@@ -194,10 +206,9 @@ export function updateVoiceProfile(
 }
 
 // Takes workspaceId (not profile.id) — resolves profile internally.
-// getOrCreateVoiceProfile may INSERT a voice_profiles row, and we then INSERT
-// a voice_samples row. Wrapping the two writes in a single transaction means a
-// failed sample insert rolls back the just-created profile (no orphaned empty
-// profile left behind) and satisfies CLAUDE.md's multi-step-mutation rule.
+// The profile must already exist (call createVoiceProfile first). Wrapping
+// the read + insert in a single transaction means the sort_order computation
+// and the insert are atomic — concurrent adds can't collide on sort_order.
 export function addVoiceSample(
   workspaceId: string, content: string,
   contextTag?: VoiceSampleContext, source?: VoiceSampleSource,
@@ -207,7 +218,8 @@ export function addVoiceSample(
   const effectiveSource = source ?? 'manual';
 
   const doAdd = db.transaction((): { voiceProfileId: string; sortOrder: number } => {
-    const profile = getOrCreateVoiceProfile(workspaceId);
+    const profile = getVoiceProfile(workspaceId);
+    if (!profile) throw new Error('No voice profile exists for this workspace');
     // Read MAX(sort_order)+1 inside the transaction so concurrent adds can't
     // assign duplicate sort_orders. `profile.samples.length` from the in-memory
     // snapshot is stale as soon as another request commits between read and write.
@@ -277,7 +289,8 @@ export function buildVoiceCalibrationContext(profile: VoiceProfile & { samples: 
 export async function generateCalibrationVariations(
   workspaceId: string, promptType: string, steeringNotes?: string,
 ): Promise<CalibrationSession> {
-  const profile = getOrCreateVoiceProfile(workspaceId);
+  const profile = getVoiceProfile(workspaceId);
+  if (!profile) throw new Error('No voice profile exists for this workspace');
   const fullContext = await buildIntelPrompt(workspaceId, ['seoContext']);
 
   const { samplesText, dnaText, guardrailsText } = buildVoiceCalibrationContext(profile);
@@ -385,4 +398,29 @@ Return valid JSON: { "refined": "the refined text" }`;
   });
 
   return doRefine();
+}
+
+/**
+ * Persist per-variation feedback for a calibration session.
+ * Appends to the existing feedback array stored in variation_feedback_json.
+ * Throws 'Session not found' if the session doesn't belong to this workspace.
+ */
+export function saveVariationFeedback(
+  workspaceId: string,
+  sessionId: string,
+  variationIndex: number,
+  feedback: string,
+): void {
+  const raw = stmts().getSessionFeedback.get(sessionId, workspaceId) as
+    | { variation_feedback_json: string | null }
+    | undefined;
+  if (!raw) throw new Error('Session not found');
+
+  const existing = parseJsonSafeArray(
+    raw.variation_feedback_json,
+    variationFeedbackItemSchema,
+    { field: 'variation_feedback_json', table: 'voice_calibration_sessions' },
+  );
+  existing.push({ variationIndex, feedback, createdAt: new Date().toISOString() });
+  stmts().updateSessionFeedback.run(JSON.stringify(existing), sessionId, workspaceId);
 }

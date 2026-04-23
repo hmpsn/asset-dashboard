@@ -5,14 +5,23 @@ import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import {
-  getOrCreateVoiceProfile, updateVoiceProfile,
+  getVoiceProfile, createVoiceProfile, updateVoiceProfile,
   VoiceProfileStateTransitionError,
   addVoiceSample, deleteVoiceSample,
   listCalibrationSessions,
   generateCalibrationVariations, refineVariation,
+  saveVariationFeedback,
 } from '../voice-calibration.js';
 import { clearSeoContextCache } from '../seo-context.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { aiLimiter } from '../middleware.js';
+import { incrementIfAllowed, decrementUsage } from '../usage-tracking.js';
+import { sanitizeErrorMessage } from '../helpers.js';
+import { getWorkspace } from '../workspaces.js';
+import {
+  createVoiceProfileSchema,
+  saveVariationFeedbackSchema,
+} from '../schemas/voice-calibration.js';
 
 const router = Router();
 
@@ -77,20 +86,29 @@ const refineSchema = z.object({
 
 // ── Routes ──────────────────────────────────────────────────────────────────
 
-// Get or create voice profile (includes samples)
+// Get voice profile (returns null when not yet created — call POST to create)
 router.get('/api/voice/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
-  try {
-    res.json(getOrCreateVoiceProfile(req.params.workspaceId));
-  } catch (err) {
-    // `getOrCreateVoiceProfile` throws when the INSERT-IGNORE lost a race AND
-    // the subsequent re-read also failed — meaning the row we expected to
-    // exist is gone (manual delete, FK cascade, test teardown). Rare in
-    // production but we map it to a descriptive 500 rather than letting
-    // Express's default handler emit a generic stack trace.
-    const message = err instanceof Error ? err.message : 'Failed to load voice profile';
-    return res.status(500).json({ error: message });
-  }
+  res.json(getVoiceProfile(req.params.workspaceId) ?? null);
 });
+
+// Explicitly create voice profile (A5: no longer auto-created on GET)
+router.post('/api/voice/:workspaceId',
+  requireWorkspaceAccess('workspaceId'),
+  validate(createVoiceProfileSchema),
+  (req, res) => {
+    try {
+      const profile = createVoiceProfile(req.params.workspaceId);
+      addActivity(req.params.workspaceId, 'voice_profile_created', 'Created voice profile');
+      broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, {});
+      res.status(201).json(profile);
+    } catch (err) {
+      if (err instanceof Error && /already exists/.test(err.message)) {
+        return res.status(409).json({ error: 'Voice profile already exists' });
+      }
+      throw err;
+    }
+  },
+);
 
 // Update voice profile (DNA, guardrails, modifiers, status)
 router.patch('/api/voice/:workspaceId', requireWorkspaceAccess('workspaceId'), validate(updateVoiceProfileSchema), (req, res) => {
@@ -140,34 +158,78 @@ router.delete('/api/voice/:workspaceId/samples/:sampleId', requireWorkspaceAcces
 });
 
 // Generate calibration variations
-router.post('/api/voice/:workspaceId/calibrate', requireWorkspaceAccess('workspaceId'), validate(calibrateSchema), async (req, res) => {
-  const { promptType, steeringNotes } = req.body;
-  try {
-    const session = await generateCalibrationVariations(req.params.workspaceId, promptType, steeringNotes);
-    addActivity(req.params.workspaceId, 'voice_calibrated', `Generated voice calibration variations for ${promptType}`);
-    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { sessionId: session.id });
-    clearSeoContextCache(req.params.workspaceId);
-    invalidateIntelligenceCache(req.params.workspaceId);
-    res.json(session);
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Calibration failed' });
-  }
-});
+router.post('/api/voice/:workspaceId/calibrate',
+  requireWorkspaceAccess('workspaceId'),
+  aiLimiter,
+  validate(calibrateSchema),
+  async (req, res) => {
+    const { promptType, steeringNotes } = req.body;
+    const ws = getWorkspace(req.params.workspaceId);
+    const tier = (ws?.tier ?? 'free') as string;
+    if (!incrementIfAllowed(req.params.workspaceId, tier, 'voice_calibrations')) {
+      return res.status(429).json({ error: 'Monthly limit reached for your tier', code: 'usage_limit' });
+    }
+    try {
+      const session = await generateCalibrationVariations(req.params.workspaceId, promptType, steeringNotes);
+      addActivity(req.params.workspaceId, 'voice_calibrated', `Generated voice calibration variations for ${promptType}`);
+      broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { sessionId: session.id });
+      clearSeoContextCache(req.params.workspaceId);
+      invalidateIntelligenceCache(req.params.workspaceId);
+      res.json(session);
+    } catch (err) {
+      decrementUsage(req.params.workspaceId, 'voice_calibrations');
+      res.status(500).json({ error: sanitizeErrorMessage(err, 'Calibration failed') });
+    }
+  },
+);
 
 // Refine a specific variation with steering direction
-router.post('/api/voice/:workspaceId/calibrate/:sessionId/refine', requireWorkspaceAccess('workspaceId'), validate(refineSchema), async (req, res) => {
-  const { variationIndex, direction } = req.body;
-  try {
-    const session = await refineVariation(req.params.workspaceId, req.params.sessionId, variationIndex, direction);
-    if (!session) return res.status(404).json({ error: 'Session or variation not found' });
-    addActivity(req.params.workspaceId, 'voice_refined', `Refined voice calibration variation for ${session.promptType}`);
-    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { sessionId: req.params.sessionId });
-    clearSeoContextCache(req.params.workspaceId);
-    invalidateIntelligenceCache(req.params.workspaceId);
-    res.json(session);
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Refinement failed' });
-  }
-});
+router.post('/api/voice/:workspaceId/calibrate/:sessionId/refine',
+  requireWorkspaceAccess('workspaceId'),
+  aiLimiter,
+  validate(refineSchema),
+  async (req, res) => {
+    const { variationIndex, direction } = req.body;
+    const ws = getWorkspace(req.params.workspaceId);
+    const tier = (ws?.tier ?? 'free') as string;
+    if (!incrementIfAllowed(req.params.workspaceId, tier, 'voice_calibrations')) {
+      return res.status(429).json({ error: 'Monthly limit reached for your tier', code: 'usage_limit' });
+    }
+    try {
+      const session = await refineVariation(req.params.workspaceId, req.params.sessionId, variationIndex, direction);
+      if (!session) {
+        decrementUsage(req.params.workspaceId, 'voice_calibrations');
+        return res.status(404).json({ error: 'Session or variation not found' });
+      }
+      addActivity(req.params.workspaceId, 'voice_refined', `Refined voice calibration variation for ${session.promptType}`);
+      broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { sessionId: req.params.sessionId });
+      clearSeoContextCache(req.params.workspaceId);
+      invalidateIntelligenceCache(req.params.workspaceId);
+      res.json(session);
+    } catch (err) {
+      decrementUsage(req.params.workspaceId, 'voice_calibrations');
+      res.status(500).json({ error: sanitizeErrorMessage(err, 'Refinement failed') });
+    }
+  },
+);
+
+// Persist per-variation feedback (I8 backend half)
+router.post('/api/voice/:workspaceId/calibration-feedback',
+  requireWorkspaceAccess('workspaceId'),
+  validate(saveVariationFeedbackSchema),
+  (req, res) => {
+    const { sessionId, variationIndex, feedback } = req.body;
+    try {
+      saveVariationFeedback(req.params.workspaceId, sessionId, variationIndex, feedback);
+      broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { sessionId });
+      res.status(204).send();
+    } catch (err) {
+      if (err instanceof Error && err.message === 'Session not found') {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+      res.status(500).json({ error: sanitizeErrorMessage(err, 'Failed to save feedback') });
+    }
+  },
+);
 
 export default router;

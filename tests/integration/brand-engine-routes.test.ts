@@ -56,30 +56,50 @@ afterAll(() => {
 
 // ── Voice Profile ─────────────────────────────────────────────────────────────
 
-describe('GET /api/voice/:workspaceId — get or create profile', () => {
-  it('creates and returns a draft profile with empty samples on first call', async () => {
-    const res = await api(`/api/voice/${wsId}`);
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as VoiceProfile & { samples: VoiceSample[] };
-    expect(body.workspaceId).toBe(wsId);
-    expect(body.status).toBe('draft');
-    expect(Array.isArray(body.samples)).toBe(true);
-  });
-
-  it('returns 200 for unknown workspace (creates a profile)', async () => {
-    // getOrCreateVoiceProfile always creates — the route should not 404
+describe('GET /api/voice/:workspaceId — get profile (no auto-create)', () => {
+  it('returns null when no profile exists (A5 fix: no side-effect creation on GET)', async () => {
     const ws = seedWorkspace({ clientPassword: '' });
     try {
       const res = await api(`/api/voice/${ws.workspaceId}`);
       expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toBeNull();
     } finally {
       ws.cleanup();
     }
   });
 });
 
+describe('POST /api/voice/:workspaceId — explicit create profile', () => {
+  it('creates and returns a draft profile with empty samples', async () => {
+    // Ensure no profile exists first (workspace was just created in beforeAll)
+    const res = await postJson(`/api/voice/${wsId}`, {});
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as VoiceProfile & { samples: VoiceSample[] };
+    expect(body.workspaceId).toBe(wsId);
+    expect(body.status).toBe('draft');
+    expect(Array.isArray(body.samples)).toBe(true);
+  });
+
+  it('second POST returns 409 (already exists)', async () => {
+    const res = await postJson(`/api/voice/${wsId}`, {});
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body).toHaveProperty('error');
+  });
+
+  it('GET now returns the profile', async () => {
+    const res = await api(`/api/voice/${wsId}`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as VoiceProfile & { samples: VoiceSample[] };
+    expect(body).not.toBeNull();
+    expect(body.status).toBe('draft');
+  });
+});
+
 describe('PATCH /api/voice/:workspaceId — update profile fields', () => {
   it('updates status to calibrating', async () => {
+    // Profile was created in the POST describe above
     const res = await patchJson(`/api/voice/${wsId}`, { status: 'calibrating' });
     expect(res.status).toBe(200);
     const body = (await res.json()) as VoiceProfile;
@@ -101,6 +121,7 @@ describe('PATCH /api/voice/:workspaceId — update profile fields', () => {
 
 describe('POST /api/voice/:workspaceId/samples — add voice sample', () => {
   it('adds a sample and returns it', async () => {
+    // Profile exists from the explicit POST above
     const res = await postJson(`/api/voice/${wsId}/samples`, {
       content: 'We help small businesses grow without the jargon.',
       contextTag: 'headline',
@@ -121,6 +142,7 @@ describe('POST /api/voice/:workspaceId/samples — add voice sample', () => {
 
 describe('DELETE /api/voice/:workspaceId/samples/:sampleId — delete sample', () => {
   it('deletes an existing sample', async () => {
+    // Profile exists from the explicit POST above
     const addRes = await postJson(`/api/voice/${wsId}/samples`, {
       content: 'Sample to be deleted.',
     });
@@ -138,6 +160,8 @@ describe('DELETE /api/voice/:workspaceId/samples/:sampleId — delete sample', (
   });
 
   it('returns 404 when sample exists but belongs to a different workspace (workspace scoping)', async () => {
+    // First create a profile for workspace B
+    await postJson(`/api/voice/${wsOtherId}`, {});
     // Seed a sample in workspace B
     const addRes = await postJson(`/api/voice/${wsOtherId}/samples`, {
       content: 'Workspace B sample — must not be deletable from workspace A.',
