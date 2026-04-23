@@ -103,6 +103,11 @@ describe('I13 – tier gate on /api/brand-identity/:workspaceId/:id/refine', () 
 // The aiLimiter allows 3 req/60 s per IP per path. Requests 1–3 reach the
 // handler (and get 500 because OPENAI/ANTHROPIC keys are not set in test env),
 // but the 4th is blocked with 429 before even entering the handler.
+//
+// Test isolation: the rate-limiter keys by `${ip}:${req.path}` (see
+// server/middleware.ts:23). `req.path` includes the workspaceId URL param, so
+// a fresh workspace in each test = a fresh bucket. I13 and I16 tests therefore
+// cannot leak burst-counter state into this I14 test.
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('I14 – aiLimiter burst cap on /api/brand-identity/:workspaceId/generate', () => {
@@ -145,8 +150,9 @@ describe('I16 – sanitizeErrorMessage on 500 errors from generate', () => {
     const res = await postJson(`/api/brand-identity/${growthWsId}/generate`, {
       deliverableType: 'tagline',
     });
-    // Expect an error status (500 or 429 from aiLimiter if burst already hit above)
-    expect(res.status).toBeGreaterThanOrEqual(400);
+    // growthWsId has a clean aiLimiter bucket here (I14 used a fresh workspace).
+    // All 3 I16 requests are within the 3-req budget, so only 500 is expected.
+    expect([500, 503]).toContain(res.status);
     const body = await res.text();
     expect(body).not.toMatch(/SQLITE_/i);
   });
@@ -155,7 +161,7 @@ describe('I16 – sanitizeErrorMessage on 500 errors from generate', () => {
     const res = await postJson(`/api/brand-identity/${growthWsId}/generate`, {
       deliverableType: 'values',
     });
-    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect([500, 503]).toContain(res.status);
     const body = await res.text();
     // Stack frames look like: "at SomeFn (/path/to/file.ts:42:10)"
     expect(body).not.toMatch(/at\s+\S+:\d+/);
@@ -165,7 +171,7 @@ describe('I16 – sanitizeErrorMessage on 500 errors from generate', () => {
     const res = await postJson(`/api/brand-identity/${growthWsId}/generate`, {
       deliverableType: 'vision',
     });
-    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect([500, 503]).toContain(res.status);
     const body = await res.text();
     expect(body).not.toMatch(/no such table|no such column|constraint failed/i);
   });
