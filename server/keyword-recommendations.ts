@@ -7,11 +7,13 @@
  */
 import { getConfiguredProvider } from './seo-data-provider.js';
 import { getWorkspace } from './workspaces.js';
+import { getQueryPageData } from './search-console.js';
 import { callOpenAI, parseAIJson } from './openai-helpers.js';
 import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelligence.js';
 import { createLogger } from './logger.js';
 import type { KeywordCandidate } from '../shared/types/content.ts';
 import { isProgrammingError } from './errors.js';
+import { sanitizeQueryForPrompt } from './helpers.js';
 import type * as WorkspaceLearnings from './workspace-learnings.js';
 
 const log = createLogger('keyword-recommendations');
@@ -51,7 +53,7 @@ export function opportunityScore(volume: number, difficulty: number, cpc: number
  * @internal exported for unit testing
  */
 export function shouldIncludeKeywordCandidate(source: string, volume: number): boolean {
-  return source === 'pattern' || volume >= 10;
+  return source === 'pattern' || source === 'gsc' || volume >= 10;
 }
 
 // ── Core recommendation function ──
@@ -141,6 +143,50 @@ export async function getKeywordRecommendations(
       source: 'semrush_related',
       isRecommended: false,
     });
+  }
+
+  // Fetch GSC queries as additional candidates (proven search terms).
+  if (ws?.gscPropertyUrl && ws?.webflowSiteId) {
+    try {
+      const gscRows = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90, { maxRows: 200 });
+      // Keep 2-char seed words (e.g. "AI", "UX") so short seeds don't fall through
+      // to the substring-match branch, which would match "email" for seed "AI".
+      // 1-char words are dropped as noise (stop-words like "a", "I").
+      const seedWords = new Set(
+        seedKeyword.toLowerCase().split(/\s+/).filter(w => w.length >= 2),
+      );
+      const relevantQueries = gscRows
+        .filter(r => {
+          const qWords = r.query.toLowerCase().split(/\s+/);
+          const hasOverlap = seedWords.size > 0
+            ? qWords.some(w => seedWords.has(w))
+            : r.query.toLowerCase().includes(seedKeyword.toLowerCase());
+          return hasOverlap && r.impressions >= 10 && r.query.split(' ').length >= 2;
+        })
+        .sort((a, b) => b.impressions - a.impressions)
+        .slice(0, 10);
+
+      for (const r of relevantQueries) {
+        const sanitizedQuery = sanitizeQueryForPrompt(r.query);
+        if (!candidates.some(c => c.keyword.toLowerCase() === sanitizedQuery.toLowerCase())) {
+          // GSC impressions are 90-day site-specific impression counts, NOT monthly search volume.
+          // Two corrections to prevent GSC candidates from systematically outranking SEMRush ones:
+          //   1. Divide by 3 to approximate monthly exposure (still a proxy, not true search volume).
+          //   2. Use difficulty=50 (neutral) instead of 0 — a 0 difficulty grants a 45-pt bonus in
+          //      opportunityScore that GSC candidates have not earned.
+          candidates.push({
+            keyword: sanitizedQuery,
+            volume: Math.max(1, Math.round(r.impressions / 3)),
+            difficulty: 50,
+            cpc: 0,
+            source: 'gsc',
+            isRecommended: false,
+          });
+        }
+      }
+    } catch (err) {
+      log.debug({ err, workspaceId }, 'GSC query enrichment failed — continuing without it');
+    }
   }
 
   // Score and sort by opportunity

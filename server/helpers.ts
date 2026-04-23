@@ -138,6 +138,67 @@ export function sanitizeString(val: unknown, maxLen = 500): string {
   return val.trim().slice(0, maxLen).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
 }
 
+// Denylist: any err.message matching one of these returns the fallback.
+// Unmatched messages are returned verbatim — prefer throwing user-safe Error
+// subclasses (e.g. with fixed strings) at the boundary over relying on this
+// list to catch every leak. Additions welcome but don't remove entries.
+const INTERNAL_ERROR_PATTERNS = [
+  /SQLITE_/i,
+  /ENOENT/,
+  /at\s+\S+:\d+/,                   // stack frame
+  /\bdatabase\b/i,
+  /prepared statement/i,
+  /constraint failed/i,             // better-sqlite3: "UNIQUE constraint failed: users.email"
+  /no such (table|column)/i,        // better-sqlite3 schema errors leak table/column names
+];
+
+/**
+ * Return the error message if safe to expose to the client, otherwise the
+ * generic fallback. Strips internal paths, DB errors, and oversize strings.
+ */
+export function sanitizeErrorMessage(err: unknown, fallback: string): string {
+  if (!(err instanceof Error)) return fallback;
+  if (err.message.length > 200) return fallback;
+  // better-sqlite3 SqliteError surfaces the SQLITE_* identifier on `err.code`
+  // even when the message itself doesn't contain it. Treat any SQLITE_*-coded
+  // error as internal regardless of the message content.
+  const code = (err as { code?: unknown }).code;
+  if (typeof code === 'string' && code.startsWith('SQLITE_')) return fallback;
+  if (INTERNAL_ERROR_PATTERNS.some((re) => re.test(err.message))) return fallback;
+  return err.message;
+}
+
+/**
+ * Wrap untrusted text before injecting into an LLM prompt. Strips NUL and
+ * other exotic control characters (preserving TAB / LF / CR), neutralizes
+ * obvious control-token sequences, and envelopes the content so the model
+ * can be instructed to treat it as data, not instructions.
+ *
+ * Control-char set matches sanitizeString() above.
+ */
+export function sanitizeForPromptInjection(untrusted: string): string {
+  const cleaned = untrusted
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
+    .replace(/<\|[^|]*\|>/g, '[removed-control-token]');
+  return `<untrusted_user_content>\n${cleaned}\n</untrusted_user_content>`;
+}
+
+/**
+ * Sanitize a user-sourced query string (e.g. from Google Search Console) for safe
+ * inline embedding as a list item in an LLM prompt. Strips newlines — the primary
+ * injection vector that can break prompt formatting — control tokens, and other
+ * non-printing chars. Truncates to maxLen to bound prompt size.
+ */
+export function sanitizeQueryForPrompt(q: string, maxLen = 150): string {
+  return q
+    .replace(/[\r\n]/g, ' ')
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
+    .replace(/<\|[^|]*\|>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLen);
+}
+
 /** Validate that a value is one of the allowed options */
 export function validateEnum<T extends string>(val: unknown, allowed: T[], fallback: T): T {
   return allowed.includes(val as T) ? (val as T) : fallback;

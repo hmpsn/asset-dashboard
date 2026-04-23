@@ -751,7 +751,8 @@
           "est": "6-8h",
           "priority": "P2",
           "notes": "Audit re-run 2026-04-21 against current HEAD — see docs/superpowers/plans/2026-04-21-brand-engine-hardening.md for execution plan. ## DONE (verified shipped): A1/A2/A3 (prior PRs). A4 shadow-mode voice parity check — isVoiceProfileAuthoritative() short-circuit in server/seo-context.ts:106-120. I9 PATCH extractions atomicity + addActivity + invalidation — server/routes/discovery-ingestion.ts:209. I18 pr-check-rule-authoring.md examples — current. ## INVALID (drop): I7 CalibrationVariation.ratings — column does not exist anywhere in schema or types; the finding referenced a column that was never created. ## DEFERRED (await clarification): I6 deliverable reset cascade — auto-creation cascade exists at server/brand-identity.ts:304-362 (draft→approved triggers voice-sample creation), but \"reset\" semantics are ambiguous. Revisit when content-deliverables roadmap reaches the re-approval workflow. I11 SteeringChat auto-summarization — zero server-side steering-chat code exists; defer to Copy Engine Phase 3 per docs/superpowers/plans/COPY_ENGINE_GUARDRAILS.md. ## PENDING (actionable — in hardening plan): (A5) Voice profile auto-creation on GET — server/voice-calibration.ts:81-93 getOrCreateVoiceProfile() still creates on GET. (I8) localFeedback dead UI — src/components/brand/VoiceTab.tsx:720 captures feedback but never saves. (I10) PUT sections route missing addActivity — server/routes/brandscript.ts:102-121. (I12) Prompt injection defense — server/routes/discovery-ingestion.ts:163 feeds rawContent.slice(0,12000) to AI unsanitized. (I13) Brand-engine tier gating — zero requireTier/checkTier usage in brand-identity.ts / voice-calibration.ts / brandscript.ts. (I14) Rate limiting — rateLimit middleware exists in server/middleware.ts but not applied to brand-engine AI routes. (I15 PARTIAL) rawText size limit — app-level 1MB cap exists at discovery-ingestion.ts:35 but DB column raw_content TEXT has no length constraint (migration 053:44). (I16) err.message leakage — server/routes/brand-identity.ts:90,106 echoes err.message to client (discovery-ingestion.ts is safe). (I19 NARROWED) COPY_ENGINE_GUARDRAILS.md line 33 references `tsc --noEmit` which checks zero files against root tsconfig — should be `npm run typecheck`. No `.windsurf/` references found.",
-          "status": "pending"
+          "status": "done",
+          "completedNotes": "Shipped 2026-04-22 on branch claude/brand-engine-hardening. 12 hardening items closed across 9 commits: Task 1 (ddfa41e5) — UsageFeature extension + sanitizers; Task 2 (cddf3484 + a96e3baa) — migration 067/068 raw_content 1MiB DB cap; Task 3 (1609ec46) — brand-identity aiLimiter + incrementIfAllowed + sanitizeErrorMessage; Task 4 (26c58772) — brandscript routes + PUT sections addActivity; Task 5 (26c58772) — voice-calibration routes hardening + explicit POST create + feedback persistence (migration 069); Task 6 (e9581678) — discovery-ingestion prompt-injection defense + 413 size-cap; Task 7+8 (485997b1) — VoiceTab create CTA + feedback save UI + guardrails doc fix. All 4635 tests passing; pr-check clean; typecheck clean. FEATURE_AUDIT.md entry #312."
         },
         {
           "id": 587,
@@ -3562,6 +3563,62 @@
       ]
     },
     {
+      "id": "sprint-rec-intelligence-tier1",
+      "name": "✅ SHIPPED — Recommendation Intelligence Tier 1",
+      "items": [
+        {
+          "id": 613,
+          "title": "CTR gap → title/meta recommendations (Item 1)",
+          "source": "SEO Recommendation Intelligence plan",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped 2026-04-23. Pulls ctr_opportunity insights from insight store, creates fix_now/fix_soon metadata recommendations for pages underperforming their expected CTR at their SERP position. Up to 10 per run sorted by click gap. Tested in tests/integration/recommendations-ctr-gap.test.ts (port 13335).",
+          "status": "done",
+          "shippedAt": "2026-04-23"
+        },
+        {
+          "id": 614,
+          "title": "Conversion-weighted traffic scoring (Item 2)",
+          "source": "SEO Recommendation Intelligence plan",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped 2026-04-23. getTrafficScore() now accepts optional conversionRate parameter. Pages with CVR > 2% receive up to 1.5x boost (proportional, capped). Conversion rates sourced from conversion_attribution insights. Applied to audit page scoring and sorting. Tested in tests/unit/recommendations-conversion.test.ts.",
+          "status": "done",
+          "shippedAt": "2026-04-23"
+        },
+        {
+          "id": 615,
+          "title": "Authority-adjusted KD filtering (Item 4)",
+          "source": "SEO Recommendation Intelligence plan",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped 2026-04-23. New adjustKdImpactScore() helper: KD 30+ above domain strength → 40% penalty, KD 15-30 above → 20% penalty, KD 20+ below → 20% boost (capped 100). Domain strength derived from SEMRush/DataForSEO organic keyword count. KD context appended to estimatedGain text. Tested in tests/unit/recommendations-authority-kd.test.ts.",
+          "status": "done",
+          "shippedAt": "2026-04-23"
+        },
+        {
+          "id": 616,
+          "title": "Search intent mismatch detection (Item 5)",
+          "source": "SEO Recommendation Intelligence plan",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped 2026-04-23. New inferPageType() classifies pages from slug patterns. isIntentMismatch() flags service/product pages targeting informational keywords and blog pages targeting transactional keywords. Emits fix_soon strategy recommendations, capped at 10 per run. Tested in tests/unit/recommendations-intent-mismatch.test.ts.",
+          "status": "done",
+          "shippedAt": "2026-04-23"
+        },
+        {
+          "id": 617,
+          "title": "Diagnostic remediation → auto-created recommendations (Item 6)",
+          "source": "SEO Recommendation Intelligence plan",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped 2026-04-23. Completed diagnostic reports with P0/P1 actions auto-generate fix_now recommendations (technical or content type based on action.owner). Up to 3 reports × 5 actions per run. Source keyed as diagnostic:{reportId}:{actionTitle} for merge stability. Tested in tests/integration/recommendations-diagnostic.test.ts (port 13337).",
+          "status": "done",
+          "shippedAt": "2026-04-23"
+        }
+      ]
+    },
+    {
       "id": "shipped-earlier",
       "name": "✅ SHIPPED — Earlier",
       "items": [
@@ -4483,6 +4540,17 @@
           "status": "done",
           "shippedAt": "2026-04-21",
           "notes": "All 8 bugs fixed (BUG-0001 through BUG-0008). resolvePagePath adopted at 15+ sites. applyBulkKeywordGuards moved to helpers. GSC path-boundary matching. bare-slug-pagepath pr-check rule added."
+        },
+        {
+          "id": "seo-tier3-data-sources",
+          "title": "SEO Tier 3 Data Source Enrichment",
+          "source": "docs/superpowers/plans/2026-04-22-seo-tier3-data-sources.md",
+          "est": "6-8h",
+          "priority": "P1",
+          "sprint": "G",
+          "status": "done",
+          "shippedAt": "2026-04-22",
+          "notes": "Six discrete backend enrichments across SEO pipelines: (Item 12) GSC queries as keyword candidates in keyword-recommendations.ts; (Item 13) GSC query breakdown in content-decay refresh AI prompt; (Item 13b) Decay query context injected when brief matches decaying page; (Item 13c) DecayContext.topQueries from GSC in copy-refresh AI prompt; (Item 14) SEMRush metrics pre-fetch for top-N pages in jobs.ts bulk analyze; (Item 15) Issue-type-specific recovery rates replacing flat 12% in recommendations.ts. All six independent, no API/UI changes, no new DB columns or shared types."
         }
       ]
     }

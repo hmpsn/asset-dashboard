@@ -29,11 +29,12 @@ import {
 } from '../webflow.js';
 import { getWorkspacePages } from '../workspace-data.js';
 import { getWorkspace, getTokenForSite, updatePageState } from '../workspaces.js';
-import { resolvePagePath } from '../helpers.js';
+import { resolvePagePath, sanitizeQueryForPrompt } from '../helpers.js';
 import { listPageKeywords } from '../page-keywords.js';
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
 import { isProgrammingError } from '../errors.js';
+import { loadDecayAnalysis } from '../content-decay.js';
 
 const log = createLogger('content-requests');
 
@@ -174,7 +175,7 @@ export async function getAllSitePages(ws: { id: string; webflowSiteId?: string; 
           } catch { /* skip malformed URL */ } // catch-ok
         }
       }
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-requests: programming error'); /* sitemap unavailable */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-requests: programming error'); /* sitemap unavailable */ } // url-fetch-ok
   }
 
   return Array.from(pageMap.values());
@@ -188,15 +189,16 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
   if (!request) return res.status(404).json({ error: 'Request not found' });
 
   try {
-    // Gather GSC context if available
+    // Gather GSC context if available (fetched once, reused for relatedQueries + decayQueryContext below)
     let relatedQueries: { query: string; position: number; clicks: number; impressions: number }[] = [];
+    let cachedGscRows: Awaited<ReturnType<typeof getQueryPageData>> | null = null;
     if (ws.gscPropertyUrl && ws.webflowSiteId) {
       try {
-        const gscData = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90);
-        relatedQueries = gscData
+        cachedGscRows = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90);
+        relatedQueries = cachedGscRows
           .filter(r => { const q = r.query.toLowerCase(); return request.targetKeyword.toLowerCase().split(' ').some(w => w.length > 2 && q.includes(w)); })
           .slice(0, 20)
-          .map(r => ({ query: r.query, position: r.position, clicks: r.clicks, impressions: r.impressions }));
+          .map(r => ({ query: sanitizeQueryForPrompt(r.query), position: r.position, clicks: r.clicks, impressions: r.impressions }));
       } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-requests: POST /api/content-requests/:workspaceId/:id/generate-brief: programming error'); /* GSC unavailable */ }
     }
 
@@ -236,6 +238,31 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
       journeyStage: deriveJourneyStage(request.intent),
     };
 
+    // If this content request targets a page that's decaying, compile a decay-specific query context.
+    let decayQueryContext: string | undefined;
+    if (request.targetPageSlug) {
+      try {
+        const decay = loadDecayAnalysis(req.params.workspaceId);
+        const normalizeTarget = request.targetPageSlug.startsWith('/') ? request.targetPageSlug : `/${request.targetPageSlug}`;
+        const decayPage = decay?.decayingPages.find(dp => dp.page === normalizeTarget);
+        if (decayPage && ws.gscPropertyUrl && ws.webflowSiteId) {
+          // Reuse the 90-day GSC dataset fetched above — avoids a duplicate API call.
+          // Fall back to a fresh fetch only if the earlier call failed (cachedGscRows === null).
+          const qpRows = cachedGscRows ?? await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90, { maxRows: 500 });
+          const pageQueries = qpRows
+            .filter(r => { try { return new URL(r.page).pathname === decayPage.page; } catch { return false; } })
+            .sort((a, b) => b.impressions - a.impressions)
+            .slice(0, 15);
+          if (pageQueries.length > 0) {
+            decayQueryContext = `DECAY CONTEXT: This page has lost ${Math.abs(decayPage.clickDeclinePct)}% of search clicks. Top queries:\n` +
+              pageQueries.map(q => `- "${sanitizeQueryForPrompt(q.query)}": ${q.clicks} clicks, ${q.impressions} impressions, pos ${q.position.toFixed(1)}`).join('\n');
+          }
+        }
+      } catch (err) {
+        log.debug({ err }, 'Decay query context enrichment failed — continuing without it');
+      }
+    }
+
     const brief = await generateBrief(req.params.workspaceId, request.targetKeyword, {
       relatedQueries,
       businessContext: ws.keywordStrategy?.businessContext || '',
@@ -246,6 +273,7 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
       pageType: request.pageType || 'blog',
       ga4PagePerformance,
       strategyCardContext,
+      decayQueryContext,
     });
 
     // Link brief to request and update status
@@ -254,6 +282,7 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
       briefId: brief.id,
     });
 
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: request.id, status: 'brief_generated' });
     addActivity(req.params.workspaceId, 'brief_generated', `Content brief generated for "${request.targetKeyword}"`, `Title: ${brief.suggestedTitle}`, { requestId: request.id, briefId: brief.id });
     res.json(brief);
   } catch (err: unknown) {
@@ -299,7 +328,7 @@ export async function handleContentPerformance(workspaceId: string): Promise<{
           gscPages.set(p.page, { clicks: p.clicks, impressions: p.impressions, ctr: p.ctr, position: p.position });
         }
       }
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-requests: programming error'); /* GSC unavailable */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-requests: programming error'); /* GSC unavailable */ } // url-fetch-ok
   }
 
   // Batch-fetch GA4 landing pages (one API call)

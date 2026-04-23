@@ -114,7 +114,16 @@ router.post('/api/discovery/:workspaceId/sources',
         continue;
       }
 
-      const source = addSource(req.params.workspaceId, file.originalname, sourceType, content);
+      let source;
+      try {
+        source = addSource(req.params.workspaceId, file.originalname, sourceType, content);
+      } catch (err) {
+        if (err instanceof Error && /exceeds 1 MiB limit/.test(err.message)) {
+          rejected.push({ filename: file.originalname, reason: 'File content exceeds 1 MB limit' });
+          continue;
+        }
+        throw err;
+      }
       sources.push(source);
     }
 
@@ -138,7 +147,15 @@ router.post('/api/discovery/:workspaceId/sources',
 // Upload source from pasted text — MUST be before /:id routes to avoid shadowing
 router.post('/api/discovery/:workspaceId/sources/text', requireWorkspaceAccess('workspaceId'), validate(pasteSourceSchema), (req, res) => {
   const { filename, sourceType, rawContent } = req.body;
-  const source = addSource(req.params.workspaceId, filename || 'pasted-text.txt', sourceType, rawContent);
+  let source;
+  try {
+    source = addSource(req.params.workspaceId, filename || 'pasted-text.txt', sourceType, rawContent);
+  } catch (err) {
+    if (err instanceof Error && /exceeds 1 MiB limit/.test(err.message)) {
+      return res.status(413).json({ error: 'Pasted text exceeds 1 MB limit' });
+    }
+    throw err;
+  }
   addActivity(req.params.workspaceId, 'discovery_source_added', `Added discovery source "${source.filename}"`);
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.DISCOVERY_UPDATED, { sourceId: source.id });
   res.json(source);

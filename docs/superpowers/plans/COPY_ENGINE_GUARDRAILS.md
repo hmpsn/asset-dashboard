@@ -30,7 +30,7 @@ Phase 3: Full Copy Pipeline
 **No phase overlap.** Phase 2 reads from Phase 1 tables and imports Phase 1 types. Phase 3 reads from both. Starting Phase 2 before Phase 1 is committed will cause import failures and missing tables.
 
 **Verification gate between phases:**
-- [ ] `npx tsc --noEmit --skipLibCheck` — zero errors
+- [ ] `npm run typecheck` — zero errors
 - [ ] `npx vite build` — builds successfully
 - [ ] All Phase N tables exist in `data/app.db`
 - [ ] All Phase N exported functions are importable
@@ -401,7 +401,7 @@ Run this before dispatching any task batch. Takes 2 minutes; prevents 2-hour rol
 
 ### After PARALLEL batch completes (before next batch)
 
-- [ ] `npx tsc --noEmit --skipLibCheck` — zero errors
+- [ ] `npm run typecheck` — zero errors
 - [ ] `npx vitest run` — full test suite passing (not just new tests)
 - [ ] **Invoke `scaled-code-review` skill** — multi-agent review of the batch output. This catches cross-module issues, compliance violations, and logic bugs that single-file review misses. The skill auto-scales agent count based on change size.
 - [ ] Fix all Critical and Important issues before dispatching next batch
