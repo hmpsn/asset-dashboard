@@ -503,7 +503,7 @@ Matches siblings at `server/routes/brandscript.ts:76, 89, 128, 144` and all othe
 **Owns:**
 - `server/routes/voice-calibration.ts`
 - `server/voice-calibration.ts` (rename `getOrCreateVoiceProfile` → `getVoiceProfile`; add `createVoiceProfile`; add `saveVariationFeedback`)
-- `server/db/migrations/068-voice-calibration-feedback.sql` (NEW)
+- `server/db/migrations/069-voice-calibration-feedback.sql` (NEW)
 - `server/schemas/voice-calibration.ts` (NEW — Zod schemas for new endpoints; create if absent or add to existing)
 - `tests/integration/voice-calibration-hardening.test.ts` (NEW, port 13324)
 
@@ -513,9 +513,9 @@ Matches siblings at `server/routes/brandscript.ts:76, 89, 128, 144` and all othe
 
 **Steps:**
 
-- [ ] **Step 1: Write migration 068**
+- [ ] **Step 1: Write migration 069**
 
-  Create `server/db/migrations/068-voice-calibration-feedback.sql`:
+  Create `server/db/migrations/069-voice-calibration-feedback.sql`:
   ```sql
   -- Per-variation user feedback captured during a calibration session.
   -- Stored as JSON array of VoiceCalibrationVariationFeedback (shared/types/brand-engine.ts).
@@ -602,7 +602,7 @@ Matches siblings at `server/routes/brandscript.ts:76, 89, 128, 144` and all othe
 - [ ] **Step 9: Commit**
 
   ```bash
-  git add server/db/migrations/068-voice-calibration-feedback.sql \
+  git add server/db/migrations/069-voice-calibration-feedback.sql \
           server/schemas/voice-calibration.ts \
           server/routes/voice-calibration.ts \
           server/voice-calibration.ts \
@@ -811,7 +811,8 @@ Matches siblings at `server/routes/brandscript.ts:76, 89, 128, 144` and all othe
   - Voice profile explicit-POST endpoint (A5)
   - Calibration variation-feedback persistence (I8)
   - Migration 067 (raw_content size cap trigger)
-  - Migration 068 (variation_feedback_json column)
+  - Migration 068 (raw_content trigger bytecount fix)
+  - Migration 069 (variation_feedback_json column)
 
 - [ ] **Step 4: Update `data/roadmap.json` #586**
 
@@ -851,7 +852,7 @@ Parallel after Task 1 (exclusive file ownership):
 
 Sequential after Task 2 + Task 5:
   Task 6 (discovery-ingestion)   — depends on Task 2's migration 067 AND Task 1's sanitizer
-  Task 7 (VoiceTab frontend)     — depends on Task 5's endpoints + migration 068
+  Task 7 (VoiceTab frontend)     — depends on Task 5's endpoints + migration 069
 
 Parallel cleanup:
   Task 8 (doc fix)               — can run anytime after Task 1 commit
@@ -872,7 +873,7 @@ Sequential finale:
 | `server/helpers.ts` (append `sanitizeErrorMessage` + `sanitizeForPromptInjection`) | Task 1 |
 | `shared/types/brand-engine.ts` (add `VoiceCalibrationVariationFeedback`) | Task 1 |
 | `server/db/migrations/067-discovery-rawcontent-size-cap.sql` | Task 2 |
-| `server/db/migrations/068-voice-calibration-feedback.sql` | Task 5 |
+| `server/db/migrations/069-voice-calibration-feedback.sql` | Task 5 |
 | `server/routes/brand-identity.ts` | Task 3 |
 | `server/routes/brandscript.ts`, `server/brandscript.ts` | Task 4 |
 | `server/routes/voice-calibration.ts`, `server/voice-calibration.ts`, `server/schemas/voice-calibration.ts` | Task 5 |
@@ -947,5 +948,5 @@ Each task produces an isolated commit. Rollback notes:
 
 - **Tasks 3, 4, 6 are independent** — reverting one does not affect the others.
 - **Tasks 5 and 7 are coupled** — Task 7 consumes Task 5's `POST /api/voice/:workspaceId` and `POST /api/voice/:workspaceId/calibration-feedback` endpoints directly. If Task 5 is rolled back, Task 7 must be reverted in the same operation or the VoiceTab UI will 404.
-- **Migration rollback:** migrations 067 (trigger) and 068 (column addition) are additive — safe to ship. If trigger 067 rejects a legitimate 1MB+ paste in production, increase the limit via a follow-up migration rather than reverting (rollback of a DROP TRIGGER is clean, but we lose the defense-in-depth).
+- **Migration rollback:** migrations 067 (trigger), 068 (trigger bytecount fix), and 069 (column addition) are additive — safe to ship. If trigger 067 rejects a legitimate 1MB+ paste in production, increase the limit via a follow-up migration rather than reverting (rollback of a DROP TRIGGER is clean, but we lose the defense-in-depth).
 - **Task 1 is a hard prerequisite** — reverting Task 1 breaks every downstream task. Do not revert Task 1 without reverting Tasks 3–7 first.
