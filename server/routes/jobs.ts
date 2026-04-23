@@ -53,9 +53,8 @@ import {
   updatePageState,
   getBrandName,
 } from '../workspaces.js';
-import { getPageKeyword, upsertPageKeywordsBatch, clearAnalysisFields, countPageKeywords, countAnalyzedPages } from '../page-keywords.js';
-// SEMRush imports removed — bulk analysis skips SEMRush to conserve API credits.
-// Individual page analysis (frontend) still uses SEMRush via the keyword-analysis endpoint.
+import { getPageKeyword, listPageKeywords, upsertPageKeywordsBatch, clearAnalysisFields, countPageKeywords, countAnalyzedPages } from '../page-keywords.js';
+import { getConfiguredProvider } from '../seo-data-provider.js';
 import { createLogger } from '../logger.js';
 import { debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { isFeatureEnabled } from '../feature-flags.js';
@@ -71,6 +70,47 @@ import { isProgrammingError } from '../errors.js';
 const log = createLogger('jobs');
 
 const PORT = parseInt(process.env.PORT || '3001', 10);
+
+/**
+ * Pre-fetch SEMRush metrics for the top-N pages in a workspace that already have a primary keyword
+ * assigned. Returns a Map from normalized page path (leading-slash) to a prompt-ready block.
+ * Global SQLite cache in the SEMRush provider means repeat lookups cost zero API credits.
+ */
+export async function prefetchSemrushForTopPages(
+  workspaceId: string,
+  topN: number,
+): Promise<Map<string, string>> {
+  const cache = new Map<string, string>();
+  const ws = getWorkspace(workspaceId);
+  const provider = getConfiguredProvider(ws?.seoDataProvider);
+  if (!provider) return cache;
+
+  try {
+    const existingPKs = listPageKeywords(workspaceId);
+    const withKeywords = existingPKs
+      .filter(pk => pk.primaryKeyword && pk.primaryKeyword.trim().length > 0)
+      .slice(0, topN);
+    if (withKeywords.length === 0) return cache;
+
+    const keywords = withKeywords.map(pk => pk.primaryKeyword!);
+    const metrics = await provider.getKeywordMetrics(keywords, workspaceId).catch(() => []);
+    const metricsMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m]));
+
+    for (const pk of withKeywords) {
+      const m = metricsMap.get(pk.primaryKeyword!.toLowerCase());
+      if (!m) continue;
+      let block = `\n\nREAL KEYWORD DATA (from SEMRush — use these exact values, do NOT estimate):\n`;
+      block += `- "${m.keyword}": vol ${m.volume.toLocaleString()}/mo, KD ${m.difficulty}/100, CPC $${m.cpc.toFixed(2)}, competition ${m.competition.toFixed(2)}`;
+      const normalized = pk.pagePath.startsWith('/') ? pk.pagePath : `/${pk.pagePath}`;
+      cache.set(normalized, block);
+    }
+    log.info({ workspaceId, cached: cache.size, attempted: withKeywords.length },
+      'Pre-fetched SEMRush data for top pages in bulk analysis');
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'SEMRush pre-fetch for bulk analysis failed — continuing without it');
+  }
+  return cache;
+}
 
 // --- Background Job Endpoints ---
 router.get('/api/jobs', (_req, res) => {
@@ -725,6 +765,9 @@ router.post('/api/jobs', async (req, res) => {
             let webflowSubdomain: string | null = null;
             try { webflowSubdomain = await getSiteSubdomain(paSiteId, paToken); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'jobs: programming error'); /* skip */ }
 
+            const TOP_N_SEMRUSH = 10;
+            const semrushCache = await prefetchSemrushForTopPages(paWsId, TOP_N_SEMRUSH);
+
             for (let i = 0; i < toAnalyze.length; i += BATCH) {
               if (isJobCancelled(paJob.id)) break;
               const batch = toAnalyze.slice(i, i + BATCH);
@@ -759,9 +802,9 @@ router.post('/api/jobs', async (req, res) => {
                   const effectiveTitle = page.seoTitle || htmlTitle || page.title;
                   const effectiveMeta = page.metaDesc || htmlMeta;
 
-                  // SEMRush enrichment — SKIPPED during bulk analysis to conserve API credits.
-                  // SEMRush data is fetched only for individual page analysis (frontend analyzePage).
-                  const semrushBlock = '';
+                  // SEMRush enrichment — use pre-fetched cache populated before the loop.
+                  const normalizedPath = page.path.startsWith('/') ? page.path : `/${page.path}`;
+                  const semrushBlock = semrushCache.get(normalizedPath) || '';
 
                   // Call OpenAI for keyword analysis
                   const prompt = `You are an expert SEO strategist. Analyze this web page and provide a keyword analysis.
