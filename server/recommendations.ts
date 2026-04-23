@@ -1130,7 +1130,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           effort: action.effort,
           impactScore: diagImpactMap[action.impact] ?? 55,
           source: RecSource.diagnostic(report.id, actionIdx, action.title),
-          affectedPages: action.pageUrls?.map((u: string) => u.replace(/^\//, '')) ?? [],
+          affectedPages: action.pageUrls?.map(toPageSlug) ?? [],
           trafficAtRisk: 0,
           impressionsAtRisk: 0,
           estimatedGain: `Diagnostic-identified fix (${action.priority} priority, ${action.effort} effort)`,
