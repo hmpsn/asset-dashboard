@@ -13,7 +13,9 @@ import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 
-const ctx = createTestContext(13321); // port-ok: range extended beyond 13319 in Task 3
+// Port 13321 is taken by keyword-strategy-concurrent-guard.test.ts (const PORT, not createTestContext).
+// 13323 is taken by brandscript-hardening.test.ts; 13324 is the next free port.
+const ctx = createTestContext(13324); // port-ok: 13201-13323 fully allocated; extending range
 const { api, postJson } = ctx;
 
 let testWsId = '';

@@ -10,7 +10,8 @@
  *  I14 – aiLimiter burst: the 4th POST to the same /complete path within 60 s
  *         is blocked by the per-IP burst limiter (3 req/min).
  *
- * Port: 13320 (unique — no other file uses this port).
+ * Port: 13323 (unique — verified free; 13320-13322 are taken by keyword-strategy
+ *        and stripe-admin-auth tests that use const PORT, not createTestContext).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
@@ -19,8 +20,7 @@ import { getUsageCount } from '../../server/usage-tracking.js';
 import { listActivity } from '../../server/activity-log.js';
 import { createBrandscript } from '../../server/brandscript.js';
 
-// Dedicated port — no other test file uses 13320
-const ctx = createTestContext(13320); // port-ok: range extended beyond 13319 in Task 3
+const ctx = createTestContext(13323); // port-ok: 13201-13322 fully allocated; extending range
 const { postJson, api } = ctx;
 
 let freeWsId = '';

@@ -73,19 +73,36 @@ router.get('/api/brandscripts/:workspaceId', requireWorkspaceAccess('workspaceId
 });
 
 // AI: Import from text — MUST be before /:workspaceId/:id to avoid shadowing
-router.post('/api/brandscripts/:workspaceId/import', requireWorkspaceAccess('workspaceId'), validate(importBrandscriptSchema), async (req, res) => {
-  const { name, rawText } = req.body;
-  try {
-    const bs = await importBrandscript(req.params.workspaceId, name || 'Imported Brandscript', rawText);
-    addActivity(req.params.workspaceId, 'brandscript_imported', `Imported brandscript "${bs.name}"`);
-    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRANDSCRIPT_UPDATED, { brandscriptId: bs.id });
-    clearSeoContextCache(req.params.workspaceId);
-    invalidateIntelligenceCache(req.params.workspaceId);
-    res.json(bs);
-  } catch (err) {
-    res.status(500).json({ error: sanitizeErrorMessage(err, 'Import failed') });
-  }
-});
+router.post(
+  '/api/brandscripts/:workspaceId/import',
+  requireWorkspaceAccess('workspaceId'),
+  aiLimiter,
+  validate(importBrandscriptSchema),
+  async (req, res) => {
+    const { name, rawText } = req.body;
+    const ws = getWorkspace(req.params.workspaceId);
+    const tier = (ws?.tier ?? 'free') as string;
+
+    if (!incrementIfAllowed(req.params.workspaceId, tier, 'brandscript_generations')) {
+      return res.status(429).json({
+        error: 'Monthly limit reached for your tier',
+        code: 'usage_limit',
+      });
+    }
+
+    try {
+      const bs = await importBrandscript(req.params.workspaceId, name || 'Imported Brandscript', rawText);
+      addActivity(req.params.workspaceId, 'brandscript_imported', `Imported brandscript "${bs.name}"`);
+      broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRANDSCRIPT_UPDATED, { brandscriptId: bs.id });
+      clearSeoContextCache(req.params.workspaceId);
+      invalidateIntelligenceCache(req.params.workspaceId);
+      res.json(bs);
+    } catch (err) {
+      decrementUsage(req.params.workspaceId, 'brandscript_generations');
+      res.status(500).json({ error: sanitizeErrorMessage(err, 'Import failed') });
+    }
+  },
+);
 
 router.post('/api/brandscripts/:workspaceId', requireWorkspaceAccess('workspaceId'), validate(createBrandscriptSchema), (req, res) => {
   const { name, frameworkType, sections } = req.body;
