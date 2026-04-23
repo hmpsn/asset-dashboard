@@ -72,6 +72,30 @@ const recsInFlight = new Set<string>();
 // workspace from racing to the DB. The second request receives a 409 immediately.
 const activeGenerations = new Set<string>();
 
+/** Composite opportunity score (0–100) for a content gap.
+ *  Weights: volume 45%, ease-of-ranking 45%, GSC signal bonus 10%.
+ *  Trend multiplier: rising ×1.3, declining ×0.7, stable ×1.0.
+ *  Returns 0 when no signal data (volume, difficulty, impressions) is present. */
+export function computeOpportunityScore(cg: {
+  volume?: number;
+  difficulty?: number;
+  impressions?: number;
+  trendDirection?: string;
+}): number {
+  const hasData = (cg.volume != null && cg.volume > 0)
+    || cg.difficulty != null
+    || (cg.impressions != null && cg.impressions > 0);
+  if (!hasData) return 0;
+  const vol = Math.min((cg.volume ?? 0) / 10000, 1);
+  const ease = 1 - (cg.difficulty ?? 50) / 100;
+  const gscBonus = Math.min((cg.impressions ?? 0) / 2000, 0.5);
+  const trendMult =
+    cg.trendDirection === 'rising' ? 1.3 :
+    cg.trendDirection === 'declining' ? 0.7 : 1.0;
+  const raw = (vol * 0.45 + ease * 0.45 + gscBonus * 0.1) * trendMult;
+  return Math.min(100, Math.round(raw * 100));
+}
+
 // ── Incremental mode helpers ─────────────────────────────────────
 
 const INCREMENTAL_THRESHOLD_DAYS = 7;
@@ -209,6 +233,7 @@ interface StrategyContentGap {
   serpFeatures?: string[];
   serpTargeting?: string[];
   questionKeywords?: string[];
+  opportunityScore?: number;
 }
 
 interface StrategyQuickWin {
@@ -1894,6 +1919,16 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
         }
         if (recs.length > 0) cg.serpTargeting = recs;
       }
+    }
+
+    // Compute composite opportunity score — all enrichment (volume, KD, impressions, trend) is now done
+    if (strategy.contentGaps?.length) {
+      for (const cg of strategy.contentGaps) {
+        cg.opportunityScore = computeOpportunityScore(cg);
+      }
+      // Sort descending so highest-value gaps surface first in the UI
+      strategy.contentGaps.sort((a, b) => (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0));
+      log.info({ workspaceId: ws.id, count: strategy.contentGaps.length }, 'Computed content gap opportunity scores');
     }
 
     // ── Cannibalization Detection + Canonical Recommender ────────

@@ -18,6 +18,7 @@ interface ContentGap {
   serpFeatures?: string[];
   serpTargeting?: string[];
   questionKeywords?: string[];
+  opportunityScore?: number;
 }
 
 const kdColor = (kd?: number) => !kd ? 'text-zinc-500' : kd <= 30 ? 'text-green-400' : kd <= 60 ? 'text-amber-400' : kd <= 80 ? 'text-orange-400' : 'text-red-400';
@@ -33,8 +34,10 @@ export interface ContentGapsProps {
 export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGapsProps) {
   const navigate = useNavigate();
 
-  // Sort by impact: volume descending, then priority
+  // Sort by opportunity score (server-computed), falling back to volume then priority
   const sorted = [...contentGaps].sort((a, b) => {
+    const scoreDiff = (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0);
+    if (scoreDiff !== 0) return scoreDiff;
     const volDiff = (b.volume || 0) - (a.volume || 0);
     if (volDiff !== 0) return volDiff;
     const prioW = (p: string) => p === 'high' ? 3 : p === 'medium' ? 2 : 1;
@@ -55,7 +58,11 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
           return (
             <div key={i} className="px-3 py-2.5 bg-zinc-800/40 rounded-lg border border-zinc-800">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-zinc-200">{gap.topic}</span>
+                <span className="text-xs font-medium text-zinc-200">{gap.topic}{gap.opportunityScore != null && (
+                  <span className="ml-2 inline-flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-400">
+                    {gap.opportunityScore}/100
+                  </span>
+                )}</span>
                 <div className="flex items-center gap-2">
                   <span className={`text-[11px] uppercase px-1.5 py-0.5 rounded-full border font-medium ${intentColor(gap.intent)}`}>{gap.intent}</span>
                   <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded border ${prioColor}`}>{gap.priority}</span>
