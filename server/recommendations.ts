@@ -39,6 +39,54 @@ interface TrafficMap {
   [path: string]: { clicks: number; impressions: number; sessions: number; pageviews: number };
 }
 
+/** Issue-type-specific recovery rates for traffic estimation.
+ * `perRec` is a user-facing percent range shown in estimatedGain text.
+ * `summary` is the decimal multiplier applied to trafficAtRisk for the aggregate summary.
+ * @internal exported for unit testing
+ */
+export interface RecoveryRate { perRec: string; summary: number }
+
+const DEFAULT_RECOVERY: RecoveryRate = { perRec: '5-15%', summary: 0.12 };
+
+const RECOVERY_RATES: Record<string, RecoveryRate> = {
+  // High-impact content issues
+  'title':                { perRec: '10-25%', summary: 0.18 },
+  'meta-description':     { perRec: '5-15%',  summary: 0.10 },
+  'h1':                   { perRec: '8-20%',  summary: 0.14 },
+  'content-length':       { perRec: '10-30%', summary: 0.20 },
+  'duplicate-title':      { perRec: '10-20%', summary: 0.15 },
+  'duplicate-description':{ perRec: '5-10%',  summary: 0.08 },
+  // Technical issues
+  'canonical':            { perRec: '15-30%', summary: 0.22 },
+  'indexability':         { perRec: '20-50%', summary: 0.35 },
+  'robots':               { perRec: '15-40%', summary: 0.28 },
+  'redirect-chains':      { perRec: '5-15%',  summary: 0.10 },
+  'redirects':            { perRec: '10-25%', summary: 0.18 },
+  'sitemap':              { perRec: '5-10%',  summary: 0.08 },
+  'robots-txt':           { perRec: '5-15%',  summary: 0.10 },
+  'response-time':        { perRec: '5-15%',  summary: 0.10 },
+  'ssl':                  { perRec: '10-20%', summary: 0.15 },
+  // Performance issues
+  'cwv':                  { perRec: '5-15%',  summary: 0.10 },
+  'cwv-lcp':              { perRec: '5-15%',  summary: 0.10 },
+  'cwv-cls':              { perRec: '3-10%',  summary: 0.07 },
+  'cwv-tbt':              { perRec: '3-10%',  summary: 0.07 },
+  'render-blocking':      { perRec: '3-8%',   summary: 0.05 },
+  // Low-impact issues
+  'og-tags':              { perRec: '1-3%',   summary: 0.02 },
+  'og-image':             { perRec: '1-3%',   summary: 0.02 },
+  'img-alt':              { perRec: '2-5%',   summary: 0.03 },
+  'structured-data':      { perRec: '5-15%',  summary: 0.10 },
+  // Internal linking
+  'internal-links':       { perRec: '5-15%',  summary: 0.10 },
+  'link-text':            { perRec: '3-8%',   summary: 0.05 },
+  'orphan-pages':         { perRec: '10-25%', summary: 0.18 },
+};
+
+export function getRecoveryRate(checkName: string): RecoveryRate {
+  return RECOVERY_RATES[checkName] || DEFAULT_RECOVERY;
+}
+
 // ─── Storage ──────────────────────────────────────────────────────
 
 interface RecSetRow {
@@ -476,9 +524,10 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         : recType === 'schema' ? 'medium'
         : 'medium';
 
+      const rate = getRecoveryRate(group.check);
       const estimatedGain =
         group.totalClicks > 0
-          ? `Fixing this could increase organic clicks by 5-15% on ${group.pages.length} affected page${group.pages.length !== 1 ? 's' : ''}`
+          ? `Fixing this could increase organic clicks by ${rate.perRec} on ${group.pages.length} affected page${group.pages.length !== 1 ? 's' : ''}`
           : `Improves SEO health score and search engine compatibility across ${group.pages.length} page${group.pages.length !== 1 ? 's' : ''}`;
 
       recs.push({
@@ -844,10 +893,22 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   // ── Build summary (exclude auto-resolved from active counts) ──
   const activeRecs = recs.filter(r => r.status !== 'completed' && r.status !== 'dismissed');
   const totalTrafficAtRisk = activeRecs.reduce((s, r) => s + r.trafficAtRisk, 0);
-  // Conservative 12% recovery rate on traffic at risk (actionable issues only)
   const actionableRecs = activeRecs.filter(r => r.priority === 'fix_now' || r.priority === 'fix_soon');
-  const actionableTraffic = actionableRecs.reduce((s, r) => s + r.trafficAtRisk, 0);
-  const actionableImpressions = actionableRecs.reduce((s, r) => s + r.impressionsAtRisk, 0);
+
+  // Weighted recovery: each rec contributes traffic × its issue-specific recovery rate.
+  let weightedRecoverableClicks = 0;
+  let weightedRecoverableImpressions = 0;
+  for (const r of actionableRecs) {
+    const checkName = r.source?.startsWith('audit:site-wide:')
+      ? r.source.replace('audit:site-wide:', '')
+      : r.source?.startsWith('audit:')
+        ? r.source.replace('audit:', '')
+        : '';
+    const rate = checkName ? getRecoveryRate(checkName) : DEFAULT_RECOVERY;
+    weightedRecoverableClicks += r.trafficAtRisk * rate.summary;
+    weightedRecoverableImpressions += r.impressionsAtRisk * rate.summary;
+  }
+
   const summary = {
     fixNow: activeRecs.filter(r => r.priority === 'fix_now').length,
     fixSoon: activeRecs.filter(r => r.priority === 'fix_soon').length,
@@ -855,8 +916,8 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     ongoing: activeRecs.filter(r => r.priority === 'ongoing').length,
     totalImpactScore: activeRecs.reduce((s, r) => s + r.impactScore, 0),
     trafficAtRisk: totalTrafficAtRisk,
-    estimatedRecoverableClicks: Math.round(actionableTraffic * 0.12),
-    estimatedRecoverableImpressions: Math.round(actionableImpressions * 0.12),
+    estimatedRecoverableClicks: Math.round(weightedRecoverableClicks),
+    estimatedRecoverableImpressions: Math.round(weightedRecoverableImpressions),
   };
 
   const set: RecommendationSet = {
