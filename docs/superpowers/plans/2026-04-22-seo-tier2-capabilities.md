@@ -241,7 +241,17 @@ export const freshnessAlertDataSchema = z.object({
 });
 ```
 
-Then add the three new schemas to the `insightSchemaMap` (find it by anchor `insightSchemaMap` or `INSIGHT_SCHEMA_MAP`). If no such map exists, check whether `parseJsonSafe` uses a schema lookup — if so, extend the lookup. If schemas are imported individually per call site, skip this step and note it for per-task implementers to import the schema by name.
+Then extend `INSIGHT_DATA_SCHEMA_MAP` in the same file. This map is typed as `Record<InsightType, ZodTypeAny>` — it is **exhaustive**: adding new values to `InsightType` without adding entries here causes `npm run typecheck` to fail. Find the map (anchored by `site_health: siteHealthInsightDataSchema`) and add the three new entries:
+
+```ts
+export const INSIGHT_DATA_SCHEMA_MAP: Record<InsightType, ZodTypeAny> = {
+  // ... existing entries ...
+  site_health: siteHealthInsightDataSchema.partial().passthrough(),
+  emerging_keyword: emergingKeywordDataSchema.partial().passthrough(),
+  competitor_alert: competitorAlertDataSchema.partial().passthrough(),
+  freshness_alert: freshnessAlertDataSchema.partial().passthrough(),
+};
+```
 
 - [ ] **Step 6: Typecheck**
 
@@ -493,6 +503,7 @@ This file owns all DB reads/writes for both tables and the comparison logic.
  * competitorDomains configured. Compares new snapshot to last snapshot and
  * writes competitor_alerts rows for significant changes.
  */
+import { randomUUID } from 'crypto';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { createLogger } from './logger.js';
@@ -633,7 +644,7 @@ function rowToAlert(r: AlertRow): CompetitorAlert {
 }
 
 function generateId(): string {
-  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+  return randomUUID();
 }
 
 // ── Public API ──
@@ -764,15 +775,16 @@ Add a new function `startCompetitorMonitoringCron()` that:
 6. Calls `getConfiguredProvider(ws.seoDataProvider)` to fetch top keywords for each competitor via `provider.getDomainKeywords(competitorDomain, ws.id, 50)`
 7. Saves snapshot via `saveCompetitorSnapshot`
 8. Compares to previous snapshot via `detectCompetitorAlerts` 
-9. For each alert, calls `enrichAndUpsert({ insightType: 'competitor_alert', pageId: null, data: {...}, severity: alert.severity })`
+9. For each alert, calls `upsertInsight<'competitor_alert'>({ workspaceId, pageId: null, insightType: 'competitor_alert', data: { competitorDomain: alert.competitorDomain, alertType: alert.alertType, keyword: alert.keyword, previousPosition: alert.previousPosition, currentPosition: alert.currentPosition, positionChange: alert.positionChange, volume: alert.volume, snapshotDate: alert.snapshotDate }, severity: alert.severity })` — **do NOT use `enrichAndUpsert`**; that function is a non-exported closure inside `runWorkspaceIntelligence` and is unavailable here.
 
-Import the new store functions at the top:
+Import the new store functions and `upsertInsight` at the top:
 
 ```ts
 import {
   getLatestCompetitorSnapshot, saveCompetitorSnapshot,
   detectCompetitorAlerts, snapshotExistsForDate,
 } from './competitor-snapshot-store.js';
+import { upsertInsight } from './analytics-insights-store.js';
 ```
 
 Import `getConfiguredProvider` if not already imported (check existing imports first).
