@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Mic, Plus, Trash2, Sparkles, Loader2, Save } from 'lucide-react';
 import { queryKeys } from '../../lib/queryKeys';
 import { voice } from '../../api/brand-engine';
@@ -720,6 +720,31 @@ function CalibrationSection({ workspaceId, onSampleSaved }: CalibrationSectionPr
   const [refineDirection, setRefineDirection] = useState('');
   const [refining, setRefining] = useState(false);
   const [savingIndex, setSavingIndex] = useState<number | null>(null);
+  const [savingFeedbackIndex, setSavingFeedbackIndex] = useState<number | null>(null);
+
+  const saveFeedbackMutation = useMutation({
+    mutationFn: ({ sessionId, variationIndex, feedback }: { sessionId: string; variationIndex: number; feedback: string }) =>
+      voice.saveVariationFeedback(workspaceId, sessionId, variationIndex, feedback),
+    onSuccess: (_data, variables) => {
+      setSavingFeedbackIndex(null);
+      toast(`Feedback saved for variation ${variables.variationIndex + 1}`);
+    },
+    onError: () => {
+      setSavingFeedbackIndex(null);
+      toast('Failed to save feedback', 'error');
+    },
+  });
+
+  const handleSaveFeedback = (variationIndex: number) => {
+    if (!session) return;
+    const feedback = localFeedback[variationIndex];
+    if (!feedback?.trim()) {
+      toast('No feedback to save', 'error');
+      return;
+    }
+    setSavingFeedbackIndex(variationIndex);
+    saveFeedbackMutation.mutate({ sessionId: session.id, variationIndex, feedback: feedback.trim() });
+  };
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -912,8 +937,21 @@ function CalibrationSection({ workspaceId, onSampleSaved }: CalibrationSectionPr
                   />
                 </div>
 
-                {/* Save as Sample */}
-                <div className="flex justify-end">
+                {/* Actions: Save feedback + Save as Sample */}
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleSaveFeedback(i)}
+                    disabled={savingFeedbackIndex === i || !localFeedback[i]?.trim()}
+                    className="flex items-center gap-1.5 px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {savingFeedbackIndex === i ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Save className="w-3.5 h-3.5" />
+                    )}
+                    Save feedback
+                  </button>
                   <button
                     type="button"
                     onClick={() => handleSaveAsSample(i, variation.text)}
@@ -987,11 +1025,23 @@ function CalibrationSection({ workspaceId, onSampleSaved }: CalibrationSectionPr
 
 export function VoiceTab({ workspaceId }: { workspaceId: string }) {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [activeSection, setActiveSection] = useState<VoiceSection>('samples');
 
   const { data: profile, isLoading } = useQuery({
     queryKey: queryKeys.admin.voiceProfile(workspaceId),
     queryFn: () => voice.getProfile(workspaceId),
+  });
+
+  const createProfileMutation = useMutation({
+    mutationFn: () => voice.createProfile(workspaceId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.voiceProfile(workspaceId) });
+      toast('Voice profile created');
+    },
+    onError: () => {
+      toast('Failed to create voice profile', 'error');
+    },
   });
 
   const invalidateProfile = () => {
@@ -1020,6 +1070,38 @@ export function VoiceTab({ workspaceId }: { workspaceId: string }) {
     );
   }
 
+  if (!profile) {
+    return (
+      <SectionCard
+        title="Voice Calibration"
+        titleIcon={<Mic className="w-4 h-4 text-teal-400" />}
+      >
+        <EmptyState
+          icon={Mic}
+          title="No voice profile yet"
+          description="Create a voice profile to start calibrating your brand's tone and style."
+          action={
+            <button
+              type="button"
+              onClick={() => createProfileMutation.mutate()}
+              disabled={createProfileMutation.isPending}
+              className="flex items-center gap-2 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {createProfileMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Creating…
+                </>
+              ) : (
+                'Create voice profile'
+              )}
+            </button>
+          }
+        />
+      </SectionCard>
+    );
+  }
+
   return (
     <SectionCard
       title="Voice Calibration"
@@ -1037,7 +1119,7 @@ export function VoiceTab({ workspaceId }: { workspaceId: string }) {
       {activeSection === 'samples' && (
         <SamplesSection
           workspaceId={workspaceId}
-          samples={profile?.samples ?? []}
+          samples={profile.samples ?? []}
           onChanged={invalidateProfile}
         />
       )}
@@ -1045,7 +1127,7 @@ export function VoiceTab({ workspaceId }: { workspaceId: string }) {
       {activeSection === 'dna' && (
         <DNASection
           workspaceId={workspaceId}
-          voiceDNA={profile?.voiceDNA}
+          voiceDNA={profile.voiceDNA}
           onChanged={invalidateProfile}
         />
       )}
@@ -1053,7 +1135,7 @@ export function VoiceTab({ workspaceId }: { workspaceId: string }) {
       {activeSection === 'guardrails' && (
         <GuardrailsSection
           workspaceId={workspaceId}
-          guardrails={profile?.guardrails}
+          guardrails={profile.guardrails}
           onChanged={invalidateProfile}
         />
       )}
