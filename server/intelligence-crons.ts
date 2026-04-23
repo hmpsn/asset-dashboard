@@ -17,6 +17,9 @@ const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
 let refreshInterval: ReturnType<typeof setInterval> | null = null;
 let startupTimeout: ReturnType<typeof setTimeout> | null = null;
 let isRunning = false;
+let competitorInterval: ReturnType<typeof setInterval> | null = null;
+let competitorStartupTimeout: ReturnType<typeof setTimeout> | null = null;
+let isCompetitorRunning = false;
 
 async function runIntelligenceRefresh(): Promise<void> {
   if (isRunning) { log.warn('Intelligence refresh already in progress — skipping cycle'); return; }
@@ -62,63 +65,78 @@ export function stopIntelligenceCrons(): void {
 }
 
 export function startCompetitorMonitoringCron(): void {
+  if (competitorInterval) return;
   const FIFTEEN_MIN_MS = 15 * 60 * 1000;
   const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
-  const t = setTimeout(() => {
+  competitorStartupTimeout = setTimeout(() => {
     void runCompetitorCheck();
-    const i = setInterval(() => { void runCompetitorCheck(); }, TWENTY_FOUR_HOURS_MS);
-    i.unref?.();
+    competitorInterval = setInterval(() => { void runCompetitorCheck(); }, TWENTY_FOUR_HOURS_MS);
+    competitorInterval.unref?.();
   }, FIFTEEN_MIN_MS);
-  t.unref?.();
+  competitorStartupTimeout.unref?.();
+}
+
+export function stopCompetitorMonitoringCron(): void {
+  if (competitorStartupTimeout) { clearTimeout(competitorStartupTimeout); competitorStartupTimeout = null; }
+  if (competitorInterval) { clearInterval(competitorInterval); competitorInterval = null; }
 }
 
 async function runCompetitorCheck(): Promise<void> {
+  if (isCompetitorRunning) { log.warn('Competitor check already in progress — skipping cycle'); return; }
   // Only run on Monday (day 1)
   if (new Date().getDay() !== 1) return;
+  isCompetitorRunning = true;
 
-  const workspaces = listWorkspaces();
-  const today = new Date().toISOString().slice(0, 10);
+  try {
+    const workspaces = listWorkspaces();
+    const today = new Date().toISOString().slice(0, 10);
 
-  for (const ws of workspaces) {
-    if (!ws.liveDomain || !ws.competitorDomains?.length || !ws.seoDataProvider) continue;
-    const provider = getConfiguredProvider(ws.seoDataProvider);
-    if (!provider?.isConfigured()) continue;
+    for (const ws of workspaces) {
+      if (!ws.liveDomain || !ws.competitorDomains?.length || !ws.seoDataProvider) continue;
+      const provider = getConfiguredProvider(ws.seoDataProvider);
+      if (!provider?.isConfigured()) continue;
 
-    for (const domain of ws.competitorDomains) {
-      if (snapshotExistsForDate(ws.id, domain, today)) continue;
-      try {
-        const kwResults = await provider.getDomainKeywords(domain, ws.id, 50);
-        const topKeywords = kwResults.map(k => ({
-          keyword: k.keyword,
-          position: k.position ?? 0,
-          volume: k.volume,
-        }));
-        const current = saveCompetitorSnapshot(ws.id, domain, today, topKeywords, kwResults.length);
-        const previous = getLatestCompetitorSnapshot(ws.id, domain);
-        if (!previous || previous.snapshotDate === today) continue;
-        const alerts = detectCompetitorAlerts(ws.id, domain, current, previous);
-        for (const alert of alerts) {
-          upsertInsight({
-            workspaceId: ws.id,
-            pageId: null,
-            insightType: 'competitor_alert',
-            data: {
-              competitorDomain: alert.competitorDomain,
-              alertType: alert.alertType,
-              keyword: alert.keyword,
-              previousPosition: alert.previousPosition,
-              currentPosition: alert.currentPosition,
-              positionChange: alert.positionChange,
-              volume: alert.volume,
-              snapshotDate: alert.snapshotDate,
-            },
-            severity: alert.severity,
-          });
+      for (const domain of ws.competitorDomains) {
+        if (snapshotExistsForDate(ws.id, domain, today)) continue;
+        try {
+          // Read previous snapshot BEFORE saving current so diff is meaningful
+          const previous = getLatestCompetitorSnapshot(ws.id, domain);
+          const kwResults = await provider.getDomainKeywords(domain, ws.id, 50);
+          const topKeywords = kwResults.map(k => ({
+            keyword: k.keyword,
+            position: k.position ?? 0,
+            volume: k.volume,
+          }));
+          const current = saveCompetitorSnapshot(ws.id, domain, today, topKeywords, kwResults.length);
+          if (!previous || previous.snapshotDate === today) continue;
+          const alerts = detectCompetitorAlerts(ws.id, domain, current, previous);
+          for (const alert of alerts) {
+            // Use a stable unique pageId so each (domain, keyword) alert gets its own DB row
+            const alertPageId = `competitor_alert::${alert.competitorDomain}::${alert.keyword ?? 'domain'}`;
+            upsertInsight({
+              workspaceId: ws.id,
+              pageId: alertPageId,
+              insightType: 'competitor_alert',
+              data: {
+                competitorDomain: alert.competitorDomain,
+                alertType: alert.alertType,
+                keyword: alert.keyword,
+                previousPosition: alert.previousPosition,
+                currentPosition: alert.currentPosition,
+                positionChange: alert.positionChange,
+                volume: alert.volume,
+                snapshotDate: alert.snapshotDate,
+              },
+              severity: alert.severity,
+            });
+          }
+        } catch (err) {
+          log.warn({ err, workspaceId: ws.id, domain }, 'Failed competitor monitoring check');
         }
-      } catch (err) {
-        log.warn({ err, workspaceId: ws.id, domain }, 'Failed competitor monitoring check');
       }
     }
+  } finally {
+    isCompetitorRunning = false;
   }
 }

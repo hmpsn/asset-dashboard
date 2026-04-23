@@ -1,6 +1,7 @@
 import { TrendingUp, TrendingDown, Clock, Target, Award, Code2, HeartPulse } from 'lucide-react';
 import { SectionCard } from '../ui/SectionCard';
 import { Skeleton } from '../ui/Skeleton';
+import { TierGate } from '../ui/TierGate';
 import type { AnalyticsInsight, QuickWinData, ContentDecayData, SiteHealthInsightData, CompetitorAlertData, EmergingKeywordData, FreshnessAlertData } from '../../../shared/types/analytics';
 
 interface InsightCardsProps {
@@ -404,119 +405,149 @@ export function SiteHealthCard({
 
 // ── Competitor Alerts ────────────────────────────────────────────
 
-function CompetitorAlertCard({ insights, loading }: { insights: AnalyticsInsight[]; loading: boolean }) {
+function CompetitorAlertCard({ insights, tier, loading }: { insights: AnalyticsInsight[]; tier: 'free' | 'growth' | 'premium'; loading: boolean }) {
   const alerts = insights.filter(i => i.insightType === 'competitor_alert') as AnalyticsInsight<'competitor_alert'>[];
   const topAlert = alerts[0];
   const data = topAlert?.data as CompetitorAlertData | undefined;
-  if (!loading && !topAlert) return null;
+  if (!loading && !topAlert && tier !== 'free') return null;
   return (
     <SectionCard
       title="Competitor Alerts"
       titleIcon={<TrendingDown size={14} className="text-blue-400" />}
     >
-      {loading ? (
-        <div className="space-y-2">
-          <Skeleton className="h-4 w-3/4" />
-          <Skeleton className="h-4 w-1/2" />
-        </div>
-      ) : data ? (
-        <div className="space-y-2 text-sm">
-          <p className="text-zinc-200">
-            <span className="text-blue-400 font-medium">{data.competitorDomain}</span>
-            {data.keyword ? ` — "${data.keyword}"` : ''}
-          </p>
-          {data.previousPosition != null && data.currentPosition != null && (
-            <p className="text-zinc-400 text-xs">
-              Position {data.previousPosition} → {data.currentPosition}
-              {data.volume ? ` · ${Number(data.volume).toLocaleString()} searches/mo` : ''}
+      <TierGate
+        tier={tier}
+        required="growth"
+        feature="Competitor Alerts"
+        teaser="Track when competitors gain or lose rankings for keywords relevant to your site."
+        compact
+      >
+        {loading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
+          </div>
+        ) : data ? (
+          <div className="space-y-2 text-sm">
+            <p className="text-zinc-200">
+              <span className="text-blue-400 font-medium">{data.competitorDomain}</span>
+              {data.keyword ? ` — "${data.keyword}"` : ''}
             </p>
-          )}
-          {alerts.length > 1 && (
-            <p className="text-zinc-500 text-xs">{alerts.length - 1} more competitor movement{alerts.length > 2 ? 's' : ''}</p>
-          )}
-        </div>
-      ) : null}
+            {data.previousPosition != null && data.currentPosition != null && (
+              <p className="text-zinc-400 text-xs">
+                Position {data.previousPosition} → {data.currentPosition}
+                {data.volume ? ` · ${Number(data.volume).toLocaleString()} searches/mo` : ''}
+              </p>
+            )}
+            {alerts.length > 1 && (
+              <p className="text-zinc-500 text-xs">{alerts.length - 1} more competitor movement{alerts.length > 2 ? 's' : ''}</p>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-zinc-400">No competitor movements detected yet</p>
+        )}
+      </TierGate>
     </SectionCard>
   );
 }
 
 // ── Emerging Keywords ────────────────────────────────────────────
 
-function EmergingKeywordCard({ insights, loading }: { insights: AnalyticsInsight[]; loading: boolean }) {
+function EmergingKeywordCard({ insights, tier, loading }: { insights: AnalyticsInsight[]; tier: 'free' | 'growth' | 'premium'; loading: boolean }) {
   const emerging = insights.filter(i => i.insightType === 'emerging_keyword') as AnalyticsInsight<'emerging_keyword'>[];
   const top = emerging[0];
   const data = top?.data as EmergingKeywordData | undefined;
-  if (!loading && !top) return null;
+  if (!loading && !top && tier !== 'free') return null;
   return (
     <SectionCard
       title="Rising Search Trends"
       titleIcon={<TrendingUp size={14} className="text-blue-400" />}
     >
-      {loading ? (
-        <div className="space-y-2">
-          <Skeleton className="h-4 w-3/4" />
-          <Skeleton className="h-4 w-1/2" />
-        </div>
-      ) : data ? (
-        <div className="space-y-2 text-sm">
-          <p className="text-zinc-200 font-medium">"{data.keyword}"</p>
-          <div className="flex items-center gap-2">
-            {data.volume != null && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-500/10 text-blue-400">
-                {Number(data.volume).toLocaleString()} searches/mo
-              </span>
+      <TierGate
+        tier={tier}
+        required="growth"
+        feature="Rising Search Trends"
+        teaser="Spot keywords gaining momentum before your competitors do."
+        compact
+      >
+        {loading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
+          </div>
+        ) : data ? (
+          <div className="space-y-2 text-sm">
+            <p className="text-zinc-200 font-medium">"{data.keyword}"</p>
+            <div className="flex items-center gap-2">
+              {data.volume != null && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-500/10 text-blue-400">
+                  {Number(data.volume).toLocaleString()} searches/mo
+                </span>
+              )}
+              {data.difficulty != null && (
+                <span className="text-zinc-500 text-xs">KD {data.difficulty}</span>
+              )}
+            </div>
+            {data.currentPosition != null ? (
+              <p className="text-zinc-400 text-xs">Currently ranking at position {Math.round(data.currentPosition)}</p>
+            ) : (
+              <p className="text-zinc-400 text-xs">Not yet ranking — opportunity to get ahead early</p>
             )}
-            {data.difficulty != null && (
-              <span className="text-zinc-500 text-xs">KD {data.difficulty}</span>
+            {emerging.length > 1 && (
+              <p className="text-zinc-500 text-xs">{emerging.length - 1} more trending keyword{emerging.length > 2 ? 's' : ''}</p>
             )}
           </div>
-          {data.currentPosition != null ? (
-            <p className="text-zinc-400 text-xs">Currently ranking at position {Math.round(data.currentPosition)}</p>
-          ) : (
-            <p className="text-zinc-400 text-xs">Not yet ranking — opportunity to get ahead early</p>
-          )}
-          {emerging.length > 1 && (
-            <p className="text-zinc-500 text-xs">{emerging.length - 1} more trending keyword{emerging.length > 2 ? 's' : ''}</p>
-          )}
-        </div>
-      ) : null}
+        ) : (
+          <p className="text-sm text-zinc-400">No rising trends detected yet</p>
+        )}
+      </TierGate>
     </SectionCard>
   );
 }
 
 // ── Freshness Alerts ─────────────────────────────────────────────
 
-function FreshnessAlertCard({ insights, loading }: { insights: AnalyticsInsight[]; loading: boolean }) {
+function FreshnessAlertCard({ insights, tier, loading }: { insights: AnalyticsInsight[]; tier: 'free' | 'growth' | 'premium'; loading: boolean }) {
   const stale = insights.filter(i => i.insightType === 'freshness_alert') as AnalyticsInsight<'freshness_alert'>[];
-  const worst = stale.sort((a, b) => b.data.daysSinceLastAnalysis - a.data.daysSinceLastAnalysis)[0];
+  const worst = [...stale].sort((a, b) => b.data.daysSinceLastAnalysis - a.data.daysSinceLastAnalysis)[0];
   const data = worst?.data as FreshnessAlertData | undefined;
-  if (!loading && !worst) return null;
+  if (!loading && !worst && tier !== 'free') return null;
   return (
     <SectionCard
       title="Content Freshness"
       titleIcon={<Clock size={14} className="text-amber-400" />}
     >
-      {loading ? (
-        <div className="space-y-2">
-          <Skeleton className="h-4 w-3/4" />
-          <Skeleton className="h-4 w-1/2" />
-        </div>
-      ) : data ? (
-        <div className="space-y-2 text-sm">
-          <p className="text-zinc-200 text-xs font-mono truncate">{data.pagePath}</p>
-          <p className="text-amber-400 text-xs font-medium">
-            {data.daysSinceLastAnalysis} days since last update
-          </p>
-          {data.impressions != null && (
-            <p className="text-zinc-400 text-xs">
-              {Number(data.impressions).toLocaleString()} monthly impressions at risk
+      <TierGate
+        tier={tier}
+        required="growth"
+        feature="Content Freshness Alerts"
+        teaser="Get notified when high-traffic pages haven't been analyzed in over 90 days."
+        compact
+      >
+        {loading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
+          </div>
+        ) : data ? (
+          <div className="space-y-2 text-sm">
+            <p className="text-zinc-200 text-xs font-mono truncate">{data.pagePath}</p>
+            <p className="text-amber-400 text-xs font-medium">
+              {data.daysSinceLastAnalysis} days since last analysis
             </p>
-          )}
-          {stale.length > 1 && (
-            <p className="text-zinc-500 text-xs">{stale.length - 1} more stale page{stale.length > 2 ? 's' : ''}</p>
-          )}
-        </div>
-      ) : null}
+            {data.impressions != null && (
+              <p className="text-zinc-400 text-xs">
+                {Number(data.impressions).toLocaleString()} monthly impressions at risk
+              </p>
+            )}
+            {stale.length > 1 && (
+              <p className="text-zinc-500 text-xs">{stale.length - 1} more stale page{stale.length > 2 ? 's' : ''}</p>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-zinc-400">All analyzed pages are up to date</p>
+        )}
+      </TierGate>
     </SectionCard>
   );
 }
@@ -532,9 +563,9 @@ export function InsightCards({ workspaceId: _workspaceId, insights, tier, loadin
       <SchemaOpportunitiesCard insights={insights} tier={tier} loading={loading} />
       <ContentHealthCard insights={insights} tier={tier} loading={loading} />
       <SiteHealthCard insights={insights} loading={loading} />
-      <CompetitorAlertCard insights={insights} loading={loading} />
-      <EmergingKeywordCard insights={insights} loading={loading} />
-      <FreshnessAlertCard insights={insights} loading={loading} />
+      <CompetitorAlertCard insights={insights} tier={tier} loading={loading} />
+      <EmergingKeywordCard insights={insights} tier={tier} loading={loading} />
+      <FreshnessAlertCard insights={insights} tier={tier} loading={loading} />
     </div>
   );
 }

@@ -419,6 +419,9 @@ const INSIGHT_TYPE_ACTIONS: Partial<Record<InsightType, { label: string; tab: Cl
   anomaly_digest: { label: 'View analytics', tab: 'performance' },
   strategy_alignment: { label: 'View strategy', tab: 'strategy' },
   site_health: { label: 'View site audit', tab: 'health' },
+  competitor_alert: { label: 'View analytics', tab: 'analytics' },
+  emerging_keyword: { label: 'View strategy', tab: 'strategy' },
+  freshness_alert: { label: 'View strategy', tab: 'strategy' },
 };
 
 function mapServerInsights(insights: ClientInsight[]): DigestInsight[] {

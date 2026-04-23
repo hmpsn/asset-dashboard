@@ -288,7 +288,7 @@ export function buildInsightsContext(insights: AnalyticsInsight[]): string {
   if (emergingKeywords.length > 0) {
     const lines = emergingKeywords.slice(0, 8).map(e => {
       const d = e.data;
-      const volStr = d.volume ? `, ${Number(d.volume).toLocaleString()} mo/searches` : '';
+      const volStr = d.volume ? `, ${Number(d.volume).toLocaleString()} searches/mo` : '';
       const kdStr = d.difficulty != null ? `, KD ${d.difficulty}` : '';
       const posStr = d.currentPosition != null ? `, we rank pos ${Math.round(d.currentPosition)}` : ' (not yet ranking)';
       return `  "${d.keyword}"${volStr}${kdStr}${posStr}`;

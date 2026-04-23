@@ -1323,7 +1323,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
           const currentPosition = gscLookup.get(kw.keyword.toLowerCase());
           enrichAndUpsert({
             insightType: 'emerging_keyword',
-            pageId: null,
+            pageId: `emerging_keyword::${kw.keyword}`, // unique per keyword so each gets its own DB row
             data: {
               keyword: kw.keyword,
               volume: kw.volume,
@@ -1335,12 +1335,14 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
             severity: 'opportunity',
           });
         }
-        deleteStaleInsightsByType(workspaceId, 'emerging_keyword', cycleStart);
         log.info({ workspaceId, count: Math.min(emerging.length, 10) }, 'Computed emerging keyword insights');
       }
     } catch (err) {
       log.warn({ err, workspaceId }, 'Failed to compute emerging keyword insights');
     }
+    // Always prune stale emerging_keyword rows — even when the provider is unconfigured
+    // (avoids orphaning rows from a previous run when the provider is later removed)
+    deleteStaleInsightsByType(workspaceId, 'emerging_keyword', cycleStart);
   }
 
   // Phase 6: Content freshness alerts — flag pages with stale keyword analysis + meaningful traffic

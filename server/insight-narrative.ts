@@ -142,9 +142,12 @@ function toClientInsight(insight: AnalyticsInsight): ClientInsight {
       const domain = d.competitorDomain ?? 'a competitor';
       const kw = d.keyword ? `"${d.keyword}"` : 'a keyword';
       if (d.alertType === 'keyword_gained') {
+        const posChange = (d.previousPosition != null && d.currentPosition != null)
+          ? `moved from position ${d.previousPosition} to position ${d.currentPosition}`
+          : 'improved their ranking';
         return {
           headline: `Competitor gaining ground on ${kw}`,
-          narrative: `${domain} moved from position ${d.previousPosition} to position ${d.currentPosition} for ${kw}. We're reviewing whether to target this keyword more aggressively.`,
+          narrative: `${domain} ${posChange} for ${kw}. We're reviewing whether to target this keyword more aggressively.`,
           impact: d.volume ? `${Number(d.volume).toLocaleString()} monthly searches at stake` : undefined,
         };
       }
@@ -175,11 +178,11 @@ function toClientInsight(insight: AnalyticsInsight): ClientInsight {
 
     freshness_alert: () => {
       const d = data as import('../shared/types/analytics.js').FreshnessAlertData;
-      const days = d.daysSinceLastAnalysis;
+      const days = d.daysSinceLastAnalysis ?? 0;
       return {
         headline: `Content on ${d.pagePath} may need a refresh`,
-        narrative: `This page hasn't been updated in ${days} days. Search engines tend to favor recently-updated content${d.impressions ? `, and this page still receives ${Number(d.impressions).toLocaleString()} monthly impressions that could be protected with a refresh` : ''}.`,
-        impact: days > 180 ? `Over 6 months since last update — elevated risk of ranking decline` : `Over 3 months since last update`,
+        narrative: `This page hasn't been analyzed in ${days} days. Search engines tend to favor recently-updated content${d.impressions ? `, and this page still receives ${Number(d.impressions).toLocaleString()} monthly impressions that could be protected with a refresh` : ''}.`,
+        impact: days > 180 ? `Over 6 months since last analysis — elevated risk of ranking decline` : `Over 3 months since last analysis`,
       };
     },
   };

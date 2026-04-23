@@ -83,8 +83,8 @@ const stmts = createStmtCache(() => ({
     `SELECT * FROM competitor_alerts WHERE workspace_id = ? AND insight_id IS NULL
      ORDER BY created_at DESC LIMIT 50`,
   ),
-  linkInsightId: db.prepare<[string, string]>(
-    `UPDATE competitor_alerts SET insight_id = ? WHERE id = ?`,
+  linkInsightId: db.prepare<[string, string, string]>(
+    `UPDATE competitor_alerts SET insight_id = ? WHERE id = ? AND workspace_id = ?`,
   ),
   snapshotExistsForDate: db.prepare<[string, string, string]>(
     `SELECT 1 FROM competitor_snapshots WHERE workspace_id = ? AND competitor_domain = ? AND snapshot_date = ? LIMIT 1`,
@@ -160,7 +160,9 @@ export function detectCompetitorAlerts(
   const { positionChangeThreshold = 5, minVolume = 100 } = opts;
   const alerts: CompetitorAlert[] = [];
   const prevMap = new Map(previous.topKeywords.map(k => [k.keyword.toLowerCase(), k]));
+  const currMap = new Map(current.topKeywords.map(k => [k.keyword.toLowerCase(), k]));
 
+  // keyword_gained, new_keyword: iterate current keywords
   for (const kw of current.topKeywords) {
     const prev = prevMap.get(kw.keyword.toLowerCase());
     if (!prev) {
@@ -183,25 +185,50 @@ export function detectCompetitorAlerts(
       continue;
     }
     const change = prev.position - kw.position;
-    if (Math.abs(change) >= positionChangeThreshold && kw.volume >= minVolume) {
-      const alertType = change > 0 ? 'keyword_gained' as const : 'keyword_lost' as const;
-      const severity = Math.abs(change) >= 10 ? 'critical' as const : 'warning' as const;
+    if (change >= positionChangeThreshold && kw.volume >= minVolume) {
+      const severity = change >= 10 ? 'critical' as const : 'warning' as const;
       const alertId = randomUUID();
       stmts().insertAlert.run({
         id: alertId, workspace_id: workspaceId, competitor_domain: domain,
-        alert_type: alertType, keyword: kw.keyword,
+        alert_type: 'keyword_gained', keyword: kw.keyword,
         previous_position: prev.position, current_position: kw.position, position_change: change,
         volume: kw.volume, severity, snapshot_date: current.snapshotDate,
       });
       alerts.push({
         id: alertId, workspaceId, competitorDomain: domain,
-        alertType, keyword: kw.keyword,
+        alertType: 'keyword_gained', keyword: kw.keyword,
         previousPosition: prev.position, currentPosition: kw.position, positionChange: change,
         volume: kw.volume, severity, snapshotDate: current.snapshotDate,
         createdAt: new Date().toISOString(),
       });
     }
   }
+
+  // keyword_lost: iterate previous keywords that dropped out of current top set
+  for (const prev of previous.topKeywords) {
+    const curr = currMap.get(prev.keyword.toLowerCase());
+    const dropped = !curr || curr.position - prev.position >= positionChangeThreshold;
+    if (dropped && prev.volume >= minVolume && prev.position <= 20) {
+      const severity = !curr ? 'warning' as const : (curr.position - prev.position >= 10 ? 'critical' as const : 'warning' as const);
+      const alertId = randomUUID();
+      stmts().insertAlert.run({
+        id: alertId, workspace_id: workspaceId, competitor_domain: domain,
+        alert_type: 'keyword_lost', keyword: prev.keyword,
+        previous_position: prev.position, current_position: curr?.position ?? null,
+        position_change: curr ? prev.position - curr.position : null,
+        volume: prev.volume, severity, snapshot_date: current.snapshotDate,
+      });
+      alerts.push({
+        id: alertId, workspaceId, competitorDomain: domain,
+        alertType: 'keyword_lost', keyword: prev.keyword,
+        previousPosition: prev.position, currentPosition: curr?.position,
+        positionChange: curr ? prev.position - curr.position : undefined,
+        volume: prev.volume, severity, snapshotDate: current.snapshotDate,
+        createdAt: new Date().toISOString(),
+      });
+    }
+  }
+
   log.info({ workspaceId, domain, alertCount: alerts.length }, 'Competitor alerts detected');
   return alerts;
 }
@@ -211,6 +238,6 @@ export function listUnlinkedCompetitorAlerts(workspaceId: string): CompetitorAle
   return rows.map(rowToAlert);
 }
 
-export function linkAlertToInsight(alertId: string, insightId: string): void {
-  stmts().linkInsightId.run(insightId, alertId);
+export function linkAlertToInsight(alertId: string, insightId: string, workspaceId: string): void {
+  stmts().linkInsightId.run(insightId, alertId, workspaceId);
 }
