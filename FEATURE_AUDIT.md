@@ -3746,3 +3746,57 @@ Current feature count: **310**. Last updated: April 2026.
 
 **Files:** `server/schemas/insight-schemas.ts`, `server/analytics-insights-store.ts`, `tests/unit/migration-data-preservation.test.ts`, `tests/integration/anomaly-boost-reversal.test.ts`, `tests/integration/public-analytics.test.ts`, `tests/contract/insight-data-shapes.test.ts`
 
+---
+
+## SEO Tier 2 Capabilities (2026-04-23)
+
+### 312. Content Gap Opportunity Score
+**What it does:** Exported `computeOpportunityScore()` function in `server/routes/keyword-strategy.ts` that scores content gaps 0–100 by composing four weighted signals: monthly search volume (40%), ease-of-ranking (KD inverse, 30%), GSC impressions signal (20%), and trend multiplier (10% boost for rising keywords). Results sorted descending by opportunity score in both admin `ContentGaps.tsx` and client `StrategyTab.tsx`. Blue score badges display the normalized 0–100 value with intuitive color-coding (green for high-opportunity, amber for medium, gray for low-potential gaps).
+
+**Agency value:** Prioritizes content creation roadmap by estimated revenue impact. Automatically ranks opportunities by combination of search demand, competitive difficulty, existing audience interest (via GSC), and trend trajectory — eliminating manual scoring and guesswork about which gaps to tackle first.
+
+**Client value:** Clear, data-driven content roadmap showing the most valuable opportunities to pursue. Opportunity scores provide transparent justification for content prioritization.
+
+**Mutual:** Accelerates strategic content decisions. Agencies can now confidently recommend "focus on these 3 gaps first — they represent 60% of total monthly opportunity" with quantified backing.
+
+**Files:** `server/routes/keyword-strategy.ts` (computeOpportunityScore export), `src/components/admin/ContentGaps.tsx` (sort by score), `src/components/client/StrategyTab.tsx` (score display in gap cards), `src/components/ui/Badge.tsx` (score color coding)
+
+---
+
+### 313. Emerging Keyword Insights
+**What it does:** Phase 5 in `server/analytics-intelligence.ts`. Implements `isKeywordEmerging()` (exported) to detect trend-rising keywords from SEMRush organic data: ≥20% net gain in search volume over the analysis period AND positive second-half slope (last 3 months trending up). Filters `getDomainKeywords()` results to surface only emerging keywords. Emits `emerging_keyword` InsightType into the insight store with data shape `EmergingKeywordData` (keyword, currentVolume, volumeGain%, trend). Wired into: (1) insight narrative generation via dedicated formatter in `server/prompt-assembly.ts`, (2) admin chat context via `buildInsightsContext()` in `server/admin-chat-context.ts`, (3) frontend rendering in `InsightCards.tsx` with trend sparkline and percentage-change badge.
+
+**Agency value:** Proactive opportunity detection. Surfaces keywords starting to trend up before competitors notice, enabling agencies to recommend new content that captures rising demand. Monthly insight feed surfaces "emerging_keyword" entries separately from generic ranking opportunities.
+
+**Client value:** Real-time trend awareness. Clients see which keywords their competitors are starting to rank for, enabling faster content response.
+
+**Mutual:** Shifts from reactive (ranking tracking) to predictive (trend detection). Enables forward-looking strategy conversations: "These 5 keywords are emerging in your category — we should create content this month."
+
+**Files:** `server/analytics-intelligence.ts` (isKeywordEmerging export, Phase 5), `shared/types/analytics.ts` (EmergingKeywordData), `server/schemas/insight-schemas.ts` (emergingKeywordSchema), `server/prompt-assembly.ts` (emerging keyword formatter), `server/admin-chat-context.ts` (insights context), `src/components/InsightCards.tsx` (rendering + sparkline)
+
+---
+
+### 314. Competitor Monitoring
+**What it does:** Backend competitor snapshot system in `server/competitor-snapshot-store.ts` with migrations `070-competitor-snapshots.sql` and `071-competitor-alerts.sql`. Weekly cron `startCompetitorMonitoringCron()` in `server/intelligence-crons.ts` executes Monday-only (15min delayed start to batch with other weekly jobs) and: (1) fetches current competitor keyword rankings via `getDomainKeywords()` per competitor domain, (2) compares against previous week's snapshot, (3) detects keyword gains (new rankings, position improvements ≥3), losses (dropped keywords), and schema additions (competitors added structured data). Emits `competitor_alert` InsightType with `CompetitorAlertData` (competitor domain, new_keywords[], lost_keywords[], schema_additions[], impact_summary). Wired into: (1) insight narrative generation (competitor context injected into admin chat), (2) frontend rendering in `InsightCards.tsx` with competitor domain + change summary, (3) workspace intelligence for context injection.
+
+**Agency value:** Competitive awareness automation. Eliminates manual competitor tracking. Weekly alerts surface which competitors are gaining ground and which keyword categories they're entering — enabling strategic defensive/offensive content recommendations.
+
+**Client value:** Market intelligence without manual research. "Your top 3 competitors added rankings in these 12 keywords this month" with specific targets and opportunities to respond.
+
+**Mutual:** Shifts competitive analysis from quarterly reports to weekly automation. Enables faster, data-driven strategic responses to competitive moves.
+
+**Files:** `server/competitor-snapshot-store.ts` (new), `server/db/migrations/070-competitor-snapshots.sql`, `server/db/migrations/071-competitor-alerts.sql`, `server/intelligence-crons.ts` (startCompetitorMonitoringCron), `shared/types/analytics.ts` (CompetitorAlertData), `server/schemas/insight-schemas.ts` (competitorAlertSchema), `server/analytics-intelligence.ts` (competitor alert generation), `server/admin-chat-context.ts` (competitor context), `src/components/InsightCards.tsx` (rendering)
+
+---
+
+### 315. Content Freshness Alerts
+**What it does:** Phase 6 in `server/analytics-intelligence.ts`. Reads `listPageKeywords()` and flags pages where `analysisGeneratedAt` > 90 days old AND ≥100 monthly impressions (via GSC overlap) as `freshness_alert` insights. Severity graduated: **critical** at 180+ days old (high-traffic page not updated in 6 months), **warning** at 90-180 days. Data shape `FreshnessAlertData` captures page, keyword_count, top_decaying_keywords[], last_analysis_date, impressions, suggested_refresh_priority. Generates auto-created `content_refresh` recommendations in `server/recommendations.ts` — one recommendation per critical-freshness page with target outline and refresh angle based on decay context. Wired into: (1) insight narrative (critical freshness alerts proactively mentioned in chat), (2) admin chat context highlighting oldest/highest-traffic pages, (3) frontend `InsightCards.tsx` with age badge and "Generate Refresh Brief" CTA, (4) content pipeline integration (suggests page for content brief regeneration).
+
+**Agency value:** Automated content maintenance detection. Stops agencies from overlooking high-traffic pages that haven't been refreshed in 6+ months. Monthly insight feed surfaces critical freshness gaps before they become ranking losses.
+
+**Client value:** Data-driven content refresh roadmap. "These 5 pages get 1000+ monthly impressions but haven't been updated in 6 months — refreshing them could boost clicks by 15-20%."
+
+**Mutual:** Bridges analytics (impressions trending down) to content action (refresh brief generation). Automated recommendations let agencies immediately turn freshness insights into billable work.
+
+**Files:** `server/analytics-intelligence.ts` (Phase 6), `shared/types/analytics.ts` (FreshnessAlertData), `server/schemas/insight-schemas.ts` (freshnessAlertSchema), `server/recommendations.ts` (content_refresh recommendations), `server/admin-chat-context.ts` (freshness context), `src/components/InsightCards.tsx` (rendering + refresh CTA), `src/components/client/StrategyTab.tsx` (client freshness visibility)
+
