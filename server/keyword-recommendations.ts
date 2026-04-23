@@ -7,6 +7,7 @@
  */
 import { getConfiguredProvider } from './seo-data-provider.js';
 import { getWorkspace } from './workspaces.js';
+import { getQueryPageData } from './search-console.js';
 import { callOpenAI, parseAIJson } from './openai-helpers.js';
 import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelligence.js';
 import { createLogger } from './logger.js';
@@ -51,7 +52,7 @@ export function opportunityScore(volume: number, difficulty: number, cpc: number
  * @internal exported for unit testing
  */
 export function shouldIncludeKeywordCandidate(source: string, volume: number): boolean {
-  return source === 'pattern' || volume >= 10;
+  return source === 'pattern' || source === 'gsc' || volume >= 10;
 }
 
 // ── Core recommendation function ──
@@ -141,6 +142,38 @@ export async function getKeywordRecommendations(
       source: 'semrush_related',
       isRecommended: false,
     });
+  }
+
+  // Fetch GSC queries as additional candidates (proven search terms).
+  if (ws?.gscPropertyUrl && ws?.webflowSiteId) {
+    try {
+      const gscRows = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90, { maxRows: 200 });
+      const seedWords = new Set(
+        seedKeyword.toLowerCase().split(/\s+/).filter(w => w.length > 2),
+      );
+      const relevantQueries = gscRows
+        .filter(r => {
+          const qWords = r.query.toLowerCase().split(/\s+/);
+          return qWords.some(w => seedWords.has(w)) && r.impressions >= 10 && r.query.split(' ').length >= 2;
+        })
+        .sort((a, b) => b.impressions - a.impressions)
+        .slice(0, 10);
+
+      for (const r of relevantQueries) {
+        if (!candidates.some(c => c.keyword.toLowerCase() === r.query.toLowerCase())) {
+          candidates.push({
+            keyword: r.query,
+            volume: r.impressions,
+            difficulty: 0,
+            cpc: 0,
+            source: 'gsc',
+            isRecommended: false,
+          });
+        }
+      }
+    } catch (err) {
+      log.debug({ err, workspaceId }, 'GSC query enrichment failed — continuing without it');
+    }
   }
 
   // Score and sort by opportunity
