@@ -1343,6 +1343,43 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
     }
   }
 
+  // Phase 6: Content freshness alerts — flag pages with stale keyword analysis + meaningful traffic
+  {
+    const STALE_DAYS = 90;
+    const MIN_IMPRESSIONS = 100;
+    try {
+      const pageKws = listPageKeywords(workspaceId);
+      const now = Date.now();
+      const stale = pageKws.filter(p => {
+        if (!p.analysisGeneratedAt) return false;
+        const lastAnalyzedMs = new Date(p.analysisGeneratedAt).getTime();
+        if (isNaN(lastAnalyzedMs)) return false;
+        const daysSince = Math.floor((now - lastAnalyzedMs) / 86_400_000);
+        return daysSince >= STALE_DAYS && (p.impressions ?? 0) >= MIN_IMPRESSIONS;
+      });
+      for (const p of stale) {
+        const lastAnalyzedMs = new Date(p.analysisGeneratedAt!).getTime();
+        const daysSince = Math.floor((now - lastAnalyzedMs) / 86_400_000);
+        enrichAndUpsert({
+          insightType: 'freshness_alert',
+          pageId: p.pagePath,
+          data: {
+            pagePath: p.pagePath,
+            lastAnalyzedAt: p.analysisGeneratedAt!,
+            daysSinceLastAnalysis: daysSince,
+            impressions: p.impressions,
+            clicks: p.clicks,
+          } satisfies import('../shared/types/analytics.js').FreshnessAlertData,
+          severity: daysSince > 180 ? 'critical' : 'warning',
+        });
+      }
+      deleteStaleInsightsByType(workspaceId, 'freshness_alert', cycleStart);
+      log.info({ workspaceId, count: stale.length }, 'Computed content freshness alerts');
+    } catch (err) {
+      log.warn({ err, workspaceId }, 'Failed to compute content freshness alerts');
+    }
+  }
+
   // Phase 3C: Conversion attribution (GA4 organic landing pages)
   if (ga4Id) {
     try {
