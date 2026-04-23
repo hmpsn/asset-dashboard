@@ -12,6 +12,9 @@ import { getSectionsForEntry } from './copy-review.js';
 import { loadDecayAnalysis } from './content-decay.js';
 import { callOpenAI, parseAIJson } from './openai-helpers.js';
 import { createLogger } from './logger.js';
+import { getWorkspace } from './workspaces.js';
+import { getQueryPageData } from './search-console.js';
+import { sanitizeQueryForPrompt } from './helpers.js';
 import type { BlueprintEntry } from '../shared/types/page-strategy.js';
 import type { CopySection } from '../shared/types/copy-pipeline.js';
 const log = createLogger('copy-refresh');
@@ -23,6 +26,8 @@ export interface DecayContext {
   decayType: string;
   severity: string;
   metrics?: Record<string, number>;
+  /** Top GSC queries for this page, ordered by impressions (highest first). Optional — enrichment is best-effort. */
+  topQueries?: Array<{ query: string; clicks: number; impressions: number; position: number }>;
 }
 
 export interface CopyRefreshSuggestion {
@@ -172,13 +177,19 @@ export async function suggestCopyRefresh(
     ? Object.entries(decayContext.metrics).map(([k, v]) => `${k}: ${v}`).join(', ')
     : 'none available';
 
+  const queryStr = decayContext.topQueries?.length
+    ? `\nTop search queries for this page:\n${decayContext.topQueries.map(q =>
+        `- "${sanitizeQueryForPrompt(q.query)}": ${q.clicks} clicks, ${q.impressions} impressions, pos ${q.position.toFixed(1)}`,
+      ).join('\n')}`
+    : '';
+
   const prompt = `You are an SEO content strategist. A page is experiencing content decay and we need to determine which copy sections need refreshing.
 
 Decay signals:
 - URL: ${decayContext.url}
 - Decay type: ${decayContext.decayType}
 - Severity: ${decayContext.severity}
-- Metrics: ${metricsStr}
+- Metrics: ${metricsStr}${queryStr}
 
 Current copy sections:
 ${sectionSummary}
@@ -287,15 +298,35 @@ export async function analyzeDecayForCopyRefresh(
     return { pagesNeedingRefresh: [] };
   }
 
+  // Fetch GSC query-page data once per workspace for all decaying-page enrichment.
+  const ws = getWorkspace(workspaceId);
+  let gscQueryData: Array<{ query: string; page: string; clicks: number; impressions: number; position: number }> = [];
+  if (ws?.gscPropertyUrl && ws?.webflowSiteId) {
+    try {
+      gscQueryData = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90, { maxRows: 500 });
+    } catch (err) {
+      log.debug({ err, workspaceId }, 'GSC query data for copy refresh unavailable — continuing without it');
+    }
+  }
+
   const results: PageRefreshResult[] = [];
 
   for (const page of decay.decayingPages) {
     const match = matchDecayToEntry(workspaceId, page.page);
     if (!match) continue;
 
+    const pageQueries = gscQueryData
+      .filter(r => {
+        try { return new URL(r.page).pathname === page.page; } catch { return false; }
+      })
+      .sort((a, b) => b.impressions - a.impressions)
+      .slice(0, 10);
+
     const decayContext: DecayContext = {
       url: page.page,
-      decayType: page.clickDeclinePct <= -50 ? 'severe_click_decline' : 'click_decline',
+      decayType: page.clickDeclinePct <= -50 ? 'severe_click_decline'
+        : page.impressionChangePct < -20 && Math.abs(page.impressionChangePct) > Math.abs(page.clickDeclinePct) ? 'impression_decline'
+        : 'click_decline',
       severity: page.severity,
       metrics: {
         clickDeclinePct: page.clickDeclinePct,
@@ -305,6 +336,9 @@ export async function analyzeDecayForCopyRefresh(
         positionChange: page.positionChange,
         currentPosition: page.currentPosition,
       },
+      topQueries: pageQueries.length > 0
+        ? pageQueries.map(q => ({ query: q.query, clicks: q.clicks, impressions: q.impressions, position: q.position }))
+        : undefined,
     };
 
     try {

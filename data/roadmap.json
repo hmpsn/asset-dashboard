@@ -4484,6 +4484,17 @@
           "status": "done",
           "shippedAt": "2026-04-21",
           "notes": "All 8 bugs fixed (BUG-0001 through BUG-0008). resolvePagePath adopted at 15+ sites. applyBulkKeywordGuards moved to helpers. GSC path-boundary matching. bare-slug-pagepath pr-check rule added."
+        },
+        {
+          "id": "seo-tier3-data-sources",
+          "title": "SEO Tier 3 Data Source Enrichment",
+          "source": "docs/superpowers/plans/2026-04-22-seo-tier3-data-sources.md",
+          "est": "6-8h",
+          "priority": "P1",
+          "sprint": "G",
+          "status": "done",
+          "shippedAt": "2026-04-22",
+          "notes": "Six discrete backend enrichments across SEO pipelines: (Item 12) GSC queries as keyword candidates in keyword-recommendations.ts; (Item 13) GSC query breakdown in content-decay refresh AI prompt; (Item 13b) Decay query context injected when brief matches decaying page; (Item 13c) DecayContext.topQueries from GSC in copy-refresh AI prompt; (Item 14) SEMRush metrics pre-fetch for top-N pages in jobs.ts bulk analyze; (Item 15) Issue-type-specific recovery rates replacing flat 12% in recommendations.ts. All six independent, no API/UI changes, no new DB columns or shared types."
         }
       ]
     }

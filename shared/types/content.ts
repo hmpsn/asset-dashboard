@@ -237,7 +237,7 @@ export interface KeywordCandidate {
   volume: number;
   difficulty: number;
   cpc: number;
-  source: 'pattern' | 'semrush_related' | 'ai_suggested';
+  source: 'pattern' | 'semrush_related' | 'ai_suggested' | 'gsc';
   isRecommended: boolean;
 }
 

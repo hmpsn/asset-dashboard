@@ -6,7 +6,7 @@
 
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { getAllGscPages } from './search-console.js';
+import { getAllGscPages, getQueryPageData } from './search-console.js';
 import type { CustomDateRange } from './google-analytics.js';
 import { callOpenAI } from './openai-helpers.js';
 import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelligence.js';
@@ -14,6 +14,7 @@ import type { Workspace } from './workspaces.js';
 import { createLogger } from './logger.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { isProgrammingError } from './errors.js';
+import { sanitizeQueryForPrompt } from './helpers.js';
 import type * as OutcomeTracking from './outcome-tracking.js';
 
 const log = createLogger('content-decay');
@@ -258,6 +259,30 @@ export async function generateRefreshRecommendation(
   const intel = await buildWorkspaceIntelligence(ws.id, { slices, pagePath: page.page });
   const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext', 'learnings', 'pageProfile'] }); // bip-ok: slices is a superset
 
+  // Fetch per-query GSC data for this specific page to show which queries are declining.
+  let queryBreakdownBlock = '';
+  if (ws.gscPropertyUrl && ws.webflowSiteId) {
+    try {
+      const qpData = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90, { maxRows: 500 });
+      const pageQueries = qpData
+        .filter(r => {
+          try { return new URL(r.page).pathname === page.page; } catch { return false; }
+        })
+        .sort((a, b) => b.impressions - a.impressions)
+        .slice(0, 15);
+
+      if (pageQueries.length > 0) {
+        queryBreakdownBlock = `\n\nTOP SEARCH QUERIES FOR THIS PAGE (from Google Search Console — last 90 days):\n`;
+        queryBreakdownBlock += pageQueries.map(q =>
+          `- "${sanitizeQueryForPrompt(q.query)}": ${q.clicks} clicks, ${q.impressions} impressions, pos ${q.position.toFixed(1)}, CTR ${q.ctr}%`,
+        ).join('\n');
+        queryBreakdownBlock += `\n\nUse these queries to understand what users are searching for when they find this page. Focus your refresh recommendations on improving relevance for the highest-impression queries.`;
+      }
+    } catch (err) {
+      log.debug({ err, workspaceId: ws.id }, 'GSC query breakdown for decay page failed — continuing without it');
+    }
+  }
+
   const prompt = `You are an SEO content strategist. A page on this site is experiencing content decay — declining search performance.
 
 Page: ${page.page}
@@ -265,7 +290,7 @@ Click decline: ${page.clickDeclinePct}% (from ${page.previousClicks} to ${page.c
 Impression change: ${page.impressionChangePct}%
 Position change: ${page.positionChange > 0 ? '+' : ''}${page.positionChange} (now ${page.currentPosition})
 
-${fullContext ? `SEO Context:\n${fullContext}\n` : ''}
+${fullContext ? `SEO Context:\n${fullContext}\n` : ''}${queryBreakdownBlock}
 
 Provide a concise, actionable content refresh plan (3-5 bullet points). Focus on:
 1. What's likely causing the decline (algorithm changes, fresher competitors, outdated info)
