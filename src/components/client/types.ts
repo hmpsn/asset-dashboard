@@ -77,7 +77,7 @@ export interface ClientKeywordStrategy {
   siteKeywordMetrics?: { keyword: string; volume: number; difficulty: number }[];
   pageMap: { pagePath: string; pageTitle?: string; primaryKeyword: string; secondaryKeywords?: string[]; searchIntent?: string; currentPosition?: number; impressions?: number; clicks?: number; volume?: number; difficulty?: number; metricsSource?: MetricsSource; validated?: boolean; gscKeywords?: { query: string; clicks: number; impressions: number; position: number }[] }[];
   opportunities: string[];
-  contentGaps?: { topic: string; targetKeyword: string; intent: string; priority: string; rationale: string; suggestedPageType?: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource'; volume?: number; difficulty?: number; impressions?: number; competitorProof?: string; trendDirection?: 'rising' | 'declining' | 'stable'; serpFeatures?: string[]; questionKeywords?: string[] }[];
+  contentGaps?: { topic: string; targetKeyword: string; intent: string; priority: string; rationale: string; suggestedPageType?: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource'; volume?: number; difficulty?: number; impressions?: number; competitorProof?: string; trendDirection?: 'rising' | 'declining' | 'stable'; serpFeatures?: string[]; questionKeywords?: string[]; opportunityScore?: number }[];
   quickWins?: { pagePath: string; action: string; estimatedImpact: string; rationale: string }[];
   keywordGaps?: { keyword: string; volume?: number; difficulty?: number }[];
   topicClusters?: { topic: string; keywords: string[]; ownedCount: number; totalCount: number; coveragePercent: number; avgPosition?: number; topCompetitor?: string; topCompetitorCoverage?: number; gap: string[] }[];
