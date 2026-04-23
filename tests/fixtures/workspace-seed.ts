@@ -18,6 +18,7 @@ interface SeedWorkspaceOverrides {
   clientPassword?: string;
   gscPropertyUrl?: string;
   ga4PropertyId?: string;
+  seoDataProvider?: string;
 }
 
 /**
@@ -33,8 +34,8 @@ export function seedWorkspace(overrides?: SeedWorkspaceOverrides): SeededFullWor
 
   db.prepare(`
     INSERT INTO workspaces (id, name, folder, webflow_site_id, webflow_token,
-      gsc_property_url, ga4_property_id, client_password, live_domain, tier, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      gsc_property_url, ga4_property_id, client_password, live_domain, tier, seo_data_provider, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     workspaceId,
     `Test Workspace ${suffix}`,
@@ -46,6 +47,7 @@ export function seedWorkspace(overrides?: SeedWorkspaceOverrides): SeededFullWor
     overrides?.clientPassword ?? 'test-password',
     'test.example.com',
     overrides?.tier ?? 'free',
+    overrides?.seoDataProvider ?? null,
     now,
   );
 
