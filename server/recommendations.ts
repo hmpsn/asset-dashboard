@@ -417,7 +417,10 @@ function toPageSlug(url: string): string {
 
 // Source prefixes whose slug portion may have been stored as an absolute URL
 // in recs generated before the toPageSlug normalisation was introduced.
-const URL_SLUG_PREFIXES = ['insight:ctr_opportunity:', 'decay:'] as const;
+// Every source prefix that embeds a page slug must appear here.
+// If the slug computation for a prefix uses toPageSlug(), add it to this list
+// so migrateSourceKey() can normalise old recs that pre-date the change.
+const URL_SLUG_PREFIXES = ['insight:ctr_opportunity:', 'decay:', 'strategy:intent-mismatch:'] as const;
 
 /**
  * Migrate a stored source key that may embed a full URL slug to its normalised
@@ -994,7 +997,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       const { mismatch, reason } = isIntentMismatch(pageType, pk.searchIntent);
       if (!mismatch) continue;
       intentMismatchCount++;
-      const pageSlug = pk.pagePath.replace(/^\//, '');
+      const pageSlug = toPageSlug(pk.pagePath);
       recs.push({
         id: `rec_${crypto.randomBytes(6).toString('hex')}`,
         workspaceId,
