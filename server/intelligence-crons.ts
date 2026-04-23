@@ -5,6 +5,12 @@ import { createLogger } from './logger.js';
 import { listWorkspaces } from './workspaces.js';
 import { hasRecentActivity } from './activity-log.js';
 import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
+import { getConfiguredProvider } from './seo-data-provider.js';
+import {
+  getLatestCompetitorSnapshot, saveCompetitorSnapshot,
+  detectCompetitorAlerts, snapshotExistsForDate,
+} from './competitor-snapshot-store.js';
+import { upsertInsight } from './analytics-insights-store.js';
 
 const log = createLogger('intelligence-crons');
 const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
@@ -53,4 +59,66 @@ export function startIntelligenceCrons(): void {
 export function stopIntelligenceCrons(): void {
   if (startupTimeout) { clearTimeout(startupTimeout); startupTimeout = null; }
   if (refreshInterval) { clearInterval(refreshInterval); refreshInterval = null; }
+}
+
+export function startCompetitorMonitoringCron(): void {
+  const FIFTEEN_MIN_MS = 15 * 60 * 1000;
+  const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+
+  const t = setTimeout(() => {
+    void runCompetitorCheck();
+    const i = setInterval(() => { void runCompetitorCheck(); }, TWENTY_FOUR_HOURS_MS);
+    i.unref?.();
+  }, FIFTEEN_MIN_MS);
+  t.unref?.();
+}
+
+async function runCompetitorCheck(): Promise<void> {
+  // Only run on Monday (day 1)
+  if (new Date().getDay() !== 1) return;
+
+  const workspaces = listWorkspaces();
+  const today = new Date().toISOString().slice(0, 10);
+
+  for (const ws of workspaces) {
+    if (!ws.liveDomain || !ws.competitorDomains?.length || !ws.seoDataProvider) continue;
+    const provider = getConfiguredProvider(ws.seoDataProvider);
+    if (!provider?.isConfigured()) continue;
+
+    for (const domain of ws.competitorDomains) {
+      if (snapshotExistsForDate(ws.id, domain, today)) continue;
+      try {
+        const kwResults = await provider.getDomainKeywords(domain, ws.id, 50);
+        const topKeywords = kwResults.map(k => ({
+          keyword: k.keyword,
+          position: k.position ?? 0,
+          volume: k.volume,
+        }));
+        const current = saveCompetitorSnapshot(ws.id, domain, today, topKeywords, kwResults.length);
+        const previous = getLatestCompetitorSnapshot(ws.id, domain);
+        if (!previous || previous.snapshotDate === today) continue;
+        const alerts = detectCompetitorAlerts(ws.id, domain, current, previous);
+        for (const alert of alerts) {
+          upsertInsight({
+            workspaceId: ws.id,
+            pageId: null,
+            insightType: 'competitor_alert',
+            data: {
+              competitorDomain: alert.competitorDomain,
+              alertType: alert.alertType,
+              keyword: alert.keyword,
+              previousPosition: alert.previousPosition,
+              currentPosition: alert.currentPosition,
+              positionChange: alert.positionChange,
+              volume: alert.volume,
+              snapshotDate: alert.snapshotDate,
+            },
+            severity: alert.severity,
+          });
+        }
+      } catch (err) {
+        log.warn({ err, workspaceId: ws.id, domain }, 'Failed competitor monitoring check');
+      }
+    }
+  }
 }
