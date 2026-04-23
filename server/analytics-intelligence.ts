@@ -1340,10 +1340,10 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
     } catch (err) {
       log.warn({ err, workspaceId }, 'Failed to compute emerging keyword insights');
     }
-    // Always prune stale emerging_keyword rows — even when the provider is unconfigured
-    // (avoids orphaning rows from a previous run when the provider is later removed)
-    deleteStaleInsightsByType(workspaceId, 'emerging_keyword', cycleStart);
   }
+  // Always prune stale emerging_keyword rows — even when liveDomain is unset or provider is unconfigured
+  // (avoids orphaning rows from a previous run when liveDomain is later cleared)
+  deleteStaleInsightsByType(workspaceId, 'emerging_keyword', cycleStart);
 
   // Phase 6: Content freshness alerts — flag pages with stale keyword analysis + meaningful traffic
   {
@@ -1375,11 +1375,12 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
           severity: daysSince > 180 ? 'critical' : 'warning',
         });
       }
-      deleteStaleInsightsByType(workspaceId, 'freshness_alert', cycleStart);
       log.info({ workspaceId, count: stale.length }, 'Computed content freshness alerts');
     } catch (err) {
       log.warn({ err, workspaceId }, 'Failed to compute content freshness alerts');
     }
+    // Always prune stale freshness_alert rows — outside try so it runs even if listPageKeywords throws
+    deleteStaleInsightsByType(workspaceId, 'freshness_alert', cycleStart);
   }
 
   // Phase 3C: Conversion attribution (GA4 organic landing pages)
