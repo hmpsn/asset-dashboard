@@ -8,7 +8,7 @@ import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
 import {
   getLatestCompetitorSnapshot, saveCompetitorSnapshot,
-  detectCompetitorAlerts, snapshotExistsForDate,
+  detectCompetitorAlerts, snapshotExistsForDate, linkAlertToInsight,
 } from './competitor-snapshot-store.js';
 import { upsertInsight, deleteStaleInsightsByType } from './analytics-insights-store.js';
 
@@ -121,7 +121,7 @@ async function runCompetitorCheck(): Promise<void> {
           for (const alert of alerts) {
             // Use a stable unique pageId so each (domain, keyword) alert gets its own DB row
             const alertPageId = `competitor_alert::${alert.competitorDomain}::${alert.keyword ?? 'domain'}`;
-            upsertInsight({
+            const insight = upsertInsight({
               workspaceId: ws.id,
               pageId: alertPageId,
               insightType: 'competitor_alert',
@@ -137,6 +137,8 @@ async function runCompetitorCheck(): Promise<void> {
               },
               severity: alert.severity,
             });
+            // Link the alert row back to its insight for traceability
+            linkAlertToInsight(alert.id, insight.id, ws.id);
           }
         } catch (err) {
           log.warn({ err, workspaceId: ws.id, domain }, 'Failed competitor monitoring check');

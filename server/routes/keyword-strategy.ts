@@ -73,7 +73,12 @@ const recsInFlight = new Set<string>();
 const activeGenerations = new Set<string>();
 
 /** Composite opportunity score (0–100) for a content gap.
- *  Weights: volume 45%, ease-of-ranking 45%, GSC signal bonus 10%.
+ *  Weighted components of the raw score (pre-trend):
+ *    - volume:      vol/10000 capped at 1.0, × 0.45 → up to 0.45
+ *    - ease:        (1 − difficulty/100),    × 0.45 → up to 0.45
+ *    - GSC bonus:   impressions/2000 capped at 0.5, × 0.1 → up to 0.05
+ *  Max raw = 0.95 (the 5% headroom is intentional — GSC signal is an additive
+ *  bonus on top of volume/ease, not a co-equal component).
  *  Trend multiplier: rising ×1.3, declining ×0.7, stable ×1.0.
  *  Returns 0 when no signal data (volume, difficulty, impressions) is present. */
 export function computeOpportunityScore(cg: {

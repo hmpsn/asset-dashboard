@@ -1467,6 +1467,33 @@
           "priority": "P3",
           "notes": "detectCompetitorAlerts() in server/competitor-snapshot-store.ts both computes alerts AND inserts them into the competitor_alerts table as a side effect. This tight coupling makes the function hard to unit-test in isolation and violates the separation seen elsewhere (e.g. computePageHealthScores returns data without DB writes). Fix: split into computeCompetitorAlerts(current, previous, opts) returning CompetitorAlert[] (pure, no DB writes) and saveCompetitorAlerts(workspaceId, alerts) for the insert pass. Callers in intelligence-crons.ts call both in sequence.",
           "status": "pending"
+        },
+        {
+          "id": "analytics-intelligence-phase-reorder",
+          "title": "Move Phase 5 (emerging_keyword) and Phase 6 (freshness_alert) to after Phase 4 in analytics-intelligence.ts",
+          "source": "TECH DEBT \u2014 scaled code review on PR #267",
+          "est": "0.5h",
+          "priority": "P3",
+          "notes": "Phase 5 (line ~1309) and Phase 6 (line ~1349) are currently inserted between Phase 3B and Phase 3C, contradicting the new rule 8.3 in docs/rules/analytics-insights.md (phases must be appended after the last existing phase). Pure code motion \u2014 no logic change, no dependency conflicts. Deferred from PR #267 to avoid mixing functional bug fixes with pure reorder churn.",
+          "status": "pending"
+        },
+        {
+          "id": "freshness-detection-direct-test",
+          "title": "Add direct unit test for Phase 6 content freshness detection logic",
+          "source": "TECH DEBT \u2014 scaled code review on PR #267",
+          "est": "0.5h",
+          "priority": "P3",
+          "notes": "tests/integration/content-freshness.test.ts only validates the GET /api/public/insights endpoint accepts freshness_alert shapes \u2014 it does NOT actually run the Phase 6 detection filter. Mirror tests/unit/emerging-keywords.test.ts: extract the 90d+100impressions filter into a helper (or test the existing pageKws.filter logic by calling into analytics-intelligence via a test harness). Goal: confirm pages exactly at the 90/100 thresholds behave correctly and stale pages below MIN_IMPRESSIONS are excluded.",
+          "status": "pending"
+        },
+        {
+          "id": "insight-cards-empty-state-parity",
+          "title": "Unify empty-state behavior for new Tier 2 InsightCards (grid gap fix)",
+          "source": "UX \u2014 scaled code review on PR #267",
+          "est": "0.5h",
+          "priority": "P3",
+          "notes": "CompetitorAlertCard, EmergingKeywordCard, FreshnessAlertCard in src/components/client/InsightCards.tsx return null when no data is available for growth/premium tiers, breaking the 3-column grid (leaves 8 cards as 3+3+2). The original 6 cards always render with an empty state. Fix: give the new cards a lightweight empty state rather than returning null, or switch all 9 to conditional rendering so the grid is consistent. Pick one pattern.",
+          "status": "pending"
         }
       ]
     },
@@ -1482,7 +1509,7 @@
           "source": "SEO Tier 2 Capabilities plan",
           "est": "2-3h",
           "priority": "P1",
-          "notes": "Shipped 2026-04-23. computeOpportunityScore() exported from server/routes/keyword-strategy.ts. Scores content gaps 0\u2013100 by composing volume (40%), ease-of-ranking/KD inverse (30%), GSC impressions signal (20%), and trend multiplier (10% boost for \u226520% rising keywords). Results sorted descending in both admin ContentGaps.tsx and client StrategyTab.tsx with blue score badges.",
+          "notes": "Shipped 2026-04-23. computeOpportunityScore() exported from server/routes/keyword-strategy.ts. Scores content gaps 0\u2013100 by composing volume (45% weight, capped at 10K/mo), ease-of-ranking via 1\u2212KD/100 (45% weight), and a GSC impressions additive bonus (up to 5% of the raw score, capped at 2K impressions). A trend multiplier (\u00d71.3 rising / \u00d70.7 declining / \u00d71.0 stable) is applied last. Results sorted descending in both admin ContentGaps.tsx and client StrategyTab.tsx with blue score badges.",
           "status": "done",
           "shippedAt": "2026-04-23"
         },
