@@ -172,8 +172,7 @@ export interface FreshnessAlertData extends InsightDataBase {
   pagePath: string;
   lastAnalyzedAt: string;        // ISO timestamp of most recent keyword analysis
   daysSinceLastAnalysis: number;
-  /** Already a percentage if present. */
-  impressions?: number;          // 28d GSC impressions (proxy for traffic at risk)
+  impressions?: number;          // 28d GSC impressions (proxy for traffic at risk) — raw count, NOT a percentage
   clicks?: number;               // 28d GSC clicks
 }
 ```

@@ -151,6 +151,16 @@ function toClientInsight(insight: AnalyticsInsight): ClientInsight {
           impact: d.volume ? `${Number(d.volume).toLocaleString()} monthly searches at stake` : undefined,
         };
       }
+      if (d.alertType === 'keyword_lost') {
+        const posChange = (d.previousPosition != null && d.currentPosition != null)
+          ? `dropped from position ${d.previousPosition} to position ${d.currentPosition}`
+          : 'lost significant ground';
+        return {
+          headline: `Competitor losing ground on ${kw}`,
+          narrative: `${domain} ${posChange} for ${kw}. This opens an opportunity to capture visibility on a keyword where competition is weakening.`,
+          impact: d.volume ? `${Number(d.volume).toLocaleString()} monthly searches up for grabs` : undefined,
+        };
+      }
       if (d.alertType === 'new_keyword') {
         return {
           headline: `Competitor entered top results for ${kw}`,

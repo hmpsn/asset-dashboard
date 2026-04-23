@@ -10,7 +10,7 @@ import {
   getLatestCompetitorSnapshot, saveCompetitorSnapshot,
   detectCompetitorAlerts, snapshotExistsForDate,
 } from './competitor-snapshot-store.js';
-import { upsertInsight } from './analytics-insights-store.js';
+import { upsertInsight, deleteStaleInsightsByType } from './analytics-insights-store.js';
 
 const log = createLogger('intelligence-crons');
 const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
@@ -65,7 +65,7 @@ export function stopIntelligenceCrons(): void {
 }
 
 export function startCompetitorMonitoringCron(): void {
-  if (competitorInterval) return;
+  if (competitorInterval || competitorStartupTimeout) return;
   const FIFTEEN_MIN_MS = 15 * 60 * 1000;
   const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
@@ -91,11 +91,18 @@ async function runCompetitorCheck(): Promise<void> {
   try {
     const workspaces = listWorkspaces();
     const today = new Date().toISOString().slice(0, 10);
+    const cycleStart = new Date().toISOString();
 
     for (const ws of workspaces) {
-      if (!ws.liveDomain || !ws.competitorDomains?.length || !ws.seoDataProvider) continue;
+      if (!ws.liveDomain || !ws.competitorDomains?.length || !ws.seoDataProvider) {
+        deleteStaleInsightsByType(ws.id, 'competitor_alert', cycleStart);
+        continue;
+      }
       const provider = getConfiguredProvider(ws.seoDataProvider);
-      if (!provider?.isConfigured()) continue;
+      if (!provider?.isConfigured()) {
+        deleteStaleInsightsByType(ws.id, 'competitor_alert', cycleStart);
+        continue;
+      }
 
       for (const domain of ws.competitorDomains) {
         if (snapshotExistsForDate(ws.id, domain, today)) continue;
@@ -135,6 +142,8 @@ async function runCompetitorCheck(): Promise<void> {
           log.warn({ err, workspaceId: ws.id, domain }, 'Failed competitor monitoring check');
         }
       }
+      // Always prune stale competitor_alert rows — runs even when liveDomain/provider removed mid-week
+      deleteStaleInsightsByType(ws.id, 'competitor_alert', cycleStart);
     }
   } finally {
     isCompetitorRunning = false;
