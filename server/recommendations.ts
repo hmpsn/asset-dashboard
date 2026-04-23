@@ -24,6 +24,7 @@ import { loadDecayAnalysis } from './content-decay.js';
 import type { DecayingPage } from './content-decay.js';
 import { getDeclinedKeywords } from './keyword-feedback.js';
 import { listPageKeywords } from './page-keywords.js';
+import { getInsights } from './analytics-insights-store.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 
@@ -210,10 +211,14 @@ function isCriticalCheck(check: string): boolean {
   return CRITICAL_CHECKS.has(check);
 }
 
-function getTrafficScore(traffic: TrafficMap, slug: string): number {
+export function getTrafficScore(traffic: TrafficMap, slug: string, conversionRate?: number): number {
   const t = traffic[`/${slug}`] || traffic[slug];
   if (!t) return 0;
-  return t.clicks * 2 + t.impressions * 0.1 + t.pageviews;
+  const base = t.clicks * 2 + t.impressions * 0.1 + t.pageviews;
+  const convMultiplier = conversionRate && conversionRate > 2
+    ? Math.min(1.5, 1 + conversionRate / 20)
+    : 1;
+  return base * convMultiplier;
 }
 
 function getTrafficForSlug(traffic: TrafficMap, slug: string): { clicks: number; impressions: number } {
@@ -449,11 +454,23 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   const traffic = await fetchTrafficMap(ws);
   const strategy = ws.keywordStrategy;
 
+  // Build conversion rate map: slug → conversionRate (%)
+  // pageId for conversion_attribution insights is the landing page URL (e.g. "/plumbing")
+  const conversionMap = new Map<string, number>();
+  for (const insight of getInsights(workspaceId, 'conversion_attribution')) {
+    const data = insight.data as import('../shared/types/analytics.js').ConversionAttributionData;
+    if (data?.conversionRate != null && insight.pageId) {
+      // pageId is landing page URL — normalize to slug without leading slash
+      const slug = insight.pageId.replace(/^\//, '');
+      conversionMap.set(slug, data.conversionRate);
+    }
+  }
+
   // Compute max traffic score for normalization
   let maxTrafficScore = 1;
   if (audit) {
     for (const page of audit.audit.pages) {
-      const ts = getTrafficScore(traffic, page.slug);
+      const ts = getTrafficScore(traffic, page.slug, conversionMap.get(page.slug));
       if (ts > maxTrafficScore) maxTrafficScore = ts;
     }
   }
@@ -486,7 +503,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           });
         }
         const group = issueGroups.get(key)!;
-        const ts = getTrafficScore(traffic, page.slug);
+        const ts = getTrafficScore(traffic, page.slug, conversionMap.get(page.slug));
         const t = getTrafficForSlug(traffic, page.slug);
         group.pages.push({ slug: page.slug, pageTitle: page.slug, message: issue.message, recommendation: issue.recommendation });
         group.totalTrafficScore += ts;
@@ -514,7 +531,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
 
       // Sort affected pages by traffic (highest first)
       const sortedPages = group.pages
-        .map(p => ({ ...p, ts: getTrafficScore(traffic, p.slug) }))
+        .map(p => ({ ...p, ts: getTrafficScore(traffic, p.slug, conversionMap.get(p.slug)) }))
         .sort((a, b) => b.ts - a.ts);
 
       const impact: 'high' | 'medium' | 'low' =
