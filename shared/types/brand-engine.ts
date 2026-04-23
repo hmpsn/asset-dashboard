@@ -228,3 +228,19 @@ export const DEFAULT_TIER_MAP: Record<DeliverableType, DeliverableTier> = {
   objection_handling: 'premium',
   emotional_triggers: 'premium',
 };
+
+// ═══ VOICE CALIBRATION FEEDBACK ═══
+
+/**
+ * Per-variation user feedback captured during voice calibration.
+ * Stored as a JSON array in voice_calibration_sessions.variation_feedback_json.
+ * Must use parseJsonSafeArray at read boundaries (CLAUDE.md "Array validation from DB").
+ */
+export interface VoiceCalibrationVariationFeedback {
+  /** Index into the session's variations array (0-based). */
+  variationIndex: number;
+  /** User-authored feedback text (trimmed, 1–2000 chars). */
+  feedback: string;
+  /** ISO-8601 timestamp of the save. */
+  createdAt: string;
+}

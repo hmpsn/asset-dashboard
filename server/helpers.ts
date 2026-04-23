@@ -138,6 +138,37 @@ export function sanitizeString(val: unknown, maxLen = 500): string {
   return val.trim().slice(0, maxLen).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
 }
 
+const INTERNAL_ERROR_PATTERNS = [
+  /SQLITE_/i,
+  /ENOENT/,
+  /at\s+\S+:\d+/,          // stack frame
+  /\bdatabase\b/i,
+  /prepared statement/i,
+];
+
+/**
+ * Return the error message if safe to expose to the client, otherwise the
+ * generic fallback. Strips internal paths, DB errors, and oversize strings.
+ */
+export function sanitizeErrorMessage(err: unknown, fallback: string): string {
+  if (!(err instanceof Error)) return fallback;
+  if (err.message.length > 200) return fallback;
+  if (INTERNAL_ERROR_PATTERNS.some((re) => re.test(err.message))) return fallback;
+  return err.message;
+}
+
+/**
+ * Wrap untrusted text before injecting into an LLM prompt. Strips NULs and
+ * obvious control-token sequences, and envelopes the content so the model
+ * can be instructed to treat it as data, not instructions.
+ */
+export function sanitizeForPromptInjection(untrusted: string): string {
+  const cleaned = untrusted
+    .replace(/ /g, '')
+    .replace(/<\|[^|]*\|>/g, '[removed-control-token]');
+  return `<untrusted_user_content>\n${cleaned}\n</untrusted_user_content>`;
+}
+
 /** Validate that a value is one of the allowed options */
 export function validateEnum<T extends string>(val: unknown, allowed: T[], fallback: T): T {
   return allowed.includes(val as T) ? (val as T) : fallback;
