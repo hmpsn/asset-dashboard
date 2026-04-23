@@ -309,7 +309,7 @@ Return a JSON array of the keywords in ranked order (best first). Only return th
   if (!Array.isArray(ranked)) throw new Error('AI did not return an array');
 
   // Reorder candidates by AI ranking
-  const candidateMap = new Map(candidates.map(c => [c.keyword.toLowerCase(), c]));
+  const candidateMap = new Map(candidates.map(c => [c.keyword.toLowerCase(), c])); // map-dup-ok
   const reordered: KeywordCandidate[] = [];
 
   for (const kw of ranked) {

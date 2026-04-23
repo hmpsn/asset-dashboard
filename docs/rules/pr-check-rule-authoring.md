@@ -120,6 +120,7 @@ A rule without a hatch is a rule that will be deleted within 3 months.
 | Public-portal mutation without addActivity | `// activity-ok` | Endpoint is a read-only probe or activity logged upstream |
 | broadcastToWorkspace inside bridge callback | `// bridge-broadcast-ok` | Broadcast is separate from the bridge result |
 | Layout-driving state set in useEffect | `// effect-layout-ok` | State is not layout-driving (data fetch, animation, etc.) |
+| new Map from .toLowerCase() key without uniqueness proof | `// map-dup-ok` | Source array has one row per normalized key (API returning unique keywords) |
 
 ---
 

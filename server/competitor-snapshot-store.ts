@@ -159,8 +159,8 @@ export function detectCompetitorAlerts(
 ): CompetitorAlert[] {
   const { positionChangeThreshold = 5, minVolume = 100 } = opts;
   const alerts: CompetitorAlert[] = [];
-  const prevMap = new Map(previous.topKeywords.map(k => [k.keyword.toLowerCase(), k]));
-  const currMap = new Map(current.topKeywords.map(k => [k.keyword.toLowerCase(), k]));
+  const prevMap = new Map(previous.topKeywords.map(k => [k.keyword.toLowerCase(), k])); // map-dup-ok
+  const currMap = new Map(current.topKeywords.map(k => [k.keyword.toLowerCase(), k])); // map-dup-ok
 
   // keyword_gained, new_keyword: iterate current keywords
   for (const kw of current.topKeywords) {

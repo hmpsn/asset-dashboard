@@ -876,6 +876,29 @@ export const CHECKS: Check[] = [
     claudeMdRef: '#code-conventions',
   },
   {
+    // Catches the silent-overwrite bug class from PR #267: `new Map(arr.map(r => [key.toLowerCase(), v]))`
+    // keeps only the LAST entry when the source array has duplicate normalized keys.
+    // The canonical failure: GSC query×page data (one row per (query, page)) built this way,
+    // so `currentPosition` on emerging_keyword insights reflected an arbitrary page's position
+    // rather than the strongest ranking. Fix is to use `reduce` with a merge/min function.
+    //
+    // Scoped to `.toLowerCase()` keys because that's the distinctive signal of a normalizer
+    // that can collapse distinct source rows into the same key. Raw id keys are almost always
+    // unique by DB constraint; normalized-string keys are where the bug hides.
+    name: 'new Map from .toLowerCase() key without uniqueness proof',
+    // NOTE: BSD `grep -E` (macOS) doesn't support `\s` or `[^\]]`. Use POSIX
+    // classes instead: `[[:space:]]` and `[^]]`. Tested against all 14 known
+    // sites in server/ — all match.
+    pattern: 'new Map\\([^)]*\\.map\\([^)]*=>[[:space:]]*\\[[^]]*\\.toLowerCase\\(\\)',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    excludeLines: ['// map-dup-ok'],
+    message: 'new Map(arr.map(r => [key.toLowerCase(), v])) silently keeps the LAST entry on duplicate normalized keys. If the source array has one row per key (API returning unique keywords), add // map-dup-ok inline. If it can have multiple rows per key (GSC query×page, etc.), use reduce to merge/pick: arr.reduce<Map<K,V>>((m, r) => { const k = r.x.toLowerCase(); const existing = m.get(k); if (!existing || r.pos < existing.pos) m.set(k, r); return m; }, new Map()).',
+    severity: 'warn',
+    rationale: 'Silent-overwrite in Map construction from tuples — TypeScript cannot see the key collision, and the bug only manifests for a subset of input distributions.',
+    claudeMdRef: '#code-conventions',
+  },
+  {
     name: 'window.confirm() in client components',
     pattern: 'window\\.confirm\\(',
     fileGlobs: ['*.ts', '*.tsx'],

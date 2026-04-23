@@ -1287,7 +1287,7 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
     // --- Post-AI keyword validation via SEMRush bulk lookup ---
     // Optimization: check domain organic data + existing page_keywords before calling API
     if (provider && semrushMode !== 'none') {
-      const domainKwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k]));
+      const domainKwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k])); // map-dup-ok
       const existingPkLookup = new Map(
         listPageKeywords(ws.id)
           .filter(pk => pk.volume && pk.volume > 0)
@@ -1327,7 +1327,7 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
         try {
           const uniqueNeeds = [...new Set(needsApiLookup.map(k => k.toLowerCase()))];
           const metrics = await provider.getKeywordMetrics(uniqueNeeds.slice(0, 100), ws.id);
-          const metricMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m]));
+          const metricMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m])); // map-dup-ok
 
           let unvalidated = 0;
           for (const pm of allPageMappings) {
@@ -1711,7 +1711,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
     // Enrich pageMap with SEMRush volume/difficulty data
     if (semrushDomainData.length > 0) {
       // Build lookup: keyword → metrics
-      const kwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k]));
+      const kwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k])); // map-dup-ok
       for (const pm of strategy.pageMap) {
         // Skip pages with no primary keyword (declined filter may have cleared it, or AI omitted it)
         if (!pm.primaryKeyword) continue;
@@ -1777,7 +1777,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
       if (needsVolume.length > 0) {
         try {
           const metrics = await provider.getKeywordMetrics(needsVolume as string[], ws.id);
-          const metricMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m]));
+          const metricMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m])); // map-dup-ok
           for (const pm of strategy.pageMap) {
             if (!pm.volume) {
               const m = metricMap.get(pm.primaryKeyword.toLowerCase());
@@ -1801,7 +1801,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
       // competitor gaps, competitor keywords, GSC, related keywords), then domain organic
       // data, then bulk API fetch as last resort. The keyword pool is the richest source
       // because it aggregates all data gathered during this strategy run.
-      const domainKwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k]));
+      const domainKwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k])); // map-dup-ok
       const missingCgKws: string[] = [];
       let poolEnriched = 0;
       for (const cg of strategy.contentGaps) {
@@ -1830,7 +1830,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
       if (missingCgKws.length > 0 && provider && semrushMode !== 'none') {
         try {
           const cgMetrics = await provider.getKeywordMetrics(missingCgKws.slice(0, 30), ws.id);
-          const cgMap = new Map(cgMetrics.map(m => [m.keyword.toLowerCase(), m]));
+          const cgMap = new Map(cgMetrics.map(m => [m.keyword.toLowerCase(), m])); // map-dup-ok
           for (const cg of strategy.contentGaps) {
             if (cg.volume == null) {
               const m = cgMap.get(cg.targetKeyword.toLowerCase());
@@ -1879,7 +1879,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
 
     // Enrich content gaps with trend direction + SERP features from domain data
     if (strategy.contentGaps?.length && semrushDomainData.length > 0) {
-      const domainLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k]));
+      const domainLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k])); // map-dup-ok
       for (const cg of strategy.contentGaps) {
         const match = domainLookup.get(cg.targetKeyword.toLowerCase());
         if (match) {
@@ -2156,7 +2156,7 @@ Rules:
     // Enrich siteKeywords with volume/difficulty
     let siteKeywordMetrics: { keyword: string; volume: number; difficulty: number }[] = [];
     if (provider && semrushMode !== 'none' && strategy.siteKeywords?.length) {
-      const kwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k]));
+      const kwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k])); // map-dup-ok
       const found: typeof siteKeywordMetrics = [];
       const missing: string[] = [];
       for (const kw of strategy.siteKeywords) {

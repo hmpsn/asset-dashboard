@@ -383,7 +383,7 @@ router.post('/api/content-briefs/:workspaceId/validate-keywords', requireWorkspa
 
   try {
     const metrics = await bulkProvider.getKeywordMetrics(keywords.slice(0, 50), req.params.workspaceId);
-    const metricsMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m]));
+    const metricsMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m])); // map-dup-ok
 
     const results = keywords.slice(0, 50).map((kw: string) => {
       const m = metricsMap.get(kw.toLowerCase());
