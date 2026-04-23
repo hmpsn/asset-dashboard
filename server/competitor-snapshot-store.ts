@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('competitor-snapshot-store');
@@ -98,9 +99,7 @@ function rowToSnapshot(r: SnapshotRow): CompetitorSnapshot {
     snapshotDate: r.snapshot_date,
     keywordCount: r.keyword_count,
     organicTraffic: r.organic_traffic,
-    topKeywords: (() => {
-      try { return JSON.parse(r.top_keywords) as CompetitorTopKeyword[]; } catch { return []; }
-    })(),
+    topKeywords: parseJsonFallback<CompetitorTopKeyword[]>(r.top_keywords, []),
     createdAt: r.created_at,
   };
 }
