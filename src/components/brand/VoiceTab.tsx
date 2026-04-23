@@ -1108,6 +1108,7 @@ export function VoiceTab({ workspaceId }: { workspaceId: string }) {
       titleIcon={<Mic className="w-4 h-4 text-teal-400" />}
     >
       {/* Section tabs */}
+      {/* tab-deeplink-ok: VoiceTab section tabs (samples/calibration/analytics) are not externally deep-linked */}
       <TabBar
         tabs={sections}
         active={activeSection}
