@@ -135,7 +135,7 @@ function getPagesNeedingAnalysis<T extends { path: string }>(
   return { toAnalyze, toPreserve };
 }
 
-export function shouldFetchCompetitorData(ws: Workspace): boolean {
+export function shouldFetchCompetitorData(ws: Workspace, currentDomains?: string[]): boolean {
   if (!ws.competitorLastFetchedAt) return true;
 
   // Direct domain-change signal: re-fetch immediately if domains changed.
@@ -144,9 +144,11 @@ export function shouldFetchCompetitorData(ws: Workspace): boolean {
   // against current domains would always appear as a "change" and force a costly
   // API re-fetch on every workspace that had data fetched before the migration.
   if (ws.competitorDomainsAtLastFetch !== null && ws.competitorDomainsAtLastFetch !== undefined) {
-    const currentDomains = (ws.competitorDomains ?? []).slice().sort().join(',');
+    // Use caller-supplied domains when available (e.g. req.body.competitorDomains was just
+    // saved to DB but ws is the pre-save snapshot). Falls back to ws.competitorDomains.
+    const current = (currentDomains ?? ws.competitorDomains ?? []).slice().sort().join(',');
     const lastFetchDomains = ws.competitorDomainsAtLastFetch.slice().sort().join(',');
-    if (currentDomains !== lastFetchDomains) return true;
+    if (current !== lastFetchDomains) return true;
   }
 
   const cutoff = new Date(Date.now() - COMPETITOR_CACHE_DAYS * 24 * 60 * 60 * 1000);
@@ -698,7 +700,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
     // Competitor keyword data — used to enrich the keyword pool and give competitor proof to content gaps
     const competitorKeywordData: Array<{ keyword: string; volume: number; difficulty: number; domain: string; position: number; serpFeatures?: string }> = [];
 
-    const fetchCompetitors = strategyMode !== 'incremental' || shouldFetchCompetitorData(ws);
+    const fetchCompetitors = strategyMode !== 'incremental' || shouldFetchCompetitorData(ws, competitorDomains);
 
     // When skipping competitor fetch, carry forward previously stored data so the
     // strategy save doesn't wipe keywordGaps with undefined (data loss bug).
