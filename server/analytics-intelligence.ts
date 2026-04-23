@@ -1295,7 +1295,6 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
                 severity: insight.severity,
               });
             }
-            deleteStaleInsightsByType(workspaceId, 'competitor_gap', cycleStart);
             log.info({ workspaceId, count: Math.min(gapInsights.length, 30) }, 'Computed competitor gap insights');
           }
         }
@@ -1303,6 +1302,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
     } catch (err) {
       log.warn({ err, workspaceId }, 'Failed to compute competitor gap insights');
     }
+    deleteStaleInsightsByType(workspaceId, 'competitor_gap', cycleStart);
   }
 
   // Phase 5: Emerging keyword detection (SEMRush trend analysis)
