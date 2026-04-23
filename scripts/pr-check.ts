@@ -3896,6 +3896,7 @@ const manualChecks = [
   'Batch save endpoints (delete-all + reinsert): Map<id, preserved> built before delete to restore created_at, sort_order, and approval state',
   'Field semantics changed (not just renamed): grep every reader of `result.X` / `slice.X` / `intel.X`, every Zod schema, every test, and every JSDoc comment for the field. Update them in the same commit. The compiler will not catch a meaning change when the type stays `string` (see seo-context.brandVoiceBlock as the canonical example).',
   'useEffect external-sync: when copying a prop into local state on update, the dirty check must compare local state to a `useRef` of the last-synced prop, never to the live prop. Comparing against the live prop guarantees the sync never fires after an external update (see BrandscriptTab.SectionEditorCard).',
+  'In-place sort on shared arrays: any `.sort(` on a React Query result, a function parameter, or a prop must use `[...arr].sort(...)` to avoid mutating cached/shared state. Only safe to omit the spread when the array was just constructed locally (e.g. result of `.filter()` on a local variable that is not a prop/parameter). See docs/rules/analytics-insights.md §8.',
 ];
 for (const item of manualChecks) {
   console.log(`    [ ] ${item}`);
