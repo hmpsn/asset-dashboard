@@ -26,6 +26,7 @@ import { getDeclinedKeywords } from './keyword-feedback.js';
 import { listPageKeywords } from './page-keywords.js';
 import { getInsights } from './analytics-insights-store.js';
 import { listDiagnosticReports } from './diagnostic-store.js';
+import { getConfiguredProvider } from './seo-data-provider.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 
@@ -496,7 +497,6 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   let domainStrength = 0;
   if (ws.liveDomain) {
     try {
-      const { getConfiguredProvider } = await import('./seo-data-provider.js');
       const provider = getConfiguredProvider(ws.seoDataProvider);
       if (provider) {
         const overview = await provider.getDomainOverview(ws.liveDomain, workspaceId);
