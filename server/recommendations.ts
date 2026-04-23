@@ -426,6 +426,11 @@ const URL_SLUG_PREFIXES = ['insight:ctr_opportunity:', 'decay:', 'strategy:inten
  * Migrate a stored source key that may embed a full URL slug to its normalised
  * form. Safe to call on already-normalised keys — returns them unchanged.
  * Used only during the merge phase to match old recs against new ones.
+ *
+ * Operates on the raw `source` field only — never on composite merge keys
+ * (e.g. `strategy:foo::affectedPage`). For composite keys, use buildMergeKey,
+ * which applies this function to the source portion and toPageSlug() to the
+ * suffix portion separately.
  */
 function migrateSourceKey(source: string): string {
   for (const prefix of URL_SLUG_PREFIXES) {
@@ -436,6 +441,20 @@ function migrateSourceKey(source: string): string {
     }
   }
   return source;
+}
+
+/**
+ * Build the merge-lookup key for a rec. For strategy recs the key is a
+ * composite of `source::affectedPages[0]` (or title); for all others it's just
+ * the source. Both halves are normalised so old recs (pre-toPageSlug) and new
+ * recs produce matching keys, preserving in_progress/dismissed status across
+ * the one-time migration.
+ */
+function buildMergeKey(rec: { source: string; affectedPages: string[]; title: string }): string {
+  const source = migrateSourceKey(rec.source);
+  if (!source.startsWith('strategy:')) return source;
+  const page = rec.affectedPages[0] ? toPageSlug(rec.affectedPages[0]) : rec.title;
+  return `${source}::${page}`;
 }
 
 /** Weight impact score based on page type (homepage/service pages matter more) */
@@ -1191,19 +1210,15 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     // For strategy recs, use source + first affected page as key
     const existingByKey = new Map<string, Recommendation>();
     for (const oldRec of existing.recommendations) {
-      const rawKey = oldRec.source.startsWith('strategy:')
-        ? `${oldRec.source}::${oldRec.affectedPages[0] || oldRec.title}`
-        : oldRec.source;
-      // Migrate old recs whose source embeds a full URL slug (pre-toPageSlug)
-      // so they match newly-generated normalised keys and statuses are preserved.
-      existingByKey.set(migrateSourceKey(rawKey), oldRec);
+      // buildMergeKey migrates old recs whose source embeds a full URL slug
+      // (pre-toPageSlug) so they match newly-generated normalised keys and
+      // in_progress/dismissed statuses are preserved.
+      existingByKey.set(buildMergeKey(oldRec), oldRec);
     }
 
     const newSources = new Set<string>();
     for (const newRec of recs) {
-      const key = newRec.source.startsWith('strategy:')
-        ? `${newRec.source}::${newRec.affectedPages[0] || newRec.title}`
-        : newRec.source;
+      const key = buildMergeKey(newRec);
       newSources.add(key);
 
       // Preserve status from existing rec if it was in_progress or completed
@@ -1232,10 +1247,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       if (oldRec.status === 'completed' || oldRec.status === 'dismissed') continue;
       const category = getRecSourceCategory(oldRec.source);
       if (category && failedCategories.has(category)) continue;
-      const rawKey = oldRec.source.startsWith('strategy:')
-        ? `${oldRec.source}::${oldRec.affectedPages[0] || oldRec.title}`
-        : oldRec.source;
-      if (!newSources.has(migrateSourceKey(rawKey))) {
+      if (!newSources.has(buildMergeKey(oldRec))) {
         // Issue no longer detected — auto-resolve
         recs.push({
           ...oldRec,
