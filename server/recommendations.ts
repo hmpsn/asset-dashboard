@@ -877,7 +877,9 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           ? Math.round((cg.difficulty - 60) * 0.25) // -0 to -10 for very hard keywords
           : 0;
         const impactScore = Math.max(10, Math.min(100, baseScore + volumeBoost - difficultyPenalty));
-        const kdNote = cg.difficulty ? kdClassificationNote(cg.difficulty, domainStrength) : '';
+        // Use `!= null` (not truthy) so difficulty=0 (trivial keyword) is classified as
+        // "within-reach" by kdClassificationNote, matching adjustKdImpactScore above.
+        const kdNote = cg.difficulty != null ? kdClassificationNote(cg.difficulty, domainStrength) : '';
         recs.push({
           id: `rec_${crypto.randomBytes(6).toString('hex')}`,
           workspaceId,

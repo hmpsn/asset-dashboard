@@ -80,4 +80,12 @@ describe('kdClassificationNote — single source of truth with adjustKdImpactSco
     expect(adjustKdImpactScore(65, 30, 30)).toBe(65); // no adjustment
     expect(kdClassificationNote(30, 30)).toBe('');
   });
+  it('treats difficulty=0 as a valid (trivial) keyword, not as "unknown"', () => {
+    // Regression: kdNote used to use a truthy check `difficulty ? note : ''` which
+    // silently skipped the "within-reach" note when difficulty was 0.
+    // Both consumers must agree: difficulty=0 with known domainStrength is
+    // within-reach (kdGap = 0 - 50 = -50).
+    expect(adjustKdImpactScore(65, 0, 50)).toBe(Math.min(100, Math.round(65 * 1.2)));
+    expect(kdClassificationNote(0, 50)).toBe(' (KD 0 is well within reach for your domain)');
+  });
 });
