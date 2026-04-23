@@ -46,4 +46,17 @@ describe('suggestCopyRefresh — topQueries in prompt', () => {
     expect(capturedPrompt).toContain('best plumber near me');
     expect(capturedPrompt).toContain('pos 15.2');
   });
+
+  it('degrades gracefully when topQueries is absent — no query block, still generates', async () => {
+    capturedPrompt = '';
+    const { suggestCopyRefresh } = await import('../../server/copy-refresh.js');
+    const result = await suggestCopyRefresh(wsId, 'entry_x', {
+      url: '/plumbing',
+      decayType: 'click_decline',
+      severity: 'critical',
+      metrics: { clickDeclinePct: -60 },
+    });
+    expect(result).toBeDefined();
+    expect(capturedPrompt).not.toContain('Top search queries for this page');
+  });
 });

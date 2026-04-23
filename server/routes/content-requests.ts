@@ -189,12 +189,13 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
   if (!request) return res.status(404).json({ error: 'Request not found' });
 
   try {
-    // Gather GSC context if available
+    // Gather GSC context if available (fetched once, reused for relatedQueries + decayQueryContext below)
     let relatedQueries: { query: string; position: number; clicks: number; impressions: number }[] = [];
+    let cachedGscRows: Awaited<ReturnType<typeof getQueryPageData>> | null = null;
     if (ws.gscPropertyUrl && ws.webflowSiteId) {
       try {
-        const gscData = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90);
-        relatedQueries = gscData
+        cachedGscRows = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90);
+        relatedQueries = cachedGscRows
           .filter(r => { const q = r.query.toLowerCase(); return request.targetKeyword.toLowerCase().split(' ').some(w => w.length > 2 && q.includes(w)); })
           .slice(0, 20)
           .map(r => ({ query: sanitizeQueryForPrompt(r.query), position: r.position, clicks: r.clicks, impressions: r.impressions }));
@@ -245,7 +246,9 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
         const normalizeTarget = request.targetPageSlug.startsWith('/') ? request.targetPageSlug : `/${request.targetPageSlug}`;
         const decayPage = decay?.decayingPages.find(dp => dp.page === normalizeTarget);
         if (decayPage && ws.gscPropertyUrl && ws.webflowSiteId) {
-          const qpRows = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90, { maxRows: 500 });
+          // Reuse the 90-day GSC dataset fetched above — avoids a duplicate API call.
+          // Fall back to a fresh fetch only if the earlier call failed (cachedGscRows === null).
+          const qpRows = cachedGscRows ?? await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90, { maxRows: 500 });
           const pageQueries = qpRows
             .filter(r => { try { return new URL(r.page).pathname === decayPage.page; } catch { return false; } })
             .sort((a, b) => b.impressions - a.impressions)

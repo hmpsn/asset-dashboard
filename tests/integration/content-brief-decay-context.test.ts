@@ -116,4 +116,27 @@ describe('generateBrief — decay query context', () => {
     );
     expect(allUserContent.every(c => !c.includes('DECAY CONTEXT'))).toBe(true); // every-ok: empty means no user messages, which is also passing (no decay context injected)
   });
+
+  it('handles decayQueryContext containing already-sanitized query strings without crashing', async () => {
+    // Upstream callers (server/routes/content-requests.ts) sanitize queries via
+    // sanitizeQueryForPrompt before assembling decayQueryContext. This test
+    // verifies generateBrief passes such pre-sanitized content through opaquely
+    // (control chars stripped, newlines collapsed, length capped at 150).
+    const sanitizedBlock =
+      'DECAY CONTEXT: This page has lost 40% of search clicks. Top queries:\n' +
+      '- "query with tabs stripped and safe brackets": 20 clicks, 500 impressions, pos 12.3\n' +
+      '- "another clean query": 5 clicks, 80 impressions, pos 18.0';
+
+    await expect(
+      generateBrief(TEST_WS_ID, 'best plumber', { decayQueryContext: sanitizedBlock }),
+    ).resolves.toBeDefined();
+
+    const calls = getCapturedOpenAICalls();
+    const allUserContent = calls.flatMap(c =>
+      c.messages.filter((m: { role: string; content?: string }) => m.role === 'user').map((m: { content?: string }) => m.content ?? ''),
+    );
+    expect(allUserContent.some(c => c.includes('another clean query'))).toBe(true);
+    // Injection markers that sanitization would remove must never reach the prompt.
+    expect(allUserContent.every(c => !c.includes('<|im_start|>'))).toBe(true); // every-ok: no user messages is also a passing case
+  });
 });

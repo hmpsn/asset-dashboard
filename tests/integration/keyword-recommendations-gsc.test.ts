@@ -10,6 +10,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { getKeywordRecommendations, shouldIncludeKeywordCandidate } from '../../server/keyword-recommendations.js';
+import { getQueryPageData } from '../../server/search-console.js';
 
 // ── Mock search-console (hoisted by Vitest before any imports run) ────────────
 vi.mock('../../server/search-console.js', async (importOriginal) => {
@@ -71,5 +72,13 @@ describe('getKeywordRecommendations — GSC candidate enrichment', () => {
     expect(shouldIncludeKeywordCandidate('gsc', 5)).toBe(true);
     expect(shouldIncludeKeywordCandidate('semrush_related', 5)).toBe(false);
     expect(shouldIncludeKeywordCandidate('pattern', 0)).toBe(true);
+  });
+
+  it('degrades gracefully when GSC throws — still returns non-GSC candidates', async () => {
+    vi.mocked(getQueryPageData).mockRejectedValueOnce(new Error('GSC API down'));
+    const result = await getKeywordRecommendations(wsId, 'plumber');
+    expect(result).toBeDefined();
+    const gsc = result.candidates.filter(c => c.source === 'gsc');
+    expect(gsc.length).toBe(0);
   });
 });

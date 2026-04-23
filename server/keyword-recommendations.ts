@@ -149,8 +149,11 @@ export async function getKeywordRecommendations(
   if (ws?.gscPropertyUrl && ws?.webflowSiteId) {
     try {
       const gscRows = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90, { maxRows: 200 });
+      // Keep 2-char seed words (e.g. "AI", "UX") so short seeds don't fall through
+      // to the substring-match branch, which would match "email" for seed "AI".
+      // 1-char words are dropped as noise (stop-words like "a", "I").
       const seedWords = new Set(
-        seedKeyword.toLowerCase().split(/\s+/).filter(w => w.length > 2),
+        seedKeyword.toLowerCase().split(/\s+/).filter(w => w.length >= 2),
       );
       const relevantQueries = gscRows
         .filter(r => {
@@ -166,10 +169,15 @@ export async function getKeywordRecommendations(
       for (const r of relevantQueries) {
         const sanitizedQuery = sanitizeQueryForPrompt(r.query);
         if (!candidates.some(c => c.keyword.toLowerCase() === sanitizedQuery.toLowerCase())) {
+          // GSC impressions are 90-day site-specific impression counts, NOT monthly search volume.
+          // Two corrections to prevent GSC candidates from systematically outranking SEMRush ones:
+          //   1. Divide by 3 to approximate monthly exposure (still a proxy, not true search volume).
+          //   2. Use difficulty=50 (neutral) instead of 0 — a 0 difficulty grants a 45-pt bonus in
+          //      opportunityScore that GSC candidates have not earned.
           candidates.push({
             keyword: sanitizedQuery,
-            volume: r.impressions,
-            difficulty: 0,
+            volume: Math.max(1, Math.round(r.impressions / 3)),
+            difficulty: 50,
             cpc: 0,
             source: 'gsc',
             isRecommended: false,

@@ -87,8 +87,16 @@ export async function prefetchSemrushForTopPages(
 
   try {
     const existingPKs = listPageKeywords(workspaceId);
+    // Sort by traffic descending so slice(0, topN) returns the genuinely top pages,
+    // not whichever rows happened to be inserted first. Pages without clicks/impressions
+    // fall to the bottom (treated as 0).
     const withKeywords = existingPKs
       .filter(pk => pk.primaryKeyword && pk.primaryKeyword.trim().length > 0)
+      .sort((a, b) => {
+        const ac = a.clicks ?? 0, bc = b.clicks ?? 0;
+        if (ac !== bc) return bc - ac;
+        return (b.impressions ?? 0) - (a.impressions ?? 0);
+      })
       .slice(0, topN);
     if (withKeywords.length === 0) return cache;
 
