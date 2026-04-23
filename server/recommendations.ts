@@ -88,6 +88,18 @@ export function getRecoveryRate(checkName: string): RecoveryRate {
   return RECOVERY_RATES[checkName] || DEFAULT_RECOVERY;
 }
 
+/** Adjusts a content-gap impact score based on keyword difficulty vs domain strength.
+ * @internal exported for unit testing
+ */
+export function adjustKdImpactScore(baseScore: number, difficulty: number, domainStrength: number): number {
+  if (!domainStrength) return baseScore;
+  const kdGap = difficulty - domainStrength;
+  if (kdGap > 30)  return Math.round(baseScore * 0.6);
+  if (kdGap > 15)  return Math.round(baseScore * 0.8);
+  if (kdGap < -20) return Math.min(100, Math.round(baseScore * 1.2));
+  return baseScore;
+}
+
 // ─── Storage ──────────────────────────────────────────────────────
 
 interface RecSetRow {
@@ -454,6 +466,23 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   const traffic = await fetchTrafficMap(ws);
   const strategy = ws.keywordStrategy;
 
+  // Fetch domain strength for KD adjustment
+  let domainStrength = 0;
+  if (ws.liveDomain) {
+    try {
+      const { getConfiguredProvider } = await import('./seo-data-provider.js');
+      const provider = getConfiguredProvider(ws.seoDataProvider);
+      if (provider) {
+        const overview = await provider.getDomainOverview(ws.liveDomain, workspaceId);
+        if (overview) {
+          domainStrength = overview.organicKeywords >= 1000 ? 80
+            : overview.organicKeywords >= 100 ? 50
+            : 20;
+        }
+      }
+    } catch { /* non-critical */ }
+  }
+
   // Build conversion rate map: slug → conversionRate (%)
   // pageId for conversion_attribution insights is the landing page URL (e.g. "/plumbing")
   const conversionMap = new Map<string, number>();
@@ -672,7 +701,11 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         // 2C: skip if the target keyword was declined by the client
         if (cg.targetKeyword && declinedKeywords.has(cg.targetKeyword.toLowerCase())) continue;
 
-        const baseScore = cg.priority === 'high' ? 65 : cg.priority === 'medium' ? 45 : 25;
+        let baseScore = cg.priority === 'high' ? 65 : cg.priority === 'medium' ? 45 : 25;
+        // Apply authority-adjusted KD filtering
+        if (cg.difficulty != null) {
+          baseScore = adjustKdImpactScore(baseScore, cg.difficulty, domainStrength);
+        }
         // Boost impact score based on actual volume data when available
         const volumeBoost = cg.volume && cg.volume > 0
           ? Math.min(25, Math.round((Math.log10(cg.volume) / 5) * 25)) // up to +25 for high-volume gaps
@@ -681,6 +714,13 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           ? Math.round((cg.difficulty - 60) * 0.25) // -0 to -10 for very hard keywords
           : 0;
         const impactScore = Math.max(10, Math.min(100, baseScore + volumeBoost - difficultyPenalty));
+        const kdNote = cg.difficulty && domainStrength
+          ? (cg.difficulty - domainStrength > 15
+              ? ` (KD ${cg.difficulty} may be challenging — consider building authority first)`
+              : cg.difficulty - domainStrength < -20
+                ? ` (KD ${cg.difficulty} is well within reach for your domain)`
+                : '')
+          : '';
         recs.push({
           id: `rec_${crypto.randomBytes(6).toString('hex')}`,
           workspaceId,
@@ -696,7 +736,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           affectedPages: [],
           trafficAtRisk: 0,
           impressionsAtRisk: 0,
-          estimatedGain: `New ${cg.suggestedPageType || 'page'} targeting "${cg.targetKeyword}" (${cg.intent} intent)`,
+          estimatedGain: `New ${cg.suggestedPageType || 'page'} targeting "${cg.targetKeyword}" (${cg.intent} intent)${kdNote}`,
           actionType: 'content_creation',
           status: 'pending',
           assignedTo,
