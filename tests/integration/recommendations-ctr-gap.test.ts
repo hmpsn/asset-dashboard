@@ -65,7 +65,7 @@ describe('generateRecommendations — CTR gap', () => {
 
   it('creates a fix_now metadata rec for large CTR gaps', async () => {
     const set = await generateRecommendations(wsId);
-    const ctrRec = set.recommendations.find(r => r.source === 'insight:ctr_opportunity');
+    const ctrRec = set.recommendations.find(r => r.source?.startsWith('insight:ctr_opportunity:'));
     expect(ctrRec).toBeDefined();
     expect(ctrRec?.priority).toBe('fix_now');
     expect(ctrRec?.type).toBe('metadata');

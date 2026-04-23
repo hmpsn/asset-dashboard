@@ -513,13 +513,16 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   // Build conversion rate map: slug → conversionRate (%)
   // pageId for conversion_attribution insights is the landing page URL (e.g. "/plumbing")
   const conversionMap = new Map<string, number>();
-  for (const insight of getInsights(workspaceId, 'conversion_attribution')) {
-    const data = insight.data as ConversionAttributionData;
-    if (data?.conversionRate != null && insight.pageId) {
-      // pageId is landing page URL — normalize to slug without leading slash
-      const slug = insight.pageId.replace(/^\//, '');
-      conversionMap.set(slug, data.conversionRate);
+  try {
+    for (const insight of getInsights(workspaceId, 'conversion_attribution')) {
+      const data = insight.data as ConversionAttributionData;
+      if (data?.conversionRate != null && insight.pageId) {
+        const slug = insight.pageId.replace(/^\//, '');
+        conversionMap.set(slug, data.conversionRate);
+      }
     }
+  } catch (err) {
+    log.warn({ err }, 'Conversion attribution insights unavailable — skipping CVR boost');
   }
 
   // Compute max traffic score for normalization
@@ -921,6 +924,8 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       const d = insight.data as CtrOpportunityData;
       const pageSlug = (d.pageUrl ?? insight.pageId ?? '').replace(/^\//, '');
       const gap = d.estimatedClickGap ?? 0;
+      if (gap <= 0) continue;
+      const product = mapToProduct('metadata', 1);
       recs.push({
         id: `rec_${crypto.randomBytes(6).toString('hex')}`,
         workspaceId,
@@ -932,12 +937,14 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         impact: gap > 100 ? 'high' : gap > 30 ? 'medium' : 'low',
         effort: 'low',
         impactScore: Math.min(90, 40 + Math.round(gap / 2)),
-        source: 'insight:ctr_opportunity',
+        source: `insight:ctr_opportunity:${pageSlug}`,
         affectedPages: [pageSlug],
         trafficAtRisk: gap,
-        impressionsAtRisk: 0,
+        impressionsAtRisk: d.impressions ?? 0,
         estimatedGain: `Optimizing title/meta could recover ~${gap} clicks/mo`,
-        actionType: 'purchase',
+        actionType: product.productType ? 'purchase' : 'manual',
+        productType: product.productType,
+        productPrice: product.productPrice,
         status: 'pending',
         assignedTo,
         createdAt: now,
