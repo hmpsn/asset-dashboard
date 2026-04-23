@@ -26,7 +26,17 @@ let cleanupFree: () => void;
 let cleanupGrowth: () => void;
 
 beforeAll(async () => {
+  // Clear AI keys before spawning so the test server inherits a keyless env.
+  // I16 tests expect 5xx because the AI call throws when no key is present.
+  // Without this, a real key in the developer's shell would cause the AI call
+  // to succeed (200) and the tests would fail.
+  const savedOpenAI = process.env.OPENAI_API_KEY;
+  const savedAnthropic = process.env.ANTHROPIC_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+  delete process.env.ANTHROPIC_API_KEY;
   await ctx.startServer();
+  if (savedOpenAI !== undefined) process.env.OPENAI_API_KEY = savedOpenAI;
+  if (savedAnthropic !== undefined) process.env.ANTHROPIC_API_KEY = savedAnthropic;
 
   // Free-tier workspace: brandscript_generations limit = 0
   const free = seedWorkspace({ tier: 'free' });
