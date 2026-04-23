@@ -844,6 +844,48 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     log.warn({ err }, 'Content decay data unavailable for recommendations');
   }
 
+  // ── 4. CTR opportunity recommendations ──────────────────────────────────────
+  try {
+    const ctrInsights = getInsights(workspaceId, 'ctr_opportunity');
+    const topCtr = [...ctrInsights]
+      .sort((a, b) => {
+        const aGap = (a.data as import('../shared/types/analytics.js').CtrOpportunityData).estimatedClickGap ?? 0;
+        const bGap = (b.data as import('../shared/types/analytics.js').CtrOpportunityData).estimatedClickGap ?? 0;
+        return bGap - aGap;
+      })
+      .slice(0, 10);
+
+    for (const insight of topCtr) {
+      const d = insight.data as import('../shared/types/analytics.js').CtrOpportunityData;
+      const pageSlug = (d.pageUrl ?? insight.pageId ?? '').replace(/^\//, '');
+      const gap = d.estimatedClickGap ?? 0;
+      recs.push({
+        id: `rec_${crypto.randomBytes(6).toString('hex')}`,
+        workspaceId,
+        priority: gap > 50 ? 'fix_now' : 'fix_soon',
+        type: 'metadata',
+        title: `CTR Underperformance: /${pageSlug} (${d.actualCtr}% vs ${d.expectedCtr}% expected)`,
+        description: `This page gets ${d.impressions?.toLocaleString()} impressions/mo at position #${d.position?.toFixed(1)} but only ${d.actualCtr}% CTR (expected ~${d.expectedCtr}%). Improving the title and meta description could add ~${gap} clicks/mo.`,
+        insight: `CTR below expected for this position means the title/description isn't compelling enough to earn clicks. Target CTR for position ${d.position?.toFixed(1)} is ~${d.expectedCtr}%.`,
+        impact: gap > 100 ? 'high' : gap > 30 ? 'medium' : 'low',
+        effort: 'low',
+        impactScore: Math.min(90, 40 + Math.round(gap / 2)),
+        source: 'insight:ctr_opportunity',
+        affectedPages: [pageSlug],
+        trafficAtRisk: gap,
+        impressionsAtRisk: 0,
+        estimatedGain: `Optimizing title/meta could recover ~${gap} clicks/mo`,
+        actionType: 'purchase',
+        status: 'pending',
+        assignedTo,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+  } catch (err) {
+    log.warn({ err }, 'CTR opportunity insights unavailable for recommendations');
+  }
+
   // ── Build slug→pageId map from audit for resolving affectedPages ──
   const slugToPageId = new Map<string, string>();
   if (audit) {
