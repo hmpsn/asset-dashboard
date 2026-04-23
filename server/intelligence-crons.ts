@@ -104,6 +104,7 @@ async function runCompetitorCheck(): Promise<void> {
         continue;
       }
 
+      let anyDomainFailed = false;
       for (const domain of ws.competitorDomains) {
         if (snapshotExistsForDate(ws.id, domain, today)) continue;
         try {
@@ -141,11 +142,16 @@ async function runCompetitorCheck(): Promise<void> {
             linkAlertToInsight(alert.id, insight.id, ws.id);
           }
         } catch (err) {
+          anyDomainFailed = true;
           log.warn({ err, workspaceId: ws.id, domain }, 'Failed competitor monitoring check');
         }
       }
-      // Always prune stale competitor_alert rows — runs even when liveDomain/provider removed mid-week
-      deleteStaleInsightsByType(ws.id, 'competitor_alert', cycleStart);
+      // Skip stale cleanup if any domain failed — transient provider errors shouldn't wipe
+      // prior-week alerts that simply weren't refreshed this cycle. Mirrors the failedCategories
+      // guard in server/recommendations.ts:1237-1238.
+      if (!anyDomainFailed) {
+        deleteStaleInsightsByType(ws.id, 'competitor_alert', cycleStart);
+      }
     }
   } finally {
     isCompetitorRunning = false;

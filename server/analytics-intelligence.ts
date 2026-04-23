@@ -1314,9 +1314,14 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
         const domainKws = await apiCache.wrap(workspaceId, 'domainKeywords_emerging', {}, () =>
           provider.getDomainKeywords(ws.liveDomain!, workspaceId, 200),
         );
-        const gscLookup = new Map<string, number>(
-          normQueryPageData.map(r => [r.query.toLowerCase(), r.position]),
-        );
+        // A keyword can rank on multiple pages; keep the BEST (lowest) position so
+        // currentPosition reflects our strongest ranking, not an arbitrary last-seen page.
+        const gscLookup = normQueryPageData.reduce<Map<string, number>>((map, r) => {
+          const key = r.query.toLowerCase();
+          const existing = map.get(key);
+          if (existing === undefined || r.position < existing) map.set(key, r.position);
+          return map;
+        }, new Map());
         const emerging = domainKws.filter(
           kw => kw.volume >= 100 && isKeywordEmerging({ trend: kw.trend }),
         );
