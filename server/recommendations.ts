@@ -402,6 +402,19 @@ function determinePriority(
   return 'fix_later';
 }
 
+/**
+ * Normalise any URL or path value to a bare slug (no leading slash, no domain).
+ * GSC and GA4 both store pages as absolute URLs (https://domain.com/path).
+ * Decay analysis also stores absolute URLs in some code paths.
+ * All other callers pass relative paths (/foo or foo) — those work unchanged.
+ */
+function toPageSlug(url: string): string {
+  if (url.startsWith('http')) {
+    try { return new URL(url).pathname.replace(/^\//, ''); } catch { /* fall through */ }
+  }
+  return url.replace(/^\//, '');
+}
+
 /** Weight impact score based on page type (homepage/service pages matter more) */
 function pageImportanceMultiplier(slug: string): number {
   const s = slug.toLowerCase().replace(/^\//, '');
@@ -648,7 +661,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     for (const insight of getInsights(workspaceId, 'conversion_attribution')) {
       const data = insight.data as ConversionAttributionData;
       if (data?.conversionRate != null && insight.pageId) {
-        const slug = insight.pageId.replace(/^\//, '');
+        const slug = toPageSlug(insight.pageId);
         conversionMap.set(slug, data.conversionRate);
       }
     }
@@ -995,7 +1008,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       const actionableDecay = decayAnalysis.decayingPages.filter(p => p.severity === 'critical' || p.severity === 'warning');
 
       for (const dp of actionableDecay) {
-        const pageSlug = dp.page.replace(/^\//, '');
+        const pageSlug = toPageSlug(dp.page);
         const isHighTraffic = dp.previousClicks >= 100; // Was a meaningful traffic page
 
         const priority: RecPriority = dp.severity === 'critical' ? 'fix_now' : 'fix_soon';
@@ -1057,10 +1070,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
 
     for (const insight of topCtr) {
       const d = insight.data as CtrOpportunityData;
-      const rawPageUrl = d.pageUrl ?? insight.pageId ?? '';
-      const pageSlug = rawPageUrl.startsWith('http')
-        ? new URL(rawPageUrl).pathname.replace(/^\//, '')
-        : rawPageUrl.replace(/^\//, '');
+      const pageSlug = toPageSlug(d.pageUrl ?? insight.pageId ?? '');
       const gap = d.estimatedClickGap ?? 0;
       if (gap <= 0) continue;
       const product = mapToProduct('metadata', 1);
