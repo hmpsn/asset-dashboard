@@ -169,6 +169,38 @@ export const serpOpportunityDataSchema = z.object({
   schemaStatus: z.enum(['missing', 'partial', 'complete']),
 });
 
+/** EmergingKeywordData — Tier 2: trending keyword not yet targeted */
+export const emergingKeywordDataSchema = z.object({
+  keyword: z.string(),
+  volume: z.number(),
+  difficulty: z.number(),
+  trendData: z.array(z.number()).optional(),
+  currentPosition: z.number().optional(),
+  rankingUrl: z.string().optional(),
+  suggestedAngle: z.string().optional(),
+});
+
+/** CompetitorAlertData — Tier 2: competitor position change */
+export const competitorAlertDataSchema = z.object({
+  competitorDomain: z.string(),
+  alertType: z.enum(['keyword_gained', 'keyword_lost', 'authority_change', 'new_keyword']),
+  keyword: z.string().optional(),
+  previousPosition: z.number().optional(),
+  currentPosition: z.number().optional(),
+  positionChange: z.number().optional(),
+  volume: z.number().optional(),
+  snapshotDate: z.string(),
+});
+
+/** FreshnessAlertData — Tier 2: stale content via page_keywords age */
+export const freshnessAlertDataSchema = z.object({
+  pagePath: z.string(),
+  lastAnalyzedAt: z.string(),
+  daysSinceLastAnalysis: z.number(),
+  impressions: z.number().optional(),
+  clicks: z.number().optional(),
+});
+
 /**
  * Maps each InsightType to its DB-stored Zod schema.
  * Used by rowToInsight to validate the data JSON column via parseJsonSafe.
@@ -192,4 +224,7 @@ export const INSIGHT_DATA_SCHEMA_MAP: Record<InsightType, ZodTypeAny> = {
   anomaly_digest: anomalyDigestDataSchema.partial().passthrough(),
   audit_finding: auditFindingDataSchema.partial().passthrough(),
   site_health: siteHealthInsightDataSchema.partial().passthrough(),
+  emerging_keyword: emergingKeywordDataSchema.partial().passthrough(),
+  competitor_alert: competitorAlertDataSchema.partial().passthrough(),
+  freshness_alert: freshnessAlertDataSchema.partial().passthrough(),
 };

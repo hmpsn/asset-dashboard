@@ -94,6 +94,9 @@ export function classifyDomain(type: InsightType): InsightDomain {
     'ranking_opportunity',
     'serp_opportunity',
     'cannibalization',
+    'emerging_keyword',
+    'competitor_alert',
+    'freshness_alert',
   ];
 
   const trafficTypes: InsightType[] = [

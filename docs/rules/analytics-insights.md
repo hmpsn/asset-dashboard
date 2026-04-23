@@ -45,6 +45,9 @@ Expect hits in all 8 locations.
 | `anomaly_digest` | `AnomalyDigestData` | needs schema | Phase 2 |
 | `audit_finding` | `AuditFindingData` | needs schema | existing (bridge-generated per-page and site-level audit issues) |
 | `site_health` | `SiteHealthInsightData` | needs schema | existing (Bridge #15 — site-level audit health summary) |
+| `emerging_keyword` | `EmergingKeywordData` | ✓ | Tier 2 Phase 5 |
+| `competitor_alert` | `CompetitorAlertData` | ✓ | Tier 2 Phase 5 |
+| `freshness_alert` | `FreshnessAlertData` | ✓ | Tier 2 Phase 6 |
 
 ---
 
@@ -297,3 +300,85 @@ Before marking Phase 3 complete, verify ALL of the following:
 - [ ] `npx vitest run` — zero failures (full suite, not just new tests — Section 7.5)
 - [ ] `npm run typecheck` — zero errors
 - [ ] `npx vite build` — clean
+
+---
+
+## 8. Phase Authoring Conventions (Tier 2 Lessons)
+
+These rules apply when adding a new computation phase to `runIntelligenceCycle()` in
+`server/analytics-intelligence.ts`. Each maps to a real bug found in the Tier 2 scaled review.
+
+### 8.1 `pageId` Cardinality — Never `null` for Multi-Row Types
+
+Before choosing `pageId`, answer: **how many rows does this phase generate per workspace per cycle?**
+
+| Cardinality | Correct `pageId` | Wrong |
+|---|---|---|
+| Exactly one row per workspace | `null` (e.g. `anomaly_digest`) | |
+| One row per page/path | `p.pagePath` (e.g. `freshness_alert`) | `null` |
+| One row per keyword | `` `keyword_type::${kw.keyword}` `` (e.g. `emerging_keyword`) | `null` |
+| One row per domain+keyword | `` `alert_type::${domain}::${kw ?? 'domain'}` `` (e.g. `competitor_alert`) | `null` |
+
+**Why it matters:** the `analytics_insights` table has a UNIQUE constraint on
+`(workspace_id, COALESCE(page_id, '__workspace__'), insight_type)`. Passing `null` for
+a multi-row type silently collapses all rows to one — only the last upsert survives.
+This produces no TypeScript error and no runtime exception. The feed looks empty.
+
+### 8.2 Stale Cleanup Placement — Unconditional, Outside Try
+
+Every phase must prune rows from previous cycles using `deleteStaleInsightsByType()`.
+The placement must be:
+
+```typescript
+// ✅ Correct: outside the if-guard AND outside the try block
+if (ws.liveDomain) {
+  try {
+    // ... generate insights
+  } catch (err) {
+    log.warn({ err, workspaceId }, '...');
+  }
+}
+deleteStaleInsightsByType(workspaceId, 'your_type', cycleStart); // ← here
+
+// ✅ Also correct: unconditional block, delete after catch
+{
+  try {
+    // ... generate insights
+  } catch (err) {
+    log.warn({ err, workspaceId }, '...');
+  }
+  deleteStaleInsightsByType(workspaceId, 'your_type', cycleStart); // ← here, after catch
+}
+
+// ❌ Wrong: inside the if-guard (missed when liveDomain is cleared)
+if (ws.liveDomain) {
+  try { ... } catch { ... }
+  deleteStaleInsightsByType(...); // inside if — skipped when liveDomain removed
+}
+
+// ❌ Wrong: inside the try block (missed when listX() throws)
+try {
+  const pageKws = listPageKeywords(workspaceId);
+  // ... generate
+  deleteStaleInsightsByType(...); // inside try — skipped on any error above
+} catch { ... }
+```
+
+**Why it matters:** if a workspace previously had `liveDomain` set (or the provider configured)
+and generated insights, then the condition is later cleared, the cleanup is skipped every cycle
+and orphaned insights remain in the client feed indefinitely.
+
+### 8.3 Phase Numbering — Append New Phases at the End
+
+New phases must be appended after the last existing phase, not inserted between existing numbered
+phases. Out-of-sequence numbering (e.g. 3B → 5 → 6 → 3C → 4) makes the file hard to navigate
+and signals the phase was added hastily. Renumber all phases in the same commit if needed.
+
+### 8.4 JSDoc on Insight Data Fields — No "Percentage" Annotation on Raw Counts
+
+When documenting fields in `XData` interfaces in `shared/types/analytics.ts`, only apply the
+`/** Already a percentage (e.g., 6.3 for 6.3%). Do NOT multiply by 100. */` annotation to fields
+that are actually stored as percentages (e.g., CTR, change percent). Fields like `impressions`,
+`clicks`, `volume`, and `position` are raw counts/integers — annotating them as percentages
+causes future consumers to incorrectly divide by 100. If in doubt, add a `// units: raw count`
+or `// units: integer position` inline comment instead.

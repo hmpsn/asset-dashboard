@@ -240,7 +240,7 @@ export function updateMatrix(
   let cells: MatrixCell[];
   if (updates.dimensions && JSON.stringify(updates.dimensions) !== JSON.stringify(existing.dimensions)) {
     const newCells = generateCells(dimensions, urlPattern, keywordPattern);
-    const existingByKw = new Map(existing.cells.map(c => [c.targetKeyword.toLowerCase(), c]));
+    const existingByKw = new Map(existing.cells.map(c => [c.targetKeyword.toLowerCase(), c])); // map-dup-ok
     cells = newCells.map(nc => {
       const match = existingByKw.get(nc.targetKeyword.toLowerCase());
       if (match) {
