@@ -34,6 +34,7 @@ import { listPageKeywords } from '../page-keywords.js';
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
 import { isProgrammingError } from '../errors.js';
+import { loadDecayAnalysis } from '../content-decay.js';
 
 const log = createLogger('content-requests');
 
@@ -236,6 +237,29 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
       journeyStage: deriveJourneyStage(request.intent),
     };
 
+    // If this content request targets a page that's decaying, compile a decay-specific query context.
+    let decayQueryContext: string | undefined;
+    if (request.targetPageSlug) {
+      try {
+        const decay = loadDecayAnalysis(req.params.workspaceId);
+        const normalizeTarget = request.targetPageSlug.startsWith('/') ? request.targetPageSlug : `/${request.targetPageSlug}`;
+        const decayPage = decay?.decayingPages.find(dp => dp.page === normalizeTarget);
+        if (decayPage && ws.gscPropertyUrl && ws.webflowSiteId) {
+          const qpRows = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90, { maxRows: 500 });
+          const pageQueries = qpRows
+            .filter(r => { try { return new URL(r.page).pathname === decayPage.page; } catch { return false; } })
+            .sort((a, b) => b.impressions - a.impressions)
+            .slice(0, 15);
+          if (pageQueries.length > 0) {
+            decayQueryContext = `DECAY CONTEXT: This page has lost ${Math.abs(decayPage.clickDeclinePct)}% of search clicks. Top queries:\n` +
+              pageQueries.map(q => `- "${q.query}": ${q.clicks} clicks, ${q.impressions} impressions, pos ${q.position.toFixed(1)}`).join('\n');
+          }
+        }
+      } catch (err) {
+        log.debug({ err }, 'Decay query context enrichment failed — continuing without it');
+      }
+    }
+
     const brief = await generateBrief(req.params.workspaceId, request.targetKeyword, {
       relatedQueries,
       businessContext: ws.keywordStrategy?.businessContext || '',
@@ -246,6 +270,7 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
       pageType: request.pageType || 'blog',
       ga4PagePerformance,
       strategyCardContext,
+      decayQueryContext,
     });
 
     // Link brief to request and update status
