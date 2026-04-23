@@ -83,7 +83,7 @@ router.post('/api/brandscripts/:workspaceId/import', requireWorkspaceAccess('wor
     invalidateIntelligenceCache(req.params.workspaceId);
     res.json(bs);
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Import failed' });
+    res.status(500).json({ error: sanitizeErrorMessage(err, 'Import failed') });
   }
 });
 
