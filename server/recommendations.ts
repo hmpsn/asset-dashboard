@@ -25,6 +25,7 @@ import type { DecayingPage } from './content-decay.js';
 import { getDeclinedKeywords } from './keyword-feedback.js';
 import { listPageKeywords } from './page-keywords.js';
 import { getInsights } from './analytics-insights-store.js';
+import { listDiagnosticReports } from './diagnostic-store.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 
@@ -944,6 +945,48 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     }
   } catch (err) {
     log.warn({ err }, 'CTR opportunity insights unavailable for recommendations');
+  }
+
+  // ── 5. Diagnostic remediation recommendations ───────────────────────────────
+  try {
+    const reports = listDiagnosticReports(workspaceId);
+    const completedReports = reports
+      .filter(r => r.status === 'completed' && r.remediationActions?.length > 0)
+      .slice(0, 3);
+
+    const diagPriorityMap: Record<string, RecPriority> = { P0: 'fix_now', P1: 'fix_now', P2: 'fix_soon', P3: 'fix_later' };
+    const diagImpactMap: Record<string, number> = { high: 75, medium: 55, low: 35 };
+
+    for (const report of completedReports) {
+      for (const action of report.remediationActions.slice(0, 5)) {
+        const pageSlug = action.pageUrls?.[0]?.replace(/^\//, '') ?? '';
+        const recType: RecType = action.owner === 'content' ? 'content' : 'technical';
+        recs.push({
+          id: `rec_${crypto.randomBytes(6).toString('hex')}`,
+          workspaceId,
+          priority: diagPriorityMap[action.priority] ?? 'fix_soon',
+          type: recType,
+          title: `Diagnostic: ${action.title}`,
+          description: action.description,
+          insight: `Identified by deep diagnostic investigation (report ${report.id.slice(0, 8)}). ${action.description}`,
+          impact: action.impact,
+          effort: action.effort,
+          impactScore: diagImpactMap[action.impact] ?? 55,
+          source: `diagnostic:${report.id}:${action.title.slice(0, 30)}`,
+          affectedPages: action.pageUrls?.map((u: string) => u.replace(/^\//, '')) ?? [],
+          trafficAtRisk: 0,
+          impressionsAtRisk: 0,
+          estimatedGain: `Diagnostic-identified fix (${action.priority} priority, ${action.effort} effort)`,
+          actionType: 'manual',
+          status: 'pending',
+          assignedTo,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+    }
+  } catch (err) {
+    log.warn({ err }, 'Diagnostic reports unavailable for recommendations');
   }
 
   // ── Build slug→pageId map from audit for resolving affectedPages ──
