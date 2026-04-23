@@ -34,6 +34,7 @@ import { WS_EVENTS } from './ws-events.js';
 
 export type { RecPriority, RecType, RecStatus, RecActionType, Recommendation, RecommendationSet } from '../shared/types/recommendations.ts';
 import type { RecPriority, RecType, RecStatus, Recommendation, RecommendationSet } from '../shared/types/recommendations.ts';
+import type { ConversionAttributionData, CtrOpportunityData } from '../shared/types/analytics.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('recommendations');
@@ -513,7 +514,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   // pageId for conversion_attribution insights is the landing page URL (e.g. "/plumbing")
   const conversionMap = new Map<string, number>();
   for (const insight of getInsights(workspaceId, 'conversion_attribution')) {
-    const data = insight.data as import('../shared/types/analytics.js').ConversionAttributionData;
+    const data = insight.data as ConversionAttributionData;
     if (data?.conversionRate != null && insight.pageId) {
       // pageId is landing page URL — normalize to slug without leading slash
       const slug = insight.pageId.replace(/^\//, '');
@@ -814,11 +815,11 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     }
 
     // ── Intent mismatch detection ──────────────────────────────────────────────
-    // Reuse pageKeywords already fetched above (or fetch fresh if strategy block skipped)
-    const intentPageKws = strategy ? pageKeywords : listPageKeywords(workspaceId);
+    const intentPageKws = pageKeywords;
     let intentMismatchCount = 0;
     for (const pk of intentPageKws) {
-      if (!pk.searchIntent || intentMismatchCount >= 10) break;
+      if (intentMismatchCount >= 10) break;
+      if (!pk.searchIntent) continue;
       const pageType = inferPageType(pk.pagePath);
       const { mismatch, reason } = isIntentMismatch(pageType, pk.searchIntent);
       if (!mismatch) continue;
@@ -910,14 +911,14 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     const ctrInsights = getInsights(workspaceId, 'ctr_opportunity');
     const topCtr = [...ctrInsights]
       .sort((a, b) => {
-        const aGap = (a.data as import('../shared/types/analytics.js').CtrOpportunityData).estimatedClickGap ?? 0;
-        const bGap = (b.data as import('../shared/types/analytics.js').CtrOpportunityData).estimatedClickGap ?? 0;
+        const aGap = (a.data as CtrOpportunityData).estimatedClickGap ?? 0;
+        const bGap = (b.data as CtrOpportunityData).estimatedClickGap ?? 0;
         return bGap - aGap;
       })
       .slice(0, 10);
 
     for (const insight of topCtr) {
-      const d = insight.data as import('../shared/types/analytics.js').CtrOpportunityData;
+      const d = insight.data as CtrOpportunityData;
       const pageSlug = (d.pageUrl ?? insight.pageId ?? '').replace(/^\//, '');
       const gap = d.estimatedClickGap ?? 0;
       recs.push({
