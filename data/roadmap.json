@@ -3563,6 +3563,62 @@
       ]
     },
     {
+      "id": "sprint-rec-intelligence-tier1",
+      "name": "✅ SHIPPED — Recommendation Intelligence Tier 1",
+      "items": [
+        {
+          "id": 613,
+          "title": "CTR gap → title/meta recommendations (Item 1)",
+          "source": "SEO Recommendation Intelligence plan",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped 2026-04-23. Pulls ctr_opportunity insights from insight store, creates fix_now/fix_soon metadata recommendations for pages underperforming their expected CTR at their SERP position. Up to 10 per run sorted by click gap. Tested in tests/integration/recommendations-ctr-gap.test.ts (port 13335).",
+          "status": "done",
+          "shippedAt": "2026-04-23"
+        },
+        {
+          "id": 614,
+          "title": "Conversion-weighted traffic scoring (Item 2)",
+          "source": "SEO Recommendation Intelligence plan",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped 2026-04-23. getTrafficScore() now accepts optional conversionRate parameter. Pages with CVR > 2% receive up to 1.5x boost (proportional, capped). Conversion rates sourced from conversion_attribution insights. Applied to audit page scoring and sorting. Tested in tests/unit/recommendations-conversion.test.ts.",
+          "status": "done",
+          "shippedAt": "2026-04-23"
+        },
+        {
+          "id": 615,
+          "title": "Authority-adjusted KD filtering (Item 4)",
+          "source": "SEO Recommendation Intelligence plan",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped 2026-04-23. New adjustKdImpactScore() helper: KD 30+ above domain strength → 40% penalty, KD 15-30 above → 20% penalty, KD 20+ below → 20% boost (capped 100). Domain strength derived from SEMRush/DataForSEO organic keyword count. KD context appended to estimatedGain text. Tested in tests/unit/recommendations-authority-kd.test.ts.",
+          "status": "done",
+          "shippedAt": "2026-04-23"
+        },
+        {
+          "id": 616,
+          "title": "Search intent mismatch detection (Item 5)",
+          "source": "SEO Recommendation Intelligence plan",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped 2026-04-23. New inferPageType() classifies pages from slug patterns. isIntentMismatch() flags service/product pages targeting informational keywords and blog pages targeting transactional keywords. Emits fix_soon strategy recommendations, capped at 10 per run. Tested in tests/unit/recommendations-intent-mismatch.test.ts.",
+          "status": "done",
+          "shippedAt": "2026-04-23"
+        },
+        {
+          "id": 617,
+          "title": "Diagnostic remediation → auto-created recommendations (Item 6)",
+          "source": "SEO Recommendation Intelligence plan",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped 2026-04-23. Completed diagnostic reports with P0/P1 actions auto-generate fix_now recommendations (technical or content type based on action.owner). Up to 3 reports × 5 actions per run. Source keyed as diagnostic:{reportId}:{actionTitle} for merge stability. Tested in tests/integration/recommendations-diagnostic.test.ts (port 13337).",
+          "status": "done",
+          "shippedAt": "2026-04-23"
+        }
+      ]
+    },
+    {
       "id": "shipped-earlier",
       "name": "✅ SHIPPED — Earlier",
       "items": [

@@ -24,6 +24,9 @@ import { loadDecayAnalysis } from './content-decay.js';
 import type { DecayingPage } from './content-decay.js';
 import { getDeclinedKeywords } from './keyword-feedback.js';
 import { listPageKeywords } from './page-keywords.js';
+import { getInsights } from './analytics-insights-store.js';
+import { listDiagnosticReports } from './diagnostic-store.js';
+import { getConfiguredProvider } from './seo-data-provider.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 
@@ -31,6 +34,7 @@ import { WS_EVENTS } from './ws-events.js';
 
 export type { RecPriority, RecType, RecStatus, RecActionType, Recommendation, RecommendationSet } from '../shared/types/recommendations.ts';
 import type { RecPriority, RecType, RecStatus, Recommendation, RecommendationSet } from '../shared/types/recommendations.ts';
+import type { ConversionAttributionData, CtrOpportunityData } from '../shared/types/analytics.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('recommendations');
@@ -85,6 +89,149 @@ const RECOVERY_RATES: Record<string, RecoveryRate> = {
 
 export function getRecoveryRate(checkName: string): RecoveryRate {
   return RECOVERY_RATES[checkName] || DEFAULT_RECOVERY;
+}
+
+/** Classification of a keyword's difficulty relative to a domain's authority.
+ * Single source of truth for KD-gap boundaries — consumed by both
+ * `adjustKdImpactScore` (score multiplier) and `kdClassificationNote`
+ * (user-facing copy) so the boundaries can never drift.
+ * @internal exported for unit testing
+ */
+export type KdClassification = 'very-challenging' | 'challenging' | 'within-reach' | 'aligned';
+
+/** Classifies a keyword's difficulty vs. a domain's authority bucket.
+ * Returns `'aligned'` when domain strength is unknown (domainStrength === 0).
+ * Boundaries are inclusive at both ends so callers never see off-by-one drift.
+ * @internal exported for unit testing
+ */
+export function classifyKdGap(difficulty: number, domainStrength: number): KdClassification {
+  if (!domainStrength) return 'aligned';
+  const kdGap = difficulty - domainStrength;
+  if (kdGap >= 30)  return 'very-challenging';
+  if (kdGap >= 15)  return 'challenging';
+  if (kdGap <= -20) return 'within-reach';
+  return 'aligned';
+}
+
+/** Score multipliers per KD classification. Centralized so they stay in lockstep
+ * with `classifyKdGap` boundaries and the user-facing copy.
+ */
+const KD_SCORE_MULTIPLIER: Record<KdClassification, number> = {
+  'very-challenging': 0.6,
+  'challenging':      0.8,
+  'aligned':          1.0,
+  'within-reach':     1.2,
+};
+
+/** Adjusts a content-gap impact score based on keyword difficulty vs domain strength.
+ * @internal exported for unit testing
+ */
+export function adjustKdImpactScore(baseScore: number, difficulty: number, domainStrength: number): number {
+  const classification = classifyKdGap(difficulty, domainStrength);
+  const adjusted = Math.round(baseScore * KD_SCORE_MULTIPLIER[classification]);
+  return classification === 'within-reach' ? Math.min(100, adjusted) : adjusted;
+}
+
+/** Returns a user-facing KD note (prefixed with a leading space) matching the
+ * classification, or an empty string when no note is warranted. Consumes the
+ * same classifier as `adjustKdImpactScore` so note + score can never disagree.
+ * @internal exported for unit testing
+ */
+export function kdClassificationNote(difficulty: number, domainStrength: number): string {
+  switch (classifyKdGap(difficulty, domainStrength)) {
+    case 'very-challenging':
+    case 'challenging':
+      return ` (KD ${difficulty} may be challenging — consider building authority first)`;
+    case 'within-reach':
+      return ` (KD ${difficulty} is well within reach for your domain)`;
+    case 'aligned':
+      return '';
+  }
+}
+
+// ─── Recommendation source keys ────────────────────────────────────
+// Every rec carries a `source` string that uniquely identifies the
+// underlying signal. The merge logic relies on these strings being:
+//   (a) stable across runs for the same logical issue, so status carries
+//       over, and
+//   (b) distinct per-page for per-page categories, so fixing one page
+//       doesn't auto-resolve another.
+// Centralizing construction here prevents future code from accidentally
+// sharing a source key across unrelated issues (the #1 cause of the
+// "auto-resolved too eagerly" reviewer flag).
+
+/** Top-level category of a recommendation source. The category prefix
+ * determines how the merge logic matches the rec against its previous run.
+ * Keep this union in lockstep with `REC_SOURCE_CATEGORIES` below.
+ */
+export type RecSourceCategory =
+  | 'audit'
+  | 'strategy'
+  | 'decay'
+  | 'insight:ctr_opportunity'
+  | 'diagnostic';
+
+const REC_SOURCE_CATEGORIES: RecSourceCategory[] = [
+  'audit',
+  'strategy',
+  'decay',
+  'insight:ctr_opportunity',
+  'diagnostic',
+];
+
+/** Returns the category prefix for a given source string, or `null` when
+ * the source doesn't match a known category (defensive — should never
+ * happen in practice but prevents a rogue source string from bypassing
+ * the auto-resolve safety check).
+ */
+export function getRecSourceCategory(source: string): RecSourceCategory | null {
+  for (const category of REC_SOURCE_CATEGORIES) {
+    if (source === category || source.startsWith(`${category}:`)) return category;
+  }
+  return null;
+}
+
+/** Typed builders for rec source strings. Every source in `generateRecommendations`
+ * MUST flow through one of these so the category prefix and scoping are
+ * impossible to get wrong. Adding a new category is a deliberate, four-line
+ * change: add to the union, the array, the builder, and the caller.
+ */
+export const RecSource = {
+  audit:                  (check: string): string => `audit:${check}`,
+  auditSiteWide:          (check: string): string => `audit:site-wide:${check}`,
+  strategyContentGap:     (): string => 'strategy:content-gap',
+  strategyQuickWin:       (): string => 'strategy:quick-win',
+  strategyRankingOpp:     (): string => 'strategy:ranking-opportunity',
+  strategyIntentMismatch: (pageSlug: string): string => `strategy:intent-mismatch:${pageSlug}`,
+  decay:                  (pageSlug: string): string => `decay:${pageSlug}`,
+  ctrOpportunity:         (pageSlug: string): string => `insight:ctr_opportunity:${pageSlug}`,
+  diagnostic:             (reportId: string, actionIdx: number, actionTitle: string): string =>
+    `diagnostic:${reportId}:${actionIdx}:${actionTitle.slice(0, 20)}`,
+};
+
+/** Infer page type from slug path.
+ * @internal exported for unit testing
+ */
+export function inferPageType(slug: string): 'blog' | 'service' | 'landing' | 'product' | 'other' {
+  const s = slug.toLowerCase();
+  if (/(?:^|\/)(?:blog|articles?|news|posts?|guides?)/.test(s)) return 'blog';
+  if (/(?:^|\/)(?:services?|solutions?|offerings?)/.test(s)) return 'service';
+  if (/(?:^|\/)(?:products?|shop|store)/.test(s)) return 'product';
+  if (/(?:^|\/)(?:landing|lp[-_])/.test(s)) return 'landing';
+  return 'other';
+}
+
+/** Detect search intent mismatch between page type and targeted keyword intent.
+ * @internal exported for unit testing
+ */
+export function isIntentMismatch(pageType: string, searchIntent: string): { mismatch: boolean; reason: string } {
+  if ((pageType === 'service' || pageType === 'product') && searchIntent === 'informational') {
+    return { mismatch: true, reason: `This ${pageType} page targets an informational keyword — consider creating a blog post for the informational query and retargeting this page to a commercial/transactional keyword.` };
+  }
+  if (pageType === 'blog' && searchIntent === 'transactional') {
+    return { mismatch: true, reason: `This blog post targets a transactional keyword — consider creating a dedicated service/product page for this keyword instead.` };
+  }
+  return { mismatch: false, reason: '' };
 }
 
 // ─── Storage ──────────────────────────────────────────────────────
@@ -210,10 +357,14 @@ function isCriticalCheck(check: string): boolean {
   return CRITICAL_CHECKS.has(check);
 }
 
-function getTrafficScore(traffic: TrafficMap, slug: string): number {
+export function getTrafficScore(traffic: TrafficMap, slug: string, conversionRate?: number): number {
   const t = traffic[`/${slug}`] || traffic[slug];
   if (!t) return 0;
-  return t.clicks * 2 + t.impressions * 0.1 + t.pageviews;
+  const base = t.clicks * 2 + t.impressions * 0.1 + t.pageviews;
+  const convMultiplier = conversionRate && conversionRate > 2
+    ? Math.min(1.5, 1 + conversionRate / 20)
+    : 1;
+  return base * convMultiplier;
 }
 
 function getTrafficForSlug(traffic: TrafficMap, slug: string): { clicks: number; impressions: number } {
@@ -420,6 +571,36 @@ function strategyInsight(type: 'content_gap' | 'quick_win' | 'keyword_gap', item
   return '';
 }
 
+/** Resolves a workspace's domain-authority bucket once per rec-generation cycle.
+ *
+ * Returns an 80/50/20 bucket based on the provider's organic-keyword count, or
+ * `0` when the domain is unknown, the provider is unconfigured, the call
+ * throws, or the provider returns no data. `0` signals "authority unknown" to
+ * the KD classifier — callers fall back to the classification-free impact
+ * score, not a zero multiplier.
+ *
+ * API-credit note: the underlying `provider.getDomainOverview` call is cached
+ * at the provider layer (SQLite with TTL — see `CACHE_TTL_DOMAIN_OVERVIEW` in
+ * `server/semrush.ts`). First call per domain per TTL window costs ~10 credits;
+ * subsequent calls within the window cost 0. Isolating the call in this helper
+ * means there is exactly one call site per rec-gen cycle, regardless of how
+ * many individual recs consult `domainStrength`.
+ */
+async function resolveDomainStrength(ws: Workspace, workspaceId: string): Promise<number> {
+  if (!ws.liveDomain) return 0;
+  try {
+    const provider = getConfiguredProvider(ws.seoDataProvider);
+    if (!provider) return 0;
+    const overview = await provider.getDomainOverview(ws.liveDomain, workspaceId);
+    if (!overview) return 0;
+    if (overview.organicKeywords >= 1000) return 80;
+    if (overview.organicKeywords >= 100)  return 50;
+    return 20;
+  } catch { // catch-ok: non-critical — failure degrades to "authority unknown" and the KD classifier treats 0 as unknown
+    return 0;
+  }
+}
+
 function decayInsight(page: DecayingPage): string {
   const decline = Math.abs(page.clickDeclinePct);
   const clickDrop = page.previousClicks - page.currentClicks;
@@ -444,16 +625,42 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   const tier = ws.tier || 'free';
   const assignedTo: 'team' | 'client' = tier === 'premium' ? 'team' : 'client';
 
+  // Track categories whose data fetch failed this run so the merge logic can
+  // skip auto-resolving existing recs in those categories. Without this guard,
+  // a transient provider/store failure would silently mark every rec in the
+  // affected category as "completed" — the recurring "auto-resolved too
+  // eagerly" reviewer flag. Adding a category here requires the corresponding
+  // try/catch below to call `failedCategories.add(...)` on the catch path.
+  const failedCategories = new Set<RecSourceCategory>();
+
   // ── Fetch data sources ──
   const audit: AuditSnapshot | null = ws.webflowSiteId ? getLatestSnapshot(ws.webflowSiteId) : null;
   const traffic = await fetchTrafficMap(ws);
   const strategy = ws.keywordStrategy;
 
+  // Fetch domain strength once per rec-gen cycle (cached at provider layer; see resolveDomainStrength).
+  const domainStrength = await resolveDomainStrength(ws, workspaceId);
+
+  // Build conversion rate map: slug → conversionRate (%)
+  // pageId for conversion_attribution insights is the landing page URL (e.g. "/plumbing")
+  const conversionMap = new Map<string, number>();
+  try {
+    for (const insight of getInsights(workspaceId, 'conversion_attribution')) {
+      const data = insight.data as ConversionAttributionData;
+      if (data?.conversionRate != null && insight.pageId) {
+        const slug = insight.pageId.replace(/^\//, '');
+        conversionMap.set(slug, data.conversionRate);
+      }
+    }
+  } catch (err) {
+    log.warn({ err }, 'Conversion attribution insights unavailable — skipping CVR boost');
+  }
+
   // Compute max traffic score for normalization
   let maxTrafficScore = 1;
   if (audit) {
     for (const page of audit.audit.pages) {
-      const ts = getTrafficScore(traffic, page.slug);
+      const ts = getTrafficScore(traffic, page.slug, conversionMap.get(page.slug));
       if (ts > maxTrafficScore) maxTrafficScore = ts;
     }
   }
@@ -486,7 +693,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           });
         }
         const group = issueGroups.get(key)!;
-        const ts = getTrafficScore(traffic, page.slug);
+        const ts = getTrafficScore(traffic, page.slug, conversionMap.get(page.slug));
         const t = getTrafficForSlug(traffic, page.slug);
         group.pages.push({ slug: page.slug, pageTitle: page.slug, message: issue.message, recommendation: issue.recommendation });
         group.totalTrafficScore += ts;
@@ -514,7 +721,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
 
       // Sort affected pages by traffic (highest first)
       const sortedPages = group.pages
-        .map(p => ({ ...p, ts: getTrafficScore(traffic, p.slug) }))
+        .map(p => ({ ...p, ts: getTrafficScore(traffic, p.slug, conversionMap.get(p.slug)) }))
         .sort((a, b) => b.ts - a.ts);
 
       const impact: 'high' | 'medium' | 'low' =
@@ -541,7 +748,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         impact,
         effort,
         impactScore,
-        source: `audit:${group.check}`,
+        source: RecSource.audit(group.check),
         affectedPages: sortedPages.map(p => p.slug),
         trafficAtRisk: group.totalClicks,
         impressionsAtRisk: group.totalImpressions,
@@ -587,7 +794,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         impact: isCrit ? 'high' : 'medium',
         effort: 'low',
         impactScore,
-        source: `audit:site-wide:${issue.check}`,
+        source: RecSource.auditSiteWide(issue.check),
         affectedPages: pages.map(p => p.replace(/^\//, '')),
         trafficAtRisk: pageTraffic,
         impressionsAtRisk: pageImpressions,
@@ -635,7 +842,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           impact: qw.estimatedImpact as 'high' | 'medium' | 'low',
           effort: 'low',
           impactScore: adjustedScore,
-          source: 'strategy:quick-win',
+          source: RecSource.strategyQuickWin(),
           affectedPages: [qw.pagePath.replace(/^\//, '')],
           trafficAtRisk: t.clicks,
           impressionsAtRisk: t.impressions,
@@ -655,15 +862,24 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         // 2C: skip if the target keyword was declined by the client
         if (cg.targetKeyword && declinedKeywords.has(cg.targetKeyword.toLowerCase())) continue;
 
-        const baseScore = cg.priority === 'high' ? 65 : cg.priority === 'medium' ? 45 : 25;
+        let baseScore = cg.priority === 'high' ? 65 : cg.priority === 'medium' ? 45 : 25;
+        // Apply authority-adjusted KD filtering
+        if (cg.difficulty != null) {
+          baseScore = adjustKdImpactScore(baseScore, cg.difficulty, domainStrength);
+        }
         // Boost impact score based on actual volume data when available
         const volumeBoost = cg.volume && cg.volume > 0
           ? Math.min(25, Math.round((Math.log10(cg.volume) / 5) * 25)) // up to +25 for high-volume gaps
           : 0;
-        const difficultyPenalty = cg.difficulty && cg.difficulty > 60
+        // Only apply the flat difficulty penalty when domain strength is unknown
+        // (adjustKdImpactScore already handled the penalty when domainStrength > 0)
+        const difficultyPenalty = !domainStrength && cg.difficulty && cg.difficulty > 60
           ? Math.round((cg.difficulty - 60) * 0.25) // -0 to -10 for very hard keywords
           : 0;
         const impactScore = Math.max(10, Math.min(100, baseScore + volumeBoost - difficultyPenalty));
+        // Use `!= null` (not truthy) so difficulty=0 (trivial keyword) is classified as
+        // "within-reach" by kdClassificationNote, matching adjustKdImpactScore above.
+        const kdNote = cg.difficulty != null ? kdClassificationNote(cg.difficulty, domainStrength) : '';
         recs.push({
           id: `rec_${crypto.randomBytes(6).toString('hex')}`,
           workspaceId,
@@ -675,11 +891,11 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           impact: cg.priority as 'high' | 'medium' | 'low',
           effort: 'high',
           impactScore,
-          source: 'strategy:content-gap',
+          source: RecSource.strategyContentGap(),
           affectedPages: [],
           trafficAtRisk: 0,
           impressionsAtRisk: 0,
-          estimatedGain: `New ${cg.suggestedPageType || 'page'} targeting "${cg.targetKeyword}" (${cg.intent} intent)`,
+          estimatedGain: `New ${cg.suggestedPageType || 'page'} targeting "${cg.targetKeyword}" (${cg.intent} intent)${kdNote}`,
           actionType: 'content_creation',
           status: 'pending',
           assignedTo,
@@ -715,7 +931,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
             impact: pm.currentPosition <= 10 ? 'high' : 'medium',
             effort: 'medium',
             impactScore,
-            source: 'strategy:ranking-opportunity',
+            source: RecSource.strategyRankingOpp(),
             affectedPages: [pm.pagePath.replace(/^\//, '')],
             trafficAtRisk: pm.clicks || 0,
             impressionsAtRisk: pm.impressions || 0,
@@ -728,6 +944,46 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           });
         }
       }
+    }
+
+    // ── Intent mismatch detection ──────────────────────────────────────────────
+    // Intentionally nested inside `if (strategy)`: intent mismatches are only
+    // meaningful when the workspace has a keyword strategy that has populated
+    // `page_keywords` with `searchIntent`. Without a strategy, `pageKeywords`
+    // is empty and the loop is a no-op — but keeping this inside the strategy
+    // guard documents the dependency and avoids recurring reviewer flags.
+    const intentPageKws = pageKeywords;
+    let intentMismatchCount = 0;
+    for (const pk of intentPageKws) {
+      if (intentMismatchCount >= 10) break;
+      if (!pk.searchIntent) continue;
+      const pageType = inferPageType(pk.pagePath);
+      const { mismatch, reason } = isIntentMismatch(pageType, pk.searchIntent);
+      if (!mismatch) continue;
+      intentMismatchCount++;
+      const pageSlug = pk.pagePath.replace(/^\//, '');
+      recs.push({
+        id: `rec_${crypto.randomBytes(6).toString('hex')}`,
+        workspaceId,
+        priority: 'fix_soon',
+        type: 'strategy',
+        title: `Intent Mismatch: /${pageSlug} (${pageType} page targeting ${pk.searchIntent} keyword)`,
+        description: reason,
+        insight: `Pages rank better when page type matches search intent. ${reason}`,
+        impact: 'medium',
+        effort: 'medium',
+        impactScore: 50,
+        source: RecSource.strategyIntentMismatch(pageSlug),
+        affectedPages: [pageSlug],
+        trafficAtRisk: 0,
+        impressionsAtRisk: 0,
+        estimatedGain: 'Aligning page type with intent typically improves CTR and conversion rate',
+        actionType: 'manual',
+        status: 'pending',
+        assignedTo,
+        createdAt: now,
+        updatedAt: now,
+      });
     }
   }
 
@@ -762,7 +1018,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           impact: dp.severity === 'critical' ? 'high' : 'medium',
           effort: 'medium',
           impactScore,
-          source: `decay:${pageSlug}`,
+          source: RecSource.decay(pageSlug),
           affectedPages: [pageSlug],
           trafficAtRisk: dp.previousClicks,
           impressionsAtRisk: dp.previousImpressions,
@@ -784,7 +1040,98 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       }
     }
   } catch (err) {
+    failedCategories.add('decay');
     log.warn({ err }, 'Content decay data unavailable for recommendations');
+  }
+
+  // ── 4. CTR opportunity recommendations ──────────────────────────────────────
+  try {
+    const ctrInsights = getInsights(workspaceId, 'ctr_opportunity');
+    const topCtr = [...ctrInsights]
+      .sort((a, b) => {
+        const aGap = (a.data as CtrOpportunityData).estimatedClickGap ?? 0;
+        const bGap = (b.data as CtrOpportunityData).estimatedClickGap ?? 0;
+        return bGap - aGap;
+      })
+      .slice(0, 10);
+
+    for (const insight of topCtr) {
+      const d = insight.data as CtrOpportunityData;
+      const pageSlug = (d.pageUrl ?? insight.pageId ?? '').replace(/^\//, '');
+      const gap = d.estimatedClickGap ?? 0;
+      if (gap <= 0) continue;
+      const product = mapToProduct('metadata', 1);
+      recs.push({
+        id: `rec_${crypto.randomBytes(6).toString('hex')}`,
+        workspaceId,
+        priority: gap > 50 ? 'fix_now' : 'fix_soon',
+        type: 'metadata',
+        title: `CTR Underperformance: /${pageSlug} (${d.actualCtr}% vs ${d.expectedCtr}% expected)`,
+        description: `This page gets ${d.impressions?.toLocaleString()} impressions/mo at position #${d.position?.toFixed(1)} but only ${d.actualCtr}% CTR (expected ~${d.expectedCtr}%). Improving the title and meta description could add ~${gap} clicks/mo.`,
+        insight: `CTR below expected for this position means the title/description isn't compelling enough to earn clicks. Target CTR for position ${d.position?.toFixed(1)} is ~${d.expectedCtr}%.`,
+        impact: gap > 100 ? 'high' : gap > 30 ? 'medium' : 'low',
+        effort: 'low',
+        impactScore: Math.min(90, 40 + Math.round(gap / 2)),
+        source: RecSource.ctrOpportunity(pageSlug),
+        affectedPages: [pageSlug],
+        trafficAtRisk: gap,
+        impressionsAtRisk: d.impressions ?? 0,
+        estimatedGain: `Optimizing title/meta could recover ~${gap} clicks/mo`,
+        actionType: product.productType ? 'purchase' : 'manual',
+        productType: product.productType,
+        productPrice: product.productPrice,
+        status: 'pending',
+        assignedTo,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+  } catch (err) {
+    failedCategories.add('insight:ctr_opportunity');
+    log.warn({ err }, 'CTR opportunity insights unavailable for recommendations');
+  }
+
+  // ── 5. Diagnostic remediation recommendations ───────────────────────────────
+  try {
+    const reports = listDiagnosticReports(workspaceId);
+    const completedReports = reports
+      .filter(r => r.status === 'completed' && r.remediationActions?.length > 0)
+      .slice(0, 3);
+
+    const diagPriorityMap: Record<string, RecPriority> = { P0: 'fix_now', P1: 'fix_now', P2: 'fix_soon', P3: 'fix_later' };
+    const diagImpactMap: Record<string, number> = { high: 75, medium: 55, low: 35 };
+
+    for (const report of completedReports) {
+      for (let actionIdx = 0; actionIdx < Math.min(report.remediationActions.length, 5); actionIdx++) {
+        const action = report.remediationActions[actionIdx];
+        const recType: RecType = action.owner === 'content' ? 'content' : 'technical';
+        recs.push({
+          id: `rec_${crypto.randomBytes(6).toString('hex')}`,
+          workspaceId,
+          priority: diagPriorityMap[action.priority] ?? 'fix_soon',
+          type: recType,
+          title: `Diagnostic: ${action.title}`,
+          description: action.description,
+          insight: `Identified by deep diagnostic investigation (report ${report.id.slice(0, 8)}). ${action.description}`,
+          impact: action.impact,
+          effort: action.effort,
+          impactScore: diagImpactMap[action.impact] ?? 55,
+          source: RecSource.diagnostic(report.id, actionIdx, action.title),
+          affectedPages: action.pageUrls?.map((u: string) => u.replace(/^\//, '')) ?? [],
+          trafficAtRisk: 0,
+          impressionsAtRisk: 0,
+          estimatedGain: `Diagnostic-identified fix (${action.priority} priority, ${action.effort} effort)`,
+          actionType: 'manual',
+          status: 'pending',
+          assignedTo,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+    }
+  } catch (err) {
+    failedCategories.add('diagnostic');
+    log.warn({ err }, 'Diagnostic reports unavailable for recommendations');
   }
 
   // ── Build slug→pageId map from audit for resolving affectedPages ──
@@ -837,9 +1184,16 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     }
 
     // Auto-resolve: old pending/in_progress recs whose source is gone (issue fixed!)
+    // Safety: if the data source for a category failed this run (e.g. provider
+    // outage, diagnostic store unavailable), skip auto-resolving recs in that
+    // category — their absence from `newSources` is a fetch artifact, not a
+    // genuine fix. This prevents silent bulk-completion of real issues during
+    // transient failures.
     const autoResolvedRecs: typeof existing.recommendations = [];
     for (const oldRec of existing.recommendations) {
       if (oldRec.status === 'completed' || oldRec.status === 'dismissed') continue;
+      const category = getRecSourceCategory(oldRec.source);
+      if (category && failedCategories.has(category)) continue;
       const key = oldRec.source.startsWith('strategy:')
         ? `${oldRec.source}::${oldRec.affectedPages[0] || oldRec.title}`
         : oldRec.source;

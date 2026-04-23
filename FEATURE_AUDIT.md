@@ -660,9 +660,16 @@ A comprehensive value assessment of every feature in the platform — **310 feat
 ### 52. AI Recommendations Engine
 **What it does:** `server/recommendations.ts` generates traffic-weighted, prioritized SEO recommendations per workspace using audit data, GSC traffic, and AI analysis. Status-tracked (active → dismissed → completed). Auto-regenerated after every audit run. Client-facing `FixRecommendations.tsx` surfaces recommendations with severity badges and "Fix →" routing to appropriate tools. `InsightsEngine` on WorkspaceHome shows prioritized recommendations grouped by urgency. Recommendation flags appear in SEO Editor and Schema Generator via `useRecommendations` hook. Site-wide issues (duplicate titles, orphan pages, etc.) now list specific affected pages with traffic data instead of generic "affects all pages" messaging.
 
-**Agency value:** Automatically identifies the highest-impact SEO actions after every audit. No manual analysis needed — recommendations are prioritized by traffic impact.
+**Tier 1 recommendation intelligence enhancements (April 2026):**
+- **(Item 2) Conversion-weighted traffic scoring**: `getTrafficScore()` now accepts an optional `conversionRate` parameter. Pages with CVR > 2% receive up to a 1.5x traffic score boost (proportional to CVR, capped at 1.5x), ensuring high-converting pages are prioritized even with moderate traffic. Conversion rates sourced from `conversion_attribution` insights.
+- **(Item 4) Authority-adjusted KD filtering**: New `adjustKdImpactScore()` helper adjusts content-gap impact scores based on keyword difficulty vs. domain strength. KD 30+ points above domain strength → 40% penalty; KD 15-30 above → 20% penalty; KD 20+ below → 20% boost (capped 100). Domain strength derived from provider organic keyword count. KD context notes appended to `estimatedGain` text.
+- **(Item 1) CTR gap metadata recommendations**: Pulls `ctr_opportunity` insights from the insight store and creates `metadata` type recommendations for pages underperforming their expected CTR for their SERP position. Click gaps >50 → `fix_now`; >30 → `fix_soon`. Up to 10 per run sorted by click gap.
+- **(Item 5) Search intent mismatch detection**: `inferPageType()` classifies pages from slug patterns; `isIntentMismatch()` flags mismatches (service page targeting informational keyword, blog targeting transactional) and emits `strategy` type `fix_soon` recommendations. Capped at 10 per run.
+- **(Item 6) Diagnostic remediation auto-creation**: Completed diagnostic reports with P0/P1 remediation actions auto-generate `fix_now` `technical` or `content` recommendations. Up to 3 reports × 5 actions each per run.
 
-**Client value:** Clear, prioritized list of what to fix and why. Each recommendation links to the tool that can fix it.
+**Agency value:** Automatically identifies the highest-impact SEO actions after every audit. No manual analysis needed — recommendations are prioritized by traffic impact, domain authority, and diagnostic findings.
+
+**Client value:** Clear, prioritized list of what to fix and why. Each recommendation links to the tool that can fix it. Conversion-boosted scoring ensures money pages always surface to the top.
 
 **Mutual:** Ensures both sides focus on the changes that will have the most impact on traffic and rankings.
 
