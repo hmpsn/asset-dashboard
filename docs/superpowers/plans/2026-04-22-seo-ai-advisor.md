@@ -25,7 +25,7 @@ This is purely additive — no existing data shapes are broken, no compute cycle
 | Narration storage | `ai_narrative TEXT NULL` column on `analytics_insights` | 1:1 with insight, no join, backwards-compatible |
 | Narrative clearing | `ON CONFLICT DO UPDATE SET ai_narrative = CASE WHEN excluded.data != analytics_insights.data THEN NULL ELSE ai_narrative END` | Re-narrates only when insight data actually changes, not every cycle |
 | Enrichment timing | Fire-and-forget after `computeAndPersistInsights` | Insights visible immediately; narration arrives seconds later via broadcast |
-| Cost gating | Premium tier only (expand UI gated via `<TierGate>`) | Simple, no token budget tracking needed at current volume |
+| Cost gating | Premium tier only — server-side: `enrichInsightsWithAI` returns early if `ws.tier !== 'premium'` | Simpler than threading `tier` through `InsightsDigest`; non-Premium workspaces never receive `aiNarrative` so no frontend gate needed |
 | AI model | GPT-4.1-mini (OpenAI) | Short factual narrations, not prose — cost efficiency wins over creativity |
 | Provider call | `callAI({ provider: 'openai', ... })` from `server/ai.ts` | Unified dispatcher, workspaceId attribution |
 | Insights to narrate | Top 20 by `impact_score` that pass `isClientRelevant()` and have null `ai_narrative` | Matches what `buildClientInsights` displays (top 15), +5 buffer |
@@ -125,18 +125,24 @@ This clears the narrative only when the insight data actually changes.
 aiNarrative: row.ai_narrative ?? undefined,
 ```
 
-**4d — Add new `updateInsightNarrative` export** after `cloneInsightParams`:
+**4d — Add `updateNarrative` to the `stmts()` cache** inside the `createStmtCache` block (after `deleteById`):
+
+```typescript
+updateNarrative: db.prepare(
+  `UPDATE analytics_insights SET ai_narrative = ? WHERE id = ? AND workspace_id = ?`,
+),
+```
+
+**4e — Add new `updateInsightNarrative` export** after `cloneInsightParams`:
 
 ```typescript
 /** Update the AI-generated narrative for a single insight. Workspace-scoped for safety. */
 export function updateInsightNarrative(id: string, workspaceId: string, narrative: string): void {
-  db.prepare(
-    `UPDATE analytics_insights SET ai_narrative = ? WHERE id = ? AND workspace_id = ?`,
-  ).run(narrative, id, workspaceId);
+  stmts().updateNarrative.run(narrative, id, workspaceId);
 }
 ```
 
-Note: This is a one-off UPDATE (not a prepared statement cache), which is acceptable for the enrichment path (called once per insight per enrichment cycle, not in a tight loop).
+Note: Uses `stmts()` cache (not bare `db.prepare()`) to match the codebase's prepared statement pattern and avoid re-parsing on every call.
 
 ---
 
@@ -225,6 +231,9 @@ export async function enrichInsightsWithAI(workspaceId: string): Promise<number>
   try {
     const ws = getWorkspace(workspaceId);
     if (!ws) return 0;
+
+    // AI narration is Premium-only — non-Premium workspaces never receive aiNarrative
+    if (ws.tier !== 'premium') return 0;
 
     // Build business context once for the whole batch
     const industry = ws.intelligenceProfile?.industry ?? '';
@@ -332,16 +341,19 @@ function buildDataSummary(insightType: InsightType, data: Record<string, unknown
     case 'ranking_opportunity':
       return `Currently ranking around position ${data.position ?? 'unknown'}. Impressions: ${data.impressions ?? 0}. Close to page 1.`;
     case 'ctr_opportunity': {
-      const ctr = ((Number(data.ctr) || 0) * 100).toFixed(1);
-      const expected = ((Number(data.expectedCtr) || 0) * 100).toFixed(1);
-      return `Current CTR: ${ctr}%. Expected for this position: ${expected}%. Gap suggests title/meta improvement opportunity.`;
+      // actualCtr and expectedCtr are ALREADY percentages (e.g. 6.3 = 6.3%) — do NOT multiply by 100
+      const ctr = (Number(data.actualCtr) || 0).toFixed(1);
+      const expected = (Number(data.expectedCtr) || 0).toFixed(1);
+      return `Current CTR: ${ctr}%. Expected for this position: ${expected}%. Estimated click gap: ${data.estimatedClickGap ?? 0} clicks/month.`;
     }
     case 'page_health':
       return `Health score: ${data.score ?? 'unknown'}/100. Trend: ${data.trend ?? 'unknown'}.`;
     case 'serp_opportunity':
-      return `Eligible for SERP feature (${data.featureType ?? 'unknown'}). Currently not capturing this feature.`;
+      // schemaStatus is the relevant field — SerpOpportunityData has no featureType field
+      return `Schema status: ${data.schemaStatus ?? 'unknown'}. Page receives ${data.impressions ?? 0} impressions but could capture structured result features.`;
     case 'conversion_attribution':
-      return `Organic conversions: ${data.conversions ?? 0}. Conversion rate: ${((Number(data.conversionRate) || 0) * 100).toFixed(2)}%.`;
+      // conversionRate is ALREADY a percentage (e.g. 4.0 = 4%) — do NOT multiply by 100
+      return `Organic conversions: ${data.conversions ?? 0}. Conversion rate: ${(Number(data.conversionRate) || 0).toFixed(2)}%.`;
     case 'competitor_gap':
       return `Competitor ranks #${data.competitorPosition ?? '?'} for "${data.keyword ?? 'unknown'}" (${data.competitorDomain ?? 'competitor'}). We do not rank for this term.`;
     default:
@@ -418,30 +430,48 @@ In `src/hooks/useWsInvalidation.ts`, import `WS_EVENTS` already at top. Add a ha
 
 ### Step 3 — `InsightsDigest.tsx` expandable AI section
 
-The AI narrative renders as a Premium-gated expandable section inside each insight card. Find the inner card rendering loop in `InsightsDigest.tsx` — the component that maps over `visible` insights (line ~494+).
+**Context — how `InsightsDigest` works (READ THIS BEFORE EDITING):**
 
-Each insight card currently renders `headline`, `narrative`, and optionally `impact` and `actionTaken`. After the `actionTaken` block, add the AI section:
+`InsightsDigest.tsx` uses a local `DigestInsight` interface (not `ClientInsight` directly). Server insights flow through `mapServerInsights(serverData?.insights ?? [])` which converts `ClientInsight[]` → `DigestInsight[]`. The render loop maps over `visible: DigestInsight[]`. This means `aiNarrative` must be threaded through THREE places: `DigestInsight`, `mapServerInsights()`, and the render loop.
 
-```tsx
-{insight.aiNarrative && (
-  <TierGate
-    tier={tier}
-    requiredTier="premium"
-    fallback={null}
-  >
-    <AiNarrativeSection narrative={insight.aiNarrative} />
-  </TierGate>
-)}
+Additionally, the outer insight card is a `<button>` element. Nesting a `<button>` inside it is invalid HTML. The AI section must be a sibling element rendered OUTSIDE the card button, not inside it.
+
+No `TierGate` is needed — Premium gating is enforced server-side (see Task 1). Non-Premium workspaces never have `aiNarrative` populated, so the section simply never appears for them.
+
+**3a — Add `aiNarrative` to `DigestInsight` interface** (line ~22):
+
+```typescript
+interface DigestInsight {
+  id: string;
+  icon: LucideIcon;
+  color: string;
+  headline: string;
+  body: string;
+  detail?: string[];
+  action?: { label: string; tab: ClientTab };
+  priority: number;
+  sentiment: 'positive' | 'neutral' | 'negative' | 'opportunity';
+  aiNarrative?: string;   // ← add this field
+}
 ```
 
-Add the `AiNarrativeSection` component at the top of the file (before the main export):
+**3b — Pass `aiNarrative` through `mapServerInsights()`** (line ~421):
+
+In the returned object from `insights.map(i => ({ ... }))`, add:
+
+```typescript
+aiNarrative: i.aiNarrative,
+```
+
+**3c — Add `AiNarrativeSection` component** near the top of the file (before the main `InsightsDigest` export, after the existing helper functions):
 
 ```tsx
 function AiNarrativeSection({ narrative }: { narrative: string }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="mt-3 pt-3 border-t border-zinc-800">
+    <div className="mt-2 px-5 pb-4">
       <button
+        type="button"
         onClick={() => setOpen(v => !v)}
         className="flex items-center gap-1.5 text-xs text-teal-400 hover:text-teal-300 transition-colors"
       >
@@ -449,7 +479,7 @@ function AiNarrativeSection({ narrative }: { narrative: string }) {
         <ChevronDown size={12} className={open ? 'rotate-180 transition-transform' : 'transition-transform'} />
       </button>
       {open && (
-        <p className="mt-2 text-xs text-zinc-300 leading-relaxed">
+        <p className="mt-2 text-xs text-zinc-400 leading-relaxed">
           {narrative}
         </p>
       )}
@@ -458,11 +488,34 @@ function AiNarrativeSection({ narrative }: { narrative: string }) {
 }
 ```
 
-Add the `ChevronDown` import from `lucide-react` at the top with the existing lucide imports. Add `useState` to the React import if not already there.
+**3d — Update the render loop** to wrap the card `<button>` and the AI section in a single `<div>`:
 
-**Important:** `InsightsDigest.tsx` is large. Read the file before editing to confirm line numbers and the existing `tier` prop name. The `TierGate` component is already used elsewhere in the codebase — check existing imports in this file rather than adding a duplicate.
+Currently the render loop returns a bare `<button key={insight.id} ...>`. Wrap it so the AI section can be a sibling:
 
-**Check existing imports first:** `grep -n '^import' src/components/client/InsightsDigest.tsx` before adding any import.
+```tsx
+{visible.map(insight => {
+  const c = COLORS[insight.color] || COLORS.teal;
+  const Icon = insight.icon;
+  return (
+    <div key={insight.id}>
+      <button
+        onClick={() => insight.action && navigate(clientPath(props.workspaceId, insight.action.tab, betaMode))}
+        className="w-full bg-zinc-900 border border-zinc-800 p-5 text-left hover:border-zinc-700 transition-colors cursor-pointer group"
+        style={{ borderRadius: '10px 24px 10px 24px' }}
+      >
+        {/* existing card content — unchanged */}
+      </button>
+      {insight.aiNarrative && <AiNarrativeSection narrative={insight.aiNarrative} />}
+    </div>
+  );
+})}
+```
+
+Move the `key` prop from the `<button>` to the wrapping `<div>`. Keep all existing card content inside the `<button>` unchanged.
+
+**Check existing imports first:** `grep -n '^import' src/components/client/InsightsDigest.tsx`
+
+Add `ChevronDown` to the lucide-react import line if not already present. `useState` is already imported (line 1). Do NOT import `TierGate` — it is not needed.
 
 ---
 
