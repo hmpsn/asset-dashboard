@@ -1302,8 +1302,9 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
     } catch (err) {
       log.warn({ err, workspaceId }, 'Failed to compute competitor gap insights');
     }
-    deleteStaleInsightsByType(workspaceId, 'competitor_gap', cycleStart);
   }
+  // Always prune stale competitor_gap rows — outside liveDomain guard so cleanup runs when liveDomain is cleared
+  deleteStaleInsightsByType(workspaceId, 'competitor_gap', cycleStart);
 
   // Phase 5: Emerging keyword detection (SEMRush trend analysis)
   if (ws.liveDomain) {
@@ -1399,13 +1400,14 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
             severity: insight.severity,
           });
         }
-        deleteStaleInsightsByType(workspaceId, 'conversion_attribution', cycleStart);
         log.info({ workspaceId, count: Math.min(conversionInsights.length, 20) }, 'Computed conversion attribution insights');
       }
     } catch (err) {
       log.warn({ err, workspaceId }, 'Failed to compute conversion attribution insights');
     }
   }
+  // Always prune stale conversion_attribution rows — outside ga4Id guard so cleanup runs when GA4 is disconnected
+  deleteStaleInsightsByType(workspaceId, 'conversion_attribution', cycleStart);
 
   // Phase 4: New insight types
   if (normQueryPageData.length > 0 && normPrevQueryPageData.length > 0) {
