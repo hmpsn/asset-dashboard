@@ -740,7 +740,9 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         const volumeBoost = cg.volume && cg.volume > 0
           ? Math.min(25, Math.round((Math.log10(cg.volume) / 5) * 25)) // up to +25 for high-volume gaps
           : 0;
-        const difficultyPenalty = cg.difficulty && cg.difficulty > 60
+        // Only apply the flat difficulty penalty when domain strength is unknown
+        // (adjustKdImpactScore already handled the penalty when domainStrength > 0)
+        const difficultyPenalty = !domainStrength && cg.difficulty && cg.difficulty > 60
           ? Math.round((cg.difficulty - 60) * 0.25) // -0 to -10 for very hard keywords
           : 0;
         const impactScore = Math.max(10, Math.min(100, baseScore + volumeBoost - difficultyPenalty));
