@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 
-const ctx = createTestContext(13323);
+const ctx = createTestContext(13326); // port-ok: 13201-13325 fully allocated; extending range
 let capturedPrompt = '';
 
 vi.doMock('../../server/openai-helpers.js', async (orig) => {

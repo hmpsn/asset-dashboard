@@ -13,6 +13,7 @@ import { loadDecayAnalysis } from './content-decay.js';
 import { callOpenAI, parseAIJson } from './openai-helpers.js';
 import { createLogger } from './logger.js';
 import { getWorkspace } from './workspaces.js';
+import { getQueryPageData } from './search-console.js';
 import type { BlueprintEntry } from '../shared/types/page-strategy.js';
 import type { CopySection } from '../shared/types/copy-pipeline.js';
 const log = createLogger('copy-refresh');
@@ -301,7 +302,6 @@ export async function analyzeDecayForCopyRefresh(
   let gscQueryData: Array<{ query: string; page: string; clicks: number; impressions: number; position: number }> = [];
   if (ws?.gscPropertyUrl && ws?.webflowSiteId) {
     try {
-      const { getQueryPageData } = await import('./search-console.js');
       gscQueryData = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 90, { maxRows: 500 });
     } catch (err) {
       log.debug({ err, workspaceId }, 'GSC query data for copy refresh unavailable — continuing without it');

@@ -175,7 +175,7 @@ export async function getAllSitePages(ws: { id: string; webflowSiteId?: string; 
           } catch { /* skip malformed URL */ } // catch-ok
         }
       }
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-requests: programming error'); /* sitemap unavailable */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-requests: programming error'); /* sitemap unavailable */ } // url-fetch-ok
   }
 
   return Array.from(pageMap.values());
@@ -324,7 +324,7 @@ export async function handleContentPerformance(workspaceId: string): Promise<{
           gscPages.set(p.page, { clicks: p.clicks, impressions: p.impressions, ctr: p.ctr, position: p.position });
         }
       }
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-requests: programming error'); /* GSC unavailable */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-requests: programming error'); /* GSC unavailable */ } // url-fetch-ok
   }
 
   // Batch-fetch GA4 landing pages (one API call)

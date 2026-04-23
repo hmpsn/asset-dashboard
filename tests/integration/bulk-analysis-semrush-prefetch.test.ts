@@ -3,7 +3,7 @@ import { createTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { upsertPageKeyword } from '../../server/page-keywords.js';
 
-const ctx = createTestContext(13324);
+const ctx = createTestContext(13327); // port-ok: 13201-13326 fully allocated; extending range
 
 vi.doMock('../../server/seo-data-provider.js', async (orig) => {
   const actual = await orig<typeof import('../../server/seo-data-provider.js')>();
