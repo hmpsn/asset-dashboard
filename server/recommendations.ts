@@ -100,6 +100,31 @@ export function adjustKdImpactScore(baseScore: number, difficulty: number, domai
   return baseScore;
 }
 
+/** Infer page type from slug path.
+ * @internal exported for unit testing
+ */
+export function inferPageType(slug: string): 'blog' | 'service' | 'landing' | 'product' | 'other' {
+  const s = slug.toLowerCase();
+  if (/(?:^|\/)(?:blog|articles?|news|posts?|guides?)/.test(s)) return 'blog';
+  if (/(?:^|\/)(?:services?|solutions?|offerings?)/.test(s)) return 'service';
+  if (/(?:^|\/)(?:products?|shop|store)/.test(s)) return 'product';
+  if (/(?:^|\/)(?:landing|lp[-_])/.test(s)) return 'landing';
+  return 'other';
+}
+
+/** Detect search intent mismatch between page type and targeted keyword intent.
+ * @internal exported for unit testing
+ */
+export function isIntentMismatch(pageType: string, searchIntent: string): { mismatch: boolean; reason: string } {
+  if ((pageType === 'service' || pageType === 'product') && searchIntent === 'informational') {
+    return { mismatch: true, reason: `This ${pageType} page targets an informational keyword — consider creating a blog post for the informational query and retargeting this page to a commercial/transactional keyword.` };
+  }
+  if (pageType === 'blog' && searchIntent === 'transactional') {
+    return { mismatch: true, reason: `This blog post targets a transactional keyword — consider creating a dedicated service/product page for this keyword instead.` };
+  }
+  return { mismatch: false, reason: '' };
+}
+
 // ─── Storage ──────────────────────────────────────────────────────
 
 interface RecSetRow {
@@ -785,6 +810,41 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           });
         }
       }
+    }
+
+    // ── Intent mismatch detection ──────────────────────────────────────────────
+    // Reuse pageKeywords already fetched above (or fetch fresh if strategy block skipped)
+    const intentPageKws = strategy ? pageKeywords : listPageKeywords(workspaceId);
+    let intentMismatchCount = 0;
+    for (const pk of intentPageKws) {
+      if (!pk.searchIntent || intentMismatchCount >= 10) break;
+      const pageType = inferPageType(pk.pagePath);
+      const { mismatch, reason } = isIntentMismatch(pageType, pk.searchIntent);
+      if (!mismatch) continue;
+      intentMismatchCount++;
+      const pageSlug = pk.pagePath.replace(/^\//, '');
+      recs.push({
+        id: `rec_${crypto.randomBytes(6).toString('hex')}`,
+        workspaceId,
+        priority: 'fix_soon',
+        type: 'strategy',
+        title: `Intent Mismatch: /${pageSlug} (${pageType} page targeting ${pk.searchIntent} keyword)`,
+        description: reason,
+        insight: `Pages rank better when page type matches search intent. ${reason}`,
+        impact: 'medium',
+        effort: 'medium',
+        impactScore: 50,
+        source: `strategy:intent-mismatch:${pageSlug}`,
+        affectedPages: [pageSlug],
+        trafficAtRisk: 0,
+        impressionsAtRisk: 0,
+        estimatedGain: 'Aligning page type with intent typically improves CTR and conversion rate',
+        actionType: 'manual',
+        status: 'pending',
+        assignedTo,
+        createdAt: now,
+        updatedAt: now,
+      });
     }
   }
 
