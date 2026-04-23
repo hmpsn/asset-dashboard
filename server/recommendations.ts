@@ -402,6 +402,61 @@ function determinePriority(
   return 'fix_later';
 }
 
+/**
+ * Normalise any URL or path value to a bare slug (no leading slash, no domain).
+ * GSC and GA4 both store pages as absolute URLs (https://domain.com/path).
+ * Decay analysis also stores absolute URLs in some code paths.
+ * All other callers pass relative paths (/foo or foo) — those work unchanged.
+ */
+function toPageSlug(url: string): string {
+  if (url.startsWith('http')) {
+    try { return new URL(url).pathname.replace(/^\//, ''); } catch { /* fall through */ }
+  }
+  return url.replace(/^\//, '');
+}
+
+// Source prefixes whose slug portion may have been stored as an absolute URL
+// in recs generated before the toPageSlug normalisation was introduced.
+// Every source prefix that embeds a page slug must appear here.
+// If the slug computation for a prefix uses toPageSlug(), add it to this list
+// so migrateSourceKey() can normalise old recs that pre-date the change.
+const URL_SLUG_PREFIXES = ['insight:ctr_opportunity:', 'decay:', 'strategy:intent-mismatch:'] as const;
+
+/**
+ * Migrate a stored source key that may embed a full URL slug to its normalised
+ * form. Safe to call on already-normalised keys — returns them unchanged.
+ * Used only during the merge phase to match old recs against new ones.
+ *
+ * Operates on the raw `source` field only — never on composite merge keys
+ * (e.g. `strategy:foo::affectedPage`). For composite keys, use buildMergeKey,
+ * which applies this function to the source portion and toPageSlug() to the
+ * suffix portion separately.
+ */
+function migrateSourceKey(source: string): string {
+  for (const prefix of URL_SLUG_PREFIXES) {
+    if (source.startsWith(prefix)) {
+      const slug = source.slice(prefix.length);
+      const normalized = toPageSlug(slug);
+      return normalized !== slug ? `${prefix}${normalized}` : source;
+    }
+  }
+  return source;
+}
+
+/**
+ * Build the merge-lookup key for a rec. For strategy recs the key is a
+ * composite of `source::affectedPages[0]` (or title); for all others it's just
+ * the source. Both halves are normalised so old recs (pre-toPageSlug) and new
+ * recs produce matching keys, preserving in_progress/dismissed status across
+ * the one-time migration.
+ */
+function buildMergeKey(rec: { source: string; affectedPages: string[]; title: string }): string {
+  const source = migrateSourceKey(rec.source);
+  if (!source.startsWith('strategy:')) return source;
+  const page = rec.affectedPages[0] ? toPageSlug(rec.affectedPages[0]) : rec.title;
+  return `${source}::${page}`;
+}
+
 /** Weight impact score based on page type (homepage/service pages matter more) */
 function pageImportanceMultiplier(slug: string): number {
   const s = slug.toLowerCase().replace(/^\//, '');
@@ -648,7 +703,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     for (const insight of getInsights(workspaceId, 'conversion_attribution')) {
       const data = insight.data as ConversionAttributionData;
       if (data?.conversionRate != null && insight.pageId) {
-        const slug = insight.pageId.replace(/^\//, '');
+        const slug = toPageSlug(insight.pageId);
         conversionMap.set(slug, data.conversionRate);
       }
     }
@@ -961,7 +1016,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       const { mismatch, reason } = isIntentMismatch(pageType, pk.searchIntent);
       if (!mismatch) continue;
       intentMismatchCount++;
-      const pageSlug = pk.pagePath.replace(/^\//, '');
+      const pageSlug = toPageSlug(pk.pagePath);
       recs.push({
         id: `rec_${crypto.randomBytes(6).toString('hex')}`,
         workspaceId,
@@ -995,7 +1050,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       const actionableDecay = decayAnalysis.decayingPages.filter(p => p.severity === 'critical' || p.severity === 'warning');
 
       for (const dp of actionableDecay) {
-        const pageSlug = dp.page.replace(/^\//, '');
+        const pageSlug = toPageSlug(dp.page);
         const isHighTraffic = dp.previousClicks >= 100; // Was a meaningful traffic page
 
         const priority: RecPriority = dp.severity === 'critical' ? 'fix_now' : 'fix_soon';
@@ -1057,7 +1112,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
 
     for (const insight of topCtr) {
       const d = insight.data as CtrOpportunityData;
-      const pageSlug = (d.pageUrl ?? insight.pageId ?? '').replace(/^\//, '');
+      const pageSlug = toPageSlug(d.pageUrl ?? insight.pageId ?? '');
       const gap = d.estimatedClickGap ?? 0;
       if (gap <= 0) continue;
       const product = mapToProduct('metadata', 1);
@@ -1117,7 +1172,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
           effort: action.effort,
           impactScore: diagImpactMap[action.impact] ?? 55,
           source: RecSource.diagnostic(report.id, actionIdx, action.title),
-          affectedPages: action.pageUrls?.map((u: string) => u.replace(/^\//, '')) ?? [],
+          affectedPages: action.pageUrls?.map(toPageSlug) ?? [],
           trafficAtRisk: 0,
           impressionsAtRisk: 0,
           estimatedGain: `Diagnostic-identified fix (${action.priority} priority, ${action.effort} effort)`,
@@ -1155,17 +1210,15 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     // For strategy recs, use source + first affected page as key
     const existingByKey = new Map<string, Recommendation>();
     for (const oldRec of existing.recommendations) {
-      const key = oldRec.source.startsWith('strategy:')
-        ? `${oldRec.source}::${oldRec.affectedPages[0] || oldRec.title}`
-        : oldRec.source;
-      existingByKey.set(key, oldRec);
+      // buildMergeKey migrates old recs whose source embeds a full URL slug
+      // (pre-toPageSlug) so they match newly-generated normalised keys and
+      // in_progress/dismissed statuses are preserved.
+      existingByKey.set(buildMergeKey(oldRec), oldRec);
     }
 
     const newSources = new Set<string>();
     for (const newRec of recs) {
-      const key = newRec.source.startsWith('strategy:')
-        ? `${newRec.source}::${newRec.affectedPages[0] || newRec.title}`
-        : newRec.source;
+      const key = buildMergeKey(newRec);
       newSources.add(key);
 
       // Preserve status from existing rec if it was in_progress or completed
@@ -1194,10 +1247,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       if (oldRec.status === 'completed' || oldRec.status === 'dismissed') continue;
       const category = getRecSourceCategory(oldRec.source);
       if (category && failedCategories.has(category)) continue;
-      const key = oldRec.source.startsWith('strategy:')
-        ? `${oldRec.source}::${oldRec.affectedPages[0] || oldRec.title}`
-        : oldRec.source;
-      if (!newSources.has(key)) {
+      if (!newSources.has(buildMergeKey(oldRec))) {
         // Issue no longer detected — auto-resolve
         recs.push({
           ...oldRec,
