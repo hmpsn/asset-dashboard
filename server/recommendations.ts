@@ -959,7 +959,6 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
 
     for (const report of completedReports) {
       for (const action of report.remediationActions.slice(0, 5)) {
-        const pageSlug = action.pageUrls?.[0]?.replace(/^\//, '') ?? '';
         const recType: RecType = action.owner === 'content' ? 'content' : 'technical';
         recs.push({
           id: `rec_${crypto.randomBytes(6).toString('hex')}`,
