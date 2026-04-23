@@ -54,7 +54,7 @@ import {
   getBrandName,
 } from '../workspaces.js';
 import { getPageKeyword, listPageKeywords, upsertPageKeywordsBatch, clearAnalysisFields, countPageKeywords, countAnalyzedPages } from '../page-keywords.js';
-import { getConfiguredProvider } from '../seo-data-provider.js';
+import { getConfiguredProvider, getProviderDisplayName } from '../seo-data-provider.js';
 import { createLogger } from '../logger.js';
 import { debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { isFeatureEnabled } from '../feature-flags.js';
@@ -107,13 +107,14 @@ export async function prefetchSemrushForTopPages(
     for (const pk of withKeywords) {
       const m = metricsMap.get(pk.primaryKeyword!.toLowerCase());
       if (!m) continue;
-      let block = `\n\nREAL KEYWORD DATA (from SEMRush — use these exact values, do NOT estimate):\n`;
+      const providerLabel = getProviderDisplayName(provider.name);
+      let block = `\n\nREAL KEYWORD DATA (from ${providerLabel} — use these exact values, do NOT estimate):\n`;
       block += `- "${m.keyword}": vol ${m.volume.toLocaleString()}/mo, KD ${m.difficulty}/100, CPC $${m.cpc.toFixed(2)}, competition ${m.competition.toFixed(2)}`;
       const normalized = pk.pagePath.startsWith('/') ? pk.pagePath : `/${pk.pagePath}`;
       cache.set(normalized, block);
     }
-    log.info({ workspaceId, cached: cache.size, attempted: withKeywords.length },
-      'Pre-fetched SEMRush data for top pages in bulk analysis');
+    log.info({ workspaceId, cached: cache.size, attempted: withKeywords.length, provider: provider.name },
+      'Pre-fetched keyword data for top pages in bulk analysis');
   } catch (err) {
     log.debug({ err, workspaceId }, 'SEMRush pre-fetch for bulk analysis failed — continuing without it');
   }
