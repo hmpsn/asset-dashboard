@@ -22,7 +22,7 @@
   /* ─── Text ─── */
   --brand-text: #a1a1aa;
   --brand-text-bright: #e4e4e7;
-  --brand-text-muted: #71717a;
+  --brand-text-muted: #a1a1aa; /* alias for body text — intentional, per styleguide v9 */
   --brand-text-dim: #52525b;
 
   /* ─── Brand colors ─── */
@@ -162,7 +162,6 @@
   --scrollbar-thumb-hover: rgba(100, 116, 139, 0.75);
 
   /* Charts */
-  --chart-grid: #e2e8f0;
   --chart-tooltip-bg: #ffffff;
   --chart-tooltip-text: #0f172a;
   --metric-ring-track: #e2e8f0;

@@ -206,7 +206,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
               in_review: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
               in_progress: 'bg-teal-500/10 border-teal-500/30 text-teal-400',
               on_hold: 'bg-zinc-500/10 border-zinc-600 text-zinc-400',
-              completed: 'bg-green-500/10 border-green-500/30 text-emerald-400',
+              completed: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400',
               closed: 'bg-zinc-500/10 border-zinc-600 text-zinc-500',
             };
             const statusLabels: Record<string, string> = {

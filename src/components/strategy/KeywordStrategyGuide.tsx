@@ -58,7 +58,7 @@ const STEPS = [
     title: 'Interpret Rankings',
     icon: BarChart3,
     color: 'text-emerald-400',
-    bg: 'bg-green-500/10 border-green-500/20',
+    bg: 'bg-emerald-500/10 border-emerald-500/20',
     description: 'The rank distribution chart breaks down pages by position tier. Understanding this spread tells you where to focus effort first.',
     actions: [
       'Top 3 (emerald) — hold these positions; monitor for drops',

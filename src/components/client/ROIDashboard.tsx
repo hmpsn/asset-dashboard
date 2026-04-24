@@ -249,7 +249,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
                     <div className="flex items-center gap-3 mt-0.5">
                       <span className="text-[10px] text-teal-400/70">&ldquo;{item.targetKeyword}&rdquo;</span>
                       {item.targetPageSlug && <span className="text-[10px] text-zinc-500 font-mono">{item.targetPageSlug}</span>}
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${item.status === 'published' ? 'bg-teal-500/10 text-teal-400' : 'bg-green-500/10 text-emerald-400'}`}>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${item.status === 'published' ? 'bg-teal-500/10 text-teal-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
                         {item.status === 'published' ? 'Published' : 'Delivered'}
                       </span>
                       {item.source === 'matrix' && (

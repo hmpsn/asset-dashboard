@@ -98,7 +98,7 @@ const STEPS = [
     title: 'Monitor Impact',
     icon: TrendingUp,
     color: 'text-emerald-400',
-    bg: 'bg-green-500/10 border-green-500/20',
+    bg: 'bg-emerald-500/10 border-emerald-500/20',
     description: 'Track GSC metrics before vs after each schema deployment. See clicks, impressions, CTR, and position deltas.',
     actions: [
       'Check the Schema Impact panel (collapsible, below the main view)',

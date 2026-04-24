@@ -43,7 +43,7 @@ const ROLE_COLORS: Partial<Record<SchemaPageRole, string>> = {
   blog: 'bg-lime-500/15 text-lime-300 border-lime-500/30',
   about: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30',
   contact: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30',
-  location: 'bg-green-500/15 text-green-300 border-green-500/30',
+  location: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
   product: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
   partnership: 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30',
   faq: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
@@ -141,9 +141,9 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
     const map: Record<string, { label: string; cls: string }> = {
       draft: { label: 'Awaiting Review', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/30' },
       sent_to_client: { label: 'Ready for Review', cls: 'bg-teal-500/15 text-teal-300 border-teal-500/30' },
-      client_approved: { label: 'Approved', cls: 'bg-green-500/15 text-green-300 border-green-500/30' },
+      client_approved: { label: 'Approved', cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
       client_changes_requested: { label: 'Changes Requested', cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
-      active: { label: 'Active', cls: 'bg-green-500/15 text-green-300 border-green-500/30' },
+      active: { label: 'Active', cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
     };
     const s = map[status] || map.draft;
     return <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium border ${s.cls}`}>{s.label}</span>;
@@ -293,7 +293,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
                   <button
                     onClick={() => handleFeedback('approve')}
                     disabled={submitting}
-                    className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-500 text-white transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-sm font-medium bg-green-600 hover:bg-emerald-500 text-white transition-colors disabled:opacity-50"
                   >
                     {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
                     Approve Strategy
@@ -357,7 +357,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap justify-end">
                   {page.existingSchemas.length > 0 && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-emerald-400 border border-green-500/20">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                       {page.existingSchemas.length} live
                     </span>
                   )}

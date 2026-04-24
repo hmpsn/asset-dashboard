@@ -427,7 +427,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                                 </span>
                               )}
                               {isCompleted && (
-                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-emerald-400 flex items-center gap-0.5">
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center gap-0.5">
                                   <CheckCircle2 className="w-3 h-3" /> Done
                                 </span>
                               )}
@@ -517,7 +517,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                                   {rec.status === 'in_progress' && (
                                     <button
                                       onClick={() => handleStatusUpdate(rec.id, 'completed')}
-                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-green-600 hover:bg-green-500 text-white transition-colors"
+                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-green-600 hover:bg-emerald-500 text-white transition-colors"
                                     >
                                       <CheckCircle2 className="w-3 h-3" />
                                       Mark Complete
@@ -556,7 +556,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                                   ) : rec.status === 'in_progress' ? (
                                     <button
                                       onClick={() => handleStatusUpdate(rec.id, 'completed')}
-                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-green-600 hover:bg-green-500 text-white transition-colors"
+                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-green-600 hover:bg-emerald-500 text-white transition-colors"
                                     >
                                       <CheckCircle2 className="w-3 h-3" />
                                       Mark Done

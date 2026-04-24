@@ -64,7 +64,7 @@ const STATUS_OPTIONS: { value: RequestStatus; label: string; color: string }[] =
   { value: 'in_review', label: 'In Review', color: 'bg-amber-500/10 border-amber-500/30 text-amber-400' },
   { value: 'in_progress', label: 'In Progress', color: 'bg-teal-500/10 border-teal-500/30 text-teal-400' },
   { value: 'on_hold', label: 'On Hold', color: 'bg-zinc-500/10 border-zinc-600 text-zinc-400' },
-  { value: 'completed', label: 'Completed', color: 'bg-green-500/10 border-green-500/30 text-emerald-400' },
+  { value: 'completed', label: 'Completed', color: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' },
   { value: 'closed', label: 'Closed', color: 'bg-zinc-500/10 border-zinc-600 text-zinc-500' },
 ];
 

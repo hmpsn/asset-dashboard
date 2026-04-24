@@ -383,7 +383,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {kw.longTailKeywords.map((k, i) => (
-                              <span key={i} className="text-[11px] px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-emerald-400">
+                              <span key={i} className="text-[11px] px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
                                 {k}
                               </span>
                             ))}
@@ -441,7 +441,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                           </div>
                         )}
                         {kw.recommendations.length > 0 && (
-                          <div className="bg-zinc-900 rounded-lg p-3 border border-green-500/20">
+                          <div className="bg-zinc-900 rounded-lg p-3 border border-emerald-500/20">
                             <div className="flex items-center gap-2 mb-2">
                               <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
                               <span className="text-xs font-medium text-zinc-300">Recommendations</span>

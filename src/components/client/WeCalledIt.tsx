@@ -56,7 +56,7 @@ function WinCard({ entry }: { entry: OutcomeWinEntry }) {
       : 'your site';
 
   return (
-    <div className="border border-green-500/20 bg-green-500/5 rounded-xl p-4 space-y-3">
+    <div className="border border-emerald-500/20 bg-emerald-500/5 rounded-xl p-4 space-y-3">
       {/* Header */}
       <div className="flex items-start gap-2">
         <Lightbulb className="w-4 h-4 text-teal-400 flex-shrink-0 mt-0.5" />

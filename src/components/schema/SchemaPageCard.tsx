@@ -355,7 +355,7 @@ export function SchemaPageCard({
                   <div className="text-[11px] font-medium text-emerald-400/80 mb-1 flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-emerald-400/60" /> Suggested <ArrowRight className="w-3 h-3" />
                   </div>
-                  <pre className="text-xs font-mono bg-zinc-950 rounded-lg p-3 overflow-x-auto text-zinc-400 border border-green-500/20 max-h-64 overflow-y-auto whitespace-pre-wrap">
+                  <pre className="text-xs font-mono bg-zinc-950 rounded-lg p-3 overflow-x-auto text-zinc-400 border border-emerald-500/20 max-h-64 overflow-y-auto whitespace-pre-wrap">
                     {JSON.stringify(schema.template, null, 2)}
                   </pre>
                 </div>
@@ -403,7 +403,7 @@ export function SchemaPageCard({
                     <button
                       onClick={() => onPublish(page.pageId, getEffectiveSchema(page.pageId, schema.template))}
                       disabled={publishing || !!schemaParseError || validationStatus === 'errors'}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 bg-green-600 hover:bg-green-500 text-white"
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 bg-green-600 hover:bg-emerald-500 text-white"
                     >
                       {publishing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
                       Yes, publish

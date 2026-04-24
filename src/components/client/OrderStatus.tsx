@@ -28,7 +28,7 @@ const STEP_LABELS: Record<string, string> = { pending: 'Pending', in_progress: '
 const STATUS_BADGE: Record<string, { label: string; icon: typeof CheckCircle2; color: string; bg: string; border: string }> = {
   pending:     { label: 'Pending',     icon: Clock,        color: 'text-amber-400',  bg: 'bg-amber-500/10',  border: 'border-amber-500/20' },
   in_progress: { label: 'In Progress', icon: Loader2,      color: 'text-blue-400',   bg: 'bg-blue-500/10',   border: 'border-blue-500/20' },
-  completed:   { label: 'Completed',   icon: CheckCircle2, color: 'text-emerald-400',  bg: 'bg-green-500/10',  border: 'border-green-500/20' },
+  completed:   { label: 'Completed',   icon: CheckCircle2, color: 'text-emerald-400',  bg: 'bg-emerald-500/10',  border: 'border-emerald-500/20' },
   cancelled:   { label: 'Cancelled',   icon: Clock,        color: 'text-zinc-400',   bg: 'bg-zinc-500/10',   border: 'border-zinc-500/20' },
 };
 

@@ -155,7 +155,7 @@ export function BulkOperations({
                   <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-start">
                     <div className="text-[11px] text-red-400/80 bg-red-500/5 rounded px-2 py-1 font-mono leading-relaxed line-through">{item.oldValue || '(empty)'}</div>
                     <ArrowRight className="w-3 h-3 text-zinc-500 mt-1.5 flex-shrink-0" />
-                    <div className="text-[11px] text-emerald-400/80 bg-green-500/5 rounded px-2 py-1 font-mono leading-relaxed">{item.newValue} <span className="text-zinc-500">({item.newValue.length})</span></div>
+                    <div className="text-[11px] text-emerald-400/80 bg-emerald-500/5 rounded px-2 py-1 font-mono leading-relaxed">{item.newValue} <span className="text-zinc-500">({item.newValue.length})</span></div>
                   </div>
                 </div>
               );

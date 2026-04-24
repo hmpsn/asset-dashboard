@@ -32,7 +32,7 @@ export function WorkflowStepper({ steps, compact = false }: WorkflowStepperProps
           let ringClasses = '';
 
           if (step.completed) {
-            circleClasses = `bg-green-500/10 border-2 border-green-500/40 text-emerald-400`;
+            circleClasses = `bg-emerald-500/10 border-2 border-emerald-500/40 text-emerald-400`;
             labelClasses = `text-emerald-400 font-medium`;
           } else if (step.current) {
             circleClasses = `bg-teal-500/10 border-2 border-teal-500 text-teal-400`;

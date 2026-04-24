@@ -115,7 +115,7 @@ function kdLabel(kd?: number) {
 function intentColor(intent?: string) {
   switch (intent) {
     case 'commercial': return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
-    case 'informational': return 'text-emerald-400 bg-green-500/10 border-green-500/20';
+    case 'informational': return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
     case 'transactional': return 'text-amber-400 bg-amber-500/10 border-amber-500/20';
     case 'navigational': return 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20';
     default: return 'text-zinc-400 bg-zinc-500/10 border-zinc-500/20';
@@ -956,7 +956,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {kw.longTailKeywords.map((k, i) => (
-                              <span key={i} className="text-[11px] px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-emerald-400">{k}</span>
+                              <span key={i} className="text-[11px] px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">{k}</span>
                             ))}
                           </div>
                         </div>
@@ -1013,7 +1013,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                               </div>
                             )}
                             {kw.recommendations.length > 0 && (
-                              <div className="bg-zinc-900 p-3 border border-green-500/20" style={{ borderRadius: '6px 12px 6px 12px' }}>
+                              <div className="bg-zinc-900 p-3 border border-emerald-500/20" style={{ borderRadius: '6px 12px 6px 12px' }}>
                                 <div className="flex items-center gap-2 mb-2">
                                   <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
                                   <span className="text-xs font-medium text-zinc-300">Recommendations</span>

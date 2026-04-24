@@ -51,7 +51,7 @@ function getBarColor(bytes: number): string {
   if (bytes > 5 * 1024 * 1024) return 'bg-red-500';
   if (bytes > 2 * 1024 * 1024) return 'bg-orange-500';
   if (bytes > 1 * 1024 * 1024) return 'bg-amber-500';
-  return 'bg-green-500';
+  return 'bg-emerald-500';
 }
 
 function PageWeight({ siteId }: Props) {

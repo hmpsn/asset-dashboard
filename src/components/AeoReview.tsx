@@ -74,7 +74,7 @@ const CHANGE_TYPE_CONFIG: Record<AeoChangeType, { label: string; icon: typeof Sp
 };
 
 const EFFORT_CONFIG: Record<AeoEffort, { label: string; color: string; bg: string }> = {
-  quick:       { label: '< 15 min',  color: 'text-emerald-400',  bg: 'bg-green-500/10 border-green-500/20' },
+  quick:       { label: '< 15 min',  color: 'text-emerald-400',  bg: 'bg-emerald-500/10 border-emerald-500/20' },
   moderate:    { label: '15–60 min', color: 'text-amber-400',  bg: 'bg-amber-500/10 border-amber-500/20' },
   significant: { label: '1+ hours',  color: 'text-red-400',    bg: 'bg-red-500/10 border-red-500/20' },
 };

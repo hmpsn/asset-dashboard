@@ -365,7 +365,7 @@ export function RedirectManager({ siteId }: Props) {
                 <div className="text-[11px] text-zinc-500 mb-2">{rule.reason}</div>
                 {!rule.accepted && editingRule !== rule.from && (
                   <div className="flex items-center gap-1.5">
-                    <button onClick={() => acceptRule(rule.from)} className="flex items-center gap-1 px-2.5 py-1 bg-green-600/80 hover:bg-green-500 rounded text-[11px] font-medium text-white transition-colors">
+                    <button onClick={() => acceptRule(rule.from)} className="flex items-center gap-1 px-2.5 py-1 bg-green-600/80 hover:bg-emerald-500 rounded text-[11px] font-medium text-white transition-colors">
                       <Check className="w-3 h-3" /> Accept
                     </button>
                     <button onClick={() => { setEditingRule(rule.from); setEditDraft(rule.to); }} className="flex items-center gap-1 px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-[11px] font-medium text-zinc-300 transition-colors">

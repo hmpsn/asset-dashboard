@@ -35,7 +35,7 @@ const STATUS_CONFIG: Record<string, { icon: typeof Clock; color: string; label: 
   generating: { icon: Sparkles, color: 'text-amber-400', label: 'Generating', bg: 'bg-amber-500/10 border-amber-500/20' },
   draft: { icon: PenLine, color: 'text-blue-400', label: 'Draft', bg: 'bg-blue-500/10 border-blue-500/20' },
   review: { icon: Eye, color: 'text-cyan-400', label: 'In Review', bg: 'bg-cyan-500/10 border-cyan-500/20' },
-  approved: { icon: CheckCircle2, color: 'text-emerald-400', label: 'Approved', bg: 'bg-green-500/10 border-green-500/20' },
+  approved: { icon: CheckCircle2, color: 'text-emerald-400', label: 'Approved', bg: 'bg-emerald-500/10 border-emerald-500/20' },
 };
 
 export function ContentManager({ workspaceId }: { workspaceId: string }) {
@@ -311,7 +311,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                           <button
                             onClick={() => updateStatus(post.id, 'approved')}
                             disabled={updatingStatus === post.id}
-                            className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-green-500/10 border border-green-500/20 text-emerald-400 hover:bg-green-500/20 transition-colors disabled:opacity-50"
+                            className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
                             title="Approve content"
                           >
                             <CheckCircle2 className="w-3 h-3" />
@@ -334,7 +334,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                     {/* Publish to Webflow */}
                     {hasPublishTarget && !isGenerating && (post.status === 'approved' || post.status === 'review') && (
                       post.publishedAt ? (
-                        <span className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-green-500/10 border border-green-500/20 text-emerald-400 font-medium">
+                        <span className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-medium">
                           <Check className="w-3 h-3" /> Published
                         </span>
                       ) : (

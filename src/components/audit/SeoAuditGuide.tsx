@@ -41,7 +41,7 @@ const SECTIONS = [
     title: 'Fix Options',
     icon: CheckCircle,
     color: 'text-emerald-400',
-    bg: 'bg-green-500/10 border-green-500/20',
+    bg: 'bg-emerald-500/10 border-emerald-500/20',
     description: 'Each issue in the audit has three action options in its action menu. Use them to keep the audit clean and actionable.',
     actions: [
       'Accept — marks the issue as a known won\'t-fix. It stays in the audit but no longer affects the score.',

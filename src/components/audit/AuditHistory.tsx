@@ -130,7 +130,7 @@ export function AuditHistory({ siteId, history, onRefresh }: { siteId: string; h
                     className="p-1.5 rounded-md hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300"
                     title="Copy share link"
                   >
-                    {loadingId === snap.id ? <CheckCircle className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    {loadingId === snap.id ? <CheckCircle className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                   </button>
                   <button
                     onClick={() => openReport(snap.id)}

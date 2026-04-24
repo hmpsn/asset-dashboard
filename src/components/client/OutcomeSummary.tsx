@@ -36,7 +36,7 @@ function winRateColor(rate: number): string {
 }
 
 function winRateBg(rate: number): string {
-  if (rate >= 0.6) return 'bg-green-500/10 border-green-500/20';
+  if (rate >= 0.6) return 'bg-emerald-500/10 border-emerald-500/20';
   if (rate >= 0.4) return 'bg-amber-500/10 border-amber-500/20';
   return 'bg-red-500/10 border-red-500/20';
 }
