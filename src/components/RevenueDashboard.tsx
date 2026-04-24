@@ -131,7 +131,7 @@ export function RevenueDashboard() {
           <div className="px-4 py-3">
             <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 mb-1"><BarChart3 className="w-3 h-3" /> This Month</div>
             <div className="text-xl font-bold text-zinc-200">{fmtCents(data.currentMonthRevenue)}</div>
-            <TrendBadge value={Math.round(monthDelta)} showSign label="vs last month" className="mt-0.5" />
+            <TrendBadge value={Math.round(monthDelta)} showSign hideOnZero={false} label="vs last month" className="mt-0.5" />
           </div>
         </SectionCard>
         <SectionCard noPadding>
