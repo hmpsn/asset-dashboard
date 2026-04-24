@@ -12,7 +12,7 @@ interface Props {
   workspaceId: string;
 }
 
-type BadgeColor = 'teal' | 'blue' | 'emerald' | 'green' | 'amber' | 'red' | 'orange' | 'purple' | 'zinc';
+type BadgeColor = 'teal' | 'blue' | 'emerald' | 'green' | 'amber' | 'red' | 'orange' | 'zinc';
 
 const STATUS_CONFIG: Record<string, { icon: typeof CheckCircle2; color: string; label: string; badgeColor: BadgeColor }> = {
   active:    { icon: CheckCircle2,  color: 'text-emerald-400', label: 'Active',    badgeColor: 'emerald' },

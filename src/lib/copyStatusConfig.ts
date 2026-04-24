@@ -1,7 +1,7 @@
 import type { CopySectionStatus } from '../../shared/types/copy-pipeline';
 
 /** Badge color values matching the Badge component's color prop union. */
-export type BadgeColor = 'teal' | 'blue' | 'emerald' | 'green' | 'amber' | 'red' | 'orange' | 'purple' | 'zinc';
+export type BadgeColor = 'teal' | 'blue' | 'emerald' | 'green' | 'amber' | 'red' | 'orange' | 'zinc';
 
 export interface CopyStatusBadgeConfig {
   label: string;

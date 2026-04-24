@@ -127,8 +127,8 @@ const SECTIONS = [
   {
     title: 'Taking Action',
     icon: Pencil,
-    color: 'text-rose-400',
-    bg: 'bg-rose-500/10 border-rose-500/20',
+    color: 'text-teal-400',
+    bg: 'bg-teal-500/10 border-teal-500/20',
     description: 'Every page row has direct action shortcuts. No need to manually navigate between tools.',
     items: [
       {

@@ -96,9 +96,9 @@ interface SiteArchitectureResult {
 
 // ── Source badge helpers ──
 
-const SOURCE_BADGE: Record<string, { label: string; color: 'green' | 'blue' | 'purple' | 'zinc' }> = {
+const SOURCE_BADGE: Record<string, { label: string; color: 'green' | 'blue' | 'zinc' }> = {
   existing: { label: 'Live', color: 'green' },
-  planned: { label: 'Planned', color: 'purple' },
+  planned: { label: 'Planned', color: 'blue' },
   strategy: { label: 'Strategy', color: 'blue' },
   gap: { label: 'Gap', color: 'zinc' },
 };

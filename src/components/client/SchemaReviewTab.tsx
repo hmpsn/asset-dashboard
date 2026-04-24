@@ -47,8 +47,8 @@ const ROLE_COLORS: Partial<Record<SchemaPageRole, string>> = {
   product: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
   partnership: 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30',
   faq: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
-  'case-study': 'bg-pink-500/15 text-pink-300 border-pink-500/30',
-  comparison: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+  'case-study': 'bg-blue-500/15 text-blue-300 border-blue-500/30',
+  comparison: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
   generic: 'bg-zinc-500/10 text-zinc-400 border-zinc-600/30',
 };
 const DEFAULT_ROLE_COLOR = 'bg-zinc-500/10 text-zinc-400 border-zinc-600/30';

@@ -315,7 +315,6 @@ export function Styleguide() {
               <Badge label="Amber" color="amber" />
               <Badge label="Red" color="red" />
               <Badge label="Orange" color="orange" />
-              <Badge label="Purple" color="purple" />
               <Badge label="Zinc (muted)" color="zinc" />
             </div>
           </div>

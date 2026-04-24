@@ -17,7 +17,7 @@ interface CellDetailPanelProps {
   onFlag?: (cellId: string, comment: string) => void;
 }
 
-const STATUS_CONFIG: Record<MatrixCell['status'], { label: string; color: 'zinc' | 'blue' | 'amber' | 'purple' | 'teal' | 'orange' | 'green'; icon: string }> = {
+const STATUS_CONFIG: Record<MatrixCell['status'], { label: string; color: 'zinc' | 'blue' | 'amber' | 'teal' | 'orange' | 'green'; icon: string }> = {
   planned: { label: 'Planned', color: 'zinc', icon: '\u25CB' },
   keyword_validated: { label: 'Keyword Optimized', color: 'blue', icon: '\u25D0' },
   brief_generated: { label: 'Brief Generated', color: 'amber', icon: '\u25D1' },
@@ -174,7 +174,7 @@ export function CellDetailPanel({
             <span className="text-[11px] text-zinc-500 font-medium">Expected Schema</span>
             <div className="flex items-center gap-1 flex-wrap">
               {cell.expectedSchemaTypes.map(t => (
-                <Badge key={t} label={t} color="purple" />
+                <Badge key={t} label={t} color="blue" />
               ))}
             </div>
           </div>
@@ -223,7 +223,7 @@ export function CellDetailPanel({
                 const toCfg = STATUS_CONFIG[entry.to];
                 return (
                   <div key={i} className="relative flex items-start gap-2.5 pb-2.5 last:pb-0">
-                    <div className={`w-2 h-2 rounded-full mt-1 flex-shrink-0 -ml-[3.5px] ring-2 ring-zinc-900 ${toCfg ? `bg-${toCfg.color}-400` : 'bg-zinc-500'}`} style={{ backgroundColor: toCfg?.color === 'green' ? '#4ade80' : toCfg?.color === 'teal' ? '#2dd4bf' : toCfg?.color === 'amber' ? '#fbbf24' : toCfg?.color === 'blue' ? '#60a5fa' : toCfg?.color === 'orange' ? '#fb923c' : toCfg?.color === 'purple' ? '#a78bfa' : themeColor('#71717a', '#94a3b8') }} />
+                    <div className={`w-2 h-2 rounded-full mt-1 flex-shrink-0 -ml-[3.5px] ring-2 ring-zinc-900 ${toCfg ? `bg-${toCfg.color}-400` : 'bg-zinc-500'}`} style={{ backgroundColor: toCfg?.color === 'green' ? '#4ade80' : toCfg?.color === 'teal' ? '#2dd4bf' : toCfg?.color === 'amber' ? '#fbbf24' : toCfg?.color === 'blue' ? '#60a5fa' : toCfg?.color === 'orange' ? '#fb923c' : themeColor('#71717a', '#94a3b8') }} />
                     <div className="min-w-0">
                       <span className="text-[11px] text-zinc-300 font-medium">{toCfg?.label || entry.to}</span>
                       <span className="text-[10px] text-zinc-600 ml-1.5">{timeAgo(entry.at)}</span>

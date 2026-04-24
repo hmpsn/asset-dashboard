@@ -329,7 +329,7 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
                   >
                     {isSelected ? <CheckSquare className="w-3.5 h-3.5 text-teal-400" /> : <Square className="w-3.5 h-3.5" />}
                   </button>
-                  <Badge label={`${cfg.icon} ${cfg.label}`} color={cfg.text.includes('zinc') ? 'zinc' : cfg.text.includes('blue') ? 'blue' : cfg.text.includes('amber') ? 'amber' : cfg.text.includes('purple') ? 'purple' : cfg.text.includes('teal') ? 'teal' : cfg.text.includes('orange') ? 'orange' : 'green'} />
+                  <Badge label={`${cfg.icon} ${cfg.label}`} color={cfg.text.includes('zinc') ? 'zinc' : cfg.text.includes('blue') ? 'blue' : cfg.text.includes('amber') ? 'amber' : cfg.text.includes('teal') ? 'teal' : cfg.text.includes('orange') ? 'orange' : 'green'} />
                   <span className="text-xs text-zinc-300 flex-1 truncate">{cell.customKeyword ?? cell.targetKeyword}</span>
                   {cell.keywordValidation && (
                     <div className="flex items-center gap-2 flex-shrink-0">
