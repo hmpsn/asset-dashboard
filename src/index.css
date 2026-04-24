@@ -253,6 +253,131 @@ body::after {
 }
 
 
+/* ─── Typography utilities (canonical) ────────────────────────────────────────
+   These classes (.t-*) are the Phase 5 type system. Use them instead of
+   arbitrary text-[Npx] values. They are globally available from any .tsx.
+
+   Law: Phase 2 codemods replace arbitrary text sizes → .t-* classes.
+         Phase 3 pr-check blocks new text-[Npx] usages.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Display / Hero */
+.t-hero {
+  font-family: 'DIN Pro', 'Inter', sans-serif;
+  font-size: 42px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+/* Headings */
+.t-h1 {
+  font-family: 'DIN Pro', 'Inter', sans-serif;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+
+.t-h2 {
+  font-family: 'DIN Pro', 'Inter', sans-serif;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+/* Stat values */
+.t-stat-lg {
+  font-family: 'DIN Pro', 'Inter', sans-serif;
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.t-stat {
+  font-family: 'DIN Pro', 'Inter', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.t-stat-sm {
+  font-family: 'DIN Pro', 'Inter', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Body text */
+.t-page {
+  font-family: 'Inter', sans-serif;
+  font-size: 15.5px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.t-body {
+  font-family: 'Inter', sans-serif;
+  font-size: 14.5px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.t-ui {
+  font-family: 'Inter', sans-serif;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+/* Labels & captions */
+.t-label {
+  font-family: 'DIN Pro', 'Inter', sans-serif;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.4;
+}
+
+.t-caption {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.t-caption-sm {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+/* Monospace */
+.t-mono {
+  font-family: 'Fira Code', 'JetBrains Mono', 'Menlo', 'Courier New', monospace;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Micro */
+.t-micro {
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
 /* ─── Client Dashboard Light Theme ─── */
 
 /* === Base ===
