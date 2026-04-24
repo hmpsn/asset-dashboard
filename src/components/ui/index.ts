@@ -45,3 +45,26 @@ export type { WorkflowStep, WorkflowStepperProps } from './WorkflowStepper';
 export { WorkspaceHealthBar } from './WorkspaceHealthBar';
 export type { HealthMetric, WorkspaceHealthBarProps } from './WorkspaceHealthBar';
 export { ConfirmDialog } from './ConfirmDialog';
+
+// ─── Phase 1 primitives (pre-committed stubs; Phase 1 agents fill implementations) ───
+
+// Typography
+export { Heading, Stat, BodyText, Caption, Label, Mono } from './typography';
+
+// Icon
+export { Icon } from './Icon';
+
+// Actions
+export { Button } from './Button';
+export { IconButton } from './IconButton';
+export { ActionPill } from './ActionPill';
+export { SegmentedControl } from './SegmentedControl';
+
+// Forms
+export { FormField, FormInput, FormSelect, FormTextarea, Checkbox, Toggle } from './forms';
+
+// Layout
+export { Row, Stack, Column, Grid, Divider } from './layout';
+
+// Overlays
+export { Modal, Popover, Tooltip } from './overlay';
