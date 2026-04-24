@@ -272,6 +272,27 @@ router.post(
   },
 );
 
+// POST /api/copy/:workspaceId/:blueprintId/:entryId/send-to-client
+// Bulk-transitions all draft sections for an entry to client_review.
+router.post(
+  '/api/copy/:workspaceId/:blueprintId/:entryId/send-to-client',
+  requireWorkspaceAccess('workspaceId'),
+  (req, res) => {
+    const { workspaceId, entryId } = req.params;
+    const sections = getSectionsForEntry(entryId, workspaceId);
+    const draftSections = sections.filter(s => s.status === 'draft');
+    if (draftSections.length === 0) return res.status(400).json({ error: 'No draft sections to send' });
+    let sent = 0;
+    for (const s of draftSections) {
+      const updated = updateSectionStatus(s.id, workspaceId, 'client_review');
+      if (updated) sent++;
+    }
+    broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_SECTION_UPDATED, { entryId, action: 'sent_to_client' });
+    addActivity(workspaceId, 'copy_section_edited', `Sent ${sent} section${sent !== 1 ? 's' : ''} for client review`);
+    return res.json({ sent });
+  },
+);
+
 // ── Batch routes ─────────────────────────────────────────────────────────────
 
 // POST /api/copy/:workspaceId/:blueprintId/batch

@@ -208,7 +208,10 @@ export function ContentTab({
           : [isPending ? 'Awaiting Payment' : 'Requested', 'Brief Ready', 'Your Review', 'Approved', 'In Production', 'Delivered', 'Published'];
         // Map pending_payment and changes_requested back for timeline display
         const displayStatus = req.status === 'pending_payment' ? 'requested' : req.status === 'changes_requested' ? 'client_review' : req.status;
-        const currentIdx = (steps as readonly string[]).indexOf(displayStatus);
+        const rawIdx = (steps as readonly string[]).indexOf(displayStatus);
+        // Fallback: if status isn't in this step set (e.g. in_progress on a brief_only),
+        // pin to the last step we do know about so the bar stays filled rather than going dark.
+        const currentIdx = rawIdx >= 0 ? rawIdx : Math.max(0, (steps as readonly string[]).indexOf('approved'));
         const isExpanded = expandedContentReq === req.id;
         const brief = req.briefId ? briefPreviews[req.briefId] : null;
         const canUpgrade = isBriefOnly && ['approved', 'delivered', 'published'].includes(req.status);

@@ -150,7 +150,7 @@ router.get('/api/public/content-requests/:workspaceId', (req, res) => {
     serviceType: r.serviceType || 'brief_only', pageType: r.pageType || 'blog', upgradedAt: r.upgradedAt,
     comments: r.comments || [], requestedAt: r.requestedAt, updatedAt: r.updatedAt,
     // Include briefId only when in client_review or later
-    briefId: ['client_review', 'approved', 'changes_requested', 'in_progress', 'delivered'].includes(r.status) ? r.briefId : undefined,
+    briefId: ['client_review', 'approved', 'changes_requested', 'in_progress', 'delivered', 'published'].includes(r.status) ? r.briefId : undefined,
   })));
 });
 

@@ -202,6 +202,11 @@ export const copyReview = {
       `/api/copy/${wsId}/section/${sectionId}/suggest`,
       body
     ),
+  sendEntryToClientReview: (wsId: string, blueprintId: string, entryId: string) =>
+    post<{ sent: number }>(
+      `/api/copy/${wsId}/${blueprintId}/${entryId}/send-to-client`,
+      {},
+    ),
 };
 
 export const copyBatch = {

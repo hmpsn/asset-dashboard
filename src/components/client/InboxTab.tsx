@@ -85,14 +85,14 @@ export function InboxTab({
     { id: 'approvals', label: 'SEO Changes', icon: ClipboardCheck, count: pendingApprovals || undefined },
     { id: 'requests', label: 'Requests', icon: MessageSquare, count: pendingRequests || undefined },
     ...(hasCopyEntries ? [{ id: 'copy' as InboxFilter, label: 'Copy Review', icon: FileText }] : []),
-    ...(!betaMode ? [{ id: 'content' as InboxFilter, label: 'Content', icon: FileText, count: contentReviews || undefined }] : []),
+    { id: 'content' as InboxFilter, label: 'Content', icon: FileText, count: contentReviews || undefined },
     ...(planReviewCount > 0 ? [{ id: 'content-plan' as InboxFilter, label: 'Content Plan', icon: Layers, count: planReviewCount }] : []),
   ];
 
   const showApprovals = filter === 'all' || filter === 'approvals';
   const showRequests = filter === 'all' || filter === 'requests';
   const showCopy = filter === 'all' || filter === 'copy';
-  const showContent = !betaMode && (filter === 'all' || filter === 'content');
+  const showContent = filter === 'all' || filter === 'content';
   const showContentPlan = filter === 'all' || filter === 'content-plan';
 
   const handleFlagCell = async (cell: ContentPlanReviewCell) => {

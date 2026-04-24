@@ -179,7 +179,7 @@ export function RequestList({
                       {req.status === 'client_review' && (
                         <span className="text-[11px] text-cyan-400/60 italic">Awaiting client feedback</span>
                       )}
-                      {req.status === 'approved' && (
+                      {req.status === 'approved' && (req.serviceType || 'brief_only') === 'full_post' && (
                         <button onClick={() => onUpdateRequestStatus(req.id, 'in_progress')} className="px-2 py-1 rounded bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 hover:bg-teal-600/30 transition-colors">Start Production</button>
                       )}
                       {req.status === 'changes_requested' && (

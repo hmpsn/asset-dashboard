@@ -22,6 +22,7 @@ import {
   useUpdateSectionText,
   useRegenerateCopySection,
   useGenerateCopy,
+  useSendEntryToClientReview,
 } from '../../hooks/admin/useCopyPipeline';
 import { SectionCard } from '../ui/SectionCard';
 import { Badge } from '../ui/Badge';
@@ -367,6 +368,7 @@ function CopyReviewPanelInner({ workspaceId, blueprintId, entryId }: Props) {
   const { data: copyStatus } = useCopyStatus(workspaceId, entryId);
   const { data: metadata } = useCopyMetadata(workspaceId, entryId);
   const generateCopy = useGenerateCopy(workspaceId, blueprintId);
+  const sendToClient = useSendEntryToClientReview(workspaceId, blueprintId);
 
   // ── Loading ────────────────────────────────────────────────────────────────
 
@@ -433,6 +435,7 @@ function CopyReviewPanelInner({ workspaceId, blueprintId, entryId }: Props) {
   const approved     = copyStatus?.approvedSections ?? sections.filter(s => s.status === 'approved').length;
   const total        = copyStatus?.totalSections ?? sections.length;
   const percentage   = copyStatus?.approvalPercentage ?? (total > 0 ? (approved / total) * 100 : 0);
+  const draftCount   = copyStatus?.draftSections ?? sections.filter(s => s.status === 'draft').length;
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -451,19 +454,36 @@ function CopyReviewPanelInner({ workspaceId, blueprintId, entryId }: Props) {
           ) : undefined
         }
         action={
-          <button
-            onClick={() => generateCopy.mutate(entryId)}
-            disabled={generateCopy.isPending}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 text-zinc-300 text-xs rounded-lg font-medium hover:bg-zinc-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            aria-label="Regenerate all copy"
-          >
-            {generateCopy.isPending ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <RefreshCw className="w-3.5 h-3.5" />
+          <div className="flex items-center gap-2">
+            {draftCount > 0 && (
+              <button
+                onClick={() => sendToClient.mutate(entryId)}
+                disabled={sendToClient.isPending}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white text-xs rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+                aria-label="Send all draft sections to client review"
+              >
+                {sendToClient.isPending ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Send className="w-3.5 h-3.5" />
+                )}
+                Send for Client Review
+              </button>
             )}
-            Regenerate All
-          </button>
+            <button
+              onClick={() => generateCopy.mutate(entryId)}
+              disabled={generateCopy.isPending}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 text-zinc-300 text-xs rounded-lg font-medium hover:bg-zinc-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              aria-label="Regenerate all copy"
+            >
+              {generateCopy.isPending ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="w-3.5 h-3.5" />
+              )}
+              Regenerate All
+            </button>
+          </div>
         }
       >
         <ProgressBar approved={approved} total={total} percentage={percentage} />
