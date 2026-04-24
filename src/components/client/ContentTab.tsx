@@ -32,12 +32,14 @@ interface ContentTabProps {
   pricingConfirming: boolean;
   workspaceId: string;
   setToast: (t: { message: string; type: 'success' | 'error' } | null) => void;
+  /** When true (external billing), hide price chips on upgrade button. */
+  hidePrices?: boolean;
 }
 
 export function ContentTab({
   contentRequests, setContentRequests, effectiveTier,
   briefPrice, fullPostPrice, fmtPrice, setPricingModal, pricingConfirming,
-  workspaceId, setToast,
+  workspaceId, setToast, hidePrices = false,
 }: ContentTabProps) {
   const navigate = useNavigate();
   const betaMode = useBetaMode();
@@ -599,7 +601,7 @@ export function ContentTab({
                     >
                       <Sparkles className="w-3.5 h-3.5" />
                       Upgrade to Full Post
-                      {briefPrice != null && fullPostPrice != null && <span className="text-[11px] opacity-70 ml-0.5">+{fmtPrice(Math.max(0, fullPostPrice - briefPrice))}</span>}
+                      {!hidePrices && briefPrice != null && fullPostPrice != null && <span className="text-[11px] opacity-70 ml-0.5">+{fmtPrice(Math.max(0, fullPostPrice - briefPrice))}</span>}
                     </button>
                   </div>
                 )}

@@ -56,6 +56,8 @@ interface InboxTabProps {
   initialFilter?: InboxFilter;
   // Page keyword hints for approval card targeting chips (independent of seoClientView)
   pageMap?: ApprovalPageKeyword[];
+  /** When true (external billing), hide price chips on request/upgrade buttons. */
+  hidePrices?: boolean;
 }
 
 export function InboxTab({
@@ -67,6 +69,7 @@ export function InboxTab({
   contentPlanReviewCells = [],
   hasCopyEntries = false,
   initialFilter,
+  hidePrices = false,
   pageMap,
 }: InboxTabProps) {
   const [filter, setFilter] = useState<InboxFilter>(initialFilter || 'all');
@@ -317,6 +320,7 @@ export function InboxTab({
             pricingConfirming={pricingConfirming}
             workspaceId={workspaceId}
             setToast={setToast}
+            hidePrices={hidePrices}
           />
         </div>
       )}
