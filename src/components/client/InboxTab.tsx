@@ -8,7 +8,6 @@ import { ClientCopyReview } from './ClientCopyReview';
 import type { Tier } from '../ui';
 import type { ClientContentRequest, ClientRequest, ApprovalBatch } from './types';
 import type { ContentPlanReviewCell, ApprovalPageKeyword } from '../../hooks/useClientData';
-import { useBetaMode } from './BetaContext';
 import { STUDIO_NAME } from '../../constants';
 import { post } from '../../api/client';
 
@@ -70,7 +69,6 @@ export function InboxTab({
   initialFilter,
   pageMap,
 }: InboxTabProps) {
-  const betaMode = useBetaMode();
   const [filter, setFilter] = useState<InboxFilter>(initialFilter || 'all');
   const [flaggingCell, setFlaggingCell] = useState<string | null>(null);
   const [flagComment, setFlagComment] = useState('');
@@ -85,14 +83,14 @@ export function InboxTab({
     { id: 'approvals', label: 'SEO Changes', icon: ClipboardCheck, count: pendingApprovals || undefined },
     { id: 'requests', label: 'Requests', icon: MessageSquare, count: pendingRequests || undefined },
     ...(hasCopyEntries ? [{ id: 'copy' as InboxFilter, label: 'Copy Review', icon: FileText }] : []),
-    ...(!betaMode ? [{ id: 'content' as InboxFilter, label: 'Content', icon: FileText, count: contentReviews || undefined }] : []),
+    { id: 'content' as InboxFilter, label: 'Content', icon: FileText, count: contentReviews || undefined },
     ...(planReviewCount > 0 ? [{ id: 'content-plan' as InboxFilter, label: 'Content Plan', icon: Layers, count: planReviewCount }] : []),
   ];
 
   const showApprovals = filter === 'all' || filter === 'approvals';
   const showRequests = filter === 'all' || filter === 'requests';
   const showCopy = filter === 'all' || filter === 'copy';
-  const showContent = !betaMode && (filter === 'all' || filter === 'content');
+  const showContent = filter === 'all' || filter === 'content';
   const showContentPlan = filter === 'all' || filter === 'content-plan';
 
   const handleFlagCell = async (cell: ContentPlanReviewCell) => {
@@ -122,7 +120,7 @@ export function InboxTab({
           <Inbox className="w-5 h-5 text-teal-400" />
           <div>
             <h2 className="text-xl font-semibold text-zinc-100">Inbox</h2>
-            <p className="text-sm text-zinc-500 mt-0.5">{betaMode ? 'SEO changes and requests — all in one place.' : 'SEO changes, requests, and content — all in one place.'}</p>
+            <p className="text-sm text-zinc-500 mt-0.5">SEO changes, requests, and content — all in one place.</p>
           </div>
         </div>
         <div className="flex items-center gap-1.5">
@@ -346,7 +344,7 @@ export function InboxTab({
         <EmptyState
           icon={Inbox}
           title="Your inbox is empty."
-          description={betaMode ? `SEO changes and requests will appear here as ${STUDIO_NAME} works on your site.` : `SEO changes, requests, and content items will appear here as ${STUDIO_NAME} works on your site.`}
+          description={`SEO changes, requests, and content items will appear here as ${STUDIO_NAME} works on your site.`}
           action={
             <button
               onClick={() => setFilter('requests')}

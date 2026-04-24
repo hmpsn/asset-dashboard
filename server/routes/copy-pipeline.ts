@@ -6,7 +6,7 @@ import { randomUUID } from 'crypto';
 import { Router } from 'express';
 import { requireWorkspaceAccess } from '../auth.js';
 import { aiLimiter } from '../middleware.js';
-import { validate } from '../middleware/validate.js';
+import { validate, z } from '../middleware/validate.js';
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
@@ -269,6 +269,33 @@ router.post(
     broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_SECTION_UPDATED, { sectionId, status: section.status });
     addActivity(workspaceId, 'copy_suggestion_added', `Client suggestion added to section`);
     return res.json(section);
+  },
+);
+
+// POST /api/copy/:workspaceId/:blueprintId/:entryId/send-to-client
+// Bulk-transitions all draft sections for an entry to client_review.
+router.post(
+  '/api/copy/:workspaceId/:blueprintId/:entryId/send-to-client',
+  requireWorkspaceAccess('workspaceId'),
+  validate(z.object({})),
+  (req, res) => {
+    const { workspaceId, entryId } = req.params;
+    const sections = getSectionsForEntry(entryId, workspaceId);
+    const draftSections = sections.filter(s => s.status === 'draft');
+    if (draftSections.length === 0) return res.status(400).json({ error: 'No draft sections to send' });
+    // blueprintId is in the URL for API consistency with other entry-scoped routes but is
+    // not needed here — sections are scoped by entryId + workspaceId.
+    const bulkTransition = db.transaction((): number => {
+      let count = 0;
+      for (const s of draftSections) {
+        if (updateSectionStatus(s.id, workspaceId, 'client_review')) count++;
+      }
+      return count;
+    });
+    const sent = bulkTransition();
+    broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_SECTION_UPDATED, { entryId, action: 'sent_to_client' });
+    addActivity(workspaceId, 'copy_sent_to_client', `Sent ${sent} section${sent !== 1 ? 's' : ''} for client review`);
+    return res.json({ sent });
   },
 );
 

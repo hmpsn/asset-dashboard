@@ -663,8 +663,8 @@ router.get('/api/public/copy/:workspaceId/entries', (req, res) => {
     if (!bp.entries) continue;
     for (const entry of bp.entries) {
       const copyStatus = getEntryCopyStatus(entry.id, wsId);
-      // Only include entries that have at least some sections beyond pending
-      if (copyStatus.totalSections > 0 && copyStatus.pendingSections < copyStatus.totalSections) {
+      // Only include entries that have sections actually visible to the client
+      if (copyStatus.clientReviewSections > 0 || copyStatus.approvedSections > 0) {
         entries.push({
           id: entry.id,
           name: entry.name,
