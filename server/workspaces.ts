@@ -76,6 +76,7 @@ interface WorkspaceRow {
   trial_ends_at: string | null;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
+  billing_mode: string | null;
   onboarding_enabled: number;
   onboarding_completed: number;
   content_pricing: string | null;
@@ -157,6 +158,9 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
   if (row.trial_ends_at) ws.trialEndsAt = row.trial_ends_at;
   if (row.stripe_customer_id) ws.stripeCustomerId = row.stripe_customer_id;
   if (row.stripe_subscription_id) ws.stripeSubscriptionId = row.stripe_subscription_id;
+  // Always surface billingMode (DB column has a DEFAULT 'platform' so a value should
+  // always be present); narrow to the typed union on the way out.
+  ws.billingMode = row.billing_mode === 'external' ? 'external' : 'platform';
   if (row.onboarding_enabled !== null) ws.onboardingEnabled = !!row.onboarding_enabled;
   if (row.onboarding_completed !== null) ws.onboardingCompleted = !!row.onboarding_completed;
   if (row.content_pricing) ws.contentPricing = parseJsonSafe(row.content_pricing, contentPricingSchema, { briefPrice: 0, fullPostPrice: 0, currency: 'USD' }, { workspaceId: row.id, field: 'content_pricing', table: 'workspaces' });
@@ -227,7 +231,7 @@ const stmts = createStmtCache(() => ({
        competitor_domains, personas, client_portal_enabled, seo_client_view,
        analytics_client_view, site_intelligence_client_view, auto_reports, auto_report_frequency,
        brand_voice, knowledge_base, brand_logo_url, brand_accent_color,
-       tier, trial_ends_at, stripe_customer_id, stripe_subscription_id,
+       tier, trial_ends_at, stripe_customer_id, stripe_subscription_id, billing_mode,
        onboarding_enabled, onboarding_completed, content_pricing,
        portal_contacts, audit_suppressions, custom_prompt_notes, created_at)
     VALUES
@@ -237,7 +241,7 @@ const stmts = createStmtCache(() => ({
        @competitor_domains, @personas, @client_portal_enabled, @seo_client_view,
        @analytics_client_view, @site_intelligence_client_view, @auto_reports, @auto_report_frequency,
        @brand_voice, @knowledge_base, @brand_logo_url, @brand_accent_color,
-       @tier, @trial_ends_at, @stripe_customer_id, @stripe_subscription_id,
+       @tier, @trial_ends_at, @stripe_customer_id, @stripe_subscription_id, @billing_mode,
        @onboarding_enabled, @onboarding_completed, @content_pricing,
        @portal_contacts, @audit_suppressions, @custom_prompt_notes, @created_at)
   `),
@@ -299,6 +303,9 @@ function workspaceToParams(ws: Workspace) {
     trial_ends_at: ws.trialEndsAt ?? null,
     stripe_customer_id: ws.stripeCustomerId ?? null,
     stripe_subscription_id: ws.stripeSubscriptionId ?? null,
+    // Default to 'platform' at the write boundary so the mapper can rely on a value
+    // always being present (matches the column's DEFAULT 'platform').
+    billing_mode: ws.billingMode ?? 'platform',
     onboarding_enabled: ws.onboardingEnabled === undefined ? null : (ws.onboardingEnabled ? 1 : 0),
     onboarding_completed: ws.onboardingCompleted === undefined ? null : (ws.onboardingCompleted ? 1 : 0),
     content_pricing: ws.contentPricing ? JSON.stringify(ws.contentPricing) : null,
@@ -372,7 +379,7 @@ export function createWorkspace(name: string, webflowSiteId?: string, webflowSit
   return workspace;
 }
 
-export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'competitorLastFetchedAt' | 'competitorDomainsAtLastFetch' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile' | 'intelligenceProfile' | 'siteIntelligenceClientView' | 'businessPriorities' | 'customPromptNotes'>>): Workspace | null {
+export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'competitorLastFetchedAt' | 'competitorDomainsAtLastFetch' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'billingMode' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile' | 'intelligenceProfile' | 'siteIntelligenceClientView' | 'businessPriorities' | 'customPromptNotes'>>): Workspace | null {
   const row = stmts().getById.get(id) as WorkspaceRow | undefined;
   if (!row) return null;
 
@@ -397,6 +404,7 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
     knowledgeBase: 'knowledge_base', rewritePlaybook: 'rewrite_playbook', brandLogoUrl: 'brand_logo_url',
     brandAccentColor: 'brand_accent_color', contentPricing: 'content_pricing',
     stripeCustomerId: 'stripe_customer_id', stripeSubscriptionId: 'stripe_subscription_id',
+    billingMode: 'billing_mode',
     tier: 'tier', trialEndsAt: 'trial_ends_at',
     onboardingEnabled: 'onboarding_enabled', onboardingCompleted: 'onboarding_completed',
     portalContacts: 'portal_contacts', auditSuppressions: 'audit_suppressions',

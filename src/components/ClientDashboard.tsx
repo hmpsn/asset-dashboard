@@ -620,6 +620,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       {/* Pricing confirmation modal + Stripe Elements modal */}
       <PricingConfirmationModal
         betaMode={betaMode}
+        billingMode={ws?.billingMode}
         pricingModal={pricingModal}
         setPricingModal={setPricingModal}
         pricingConfirming={pricingConfirming}

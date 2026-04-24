@@ -67,8 +67,9 @@ export function usePayments(
     if (!pricingModal) return;
     setPricingConfirming(true);
     try {
-      // --- Stripe Elements inline payment (when configured) ---
-      if (ws?.stripeEnabled) {
+      // --- Stripe Elements inline payment (when configured AND workspace bills on-platform) ---
+      // External-billing workspaces fall through to the direct-submit path below.
+      if (ws?.stripeEnabled && ws?.billingMode !== 'external') {
         let contentRequestId: string | undefined;
         if (pricingModal.source === 'upgrade' && pricingModal.upgradeReqId) {
           contentRequestId = pricingModal.upgradeReqId;
