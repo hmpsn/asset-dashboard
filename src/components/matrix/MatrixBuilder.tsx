@@ -337,7 +337,7 @@ export function MatrixBuilder({ workspaceId, templates, onComplete, onCancel }: 
               />
             </div>
 
-            // pr-check-disable-next-line -- stats grid summary panel; pending Phase 4 SectionCard migration
+            {/* pr-check-disable-next-line -- stats grid summary panel; pending Phase 4 SectionCard migration */}
             <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-4 space-y-3">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="text-center">

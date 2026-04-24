@@ -3879,8 +3879,9 @@ function applyExcludeLines(lines: string[], excludeLines?: string[]): string[] {
 function checkFile(file: string, check: Check): string[] {
   if (isExcluded(file, check.exclude)) return [];
   try {
+    const safePattern = check.pattern.replace(/"/g, '\\"');
     const out = execSync(
-      `grep -n -E "${check.pattern}" "${file}" 2>/dev/null || true`,
+      `grep -n -E "${safePattern}" "${file}" 2>/dev/null || true`,
       { cwd: ROOT, encoding: 'utf-8' }
     );
     const lines = out.trim() ? out.trim().split('\n').filter(Boolean).map(l => `${file}:${l}`) : [];
