@@ -22,7 +22,7 @@
   /* ─── Text ─── */
   --brand-text: #a1a1aa;
   --brand-text-bright: #e4e4e7;
-  --brand-text-muted: #a1a1aa; /* alias for body text — intentional, per styleguide v9 */
+  --brand-text-muted: #71717a; /* zinc-500 — one step dimmer than body text (#a1a1aa zinc-400) */
   --brand-text-dim: #52525b;
 
   /* ─── Brand colors ─── */

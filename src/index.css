@@ -422,7 +422,7 @@ body::after {
 .dashboard-light .text-zinc-500 { color: var(--brand-text-muted) !important; }   /* #475569 muted */
 .dashboard-light .text-zinc-600 { color: var(--brand-text-muted) !important; }   /* #475569 muted */
 .dashboard-light .text-zinc-700 { color: var(--brand-text) !important; }         /* #334155 body */
-/* .text-white stays white — used on teal/green button backgrounds in both modes */
+/* .text-white stays white — used on teal/emerald button backgrounds in both modes */
 
 /* === Accent Text — accessible on white (≥4.5:1 WCAG AA) === */
 .dashboard-light .text-teal-400 { color: #0d9488 !important; }       /* teal-600  · 4.5:1 */
