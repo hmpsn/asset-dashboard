@@ -4942,3 +4942,82 @@ describe('Rule: SVG with hardcoded dark fill/stroke', () => {
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
 });
+
+describe('Pattern rule: Hand-rolled trend badge', () => {
+  const RULE = CHECKS.find(c => c.name === 'Hand-rolled trend badge')!;
+
+  it('rule exists with warn severity', () => {
+    expect(RULE).toBeDefined();
+    expect(RULE.pattern).toBeTruthy();
+    expect(RULE.severity).toBe('warn');
+    expect(RULE.pathFilter).toBe('src/components/');
+  });
+
+  it('flags TrendingUp/TrendingDown ternary in one line', () => {
+    const dir = path.join(TMPDIR, 'trend-badge-trigger/src/components');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'Bad.tsx'), [
+      'export function Bad({ delta }: { delta: number }) {',
+      '  return (',
+      '    <span className={delta > 0 ? "text-emerald-400" : "text-red-400"}>',
+      '      {delta > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}',
+      '      {delta}%',
+      '    </span>',
+      '  );',
+      '}',
+    ].join('\n'));
+    const hits = checkDirectory(path.join(TMPDIR, 'trend-badge-trigger'), RULE);
+    expect(hits.length).toBe(1);
+  });
+
+  it('flags reversed TrendingDown/TrendingUp order', () => {
+    const dir = path.join(TMPDIR, 'trend-badge-reverse/src/components');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'Bad.tsx'), [
+      'export function Bad({ delta }: { delta: number }) {',
+      '  return delta < 0 ? <TrendingDown className="w-3 h-3" /> : <TrendingUp className="w-3 h-3" />;',
+      '}',
+    ].join('\n'));
+    const hits = checkDirectory(path.join(TMPDIR, 'trend-badge-reverse'), RULE);
+    expect(hits.length).toBe(1);
+  });
+
+  it('does NOT flag a proper <TrendBadge> usage', () => {
+    const dir = path.join(TMPDIR, 'trend-badge-ok/src/components');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'Good.tsx'), [
+      'import { TrendBadge } from "./ui";',
+      'export function Good({ delta }: { delta: number }) {',
+      '  return <TrendBadge value={delta} showSign label="vs last month" />;',
+      '}',
+    ].join('\n'));
+    const hits = checkDirectory(path.join(TMPDIR, 'trend-badge-ok'), RULE);
+    expect(hits.length).toBe(0);
+  });
+
+  it('does NOT flag TrendBadge.tsx itself (the primitive)', () => {
+    const dir = path.join(TMPDIR, 'trend-badge-self/src/components/ui');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'TrendBadge.tsx'), [
+      'export function TrendBadge({ value }: { value: number }) {',
+      '  const positive = value > 0;',
+      '  return positive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />;',
+      '}',
+    ].join('\n'));
+    const hits = checkDirectory(path.join(TMPDIR, 'trend-badge-self'), RULE);
+    expect(hits.length).toBe(0);
+  });
+
+  it('respects inline // trend-badge-ok escape hatch on the match line', () => {
+    const dir = path.join(TMPDIR, 'trend-badge-hatch/src/components');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'Bad.tsx'), [
+      'export function Bad({ delta }: { delta: number }) {',
+      '  // 3-way ternary with Minus icon, not replaceable by TrendBadge',
+      '  return delta > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />; // trend-badge-ok',
+      '}',
+    ].join('\n'));
+    const hits = checkDirectory(path.join(TMPDIR, 'trend-badge-hatch'), RULE);
+    expect(hits.length).toBe(0);
+  });
+});

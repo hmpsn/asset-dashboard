@@ -6,13 +6,13 @@ import { useSchemaSnapshot, useWebflowPages } from '../hooks/admin';
 import {
   Loader2, CheckCircle,
   Info, Sparkles, RefreshCw, Plus, Database, HelpCircle,
-  TrendingUp, TrendingDown, Clock, BarChart3, BookOpen,
+  Clock, BarChart3, BookOpen,
 } from 'lucide-react';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { StatusBadge } from './ui/StatusBadge';
-import { WorkflowStepper, ErrorState, ProgressIndicator, NextStepsCard } from './ui';
+import { WorkflowStepper, ErrorState, ProgressIndicator, NextStepsCard, TrendBadge } from './ui';
 import { CmsTemplatePanel } from './schema/CmsTemplatePanel';
 import { SchemaPageCard } from './schema/SchemaPageCard';
 import { BulkPublishPanel } from './schema/BulkPublishPanel';
@@ -975,10 +975,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
                       <span className="flex items-center gap-1 text-[10px] text-zinc-500"><Clock className="w-3 h-3" /> Too recent</span>
                     ) : d.before && d.after ? (
                       <div className="flex items-center gap-3 text-[11px]">
-                        <span className={d.after.clicks >= d.before.clicks ? 'text-emerald-400/80' : 'text-red-400/80'}>
-                          {d.after.clicks >= d.before.clicks ? <TrendingUp className="w-3 h-3 inline" /> : <TrendingDown className="w-3 h-3 inline" />}
-                          {' '}{d.after.clicks - d.before.clicks >= 0 ? '+' : ''}{d.after.clicks - d.before.clicks} clicks
-                        </span>
+                        <TrendBadge value={d.after.clicks - d.before.clicks} suffix="" showSign label="clicks" hideOnZero={false} />
                         <span className={d.after.position <= d.before.position ? 'text-emerald-400/80' : 'text-red-400/80'}>
                           pos {d.after.position.toFixed(1)}
                         </span>

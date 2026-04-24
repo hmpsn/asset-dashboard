@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { DollarSign, TrendingUp, TrendingDown, BarChart3, Users, Package, Trash2, AlertTriangle } from 'lucide-react';
+import { DollarSign, BarChart3, Users, Package, Trash2, AlertTriangle } from 'lucide-react';
 import { get, del } from '../api/client';
-import { SectionCard, EmptyState } from './ui';
+import { SectionCard, EmptyState, TrendBadge } from './ui';
 
 interface RevenueSummary {
   totalRevenue: number;
@@ -131,10 +131,7 @@ export function RevenueDashboard() {
           <div className="px-4 py-3">
             <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 mb-1"><BarChart3 className="w-3 h-3" /> This Month</div>
             <div className="text-xl font-bold text-zinc-200">{fmtCents(data.currentMonthRevenue)}</div>
-            <div className={`flex items-center gap-0.5 text-[11px] mt-0.5 ${monthDelta >= 0 ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
-              {monthDelta >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-              {monthDelta >= 0 ? '+' : ''}{monthDelta.toFixed(0)}% vs last month
-            </div>
+            <TrendBadge value={Math.round(monthDelta)} showSign label="vs last month" className="mt-0.5" />
           </div>
         </SectionCard>
         <SectionCard noPadding>

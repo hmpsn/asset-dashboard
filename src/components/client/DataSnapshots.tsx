@@ -1,5 +1,5 @@
 import {
-  TrendingUp, TrendingDown, MousePointer, Eye, Smartphone, Monitor, Tablet,
+  MousePointer, Eye, Smartphone, Monitor, Tablet,
   Globe, Users, ArrowRight,
 } from 'lucide-react';
 import type {
@@ -9,20 +9,9 @@ import type {
 } from './types';
 import { ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { fmtNum as formatNum } from '../../utils/formatNumbers';
-import { SectionCard } from '../ui';
+import { SectionCard, TrendBadge } from '../ui';
 
 // ─── Helpers ───
-
-function ChangeBadge({ value, suffix = '%', invert = false }: { value: number; suffix?: string; invert?: boolean }) {
-  if (value === 0) return null;
-  const positive = invert ? value < 0 : value > 0;
-  return (
-    <span className={`inline-flex items-center gap-0.5 text-[11px] font-medium ${positive ? 'text-emerald-400' : 'text-red-400'}`}>
-      {positive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-      {Math.abs(value)}{suffix}
-    </span>
-  );
-}
 
 function MiniSparkline({ data, color }: { data: number[]; color: string }) {
   if (data.length < 3) return null;
@@ -86,7 +75,7 @@ export function SearchSnapshot({ overview, trend, comparison, devices, onViewMor
           </div>
           <div className="flex items-center gap-2">
             <span className="text-lg font-bold text-blue-400">{formatNum(overview.totalClicks)}</span>
-            {comparison && <ChangeBadge value={comparison.changePercent.clicks} />}
+            {comparison && <TrendBadge value={comparison.changePercent.clicks} />}
           </div>
         </div>
         <div className="bg-zinc-800/40 rounded-lg px-3 py-2.5">
@@ -96,7 +85,7 @@ export function SearchSnapshot({ overview, trend, comparison, devices, onViewMor
           </div>
           <div className="flex items-center gap-2">
             <span className="text-lg font-bold text-blue-400">{formatNum(overview.totalImpressions)}</span>
-            {comparison && <ChangeBadge value={comparison.changePercent.impressions} />}
+            {comparison && <TrendBadge value={comparison.changePercent.impressions} />}
           </div>
         </div>
       </div>
@@ -195,21 +184,21 @@ export function AnalyticsSnapshot({ overview, trend, topPages, comparison, newVs
           <div className="text-[11px] text-zinc-500 mb-0.5">Visitors</div>
           <div className="flex items-center gap-1.5">
             <span className="text-lg font-bold text-teal-400">{formatNum(overview.totalUsers)}</span>
-            {comparison && <ChangeBadge value={comparison.changePercent.users} />}
+            {comparison && <TrendBadge value={comparison.changePercent.users} />}
           </div>
         </div>
         <div className="bg-zinc-800/40 rounded-lg px-3 py-2.5">
           <div className="text-[11px] text-zinc-500 mb-0.5">Sessions</div>
           <div className="flex items-center gap-1.5">
             <span className="text-lg font-bold text-blue-400">{formatNum(overview.totalSessions)}</span>
-            {comparison && <ChangeBadge value={comparison.changePercent.sessions} />}
+            {comparison && <TrendBadge value={comparison.changePercent.sessions} />}
           </div>
         </div>
         <div className="bg-zinc-800/40 rounded-lg px-3 py-2.5">
           <div className="text-[11px] text-zinc-500 mb-0.5">Page Views</div>
           <div className="flex items-center gap-1.5">
             <span className="text-lg font-bold text-zinc-200">{formatNum(overview.totalPageviews)}</span>
-            {comparison && <ChangeBadge value={comparison.changePercent.pageviews} />}
+            {comparison && <TrendBadge value={comparison.changePercent.pageviews} />}
           </div>
         </div>
       </div>

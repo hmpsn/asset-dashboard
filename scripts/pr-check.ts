@@ -957,6 +957,23 @@ export const CHECKS: Check[] = [
     severity: 'warn',
   },
   {
+    // Hand-rolled trend badge: `<TrendingUp/>` + `<TrendingDown/>` in one ternary.
+    // This is the canonical signature of a delta indicator assembled inline rather
+    // than using `<TrendBadge>` from src/components/ui/TrendBadge.tsx. Ships as
+    // warn — promote to error once the long tail (currently ChatBlocks, SeoChangeImpact)
+    // is migrated.
+    name: 'Hand-rolled trend badge',
+    pattern: '<TrendingUp[^>]*/>[^<]*:[^<]*<TrendingDown|<TrendingDown[^>]*/>[^<]*:[^<]*<TrendingUp',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: ['src/components/ui/TrendBadge.tsx'],
+    excludeLines: ['// pr-check-disable-next-line', '// trend-badge-ok'],
+    message: 'Use <TrendBadge value={delta} /> from src/components/ui/ instead of hand-rolled TrendingUp/TrendingDown ternaries. Props: value, suffix, invert, showSign, label, size, hideOnZero.',
+    severity: 'warn',
+    rationale: 'Hand-rolled trend badges drift in color (text-green-400 vs text-emerald-400), sign handling, and zero-state across 7+ callsites. <TrendBadge> consolidates the canonical form.',
+    claudeMdRef: '#design-system--the-three-laws-of-color',
+  },
+  {
     name: 'z.array(z.unknown()) on server',
     pattern: 'z\\.array\\(z\\.unknown\\(\\)\\)',
     fileGlobs: ['*.ts'],

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { TrendingUp, TrendingDown, Clock, Pencil, Minus } from 'lucide-react';
-import { SectionCard, EmptyState } from '../ui';
+import { TrendingUp, Clock, Pencil } from 'lucide-react';
+import { SectionCard, EmptyState, TrendBadge } from '../ui';
 import { getOptional } from '../../api/client';
 
 interface SeoChangeEvent {
@@ -48,8 +48,6 @@ function DeltaBadge({ before, after, label, invert }: { before: number; after: n
   if (before === 0 && after === 0) return null;
   const diff = after - before;
   const pct = before > 0 ? ((diff / before) * 100) : (after > 0 ? 100 : 0);
-  const isPositive = invert ? diff < 0 : diff > 0;
-  const isNeutral = diff === 0;
 
   return (
     <div className="flex items-center gap-1.5">
@@ -57,16 +55,7 @@ function DeltaBadge({ before, after, label, invert }: { before: number; after: n
       <span className="text-[11px] font-medium text-zinc-300 tabular-nums w-10 text-right">
         {label === 'CTR' ? `${after.toFixed(1)}%` : label === 'Pos' ? after.toFixed(1) : after.toLocaleString()}
       </span>
-      {isNeutral ? (
-        <span className="flex items-center gap-0.5 text-[10px] text-zinc-600">
-          <Minus className="w-2.5 h-2.5" /> 0%
-        </span>
-      ) : (
-        <span className={`flex items-center gap-0.5 text-[10px] font-medium ${isPositive ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
-          {isPositive ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
-          {pct > 0 ? '+' : ''}{pct.toFixed(0)}%
-        </span>
-      )}
+      <TrendBadge value={Math.round(pct)} invert={invert} showSign hideOnZero={false} />
     </div>
   );
 }
