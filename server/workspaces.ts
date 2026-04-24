@@ -146,7 +146,8 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
   if (row.client_portal_enabled !== null) ws.clientPortalEnabled = !!row.client_portal_enabled;
   if (row.seo_client_view !== null) ws.seoClientView = !!row.seo_client_view;
   if (row.analytics_client_view !== null) ws.analyticsClientView = !!row.analytics_client_view;
-  if (row.site_intelligence_client_view !== null) ws.siteIntelligenceClientView = !!row.site_intelligence_client_view;
+  // siteIntelligenceClientView is mapped further down (line ~187) with a more defensive `!= null`
+  // check that also handles undefined (pre-migration-049 rows). Don't duplicate it here.
   if (row.auto_reports !== null) ws.autoReports = !!row.auto_reports;
   if (row.auto_report_frequency) ws.autoReportFrequency = row.auto_report_frequency as 'weekly' | 'monthly';
   if (row.brand_voice) ws.brandVoice = row.brand_voice;
