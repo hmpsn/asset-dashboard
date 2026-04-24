@@ -1,25 +1,17 @@
 import React from 'react';
+import { cn } from '../../../lib/utils';
+import { gapMap, type GapSize } from './utils';
 
-export type GapSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+export type { GapSize } from './utils';
 export type RowAlign = 'start' | 'center' | 'end' | 'baseline';
 export type RowJustify = 'start' | 'center' | 'end' | 'between' | 'around';
 
-export interface RowProps {
+export interface RowProps extends React.HTMLAttributes<HTMLDivElement> {
   gap?: GapSize;
   align?: RowAlign;
   justify?: RowJustify;
   wrap?: boolean;
-  className?: string;
-  children?: React.ReactNode;
 }
-
-const gapMap: Record<GapSize, string> = {
-  xs: 'gap-1',
-  sm: 'gap-2',
-  md: 'gap-3',
-  lg: 'gap-4',
-  xl: 'gap-6',
-};
 
 const alignMap: Record<RowAlign, string> = {
   start: 'items-start',
@@ -37,20 +29,20 @@ const justifyMap: Record<RowJustify, string> = {
 };
 
 export const Row = React.forwardRef<HTMLDivElement, RowProps>(
-  ({ gap, align = 'center', justify, wrap, className, children }, ref) => {
-    const classes = [
-      'flex flex-row',
-      alignMap[align],
-      gap ? gapMap[gap] : '',
-      justify ? justifyMap[justify] : '',
-      wrap !== undefined ? (wrap ? 'flex-wrap' : 'flex-nowrap') : '',
-      className ?? '',
-    ]
-      .filter(Boolean)
-      .join(' ');
-
+  ({ gap, align = 'center', justify, wrap, className, children, ...rest }, ref) => {
     return (
-      <div ref={ref} className={classes}>
+      <div
+        ref={ref}
+        className={cn(
+          'flex flex-row',
+          alignMap[align],
+          gap && gapMap[gap],
+          justify && justifyMap[justify],
+          wrap !== undefined && (wrap ? 'flex-wrap' : 'flex-nowrap'),
+          className,
+        )}
+        {...rest}
+      >
         {children}
       </div>
     );

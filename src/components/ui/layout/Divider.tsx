@@ -1,31 +1,27 @@
 import React from 'react';
+import { cn } from '../../../lib/utils';
 
 export type DividerOrientation = 'horizontal' | 'vertical';
 
-export interface DividerProps {
+export interface DividerProps extends React.HTMLAttributes<HTMLDivElement> {
   orientation?: DividerOrientation;
-  className?: string;
 }
 
 export const Divider = React.forwardRef<HTMLDivElement, DividerProps>(
-  ({ orientation = 'horizontal', className }, ref) => {
-    if (orientation === 'vertical') {
-      const classes = [
-        'border-r border-[var(--brand-border)] h-full',
-        className ?? '',
-      ]
-        .filter(Boolean)
-        .join(' ');
-      return <div ref={ref} className={classes} role="separator" aria-orientation="vertical" />;
-    }
-
-    const classes = [
-      'border-b border-[var(--brand-border)] w-full',
-      className ?? '',
-    ]
-      .filter(Boolean)
-      .join(' ');
-    return <div ref={ref} className={classes} role="separator" aria-orientation="horizontal" />;
+  ({ orientation = 'horizontal', className, ...rest }, ref) => {
+    const base =
+      orientation === 'vertical'
+        ? 'border-r border-[var(--brand-border)] h-full'
+        : 'border-b border-[var(--brand-border)] w-full';
+    return (
+      <div
+        ref={ref}
+        className={cn(base, className)}
+        role="separator"
+        aria-orientation={orientation}
+        {...rest}
+      />
+    );
   }
 );
 

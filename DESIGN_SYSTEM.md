@@ -451,7 +451,7 @@ src/components/ui/
 
 ---
 
-## § 18 Layout Primitives (Phase 5)
+## § 19 Layout Primitives (Phase 5)
 
 Five structural layout primitives live in `src/components/ui/layout/`. Import from the barrel: `import { Row, Stack, Column, Grid, Divider } from '@/components/ui/layout'`. All are `React.forwardRef` components that accept an optional `className` prop for composition.
 
