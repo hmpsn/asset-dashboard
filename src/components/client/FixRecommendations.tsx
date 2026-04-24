@@ -412,7 +412,7 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
   const totalHighTraffic = categories.reduce((s, c) => s + c.highTrafficPages, 0);
 
   return (
-    <SectionCard title="Recommended Fixes" titleIcon={<Sparkles className="w-4 h-4 text-teal-400" />} titleExtra={autoCategories.length > 0 && !isPremium ? <span className="text-[11px] text-zinc-500">Est. total: <span className="text-teal-400 font-medium">{fmt(estimatedTotal)}</span></span> : undefined} noPadding className="overflow-hidden">
+    <SectionCard title="Recommended Fixes" titleIcon={<Sparkles className="w-4 h-4 text-teal-400" />} action={autoCategories.length > 0 && !isPremium ? <span className="text-[11px] text-zinc-500">Est. total: <span className="text-teal-400 font-medium">{fmt(estimatedTotal)}</span></span> : undefined} noPadding className="overflow-hidden">
       {/* Sub-header description */}
       {((hasTrafficData && totalHighTraffic > 0) || serverRecsError) && (
         <div className="px-5 pt-3 pb-0">
