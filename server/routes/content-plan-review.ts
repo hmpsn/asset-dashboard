@@ -15,6 +15,7 @@ import { createBatch } from '../approvals.js';
 import { getWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { broadcastToWorkspace } from '../broadcast.js';
+import { WS_EVENTS } from '../ws-events.js';
 
 const log = createLogger('routes:content-plan-review');
 import { requireWorkspaceAccess } from '../auth.js';
@@ -163,7 +164,7 @@ router.post('/api/content-plan/:workspaceId/:matrixId/send-template-review', req
       }],
     );
 
-    broadcastToWorkspace(req.params.workspaceId, 'approval:update', { batchId: batch.id, action: 'created' });
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.APPROVAL_UPDATE, { batchId: batch.id, action: 'created' });
     log.info({ workspaceId: req.params.workspaceId, matrixId: matrix.id, batchId: batch.id }, 'Template sent for client review');
     res.json({ batchId: batch.id, batch });
   } catch (err) {
@@ -217,7 +218,7 @@ router.post('/api/content-plan/:workspaceId/:matrixId/send-samples', requireWork
       updateMatrixCell(req.params.workspaceId, req.params.matrixId, cell.id, { status: 'review' });
     }
 
-    broadcastToWorkspace(req.params.workspaceId, 'approval:update', { batchId: batch.id, action: 'created' });
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.APPROVAL_UPDATE, { batchId: batch.id, action: 'created' });
     log.info({ workspaceId: req.params.workspaceId, matrixId: matrix.id, batchId: batch.id, cellCount: selectedCells.length }, 'Samples sent for client review');
     res.json({ batchId: batch.id, batch, cellsSent: selectedCells.length });
   } catch (err) {

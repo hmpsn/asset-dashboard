@@ -81,6 +81,11 @@ export function useClientData(workspaceId: string) {
   const annotationsQ = useClientAnnotations(workspaceId, dataEnabled);
   const anomaliesQ = useClientAnomalies(workspaceId, dataEnabled);
   const approvalsQ = useClientApprovals(workspaceId, dataEnabled);
+  // copyEntries fires for every workspace once dataEnabled — adds one request
+  // per session even for workspaces that don't use the copy pipeline. Acceptable
+  // for now: getSafe falls back to {entries:[]} on any error, and React Query
+  // dedupes with the default stale window. Future: gate on `ws?.copyPipelineEnabled`
+  // (workspace.ts feature toggles) once the admin UI exposes that flag.
   const copyEntriesQ = useClientCopyEntries(workspaceId, dataEnabled);
   const requestsQ = useClientRequestsQuery(workspaceId, dataEnabled);
   const contentReqQ = useClientContentRequests(workspaceId, dataEnabled);
