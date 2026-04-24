@@ -240,7 +240,9 @@ function PopoverInner({
         next.focus();
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        const prev = items[(activeIdx - 1 + items.length) % items.length] ?? items[items.length - 1];
+        // When nothing is focused (activeIdx === -1), land on the last item.
+        // The naive modular arithmetic gives (−1 − 1 + N) % N = N−2, which is off by one.
+        const prev = activeIdx <= 0 ? items[items.length - 1] : items[activeIdx - 1];
         prev.focus();
       } else if (e.key === 'Home') {
         e.preventDefault();

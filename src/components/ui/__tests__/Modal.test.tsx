@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import { Modal } from '../overlay/Modal';
 
 afterEach(() => {
@@ -120,5 +120,40 @@ describe('Modal', () => {
     expect(screen.getByRole('dialog').className).toMatch(/max-w-\[24rem\]/);
     rerender(<Harness open={true} onClose={() => {}} size="xl" />);
     expect(screen.getByRole('dialog').className).toMatch(/max-w-\[64rem\]/);
+  });
+
+  it('restores focus to original trigger after multiple parent re-renders with new onClose references', async () => {
+    // Simulates the most common React pattern: parent passes an inline arrow function
+    // as onClose. Each re-render produces a new function reference, which would
+    // retrigger the focus-capture effect if it had [open, onClose] as deps.
+    // After the fix, the capture effect has deps=[open] only, so the captured
+    // element is the trigger BEFORE the modal opened, not whatever is focused inside.
+    const trigger = document.createElement('button');
+    trigger.setAttribute('data-testid', 'outside-trigger');
+    document.body.appendChild(trigger);
+    trigger.focus();
+    expect(document.activeElement).toBe(trigger);
+
+    let rerenderFn: ReturnType<typeof render>['rerender'];
+    await act(async () => {
+      const result = render(<Harness open={true} onClose={() => {}} />);
+      rerenderFn = result.rerender;
+    });
+
+    // Re-render several times with a fresh onClose reference each call (inline arrow).
+    // In between, focus should naturally shift to something inside the modal.
+    await act(async () => {
+      rerenderFn(<Harness open={true} onClose={() => { /* re-render 1 */ }} />);
+      rerenderFn(<Harness open={true} onClose={() => { /* re-render 2 */ }} />);
+      rerenderFn(<Harness open={true} onClose={() => { /* re-render 3 */ }} />);
+    });
+
+    // Now close the modal — focus should restore to the original trigger.
+    await act(async () => {
+      rerenderFn(<Harness open={false} onClose={() => {}} />);
+    });
+
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
   });
 });

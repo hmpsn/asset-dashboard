@@ -10,6 +10,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { prefersReducedMotion } from './reducedMotion';
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -174,27 +175,36 @@ export function Tooltip({
 
   const motionClass = reducedMotion ? '' : 'transition-opacity duration-150';
 
+  // Portal to document.body so ancestors with transform/filter/contain do not create
+  // a new stacking context that would break position:fixed relative to the viewport.
+  // The id on the portaled element is still linked to the trigger via aria-describedby.
+  const tooltipNode =
+    visible && typeof document !== 'undefined'
+      ? createPortal(
+          <div
+            id={tipId}
+            ref={tipRef}
+            role="tooltip"
+            data-tooltip="true"
+            style={{
+              position: 'fixed',
+              top: position.top,
+              left: position.left,
+              zIndex: 'var(--z-tooltip)' as unknown as number,
+              pointerEvents: 'none',
+            }}
+            className={`bg-zinc-950 text-zinc-100 text-xs px-2 py-1 rounded shadow-lg max-w-xs ${motionClass}`}
+          >
+            {content}
+          </div>,
+          document.body,
+        )
+      : null;
+
   return (
     <>
       {clonedChild}
-      {visible ? (
-        <div
-          id={tipId}
-          ref={tipRef}
-          role="tooltip"
-          data-tooltip="true"
-          style={{
-            position: 'fixed',
-            top: position.top,
-            left: position.left,
-            zIndex: 'var(--z-tooltip)' as unknown as number,
-            pointerEvents: 'none',
-          }}
-          className={`bg-zinc-950 text-zinc-100 text-xs px-2 py-1 rounded shadow-lg max-w-xs ${motionClass}`}
-        >
-          {content}
-        </div>
-      ) : null}
+      {tooltipNode}
     </>
   );
 }

@@ -84,10 +84,19 @@ function ModalInner({
   const titleId = labelledById ?? `modal-title-${generatedId}`;
   const reducedMotion = prefersReducedMotion();
 
-  // Escape key + focus trap.
+  // Capture the previously focused element once when the modal opens (open: false→true).
+  // Must be a separate effect with deps=[open] only so a non-memoized onClose prop
+  // passed inline (the most common React pattern) does NOT retrigger this effect
+  // while the modal is open — which would overwrite the capture with whatever element
+  // is focused inside the modal, causing focus to restore to the wrong target on close.
   useEffect(() => {
     if (!open) return;
     previouslyFocusedRef.current = (document.activeElement as HTMLElement | null) ?? null;
+  }, [open]);
+
+  // Escape key + focus trap.
+  useEffect(() => {
+    if (!open) return;
 
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {

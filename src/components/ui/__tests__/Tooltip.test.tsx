@@ -116,6 +116,20 @@ describe('Tooltip', () => {
     expect(onFocus).toHaveBeenCalledTimes(1);
   });
 
+  it('portals the tooltip to document.body, not into the trigger tree', () => {
+    const { container } = render(
+      <Tooltip content="Portal tip">
+        <button>Hover me</button>
+      </Tooltip>,
+    );
+    fireEvent.focus(screen.getByRole('button'));
+    const tip = screen.getByRole('tooltip');
+    // The portaled element is a direct child of document.body.
+    expect(document.body.contains(tip)).toBe(true);
+    // It is NOT a descendant of the component's own render container.
+    expect(container.contains(tip)).toBe(false);
+  });
+
   it('skips transition class when prefers-reduced-motion is set', () => {
     const originalMatchMedia = window.matchMedia;
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({

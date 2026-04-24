@@ -123,6 +123,19 @@ describe('Popover', () => {
     expect(document.activeElement).toBe(items[1]);
   });
 
+  it('ArrowUp with nothing focused lands on last item (off-by-one fix)', async () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByTestId('trigger'));
+    // Do NOT wait for the post-open focus rAF — keep activeElement outside the menu
+    // so activeIdx === -1 when ArrowUp fires.
+    const items = screen.getAllByRole('menuitem');
+    // Ensure focus is outside the popover items.
+    screen.getByTestId('trigger').focus();
+    fireEvent.keyDown(document, { key: 'ArrowUp' });
+    // Should land on the last item, not the second-to-last.
+    expect(document.activeElement).toBe(items[items.length - 1]);
+  });
+
   it('danger item has red text class', () => {
     render(<Harness />);
     fireEvent.click(screen.getByTestId('trigger'));
