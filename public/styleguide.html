@@ -993,6 +993,73 @@
       </div>
     </div>
 
+    <!-- TrendBadge + ChartCard (Phase 4 primitives) -->
+    <div class="sub-section">
+      <div class="col-label">TrendBadge · directional delta indicator</div>
+      <div class="card">
+        <p class="muted" style="margin:0 0 14px; font-size:12px;">Single reusable primitive for up/down deltas across metric tiles, chart titles, and inline rows. Replaces ~30 hand-rolled TrendingUp/Down + emerald-400/red-400 patterns. Props: <span class="t-mono">value, suffix, invert, showSign, label, size, hideOnZero</span>.</p>
+        <div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:14px;">
+          <div>
+            <div class="t-label" style="margin:0 0 6px;">Positive</div>
+            <span style="display:inline-flex; align-items:center; gap:2px; font-size:11px; font-weight:500; color:var(--emerald);">
+              <svg class="i i-sm"><use href="#i-trend"/></svg> 12.4%
+            </span>
+          </div>
+          <div>
+            <div class="t-label" style="margin:0 0 6px;">Negative</div>
+            <span style="display:inline-flex; align-items:center; gap:2px; font-size:11px; font-weight:500; color:var(--red);">
+              <svg class="i i-sm" style="transform:scaleY(-1);"><use href="#i-trend"/></svg> 3.1%
+            </span>
+          </div>
+          <div>
+            <div class="t-label" style="margin:0 0 6px;">Zero (hideOnZero=false)</div>
+            <span style="display:inline-flex; align-items:center; gap:2px; font-size:11px; font-weight:500; color:var(--zinc-400, #a1a1aa);">
+              <svg class="i i-sm" viewBox="0 0 24 24"><path d="M5 12h14"/></svg> 0%
+            </span>
+          </div>
+          <div>
+            <div class="t-label" style="margin:0 0 6px;">With label · showSign</div>
+            <span style="display:inline-flex; align-items:center; gap:2px; font-size:11px; font-weight:500; color:var(--emerald);">
+              <svg class="i i-sm"><use href="#i-trend"/></svg> +8% vs last month
+            </span>
+          </div>
+          <div>
+            <div class="t-label" style="margin:0 0 6px;">Invert · rank (lower better)</div>
+            <span style="display:inline-flex; align-items:center; gap:2px; font-size:11px; font-weight:500; color:var(--emerald);">
+              <svg class="i i-sm" style="transform:scaleY(-1);"><use href="#i-trend"/></svg> 2 positions
+            </span>
+          </div>
+          <div>
+            <div class="t-label" style="margin:0 0 6px;">Size · md</div>
+            <span style="display:inline-flex; align-items:center; gap:2px; font-size:12px; font-weight:500; color:var(--emerald);">
+              <svg class="i"><use href="#i-trend"/></svg> 14%
+            </span>
+          </div>
+        </div>
+      </div>
+      <div class="muted" style="font-size:11px; margin-top:10px;">Enforcement: hand-rolled <span class="t-mono">TrendingUp</span> / <span class="t-mono">TrendingDown</span> adjacent to <span class="t-mono">emerald-400</span>/<span class="t-mono">red-400</span> fires a pr-check <b>warn</b>. Escape hatch: <span class="t-mono">// pr-check-disable-next-line -- &lt;reason&gt;</span>.</div>
+    </div>
+
+    <div class="sub-section">
+      <div class="col-label">ChartCard · chart-friendly SectionCard variant</div>
+      <div class="sectioncard" style="border-radius:10px 24px 10px 24px;">
+        <div class="sc-header" style="border-bottom:none;">
+          <div class="sc-title"><svg class="i"><use href="#i-chart"/></svg> Clicks trend
+            <span style="display:inline-flex; align-items:center; gap:2px; font-size:11px; font-weight:500; color:var(--emerald); margin-left:8px;">
+              <svg class="i i-sm"><use href="#i-trend"/></svg> +6%
+            </span>
+          </div>
+          <button class="btn btn-link">View details</button>
+        </div>
+        <div class="sc-body" style="padding:0 16px 12px;">
+          <div style="height:120px; background:linear-gradient(180deg, rgba(45,212,191,.08), transparent); border-radius:6px; display:flex; align-items:flex-end;">
+            <svg viewBox="0 0 400 120" style="width:100%; height:100%;"><polyline points="0,90 40,80 80,85 120,60 160,55 200,40 240,50 280,30 320,25 360,15 400,20" fill="none" stroke="var(--teal)" stroke-width="1.5"/></svg>
+          </div>
+        </div>
+      </div>
+      <div class="muted" style="font-size:11px; margin-top:10px;">Thin <span class="t-mono">SectionCard</span> wrapper with chart-friendly defaults: tighter padding (<span class="t-mono">px-4 py-3</span>), inline title + <span class="t-mono">&lt;TrendBadge&gt;</span> row, no <span class="t-mono">border-b</span> separator before the chart body. Signature 10/24 radius preserved. Pairs with <span class="t-mono">&lt;AnnotatedTrendChart&gt;</span> and <span class="t-mono">&lt;MiniSparkline&gt;</span>.</div>
+    </div>
+
     <!-- TrendChart pointer — lives in §06 now -->
     <div class="sub-section">
       <div class="col-label">Area chart · dual trend (TrendChart)</div>

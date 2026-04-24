@@ -3,10 +3,9 @@
  */
 import { useState } from 'react';
 import {
-  CheckCircle, Globe, RefreshCw, Copy, ExternalLink, Clock,
-  TrendingUp, TrendingDown, Minus,
+  CheckCircle, Globe, RefreshCw, Copy, ExternalLink, Clock, Minus,
 } from 'lucide-react';
-import { scoreColorClass, EmptyState } from '../ui';
+import { scoreColorClass, EmptyState, TrendBadge } from '../ui';
 import { ScoreTrendChart } from './ScoreTrendChart';
 import { ActionItemsPanel } from './ActionItemsPanel';
 import type { SnapshotSummary } from './types';
@@ -44,10 +43,7 @@ export function AuditHistory({ siteId, history, onRefresh }: { siteId: string; h
           <div className="flex items-end gap-2">
             <span className={`text-3xl font-bold ${scoreColorClass(latest.siteScore)}`}>{latest.siteScore}</span>
             {scoreDelta !== 0 && (
-              <span className={`flex items-center gap-0.5 text-xs font-medium pb-1 ${scoreDelta > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {scoreDelta > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                {scoreDelta > 0 ? '+' : ''}{scoreDelta}
-              </span>
+              <TrendBadge value={scoreDelta} suffix="" showSign size="md" className="pb-1" />
             )}
             {scoreDelta === 0 && previous && (
               <span className="flex items-center gap-0.5 text-xs text-zinc-500 pb-1"><Minus className="w-3 h-3" /> No change</span>
@@ -63,9 +59,7 @@ export function AuditHistory({ siteId, history, onRefresh }: { siteId: string; h
           <div className="flex items-end gap-2">
             <span className="text-3xl font-bold text-red-400">{latest.errors}</span>
             {errorDelta !== 0 && previous && (
-              <span className={`text-xs font-medium pb-1 ${errorDelta < 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {errorDelta > 0 ? '+' : ''}{errorDelta}
-              </span>
+              <TrendBadge value={errorDelta} suffix="" showSign invert size="md" className="pb-1" />
             )}
           </div>
         </div>
@@ -126,9 +120,7 @@ export function AuditHistory({ siteId, history, onRefresh }: { siteId: string; h
                   <div className="text-xs text-zinc-500">
                     {snap.totalPages} pages · {snap.errors} errors · {snap.warnings} warnings
                     {delta !== 0 && (
-                      <span className={`ml-2 ${delta > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        ({delta > 0 ? '+' : ''}{delta} pts)
-                      </span>
+                      <TrendBadge value={delta} suffix=" pts" showSign className="ml-2" />
                     )}
                   </div>
                 </div>

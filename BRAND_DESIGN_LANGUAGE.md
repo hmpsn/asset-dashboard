@@ -120,6 +120,8 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **MetricRing** | `MetricRing.tsx` | Auto from `scoreColor()`: ≥80 green, ≥60 amber, <60 red | DIN Pro 700, font size = `0.38 × ring size` |
 | **MetricRingSvg** | `MetricRing.tsx` | Same as MetricRing | Smaller inline SVG variant for tight spaces |
 | **SectionCard** | `SectionCard.tsx` | `bg-zinc-900 border-zinc-800` | Header row optional; title: `text-sm font-semibold text-zinc-200` |
+| **ChartCard** | `ChartCard.tsx` | Same as SectionCard (`bg-[var(--surface-2)] border-zinc-800`) | Thin SectionCard wrapper for chart-friendly defaults: tighter padding (`px-4 py-3`), inline title + optional `<TrendBadge>` row, no `border-b` separator. Preserves signature `10px 24px` radius. |
+| **TrendBadge** | `TrendBadge.tsx` | Positive: `text-emerald-400` + `TrendingUp`; Negative: `text-red-400` + `TrendingDown`; Zero (when `hideOnZero={false}`): `text-zinc-400` + `Minus` | Canonical directional delta indicator. Props: `value`, `suffix='%'`, `invert`, `showSign`, `label`, `size='sm'\|'md'`, `hideOnZero=true`. Replaces all hand-rolled `TrendingUp/Down + emerald/red` ternaries. Use `invert` when lower=better (positions, error counts). |
 | **PageHeader** | `PageHeader.tsx` | `text-lg font-semibold text-zinc-100` | Title + optional subtitle + action slot |
 | **Badge** | `Badge.tsx` | 9 colors: `teal`, `blue`, `emerald`, `green`, `amber`, `red`, `orange`, `purple`, `zinc` | Pattern: `bg-{color}-500/10 text-{color}-400` |
 | **TabBar** | `TabBar.tsx` | Active: `border-teal-500 text-teal-200` | Underline style, `border-b-2` |
@@ -378,6 +380,8 @@ The platform's signature shape is an asymmetric diagonal radius — tight top-le
 | `src/components/ui/StatCard.tsx` | Default + CompactStatBar |
 | `src/components/ui/MetricRing.tsx` | MetricRing + MetricRingSvg |
 | `src/components/ui/SectionCard.tsx` | Standard card container |
+| `src/components/ui/ChartCard.tsx` | SectionCard variant for charts (tighter padding, inline title+trend) |
+| `src/components/ui/TrendBadge.tsx` | Canonical directional delta indicator (emerald/red/zinc) |
 | `src/components/ui/PageHeader.tsx` | Consistent page header |
 | `src/components/ui/TabBar.tsx` | Underline tab navigation |
 | `src/components/ui/DateRangeSelector.tsx` | Segmented date picker |

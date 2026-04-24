@@ -809,49 +809,74 @@ After migrating the final cluster, promote the three Phase 1 rules from `warn` t
 
 ## Phase 4 — Primitive Hardening (one PR, after Phase 3 complete)
 
-> Add primitives revealed as missing during Phase 3. Exact specs depend on Phase 3 findings. Anticipated below.
+> Add primitives revealed as missing during Phase 3. Scope narrowed after Phase 3 audit (2026-04-24).
 
-### Anticipated primitives (confirm against Phase 3 learnings)
+### Audit findings (2026-04-24)
 
-**`<Surface tier={1|2|3}>`** — a lightweight div with `var(--surface-N)` background for one-off surfaces that aren't SectionCard:
+An Explore-agent audit across all 38 Phase 3 files measured each anticipated primitive against a 3+ instances bar:
+
+- **`<Surface tier={1|2|3}>`** — **not justified.** Only 9 uses of `bg-[var(--surface-N)]` in Phase 3 files, all already inside SectionCard / StatCard / Skeleton. No bare-div pattern to consolidate. **Deferred.**
+- **`<Toolbar>`** — **borderline, deferred.** 6 filter/action rows, but high variance (toggles vs. static headers vs. filter+search+button combos, different padding, different responsibilities). A shared wrapper would be either too loose (just a flex row, no value) or too opinionated (baking assumptions that don't fit all callers). Document the pattern; keep callsites local.
+- **`<DataCard>`** — **justified but reshape.** 7 chart+trend instances, but the pattern is not uniform enough for a single wrapper. Split into a thin `<ChartCard>` wrapper + a separate `<TrendBadge>` primitive.
+
+### Primitives to ship
+
+**`<TrendBadge>`** — reusable trend indicator (up/down arrow + % delta, emerald/red coloring). Extracts the canonical `ChangeBadge` helper from [DataSnapshots.tsx:16](src/components/client/DataSnapshots.tsx:16) and replaces hand-rolled versions found in:
+
+- [RevenueDashboard.tsx:134-137](src/components/RevenueDashboard.tsx:134) — monthDelta % vs last month
+- [AuditHistory.tsx:47-49](src/components/audit/AuditHistory.tsx:47) — scoreDelta
+- [SchemaSuggester.tsx:979](src/components/SchemaSuggester.tsx:979) — clicks delta (inline)
+- [DataSnapshots.tsx](src/components/client/DataSnapshots.tsx) — 5 ChangeBadge callsites (extract + replace local helper)
 
 ```tsx
-// src/components/ui/Surface.tsx
-import type { ReactNode } from 'react';
-
-interface SurfaceProps {
-  tier?: 1 | 2 | 3;
-  children: ReactNode;
+// src/components/ui/TrendBadge.tsx
+interface TrendBadgeProps {
+  value: number;
+  suffix?: string;         // default '%'
+  invert?: boolean;        // flip what's "good" (e.g. rank position — lower is better)
+  showSign?: boolean;      // show '+' prefix for positive values; default false
+  label?: string;          // contextual text appended after the value, e.g. 'vs last month'
+  size?: 'sm' | 'md';      // sm = 11px / w-3 (default), md = 12px / w-3.5
+  hideOnZero?: boolean;    // default true
   className?: string;
-}
-
-export function Surface({ tier = 2, children, className }: SurfaceProps) {
-  const bg = {
-    1: 'bg-[var(--surface-1)]',
-    2: 'bg-[var(--surface-2)]',
-    3: 'bg-[var(--surface-3)]',
-  }[tier];
-  return (
-    <div className={`${bg} ${className ?? ''}`}>
-      {children}
-    </div>
-  );
 }
 ```
 
-**`<Toolbar>`** — standardized filter/action bar with consistent padding, replaces ad-hoc filter rows discovered during Phase 3.
+Renders `TrendingUp` + `text-emerald-400` for positive, `TrendingDown` + `text-red-400` for negative, `null` (or `Minus` + `text-zinc-400`) for zero based on `hideOnZero`.
 
-**`<DataCard>`** — SectionCard variant with an annotated-trend chart slot baked in, if Phase 3 reveals 3+ hand-rolled instances of "chart card" pattern.
+**`<ChartCard>`** — thin SectionCard wrapper with chart-friendly defaults: tighter padding (`px-4 py-3`), inline title+trend row (no border-b separator), no asymmetric corner clash with embedded recharts containers. Pairs with existing `<AnnotatedTrendChart>` and `<MiniSparkline>`.
+
+```tsx
+// src/components/ui/ChartCard.tsx
+interface ChartCardProps {
+  title?: string;
+  titleIcon?: ReactNode;
+  /** Trend delta to display inline next to title. Rendered via <TrendBadge>. */
+  trend?: number;
+  /** Props forwarded to the inline TrendBadge (suffix, label, invert, etc.). */
+  trendProps?: Omit<TrendBadgeProps, 'value'>;
+  /** Right-aligned slot (e.g. a "View details" link). */
+  action?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}
+```
 
 ### Per-primitive checklist
 
-- [ ] Create `src/components/ui/<Name>.tsx`
-- [ ] Export from `src/components/ui/index.ts` barrel
-- [ ] Add demonstration section to `/public/styleguide.html` (the static v9 file — edit the HTML directly, not a React component)
-- [ ] Add pr-check rule (warn → error after adoption period)
+- [ ] Create `src/components/ui/TrendBadge.tsx` and `src/components/ui/ChartCard.tsx`
+- [ ] Export both from `src/components/ui/index.ts` barrel
+- [ ] Add demonstration section to `/public/styleguide.html`
+- [ ] Add pr-check **warn** rule: hand-rolled TrendingUp/Down + emerald-400/red-400 pattern should use `<TrendBadge>` (warn for now; promote to error in a follow-up after adoption)
+- [ ] Add pr-check fixture tests in `tests/pr-check.test.ts`
+- [ ] Migrate the 7 identified callsites (DataSnapshots × 5 ChangeBadge, RevenueDashboard, AuditHistory, SchemaSuggester) to `<TrendBadge>` in the same PR
 - [ ] `npm run rules:generate`
 - [ ] `npm run typecheck && npx vite build && npx vitest run && npx tsx scripts/pr-check.ts`
-- [ ] Open PR: `feat(primitives): Phase 4 — Surface, Toolbar, DataCard primitives`
+- [ ] Open PR: `feat(primitives): Phase 4 — ChartCard + TrendBadge primitives`
+
+### Deferred
+
+`<Surface>` and `<Toolbar>` are intentionally deferred. Revisit if a future phase surfaces 3+ new callsites.
 
 ---
 

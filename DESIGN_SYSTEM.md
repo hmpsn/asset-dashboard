@@ -207,6 +207,44 @@ Standard card container for content sections.
 - `interactive` prop: adds teal left-border accent on hover (`hover:border-l-teal-500/40`) for clickable cards
 - `staggerIndex` prop: entrance animation delay (0-based, 60ms per index)
 
+### 4a. ChartCard
+
+Thin `SectionCard` wrapper with chart-friendly defaults. Used for sparkline/mini-chart panels where the header needs to fit a title plus a directional trend indicator inline.
+
+```
+┌──────────────────────────────────────────────────────┐
+│ Title  ↗ +12.4%                        [optional action]│  ← inline title + TrendBadge
+│ <chart body>                                          │
+└──────────────────────────────────────────────────────┘
+```
+
+- Container: same `bg-[var(--surface-2)] border-zinc-800` + signature `10px 24px 10px 24px` radius as SectionCard
+- Tighter padding than SectionCard: header `px-4 py-3`, body `px-4 pb-3`
+- No `border-b` separator — chart visuals flow directly under header
+- `trend?: number` prop renders an inline `<TrendBadge>` next to the title; `trendProps` passes through (`invert`, `showSign`, `label`, etc.)
+- Omit all header props → header row doesn't render, body gets `px-4 py-3`
+
+### 4b. TrendBadge
+
+Canonical directional delta indicator. Replaces hand-rolled `TrendingUp/Down + emerald/red-400` ternaries across the app.
+
+```
+↗ +12.4%        ↘ -3.2%        — 0%
+```
+
+- Positive (or negative with `invert`): `text-emerald-400` + `TrendingUp` icon
+- Negative (or positive with `invert`): `text-red-400` + `TrendingDown` icon
+- Zero (only when `hideOnZero={false}`): `text-zinc-400` + `Minus` icon
+- Props:
+  - `value: number` — raw delta (e.g. `-12.4` or `3`)
+  - `suffix='%'` — unit string appended after the number
+  - `invert=false` — flip color mapping (use when lower = better, e.g. position, error count)
+  - `showSign=false` — show `+`/`-` sign prefix (default shows `Math.abs(value)`)
+  - `label?: string` — optional trailing context string (e.g. `"vs last month"`)
+  - `size='sm' | 'md'` — `sm` = `text-[11px]` + `w-3 h-3` icon (default), `md` = `text-xs` + `w-3.5 h-3.5`
+  - `hideOnZero=true` — return `null` when `value === 0` (override to `false` to keep a neutral Minus visible)
+- Always use `<TrendBadge>` instead of inlining `TrendingUp/Down` + emerald/red. Enforced by the pr-check `Hand-rolled trend badge` warn rule.
+
 ### 5. DateRangeSelector
 
 **ONE pattern** for all date/period selectors (replaces 3 current styles).
@@ -398,6 +436,8 @@ src/components/ui/
 ├── MetricToggleCard.tsx    # Toggleable stat card for chart series visibility (active/inactive states)
 ├── PageHeader.tsx          # Consistent page header
 ├── SectionCard.tsx         # Standard card container
+├── ChartCard.tsx           # SectionCard variant for charts (inline title+TrendBadge)
+├── TrendBadge.tsx          # Canonical directional delta indicator (emerald/red/zinc)
 ├── DateRangeSelector.tsx   # Unified date/period picker
 ├── DataList.tsx            # Ranked list display
 ├── Badge.tsx               # Status/category pill
