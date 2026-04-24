@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Building2, Phone, Mail, MapPin, Link2, Clock, Save, Loader2 } from 'lucide-react';
 import { put } from '../../api/client';
+import { SectionCard } from '../ui';
 
 interface BusinessProfile {
   phone?: string;
@@ -120,7 +121,7 @@ export function BusinessProfileTab({ workspaceId, businessProfile, toast, onSave
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+      <SectionCard noPadding>
         <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
           <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
             <Building2 className="w-4 h-4 text-teal-400" />
@@ -310,13 +311,13 @@ export function BusinessProfileTab({ workspaceId, businessProfile, toast, onSave
             </button>
           </div>
         </div>
-      </div>
+      </SectionCard>
 
       {/* Context note */}
-      <div className="rounded-xl bg-zinc-900/50 border border-zinc-800 px-4 py-3 text-[11px] text-zinc-500 space-y-1">
-        <p className="font-medium text-zinc-400">How this is used</p>
-        <p>Schema generation will inject these values directly into LocalBusiness, Organization, and related schema types — even if they don't appear on the page being analyzed. Contact details verified here also bypass the content-verification step that normally strips data not found in page HTML.</p>
-      </div>
+      <SectionCard variant="subtle">
+        <p className="font-medium text-zinc-400 text-[11px]">How this is used</p>
+        <p className="text-[11px] text-zinc-500 mt-1">Schema generation will inject these values directly into LocalBusiness, Organization, and related schema types — even if they don't appear on the page being analyzed. Contact details verified here also bypass the content-verification step that normally strips data not found in page HTML.</p>
+      </SectionCard>
     </div>
   );
 }
