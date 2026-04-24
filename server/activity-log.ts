@@ -152,7 +152,7 @@ const CLIENT_VISIBLE_TYPES: Set<ActivityType> = new Set([
   'audit_completed', 'request_resolved', 'approval_applied', 'seo_updated',
   'images_optimized', 'links_fixed', 'content_updated', 'content_requested',
   'brief_generated', 'brief_approved', 'content_upgraded', 'fix_completed',
-  'content_published',
+  'content_published', 'copy_sent_to_client',
 ]);
 
 // --- Prepared statements (lazily initialized after migrations run) ---

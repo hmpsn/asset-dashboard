@@ -283,14 +283,16 @@ router.post(
     const sections = getSectionsForEntry(entryId, workspaceId);
     const draftSections = sections.filter(s => s.status === 'draft');
     if (draftSections.length === 0) return res.status(400).json({ error: 'No draft sections to send' });
-    let sent = 0;
-    const bulkTransition = db.transaction(() => {
+    // blueprintId is in the URL for API consistency with other entry-scoped routes but is
+    // not needed here — sections are scoped by entryId + workspaceId.
+    const bulkTransition = db.transaction((): number => {
+      let count = 0;
       for (const s of draftSections) {
-        const updated = updateSectionStatus(s.id, workspaceId, 'client_review');
-        if (updated) sent++;
+        if (updateSectionStatus(s.id, workspaceId, 'client_review')) count++;
       }
+      return count;
     });
-    bulkTransition();
+    const sent = bulkTransition();
     broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_SECTION_UPDATED, { entryId, action: 'sent_to_client' });
     addActivity(workspaceId, 'copy_sent_to_client', `Sent ${sent} section${sent !== 1 ? 's' : ''} for client review`);
     return res.json({ sent });
