@@ -1,2 +1,19 @@
-// Phase 1 placeholder — full implementation in Task 1.1
-export function Label(_props: Record<string, unknown> = {}): null { return null; }
+import React from 'react';
+
+export interface LabelProps {
+  className?: string;
+  children?: React.ReactNode;
+}
+
+export const Label = React.forwardRef<HTMLSpanElement, LabelProps>(
+  ({ className, children }, ref) => {
+    const combinedClass = ['t-label', className].filter(Boolean).join(' ');
+    return (
+      <span ref={ref} className={combinedClass}>
+        {children}
+      </span>
+    );
+  }
+);
+
+Label.displayName = 'Label';
