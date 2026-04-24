@@ -501,7 +501,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
       <div className="space-y-2">
         {filteredIssues.length === 0 ? (
           <div className="flex flex-col items-center py-10 text-zinc-500 gap-2">
-            <CheckCircle className="w-8 h-8 text-green-500" />
+            <CheckCircle className="w-8 h-8 text-emerald-400" />
             <p className="text-sm">{activeFilter ? 'No issues in this category' : 'All clear! No issues found.'}</p>
           </div>
         ) : (

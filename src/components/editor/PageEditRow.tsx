@@ -371,7 +371,7 @@ export function PageEditRow({
                 onClick={() => onSendToClient(page.id)}
                 disabled={!hasChanges || isSendingToClient}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  isSentToClient ? 'bg-green-600 text-white' : 'bg-cyan-600/20 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-600/30 disabled:opacity-50 disabled:cursor-not-allowed'
+                  isSentToClient ? 'bg-emerald-600 text-white' : 'bg-cyan-600/20 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-600/30 disabled:opacity-50 disabled:cursor-not-allowed'
                 }`}
               >
                 {isSendingToClient ? <Loader2 className="w-3 h-3 animate-spin" /> : isSentToClient ? <Check className="w-3 h-3" /> : <Send className="w-3 h-3" />}
@@ -395,7 +395,7 @@ export function PageEditRow({
               disabled={!edit.dirty || isSaving || !onSave}
               title={!onSave && isCmsPage ? 'CMS pages must be updated directly in Webflow' : undefined}
               className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                isSaved ? 'bg-green-600 text-white' : 'bg-white text-black hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed'
+                isSaved ? 'bg-emerald-600 text-white' : 'bg-white text-black hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed'
               }`}
             >
               {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : isSaved ? <Check className="w-3 h-3" /> : <Save className="w-3 h-3" />}

@@ -109,7 +109,7 @@ function BatchProgressBar({ job }: BatchProgressProps) {
         <span className="text-zinc-400">
           {generated}/{total} generated
           {reviewed > 0 && <span className="ml-2 text-zinc-500">&middot; {reviewed} reviewed</span>}
-          {approved > 0 && <span className="ml-2 text-green-500">&middot; {approved} approved</span>}
+          {approved > 0 && <span className="ml-2 text-emerald-400">&middot; {approved} approved</span>}
         </span>
       </div>
       <div
@@ -125,7 +125,7 @@ function BatchProgressBar({ job }: BatchProgressProps) {
             job.status === 'failed'
               ? 'bg-red-500'
               : job.status === 'complete'
-              ? 'bg-gradient-to-r from-green-600 to-emerald-500'
+              ? 'bg-gradient-to-r from-emerald-600 to-emerald-500'
               : 'bg-gradient-to-r from-teal-600 to-emerald-600'
           }`}
           style={{ width: `${Math.min(100, percentage)}%` }}

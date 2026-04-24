@@ -89,7 +89,7 @@
 
   /* ─── Chart tokens ─── */
   --metric-ring-track: #27272a;
-  --blue-ghost: rgba(96, 165, 250, 0.08);
+  --blue-ghost: rgba(96, 165, 250, 0.08); /* 0.08 = subtle info tint (was 0.4 in legacy styleguide — reduced for dark bg legibility) */
   --chart-grid: #27272a;
   --chart-axis: #71717a;
   --chart-area-top: 0.18;

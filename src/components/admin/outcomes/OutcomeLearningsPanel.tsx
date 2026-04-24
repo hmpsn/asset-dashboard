@@ -13,8 +13,8 @@ interface Props {
   workspaceId: string;
 }
 
-function confidenceColor(confidence: LearningsConfidence): 'green' | 'amber' | 'red' {
-  if (confidence === 'high') return 'green';
+function confidenceColor(confidence: LearningsConfidence): 'emerald' | 'amber' | 'red' {
+  if (confidence === 'high') return 'emerald';
   if (confidence === 'medium') return 'amber';
   return 'red';
 }

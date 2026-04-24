@@ -29,7 +29,7 @@ const STATUS_CONFIG = {
 const PRIORITY_CONFIG = {
   high: { label: 'High', dot: 'bg-red-400' },
   medium: { label: 'Med', dot: 'bg-amber-400' },
-  low: { label: 'Low', dot: 'bg-green-400' },
+  low: { label: 'Low', dot: 'bg-emerald-400' },
 } as const;
 
 export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {

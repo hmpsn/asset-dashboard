@@ -321,7 +321,7 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
                     <div className="w-16 h-1.5 bg-zinc-700 rounded-full overflow-hidden">
                       <div className="h-full bg-teal-500/50 rounded-full transition-all" style={{ width: `${progress}%` }} />
                     </div>
-                    <Badge color={progress === 100 ? 'green' : progress > 0 ? 'amber' : 'zinc'} label={`${m.cells.length} pages`} />
+                    <Badge color={progress === 100 ? 'emerald' : progress > 0 ? 'amber' : 'zinc'} label={`${m.cells.length} pages`} />
                   </div>
                 </button>
               );

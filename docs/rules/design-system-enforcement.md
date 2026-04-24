@@ -88,6 +88,12 @@ All Phase 3 rules will report `warn` initially and be promoted to `error` after 
 Verification: `npx tsx scripts/verify-styleguide-parity.ts`
 pr-check rule: `styleguide-token-parity` (warn → error in Phase 3)
 
+**Phase 3 author note — `src/index.css` gap:** The `styleguide-token-parity` rule currently
+only checks `public/styleguide.css` for stray `--*` declarations. A matching rule for
+`src/index.css` (ensuring it stays token-free beyond the `@import`) is not yet mechanized.
+Phase 3 should add a `customCheck` that scans `src/index.css` for `--*` lines outside the
+import statement. Until then, `verify-styleguide-parity.ts` check #3 provides a manual gate.
+
 ### Outstanding hatches to migrate
 
 The `// pr-check-disable-next-line` comment form predates per-rule hatches. When any

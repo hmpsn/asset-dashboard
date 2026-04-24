@@ -164,7 +164,7 @@ export function StripeSettings() {
       titleIcon={<CreditCard className="w-4 h-4 text-teal-400" />}
       action={
         config?.configured ? (
-          <Badge label="Connected" color="green" />
+          <Badge label="Connected" color="emerald" />
         ) : (
           <Badge label="Not configured" color="zinc" />
         )

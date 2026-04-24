@@ -432,7 +432,7 @@ export function ApprovalsTab({
                                   <div className="flex items-center gap-2 mt-3">
                                     <button
                                       onClick={() => updateApprovalItem(batch.id, item.id, { status: 'approved' })}
-                                      className="flex items-center gap-1 px-3 py-1.5 bg-green-600/80 hover:bg-emerald-500 rounded-lg text-[11px] font-medium transition-colors"
+                                      className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600/80 hover:bg-emerald-500 rounded-lg text-[11px] font-medium transition-colors"
                                     >
                                       <Check className="w-3 h-3" /> Approve
                                     </button>
@@ -545,7 +545,7 @@ export function ApprovalsTab({
                   <button
                     onClick={() => applyApprovedBatch(batch.id)}
                     disabled={isApplying}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-emerald-500 disabled:opacity-50 rounded-lg text-xs font-medium transition-colors"
+                    className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 rounded-lg text-xs font-medium transition-colors"
                   >
                     {isApplying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                     {isApplying ? 'Applying...' : 'Apply to Website'}

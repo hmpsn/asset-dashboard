@@ -517,7 +517,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                                   {rec.status === 'in_progress' && (
                                     <button
                                       onClick={() => handleStatusUpdate(rec.id, 'completed')}
-                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-green-600 hover:bg-emerald-500 text-white transition-colors"
+                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
                                     >
                                       <CheckCircle2 className="w-3 h-3" />
                                       Mark Complete
@@ -556,7 +556,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                                   ) : rec.status === 'in_progress' ? (
                                     <button
                                       onClick={() => handleStatusUpdate(rec.id, 'completed')}
-                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-green-600 hover:bg-emerald-500 text-white transition-colors"
+                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
                                     >
                                       <CheckCircle2 className="w-3 h-3" />
                                       Mark Done

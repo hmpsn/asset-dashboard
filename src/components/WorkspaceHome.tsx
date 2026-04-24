@@ -138,7 +138,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
     : null;
 
   // Action items — priority: 1=critical, 2=important, 3=setup suggestions
-  type ActionItem = { label: string; sub: string; color: 'red' | 'amber' | 'teal' | 'green'; icon: typeof Bell; tab: string; priority: 1 | 2 | 3; queryString?: string };
+  type ActionItem = { label: string; sub: string; color: 'red' | 'amber' | 'teal' | 'emerald'; icon: typeof Bell; tab: string; priority: 1 | 2 | 3; queryString?: string };
   const actions: ActionItem[] = [];
   if (newRequests.length > 0) actions.push({ label: `${newRequests.length} new client request${newRequests.length > 1 ? 's' : ''}`, sub: 'Review and respond', color: 'red', icon: Bell, tab: 'requests', priority: 1 });
   const pendingOrders = workOrders.filter(o => o.status === 'pending' || o.status === 'in_progress');
@@ -475,7 +475,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
 
       {/* ── Needs Attention ── */}
       {(urgentActions.length > 0 || setupActions.length > 0) && (() => {
-        const colorMap = { red: 'text-red-400', amber: 'text-amber-400', teal: 'text-teal-400', green: 'text-emerald-400' };
+        const colorMap = { red: 'text-red-400', amber: 'text-amber-400', teal: 'text-teal-400', emerald: 'text-emerald-400' };
         const visibleUrgent = showMoreActions ? urgentActions : urgentActions.slice(0, 5);
         const hiddenCount = urgentActions.length - visibleUrgent.length;
         return (

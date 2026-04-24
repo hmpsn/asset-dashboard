@@ -160,7 +160,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
             title={`Online Now · ${totalOnline}`}
             titleIcon={
               <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
               </span>
             }
@@ -178,7 +178,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                       <span className="text-[10px] text-zinc-500 ml-2">{u.email}</span>
                     </div>
                     <span className="text-[10px] text-zinc-500 flex-shrink-0">{wsNames[wsId] || wsId}</span>
-                    <Badge label={u.role === 'admin' ? 'Admin' : 'Client'} color={u.role === 'admin' ? 'blue' : 'green'} />
+                    <Badge label={u.role === 'admin' ? 'Admin' : 'Client'} color={u.role === 'admin' ? 'blue' : 'emerald'} />
                   </div>
                 ))
               )}
@@ -218,7 +218,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                 {onlineUsers.length > 0 && (
                   <div className="flex items-center gap-2 px-3 py-1.5 -mx-5 -mt-5 mb-3 rounded-t-xl bg-emerald-500/10 border-b border-emerald-500/20">
                     <span className="relative flex h-2.5 w-2.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                       <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
                     </span>
                     <span className="text-[11px] font-semibold text-emerald-400">

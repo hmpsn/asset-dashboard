@@ -293,7 +293,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
                   <button
                     onClick={() => handleFeedback('approve')}
                     disabled={submitting}
-                    className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-sm font-medium bg-green-600 hover:bg-emerald-500 text-white transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-sm font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-colors disabled:opacity-50"
                   >
                     {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
                     Approve Strategy

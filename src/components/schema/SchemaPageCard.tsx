@@ -403,7 +403,7 @@ export function SchemaPageCard({
                     <button
                       onClick={() => onPublish(page.pageId, getEffectiveSchema(page.pageId, schema.template))}
                       disabled={publishing || !!schemaParseError || validationStatus === 'errors'}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 bg-green-600 hover:bg-emerald-500 text-white"
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 bg-emerald-600 hover:bg-emerald-500 text-white"
                     >
                       {publishing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
                       Yes, publish

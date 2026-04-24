@@ -20,7 +20,7 @@ function copyTokensPlugin(): Plugin {
         mkdirSync(dirname(dest), { recursive: true })
         writeFileSync(dest, content, 'utf-8')
       } catch (e) {
-        this.warn(`copy-tokens: failed to copy tokens.css — ${e}`)
+        this.error(`copy-tokens: failed to copy tokens.css — ${e}`)
       }
     },
   }
