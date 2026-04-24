@@ -169,6 +169,7 @@ export type RecSourceCategory =
   | 'strategy'
   | 'decay'
   | 'insight:ctr_opportunity'
+  | 'insight:freshness_alert'
   | 'diagnostic';
 
 const REC_SOURCE_CATEGORIES: RecSourceCategory[] = [
@@ -176,6 +177,7 @@ const REC_SOURCE_CATEGORIES: RecSourceCategory[] = [
   'strategy',
   'decay',
   'insight:ctr_opportunity',
+  'insight:freshness_alert',
   'diagnostic',
 ];
 
@@ -205,6 +207,7 @@ export const RecSource = {
   strategyIntentMismatch: (pageSlug: string): string => `strategy:intent-mismatch:${pageSlug}`,
   decay:                  (pageSlug: string): string => `decay:${pageSlug}`,
   ctrOpportunity:         (pageSlug: string): string => `insight:ctr_opportunity:${pageSlug}`,
+  freshnessAlert:         (pageSlug: string): string => `insight:freshness_alert:${pageSlug}`,
   diagnostic:             (reportId: string, actionIdx: number, actionTitle: string): string =>
     `diagnostic:${reportId}:${actionIdx}:${actionTitle.slice(0, 20)}`,
 };
@@ -420,7 +423,7 @@ function toPageSlug(url: string): string {
 // Every source prefix that embeds a page slug must appear here.
 // If the slug computation for a prefix uses toPageSlug(), add it to this list
 // so migrateSourceKey() can normalise old recs that pre-date the change.
-const URL_SLUG_PREFIXES = ['insight:ctr_opportunity:', 'decay:', 'strategy:intent-mismatch:'] as const;
+const URL_SLUG_PREFIXES = ['insight:ctr_opportunity:', 'insight:freshness_alert:', 'decay:', 'strategy:intent-mismatch:'] as const;
 
 /**
  * Migrate a stored source key that may embed a full URL slug to its normalised
@@ -1187,6 +1190,52 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   } catch (err) {
     failedCategories.add('diagnostic');
     log.warn({ err }, 'Diagnostic reports unavailable for recommendations');
+  }
+
+  // ── 6. Content freshness recommendations ────────────────────────────────────
+  // Must run BEFORE the merge block so status carry-over, auto-resolution,
+  // and deduplication apply equally to freshness recs.
+  try {
+    const freshnessInsights = getInsights(workspaceId, 'freshness_alert') as Array<import('../shared/types/analytics.js').AnalyticsInsight<'freshness_alert'>>;
+    const topFreshness = [...freshnessInsights]
+      .sort((a, b) => b.data.daysSinceLastAnalysis - a.data.daysSinceLastAnalysis)
+      .slice(0, 10);
+    for (const insight of topFreshness) {
+      const d = insight.data;
+      const trafficAtRisk = d.impressions ?? 0;
+      const impactScore = Math.min(Math.round(trafficAtRisk / 50), 80);
+      const product = mapToProduct('content_refresh', 1);
+      recs.push({
+        id: `rec_${crypto.randomBytes(6).toString('hex')}`,
+        workspaceId,
+        priority: d.daysSinceLastAnalysis > 180 ? 'fix_now' : 'fix_soon',
+        type: 'content_refresh',
+        title: `Stale Content: ${d.pagePath} (${d.daysSinceLastAnalysis} days since last update)`,
+        description: `This page hasn't been analyzed in ${d.daysSinceLastAnalysis} days${trafficAtRisk > 0 ? ` and still receives ~${trafficAtRisk.toLocaleString()} monthly impressions` : ''}. A content refresh can protect rankings before they decline.`,
+        insight: `Search engines favor recently-updated content. Pages stale for ${d.daysSinceLastAnalysis > 180 ? 'over 6 months' : 'over 3 months'} face elevated ranking risk.`,
+        impact: d.daysSinceLastAnalysis > 180 ? 'high' : 'medium',
+        effort: 'medium',
+        impactScore,
+        source: RecSource.freshnessAlert(toPageSlug(d.pagePath)),
+        affectedPages: [toPageSlug(d.pagePath)],
+        trafficAtRisk,
+        impressionsAtRisk: trafficAtRisk,
+        estimatedGain: `Refreshing this page can protect ${trafficAtRisk.toLocaleString()} monthly impressions from ranking decline`,
+        actionType: product.productType ? 'purchase' : 'manual',
+        productType: product.productType,
+        productPrice: product.productPrice,
+        status: 'pending',
+        assignedTo,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+    if (topFreshness.length > 0) {
+      log.info(`Added ${topFreshness.length} content freshness recommendations for ${workspaceId}`);
+    }
+  } catch (err) {
+    failedCategories.add('insight:freshness_alert');
+    log.warn({ err }, 'Content freshness insights unavailable for recommendations');
   }
 
   // ── Build slug→pageId map from audit for resolving affectedPages ──

@@ -602,12 +602,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               </div>
               <div className="space-y-2">
                 {[...strategyData.contentGaps]
-                  // Sort data-backed gaps above AI-only suggestions
-                  .sort((a, b) => {
-                    const aData = (a.volume != null && a.volume > 0) || (a.impressions != null && a.impressions > 0) ? 1 : 0;
-                    const bData = (b.volume != null && b.volume > 0) || (b.impressions != null && b.impressions > 0) ? 1 : 0;
-                    return bData - aData;
-                  })
+                  // Sort by opportunity score descending (server-computed composite signal)
+                  .sort((a, b) => (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0))
                   .slice(0, expandedSections.has('new-content-gaps-all') ? undefined : 6).map((gap, i) => {
                   const matchingReq = contentRequests?.find(r => r.targetKeyword === gap.targetKeyword && r.status !== 'declined');
                   const alreadyRequested = matchingReq != null || requestedTopics.has(gap.targetKeyword);
@@ -619,7 +615,11 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                     <div key={i} className="px-3 py-2.5 bg-zinc-800/40 rounded-lg border border-zinc-800 hover:border-teal-500/20 transition-colors">
                       {/* Row 1: topic title + intent/page-type badges */}
                       <div className="flex items-start justify-between gap-2 mb-1">
-                        <span className="text-xs font-semibold text-zinc-100">{gap.topic}</span>
+                        <span className="text-xs font-semibold text-zinc-100">{gap.topic}{gap.opportunityScore != null && (
+                            <span className="ml-2 inline-flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-400">
+                              {gap.opportunityScore}/100
+                            </span>
+                          )}</span>
                         <div className="flex items-center gap-1.5 flex-shrink-0">
                           {gap.intent && (
                             <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded-full border font-medium ${intentColor(gap.intent)}`}>{gap.intent}</span>

@@ -269,6 +269,46 @@ export function buildInsightsContext(insights: AnalyticsInsight[]): string {
     sections.push(`ANOMALY DIGEST (active anomalies tracked in insight feed):\n${lines.join('\n')}`);
   }
 
+  // Competitor alerts (Tier 2)
+  const competitorAlerts = insights.filter((i): i is AnalyticsInsight<'competitor_alert'> => i.insightType === 'competitor_alert');
+  if (competitorAlerts.length > 0) {
+    const lines = competitorAlerts.slice(0, 8).map(a => {
+      const d = a.data;
+      const posChange = (d.previousPosition != null && d.currentPosition != null)
+        ? ` (pos ${d.previousPosition} → ${d.currentPosition})`
+        : '';
+      const volSuffix = d.volume ? `, ${Number(d.volume).toLocaleString()} searches/mo` : '';
+      return `  ${d.competitorDomain} — ${d.alertType}${d.keyword ? ` for "${d.keyword}"` : ''}${posChange}${volSuffix}`;
+    });
+    sections.push(`COMPETITOR ALERTS (recent search ranking movements by competitors):\n${lines.join('\n')}`);
+  }
+
+  // Emerging keywords (Tier 2)
+  const emergingKeywords = insights.filter((i): i is AnalyticsInsight<'emerging_keyword'> => i.insightType === 'emerging_keyword');
+  if (emergingKeywords.length > 0) {
+    const lines = emergingKeywords.slice(0, 8).map(e => {
+      const d = e.data;
+      const volStr = d.volume ? `, ${Number(d.volume).toLocaleString()} searches/mo` : '';
+      const kdStr = d.difficulty != null ? `, KD ${d.difficulty}` : '';
+      const posStr = d.currentPosition != null ? `, we rank pos ${Math.round(d.currentPosition)}` : ' (not yet ranking)';
+      return `  "${d.keyword}"${volStr}${kdStr}${posStr}`;
+    });
+    sections.push(`EMERGING KEYWORDS (rising search trends relevant to this site):\n${lines.join('\n')}`);
+  }
+
+  // Stale content (Tier 2 freshness alerts)
+  const staleContent = insights
+    .filter((i): i is AnalyticsInsight<'freshness_alert'> => i.insightType === 'freshness_alert')
+    .sort((a, b) => b.data.daysSinceLastAnalysis - a.data.daysSinceLastAnalysis);
+  if (staleContent.length > 0) {
+    const lines = staleContent.slice(0, 8).map(s => {
+      const d = s.data;
+      const impStr = d.impressions ? `, ${Number(d.impressions).toLocaleString()} impressions/mo` : '';
+      return `  ${d.pagePath}: ${d.daysSinceLastAnalysis} days since last update${impStr}`;
+    });
+    sections.push(`STALE CONTENT (pages with outdated keyword analysis — at risk of ranking decline):\n${lines.join('\n')}`);
+  }
+
   // Proactive critical insight summary
   const criticalInsights = insights.filter(i => i.severity === 'critical');
   if (criticalInsights.length > 0) {

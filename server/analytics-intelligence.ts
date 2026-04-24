@@ -35,6 +35,7 @@ import { apiCache } from './api-cache.js';
 import { getWorkspace } from './workspaces.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
 import { extractBrandTokens, isBrandedQuery } from './competitor-brand-filter.js';
+import { listPageKeywords } from './page-keywords.js';
 import { createLogger } from './logger.js';
 import { isProgrammingError } from './errors.js';
 
@@ -130,6 +131,28 @@ const EXPECTED_CTR_BY_POSITION: Record<number, number> = {
 function expectedCtrForPosition(pos: number): number {
   const rounded = Math.max(1, Math.min(Math.round(pos), 10));
   return EXPECTED_CTR_BY_POSITION[rounded] ?? 0.02;
+}
+
+// ── Emerging keyword detection ───────────────────────────────────
+
+/**
+ * Returns true if the keyword's trend array indicates net rising volume over
+ * the last 6 months. Uses a simple linear regression approach — ≥20% net gain
+ * AND positive second-half average qualifies as "emerging".
+ */
+export function isKeywordEmerging(kw: { trend?: number[] }): boolean {
+  const t = kw.trend;
+  if (!t || t.length < 3) return false;
+  const recent = t.slice(-6);
+  const n = recent.length;
+  const first = recent[0];
+  const last = recent[n - 1];
+  if (first <= 0) return false;
+  const netGainPct = (last - first) / first;
+  const midpoint = Math.floor(n / 2);
+  const firstHalfAvg = recent.slice(0, midpoint).reduce((s, v) => s + v, 0) / midpoint;
+  const secondHalfAvg = recent.slice(midpoint).reduce((s, v) => s + v, 0) / (n - midpoint);
+  return netGainPct >= 0.20 && secondHalfAvg > firstHalfAvg;
 }
 
 // ── Staleness check ──────────────────────────────────────────────
@@ -1272,7 +1295,6 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
                 severity: insight.severity,
               });
             }
-            deleteStaleInsightsByType(workspaceId, 'competitor_gap', cycleStart);
             log.info({ workspaceId, count: Math.min(gapInsights.length, 30) }, 'Computed competitor gap insights');
           }
         }
@@ -1280,6 +1302,91 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
     } catch (err) {
       log.warn({ err, workspaceId }, 'Failed to compute competitor gap insights');
     }
+  }
+  // Always prune stale competitor_gap rows — outside liveDomain guard so cleanup runs when liveDomain is cleared
+  deleteStaleInsightsByType(workspaceId, 'competitor_gap', cycleStart);
+
+  // Phase 5: Emerging keyword detection (SEMRush trend analysis)
+  if (ws.liveDomain) {
+    try {
+      const provider = getConfiguredProvider(ws.seoDataProvider);
+      if (provider?.isConfigured()) {
+        const domainKws = await apiCache.wrap(workspaceId, 'domainKeywords_emerging', {}, () =>
+          provider.getDomainKeywords(ws.liveDomain!, workspaceId, 200),
+        );
+        // A keyword can rank on multiple pages; keep the BEST (lowest) position so
+        // currentPosition reflects our strongest ranking, not an arbitrary last-seen page.
+        const gscLookup = normQueryPageData.reduce<Map<string, number>>((map, r) => {
+          const key = r.query.toLowerCase();
+          const existing = map.get(key);
+          if (existing === undefined || r.position < existing) map.set(key, r.position);
+          return map;
+        }, new Map());
+        const emerging = domainKws.filter(
+          kw => kw.volume >= 100 && isKeywordEmerging({ trend: kw.trend }),
+        );
+        for (const kw of emerging.slice(0, 10)) {
+          const currentPosition = gscLookup.get(kw.keyword.toLowerCase());
+          enrichAndUpsert({
+            insightType: 'emerging_keyword',
+            pageId: `emerging_keyword::${kw.keyword}`, // unique per keyword so each gets its own DB row
+            data: {
+              keyword: kw.keyword,
+              volume: kw.volume,
+              difficulty: kw.difficulty,
+              trendData: kw.trend,
+              currentPosition,
+              rankingUrl: kw.url,
+            },
+            severity: 'opportunity',
+          });
+        }
+        log.info({ workspaceId, count: Math.min(emerging.length, 10) }, 'Computed emerging keyword insights');
+      }
+    } catch (err) {
+      log.warn({ err, workspaceId }, 'Failed to compute emerging keyword insights');
+    }
+  }
+  // Always prune stale emerging_keyword rows — even when liveDomain is unset or provider is unconfigured
+  // (avoids orphaning rows from a previous run when liveDomain is later cleared)
+  deleteStaleInsightsByType(workspaceId, 'emerging_keyword', cycleStart);
+
+  // Phase 6: Content freshness alerts — flag pages with stale keyword analysis + meaningful traffic
+  {
+    const STALE_DAYS = 90;
+    const MIN_IMPRESSIONS = 100;
+    try {
+      const pageKws = listPageKeywords(workspaceId);
+      const now = Date.now();
+      const stale = pageKws.filter(p => {
+        if (!p.analysisGeneratedAt) return false;
+        const lastAnalyzedMs = new Date(p.analysisGeneratedAt).getTime();
+        if (isNaN(lastAnalyzedMs)) return false;
+        const daysSince = Math.floor((now - lastAnalyzedMs) / 86_400_000);
+        return daysSince >= STALE_DAYS && (p.impressions ?? 0) >= MIN_IMPRESSIONS;
+      });
+      for (const p of stale) {
+        const lastAnalyzedMs = new Date(p.analysisGeneratedAt!).getTime();
+        const daysSince = Math.floor((now - lastAnalyzedMs) / 86_400_000);
+        enrichAndUpsert({
+          insightType: 'freshness_alert',
+          pageId: p.pagePath,
+          data: {
+            pagePath: p.pagePath,
+            lastAnalyzedAt: p.analysisGeneratedAt!,
+            daysSinceLastAnalysis: daysSince,
+            impressions: p.impressions,
+            clicks: p.clicks,
+          } satisfies import('../shared/types/analytics.js').FreshnessAlertData,
+          severity: daysSince > 180 ? 'critical' : 'warning',
+        });
+      }
+      log.info({ workspaceId, count: stale.length }, 'Computed content freshness alerts');
+    } catch (err) {
+      log.warn({ err, workspaceId }, 'Failed to compute content freshness alerts');
+    }
+    // Always prune stale freshness_alert rows — outside try so it runs even if listPageKeywords throws
+    deleteStaleInsightsByType(workspaceId, 'freshness_alert', cycleStart);
   }
 
   // Phase 3C: Conversion attribution (GA4 organic landing pages)
@@ -1298,13 +1405,14 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
             severity: insight.severity,
           });
         }
-        deleteStaleInsightsByType(workspaceId, 'conversion_attribution', cycleStart);
         log.info({ workspaceId, count: Math.min(conversionInsights.length, 20) }, 'Computed conversion attribution insights');
       }
     } catch (err) {
       log.warn({ err, workspaceId }, 'Failed to compute conversion attribution insights');
     }
   }
+  // Always prune stale conversion_attribution rows — outside ga4Id guard so cleanup runs when GA4 is disconnected
+  deleteStaleInsightsByType(workspaceId, 'conversion_attribution', cycleStart);
 
   // Phase 4: New insight types
   if (normQueryPageData.length > 0 && normPrevQueryPageData.length > 0) {

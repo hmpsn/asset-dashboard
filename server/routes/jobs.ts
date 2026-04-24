@@ -102,7 +102,7 @@ export async function prefetchSemrushForTopPages(
 
     const keywords = withKeywords.map(pk => pk.primaryKeyword!);
     const metrics = await provider.getKeywordMetrics(keywords, workspaceId).catch(() => []);
-    const metricsMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m]));
+    const metricsMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m])); // map-dup-ok
 
     for (const pk of withKeywords) {
       const m = metricsMap.get(pk.primaryKeyword!.toLowerCase());

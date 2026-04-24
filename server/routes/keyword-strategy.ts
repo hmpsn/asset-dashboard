@@ -72,6 +72,35 @@ const recsInFlight = new Set<string>();
 // workspace from racing to the DB. The second request receives a 409 immediately.
 const activeGenerations = new Set<string>();
 
+/** Composite opportunity score (0–100) for a content gap.
+ *  Weighted components of the raw score (pre-trend):
+ *    - volume:      vol/10000 capped at 1.0, × 0.45 → up to 0.45
+ *    - ease:        (1 − difficulty/100),    × 0.45 → up to 0.45
+ *    - GSC bonus:   impressions/2000 capped at 0.5, × 0.1 → up to 0.05
+ *  Max raw = 0.95 (the 5% headroom is intentional — GSC signal is an additive
+ *  bonus on top of volume/ease, not a co-equal component).
+ *  Trend multiplier: rising ×1.3, declining ×0.7, stable ×1.0.
+ *  Returns 0 when no signal data (volume, difficulty, impressions) is present. */
+export function computeOpportunityScore(cg: {
+  volume?: number;
+  difficulty?: number;
+  impressions?: number;
+  trendDirection?: string;
+}): number {
+  const hasData = (cg.volume != null && cg.volume > 0)
+    || cg.difficulty != null
+    || (cg.impressions != null && cg.impressions > 0);
+  if (!hasData) return 0;
+  const vol = Math.min((cg.volume ?? 0) / 10000, 1);
+  const ease = 1 - (cg.difficulty ?? 50) / 100;
+  const gscBonus = Math.min((cg.impressions ?? 0) / 2000, 0.5);
+  const trendMult =
+    cg.trendDirection === 'rising' ? 1.3 :
+    cg.trendDirection === 'declining' ? 0.7 : 1.0;
+  const raw = (vol * 0.45 + ease * 0.45 + gscBonus * 0.1) * trendMult;
+  return Math.min(100, Math.round(raw * 100));
+}
+
 // ── Incremental mode helpers ─────────────────────────────────────
 
 const INCREMENTAL_THRESHOLD_DAYS = 7;
@@ -111,7 +140,7 @@ function getPagesNeedingAnalysis<T extends { path: string }>(
   return { toAnalyze, toPreserve };
 }
 
-export function shouldFetchCompetitorData(ws: Workspace): boolean {
+export function shouldFetchCompetitorData(ws: Workspace, currentDomains?: string[]): boolean {
   if (!ws.competitorLastFetchedAt) return true;
 
   // Direct domain-change signal: re-fetch immediately if domains changed.
@@ -120,9 +149,11 @@ export function shouldFetchCompetitorData(ws: Workspace): boolean {
   // against current domains would always appear as a "change" and force a costly
   // API re-fetch on every workspace that had data fetched before the migration.
   if (ws.competitorDomainsAtLastFetch !== null && ws.competitorDomainsAtLastFetch !== undefined) {
-    const currentDomains = (ws.competitorDomains ?? []).slice().sort().join(',');
+    // Use caller-supplied domains when available (e.g. req.body.competitorDomains was just
+    // saved to DB but ws is the pre-save snapshot). Falls back to ws.competitorDomains.
+    const current = (currentDomains ?? ws.competitorDomains ?? []).slice().sort().join(',');
     const lastFetchDomains = ws.competitorDomainsAtLastFetch.slice().sort().join(',');
-    if (currentDomains !== lastFetchDomains) return true;
+    if (current !== lastFetchDomains) return true;
   }
 
   const cutoff = new Date(Date.now() - COMPETITOR_CACHE_DAYS * 24 * 60 * 60 * 1000);
@@ -209,6 +240,7 @@ interface StrategyContentGap {
   serpFeatures?: string[];
   serpTargeting?: string[];
   questionKeywords?: string[];
+  opportunityScore?: number;
 }
 
 interface StrategyQuickWin {
@@ -673,7 +705,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
     // Competitor keyword data — used to enrich the keyword pool and give competitor proof to content gaps
     const competitorKeywordData: Array<{ keyword: string; volume: number; difficulty: number; domain: string; position: number; serpFeatures?: string }> = [];
 
-    const fetchCompetitors = strategyMode !== 'incremental' || shouldFetchCompetitorData(ws);
+    const fetchCompetitors = strategyMode !== 'incremental' || shouldFetchCompetitorData(ws, competitorDomains);
 
     // When skipping competitor fetch, carry forward previously stored data so the
     // strategy save doesn't wipe keywordGaps with undefined (data loss bug).
@@ -1255,7 +1287,7 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
     // --- Post-AI keyword validation via SEMRush bulk lookup ---
     // Optimization: check domain organic data + existing page_keywords before calling API
     if (provider && semrushMode !== 'none') {
-      const domainKwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k]));
+      const domainKwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k])); // map-dup-ok
       const existingPkLookup = new Map(
         listPageKeywords(ws.id)
           .filter(pk => pk.volume && pk.volume > 0)
@@ -1295,7 +1327,7 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
         try {
           const uniqueNeeds = [...new Set(needsApiLookup.map(k => k.toLowerCase()))];
           const metrics = await provider.getKeywordMetrics(uniqueNeeds.slice(0, 100), ws.id);
-          const metricMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m]));
+          const metricMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m])); // map-dup-ok
 
           let unvalidated = 0;
           for (const pm of allPageMappings) {
@@ -1679,7 +1711,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
     // Enrich pageMap with SEMRush volume/difficulty data
     if (semrushDomainData.length > 0) {
       // Build lookup: keyword → metrics
-      const kwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k]));
+      const kwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k])); // map-dup-ok
       for (const pm of strategy.pageMap) {
         // Skip pages with no primary keyword (declined filter may have cleared it, or AI omitted it)
         if (!pm.primaryKeyword) continue;
@@ -1745,7 +1777,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
       if (needsVolume.length > 0) {
         try {
           const metrics = await provider.getKeywordMetrics(needsVolume as string[], ws.id);
-          const metricMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m]));
+          const metricMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m])); // map-dup-ok
           for (const pm of strategy.pageMap) {
             if (!pm.volume) {
               const m = metricMap.get(pm.primaryKeyword.toLowerCase());
@@ -1769,7 +1801,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
       // competitor gaps, competitor keywords, GSC, related keywords), then domain organic
       // data, then bulk API fetch as last resort. The keyword pool is the richest source
       // because it aggregates all data gathered during this strategy run.
-      const domainKwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k]));
+      const domainKwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k])); // map-dup-ok
       const missingCgKws: string[] = [];
       let poolEnriched = 0;
       for (const cg of strategy.contentGaps) {
@@ -1798,7 +1830,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
       if (missingCgKws.length > 0 && provider && semrushMode !== 'none') {
         try {
           const cgMetrics = await provider.getKeywordMetrics(missingCgKws.slice(0, 30), ws.id);
-          const cgMap = new Map(cgMetrics.map(m => [m.keyword.toLowerCase(), m]));
+          const cgMap = new Map(cgMetrics.map(m => [m.keyword.toLowerCase(), m])); // map-dup-ok
           for (const cg of strategy.contentGaps) {
             if (cg.volume == null) {
               const m = cgMap.get(cg.targetKeyword.toLowerCase());
@@ -1847,7 +1879,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
 
     // Enrich content gaps with trend direction + SERP features from domain data
     if (strategy.contentGaps?.length && semrushDomainData.length > 0) {
-      const domainLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k]));
+      const domainLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k])); // map-dup-ok
       for (const cg of strategy.contentGaps) {
         const match = domainLookup.get(cg.targetKeyword.toLowerCase());
         if (match) {
@@ -1894,6 +1926,16 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
         }
         if (recs.length > 0) cg.serpTargeting = recs;
       }
+    }
+
+    // Compute composite opportunity score — all enrichment (volume, KD, impressions, trend) is now done
+    if (strategy.contentGaps?.length) {
+      for (const cg of strategy.contentGaps) {
+        cg.opportunityScore = computeOpportunityScore(cg);
+      }
+      // Sort descending so highest-value gaps surface first in the UI
+      strategy.contentGaps.sort((a, b) => (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0));
+      log.info({ workspaceId: ws.id, count: strategy.contentGaps.length }, 'Computed content gap opportunity scores');
     }
 
     // ── Cannibalization Detection + Canonical Recommender ────────
@@ -2114,7 +2156,7 @@ Rules:
     // Enrich siteKeywords with volume/difficulty
     let siteKeywordMetrics: { keyword: string; volume: number; difficulty: number }[] = [];
     if (provider && semrushMode !== 'none' && strategy.siteKeywords?.length) {
-      const kwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k]));
+      const kwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k])); // map-dup-ok
       const found: typeof siteKeywordMetrics = [];
       const missing: string[] = [];
       for (const kw of strategy.siteKeywords) {
