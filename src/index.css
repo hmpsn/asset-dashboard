@@ -370,12 +370,14 @@ body::after {
   font-variant-numeric: tabular-nums;
 }
 
-/* Micro — monospace for timestamps, IDs, labels (matches public/styleguide.css) */
+/* Micro — monospace, uppercase, tracked timestamps + IDs (matches public/styleguide.css) */
 .t-micro {
   font-family: 'Fira Code', 'JetBrains Mono', 'Menlo', 'Courier New', monospace;
   font-size: 10px;
   font-weight: 400;
   line-height: 1.4;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   font-variant-numeric: tabular-nums;
 }
 
