@@ -3771,6 +3771,59 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    name: 'SectionCard titleExtra with ml-auto (use action prop)',
+    // `titleExtra` renders inside the left-aligned title cluster. The cluster
+    // has no flex-grow, so `ml-auto` on a child has no effect — the content
+    // does NOT push to the right edge. Callers who want right-aligned content
+    // must use the `action` prop instead, which lives on the outer flex row
+    // that uses `justify-between`. This rule catches the recurring migration
+    // bug where `ml-auto` is carried over from a hand-rolled card into
+    // `titleExtra`, silently producing left-clustered content.
+    fileGlobs: ['*.tsx'],
+    exclude: ['src/components/ui/'],
+    message: 'titleExtra renders inside the left-aligned title cluster — ml-auto has no effect there. Use the `action` prop for right-aligned content (date pickers, counts, export links, tier badges). See src/components/ui/SectionCard.tsx JSDoc.',
+    severity: 'error',
+    rationale: 'Prevents the recurring "right-aligned metadata lands on the left" bug seen across 5 SectionCard migrations (OrderStatus, RankTable, DataSnapshots, SearchTab, FixRecommendations).',
+    claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const idx = line.indexOf('titleExtra=');
+          if (idx === -1) continue;
+          if (line.includes('pr-check-disable-next-line')) continue;
+          if (i > 0 && lines[i - 1].includes('pr-check-disable-next-line')) continue;
+          // Scan forward up to 10 lines to find the closing `}` of the prop.
+          // Use brace balancing starting from the `{` that follows `titleExtra=`.
+          const openIdx = line.indexOf('{', idx);
+          if (openIdx === -1) continue;
+          let depth = 0;
+          let sawMlAuto = false;
+          let endLine = i;
+          outer: for (let j = i; j < Math.min(lines.length, i + 15); j++) {
+            const scan = j === i ? lines[j].slice(openIdx) : lines[j];
+            if (scan.includes('ml-auto')) sawMlAuto = true;
+            for (const ch of scan) {
+              if (ch === '{') depth++;
+              else if (ch === '}') {
+                depth--;
+                if (depth === 0) { endLine = j; break outer; }
+              }
+            }
+          }
+          void endLine;
+          if (sawMlAuto) hits.push({ file, line: i + 1, text: line.trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
     name: 'Page component missing PageHeader',
     fileGlobs: [],
     message: 'Top-level page components must use <PageHeader>. Add <PageHeader title="..." subtitle="..." /> or add this file to the exclude list in pr-check.ts with a justification comment.',

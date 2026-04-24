@@ -3,7 +3,21 @@ import type { ReactNode } from 'react';
 interface SectionCardProps {
   title?: string;
   titleIcon?: ReactNode;
+  /**
+   * Small adornment rendered INSIDE the left title cluster, immediately after the title
+   * (e.g., a count badge "3 / 10", a tier pill, a status dot). Because it sits in the
+   * left-aligned flex group, `ml-auto` on a child of `titleExtra` has no effect — the
+   * cluster has no `flex-grow`, so it does not consume the remaining space.
+   * For anything that should push to the right edge (date picker, export link, order
+   * count, tier badge, "View all"), use `action` instead.
+   */
   titleExtra?: ReactNode;
+  /**
+   * Right-aligned slot in the header row. The outer flex uses `justify-between`, so
+   * `action` naturally hugs the right edge. Use this for buttons, toggles, date range
+   * selectors, small muted counts/metadata, or anything that was previously marked with
+   * `ml-auto` in a hand-rolled card.
+   */
   action?: ReactNode;
   children: ReactNode;
   className?: string;

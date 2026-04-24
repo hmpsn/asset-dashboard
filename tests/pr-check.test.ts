@@ -4246,6 +4246,102 @@ describe('Rule: Hand-rolled card div (use SectionCard)', () => {
   });
 });
 
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: SectionCard titleExtra with ml-auto (use action prop)
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: SectionCard titleExtra with ml-auto (use action prop)', () => {
+  const RULE = 'SectionCard titleExtra with ml-auto (use action prop)';
+
+  it('flags single-line titleExtra containing ml-auto', () => {
+    const file = write(
+      uniqPath('rule-titleextra-ml-auto', 'src/components/BadCard.tsx'),
+      lines(
+        'export function BadCard() {',
+        '  return (',
+        '    <SectionCard title="X" titleExtra={<span className="ml-auto text-xs">meta</span>}>',
+        '      content',
+        '    </SectionCard>',
+        '  );',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
+
+  it('flags multi-line titleExtra with ml-auto on a nested line', () => {
+    const file = write(
+      uniqPath('rule-titleextra-ml-auto', 'src/components/BadMultiline.tsx'),
+      lines(
+        'export function BadMultiline() {',
+        '  return (',
+        '    <SectionCard',
+        '      title="X"',
+        '      titleExtra={',
+        '        <span className="text-xs ml-auto">meta</span>',
+        '      }',
+        '    >',
+        '      content',
+        '    </SectionCard>',
+        '  );',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+  });
+
+  it('does NOT flag titleExtra without ml-auto (valid inline badge)', () => {
+    const file = write(
+      uniqPath('rule-titleextra-ml-auto', 'src/components/GoodTitleExtra.tsx'),
+      lines(
+        'export function GoodTitleExtra() {',
+        '  return (',
+        '    <SectionCard title="X" titleExtra={<span className="text-xs">3 / 10</span>}>',
+        '      content',
+        '    </SectionCard>',
+        '  );',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag action={...ml-auto...} (action is the right slot)', () => {
+    const file = write(
+      uniqPath('rule-titleextra-ml-auto', 'src/components/GoodAction.tsx'),
+      lines(
+        'export function GoodAction() {',
+        '  return (',
+        '    <SectionCard title="X" action={<span className="ml-auto text-xs">Export</span>}>',
+        '      content',
+        '    </SectionCard>',
+        '  );',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with inline pr-check-disable-next-line hatch on same line', () => {
+    const file = write(
+      uniqPath('rule-titleextra-ml-auto', 'src/components/HatchedTitleExtra.tsx'),
+      lines(
+        'export function HatchedTitleExtra() {',
+        '  return (',
+        '    <SectionCard title="X" titleExtra={<span className="ml-auto">x</span>}> {/* pr-check-disable-next-line -- legacy, deliberate left cluster */}',
+        '      content',
+        '    </SectionCard>',
+        '  );',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
 describe('Meta: customCheck rule name registry', () => {
   const EXPECTED_CUSTOM_CHECK_RULES = [
     'Global keydown missing isContentEditable guard',
@@ -4308,6 +4404,8 @@ describe('Meta: customCheck rule name registry', () => {
     'Page component missing PageHeader',
     // SVG shell-quoting fix (Phase 3 follow-up)
     'SVG with hardcoded dark fill/stroke',
+    // Phase 3 migration bug pattern — recurring 5× in PR #277
+    'SectionCard titleExtra with ml-auto (use action prop)',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {

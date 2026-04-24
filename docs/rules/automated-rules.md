@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **78** — 42 error, 36 warn.
+Total rules: **79** — 43 error, 36 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -57,7 +57,8 @@ advisory but tracked.
 | 39 | roadmap.json item ID uniqueness | error | custom | `data/roadmap.json` | — | Cross-sprint duplicate IDs caused PR #258 round-4: clicking expand on one row toggled both, and the server PATCH updated whichever sprint came first. |
 | 40 | Legacy surface token in new code | error | pattern | `*.tsx, *.css` | — | Prevents new code from using deprecated token names that bypass the 3-tier surface system. |
 | 41 | Hand-rolled card div (use SectionCard) | error | custom | `*.tsx` | — | Prevents hand-rolled card divs that bypass the SectionCard primitive and the --surface-N token system. |
-| 42 | radius-signature-lg used outside SectionCard | error | pattern | `*.tsx, *.css` | — | The asymmetric corner is a SectionCard-only brand signature. Other components adopting it would dilute the design intent. |
+| 42 | SectionCard titleExtra with ml-auto (use action prop) | error | custom | `*.tsx` | — | Prevents the recurring "right-aligned metadata lands on the left" bug seen across 5 SectionCard migrations (OrderStatus, RankTable, DataSnapshots, SearchTab, FixRecommendations). |
+| 43 | radius-signature-lg used outside SectionCard | error | pattern | `*.tsx, *.css` | — | The asymmetric corner is a SectionCard-only brand signature. Other components adopting it would dilute the design intent. |
 
 ---
 
