@@ -206,7 +206,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
               in_review: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
               in_progress: 'bg-teal-500/10 border-teal-500/30 text-teal-400',
               on_hold: 'bg-zinc-500/10 border-zinc-600 text-zinc-400',
-              completed: 'bg-green-500/10 border-green-500/30 text-green-400',
+              completed: 'bg-green-500/10 border-green-500/30 text-emerald-400',
               closed: 'bg-zinc-500/10 border-zinc-600 text-zinc-500',
             };
             const statusLabels: Record<string, string> = {
@@ -326,7 +326,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
                     )}
                     {(req.status === 'completed' || req.status === 'closed') && (
                       <div className="px-5 py-3 border-t border-zinc-800/50">
-                        <div className="flex items-center gap-1.5 text-[11px] text-green-400">
+                        <div className="flex items-center gap-1.5 text-[11px] text-emerald-400">
                           <CheckCircle2 className="w-3 h-3" /> This request has been {req.status}
                         </div>
                       </div>

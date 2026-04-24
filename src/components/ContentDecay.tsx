@@ -182,7 +182,7 @@ export default function ContentDecay({ workspaceId }: Props) {
                         </div>
                         <div className="flex items-center gap-4 flex-shrink-0 text-right">
                           <div>
-                            <div className={`text-xs font-mono ${page.positionChange > 0 ? 'text-red-400' : page.positionChange < 0 ? 'text-green-400' : 'text-zinc-500'}`}>
+                            <div className={`text-xs font-mono ${page.positionChange > 0 ? 'text-red-400' : page.positionChange < 0 ? 'text-emerald-400' : 'text-zinc-500'}`}>
                               {page.positionChange > 0 ? <ArrowDown className="w-3 h-3 inline" /> : page.positionChange < 0 ? <ArrowUp className="w-3 h-3 inline" /> : null}
                               {' '}{Math.abs(page.positionChange)} pos
                             </div>
@@ -201,13 +201,13 @@ export default function ContentDecay({ workspaceId }: Props) {
                             </div>
                             <div className="bg-zinc-800/50 rounded-lg p-2">
                               <div className="text-[10px] text-zinc-500">Impressions</div>
-                              <div className={`text-xs font-medium ${page.impressionChangePct < 0 ? 'text-amber-400' : 'text-green-400'}`}>{page.previousImpressions} → {page.currentImpressions}</div>
-                              <div className={`text-[10px] ${page.impressionChangePct < 0 ? 'text-amber-400/70' : 'text-green-400/70'}`}>{page.impressionChangePct > 0 ? '+' : ''}{page.impressionChangePct}%</div>
+                              <div className={`text-xs font-medium ${page.impressionChangePct < 0 ? 'text-amber-400' : 'text-emerald-400'}`}>{page.previousImpressions} → {page.currentImpressions}</div>
+                              <div className={`text-[10px] ${page.impressionChangePct < 0 ? 'text-amber-400/70' : 'text-emerald-400/70'}`}>{page.impressionChangePct > 0 ? '+' : ''}{page.impressionChangePct}%</div>
                             </div>
                             <div className="bg-zinc-800/50 rounded-lg p-2">
                               <div className="text-[10px] text-zinc-500">Position</div>
-                              <div className={`text-xs font-medium ${page.positionChange > 0 ? 'text-red-400' : 'text-green-400'}`}>{page.previousPosition} → {page.currentPosition}</div>
-                              <div className={`text-[10px] ${page.positionChange > 0 ? 'text-red-400/70' : 'text-green-400/70'}`}>{page.positionChange > 0 ? '+' : ''}{page.positionChange}</div>
+                              <div className={`text-xs font-medium ${page.positionChange > 0 ? 'text-red-400' : 'text-emerald-400'}`}>{page.previousPosition} → {page.currentPosition}</div>
+                              <div className={`text-[10px] ${page.positionChange > 0 ? 'text-red-400/70' : 'text-emerald-400/70'}`}>{page.positionChange > 0 ? '+' : ''}{page.positionChange}</div>
                             </div>
                           </div>
                           {page.refreshRecommendation && (
@@ -229,7 +229,7 @@ export default function ContentDecay({ workspaceId }: Props) {
 
           {filtered.length === 0 && analysis.summary.totalDecaying === 0 && (
             <div className="text-center py-8 bg-zinc-900 border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
-              <div className="text-green-400 text-sm font-medium">All content performing well</div>
+              <div className="text-emerald-400 text-sm font-medium">All content performing well</div>
               <p className="text-xs text-zinc-500 mt-1">No pages showing significant traffic decline</p>
             </div>
           )}

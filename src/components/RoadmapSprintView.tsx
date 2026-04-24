@@ -47,7 +47,7 @@ export function RoadmapSprintView({ sprints, filters, featureMap, onToggleStatus
                   </span>
                   <span className="text-[11px] text-zinc-500">{done}/{total} done</span>
                   {done === total && total > 0 && (
-                    <CheckCircle2 className="w-3 h-3 text-green-400" />
+                    <CheckCircle2 className="w-3 h-3 text-emerald-400" />
                   )}
                 </div>
                 {sprint.rationale && (

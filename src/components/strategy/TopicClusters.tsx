@@ -17,7 +17,7 @@ export interface TopicClustersProps {
 }
 
 const coverageColor = (pct: number) =>
-  pct >= 70 ? 'text-green-400 bg-green-500/10 border-green-500/20'
+  pct >= 70 ? 'text-emerald-400 bg-green-500/10 border-green-500/20'
   : pct >= 40 ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
   : 'text-red-400 bg-red-500/10 border-red-500/20';
 

@@ -302,7 +302,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                         <td className="py-2.5 px-3 text-right text-zinc-400">{q.impressions.toLocaleString()}</td>
                         <td className="py-2.5 px-3 text-right text-emerald-400">{q.ctr}%</td>
                         <td className="py-2.5 px-3 text-right">
-                          <span className={q.position <= 10 ? 'text-green-400' : q.position <= 20 ? 'text-amber-400' : 'text-red-400'}>
+                          <span className={q.position <= 10 ? 'text-emerald-400' : q.position <= 20 ? 'text-amber-400' : 'text-red-400'}>
                             {q.position}
                           </span>
                         </td>
@@ -330,7 +330,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                         <td className="py-2.5 px-3 text-right text-zinc-400">{p.impressions.toLocaleString()}</td>
                         <td className="py-2.5 px-3 text-right text-emerald-400">{p.ctr}%</td>
                         <td className="py-2.5 px-3 text-right">
-                          <span className={p.position <= 10 ? 'text-green-400' : p.position <= 20 ? 'text-amber-400' : 'text-red-400'}>
+                          <span className={p.position <= 10 ? 'text-emerald-400' : p.position <= 20 ? 'text-amber-400' : 'text-red-400'}>
                             {p.position}
                           </span>
                         </td>

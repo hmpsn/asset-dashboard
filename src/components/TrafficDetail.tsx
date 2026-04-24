@@ -231,7 +231,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
             {newVsReturning.map(seg => (
               <div key={seg.segment} className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-zinc-800/30">
                 <span className="text-zinc-400 capitalize">{seg.segment} user engagement</span>
-                <span className={`font-medium ${seg.engagementRate > 60 ? 'text-green-400' : seg.engagementRate > 40 ? 'text-amber-400' : 'text-red-400'}`}>
+                <span className={`font-medium ${seg.engagementRate > 60 ? 'text-emerald-400' : seg.engagementRate > 40 ? 'text-amber-400' : 'text-red-400'}`}>
                   {seg.engagementRate}%
                 </span>
               </div>
@@ -471,7 +471,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
                           <td className="py-2.5 px-3 text-right text-blue-400">{p.sessions.toLocaleString()}</td>
                           <td className="py-2.5 px-3 text-right text-zinc-400">{p.users.toLocaleString()}</td>
                           <td className="py-2.5 px-3 text-right">
-                            <span className={p.bounceRate > 70 ? 'text-red-400' : p.bounceRate > 50 ? 'text-amber-400' : 'text-green-400'}>
+                            <span className={p.bounceRate > 70 ? 'text-red-400' : p.bounceRate > 50 ? 'text-amber-400' : 'text-emerald-400'}>
                               {p.bounceRate}%
                             </span>
                           </td>

@@ -240,7 +240,7 @@ export function ApprovalsTab({
               </div>
               <div className="flex items-center gap-2">
                 {batchPending > 0 && <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400">{batchPending} pending</span>}
-                {batchApproved > 0 && <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-500/10 border border-green-500/30 text-green-400">{batchApproved} approved</span>}
+                {batchApproved > 0 && <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-500/10 border border-green-500/30 text-emerald-400">{batchApproved} approved</span>}
                 {batchApplied > 0 && <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-400">{batchApplied} applied</span>}
                 {batchRejected > 0 && <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/30 text-red-400">{batchRejected} rejected</span>}
               </div>
@@ -277,7 +277,7 @@ export function ApprovalsTab({
                         <StatusBadge status={pageState?.status} />
                         <span className="ml-auto text-[11px] text-zinc-500">{pageItems.length} change{pageItems.length !== 1 ? 's' : ''}</span>
                         {pagePending > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">{pagePending} pending</span>}
-                        {pageApprovedCount > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/30 text-green-400">{pageApprovedCount} approved</span>}
+                        {pageApprovedCount > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/30 text-emerald-400">{pageApprovedCount} approved</span>}
                       </button>
 
                       {/* Page items (collapsible) */}
@@ -288,7 +288,7 @@ export function ApprovalsTab({
                             <div className="px-5 pb-2">
                               <button
                                 onClick={() => approveAllForPage(batch.id, pageItems)}
-                                className="flex items-center gap-1 px-2.5 py-1 bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 rounded text-[11px] font-medium text-green-400 transition-colors"
+                                className="flex items-center gap-1 px-2.5 py-1 bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 rounded text-[11px] font-medium text-emerald-400 transition-colors"
                               >
                                 <Check className="w-3 h-3" /> Approve all {pagePending} for this page
                               </button>
@@ -305,7 +305,7 @@ export function ApprovalsTab({
                               : item.field.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
                             const statusColors = {
                               pending: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
-                              approved: 'bg-green-500/10 border-green-500/30 text-green-400',
+                              approved: 'bg-green-500/10 border-green-500/30 text-emerald-400',
                               rejected: 'bg-red-500/10 border-red-500/30 text-red-400',
                               applied: 'bg-blue-500/10 border-blue-500/30 text-blue-400',
                             };
@@ -483,7 +483,7 @@ export function ApprovalsTab({
                                   </div>
                                 )}
                                 {item.status === 'approved' && (
-                                  <div className="flex items-center gap-2 mt-3 text-[11px] text-green-400">
+                                  <div className="flex items-center gap-2 mt-3 text-[11px] text-emerald-400">
                                     <Check className="w-3 h-3" /> Approved — will be applied when you push changes live
                                     <button
                                       onClick={() => updateApprovalItem(batch.id, item.id, { status: 'pending' })}
@@ -536,7 +536,7 @@ export function ApprovalsTab({
                 {batchPending > 0 && effectiveTier !== 'free' && (
                   <button
                     onClick={() => approveAllInBatch(batch)}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 rounded-lg text-[11px] font-medium text-green-400 transition-colors"
+                    className="flex items-center gap-1 px-3 py-1.5 bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 rounded-lg text-[11px] font-medium text-emerald-400 transition-colors"
                   >
                     <Check className="w-3 h-3" /> Approve All ({batchPending})
                   </button>

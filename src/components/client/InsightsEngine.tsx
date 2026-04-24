@@ -97,7 +97,7 @@ const IMPACT_BADGE: Record<string, { label: string; color: string; bg: string }>
 };
 
 const EFFORT_BADGE: Record<string, { label: string; color: string }> = {
-  low: { label: 'Quick Fix', color: 'text-green-400' },
+  low: { label: 'Quick Fix', color: 'text-emerald-400' },
   medium: { label: 'Moderate Effort', color: 'text-amber-400' },
   high: { label: 'Significant Work', color: 'text-red-400' },
 };
@@ -427,7 +427,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                                 </span>
                               )}
                               {isCompleted && (
-                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-green-400 flex items-center gap-0.5">
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-emerald-400 flex items-center gap-0.5">
                                   <CheckCircle2 className="w-3 h-3" /> Done
                                 </span>
                               )}
@@ -496,8 +496,8 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
 
                             {/* Estimated gain */}
                             <div className="flex items-center gap-1.5 mb-3">
-                              <TrendingUp className="w-3 h-3 text-green-400" />
-                              <span className="text-[11px] text-green-400">{rec.estimatedGain}</span>
+                              <TrendingUp className="w-3 h-3 text-emerald-400" />
+                              <span className="text-[11px] text-emerald-400">{rec.estimatedGain}</span>
                             </div>
 
                             {/* Action buttons */}

@@ -13,13 +13,13 @@ import type { OutcomeWinEntry, DeltaSummary, DeltaDirection } from '../../../sha
 // --- Helpers -----------------------------------------------------------
 
 function deltaDirectionIcon(direction: DeltaDirection) {
-  if (direction === 'improved') return <TrendingUp className="w-4 h-4 text-green-400 flex-shrink-0" />;
+  if (direction === 'improved') return <TrendingUp className="w-4 h-4 text-emerald-400 flex-shrink-0" />;
   if (direction === 'declined') return <TrendingDown className="w-4 h-4 text-red-400 flex-shrink-0" />;
   return <Minus className="w-4 h-4 text-zinc-400 flex-shrink-0" />;
 }
 
 function deltaColor(direction: DeltaDirection): string {
-  if (direction === 'improved') return 'text-green-400';
+  if (direction === 'improved') return 'text-emerald-400';
   if (direction === 'declined') return 'text-red-400';
   return 'text-zinc-400';
 }

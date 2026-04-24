@@ -209,7 +209,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const positionColor = (pos?: number) => {
     if (!pos) return 'text-zinc-500';
     if (pos <= 3) return 'text-emerald-400';
-    if (pos <= 10) return 'text-green-400';
+    if (pos <= 10) return 'text-emerald-400';
     if (pos <= 20) return 'text-amber-400';
     return 'text-red-400';
   };
@@ -225,7 +225,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const intentColor = (intent?: string) => {
     switch (intent) {
       case 'commercial': return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
-      case 'informational': return 'text-green-400 bg-green-500/10 border-green-500/20';
+      case 'informational': return 'text-emerald-400 bg-green-500/10 border-green-500/20';
       case 'transactional': return 'text-amber-400 bg-amber-500/10 border-amber-500/20';
       case 'navigational': return 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20';
       default: return 'text-zinc-400 bg-zinc-500/10 border-zinc-500/20';
@@ -598,7 +598,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
               </div>
               <div className="flex items-center gap-4 mt-2 flex-wrap">
                 <span className="flex items-center gap-1.5 text-[11px]"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" /> <span className="text-emerald-400 font-medium">{top3.length}</span> <span className="text-zinc-500">Top 3</span></span>
-                <span className="flex items-center gap-1.5 text-[11px]"><span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" /> <span className="text-green-400 font-medium">{top10.length}</span> <span className="text-zinc-500">4–10</span></span>
+                <span className="flex items-center gap-1.5 text-[11px]"><span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" /> <span className="text-emerald-400 font-medium">{top10.length}</span> <span className="text-zinc-500">4–10</span></span>
                 <span className="flex items-center gap-1.5 text-[11px]"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" /> <span className="text-amber-400 font-medium">{top20.length}</span> <span className="text-zinc-500">11–20</span></span>
                 <span className="flex items-center gap-1.5 text-[11px]"><span className="w-2.5 h-2.5 rounded-full bg-red-500/60 inline-block" /> <span className="text-red-400 font-medium">{beyond20.length}</span> <span className="text-zinc-500">20+</span></span>
                 <span className="flex items-center gap-1.5 text-[11px]"><span className="w-2.5 h-2.5 rounded-full bg-zinc-700 inline-block" /> <span className="text-zinc-500 font-medium">{notRankingCount}</span> <span className="text-zinc-500">Not ranking</span></span>

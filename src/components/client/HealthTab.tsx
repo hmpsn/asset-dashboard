@@ -233,7 +233,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                 <div className="text-xs text-zinc-500 mt-0.5">{summary}</div>
               </div>
               {auditDetail.previousScore != null && (
-                <div className={`text-xs ${auditDetail.audit.siteScore > auditDetail.previousScore ? 'text-green-400' : auditDetail.audit.siteScore < auditDetail.previousScore ? 'text-red-400' : 'text-zinc-500'}`}>
+                <div className={`text-xs ${auditDetail.audit.siteScore > auditDetail.previousScore ? 'text-emerald-400' : auditDetail.audit.siteScore < auditDetail.previousScore ? 'text-red-400' : 'text-zinc-500'}`}>
                   {auditDetail.audit.siteScore > auditDetail.previousScore ? '↑' : '↓'} {Math.abs(auditDetail.audit.siteScore - auditDetail.previousScore)} from previous
                 </div>
               )}

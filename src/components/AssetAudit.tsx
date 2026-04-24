@@ -258,7 +258,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
   if (!audit) return null;
 
   const score = Math.max(0, Math.round(100 - (audit.issueCount / Math.max(audit.totalAssets, 1)) * 100));
-  const scoreColor = score >= 80 ? 'text-green-400' : score >= 50 ? 'text-amber-400' : 'text-red-400';
+  const scoreColor = score >= 80 ? 'text-emerald-400' : score >= 50 ? 'text-amber-400' : 'text-red-400';
 
   return (
     <div className="space-y-8">
@@ -363,7 +363,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
             <div className="text-sm text-blue-200">
               Compressing... {bulkCompressProgress.done}/{bulkCompressProgress.total}
               {bulkCompressProgress.saved > 0 && (
-                <span className="text-green-400 ml-2">({formatSize(bulkCompressProgress.saved)} saved)</span>
+                <span className="text-emerald-400 ml-2">({formatSize(bulkCompressProgress.saved)} saved)</span>
               )}
             </div>
             <div className="mt-1.5 h-1.5 bg-blue-950 rounded-full overflow-hidden">

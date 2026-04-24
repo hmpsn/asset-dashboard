@@ -272,7 +272,7 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                               </span>
                             )}
                             {page.difficulty != null && page.difficulty > 0 && (
-                              <span className={`text-[10px] inline-flex items-center gap-0.5 ${page.difficulty <= 30 ? 'text-green-400' : page.difficulty <= 60 ? 'text-amber-400' : 'text-red-400'}`}>
+                              <span className={`text-[10px] inline-flex items-center gap-0.5 ${page.difficulty <= 30 ? 'text-emerald-400' : page.difficulty <= 60 ? 'text-amber-400' : 'text-red-400'}`}>
                                 KD {page.difficulty}
                                 {page.metricsSource === 'partial_match' && (
                                   <span className="text-amber-400" title="Metrics from a similar keyword — may not be exact">~</span>

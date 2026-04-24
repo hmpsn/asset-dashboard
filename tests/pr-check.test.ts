@@ -4221,6 +4221,8 @@ describe('Meta: customCheck rule name registry', () => {
     'useWorkspaceEvents handler for centralized event',
     // Roadmap-redesign sprint (2026-04-22) — round 4 of PR #258
     'roadmap.json item ID uniqueness',
+    // Phase 5 design-system token authority (2026-04-24)
+    'styleguide-token-parity',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -4639,5 +4641,63 @@ describe('Rule: roadmap.json item ID uniqueness', () => {
       })
     );
     expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: styleguide-token-parity
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: styleguide-token-parity', () => {
+  const RULE = 'styleguide-token-parity';
+
+  it('flags public/styleguide.css that re-declares a --* token', () => {
+    // The rule looks for --* declarations inside the file path matching
+    // public/styleguide.css. We write a minimal violating file.
+    const file = write(
+      uniqPath('rule-token-parity', 'public/styleguide.css'),
+      lines(
+        "@import url('/tokens.css');",          // 1 — correct import
+        ".sg-header { color: #fff; }",           // 2 — OK class
+        ":root {",                               // 3
+        "  --brand-mint: #2dd4bf;",              // 4 — VIOLATION
+        "}",                                     // 5
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0].text).toMatch(/--brand-mint/);
+  });
+
+  it('passes when styleguide.css has no --* declarations', () => {
+    const file = write(
+      uniqPath('rule-token-parity', 'public/styleguide.css'),
+      lines(
+        "@import url('/tokens.css');",
+        ".sg-header { color: var(--brand-text-bright); }",
+        ".sg-section { padding: 24px; }",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(0);
+  });
+
+  it('passes when a non-styleguide CSS file has --* declarations', () => {
+    // The rule only fires on files named public/styleguide.css
+    const file = write(
+      uniqPath('rule-token-parity', 'public/other.css'),
+      lines(
+        ":root { --brand-mint: #2dd4bf; }",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    // Not a styleguide.css file — no match expected
+    expect(hits).toHaveLength(0);
+  });
+
+  it('skips files that do not exist (returns empty)', () => {
+    // Passing a path to a non-existent file should not throw
+    const hits = runRule(RULE, ['/nonexistent/public/styleguide.css']);
+    expect(hits).toHaveLength(0);
   });
 });

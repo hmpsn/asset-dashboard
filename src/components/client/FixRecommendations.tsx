@@ -465,7 +465,7 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
                       </span>
                     )}
                     {allDone && (
-                      <span className="text-[11px] px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-green-400 flex items-center gap-1">
+                      <span className="text-[11px] px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-emerald-400 flex items-center gap-1">
                         <CheckCircle2 className="w-3 h-3" /> Addressed
                       </span>
                     )}

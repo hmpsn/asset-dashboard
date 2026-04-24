@@ -22,7 +22,7 @@ const STATUS_CONFIG: Record<MatrixCell['status'], { label: string; bg: string; t
   review:             { label: 'Client Review',     bg: 'bg-blue-500/10',    text: 'text-blue-400',   border: 'border-blue-500/20', icon: '\u25D1' },
   approved:           { label: 'Approved',           bg: 'bg-teal-500/10',   text: 'text-teal-400',   border: 'border-teal-500/20',  icon: '\u2713' },
   draft:              { label: 'Draft',              bg: 'bg-orange-500/10',  text: 'text-orange-400', border: 'border-orange-500/20',icon: '\u25D0' },
-  published:          { label: 'Published',          bg: 'bg-green-500/10',   text: 'text-green-400',  border: 'border-green-500/20', icon: '\u25CF' },
+  published:          { label: 'Published',          bg: 'bg-green-500/10',   text: 'text-emerald-400',  border: 'border-green-500/20', icon: '\u25CF' },
 };
 
 const ALL_STATUSES: MatrixCell['status'][] = ['planned', 'keyword_validated', 'brief_generated', 'review', 'approved', 'draft', 'published'];
@@ -141,7 +141,7 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
           {cell.keywordValidation && (
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] text-zinc-400 tabular-nums">{cell.keywordValidation.volume}/mo</span>
-              <span className={`text-[10px] tabular-nums ${cell.keywordValidation.difficulty > 60 ? 'text-red-400' : cell.keywordValidation.difficulty > 35 ? 'text-amber-400' : 'text-green-400'}`}>
+              <span className={`text-[10px] tabular-nums ${cell.keywordValidation.difficulty > 60 ? 'text-red-400' : cell.keywordValidation.difficulty > 35 ? 'text-amber-400' : 'text-emerald-400'}`}>
                 KD {cell.keywordValidation.difficulty}
               </span>
             </div>
@@ -334,7 +334,7 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
                   {cell.keywordValidation && (
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <span className="text-[10px] text-zinc-400 tabular-nums">{cell.keywordValidation.volume}/mo</span>
-                      <span className={`text-[10px] tabular-nums ${cell.keywordValidation.difficulty > 60 ? 'text-red-400' : cell.keywordValidation.difficulty > 35 ? 'text-amber-400' : 'text-green-400'}`}>
+                      <span className={`text-[10px] tabular-nums ${cell.keywordValidation.difficulty > 60 ? 'text-red-400' : cell.keywordValidation.difficulty > 35 ? 'text-amber-400' : 'text-emerald-400'}`}>
                         KD {cell.keywordValidation.difficulty}
                       </span>
                     </div>

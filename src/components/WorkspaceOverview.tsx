@@ -170,7 +170,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
               {Object.entries(presence).map(([wsId, users]) =>
                 users.map(u => (
                   <div key={`${wsId}-${u.userId}`} className="flex items-center gap-3 px-4 py-2.5">
-                    <div className="flex items-center justify-center w-7 h-7 rounded-full bg-green-500/15 text-green-400 text-xs font-bold flex-shrink-0">
+                    <div className="flex items-center justify-center w-7 h-7 rounded-full bg-green-500/15 text-emerald-400 text-xs font-bold flex-shrink-0">
                       {(u.name || u.email)[0].toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -221,7 +221,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
                       <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500" />
                     </span>
-                    <span className="text-[11px] font-semibold text-green-400">
+                    <span className="text-[11px] font-semibold text-emerald-400">
                       {onlineUsers.map(u => u.name || u.email.split('@')[0]).join(', ')} online now
                     </span>
                   </div>
@@ -271,7 +271,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                           <div className="flex items-center gap-1.5">
                             <span className="text-[11px] font-medium text-zinc-400">Health</span>
                             {scoreDelta !== null && scoreDelta !== 0 && (
-                              <span className={`flex items-center text-[11px] font-medium ${scoreDelta > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              <span className={`flex items-center text-[11px] font-medium ${scoreDelta > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                                 {scoreDelta > 0 ? <ArrowUpRight className="w-2.5 h-2.5" /> : <ArrowDownRight className="w-2.5 h-2.5" />}
                                 {Math.abs(scoreDelta)}
                               </span>
@@ -315,7 +315,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                       ws.approvals.pending > 0 ? (
                         <div className="text-[11px] text-teal-400 font-medium">{ws.approvals.pending} pending</div>
                       ) : (
-                        <div className="flex items-center gap-1 text-[11px] text-green-400">
+                        <div className="flex items-center gap-1 text-[11px] text-emerald-400">
                           <CheckCircle2 className="w-2.5 h-2.5" /> All clear
                         </div>
                       )
@@ -349,7 +349,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                         <div className="flex flex-wrap gap-1">
                           {(ws.pageStates?.issueDetected || 0) > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400">{ws.pageStates!.issueDetected} issues</span>}
                           {(ws.pageStates?.inReview || 0) > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400">{ws.pageStates!.inReview} in review</span>}
-                          {(ws.pageStates?.approved || 0) > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-green-400">{ws.pageStates!.approved} approved</span>}
+                          {(ws.pageStates?.approved || 0) > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-emerald-400">{ws.pageStates!.approved} approved</span>}
                           {(ws.pageStates?.rejected || 0) > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-red-400">{ws.pageStates!.rejected} rejected</span>}
                           {(ws.pageStates?.live || 0) > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400">{ws.pageStates!.live} live</span>}
                         </div>

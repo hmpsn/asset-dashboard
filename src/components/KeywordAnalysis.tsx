@@ -62,7 +62,7 @@ interface Props {
 
 
 function difficultyColor(d: string): string {
-  if (d === 'low') return 'text-green-400';
+  if (d === 'low') return 'text-emerald-400';
   if (d === 'medium') return 'text-amber-400';
   return 'text-red-400';
 }
@@ -348,11 +348,11 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                             return (
                               <div key={key} className="flex items-center gap-1">
                                 {present ? (
-                                  <CheckCircle className="w-3 h-3 text-green-400" />
+                                  <CheckCircle className="w-3 h-3 text-emerald-400" />
                                 ) : (
                                   <AlertCircle className="w-3 h-3 text-red-400" />
                                 )}
-                                <span className={`text-[11px] ${present ? 'text-green-400' : 'text-red-400'}`}>
+                                <span className={`text-[11px] ${present ? 'text-emerald-400' : 'text-red-400'}`}>
                                   {labels[key]}
                                 </span>
                               </div>
@@ -378,12 +378,12 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                         </div>
                         <div className="bg-zinc-900 p-3 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
                           <div className="flex items-center gap-2 mb-2">
-                            <TrendingUp className="w-3.5 h-3.5 text-green-400" />
+                            <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
                             <span className="text-xs font-medium text-zinc-300">Long-Tail Keywords</span>
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {kw.longTailKeywords.map((k, i) => (
-                              <span key={i} className="text-[11px] px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-green-400">
+                              <span key={i} className="text-[11px] px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-emerald-400">
                                 {k}
                               </span>
                             ))}
@@ -443,7 +443,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                         {kw.recommendations.length > 0 && (
                           <div className="bg-zinc-900 rounded-lg p-3 border border-green-500/20">
                             <div className="flex items-center gap-2 mb-2">
-                              <Sparkles className="w-3.5 h-3.5 text-green-400" />
+                              <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
                               <span className="text-xs font-medium text-zinc-300">Recommendations</span>
                             </div>
                             <ul className="space-y-1">
@@ -471,7 +471,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                               <div className="flex items-center gap-3">
                                 <MetricRing score={cs.readabilityScore} size={64} noAnimation />
                                 <div>
-                                  <div className={`text-lg font-bold ${cs.readabilityScore >= 60 ? 'text-green-400' : cs.readabilityScore >= 30 ? 'text-amber-400' : 'text-red-400'}`}>
+                                  <div className={`text-lg font-bold ${cs.readabilityScore >= 60 ? 'text-emerald-400' : cs.readabilityScore >= 30 ? 'text-amber-400' : 'text-red-400'}`}>
                                     {cs.readabilityScore}
                                   </div>
                                   <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">Readability</div>
@@ -505,11 +505,11 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                           {/* Title/desc length */}
                           <div className="flex items-center gap-4 mt-3">
                             <div className="flex items-center gap-1.5">
-                              {cs.titleOk ? <CheckCircle className="w-3 h-3 text-green-400" /> : <AlertCircle className="w-3 h-3 text-amber-400" />}
+                              {cs.titleOk ? <CheckCircle className="w-3 h-3 text-emerald-400" /> : <AlertCircle className="w-3 h-3 text-amber-400" />}
                               <span className="text-[11px] text-zinc-400">Title: {cs.titleLength} chars</span>
                             </div>
                             <div className="flex items-center gap-1.5">
-                              {cs.descOk ? <CheckCircle className="w-3 h-3 text-green-400" /> : <AlertCircle className="w-3 h-3 text-amber-400" />}
+                              {cs.descOk ? <CheckCircle className="w-3 h-3 text-emerald-400" /> : <AlertCircle className="w-3 h-3 text-amber-400" />}
                               <span className="text-[11px] text-zinc-400">Desc: {cs.descLength} chars</span>
                             </div>
                             <div className="flex items-center gap-1.5">

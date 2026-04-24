@@ -229,8 +229,8 @@ export function PageKeywordMapPanel({
                       )}
                       {page.cpc !== undefined && page.cpc > 0 && (
                         <div className="text-[11px] text-zinc-500 flex items-center gap-1">
-                          <DollarSign className="w-3 h-3 text-green-400" />
-                          CPC: <span className="text-green-400 font-medium">${page.cpc.toFixed(2)}</span>
+                          <DollarSign className="w-3 h-3 text-emerald-400" />
+                          CPC: <span className="text-emerald-400 font-medium">${page.cpc.toFixed(2)}</span>
                         </div>
                       )}
                       {page.impressions !== undefined && (

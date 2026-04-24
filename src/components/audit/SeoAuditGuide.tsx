@@ -40,7 +40,7 @@ const SECTIONS = [
   {
     title: 'Fix Options',
     icon: CheckCircle,
-    color: 'text-green-400',
+    color: 'text-emerald-400',
     bg: 'bg-green-500/10 border-green-500/20',
     description: 'Each issue in the audit has three action options in its action menu. Use them to keep the audit clean and actionable.',
     actions: [

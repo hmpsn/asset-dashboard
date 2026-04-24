@@ -153,7 +153,7 @@ const SECTIONS = [
   {
     title: 'Page Intelligence vs. SEO Audit',
     icon: Eye,
-    color: 'text-green-400',
+    color: 'text-emerald-400',
     bg: 'bg-green-500/10 border-green-500/20',
     description: 'These two tools answer different questions and complement each other.',
     items: [
@@ -181,7 +181,7 @@ const SECTIONS = [
 const SCORE_THRESHOLDS = [
   { label: 'Needs work', range: '0–49', color: 'text-red-400', bg: 'bg-red-500/10 border-red-500/20' },
   { label: 'Improving', range: '50–79', color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' },
-  { label: 'Optimized', range: '80–100', color: 'text-green-400', bg: 'bg-green-500/10 border-green-500/20' },
+  { label: 'Optimized', range: '80–100', color: 'text-emerald-400', bg: 'bg-green-500/10 border-green-500/20' },
 ];
 
 export function PageIntelligenceGuide() {

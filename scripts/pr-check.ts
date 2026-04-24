@@ -3714,21 +3714,32 @@ export const CHECKS: Check[] = [
     // rather than per-file pattern matching.
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
-      const ROOT_PATH = path.join(import.meta.dirname, '..');
-      const { readFileSync: readSync, existsSync: existsSync2 } = require('fs') as typeof import('fs');
 
-      const styleguidePath = path.join(ROOT_PATH, 'public', 'styleguide.css');
-      if (!existsSync2(styleguidePath)) return hits; // file doesn't exist yet — skip
+      // Find any file in the provided list that looks like public/styleguide.css
+      const styleguideCandidates = files.filter(f => f.endsWith('public/styleguide.css') || f.endsWith('public' + path.sep + 'styleguide.css'));
 
-      const css = readSync(styleguidePath, 'utf-8');
-      const matches = [...css.matchAll(/^\s*(--[\w-]+)\s*:/gm)];
-      for (const m of matches) {
-        const lineNum = css.slice(0, m.index).split('\n').length;
-        hits.push({
-          file: styleguidePath,
-          line: lineNum,
-          text: `re-declared token ${m[1]} in public/styleguide.css (must come via @import url('/tokens.css'))`,
-        });
+      // Also check the canonical project path if not already covered
+      const canonicalPath = path.join(ROOT, 'public', 'styleguide.css');
+      const pathsToCheck = new Set([...styleguideCandidates]);
+      if (!styleguideCandidates.some(f => f === canonicalPath)) {
+        pathsToCheck.add(canonicalPath);
+      }
+
+      for (const styleguidePath of pathsToCheck) {
+        try {
+          const css = readFileSync(styleguidePath, 'utf-8');
+          const matches = [...css.matchAll(/^\s*(--[\w-]+)\s*:/gm)];
+          for (const m of matches) {
+            const lineNum = (css.slice(0, m.index ?? 0).match(/\n/g) ?? []).length + 1;
+            hits.push({
+              file: styleguidePath,
+              line: lineNum,
+              text: `re-declared token ${m[1]} in public/styleguide.css (must come via @import url('/tokens.css'))`,
+            });
+          }
+        } catch {
+          // File doesn't exist — skip (not an error in Phase 0 before styleguide is created)
+        }
       }
       return hits;
     },
