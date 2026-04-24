@@ -275,28 +275,24 @@ Phase 2 agents must **never** modify these files/directories:
 
 ### Pre-push check implementation
 
-Add to `scripts/pr-check.ts` OR a dedicated `scripts/phase2-guard.ts` (simpler):
+**Already shipped: `scripts/phase2-guard.ts`** (included in this PR). Usage:
 
-```typescript
-// scripts/phase2-guard.ts
-const FROZEN_PATHS = [
-  'src/components/ui/index.ts',
-  'src/components/ui/typography/',
-  'src/components/ui/forms/',
-  'src/components/ui/layout/',
-  'src/components/ui/overlay/',
-  /* …primitive files… */
-  'vite.config.ts',
-  'src/index.css',
-  'src/tokens.css',
-  'public/tokens.css',
-  'public/styleguide.css',
-  'package.json',
-];
-// compare diff against origin/staging, fail if any frozen path modified
+```bash
+# In a Phase 2 worker agent's commit flow, run before `git push`:
+npx tsx scripts/phase2-guard.ts
+
+# Or install as a pre-push hook:
+echo '#!/bin/sh\nnpx tsx scripts/phase2-guard.ts' > .git/hooks/pre-push
+chmod +x .git/hooks/pre-push
+
+# The integrator agent (which owns coordinated doc updates) bypasses the
+# docs-only portion of the check with:
+npx tsx scripts/phase2-guard.ts --integrator
 ```
 
-Run this as a `pre-push` git hook OR as a required step in each worker's commit flow.
+The script exits 0 on clean, non-zero with a specific violation listing on failure.
+Every Phase 2 worker dispatch prompt must include: "Run `npx tsx scripts/phase2-guard.ts`
+before `git push` — fail-to-zero or do not push."
 
 ---
 
@@ -529,24 +525,163 @@ maps cleanly. Phase 3 or Phase 4 can own form-specific migrations.
 
 ---
 
-## 9. Phase 1 polish items (defer to a single follow-up PR, not to Phase 2)
+## 9. Phase 1 polish items (single follow-up PR — do AFTER Phase 1 merges)
 
 Round 3 review surfaced these low-signal items. Do NOT bundle them into Phase 2 —
-they're independent and belong in a single "Phase 1 polish" PR after the 6 main PRs merge:
+they're independent and belong in one "Phase 1 polish" PR against `staging` **after
+all 6 Phase 1 PRs merge to staging**.
 
-- **DESIGN_SYSTEM.md File Structure** section doesn't list new Phase 1 files (`Icon.tsx`,
-  `Button.tsx`, `IconButton.tsx`, `ActionPill.tsx`, `SegmentedControl.tsx`,
-  `overlay/*.tsx`). Append to the tree in `§File Structure`.
-- **IconSize / IconProps types** not re-exported from `src/components/ui/index.ts`.
-  Add: `export type { IconSize, IconProps } from './Icon';`
-- **SegmentedControl missing `pointer-events-none`** on disabled state (sibling primitives
-  have it; the `<button disabled>` native attribute handles it but the belt-and-suspenders
-  consistency is worth it).
-- **Icon `role="img"` when consumer passes `aria-label`** — per ARIA spec, `<span>` with
-  `aria-label` is not guaranteed to be announced by all screen readers. Conditional role
-  assignment based on presence of `aria-label` would make it robust.
+### 9.1 Literal patches (copy-paste ready for next session)
 
-Total scope: ~30 lines of changes across 3–4 files. One small PR, ~15 minutes of work.
+Branch: `chore/phase1-polish-roundup`, base: `staging`. Apply all four patches below,
+run quality gates, open PR against `staging`.
+
+#### Patch 1 — Export `IconSize` and `IconProps` types from barrel
+
+File: `src/components/ui/Icon.tsx` — export the types:
+
+```tsx
+// BEFORE (currently unexported):
+type IconSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+interface IconProps extends React.HTMLAttributes<HTMLSpanElement> { … }
+
+// AFTER:
+export type IconSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+export interface IconProps extends React.HTMLAttributes<HTMLSpanElement> { … }
+```
+
+File: `src/components/ui/index.ts` — add under `// Icon`:
+
+```tsx
+export { Icon } from './Icon';
+export type { IconSize, IconProps } from './Icon';  // ← add this line
+```
+
+#### Patch 2 — `SegmentedControl` disabled adds `pointer-events-none`
+
+File: `src/components/ui/SegmentedControl.tsx`, in the button `className` cn() call:
+
+```tsx
+// BEFORE:
+opt.disabled && 'opacity-50 cursor-not-allowed',
+
+// AFTER:
+opt.disabled && 'opacity-50 cursor-not-allowed pointer-events-none',
+```
+
+Matches sibling primitives (Button, IconButton, ActionPill). Belt-and-suspenders with
+the native `disabled` attribute.
+
+#### Patch 3 — `Icon` conditional `role="img"` when consumer passes `aria-label`
+
+File: `src/components/ui/Icon.tsx`:
+
+```tsx
+// BEFORE:
+export const Icon = React.forwardRef<HTMLSpanElement, IconProps>(function Icon(
+  { as: Component, size = 'md', className, ...rest },
+  ref,
+) {
+  return (
+    <span
+      ref={ref}
+      className={cn('inline-flex items-center justify-center', SIZE_MAP[size], className)}
+      {...rest}
+    >
+      <Component className="w-full h-full" aria-hidden="true" />
+    </span>
+  );
+});
+
+// AFTER:
+export const Icon = React.forwardRef<HTMLSpanElement, IconProps>(function Icon(
+  { as: Component, size = 'md', className, ...rest },
+  ref,
+) {
+  // When consumer passes aria-label, the <span> becomes a semantic image;
+  // apply role="img" so all screen readers announce it (per ARIA spec, a
+  // bare <span> with aria-label is not guaranteed to be announced).
+  const isSemantic = 'aria-label' in rest || 'aria-labelledby' in rest;
+  return (
+    <span
+      ref={ref}
+      role={isSemantic ? 'img' : undefined}
+      className={cn('inline-flex items-center justify-center', SIZE_MAP[size], className)}
+      {...rest}
+    >
+      <Component className="w-full h-full" aria-hidden="true" />
+    </span>
+  );
+});
+```
+
+Add test at `tests/components/ui/Icon.test.tsx`:
+
+```tsx
+it('applies role="img" when aria-label is provided (semantic icon)', () => {
+  const { container } = render(<Icon as={TrendingUp} aria-label="Trending up" />);
+  expect(container.firstElementChild?.getAttribute('role')).toBe('img');
+});
+
+it('omits role when no aria-label (decorative icon)', () => {
+  const { container } = render(<Icon as={TrendingUp} />);
+  expect(container.firstElementChild?.getAttribute('role')).toBeNull();
+});
+```
+
+#### Patch 4 — `DESIGN_SYSTEM.md` File Structure listing — add Phase 1 primitive files
+
+File: `DESIGN_SYSTEM.md`, find the `File Structure` section tree (roughly line 430 on
+staging post-merge) and append the new files:
+
+```
+├── Icon.tsx                # Strict-enum wrapper around Lucide components (Phase 5)
+├── Button.tsx              # Primary/secondary/ghost/danger/link button (Phase 5)
+├── IconButton.tsx          # Square icon button with required a11y label (Phase 5)
+├── ActionPill.tsx          # Workflow pill: start/approve/decline/send/request-changes (Phase 5)
+├── SegmentedControl.tsx    # Radiogroup with roving tabIndex (Phase 5)
+├── typography/
+│   ├── Heading.tsx
+│   ├── Stat.tsx
+│   ├── BodyText.tsx
+│   ├── Caption.tsx
+│   ├── Label.tsx
+│   ├── Mono.tsx
+│   └── index.ts
+├── forms/
+│   ├── FormField.tsx
+│   ├── FormInput.tsx
+│   ├── FormSelect.tsx
+│   ├── FormTextarea.tsx
+│   ├── Checkbox.tsx
+│   ├── Toggle.tsx
+│   └── index.ts
+├── layout/
+│   ├── Row.tsx
+│   ├── Stack.tsx
+│   ├── Column.tsx
+│   ├── Grid.tsx
+│   ├── Divider.tsx
+│   ├── utils.ts            # Shared GapSize + gapMap
+│   └── index.ts
+├── overlay/
+│   ├── Modal.tsx
+│   ├── Popover.tsx
+│   ├── Tooltip.tsx
+│   ├── reducedMotion.ts
+│   └── index.ts
+```
+
+### 9.2 Quality gates for the polish PR
+
+```bash
+npm run typecheck && npx vitest run && npx vite build && npx tsx scripts/pr-check.ts
+```
+
+All green → open PR against `staging` with title:
+`chore(design-system): Phase 1 polish roundup (round-3 review cleanup)`
+
+Total scope: ~50 lines changed across 4 files + 2 test additions. ~20 minutes of work.
 
 ---
 
