@@ -73,6 +73,7 @@ router.get('/api/public/workspace/:id', (req, res) => {
       : 0,
     trialEndsAt: ws.trialEndsAt || null,
     stripeEnabled: isStripeConfigured(),
+    billingMode: ws.billingMode || 'platform',
     // Onboarding
     onboardingEnabled: ws.onboardingEnabled ?? false,
     onboardingCompleted: ws.onboardingCompleted ?? false,

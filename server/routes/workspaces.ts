@@ -194,6 +194,11 @@ router.patch('/api/workspaces/:id', requireWorkspaceAccess(), async (req, res) =
     updates.webflowToken = '';
     updates.liveDomain = '';
   }
+  // Validate billingMode to one of the typed values; reject garbage at the boundary
+  // rather than relying on rowToWorkspace normalization to swallow it.
+  if ('billingMode' in updates && updates.billingMode !== 'platform' && updates.billingMode !== 'external') {
+    return res.status(400).json({ error: "billingMode must be 'platform' or 'external'" });
+  }
   // Hash clientPassword with bcrypt before saving (empty string = remove password)
   if (typeof updates.clientPassword === 'string') {
     updates.clientPassword = updates.clientPassword

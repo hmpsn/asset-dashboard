@@ -40,6 +40,8 @@ interface StrategyTabProps {
   workspaceId?: string;
   setToast?: (msg: string) => void;
   onContentRequested?: () => void;
+  /** When true (external billing), hide price chips on request buttons. */
+  hidePrices?: boolean;
 }
 
 const kdColor = (kd?: number) => !kd ? 'text-zinc-500' : kd <= 30 ? 'text-green-400' : kd <= 60 ? 'text-amber-400' : kd <= 80 ? 'text-orange-400' : 'text-red-400';
@@ -63,7 +65,7 @@ export interface KeywordFeedback {
   created_at?: string;
 }
 
-export function StrategyTab({ strategyData, requestedTopics, contentRequests, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal, contentPlanKeywords, onTabChange, workspaceId, setToast, onContentRequested }: StrategyTabProps) {
+export function StrategyTab({ strategyData, requestedTopics, contentRequests, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal, contentPlanKeywords, onTabChange, workspaceId, setToast, onContentRequested, hidePrices }: StrategyTabProps) {
   const betaMode = useBetaMode();
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['optimize-existing', 'new-content', 'page-keyword-map']));
 
@@ -768,15 +770,15 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 font-medium hover:bg-teal-600/40 transition-all"
                             >
                               <FileText className="w-3 h-3" /> Get Brief
-                              {briefPrice != null && <span className="opacity-70 ml-0.5">{fmtPrice(briefPrice)}</span>}
+                              {!hidePrices && briefPrice != null && <span className="opacity-70 ml-0.5">{fmtPrice(briefPrice)}</span>}
                             </button>
-                            {fullPostPrice != null && (
+                            {(hidePrices || fullPostPrice != null) && (
                               <button
                                 onClick={() => setPricingModal({ serviceType: 'full_post', topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, source: 'strategy', pageType })}
                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-teal-600/30 to-emerald-600/30 border border-teal-500/40 text-[11px] text-teal-200 font-medium hover:from-teal-600/50 hover:to-emerald-600/50 transition-all"
                               >
                                 <Sparkles className="w-3 h-3" /> Full Post
-                                <span className="opacity-70 ml-0.5">{fmtPrice(fullPostPrice)}</span>
+                                {!hidePrices && fullPostPrice != null && <span className="opacity-70 ml-0.5">{fmtPrice(fullPostPrice)}</span>}
                               </button>
                             )}
                           </div>

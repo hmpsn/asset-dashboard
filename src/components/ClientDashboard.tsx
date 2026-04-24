@@ -422,6 +422,10 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   const fullPostPrice = pricingData?.products?.post_polished?.price ?? ws?.contentPricing?.fullPostPrice ?? null;
   const strategyLocked = effectiveTier === 'free' || !ws?.seoClientView;
   const isPaid = effectiveTier !== 'free';
+  // External-billing workspaces don't see Stripe-managed UI (Plans, Trial banners,
+  // Upgrade modal, SEO services cart). Per-request actions still work via the
+  // bypass path in usePayments + PricingConfirmationModal.
+  const isExternalBilling = ws?.billingMode === 'external';
   const NAV = [
     { id: 'overview' as ClientTab, label: 'Insights', icon: Sparkles, locked: false },
     ...(ws?.analyticsClientView !== false ? [
@@ -432,7 +436,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     ...(isPaid && contentPlanSummary && contentPlanSummary.totalCells > 0 ? [{ id: 'content-plan' as ClientTab, label: 'Content Plan', icon: Layers, locked: false }] : []),
     ...(isPaid ? [{ id: 'inbox' as ClientTab, label: 'Inbox', icon: Zap, locked: false }] : []),
     ...(isPaid ? [{ id: 'schema-review' as ClientTab, label: 'Schema', icon: Shield, locked: false }] : []),
-    ...(!betaMode ? [{ id: 'plans' as ClientTab, label: 'Plans', icon: CreditCard, locked: false }] : []),
+    ...(!betaMode && !isExternalBilling ? [{ id: 'plans' as ClientTab, label: 'Plans', icon: CreditCard, locked: false }] : []),
     ...(isPaid && !betaMode && strategyData ? [{ id: 'roi' as ClientTab, label: 'ROI', icon: Trophy, locked: false }] : []),
     ...(brandTabEnabled ? [{ id: 'brand' as ClientTab, label: 'Brand', icon: Building2, locked: false }] : []),
   ];
@@ -450,7 +454,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     <BetaProvider value={betaMode}>
     <CartProvider>
     <div className={`min-h-screen bg-[#0f1219] text-zinc-200 ${theme === 'light' ? 'dashboard-light' : ''}`}>
-      {!betaMode && <SeoCartDrawer workspaceId={workspaceId} tier={effectiveTier} />}
+      {!betaMode && !isExternalBilling && <SeoCartDrawer workspaceId={workspaceId} tier={effectiveTier} />}
 
       <ClientHeader
         ws={ws}
@@ -486,7 +490,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         <div className="space-y-8">
 
         {/* Trial countdown banner — shows at day 10 and under */}
-        {!betaMode && ws.isTrial && (ws.trialDaysRemaining ?? 0) <= 10 && (ws.trialDaysRemaining ?? 0) > 0 && (
+        {!betaMode && !isExternalBilling && ws.isTrial && (ws.trialDaysRemaining ?? 0) <= 10 && (ws.trialDaysRemaining ?? 0) > 0 && (
           <div className="flex items-center gap-3 px-4 py-3 bg-amber-500/8 border border-amber-500/20" style={{ borderRadius: '6px 12px 6px 12px' }}>
             <Clock className="w-4 h-4 text-amber-400/80 flex-shrink-0" />
             <p className="text-sm text-amber-300">
@@ -495,7 +499,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
             </p>
           </div>
         )}
-        {!betaMode && ws.isTrial && (ws.trialDaysRemaining ?? 0) === 0 && (
+        {!betaMode && !isExternalBilling && ws.isTrial && (ws.trialDaysRemaining ?? 0) === 0 && (
           <div className="flex items-center gap-3 px-4 py-3 bg-red-500/8 border border-red-500/20" style={{ borderRadius: '6px 12px 6px 12px' }}>
             <Clock className="w-4 h-4 text-red-400/80 flex-shrink-0" />
             <p className="text-sm text-red-300">
@@ -541,13 +545,13 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
         {/* ════════════ SEO STRATEGY TAB ════════════ */}
         {tab === 'strategy' && (
-          <StrategyTab strategyData={strategyData} requestedTopics={requestedTopics} contentRequests={contentRequests} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} contentPlanKeywords={contentPlanKeywords} onTabChange={(t) => setTab(t as ClientTab)} workspaceId={workspaceId} setToast={(msg: string) => setToast({ message: msg, type: 'success' })} />
+          <StrategyTab strategyData={strategyData} requestedTopics={requestedTopics} contentRequests={contentRequests} effectiveTier={effectiveTier} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} contentPlanKeywords={contentPlanKeywords} onTabChange={(t) => setTab(t as ClientTab)} workspaceId={workspaceId} setToast={(msg: string) => setToast({ message: msg, type: 'success' })} hidePrices={isExternalBilling} />
         )}
 
 
         {/* ════════════ INBOX TAB (Approvals + Requests + Content) ════════════ */}
         {tab === 'inbox' && (
-          <InboxTab workspaceId={workspaceId} effectiveTier={effectiveTier} approvalBatches={approvalBatches} approvalsLoading={approvalsLoading} pendingApprovals={pendingApprovals} setApprovalBatches={setApprovalBatches} loadApprovals={loadApprovals} requests={requests} requestsLoading={requestsLoading} clientUser={clientUser} loadRequests={loadRequests} contentRequests={contentRequests} setContentRequests={setContentRequests} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} pricingConfirming={pricingConfirming} setToast={setToast} contentPlanReviewCells={contentPlanReviewCells} pageMap={approvalPageKeywords ?? strategyData?.pageMap} hasCopyEntries={hasCopyEntries} />
+          <InboxTab workspaceId={workspaceId} effectiveTier={effectiveTier} approvalBatches={approvalBatches} approvalsLoading={approvalsLoading} pendingApprovals={pendingApprovals} setApprovalBatches={setApprovalBatches} loadApprovals={loadApprovals} requests={requests} requestsLoading={requestsLoading} clientUser={clientUser} loadRequests={loadRequests} contentRequests={contentRequests} setContentRequests={setContentRequests} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} pricingConfirming={pricingConfirming} setToast={setToast} contentPlanReviewCells={contentPlanReviewCells} pageMap={approvalPageKeywords ?? strategyData?.pageMap} hasCopyEntries={hasCopyEntries} hidePrices={isExternalBilling} />
         )}
 
 
@@ -609,7 +613,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       </main>
 
       {/* ── SEO Upgrade Modal ── */}
-      {!betaMode && showUpgradeModal && (
+      {!betaMode && !isExternalBilling && showUpgradeModal && (
         <UpgradeModal
           workspaceId={workspaceId}
           onClose={() => setShowUpgradeModal(false)}
@@ -620,6 +624,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       {/* Pricing confirmation modal + Stripe Elements modal */}
       <PricingConfirmationModal
         betaMode={betaMode}
+        billingMode={ws?.billingMode}
         pricingModal={pricingModal}
         setPricingModal={setPricingModal}
         pricingConfirming={pricingConfirming}
