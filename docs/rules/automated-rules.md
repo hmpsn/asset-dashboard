@@ -100,7 +100,7 @@ advisory but tracked.
 | 35 | Hand-rolled card div (use SectionCard) | warn | pattern | `*.tsx` | — | Prevents hand-rolled card divs that bypass the SectionCard primitive and the --surface-N token system. |
 | 36 | Page component missing PageHeader | warn | custom | `` | — | Enforces consistent page-level header structure across all navigable views. |
 | 37 | Hardcoded card radius outside ui primitives | warn | pattern | `*.tsx` | — | Prevents hardcoded Tailwind radius classes that bypass the --radius-* token system. |
-| 38 | Non-standard transition duration | warn | pattern | `*.tsx, *.css` | — | Enforces the three-speed motion system: 120ms (micro), 180ms (standard), 400ms (entrance). |
+| 38 | Non-standard transition duration | warn | custom | `*.tsx, *.css` | — | Enforces the three-speed motion system: 120ms (micro), 180ms (standard), 400ms (entrance). |
 
 ---
 

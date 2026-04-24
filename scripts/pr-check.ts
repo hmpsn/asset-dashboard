@@ -3797,7 +3797,9 @@ export const CHECKS: Check[] = [
   },
   {
     name: 'Non-standard transition duration',
-    pattern: 'transition-duration-\\[(?!120ms|180ms|400ms)',
+    // Implemented as customCheck — grep -E does not support negative lookahead,
+    // so the original pattern `transition-duration-\\[(?!120ms|180ms|400ms)` was
+    // silently ineffective (always matched zero lines).
     fileGlobs: ['*.tsx', '*.css'],
     exclude: [
       'src/components/ui/',
@@ -3808,6 +3810,24 @@ export const CHECKS: Check[] = [
     severity: 'warn',
     rationale: 'Enforces the three-speed motion system: 120ms (micro), 180ms (standard), 400ms (entrance).',
     claudeMdRef: '#design-system--the-three-laws-of-color',
+    customCheck: (files) => {
+      const ALLOWED = new Set(['120ms', '180ms', '400ms']);
+      const violations: Array<{ file: string; line: number; text: string }> = [];
+      // files are absolute paths from resolveCheckFileList — use directly
+      files.forEach(filePath => {
+        try {
+          const lines = readFileSync(filePath, 'utf-8').split('\n');
+          lines.forEach((line, i) => {
+            for (const m of line.matchAll(/transition-duration-\[([^\]]+)\]/g)) {
+              if (!ALLOWED.has(m[1])) {
+                violations.push({ file: filePath, line: i + 1, text: line.trim() });
+              }
+            }
+          });
+        } catch { /* file not found in worktree */ }
+      });
+      return violations;
+    },
   },
 ];
 
