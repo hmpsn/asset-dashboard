@@ -3,7 +3,7 @@ import type { LucideIcon } from 'lucide-react';
 
 type IconSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
 
-interface IconProps extends React.HTMLAttributes<HTMLDivElement> {
+interface IconProps extends React.HTMLAttributes<HTMLSpanElement> {
   as: LucideIcon;
   size?: IconSize;
   className?: string;
@@ -18,15 +18,21 @@ const SIZE_MAP: Record<IconSize, string> = {
   '2xl': 'w-8 h-8',
 };
 
-export const Icon = React.forwardRef<HTMLDivElement, IconProps>(
+/**
+ * Inline icon wrapper around any Lucide component. Renders a <span> so it can
+ * be used inline within text or layout-flow containers (e.g. inside <p>, <li>,
+ * or alongside text in flex rows). The wrapper is `inline-flex` so the SVG
+ * sits flush with surrounding text.
+ */
+export const Icon = React.forwardRef<HTMLSpanElement, IconProps>(
   ({ as: Component, size = 'md', className = '', ...rest }, ref) => {
     const sizeClass = SIZE_MAP[size];
-    const combined = `${sizeClass}${className ? ' ' + className : ''}`;
+    const combined = `inline-flex items-center justify-center ${sizeClass}${className ? ' ' + className : ''}`;
 
     return (
-      <div ref={ref} className={combined} {...rest}>
+      <span ref={ref} className={combined} {...rest}>
         <Component className="w-full h-full" />
-      </div>
+      </span>
     );
   }
 );

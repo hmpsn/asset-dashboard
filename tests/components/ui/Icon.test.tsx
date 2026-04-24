@@ -37,10 +37,10 @@ describe('Icon', () => {
     expect(div.className).toContain('text-teal-400');
   });
 
-  it('forwards ref', () => {
-    const ref = React.createRef<HTMLDivElement>();
+  it('forwards ref to inline span wrapper', () => {
+    const ref = React.createRef<HTMLSpanElement>();
     render(<Icon as={X} ref={ref} />);
-    expect(ref.current).toBeInstanceOf(HTMLDivElement);
+    expect(ref.current).toBeInstanceOf(HTMLSpanElement);
   });
 
   it('rejects invalid size at TypeScript level', () => {
