@@ -408,7 +408,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
       ) : (
         <>
           {/* Introduction */}
-          <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+          <SectionCard noPadding variant="subtle">
             <div className="px-4 py-3 border-b border-zinc-800/50 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-3.5 h-3.5 text-teal-400" />
@@ -436,7 +436,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                 <div className="text-xs text-zinc-300 leading-relaxed [&_p]:mb-2 [&_strong]:text-zinc-100 [&_a]:text-teal-400" dangerouslySetInnerHTML={{ __html: post.introduction }} />
               )}
             </div>
-          </div>
+          </SectionCard>
 
           {/* Body Sections */}
           {post.sections.map((section) => (
@@ -457,7 +457,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
           ))}
 
           {/* Conclusion */}
-          <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+          <SectionCard noPadding variant="subtle">
             <div className="px-4 py-3 border-b border-zinc-800/50 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-3.5 h-3.5 text-teal-400" />
@@ -485,7 +485,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                 <div className="text-xs text-zinc-300 leading-relaxed [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:text-zinc-100 [&_h2]:mb-2 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:text-zinc-200 [&_p]:mb-2 [&_ul]:pl-4 [&_ul]:mb-2 [&_ol]:pl-4 [&_ol]:mb-2 [&_li]:mb-1 [&_strong]:text-zinc-100 [&_a]:text-teal-400" dangerouslySetInnerHTML={{ __html: post.conclusion }} />
               )}
             </div>
-          </div>
+          </SectionCard>
         </>
       )}
 
