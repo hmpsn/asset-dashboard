@@ -192,6 +192,26 @@ Standard card container for content sections.
 - `interactive` prop: adds teal left-border accent on hover (`hover:border-l-teal-500/40`) for clickable cards
 - `staggerIndex` prop: entrance animation delay (0-based, 60ms per index)
 
+### 4a. ChartCard
+
+Thin `SectionCard` wrapper with chart-friendly defaults. Used for sparkline/mini-chart panels where the header needs to fit a title plus a directional trend indicator inline.
+
+- Container: same `bg-[var(--surface-2)] border-zinc-800` + signature `10px 24px 10px 24px` radius as SectionCard
+- Tighter padding than SectionCard: header `px-4 py-3`, body `px-4 pb-3`
+- No `border-b` separator — chart visuals flow directly under header
+- `trend?: number` prop renders an inline `<TrendBadge>` next to the title; `trendProps` passes through (`invert`, `showSign`, `label`, etc.)
+- Omit all header props → header row doesn't render, body gets `px-4 py-3`
+
+### 4b. TrendBadge
+
+Canonical directional delta indicator. Replaces hand-rolled `TrendingUp/Down + emerald/red-400` ternaries across the app.
+
+- Positive (or negative with `invert`): `text-emerald-400` + `TrendingUp` icon
+- Negative (or positive with `invert`): `text-red-400` + `TrendingDown` icon
+- Zero (only when `hideOnZero={false}`): `text-zinc-400` + `Minus` icon
+- Props: `value: number`, `suffix='%'`, `invert=false` (use when lower=better), `showSign=false`, `label?`, `size='sm'|'md'`, `hideOnZero=true`
+- Always use `<TrendBadge>` instead of inlining `TrendingUp/Down` + emerald/red. Enforced by the pr-check `Hand-rolled trend badge` warn rule.
+
 ### 5. DateRangeSelector
 
 **ONE pattern** for all date/period selectors (replaces 3 current styles).
