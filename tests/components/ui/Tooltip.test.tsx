@@ -1,11 +1,18 @@
 import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
-import { Tooltip } from '../overlay/Tooltip';
+import { Tooltip } from '../../../src/components/ui/overlay/Tooltip';
+
+// Module-level saved handle to the original window.matchMedia so afterEach
+// can unconditionally restore it even if a test throws before its own
+// cleanup can run. Prevents the reduced-motion mock leaking into later
+// tests in this file.
+const originalMatchMedia = window.matchMedia;
 
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
+  window.matchMedia = originalMatchMedia;
 });
 
 describe('Tooltip', () => {
@@ -131,7 +138,7 @@ describe('Tooltip', () => {
   });
 
   it('skips transition class when prefers-reduced-motion is set', () => {
-    const originalMatchMedia = window.matchMedia;
+    // Mock is restored unconditionally by the module-level afterEach above.
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
       matches: query.includes('reduce'),
       media: query,
@@ -142,17 +149,13 @@ describe('Tooltip', () => {
       removeEventListener: vi.fn(),
       dispatchEvent: vi.fn(),
     })) as typeof window.matchMedia;
-    try {
-      render(
-        <Tooltip content="Tip">
-          <button>Hover</button>
-        </Tooltip>,
-      );
-      fireEvent.focus(screen.getByRole('button'));
-      const tip = screen.getByRole('tooltip');
-      expect(tip.className).not.toMatch(/transition-opacity/);
-    } finally {
-      window.matchMedia = originalMatchMedia;
-    }
+    render(
+      <Tooltip content="Tip">
+        <button>Hover</button>
+      </Tooltip>,
+    );
+    fireEvent.focus(screen.getByRole('button'));
+    const tip = screen.getByRole('tooltip');
+    expect(tip.className).not.toMatch(/transition-opacity/);
   });
 });

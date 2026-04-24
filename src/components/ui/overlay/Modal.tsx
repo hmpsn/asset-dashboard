@@ -9,7 +9,35 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { cn } from '../../../lib/utils';
 import { prefersReducedMotion } from './reducedMotion';
+
+// ─── Body-scroll lock coordination across stacked modals ──────────────────
+// Simple reference counter: each open modal increments; each close
+// decrements. The lock is applied only when the counter transitions 0→1
+// and released only when it transitions 1→0. Prevents the "outer modal
+// closes → scroll re-enabled while inner modal still open" bug and the
+// inverse where the inner modal's cleanup leaves the body permanently
+// locked.
+let activeModalCount = 0;
+let originalBodyOverflow = '';
+
+function acquireScrollLock(): void {
+  if (typeof document === 'undefined') return;
+  if (activeModalCount === 0) {
+    originalBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+  }
+  activeModalCount++;
+}
+
+function releaseScrollLock(): void {
+  if (typeof document === 'undefined') return;
+  activeModalCount = Math.max(0, activeModalCount - 1);
+  if (activeModalCount === 0) {
+    document.body.style.overflow = originalBodyOverflow;
+  }
+}
 
 /* ──────────────────────────────────────────────────────────────────────────
  * <Modal> — centered portal dialog with focus trap, escape, outside-click,
@@ -149,22 +177,25 @@ function ModalInner({
     return () => cancelAnimationFrame(raf);
   }, [open]);
 
-  // Restore focus on close.
+  // Restore focus on close. Guard with document.contains so we don't
+  // call .focus() on an element that was unmounted while the modal was
+  // open (common when route changes close the modal) — without the
+  // guard, focus would silently move to <body>.
   useEffect(() => {
     if (open) return;
     const prev = previouslyFocusedRef.current;
-    if (prev && typeof prev.focus === 'function') {
+    if (prev && typeof prev.focus === 'function' && document.contains(prev)) {
       prev.focus();
     }
   }, [open]);
 
-  // Body scroll lock while open.
+  // Body scroll lock while open — counter-coordinated so stacked modals
+  // don't clobber each other's state.
   useEffect(() => {
-    if (!open || typeof document === 'undefined') return;
-    const original = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    if (!open) return;
+    acquireScrollLock();
     return () => {
-      document.body.style.overflow = original;
+      releaseScrollLock();
     };
   }, [open]);
 
@@ -205,7 +236,7 @@ function ModalInner({
         tabIndex={-1}
         className={`bg-zinc-900 border border-zinc-800 rounded-lg shadow-2xl w-full ${SIZE_MAX_WIDTH[size]} outline-none ${motionClass}`}
       >
-        {injectTitleId(children, titleId)}
+        {injectTitleId(children, titleId, Boolean(labelledById))}
       </div>
     </div>,
     document.body,
@@ -216,11 +247,17 @@ function ModalInner({
  * Walk immediate children and inject `__titleId` onto the first `Modal.Header`
  * so the auto-generated title id stays aligned with `aria-labelledby`. Consumers
  * who pass an explicit `labelledById` to `<Modal>` are responsible for setting
- * that id on their own title node.
+ * that id on their own title node. If NEITHER is present, `aria-labelledby`
+ * would point to a non-existent id and screen readers receive no dialog label.
+ * Dev warning surfaces the misconfiguration so it's caught before shipping.
  */
-function injectTitleId(children: ReactNode, id: string): ReactNode {
+function injectTitleId(
+  children: ReactNode,
+  id: string,
+  hasExplicitLabelledBy: boolean,
+): ReactNode {
   let patched = false;
-  return Children.map(children, (child) => {
+  const result = Children.map(children, (child) => {
     if (!patched && isValidElement(child) && child.type === ModalHeader) {
       patched = true;
       return cloneElement(child as React.ReactElement<ModalHeaderProps>, {
@@ -229,6 +266,15 @@ function injectTitleId(children: ReactNode, id: string): ReactNode {
     }
     return child;
   });
+  if (!patched && !hasExplicitLabelledBy && process.env.NODE_ENV !== 'production') {
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[Modal] aria-labelledby points to an id with no matching element. ' +
+        'Either include a <Modal.Header title="..."/> child (preferred) or ' +
+        'pass `labelledById` and set that id on your own title node.',
+    );
+  }
+  return result;
 }
 
 interface ModalHeaderProps {
@@ -277,7 +323,7 @@ function ModalBody({
   ...rest
 }: HTMLAttributes<HTMLDivElement> & { children: ReactNode }): React.ReactElement {
   return (
-    <div className={`px-6 py-4 text-zinc-300 text-sm leading-relaxed ${className ?? ''}`} {...rest}>
+    <div className={cn('px-6 py-4 text-zinc-300 text-sm leading-relaxed', className)} {...rest}>
       {children}
     </div>
   );
@@ -290,7 +336,7 @@ function ModalFooter({
 }: HTMLAttributes<HTMLDivElement> & { children: ReactNode }): React.ReactElement {
   return (
     <div
-      className={`flex items-center justify-end gap-3 px-6 pt-3 pb-5 border-t border-zinc-800 ${className ?? ''}`}
+      className={cn('flex items-center justify-end gap-3 px-6 pt-3 pb-5 border-t border-zinc-800', className)}
       {...rest}
     >
       {children}

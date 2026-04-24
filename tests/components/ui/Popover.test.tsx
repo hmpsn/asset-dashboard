@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
-import { Popover } from '../overlay/Popover';
+import { Popover } from '../../../src/components/ui/overlay/Popover';
 
 afterEach(() => {
   cleanup();

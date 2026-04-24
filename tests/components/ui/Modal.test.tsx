@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
-import { Modal } from '../overlay/Modal';
+import { Modal } from '../../../src/components/ui/overlay/Modal';
 
 afterEach(() => {
   cleanup();

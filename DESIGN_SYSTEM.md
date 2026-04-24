@@ -402,13 +402,7 @@ Centered modal overlay for confirming destructive or irreversible actions. Repla
 
 ---
 
-### 16. Typography utilities (Phase 5)
-
-14 `.t-*` utility classes defined in `src/index.css` and available globally. See CLAUDE.md Token authority section for the full list.
-
----
-
-### 17. Overlay primitives (Phase 5)
+### 20. Overlay primitives (Phase 5)
 
 All three overlay primitives portal into `document.body` so `position: fixed` resolves relative to the viewport regardless of ancestor `transform` / `filter` / `contain` / `will-change`.
 

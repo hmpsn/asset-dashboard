@@ -85,7 +85,6 @@ export default defineConfig(async () => ({
     include: [
       'tests/**/*.test.{ts,tsx}',
       'server/__tests__/**/*.test.ts',
-      'src/components/ui/__tests__/**/*.test.{ts,tsx}',
     ],
     coverage: {
       provider: 'v8',

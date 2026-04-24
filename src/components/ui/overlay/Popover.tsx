@@ -14,6 +14,7 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { cn } from '../../../lib/utils';
 
 /* ──────────────────────────────────────────────────────────────────────────
  * <Popover> — a lightweight menu overlay with outside-click + escape dismissal,
@@ -150,7 +151,7 @@ function PopoverItem({
       role="menuitem"
       tabIndex={-1}
       onClick={handleClick}
-      className={`${baseClass} px-3 py-1.5 text-sm w-full text-left focus:outline-none focus:bg-zinc-800 ${className ?? ''}`}
+      className={cn(baseClass, 'px-3 py-1.5 text-sm w-full text-left focus:outline-none focus:bg-zinc-800', className)}
       {...rest}
     >
       {children}
