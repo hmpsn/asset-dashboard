@@ -29,18 +29,20 @@ describe('SegmentedControl', () => {
     expect(fn).toHaveBeenCalledWith('three');
   });
 
-  it('ArrowRight moves selection forward', () => {
+  it('ArrowRight moves selection forward and moves focus', () => {
     const fn = vi.fn();
     render(<SegmentedControl options={OPTS} value="one" onChange={fn} />);
     fireEvent.keyDown(screen.getByRole('radio', { name: 'One' }), { key: 'ArrowRight' });
     expect(fn).toHaveBeenCalledWith('two');
+    expect(document.activeElement).toBe(screen.getByRole('radio', { name: 'Two' }));
   });
 
-  it('ArrowLeft wraps to last', () => {
+  it('ArrowLeft wraps to last and moves focus', () => {
     const fn = vi.fn();
     render(<SegmentedControl options={OPTS} value="one" onChange={fn} />);
     fireEvent.keyDown(screen.getByRole('radio', { name: 'One' }), { key: 'ArrowLeft' });
     expect(fn).toHaveBeenCalledWith('three');
+    expect(document.activeElement).toBe(screen.getByRole('radio', { name: 'Three' }));
   });
 
   it('skips disabled options when navigating', () => {
@@ -53,6 +55,13 @@ describe('SegmentedControl', () => {
     render(<SegmentedControl options={opts} value="one" onChange={fn} />);
     fireEvent.keyDown(screen.getByRole('radio', { name: 'One' }), { key: 'ArrowRight' });
     expect(fn).toHaveBeenCalledWith('three');
+  });
+
+  it('applies roving tabIndex — selected gets 0, others get -1', () => {
+    render(<SegmentedControl options={OPTS} value="two" onChange={() => {}} />);
+    expect(screen.getByRole('radio', { name: 'Two' })).toHaveAttribute('tabindex', '0');
+    expect(screen.getByRole('radio', { name: 'One' })).toHaveAttribute('tabindex', '-1');
+    expect(screen.getByRole('radio', { name: 'Three' })).toHaveAttribute('tabindex', '-1');
   });
 
   it.each(['sm', 'md'] as const)('%s size applies correct padding', (size) => {

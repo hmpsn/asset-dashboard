@@ -506,6 +506,57 @@ src/components/ui/
 
 ---
 
+## § 17 Action Primitives (Phase 5 — 2026-04-24)
+
+Four new primitives added in Phase 5 Task 1.3. All from `src/components/ui/`.
+
+### Button
+
+| Variant | Classes | Use |
+|---------|---------|-----|
+| `primary` | `bg-gradient-to-r from-teal-600 to-emerald-600 text-white` | Primary CTA (Law 1) |
+| `secondary` | `bg-zinc-800 border border-zinc-700 text-zinc-200` | Secondary action |
+| `ghost` | `bg-transparent hover:bg-zinc-800/50 text-zinc-300` | Inline / low-emphasis |
+| `danger` | `bg-red-600 hover:bg-red-500 text-white` | Destructive actions |
+| `link` | `text-teal-400 hover:text-teal-300 underline` | Text-link style; no size padding |
+
+Sizes: `sm` / `md` (default) / `lg`. Props: `icon`, `iconPosition`, `loading` (spinner replaces icon).
+
+### IconButton
+
+| Variant | Classes | Use |
+|---------|---------|-----|
+| `ghost` | `text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800` | Toolbar / utility icons |
+| `solid` | `bg-zinc-800 hover:bg-zinc-700 text-zinc-200` | Raised icon button |
+
+Sizes: `sm` (24px) / `md` (32px, default) / `lg` (40px). Requires `label` prop (maps to `aria-label`).
+
+### ActionPill
+
+| Variant | Color family | Semantic use |
+|---------|-------------|-------------|
+| `start` | teal | Initiate a workflow |
+| `approve` | emerald | Accept / approve |
+| `decline` | red | Reject / decline |
+| `send` | blue | Transmit / publish (data-adjacent action) |
+| `request-changes` | amber | Flag for revision |
+
+Fixed size: `px-2.5 py-1 text-[11px]`. All use tinted border + bg pattern (`border-X-500/30 bg-X-500/10`).
+
+### SegmentedControl
+
+WAI-ARIA `radiogroup` with roving tabIndex (selected button = `tabIndex={0}`, others = `tabIndex={-1}`). Arrow-key navigation moves both selection and DOM focus. Supports `disabled` options (skipped during keyboard nav).
+
+| State | Classes |
+|-------|---------|
+| Active segment | `bg-zinc-700 text-white` |
+| Inactive segment | `text-zinc-400 hover:text-zinc-200` |
+| Container | `bg-zinc-900 border border-zinc-800 rounded-md p-0.5` |
+
+Sizes: `sm` (`px-2 py-1 text-[11px]`) / `md` (`px-3 py-1.5 text-xs`, default).
+
+---
+
 ## Migration Checklist
 
 When refactoring a component:

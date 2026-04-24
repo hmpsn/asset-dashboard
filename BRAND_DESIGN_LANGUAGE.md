@@ -138,6 +138,10 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **OnboardingChecklist** | `ui/OnboardingChecklist.tsx` | Progress bar: `bg-blue-500` (data); checkmarks: `text-teal-400` (action); celebration: `text-teal-400` | Modal overlay. Blue = read-only progress metric. Teal = completion/action state. |
 | **WorkflowStepper** | `ui/WorkflowStepper.tsx` | Current: `bg-teal-500/10 border-teal-500 text-teal-400`; Completed: `bg-green-500/10 border-green-500/40 text-green-400`; Future: `bg-zinc-800/50 border-zinc-700 text-zinc-500` | Horizontal step indicator. Green = success/done state. Teal = active step. |
 | **WorkspaceHealthBar** | `ui/WorkspaceHealthBar.tsx` | Progress bars: `bg-blue-500` (data/read-only); recommendation arrows: `text-teal-500` hover `text-teal-400` (action) | Wraps SectionCard. Blue = data metrics. Teal = actionable next steps. |
+| **Button** | `ui/Button.tsx` | Primary: `from-teal-600 to-emerald-600` (Law 1 teal gradient); secondary: `bg-zinc-800`; ghost: transparent; danger: `bg-red-600`; link: `text-teal-400` | 5 variants × 3 sizes (sm/md/lg). Spinner replaces icon while `loading`. `link` variant skips size padding. |
+| **IconButton** | `ui/IconButton.tsx` | Ghost: `text-zinc-400 hover:text-zinc-200`; solid: `bg-zinc-800` | Icon-only with required `label` for ARIA. 3 sizes (sm/md/lg), 2 variants (ghost/solid). |
+| **ActionPill** | `ui/ActionPill.tsx` | start: teal tint; approve: emerald tint; decline: red tint; send: blue tint; request-changes: amber tint | Compact tinted pill for workflow action buttons. Each variant maps to the status-color family (Law 1/success/error/data/warning). |
+| **SegmentedControl** | `ui/SegmentedControl.tsx` | Active: `bg-zinc-700 text-white`; inactive: `text-zinc-400`; container: `bg-zinc-900 border-zinc-800` | WAI-ARIA radiogroup. Roving tabIndex (selected=0, others=-1). Arrow-key navigation with focus move. 2 sizes (sm/md). |
 
 ### Helper Functions (`constants.ts`)
 

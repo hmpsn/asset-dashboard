@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { cn } from '../../lib/utils';
 
 export type SegmentedControlSize = 'sm' | 'md';
@@ -26,6 +26,8 @@ const SIZE: Record<SegmentedControlSize, string> = {
 
 export const SegmentedControl = React.forwardRef<HTMLDivElement, SegmentedControlProps>(
   function SegmentedControl({ options, value, onChange, size = 'md', className, label }, ref) {
+    const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
     const onKey = (e: React.KeyboardEvent<HTMLButtonElement>, idx: number) => {
       if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
       e.preventDefault();
@@ -37,6 +39,7 @@ export const SegmentedControl = React.forwardRef<HTMLDivElement, SegmentedContro
         if (!options[next].disabled) break;
       }
       onChange(options[next].id);
+      buttonRefs.current[next]?.focus();
     };
 
     return (
@@ -57,7 +60,11 @@ export const SegmentedControl = React.forwardRef<HTMLDivElement, SegmentedContro
               type="button"
               role="radio"
               aria-checked={active}
+              tabIndex={active ? 0 : -1}
               disabled={opt.disabled}
+              ref={(el) => {
+                buttonRefs.current[idx] = el;
+              }}
               onClick={() => onChange(opt.id)}
               onKeyDown={(e) => onKey(e, idx)}
               className={cn(
