@@ -44,6 +44,9 @@
   --brand-border-hover: #3f3f46;
 
   /* ─── Border-radius ─── */
+  /* Values match public/styleguide.css (4/8/10/12px), which wins over the old
+     src/index.css values (6/12/16px). Phase 2 codemods will migrate components
+     to var(--radius-*) so this is the authoritative scale going forward. */
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 10px;

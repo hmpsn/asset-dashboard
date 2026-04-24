@@ -218,7 +218,7 @@ export function RequestList({
                   <div className="mt-2 bg-green-500/5 border border-green-500/20 rounded-lg px-3 py-2">
                     <div className="flex items-center gap-2">
                       <ExternalLink className="w-3 h-3 text-emerald-400 flex-shrink-0" />
-                      <a href={req.deliveryUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] text-emerald-400 hover:text-green-300 underline underline-offset-2 truncate">{req.deliveryUrl}</a>
+                      <a href={req.deliveryUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] text-emerald-400 hover:text-emerald-300 underline underline-offset-2 truncate">{req.deliveryUrl}</a>
                     </div>
                     {req.deliveryNotes && <div className="text-[11px] text-zinc-400 mt-1">{req.deliveryNotes}</div>}
                   </div>

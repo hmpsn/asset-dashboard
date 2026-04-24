@@ -95,6 +95,25 @@ if (indexCss && tokensCss) {
   }
 }
 
+// ─── 4. public/tokens.css must be an exact mirror of src/tokens.css ──────────
+const publicTokensPath = resolve(root, 'public/tokens.css');
+const publicTokensCss = readFile(publicTokensPath);
+
+if (publicTokensCss && tokensCss) {
+  if (publicTokensCss !== tokensCss) {
+    violations.push(
+      `DRIFT: public/tokens.css differs from src/tokens.css. ` +
+      `public/tokens.css is the build-copied mirror — only edit src/tokens.css, ` +
+      `then run \`npx vite build\` (or copy manually) to sync.`
+    );
+    hasError = true;
+  } else {
+    console.log(`✓  public/tokens.css — exact mirror of src/tokens.css`);
+  }
+} else if (!publicTokensCss) {
+  console.log(`ℹ  public/tokens.css not found — will be generated at next build`);
+}
+
 // ─── Report ───────────────────────────────────────────────────────────────────
 if (hasError) {
   console.error('\n✗  Styleguide token parity check FAILED:');
