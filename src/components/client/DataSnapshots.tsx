@@ -277,7 +277,7 @@ export function OrganicInsight({ organic, landingPages, newVsReturning }: Organi
   return (
     <div className="space-y-6">
       {/* Organic overview row */}
-      <SectionCard title="Organic Search Traffic" titleIcon={<Globe className="w-3.5 h-3.5 text-emerald-400" />} titleExtra={<span className="text-[11px] text-zinc-500">{organic.dateRange.start} — {organic.dateRange.end}</span>}>
+      <SectionCard title="Organic Search Traffic" titleIcon={<div className="w-6 h-6 rounded-lg bg-emerald-500/15 flex items-center justify-center"><Globe className="w-3.5 h-3.5 text-emerald-400" /></div>} action={<span className="text-[11px] text-zinc-500">{organic.dateRange.start} — {organic.dateRange.end}</span>}>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="bg-zinc-800/40 rounded-lg px-3 py-2.5">

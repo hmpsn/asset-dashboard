@@ -73,7 +73,7 @@ export function OrderStatus({ workspaceId }: OrderStatusProps) {
   if (orders.length === 0) return null;
 
   return (
-    <SectionCard title="Your Fix Orders" titleIcon={<Wrench className="w-4 h-4 text-teal-400" />} titleExtra={<span className="text-[11px] text-zinc-500">{orders.length} order{orders.length !== 1 ? 's' : ''}</span>} noPadding>
+    <SectionCard title="Your Fix Orders" titleIcon={<Wrench className="w-4 h-4 text-teal-400" />} action={<span className="text-[11px] text-zinc-500">{orders.length} order{orders.length !== 1 ? 's' : ''}</span>} noPadding>
       <div className="divide-y divide-zinc-800/50">
         {orders.map(order => {
           const product = PRODUCT_LABELS[order.productType] || { label: order.productType.replace(/_/g, ' '), icon: FileText };
