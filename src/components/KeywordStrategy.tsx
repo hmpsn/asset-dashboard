@@ -209,7 +209,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const positionColor = (pos?: number) => {
     if (!pos) return 'text-zinc-500';
     if (pos <= 3) return 'text-emerald-400';
-    if (pos <= 10) return 'text-emerald-400';
+    if (pos <= 10) return 'text-teal-400';
     if (pos <= 20) return 'text-amber-400';
     return 'text-red-400';
   };
@@ -591,14 +591,14 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
               </div>
               <div className="flex h-4 rounded-full overflow-hidden bg-zinc-800">
                 {top3.length > 0 && <div className="bg-emerald-500 h-full transition-all" style={{ width: `${(top3.length / filteredPageMap.length) * 100}%` }} />}
-                {top10.length > 0 && <div className="bg-emerald-500 h-full transition-all" style={{ width: `${(top10.length / filteredPageMap.length) * 100}%` }} />}
+                {top10.length > 0 && <div className="bg-teal-500 h-full transition-all" style={{ width: `${(top10.length / filteredPageMap.length) * 100}%` }} />}
                 {top20.length > 0 && <div className="bg-amber-500 h-full transition-all" style={{ width: `${(top20.length / filteredPageMap.length) * 100}%` }} />}
                 {beyond20.length > 0 && <div className="bg-red-500/60 h-full transition-all" style={{ width: `${(beyond20.length / filteredPageMap.length) * 100}%` }} />}
                 {notRankingCount > 0 && <div className="bg-zinc-700 h-full transition-all" style={{ width: `${(notRankingCount / filteredPageMap.length) * 100}%` }} />}
               </div>
               <div className="flex items-center gap-4 mt-2 flex-wrap">
                 <span className="flex items-center gap-1.5 text-[11px]"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" /> <span className="text-emerald-400 font-medium">{top3.length}</span> <span className="text-zinc-500">Top 3</span></span>
-                <span className="flex items-center gap-1.5 text-[11px]"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" /> <span className="text-emerald-400 font-medium">{top10.length}</span> <span className="text-zinc-500">4–10</span></span>
+                <span className="flex items-center gap-1.5 text-[11px]"><span className="w-2.5 h-2.5 rounded-full bg-teal-500 inline-block" /> <span className="text-teal-400 font-medium">{top10.length}</span> <span className="text-zinc-500">4–10</span></span>
                 <span className="flex items-center gap-1.5 text-[11px]"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" /> <span className="text-amber-400 font-medium">{top20.length}</span> <span className="text-zinc-500">11–20</span></span>
                 <span className="flex items-center gap-1.5 text-[11px]"><span className="w-2.5 h-2.5 rounded-full bg-red-500/60 inline-block" /> <span className="text-red-400 font-medium">{beyond20.length}</span> <span className="text-zinc-500">20+</span></span>
                 <span className="flex items-center gap-1.5 text-[11px]"><span className="w-2.5 h-2.5 rounded-full bg-zinc-700 inline-block" /> <span className="text-zinc-500 font-medium">{notRankingCount}</span> <span className="text-zinc-500">Not ranking</span></span>

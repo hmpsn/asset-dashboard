@@ -91,7 +91,7 @@ type SortBy = 'priority' | 'position' | 'volume' | 'score';
 function positionColor(pos?: number) {
   if (!pos) return 'text-zinc-500';
   if (pos <= 3) return 'text-emerald-400';
-  if (pos <= 10) return 'text-emerald-400';
+  if (pos <= 10) return 'text-teal-400';
   if (pos <= 20) return 'text-amber-400';
   return 'text-red-400';
 }
