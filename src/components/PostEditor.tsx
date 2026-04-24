@@ -8,6 +8,7 @@ import {
 import { contentPosts } from '../api/content';
 import { getText } from '../api/client';
 import { useAdminPost, useAdminPostVersions, usePublishTarget } from '../hooks/admin';
+import { SectionCard } from './ui';
 import { SectionEditor } from './post-editor/SectionEditor';
 import { PostPreview } from './post-editor/PostPreview';
 import { VersionHistory } from './post-editor/VersionHistory';
@@ -258,6 +259,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
       {/* Delete Confirmation */}
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          {/* pr-check-disable-next-line -- modal dialog */}
           <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0">
@@ -360,7 +362,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
 
       {/* Progress bar during generation */}
       {isGenerating && (
-        <div className="bg-zinc-900 rounded-xl border border-amber-500/20 p-4">
+        <SectionCard className="!border-amber-500/20">
           <div className="flex items-center gap-2 mb-2">
             <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
             <span className="text-xs font-medium text-amber-300">Generating post... {completedSections}/{totalSections} sections</span>
@@ -369,7 +371,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
           <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
             <div className="h-full bg-amber-400/60 rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
           </div>
-        </div>
+        </SectionCard>
       )}
 
       {/* Review Checklist + Status controls */}
