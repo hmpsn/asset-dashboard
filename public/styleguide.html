@@ -31,6 +31,7 @@
       <li><a href="#sec-flow"><span class="sg-toc-num">05b</span> Flow primitives</a></li>
       <li><a href="#sec-dataviz"><span class="sg-toc-num">06</span> Data Viz</a></li>
       <li><a href="#sec-motion"><span class="sg-toc-num">07</span> Motion</a></li>
+      <li><a href="#sec-overlays"><span class="sg-toc-num">08</span> Overlays &amp; modals</a></li>
     </ol>
   </details>
 </nav>
@@ -3379,6 +3380,125 @@
 
     </div>
   </section>
+
+  <!-- Phase5:Overlays START -->
+  <!-- ══════ 08 · OVERLAYS & MODALS ══════ -->
+  <section class="sg" id="sec-overlays">
+    <div class="sec-head">
+      <span class="sec-num">08 ·</span>
+      <h2>Overlays &amp; modals</h2>
+      <div class="rule"></div>
+      <p>Three primitives cover every floating surface in the app. <span class="t-mono">&lt;Modal&gt;</span> for full-attention dialogs, <span class="t-mono">&lt;Popover&gt;</span> for menus and contextual actions, <span class="t-mono">&lt;Tooltip&gt;</span> for hover descriptions. All three portal into <span class="t-mono">document.body</span>, respect <span class="t-mono">prefers-reduced-motion</span>, and land on a shared z-index scale: <span class="t-mono">--z-dropdown: 20</span>, <span class="t-mono">--z-tooltip: 30</span>, <span class="t-mono">--z-modal-backdrop: 40</span>, <span class="t-mono">--z-modal: 50</span>.</p>
+    </div>
+
+    <!-- Specimen: Modal -->
+    <div class="sub-section">
+      <div class="col-label">Modal · focus-trapped, escape-to-close, backdrop-dismiss</div>
+      <div class="dd-grid">
+        <div class="dd-tile dd-do">
+          <div class="dd-head"><span class="dd-mark">✓</span> Do · use &lt;Modal&gt; with Header / Body / Footer</div>
+          <div class="dd-stage" style="flex-direction:column; align-items:stretch; gap:0; padding:0; background:rgba(0,0,0,0.25); position:relative; min-height:260px;">
+            <div style="position:absolute; inset:0; background:rgba(0,0,0,.35); backdrop-filter: blur(3px); display:flex; align-items:center; justify-content:center; padding:16px;">
+              <div style="width:100%; max-width:360px; background:var(--surface-2); border:1px solid var(--brand-border); border-radius:10px; box-shadow:0 20px 40px rgba(0,0,0,.35);">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; padding:16px 20px 10px; border-bottom:1px solid var(--brand-border);">
+                  <div style="font-weight:600; color:var(--brand-text-bright); font-size:15px;">Delete workspace?</div>
+                  <button aria-label="Close" style="background:transparent; border:0; color:var(--brand-text); cursor:pointer;">✕</button>
+                </div>
+                <div style="padding:14px 20px; color:var(--brand-text); font-size:13px; line-height:1.55;">
+                  This action is permanent. All pages, keywords, and briefs will be removed.
+                </div>
+                <div style="display:flex; justify-content:flex-end; gap:8px; padding:10px 20px 16px; border-top:1px solid var(--brand-border);">
+                  <button style="font-size:13px; padding:6px 12px; border-radius:6px; background:transparent; border:1px solid var(--brand-border); color:var(--brand-text);">Cancel</button>
+                  <button style="font-size:13px; padding:6px 12px; border-radius:6px; background:#b91c1c; border:0; color:#fff;">Delete</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="dd-note"><b>API.</b> <span class="t-mono">&lt;Modal open onClose size?&gt;&lt;Modal.Header title onClose /&gt;&lt;Modal.Body&gt;…&lt;/Modal.Body&gt;&lt;Modal.Footer&gt;…&lt;/Modal.Footer&gt;&lt;/Modal&gt;</span>. Sizes: <span class="t-mono">sm</span> (24rem), <span class="t-mono">md</span> (32rem), <span class="t-mono">lg</span> (48rem), <span class="t-mono">xl</span> (64rem).</div>
+        </div>
+        <div class="dd-tile dd-dont">
+          <div class="dd-head"><span class="dd-mark">✗</span> Don't · hand-roll <span class="t-mono">&lt;div className="fixed inset-0 …"&gt;</span></div>
+          <div class="dd-stage" style="flex-direction:column; gap:8px; padding:16px;">
+            <pre style="margin:0; font-family:var(--font-mono); font-size:12px; color:var(--brand-text); white-space:pre-wrap; line-height:1.45;">&lt;div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center"&gt;
+  &lt;div className="bg-zinc-900 rounded-lg p-6"&gt;
+    …
+  &lt;/div&gt;
+&lt;/div&gt;</pre>
+          </div>
+          <div class="dd-note"><b>Every hand-rolled modal loses something.</b> Focus trap, Escape-to-close, body-scroll lock, <span class="t-mono">role="dialog"</span>, <span class="t-mono">aria-labelledby</span>, and <span class="t-mono">prefers-reduced-motion</span> branching all disappear the moment you inline a backdrop div.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Specimen: Popover -->
+    <div class="sub-section">
+      <div class="col-label">Popover · menu overlay with arrow-key nav, outside-click + Escape dismiss</div>
+      <div class="dd-grid">
+        <div class="dd-tile dd-do">
+          <div class="dd-head"><span class="dd-mark">✓</span> Do · use &lt;Popover&gt; with &lt;Popover.Item&gt; children</div>
+          <div class="dd-stage" style="flex-direction:column; align-items:flex-start; gap:12px; padding:20px 24px;">
+            <button style="padding:6px 10px; font-size:13px; color:var(--brand-text-bright); background:var(--surface-3); border:1px solid var(--brand-border); border-radius:6px; cursor:pointer;">Menu ▾</button>
+            <div style="display:inline-block; min-width:180px; background:var(--surface-2); border:1px solid var(--brand-border); border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,.3); padding:4px 0;">
+              <div style="padding:6px 12px; font-size:13px; color:var(--brand-text-bright); cursor:pointer;">Edit</div>
+              <div style="padding:6px 12px; font-size:13px; color:var(--brand-text-bright); cursor:pointer;">Duplicate</div>
+              <div style="border-top:1px solid var(--brand-border); margin:4px 0;"></div>
+              <div style="padding:6px 12px; font-size:13px; color:#f87171; cursor:pointer;">Delete</div>
+            </div>
+          </div>
+          <div class="dd-note"><b>API.</b> <span class="t-mono">&lt;Popover trigger={…} placement? closeOnSelect?&gt;&lt;Popover.Item onClick&gt;…&lt;/Popover.Item&gt;&lt;Popover.Separator /&gt;&lt;Popover.Item danger&gt;…&lt;/Popover.Item&gt;&lt;/Popover&gt;</span>. Placement: <span class="t-mono">bottom-start / bottom-end / top-start / top-end / top / bottom / left / right</span>. Arrow keys walk items, Enter activates, Escape closes.</div>
+        </div>
+        <div class="dd-tile dd-dont">
+          <div class="dd-head"><span class="dd-mark">✗</span> Don't · hand-roll <span class="t-mono">{open &amp;&amp; &lt;div className="absolute …"&gt;}</span></div>
+          <div class="dd-stage" style="flex-direction:column; gap:8px; padding:16px;">
+            <pre style="margin:0; font-family:var(--font-mono); font-size:12px; color:var(--brand-text); white-space:pre-wrap; line-height:1.45;">{open &amp;&amp; (
+  &lt;div className="absolute right-0 bg-zinc-900 …"&gt;
+    &lt;button onClick={edit}&gt;Edit&lt;/button&gt;
+  &lt;/div&gt;
+)}</pre>
+          </div>
+          <div class="dd-note"><b>Hand-rolled menus leak.</b> Missing outside-click dismissal, no Escape handler, no <span class="t-mono">role="menu"</span>/<span class="t-mono">role="menuitem"</span>, no keyboard nav, and no viewport collision avoidance.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Specimen: Tooltip -->
+    <div class="sub-section">
+      <div class="col-label">Tooltip · hover + focus triggered, linked via <span class="t-mono">aria-describedby</span></div>
+      <div class="dd-grid">
+        <div class="dd-tile dd-do">
+          <div class="dd-head"><span class="dd-mark">✓</span> Do · wrap the interactive with &lt;Tooltip&gt;</div>
+          <div class="dd-stage" style="flex-direction:column; align-items:flex-start; gap:18px; padding:22px 24px;">
+            <div style="position:relative; display:inline-block;">
+              <button style="padding:6px 10px; font-size:13px; color:var(--brand-text-bright); background:var(--surface-3); border:1px solid var(--brand-border); border-radius:6px; cursor:pointer;">Disconnect</button>
+              <div role="tooltip" style="position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%); background:#09090b; color:#e4e4e7; font-size:12px; padding:4px 8px; border-radius:4px; white-space:nowrap; box-shadow:0 4px 12px rgba(0,0,0,.4);">Remove Google integration</div>
+            </div>
+          </div>
+          <div class="dd-note"><b>API.</b> <span class="t-mono">&lt;Tooltip content="…" placement? delay?&gt;&lt;button&gt;…&lt;/button&gt;&lt;/Tooltip&gt;</span>. Shows after <span class="t-mono">delay</span> (default 500ms) on hover; instant on focus. Trigger gets <span class="t-mono">aria-describedby</span> while visible.</div>
+        </div>
+        <div class="dd-tile dd-dont">
+          <div class="dd-head"><span class="dd-mark">✗</span> Don't · rely on native <span class="t-mono">title="…"</span></div>
+          <div class="dd-stage" style="flex-direction:column; gap:8px; padding:16px;">
+            <pre style="margin:0; font-family:var(--font-mono); font-size:12px; color:var(--brand-text); white-space:pre-wrap; line-height:1.45;">&lt;button title="Remove Google integration"&gt;
+  Disconnect
+&lt;/button&gt;</pre>
+          </div>
+          <div class="dd-note"><b>Native <span class="t-mono">title</span> is inconsistent.</b> Behavior varies across OS/browsers, delay is uncontrollable, mobile users never see it, and screen readers treat it unpredictably.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Accessibility notes -->
+    <div class="sub-section">
+      <div class="col-label">Accessibility contract</div>
+      <div class="usage-strip">
+        <div><b>Focus trap (Modal)</b>Tab cycles through focusables inside the dialog; Shift+Tab wraps the opposite direction. On close, focus restores to the element that opened the modal.</div>
+        <div><b>Escape everywhere</b>Escape closes Modals, Popovers, and hides Tooltips. Escape inside a text field still takes precedence because we never trap Escape on focused inputs unless the overlay is open.</div>
+        <div><b>ARIA roles</b>Modal = <span class="t-mono">role="dialog"</span> + <span class="t-mono">aria-modal="true"</span> + <span class="t-mono">aria-labelledby</span>. Popover menu = <span class="t-mono">role="menu"</span>, items = <span class="t-mono">role="menuitem"</span>. Tooltip = <span class="t-mono">role="tooltip"</span> linked via <span class="t-mono">aria-describedby</span>.</div>
+        <div><b>prefers-reduced-motion</b>All three primitives read the media query at render. When reduced motion is on, fade/scale animations are removed — instant show/hide.</div>
+      </div>
+    </div>
+  </section>
+  <!-- Phase5:Overlays END -->
 
   <footer class="foot">
     <span>Insights Engine · styleguide.html</span>
