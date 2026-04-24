@@ -200,282 +200,25 @@ brand asymmetric-radius note. Updates both design docs."
 
 ---
 
-### Task 0.3 — Port Styleguide v9 content into `src/components/Styleguide.tsx` (Model: sonnet)
+### Task 0.3 — ~~Port Styleguide v9 into React~~ **COMPLETE — static HTML approach**
 
-**Prerequisite:** v9 Styleguide HTML must be pasted/available.
-
-**Owns:** `src/components/Styleguide.tsx`
-**Must not touch:** `src/index.css`, design docs
-
-The v9 adds four things missing from the current file: manifesto section, scroll-spy TOC, motion section, and surface/radius documentation.
-
-- [ ] **Step 1: Add `useRef` to the React import**
-
-Current first import line:
-```tsx
-import { useState } from 'react';
-```
-Replace with:
-```tsx
-import { useState, useEffect, useRef } from 'react';
-```
-
-- [ ] **Step 2: Add scroll-spy state after the existing `useState` declarations**
-
-After `const [activeNav, setActiveNav] = useState('overview');`, add:
-
-```tsx
-const [activeSection, setActiveSection] = useState('manifesto');
-const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
-
-useEffect(() => {
-  const observer = new IntersectionObserver(
-    (entries) => {
-      for (const entry of entries) {
-        if (entry.isIntersecting) setActiveSection(entry.target.id);
-      }
-    },
-    { rootMargin: '-20% 0px -70% 0px' }
-  );
-  Object.values(sectionRefs.current).forEach(el => { if (el) observer.observe(el); });
-  return () => observer.disconnect();
-}, []);
-```
-
-- [ ] **Step 3: Add `TOC_SECTIONS` constant after `NAV_ITEMS`**
-
-```tsx
-const TOC_SECTIONS = [
-  { id: 'manifesto', label: 'Manifesto' },
-  { id: 'typography', label: 'Typography' },
-  { id: 'colors', label: 'Color Palette' },
-  { id: 'surfaces', label: 'Surfaces' },
-  { id: 'metric-rings', label: 'MetricRing' },
-  { id: 'stat-cards', label: 'StatCard' },
-  { id: 'page-header', label: 'PageHeader' },
-  { id: 'section-card', label: 'SectionCard' },
-  { id: 'date-range', label: 'DateRange' },
-  { id: 'tab-bar', label: 'TabBar' },
-  { id: 'badges', label: 'Badge' },
-  { id: 'empty-state', label: 'EmptyState' },
-  { id: 'buttons', label: 'Buttons' },
-  { id: 'data-list', label: 'DataList' },
-  { id: 'charts', label: 'Charts' },
-  { id: 'tables', label: 'Tables' },
-  { id: 'modals', label: 'Modals' },
-  { id: 'toasts', label: 'Toasts' },
-  { id: 'forms', label: 'Forms' },
-  { id: 'loading', label: 'Loading' },
-  { id: 'motion', label: 'Motion' },
-  { id: 'navigation', label: 'Navigation' },
-];
-```
-
-- [ ] **Step 4: Wrap the main layout in a two-column flex with sticky TOC**
-
-Replace:
-```tsx
-<div className="max-w-6xl mx-auto px-6 py-8 space-y-10">
-```
-With:
-```tsx
-<div className="max-w-7xl mx-auto px-6 py-8 flex gap-8">
-  {/* Scroll-spy TOC */}
-  <aside className="hidden xl:block w-44 shrink-0">
-    <div className="sticky top-8 space-y-0.5">
-      <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-3 px-2">Sections</div>
-      {TOC_SECTIONS.map(s => (
-        <a
-          key={s.id}
-          href={`#${s.id}`}
-          className={`block px-2 py-1 rounded text-xs transition-colors ${
-            activeSection === s.id
-              ? 'text-teal-400 bg-teal-500/10'
-              : 'text-zinc-500 hover:text-zinc-300'
-          }`}
-        >
-          {s.label}
-        </a>
-      ))}
-    </div>
-  </aside>
-  {/* Content */}
-  <div className="flex-1 min-w-0 space-y-10">
-```
-
-Before `</ErrorBoundary>`, add the two closing divs:
-```tsx
-  </div>{/* content */}
-</div>{/* flex */}
-```
-
-- [ ] **Step 5: Add Manifesto section as the first section inside the content div**
-
-```tsx
-{/* ═══════════ MANIFESTO ═══════════ */}
-<section
-  id="manifesto"
-  ref={el => { sectionRefs.current['manifesto'] = el; }}
-  className="space-y-4"
+> **This task is already done.** The v9 styleguide (manifesto, scroll-spy TOC, surface system, motion section, dark/light toggle, D-DIN-PRO typography) is served as a static HTML file from `/public/styleguide.html`. The React route `/styleguide` redirects there via `window.location.replace`. No React porting required.
 >
-  <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-8">
-    <div className="text-[11px] text-teal-400 uppercase tracking-widest font-medium mb-3">Design Manifesto</div>
-    <h1 className="text-2xl font-bold text-zinc-100 mb-4 leading-tight">
-      Every pixel earns its place.<br />Every interaction has intent.
-    </h1>
-    <p className="text-sm text-zinc-400 leading-relaxed max-w-2xl">
-      This design system exists for one reason: clients should understand their SEO performance
-      at a glance. Data-dense layouts use hierarchy, not decoration. Color carries semantic meaning —
-      teal for action, blue for data, never gratuitous. The system enforces this so the product
-      stays coherent as it grows.
-    </p>
-    <div className="mt-6 grid grid-cols-3 gap-4 max-w-lg">
-      {[
-        { label: 'Teal', desc: 'Action', color: 'bg-teal-500' },
-        { label: 'Blue', desc: 'Data', color: 'bg-blue-500' },
-        { label: 'Purple', desc: 'Admin AI only', color: 'bg-purple-500' },
-      ].map(item => (
-        <div key={item.label} className="flex items-center gap-2">
-          <div className={`w-3 h-3 rounded-full ${item.color}`} />
-          <div>
-            <div className="text-xs font-medium text-zinc-300">{item.label}</div>
-            <div className="text-[11px] text-zinc-500">{item.desc}</div>
-          </div>
-        </div>
-      ))}
-    </div>
-  </div>
-</section>
-```
-
-- [ ] **Step 6: Add Surface System section between Color Palette and MetricRing**
-
-```tsx
-{/* ═══════════ SURFACE SYSTEM ═══════════ */}
-<section
-  id="surfaces"
-  ref={el => { sectionRefs.current['surfaces'] = el; }}
-  className="space-y-4"
+> **Why static:** the styleguide is a design reference document, not a product feature. Static HTML/CSS is the canonical source — no JSX translation layer that can introduce drift. The page intentionally exits the SPA and has no auth requirement.
 >
-  <h2 className="text-lg font-semibold text-zinc-200 border-b border-zinc-800 pb-2">Surface System</h2>
-  <p className="text-xs text-zinc-400">
-    Three tiers of elevation. New primitives use <code className="text-teal-300 bg-zinc-800 px-1 rounded">{'bg-[var(--surface-2)]'}</code> internally.
-    Hand-rolled code must do the same. The <code className="text-zinc-500 bg-zinc-800 px-1 rounded">{'--brand-bg-*'}</code> names are legacy aliases.
-  </p>
-  <div className="grid grid-cols-3 gap-3">
-    {[
-      { token: '--surface-1', value: '#0f1219', label: 'Surface 1 — Base', desc: 'Page background only. Never use directly on cards.' },
-      { token: '--surface-2', value: '#18181b', label: 'Surface 2 — Card', desc: 'SectionCard, StatCard, Skeleton backgrounds.' },
-      { token: '--surface-3', value: '#27272a', label: 'Surface 3 — Elevated', desc: 'Inputs, active tabs, hover states.' },
-    ].map(s => (
-      <div key={s.token} className="rounded-xl border border-zinc-700 p-4" style={{ backgroundColor: s.value }}>
-        <div className="text-[11px] text-teal-400 font-mono mb-1">{s.token}</div>
-        <div className="text-xs font-medium text-zinc-200">{s.label}</div>
-        <div className="text-[11px] text-zinc-500 mt-1">{s.desc}</div>
-        <div className="text-[11px] text-zinc-600 mt-2 font-mono">{s.value}</div>
-      </div>
-    ))}
-  </div>
-  <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 space-y-3">
-    <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">Card Variant Decision</div>
-    <div className="grid grid-cols-3 gap-3 text-xs">
-      <div className="space-y-1">
-        <div className="text-teal-300 font-medium">SectionCard default</div>
-        <div className="text-zinc-400">Asymmetric radius<br/><code className="text-zinc-500">10px 24px 10px 24px</code></div>
-        <div className="text-zinc-500">Page-level content sections</div>
-      </div>
-      <div className="space-y-1">
-        <div className="text-blue-300 font-medium">SectionCard subtle</div>
-        <div className="text-zinc-400">Symmetric radius<br/><code className="text-zinc-500">rounded-lg (8px)</code></div>
-        <div className="text-zinc-500">Dense tables, nested cards, inside another SectionCard</div>
-      </div>
-      <div className="space-y-1">
-        <div className="text-zinc-400 font-medium">Hatch (keep as-is)</div>
-        <div className="text-zinc-400">Any radius<br/><code className="text-zinc-500">// pr-check-disable</code></div>
-        <div className="text-zinc-500">Modals, dialogs, controls that aren't cards</div>
-      </div>
-    </div>
-  </div>
-</section>
-```
-
-- [ ] **Step 7: Add Motion section before Sidebar Navigation**
-
-```tsx
-{/* ═══════════ MOTION ═══════════ */}
-<section
-  id="motion"
-  ref={el => { sectionRefs.current['motion'] = el; }}
-  className="space-y-4"
+> **Files already in place:**
+> - `/public/styleguide.html` — full v9 HTML
+> - `/public/styleguide.css` — styleguide styles
+> - `/public/assets/logo-mint.svg`, `/public/assets/logo-navy.svg`
+> - `src/components/Styleguide.tsx` — 8-line redirect (named export only, no default export)
 >
-  <h2 className="text-lg font-semibold text-zinc-200 border-b border-zinc-800 pb-2">Motion</h2>
-  <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
-    <p className="text-xs text-zinc-400 mb-4">All animations are defined in <code className="text-teal-300 bg-zinc-800 px-1 rounded">src/index.css</code>. Duration: 150ms for micro-interactions, 300–400ms for entrance animations.</p>
-    <div className="grid grid-cols-2 gap-4">
-      {[
-        { name: 'fadeInUp', usage: 'Cards, page sections entering viewport', css: 'animation: fadeInUp 0.3s ease' },
-        { name: 'staggerFadeIn', usage: 'SectionCard staggerIndex prop (60ms per index)', css: 'animationDelay: N * 60ms' },
-        { name: 'scaleIn', usage: 'Modals and overlays (scale 0.95 → 1)', css: 'animation: scaleIn 0.2s ease' },
-        { name: 'slideUp', usage: 'Toast notifications entering from below', css: 'animation: slideUp 0.25s ease' },
-        { name: 'Card hover', usage: 'Applied globally via index.css selector', css: 'transition: border-color 0.2s, box-shadow 0.2s' },
-        { name: 'Teal button', usage: 'from-teal-*/to-emerald-* gradient shift', css: 'background-position 0.4s ease' },
-      ].map(m => (
-        <div key={m.name} className="space-y-1">
-          <div className="text-xs font-medium text-zinc-300">{m.name}</div>
-          <div className="text-[11px] text-zinc-400 font-mono bg-zinc-800 px-2 py-1 rounded">{m.css}</div>
-          <div className="text-[11px] text-zinc-500">{m.usage}</div>
-        </div>
-      ))}
-    </div>
-  </div>
-</section>
-```
+> Skip to Task 0.5.
 
-- [ ] **Step 8: Add `id` and `ref` to every existing section**
+---
 
-Apply `id="<value>"` and `ref={el => { sectionRefs.current['<value>'] = el; }}` to every existing `<section>`:
+### _Removed steps (kept for reference only — do not execute)_
 
-| Heading text | id value |
-|---|---|
-| Typography | `typography` |
-| Color Palette | `colors` |
-| MetricRing | `metric-rings` |
-| StatCard | `stat-cards` |
-| PageHeader | `page-header` |
-| SectionCard | `section-card` |
-| DateRangeSelector | `date-range` |
-| TabBar | `tab-bar` |
-| Badge | `badges` |
-| EmptyState | `empty-state` |
-| Buttons | `buttons` |
-| DataList | `data-list` |
-| Line / Area Charts | `charts` |
-| ChartPointDetail | (merge into charts section, no separate id) |
-| Tables | `tables` |
-| Modal / Dialog | `modals` |
-| Toast Notifications | `toasts` |
-| Form Inputs | `forms` |
-| Loading States | `loading` |
-| Sidebar Navigation | `navigation` |
-
-- [ ] **Step 9: Typecheck and visual verify**
-
-```bash
-npm run typecheck
-```
-
-Open browser `/styleguide`. Verify: TOC visible at xl+ width, highlights active section on scroll, Surface System and Motion sections present, Manifesto at top.
-
-- [ ] **Step 10: Commit**
-
-```bash
-git add src/components/Styleguide.tsx
-git commit -m "feat(styleguide): add scroll-spy TOC, manifesto, surface system, motion sections
-
-Ports v9 additions: sticky IntersectionObserver TOC, manifesto intro,
-3-tier surface system with variant decision guide, and motion reference.
-All sections wired with id + ref for TOC tracking."
-```
+_All steps removed — superseded by the static HTML approach above._
 
 ---
 
@@ -488,9 +231,11 @@ All sections wired with id + ref for TOC tracking."
 **Owns:** `src/components/ui/SectionCard.tsx`, `src/components/ui/StatCard.tsx`, `src/components/ui/Skeleton.tsx`
 **Must not touch:** any page component file, `src/index.css`
 
+> **Note on line numbers:** the steps below reference line numbers as orientation only — use the search patterns, not the line numbers, since they may drift if other PRs touch these files first.
+
 - [ ] **Step 1: Update SectionCard.tsx**
 
-In `SectionCard.tsx` lines 35–37, replace the `containerClasses` assignment:
+Search for the `containerClasses` assignment and replace:
 
 ```tsx
 // Before:
@@ -504,7 +249,7 @@ const containerClasses = isSubtle
     : 'bg-[var(--surface-2)] border border-zinc-800 transition-colors duration-200';
 ```
 
-Also update the JSDoc comment on line 17 to reflect the new token:
+Also update the JSDoc comment to reflect the new token (search for `bg-zinc-900` in the JSDoc):
 ```tsx
 // Before: — solid `bg-zinc-900` with the brand asymmetric...
 // After:  — solid `bg-[var(--surface-2)]` with the brand asymmetric...
@@ -512,44 +257,33 @@ Also update the JSDoc comment on line 17 to reflect the new token:
 
 - [ ] **Step 2: Update StatCard.tsx**
 
-Line 42 (StatCard card wrapper):
-```tsx
-// Before:
-className={`bg-zinc-900 ${isHero ? 'p-4' : 'p-3'} border border-zinc-800 ...`}
+Two instances — search for `bg-zinc-900` in the file and replace both:
 
+```tsx
+// StatCard card wrapper — before:
+className={`bg-zinc-900 ${isHero ? 'p-4' : 'p-3'} border border-zinc-800 ...`}
 // After:
 className={`bg-[var(--surface-2)] ${isHero ? 'p-4' : 'p-3'} border border-zinc-800 ...`}
-```
 
-Line 79 (CompactStatBar wrapper):
-```tsx
-// Before:
+// CompactStatBar wrapper — before:
 className={`bg-zinc-900 border border-zinc-800 px-5 py-3 ...`}
-
 // After:
 className={`bg-[var(--surface-2)] border border-zinc-800 px-5 py-3 ...`}
 ```
 
 - [ ] **Step 3: Update Skeleton.tsx**
 
-Three instances — all are card-mimicking wrappers (they mimic SectionCard's look):
+Three instances — all are card-mimicking wrappers. Search for each `bg-zinc-900` string and replace:
 
-Line 19:
 ```tsx
-// Before: `bg-zinc-900 p-4 border border-zinc-800 ${className ?? ''}`
-// After:  `bg-[var(--surface-2)] p-4 border border-zinc-800 ${className ?? ''}`
-```
+// Instance 1 — before: `bg-zinc-900 p-4 border border-zinc-800 ${className ?? ''}`
+//              after:  `bg-[var(--surface-2)] p-4 border border-zinc-800 ${className ?? ''}`
 
-Line 33:
-```tsx
-// Before: `bg-zinc-900 border border-zinc-800 p-5 space-y-3 ${className ?? ''}`
-// After:  `bg-[var(--surface-2)] border border-zinc-800 p-5 space-y-3 ${className ?? ''}`
-```
+// Instance 2 — before: `bg-zinc-900 border border-zinc-800 p-5 space-y-3 ${className ?? ''}`
+//              after:  `bg-[var(--surface-2)] border border-zinc-800 p-5 space-y-3 ${className ?? ''}`
 
-Line 86:
-```tsx
-// Before: "bg-zinc-900 border border-zinc-800 p-5"
-// After:  "bg-[var(--surface-2)] border border-zinc-800 p-5"
+// Instance 3 — before: "bg-zinc-900 border border-zinc-800 p-5"
+//              after:  "bg-[var(--surface-2)] border border-zinc-800 p-5"
 ```
 
 - [ ] **Step 4: Verify light mode still works**
