@@ -71,7 +71,9 @@ describe('Stat', () => {
 
   it('renders .t-stat for size="default" (default prop)', () => {
     const { container } = render(<Stat>42</Stat>);
-    expect(container.firstElementChild!.className).toContain('t-stat');
+    // Use word-boundary regex so this doesn't pass for t-stat-lg or t-stat-sm
+    expect(container.firstElementChild!.className).toMatch(/\bt-stat\b/);
+    expect(container.firstElementChild!.className).not.toMatch(/t-stat-(lg|sm)/);
   });
 
   it('renders .t-stat-sm for size="sm"', () => {

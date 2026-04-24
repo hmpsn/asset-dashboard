@@ -370,12 +370,13 @@ body::after {
   font-variant-numeric: tabular-nums;
 }
 
-/* Micro */
+/* Micro — monospace for timestamps, IDs, labels (matches public/styleguide.css) */
 .t-micro {
-  font-family: 'Inter', sans-serif;
+  font-family: 'Fira Code', 'JetBrains Mono', 'Menlo', 'Courier New', monospace;
   font-size: 10px;
   font-weight: 400;
   line-height: 1.4;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ─── Client Dashboard Light Theme ─── */
