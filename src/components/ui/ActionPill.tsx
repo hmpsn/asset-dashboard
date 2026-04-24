@@ -47,3 +47,5 @@ export const ActionPill = React.forwardRef<HTMLButtonElement, ActionPillProps>(f
     </button>
   );
 });
+
+ActionPill.displayName = 'ActionPill';

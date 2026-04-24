@@ -506,7 +506,7 @@ src/components/ui/
 
 ---
 
-## § 17 Action Primitives (Phase 5 — 2026-04-24)
+## § 18 Action Primitives (Phase 5 — 2026-04-24)
 
 Four new primitives added in Phase 5 Task 1.3. All from `src/components/ui/`.
 

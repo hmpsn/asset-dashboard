@@ -64,6 +64,29 @@ describe('SegmentedControl', () => {
     expect(screen.getByRole('radio', { name: 'Three' })).toHaveAttribute('tabindex', '-1');
   });
 
+  it('empty options + arrow key does not crash or call onChange', () => {
+    const fn = vi.fn();
+    const { container } = render(
+      <SegmentedControl options={[]} value="" onChange={fn} />,
+    );
+    // No radios rendered → dispatch keydown on the group instead to
+    // verify the component itself doesn't throw when interacted with.
+    fireEvent.keyDown(container.querySelector('[role="radiogroup"]')!, { key: 'ArrowRight' });
+    expect(fn).not.toHaveBeenCalled();
+  });
+
+  it('all-disabled options: arrow key does not call onChange', () => {
+    const opts = [
+      { id: 'a', label: 'A', disabled: true },
+      { id: 'b', label: 'B', disabled: true },
+      { id: 'c', label: 'C', disabled: true },
+    ];
+    const fn = vi.fn();
+    render(<SegmentedControl options={opts} value="a" onChange={fn} />);
+    fireEvent.keyDown(screen.getByRole('radio', { name: 'A' }), { key: 'ArrowRight' });
+    expect(fn).not.toHaveBeenCalled();
+  });
+
   it.each(['sm', 'md'] as const)('%s size applies correct padding', (size) => {
     render(<SegmentedControl options={OPTS} value="one" onChange={() => {}} size={size} />);
     const btn = screen.getByRole('radio', { name: 'One' });

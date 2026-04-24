@@ -31,13 +31,19 @@ export const SegmentedControl = React.forwardRef<HTMLDivElement, SegmentedContro
     const onKey = (e: React.KeyboardEvent<HTMLButtonElement>, idx: number) => {
       if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
       e.preventDefault();
-      const dir = e.key === 'ArrowRight' ? 1 : -1;
       const len = options.length;
+      if (len === 0) return; // Guard: empty options list must not crash on arrow key
+      const dir = e.key === 'ArrowRight' ? 1 : -1;
       let next = idx;
+      let found = false;
       for (let i = 0; i < len; i++) {
         next = (next + dir + len) % len;
-        if (!options[next].disabled) break;
+        if (!options[next].disabled) {
+          found = true;
+          break;
+        }
       }
+      if (!found) return; // All options disabled — do not fire onChange with a disabled id
       onChange(options[next].id);
       buttonRefs.current[next]?.focus();
     };
@@ -82,3 +88,5 @@ export const SegmentedControl = React.forwardRef<HTMLDivElement, SegmentedContro
     );
   },
 );
+
+SegmentedControl.displayName = 'SegmentedControl';
