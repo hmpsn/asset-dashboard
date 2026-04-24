@@ -3697,6 +3697,42 @@ export const CHECKS: Check[] = [
       return hits;
     },
   },
+
+  // ─── Phase 5 — Token authority ───────────────────────────────────────────────
+  {
+    name: 'styleguide-token-parity',
+    severity: 'warn', // promoted to error in Phase 3 after Phase 2 clears the backlog
+    fileGlobs: ['*.css'],
+    message:
+      'public/styleguide.css must only @import url(\'/tokens.css\'); redeclaring tokens creates drift. ' +
+      'Run `npx tsx scripts/verify-styleguide-parity.ts` for details.',
+    rationale:
+      'src/tokens.css is the single canonical token source. public/styleguide.css must import ' +
+      'from /tokens.css — not redeclare — so styleguide and app always use identical values.',
+    claudeMdRef: 'Design System — Token source of truth',
+    // customCheck because this requires cross-file parsing (tokens.css vs styleguide.css)
+    // rather than per-file pattern matching.
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const ROOT_PATH = path.join(import.meta.dirname, '..');
+      const { readFileSync: readSync, existsSync: existsSync2 } = require('fs') as typeof import('fs');
+
+      const styleguidePath = path.join(ROOT_PATH, 'public', 'styleguide.css');
+      if (!existsSync2(styleguidePath)) return hits; // file doesn't exist yet — skip
+
+      const css = readSync(styleguidePath, 'utf-8');
+      const matches = [...css.matchAll(/^\s*(--[\w-]+)\s*:/gm)];
+      for (const m of matches) {
+        const lineNum = css.slice(0, m.index).split('\n').length;
+        hits.push({
+          file: styleguidePath,
+          line: lineNum,
+          text: `re-declared token ${m[1]} in public/styleguide.css (must come via @import url('/tokens.css'))`,
+        });
+      }
+      return hits;
+    },
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────

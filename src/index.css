@@ -1,3 +1,4 @@
+@import './tokens.css';
 @import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
@@ -8,25 +9,6 @@
 @font-face { font-family: 'DIN Pro'; src: url('/fonts/D-DIN-PRO-700-Bold.otf') format('opentype'); font-weight: 700; font-style: normal; font-display: swap; }
 @font-face { font-family: 'DIN Pro'; src: url('/fonts/D-DIN-PRO-800-ExtraBold.otf') format('opentype'); font-weight: 800; font-style: normal; font-display: swap; }
 @font-face { font-family: 'DIN Pro'; src: url('/fonts/D-DIN-PRO-900-Heavy.otf') format('opentype'); font-weight: 900; font-style: normal; font-display: swap; }
-
-:root {
-  --brand-bg: #0f1219;
-  --brand-bg-surface: #18181b;
-  --brand-bg-elevated: #18181b;
-  --brand-bg-card: #27272a;
-  --brand-text: #a1a1aa;
-  --brand-text-bright: #e4e4e7;
-  --brand-text-muted: #71717a;
-  --brand-mint: #2dd4bf;
-  --brand-mint-hover: #5eead4;
-  --brand-mint-dim: rgba(45, 212, 191, 0.1);
-  --brand-mint-glow: rgba(45, 212, 191, 0.18);
-  --brand-yellow: #ffb600;
-  --brand-yellow-dim: rgba(255, 182, 0, 0.1);
-  --brand-border: #27272a;
-  --brand-border-hover: #3f3f46;
-  --radius: 10px;
-}
 
 body {
   margin: 0;
@@ -273,43 +255,11 @@ body::after {
 
 /* ─── Client Dashboard Light Theme ─── */
 
-/* === Base === */
+/* === Base ===
+   All --* tokens for .dashboard-light are declared in src/tokens.css.
+   Only non-token overrides belong here. */
 .dashboard-light {
-  /* Backgrounds */
-  --brand-bg: #f8fafc;
-  --brand-bg-surface: #ffffff;
-  --brand-bg-elevated: #ffffff;
-  --brand-bg-card: #f1f5f9;
-  --brand-bg-hover: #e8edf3;
-  --brand-bg-active: #dde4ee;
-  /* Text */
-  --brand-text: #334155;
-  --brand-text-bright: #0f172a;
-  --brand-text-muted: #475569;
-  --brand-text-disabled: #94a3b8;
-  /* Borders */
-  --brand-border: rgba(148, 163, 184, 0.2);
-  --brand-border-hover: rgba(148, 163, 184, 0.35);
-  --brand-border-strong: #cbd5e1;
-  /* Shadows */
-  --brand-shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.08);
-  --brand-shadow-md: 0 4px 16px rgba(15, 23, 42, 0.10);
-  /* Scrollbar */
-  --scrollbar-thumb: rgba(148, 163, 184, 0.55);
-  --scrollbar-thumb-hover: rgba(100, 116, 139, 0.75);
-  /* Charts */
-  --chart-grid: #e2e8f0;
-  --chart-tooltip-bg: #ffffff;
-  --chart-tooltip-text: #0f172a;
-  /* Overlays */
-  --brand-overlay: rgba(15, 23, 42, 0.35);
-  /* Brand teal — deeper in light mode for contrast */
-  --brand-mint: #0d9488;
-  --brand-mint-hover: #0f766e;
-  --brand-mint-dim: rgba(13, 148, 136, 0.08);
-  /* Metric ring */
-  --metric-ring-track: #e2e8f0;
-  /* Layout defaults */
+  /* Layout defaults — not a CSS variable, can't live in tokens.css */
   background-color: #f8fafc !important;
   color: #1e293b !important;
 }
@@ -650,9 +600,6 @@ body::after {
 /* ── Missing gradient stops ── */
 .dashboard-light .from-zinc-900 { --tw-gradient-from: #ffffff !important; }
 .dashboard-light .to-zinc-900\/50 { --tw-gradient-to: rgba(255,255,255,0.8) !important; }
-
-/* ── MetricRing track color ── */
-.dashboard-light { --metric-ring-track: #e2e8f0; }
 
 /* ── Skeleton shimmer — visible pulse on light backgrounds ── */
 .dashboard-light .animate-pulse.bg-zinc-800 {
