@@ -82,8 +82,10 @@ export function BulkOperations({
           title={`Pattern Apply — ${approvalSelected.size} pages`}
           titleIcon={<Type className="w-4 h-4 text-teal-400" />}
           action={<button onClick={() => { onSetBulkMode('idle'); onSetPatternText(''); }} className="text-zinc-500 hover:text-zinc-300"><X className="w-4 h-4" /></button>}
-          className="!border-teal-500/30 space-y-3"
+          className="!border-teal-500/30"
+          noPadding
         >
+          <div className="p-4 space-y-3">
           <div className="flex items-center gap-2">
             <select
               value={bulkField}
@@ -121,6 +123,7 @@ export function BulkOperations({
             {patternAction === 'append' ? 'Text will be added after' : 'Text will be added before'} each page's {bulkField === 'title' ? 'SEO title' : 'meta description'}.
             {bulkField === 'title' && ' Titles will be truncated to 60 characters.'}
           </p>
+          </div>
         </SectionCard>
       )}
 

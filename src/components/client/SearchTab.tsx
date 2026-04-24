@@ -142,7 +142,7 @@ export function SearchTab({
 
     {/* Trend chart */}
     {trend.length > 2 && (
-      <SectionCard title="Performance Trend" titleExtra={<span className="text-[11px] text-zinc-500">{overview.dateRange.start} — {overview.dateRange.end}</span>}>
+      <SectionCard title="Performance Trend" action={<span className="text-[11px] text-zinc-500">{overview.dateRange.start} — {overview.dateRange.end}</span>}>
         <DualTrendChart data={trend} annotations={annotations} />
       </SectionCard>
     )}
