@@ -18,7 +18,7 @@ import {
   useClientRequests as useClientRequestsQuery, useClientContentRequests,
   useClientAuditSummary, useClientAuditDetail,
   useClientStrategy, useClientPricing, useClientContentPlan,
-  useClientPageKeywords,
+  useClientPageKeywords, useClientCopyEntries,
 } from './client/useClientQueries';
 export type { ApprovalPageKeyword } from './client/useClientQueries';
 
@@ -81,6 +81,7 @@ export function useClientData(workspaceId: string) {
   const annotationsQ = useClientAnnotations(workspaceId, dataEnabled);
   const anomaliesQ = useClientAnomalies(workspaceId, dataEnabled);
   const approvalsQ = useClientApprovals(workspaceId, dataEnabled);
+  const copyEntriesQ = useClientCopyEntries(workspaceId, dataEnabled);
   const requestsQ = useClientRequestsQuery(workspaceId, dataEnabled);
   const contentReqQ = useClientContentRequests(workspaceId, dataEnabled);
   const auditSummaryQ = useClientAuditSummary(workspaceId, dataEnabled);
@@ -205,6 +206,7 @@ export function useClientData(workspaceId: string) {
       approvals: queryKeys.client.approvals(workspaceId),
       requests: queryKeys.client.requests(workspaceId),
       content: queryKeys.client.contentRequests(workspaceId),
+      copy: queryKeys.client.copyEntries(workspaceId),
       audit: queryKeys.client.auditSummary(workspaceId),
       'audit-detail': queryKeys.client.auditDetail(workspaceId),
       recommendations: queryKeys.shared.recommendations(workspaceId),
@@ -263,6 +265,7 @@ export function useClientData(workspaceId: string) {
     contentPlanReviewCells: planResult?.reviewCells ?? [], setContentPlanReviewCells: noop as unknown as React.Dispatch<React.SetStateAction<ContentPlanReviewCell[]>>,
     setSectionError,
     clearSectionError,
+    hasCopyEntries: (copyEntriesQ.data ?? 0) > 0,
     loadDashboardData,
     loadSearchData,
     loadGA4Data,

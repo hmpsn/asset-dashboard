@@ -4,6 +4,7 @@ import { EmptyState } from '../ui';
 import { ApprovalsTab } from './ApprovalsTab';
 import { RequestsTab } from './RequestsTab';
 import { ContentTab } from './ContentTab';
+import { ClientCopyReview } from './ClientCopyReview';
 import type { Tier } from '../ui';
 import type { ClientContentRequest, ClientRequest, ApprovalBatch } from './types';
 import type { ContentPlanReviewCell, ApprovalPageKeyword } from '../../hooks/useClientData';
@@ -11,7 +12,7 @@ import { useBetaMode } from './BetaContext';
 import { STUDIO_NAME } from '../../constants';
 import { post } from '../../api/client';
 
-type InboxFilter = 'all' | 'approvals' | 'requests' | 'content' | 'content-plan';
+type InboxFilter = 'all' | 'approvals' | 'requests' | 'copy' | 'content' | 'content-plan';
 
 interface InboxTabProps {
   workspaceId: string;
@@ -50,6 +51,8 @@ interface InboxTabProps {
   setToast: (toast: { message: string; type: 'success' | 'error' } | null) => void;
   // Content Plan review cells
   contentPlanReviewCells?: ContentPlanReviewCell[];
+  // Whether there are copy pipeline entries ready for review
+  hasCopyEntries?: boolean;
   // Which section to show initially (for deep-linking from Overview actions)
   initialFilter?: InboxFilter;
   // Page keyword hints for approval card targeting chips (independent of seoClientView)
@@ -63,6 +66,7 @@ export function InboxTab({
   contentRequests, setContentRequests, briefPrice, fullPostPrice, fmtPrice, setPricingModal, pricingConfirming,
   setToast,
   contentPlanReviewCells = [],
+  hasCopyEntries = false,
   initialFilter,
   pageMap,
 }: InboxTabProps) {
@@ -80,12 +84,14 @@ export function InboxTab({
     { id: 'all', label: 'All', icon: Inbox },
     { id: 'approvals', label: 'SEO Changes', icon: ClipboardCheck, count: pendingApprovals || undefined },
     { id: 'requests', label: 'Requests', icon: MessageSquare, count: pendingRequests || undefined },
+    ...(hasCopyEntries ? [{ id: 'copy' as InboxFilter, label: 'Copy Review', icon: FileText }] : []),
     ...(!betaMode ? [{ id: 'content' as InboxFilter, label: 'Content', icon: FileText, count: contentReviews || undefined }] : []),
     ...(planReviewCount > 0 ? [{ id: 'content-plan' as InboxFilter, label: 'Content Plan', icon: Layers, count: planReviewCount }] : []),
   ];
 
   const showApprovals = filter === 'all' || filter === 'approvals';
   const showRequests = filter === 'all' || filter === 'requests';
+  const showCopy = filter === 'all' || filter === 'copy';
   const showContent = !betaMode && (filter === 'all' || filter === 'content');
   const showContentPlan = filter === 'all' || filter === 'content-plan';
 
@@ -188,6 +194,19 @@ export function InboxTab({
             loadRequests={loadRequests}
             setToast={setToast}
           />
+        </div>
+      )}
+
+      {/* Copy pipeline review section */}
+      {showCopy && hasCopyEntries && (
+        <div>
+          {filter === 'all' && (
+            <div className="flex items-center gap-2 mb-3 mt-2">
+              <FileText className="w-4 h-4 text-teal-400" />
+              <span className="text-sm font-medium text-zinc-300">Copy Review</span>
+            </div>
+          )}
+          <ClientCopyReview workspaceId={workspaceId} />
         </div>
       )}
 
@@ -323,7 +342,7 @@ export function InboxTab({
       {filter === 'content-plan' && planReviewCount === 0 && (
         <EmptyState icon={Layers} title="No content plan items to review." description="When your team sends content for review, items will appear here." />
       )}
-      {filter === 'all' && !hasApprovals && !hasRequests && contentRequests.length === 0 && planReviewCount === 0 && !approvalsLoading && !requestsLoading && (
+      {filter === 'all' && !hasApprovals && !hasRequests && contentRequests.length === 0 && planReviewCount === 0 && !hasCopyEntries && !approvalsLoading && !requestsLoading && (
         <EmptyState
           icon={Inbox}
           title="Your inbox is empty."
