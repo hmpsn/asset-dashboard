@@ -3697,6 +3697,118 @@ export const CHECKS: Check[] = [
       return hits;
     },
   },
+  // ─── Design system enforcement rules (Phase 1) ─────────────────────────────
+  {
+    name: 'Legacy surface token in new code',
+    pattern: 'var\\(--brand-bg-',
+    fileGlobs: ['*.tsx', '*.css'],
+    exclude: ['src/index.css'],
+    message: 'Use var(--surface-1/2/3) instead of var(--brand-bg-*). The --brand-bg-* names are legacy aliases — see DESIGN_SYSTEM.md.',
+    severity: 'warn',
+    rationale: 'Prevents new code from using deprecated token names that bypass the 3-tier surface system.',
+    claudeMdRef: '#design-system--the-three-laws-of-color',
+  },
+  {
+    name: 'Hand-rolled card div (use SectionCard)',
+    pattern: 'className="[^"]*bg-zinc-9[0-9]{2}[^"]*rounded-xl',
+    fileGlobs: ['*.tsx'],
+    exclude: [
+      'src/components/ui/',
+    ],
+    message: 'Use <SectionCard> or <SectionCard variant="subtle"> instead of hand-rolling bg-zinc-9xx + rounded-xl. Add a // pr-check-disable-next-line comment with justification for modals and non-card elements.',
+    severity: 'warn',
+    rationale: 'Prevents hand-rolled card divs that bypass the SectionCard primitive and the --surface-N token system.',
+    claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
+  },
+  {
+    name: 'Page component missing PageHeader',
+    fileGlobs: [],
+    message: 'Top-level page components must use <PageHeader>. Add <PageHeader title="..." subtitle="..." /> or add this file to the exclude list in pr-check.ts with a justification comment.',
+    severity: 'warn',
+    rationale: 'Enforces consistent page-level header structure across all navigable views.',
+    claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
+    customCheck: (_files) => {
+      const PAGE_COMPONENTS = [
+        // Currently missing PageHeader (Phase 3 migration targets):
+        'src/components/ContentPipeline.tsx',
+        'src/components/ContentManager.tsx',
+        'src/components/SeoAudit.tsx',
+        'src/components/KeywordStrategy.tsx',
+        'src/components/Performance.tsx',
+        'src/components/PageSpeedPanel.tsx',
+        'src/components/RankTracker.tsx',
+        'src/components/ContentBriefs.tsx',
+        'src/components/RevenueDashboard.tsx',
+        'src/components/ClientDashboard.tsx',
+        'src/components/KeywordAnalysis.tsx',
+        // Already have PageHeader (guard against regression):
+        'src/components/WorkspaceHome.tsx',
+        'src/components/WorkspaceOverview.tsx',
+        'src/components/AnalyticsHub.tsx',
+        'src/components/BrandHub.tsx',
+        'src/components/InternalLinks.tsx',
+        'src/components/RedirectManager.tsx',
+        'src/components/SiteArchitecture.tsx',
+        'src/components/Roadmap.tsx',
+        'src/components/LlmsTxtGenerator.tsx',
+        'src/components/ContentPerformance.tsx',
+        'src/components/ContentPlanner.tsx',
+        'src/components/ContentSubscriptions.tsx',
+        'src/components/FeatureLibrary.tsx',
+      ];
+      return PAGE_COMPONENTS
+        .filter(p => {
+          try {
+            const content = readFileSync(path.join(ROOT, p), 'utf-8');
+            return !content.includes('<PageHeader');
+          } catch {
+            return false;
+          }
+        })
+        .map(p => ({ file: p, line: 1, text: 'Missing <PageHeader>' }));
+    },
+  },
+  {
+    name: 'Hardcoded card radius outside ui primitives',
+    pattern: 'className="[^"]*rounded-xl',
+    fileGlobs: ['*.tsx'],
+    exclude: [
+      'src/components/ui/',
+      'public/styleguide.html',
+    ],
+    message: 'Use rounded-[var(--radius-lg)] instead of rounded-xl so the radius is themeable. Add a // pr-check-disable-next-line comment with justification for modals or non-card elements.',
+    severity: 'warn',
+    rationale: 'Prevents hardcoded Tailwind radius classes that bypass the --radius-* token system.',
+    claudeMdRef: '#design-system--the-three-laws-of-color',
+  },
+  {
+    name: 'radius-signature-lg used outside SectionCard',
+    pattern: '--radius-signature-lg',
+    fileGlobs: ['*.tsx', '*.css'],
+    exclude: [
+      'src/components/ui/SectionCard.tsx',
+      'public/styleguide.html',
+      'public/styleguide.css',
+    ],
+    message: '--radius-signature-lg is the brand asymmetric radius (10px 24px 10px 24px) and is only permitted inside SectionCard.tsx. Use --radius-lg for other card elements.',
+    severity: 'error',
+    rationale: 'The asymmetric corner is a SectionCard-only brand signature. Other components adopting it would dilute the design intent.',
+    claudeMdRef: '#design-system--the-three-laws-of-color',
+  },
+  {
+    name: 'Non-standard transition duration',
+    pattern: 'transition-duration-\\[(?!120ms|180ms|400ms)',
+    fileGlobs: ['*.tsx', '*.css'],
+    exclude: [
+      'src/components/ui/',
+      'public/styleguide.html',
+      'public/styleguide.css',
+    ],
+    message: 'Use transition-duration-[120ms], transition-duration-[180ms], or transition-duration-[400ms]. Non-standard durations break motion consistency.',
+    severity: 'warn',
+    rationale: 'Enforces the three-speed motion system: 120ms (micro), 180ms (standard), 400ms (entrance).',
+    claudeMdRef: '#design-system--the-three-laws-of-color',
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
