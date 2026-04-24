@@ -304,7 +304,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
 
       {/* Bulk action bar */}
       {selected.size > 0 && (
-        /* pr-check-disable-next-line -- floating bulk-action toolbar */
+        // pr-check-disable-next-line -- floating bulk-action toolbar
         <div className="rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap bg-zinc-900 border-2 border-teal-400" style={{ boxShadow: '0 0 12px rgba(45,212,191,0.1)' }}>
           <div className="flex items-center gap-2">
             <CheckCheck className="w-4 h-4 text-teal-400" />

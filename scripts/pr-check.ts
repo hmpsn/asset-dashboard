@@ -3896,6 +3896,7 @@ function applyExcludeLines(lines: string[], excludeLines?: string[]): string[] {
 
 function checkFile(file: string, check: Check): string[] {
   if (isExcluded(file, check.exclude)) return [];
+  if (!check.pattern) return [];
   try {
     const safePattern = check.pattern.replace(/"/g, '\\"');
     const out = execSync(
@@ -3918,6 +3919,7 @@ const EXCLUDED_FILES = ['test-branding.ts'];
 // collision' regression test. Not part of the public API; do not import from
 // anywhere except the test harness.
 export function checkDirectory(dir: string, check: Check): string[] {
+  if (!check.pattern) return [];
   const globs = check.fileGlobs.map(g => `--include="${g}"`).join(' ');
   // If the rule opts into a normally-excluded directory via pathFilter (e.g.
   // 'tests/'), that directory must NOT be in the grep --exclude-dir list.

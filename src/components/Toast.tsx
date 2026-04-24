@@ -66,17 +66,14 @@ function ToastMessage({ item, onDismiss }: { item: ToastItem; onDismiss: (id: st
   };
 
   return (
-    <>
-      {/* pr-check-disable-next-line -- toast notification element */}
-      <div
-        className={`pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-xl bg-zinc-900 border ${borders[item.type]} shadow-2xl shadow-black/40 text-sm text-zinc-200 transition-all duration-200 ${visible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4'}`}
-      >
+    <div
+      className={`pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-xl bg-zinc-900 border ${borders[item.type]} shadow-2xl shadow-black/40 text-sm text-zinc-200 transition-all duration-200 ${visible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4'}`}
+    >
         {icons[item.type]}
         <span className="text-xs">{item.message}</span>
         <button onClick={() => { setVisible(false); setTimeout(() => onDismiss(item.id), 200); }} className="ml-1 text-zinc-500 hover:text-zinc-400 transition-colors">
           <X className="w-3 h-3" />
         </button>
-      </div>
-    </>
+    </div>
   );
 }

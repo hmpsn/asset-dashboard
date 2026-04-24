@@ -450,7 +450,9 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
 
       {/* Keywords without rank data */}
       {keywords.filter(k => !latestRanks.find(r => r.query === k.query)).length > 0 && (
-        <SectionCard variant="subtle" title="Tracked but no rank data">
+        <SectionCard variant="subtle">
+          <div className="space-y-2">
+          <p className="text-[11px] text-zinc-500">Tracked but no rank data:</p>
           <div className="flex flex-wrap gap-1.5">
             {keywords.filter(k => !latestRanks.find(r => r.query === k.query)).map(k => (
               <span key={k.query} className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-zinc-800 text-zinc-400">
@@ -458,6 +460,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
                 <button onClick={() => removeKeyword(k.query)} className="text-zinc-500 hover:text-red-400"><Trash2 className="w-2.5 h-2.5" /></button>
               </span>
             ))}
+          </div>
           </div>
         </SectionCard>
       )}

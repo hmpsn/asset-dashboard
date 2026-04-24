@@ -163,6 +163,7 @@ function PremiumBreakdown({ scorecard }: { scorecard: OutcomeScorecard }) {
 
       {/* Detailed breakdown panel */}
       <SectionCard variant="subtle">
+        <div className="space-y-3">
         <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Detailed breakdown</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1">
@@ -183,6 +184,7 @@ function PremiumBreakdown({ scorecard }: { scorecard: OutcomeScorecard }) {
               {Math.round(scorecard.strongWinRate * 100)}%
             </p>
           </div>
+        </div>
         </div>
       </SectionCard>
     </div>
