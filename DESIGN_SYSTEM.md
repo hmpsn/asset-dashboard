@@ -241,7 +241,7 @@ Canonical directional delta indicator. Replaces hand-rolled `TrendingUp/Down + e
   - `invert=false` — flip color mapping (use when lower = better, e.g. position, error count)
   - `showSign=false` — show `+`/`-` sign prefix (default shows `Math.abs(value)`)
   - `label?: string` — optional trailing context string (e.g. `"vs last month"`)
-  - `size='sm' | 'md'` — `sm` = `text-[11px]` + `w-3 h-3` icon (default), `md` = `text-xs` + `w-4 h-4`
+  - `size='sm' | 'md'` — `sm` = `text-[11px]` + `w-3 h-3` icon (default), `md` = `text-xs` + `w-3.5 h-3.5`
   - `hideOnZero=true` — return `null` when `value === 0` (override to `false` to keep a neutral Minus visible)
 - Always use `<TrendBadge>` instead of inlining `TrendingUp/Down` + emerald/red. Enforced by the pr-check `Hand-rolled trend badge` warn rule.
 
