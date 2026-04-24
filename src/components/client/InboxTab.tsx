@@ -202,7 +202,7 @@ export function InboxTab({
         <div>
           {filter === 'all' && (
             <div className="flex items-center gap-2 mb-3 mt-2">
-              <FileText className="w-4 h-4 text-teal-400" />
+              <PenLine className="w-4 h-4 text-teal-400" />
               <span className="text-sm font-medium text-zinc-300">Copy Review</span>
             </div>
           )}

@@ -9,8 +9,15 @@ export interface SelectOption {
   label: string;
 }
 
+// Note: `multiple` is Omit'd because the onChange signature returns a single
+// string; supporting multi-select would require a different callback shape.
+// Consumers who need multi-select should render a native <select multiple>
+// directly or build a dedicated MultiSelect primitive.
 export interface FormSelectProps
-  extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'onChange' | 'children'> {
+  extends Omit<
+    React.SelectHTMLAttributes<HTMLSelectElement>,
+    'onChange' | 'children' | 'multiple'
+  > {
   options: SelectOption[];
   value: string;
   onChange: (value: string) => void;
