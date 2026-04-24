@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
 import React from 'react';
-import { Heading } from '../../src/components/ui/typography/Heading';
-import { Stat } from '../../src/components/ui/typography/Stat';
-import { BodyText } from '../../src/components/ui/typography/BodyText';
-import { Caption } from '../../src/components/ui/typography/Caption';
-import { Label } from '../../src/components/ui/typography/Label';
-import { Mono } from '../../src/components/ui/typography/Mono';
+import { Heading } from '../../../src/components/ui/typography/Heading';
+import { Stat } from '../../../src/components/ui/typography/Stat';
+import { BodyText } from '../../../src/components/ui/typography/BodyText';
+import { Caption } from '../../../src/components/ui/typography/Caption';
+import { Label } from '../../../src/components/ui/typography/Label';
+import { Mono } from '../../../src/components/ui/typography/Mono';
 
 // ─── Heading ──────────────────────────────────────────────────────────────────
 
@@ -43,15 +43,38 @@ describe('Heading', () => {
     expect(container.querySelector('h1')).toBeNull();
   });
 
+  it('adds role="heading" + aria-level when as="div" to preserve semantics', () => {
+    const { container } = render(<Heading level={2} as="div">Section</Heading>);
+    const el = container.querySelector('div')!;
+    expect(el.getAttribute('role')).toBe('heading');
+    expect(el.getAttribute('aria-level')).toBe('2');
+  });
+
+  it('does NOT add redundant role/aria-level on native heading tags', () => {
+    const { container } = render(<Heading level={1}>H1</Heading>);
+    const el = container.querySelector('h1')!;
+    expect(el.getAttribute('role')).toBeNull();
+    expect(el.getAttribute('aria-level')).toBeNull();
+  });
+
   it('accepts and appends extra className', () => {
     const { container } = render(<Heading level={1} className="extra-class">X</Heading>);
     expect(container.firstElementChild!.className).toContain('t-h1');
     expect(container.firstElementChild!.className).toContain('extra-class');
   });
 
+  it('spreads rest props (id, data-*, onClick) to the element', () => {
+    const { container } = render(
+      <Heading level={1} id="main-title" data-testid="heading-x">Title</Heading>
+    );
+    const el = container.firstElementChild!;
+    expect(el.id).toBe('main-title');
+    expect(el.getAttribute('data-testid')).toBe('heading-x');
+  });
+
   it('passes children through', () => {
     const { getByText } = render(<Heading level={2}>Hello world</Heading>);
-    expect(getByText('Hello world')).toBeTruthy();
+    expect(getByText('Hello world')).toBeInTheDocument();
   });
 
   it('forwards ref to the DOM element', () => {
@@ -71,7 +94,7 @@ describe('Stat', () => {
 
   it('renders .t-stat for size="default" (default prop)', () => {
     const { container } = render(<Stat>42</Stat>);
-    // Use word-boundary regex so this doesn't pass for t-stat-lg or t-stat-sm
+    // Word boundary so this doesn't pass for t-stat-lg or t-stat-sm
     expect(container.firstElementChild!.className).toMatch(/\bt-stat\b/);
     expect(container.firstElementChild!.className).not.toMatch(/t-stat-(lg|sm)/);
   });
@@ -87,9 +110,16 @@ describe('Stat', () => {
     expect(container.firstElementChild!.className).toContain('text-teal-400');
   });
 
+  it('spreads rest props to the div', () => {
+    const { container } = render(<Stat id="hero-kpi" data-metric="clicks">9</Stat>);
+    const el = container.firstElementChild!;
+    expect(el.id).toBe('hero-kpi');
+    expect(el.getAttribute('data-metric')).toBe('clicks');
+  });
+
   it('passes children through', () => {
     const { getByText } = render(<Stat>1,234</Stat>);
-    expect(getByText('1,234')).toBeTruthy();
+    expect(getByText('1,234')).toBeInTheDocument();
   });
 
   it('forwards ref to the div element', () => {
@@ -107,33 +137,40 @@ describe('BodyText', () => {
     expect(container.firstElementChild!.className).toContain('t-body');
   });
 
-  it('applies default tone (--brand-text)', () => {
+  it('applies default tone via text-[var(--brand-text)] utility', () => {
     const { container } = render(<BodyText>Default</BodyText>);
-    const el = container.firstElementChild as HTMLElement;
-    expect(el.style.color).toBe('var(--brand-text)');
+    expect(container.firstElementChild!.className).toContain('text-[var(--brand-text)]');
   });
 
-  it('applies muted tone (--brand-text-muted)', () => {
+  it('applies muted tone via text-[var(--brand-text-muted)] utility', () => {
     const { container } = render(<BodyText tone="muted">Muted</BodyText>);
-    const el = container.firstElementChild as HTMLElement;
-    expect(el.style.color).toBe('var(--brand-text-muted)');
+    expect(container.firstElementChild!.className).toContain('text-[var(--brand-text-muted)]');
   });
 
-  it('applies dim tone (--brand-text-dim)', () => {
+  it('applies dim tone via text-[var(--brand-text-dim)] utility', () => {
     const { container } = render(<BodyText tone="dim">Dim</BodyText>);
-    const el = container.firstElementChild as HTMLElement;
-    expect(el.style.color).toBe('var(--brand-text-dim)');
+    expect(container.firstElementChild!.className).toContain('text-[var(--brand-text-dim)]');
   });
 
-  it('accepts and appends extra className', () => {
+  it('accepts and appends extra className (can override tone)', () => {
     const { container } = render(<BodyText className="max-w-prose">Text</BodyText>);
     expect(container.firstElementChild!.className).toContain('t-body');
     expect(container.firstElementChild!.className).toContain('max-w-prose');
   });
 
+  it('does NOT set inline style.color (tone moved to className)', () => {
+    const { container } = render(<BodyText tone="muted">X</BodyText>);
+    expect((container.firstElementChild as HTMLElement).style.color).toBe('');
+  });
+
+  it('spreads rest props to the p element', () => {
+    const { container } = render(<BodyText id="intro">Hi</BodyText>);
+    expect(container.firstElementChild!.id).toBe('intro');
+  });
+
   it('passes children through', () => {
     const { getByText } = render(<BodyText>Paragraph text here</BodyText>);
-    expect(getByText('Paragraph text here')).toBeTruthy();
+    expect(getByText('Paragraph text here')).toBeInTheDocument();
   });
 
   it('forwards ref to the p element', () => {
@@ -148,7 +185,8 @@ describe('BodyText', () => {
 describe('Caption', () => {
   it('renders .t-caption for default size', () => {
     const { container } = render(<Caption>2m ago</Caption>);
-    expect(container.firstElementChild!.className).toContain('t-caption');
+    expect(container.firstElementChild!.className).toMatch(/\bt-caption\b/);
+    expect(container.firstElementChild!.className).not.toMatch(/t-caption-sm/);
   });
 
   it('renders .t-caption-sm for size="sm"', () => {
@@ -162,9 +200,14 @@ describe('Caption', () => {
     expect(container.firstElementChild!.className).toContain('text-emerald-400');
   });
 
+  it('spreads rest props to the span', () => {
+    const { container } = render(<Caption id="cap-1">x</Caption>);
+    expect(container.firstElementChild!.id).toBe('cap-1');
+  });
+
   it('passes children through', () => {
     const { getByText } = render(<Caption>Last synced 5m ago</Caption>);
-    expect(getByText('Last synced 5m ago')).toBeTruthy();
+    expect(getByText('Last synced 5m ago')).toBeInTheDocument();
   });
 
   it('forwards ref to the span element', () => {
@@ -188,9 +231,15 @@ describe('Label', () => {
     expect(container.firstElementChild!.className).toContain('text-teal-400');
   });
 
+  it('spreads rest props to the span', () => {
+    const { container } = render(<Label id="lbl" data-x="1">x</Label>);
+    expect(container.firstElementChild!.id).toBe('lbl');
+    expect(container.firstElementChild!.getAttribute('data-x')).toBe('1');
+  });
+
   it('passes children through', () => {
     const { getByText } = render(<Label>Last 28 days</Label>);
-    expect(getByText('Last 28 days')).toBeTruthy();
+    expect(getByText('Last 28 days')).toBeInTheDocument();
   });
 
   it('forwards ref to the span element', () => {
@@ -205,7 +254,8 @@ describe('Label', () => {
 describe('Mono', () => {
   it('renders .t-mono for default size', () => {
     const { container } = render(<Mono>/blog/seo-guide</Mono>);
-    expect(container.firstElementChild!.className).toContain('t-mono');
+    expect(container.firstElementChild!.className).toMatch(/\bt-mono\b/);
+    expect(container.firstElementChild!.className).not.toMatch(/t-micro/);
   });
 
   it('renders .t-micro for size="micro"', () => {
@@ -219,9 +269,14 @@ describe('Mono', () => {
     expect(container.firstElementChild!.className).toContain('select-all');
   });
 
+  it('spreads rest props to the span', () => {
+    const { container } = render(<Mono id="mono-1">x</Mono>);
+    expect(container.firstElementChild!.id).toBe('mono-1');
+  });
+
   it('passes children through', () => {
     const { getByText } = render(<Mono>abc-123</Mono>);
-    expect(getByText('abc-123')).toBeTruthy();
+    expect(getByText('abc-123')).toBeInTheDocument();
   });
 
   it('forwards ref to the span element', () => {

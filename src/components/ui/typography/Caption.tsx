@@ -1,11 +1,10 @@
 import React from 'react';
+import { cn } from '../../../lib/utils';
 
 export type CaptionSize = 'default' | 'sm';
 
-export interface CaptionProps {
+export interface CaptionProps extends React.HTMLAttributes<HTMLSpanElement> {
   size?: CaptionSize;
-  className?: string;
-  children?: React.ReactNode;
 }
 
 const SIZE_CLASS: Record<CaptionSize, string> = {
@@ -14,11 +13,9 @@ const SIZE_CLASS: Record<CaptionSize, string> = {
 };
 
 export const Caption = React.forwardRef<HTMLSpanElement, CaptionProps>(
-  ({ size = 'default', className, children }, ref) => {
-    const typeClass = SIZE_CLASS[size];
-    const combinedClass = [typeClass, className].filter(Boolean).join(' ');
+  ({ size = 'default', className, children, ...rest }, ref) => {
     return (
-      <span ref={ref} className={combinedClass}>
+      <span ref={ref} className={cn(SIZE_CLASS[size], className)} {...rest}>
         {children}
       </span>
     );

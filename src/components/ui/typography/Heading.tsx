@@ -1,13 +1,13 @@
 import React from 'react';
+import { cn } from '../../../lib/utils';
 
 export type HeadingLevel = 1 | 2 | 3;
 export type HeadingTag = 'h1' | 'h2' | 'h3' | 'div';
 
-export interface HeadingProps {
+export interface HeadingProps
+  extends React.HTMLAttributes<HTMLElement> {
   level: HeadingLevel;
   as?: HeadingTag;
-  className?: string;
-  children?: React.ReactNode;
 }
 
 const LEVEL_CLASS: Record<HeadingLevel, string> = {
@@ -23,11 +23,24 @@ const LEVEL_DEFAULT_TAG: Record<HeadingLevel, HeadingTag> = {
 };
 
 export const Heading = React.forwardRef<HTMLElement, HeadingProps>(
-  ({ level, as, className, children }, ref) => {
+  ({ level, as, className, children, ...rest }, ref) => {
     const tag = as ?? LEVEL_DEFAULT_TAG[level];
-    const typeClass = LEVEL_CLASS[level];
-    const combinedClass = [typeClass, className].filter(Boolean).join(' ');
-    return React.createElement(tag, { ref, className: combinedClass }, children);
+    const Tag = tag as React.ElementType;
+    // When caller opts out of semantic heading (as="div"), preserve heading
+    // semantics for assistive tech with role + aria-level.
+    const ariaProps = tag === 'div'
+      ? { role: 'heading' as const, 'aria-level': level }
+      : undefined;
+    return (
+      <Tag
+        ref={ref}
+        className={cn(LEVEL_CLASS[level], className)}
+        {...ariaProps}
+        {...rest}
+      >
+        {children}
+      </Tag>
+    );
   }
 );
 

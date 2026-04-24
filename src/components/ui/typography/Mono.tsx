@@ -1,11 +1,10 @@
 import React from 'react';
+import { cn } from '../../../lib/utils';
 
 export type MonoSize = 'default' | 'micro';
 
-export interface MonoProps {
+export interface MonoProps extends React.HTMLAttributes<HTMLSpanElement> {
   size?: MonoSize;
-  className?: string;
-  children?: React.ReactNode;
 }
 
 const SIZE_CLASS: Record<MonoSize, string> = {
@@ -14,11 +13,9 @@ const SIZE_CLASS: Record<MonoSize, string> = {
 };
 
 export const Mono = React.forwardRef<HTMLSpanElement, MonoProps>(
-  ({ size = 'default', className, children }, ref) => {
-    const typeClass = SIZE_CLASS[size];
-    const combinedClass = [typeClass, className].filter(Boolean).join(' ');
+  ({ size = 'default', className, children, ...rest }, ref) => {
     return (
-      <span ref={ref} className={combinedClass}>
+      <span ref={ref} className={cn(SIZE_CLASS[size], className)} {...rest}>
         {children}
       </span>
     );

@@ -5,19 +5,29 @@
  * replacement with the new <Heading>, <Stat>, <BodyText>, <Caption>, <Label>,
  * and <Mono> primitives.
  *
- * DEFAULT: --dry-run (no files written)
- * OPT-IN:  --write  (applies transformations — review dry-run output first)
+ * Dry-run only. --write is intentionally disabled — applying the rewrites
+ * requires per-file injection of `import { Heading, Stat, ... } from '...'`
+ * with a relative path computed from each file's location, which this
+ * scaffold does not implement. Phase 2 owns the migration pass.
  *
  * Usage:
  *   npx tsx scripts/codemods/phase5-typography.ts
- *   npx tsx scripts/codemods/phase5-typography.ts --write
  */
 
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync } from 'fs';
 import { globSync } from 'glob';
 import { relative } from 'path';
 
-const WRITE = process.argv.includes('--write');
+if (process.argv.includes('--write')) {
+  console.error('error: --write is not supported.');
+  console.error('  Applying rewrites requires injecting');
+  console.error('  `import { Heading, Stat, BodyText, Caption, Label, Mono } from ...`');
+  console.error('  with a relative path computed per file. This scaffold does');
+  console.error('  not implement that. Use the dry-run report as a manual');
+  console.error('  checklist or extend the codemod before enabling --write.');
+  process.exit(1);
+}
+
 const ROOT = new URL('../../', import.meta.url).pathname.replace(/\/$/, '');
 
 // ─── Pattern registry ────────────────────────────────────────────────────────
@@ -146,31 +156,12 @@ function scanFile(filePath: string): FileMatch | null {
   };
 }
 
-function applyTransforms(filePath: string): number {
-  let content = readFileSync(filePath, 'utf-8');
-  let totalReplaced = 0;
-
-  for (const pattern of PATTERNS) {
-    const before = content;
-    content = content.replace(pattern.regex, pattern.replacement);
-    // Count replacements by comparing
-    const replaced = (before.match(new RegExp(pattern.regex.source, 'g')) ?? []).length;
-    totalReplaced += replaced;
-  }
-
-  if (totalReplaced > 0) {
-    writeFileSync(filePath, content, 'utf-8');
-  }
-
-  return totalReplaced;
-}
-
 // ─── Main ──────────────────────────────────────────────────────────────────────
 
 function main() {
   const files = globSync('src/**/*.tsx', { cwd: ROOT, absolute: true });
 
-  console.log(`\nphase5-typography codemod — ${WRITE ? 'WRITE MODE' : 'DRY RUN'}`);
+  console.log(`\nphase5-typography codemod — DRY RUN`);
   console.log(`Scanning ${files.length} .tsx files in src/\n`);
 
   const results: FileMatch[] = [];
@@ -210,24 +201,8 @@ function main() {
     console.log(`  ${i + 1}. ${r.file} — ${r.totalMatches} matches`);
   });
 
-  if (WRITE) {
-    console.log('\nApplying transforms...');
-    let writtenFiles = 0;
-    let totalReplaced = 0;
-    for (const result of results) {
-      const replaced = applyTransforms(`${ROOT}/${result.file}`);
-      if (replaced > 0) {
-        writtenFiles++;
-        totalReplaced += replaced;
-        console.log(`  wrote ${result.file} (${replaced} replacement${replaced !== 1 ? 's' : ''})`);
-      }
-    }
-    console.log(`\nDone. ${totalReplaced} replacement${totalReplaced !== 1 ? 's' : ''} in ${writtenFiles} file${writtenFiles !== 1 ? 's' : ''}.`);
-    console.log('Next: run `npm run typecheck` and review diffs before committing.');
-  } else {
-    console.log('\nDRY RUN complete — no files written.');
-    console.log('Re-run with --write to apply transforms.');
-  }
+  console.log('\nDRY RUN complete — no files written.');
+  console.log('(--write is disabled; see file header for rationale.)');
 }
 
 main();

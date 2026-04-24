@@ -1,11 +1,10 @@
 import React from 'react';
+import { cn } from '../../../lib/utils';
 
 export type StatSize = 'hero' | 'default' | 'sm';
 
-export interface StatProps {
+export interface StatProps extends React.HTMLAttributes<HTMLDivElement> {
   size?: StatSize;
-  className?: string;
-  children?: React.ReactNode;
 }
 
 const SIZE_CLASS: Record<StatSize, string> = {
@@ -15,11 +14,9 @@ const SIZE_CLASS: Record<StatSize, string> = {
 };
 
 export const Stat = React.forwardRef<HTMLDivElement, StatProps>(
-  ({ size = 'default', className, children }, ref) => {
-    const typeClass = SIZE_CLASS[size];
-    const combinedClass = [typeClass, className].filter(Boolean).join(' ');
+  ({ size = 'default', className, children, ...rest }, ref) => {
     return (
-      <div ref={ref} className={combinedClass}>
+      <div ref={ref} className={cn(SIZE_CLASS[size], className)} {...rest}>
         {children}
       </div>
     );
