@@ -497,6 +497,10 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
         onSetExpandedRequest={setExpandedRequest}
         onCopyAsMarkdown={copyAsMarkdown}
         onExportClientHTML={exportClientHTML}
+        posts={posts}
+        generatingPostFor={generatingPostFor}
+        onGeneratePost={handleGeneratePost}
+        onOpenPost={setActivePostId}
       />
 
       {/* Content Briefs header — search/sort controls */}
