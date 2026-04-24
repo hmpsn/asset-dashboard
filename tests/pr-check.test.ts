@@ -4165,6 +4165,87 @@ describe('Rule: Manual pageMap pairing outside shared helpers — use findPageMa
   });
 });
 
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: Hand-rolled card div (use SectionCard)
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: Hand-rolled card div (use SectionCard)', () => {
+  const RULE = 'Hand-rolled card div (use SectionCard)';
+
+  it('flags a div with bg-zinc-9xx + rounded-xl', () => {
+    const file = write(
+      uniqPath('rule-hand-rolled-card', 'src/components/SomePanel.tsx'),
+      lines(
+        'export function SomePanel() {',
+        '  return (',
+        '    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">',
+        '      content',
+        '    </div>',
+        '  );',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
+
+  it('does NOT flag a component without the hand-rolled card pattern', () => {
+    const file = write(
+      uniqPath('rule-hand-rolled-card', 'src/components/CleanPanel.tsx'),
+      lines(
+        'export function CleanPanel() {',
+        '  return (',
+        '    <SectionCard>',
+        '      <div className="p-4">content</div>',
+        '    </SectionCard>',
+        '  );',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with inline // pr-check-disable-next-line hatch', () => {
+    const file = write(
+      uniqPath('rule-hand-rolled-card', 'src/components/HatchInline.tsx'),
+      lines(
+        'export function Modal() {',
+        '  return (',
+        '    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4"> {/* pr-check-disable-next-line -- modal, not a card */}',
+        '      content',
+        '    </div>',
+        '  );',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('suppresses with // pr-check-disable-next-line 3 lines above the className (multi-line JSX lookback)', () => {
+    // In multi-attribute JSX, the disable comment sits on the opening-tag line
+    // while className= is on a later attribute line — 3-4 lines below. The
+    // 5-line lookback in localHasHatch must cover this gap.
+    const file = write(
+      uniqPath('rule-hand-rolled-card', 'src/components/HatchAboveMultiline.tsx'),
+      lines(
+        'export function Modal() {',
+        '  return (',
+        '    // pr-check-disable-next-line -- overlay backdrop, not a card',
+        '    <div',
+        '      onClick={onClose}',
+        '      className="bg-zinc-900 border border-zinc-800 rounded-xl p-4"',
+        '    >',
+        '      content',
+        '    </div>',
+        '  );',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
 describe('Meta: customCheck rule name registry', () => {
   const EXPECTED_CUSTOM_CHECK_RULES = [
     'Global keydown missing isContentEditable guard',
@@ -4172,6 +4253,7 @@ describe('Meta: customCheck rule name registry', () => {
     'AI call before db.prepare without transaction guard',
     'UPDATE/DELETE missing workspace_id scope',
     'getOrCreate* function returns nullable',
+    'Hand-rolled card div (use SectionCard)',
     'Public-portal mutation without addActivity',
     'broadcastToWorkspace inside bridge callback',
     'Layout-driving state set in useEffect',
@@ -4221,6 +4303,9 @@ describe('Meta: customCheck rule name registry', () => {
     'useWorkspaceEvents handler for centralized event',
     // Roadmap-redesign sprint (2026-04-22) — round 4 of PR #258
     'roadmap.json item ID uniqueness',
+    // Design-system enforcement rules (Phase 1, PR #277)
+    'Non-standard transition duration',
+    'Page component missing PageHeader',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -4639,5 +4724,78 @@ describe('Rule: roadmap.json item ID uniqueness', () => {
       })
     );
     expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+});
+
+describe('Rule: Non-standard transition duration', () => {
+  const RULE = 'Non-standard transition duration';
+
+  it('flags a non-standard duration in a tsx file', () => {
+    const file = write(
+      uniqPath('rule-transition-dur', 'Comp.tsx'),
+      `export function Comp() { return <div className="transition-duration-[250ms]" />; }`,
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('250ms');
+  });
+
+  it('does NOT flag allowed durations (120ms, 180ms, 400ms)', () => {
+    const file = write(
+      uniqPath('rule-transition-dur', 'Comp.tsx'),
+      `export function Comp() {
+  return (
+    <div className="transition-duration-[120ms]">
+      <span className="transition-duration-[180ms]" />
+      <span className="transition-duration-[400ms]" />
+    </div>
+  );
+}`,
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags multiple non-standard durations as separate hits', () => {
+    const file = write(
+      uniqPath('rule-transition-dur', 'Comp.tsx'),
+      `export function A() { return <div className="transition-duration-[300ms]" />; }
+export function B() { return <span className="transition-duration-[500ms]" />; }`,
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(2);
+  });
+
+  it('does NOT flag a file with no transition-duration- utility', () => {
+    const file = write(
+      uniqPath('rule-transition-dur', 'Comp.tsx'),
+      `export function Comp() { return <div className="duration-200 transition-all" />; }`,
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('Rule: Page component missing PageHeader', () => {
+  const RULE = 'Page component missing PageHeader';
+
+  it('every result has text "Missing <PageHeader>"', () => {
+    const hits = runRule(RULE, []);
+    for (const hit of hits) {
+      expect(hit.text).toBe('Missing <PageHeader>');
+    }
+  });
+
+  it('does NOT flag WorkspaceHome.tsx (it already has <PageHeader>)', () => {
+    const hits = runRule(RULE, []);
+    const flaggedPaths = hits.map(h => h.file);
+    expect(flaggedPaths).not.toContain('src/components/WorkspaceHome.tsx');
+  });
+
+  it('does NOT flag files outside the PAGE_COMPONENTS list', () => {
+    // The rule reads a hard-coded file list; arbitrary files passed via the
+    // `files` argument are ignored.
+    const extra = write(uniqPath('rule-page-header', 'Rando.tsx'), `export function Rando() { return <div />; }`);
+    const hits = runRule(RULE, [extra]);
+    const flaggedPaths = hits.map(h => h.file);
+    expect(flaggedPaths).not.toContain(extra);
   });
 });

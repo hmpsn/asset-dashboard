@@ -88,6 +88,7 @@ export function InitialPagePicker({
   );
 
   return (
+    // pr-check-disable-next-line -- full-page picker view container; not a section card
     <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden mt-2">
       <div className="px-3 py-2 border-b border-zinc-800">
         <div className="relative">

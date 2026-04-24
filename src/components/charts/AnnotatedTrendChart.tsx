@@ -225,6 +225,7 @@ function CreatePopover({
   };
 
   return (
+    // pr-check-disable-next-line -- absolute-positioned chart annotation tooltip; not a section card
     <div
       ref={popoverRef}
       className="absolute z-50 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl p-3 w-64"

@@ -3710,7 +3710,13 @@ export const CHECKS: Check[] = [
   },
   {
     name: 'Hand-rolled card div (use SectionCard)',
-    pattern: 'className="[^"]*bg-zinc-9[0-9]{2}[^"]*rounded-xl',
+    // customCheck (was pattern) — the original regex contained literal double
+    // quotes which broke the shell `grep -E "..."` invocation in checkDirectory;
+    // the error was swallowed by `2>/dev/null || true`, so the rule silently
+    // reported ✓ despite 26 violations. Converted to customCheck to avoid the
+    // shell-quoting hazard and to support pr-check-disable-next-line with a
+    // 5-line lookback (multi-attribute JSX puts className= 3-4 lines below the
+    // opening tag where the hatch comment sits).
     fileGlobs: ['*.tsx'],
     exclude: [
       'src/components/ui/',
@@ -3719,6 +3725,32 @@ export const CHECKS: Check[] = [
     severity: 'error',
     rationale: 'Prevents hand-rolled card divs that bypass the SectionCard primitive and the --surface-N token system.',
     claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const cardRe = /className="[^"]*bg-zinc-9\d{2}[^"]*rounded-xl/;
+      // Look back up to 5 lines for the hatch comment. Multi-attribute JSX
+      // commonly places className= 3-4 lines below the opening tag where the
+      // disable comment sits, so the standard 1-line lookback in hasHatch() is
+      // insufficient here.
+      const localHasHatch = (lines: string[], i: number) => {
+        for (let j = Math.max(0, i - 5); j <= i; j++) {
+          if (lines[j].includes('pr-check-disable-next-line')) return true;
+        }
+        return false;
+      };
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!cardRe.test(lines[i])) continue;
+          if (localHasHatch(lines, i)) continue;
+          hits.push({ file, line: i + 1, text: lines[i] });
+        }
+      }
+      return hits;
+    },
   },
   {
     name: 'Page component missing PageHeader',
@@ -3878,8 +3910,16 @@ export function checkDirectory(dir: string, check: Check): string[] {
   const excludeDirs = effectiveExcludeDirs.map(d => `--exclude-dir="${d}"`).join(' ');
   const excludeFiles = EXCLUDED_FILES.map(f => `--exclude="${f}"`).join(' ');
   try {
+    // Escape any literal double quotes in the pattern before interpolating into
+    // the shell command string. Without this, patterns like `className="[^"]*...`
+    // break the outer double-quote boundary, causing grep to misparse the
+    // command. The error is swallowed by `2>/dev/null || true`, so the rule
+    // silently reports ✓ — the exact silent-false-negative class this audit
+    // tries to prevent. Rule C ("Hardcoded card radius outside ui primitives")
+    // has this pattern; Rule B was already converted to customCheck.
+    const safePattern = check.pattern.replace(/"/g, '\\"');
     const out = execSync(
-      `grep -rn ${globs} ${excludeDirs} ${excludeFiles} -E "${check.pattern}" "${dir}" 2>/dev/null || true`,
+      `grep -rn ${globs} ${excludeDirs} ${excludeFiles} -E "${safePattern}" "${dir}" 2>/dev/null || true`,
       { cwd: ROOT, encoding: 'utf-8' }
     );
     let lines = out.trim() ? out.trim().split('\n').filter(Boolean) : [];

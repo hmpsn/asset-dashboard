@@ -56,7 +56,7 @@ advisory but tracked.
 | 38 | useWorkspaceEvents handler for centralized event | error | custom | `src/` | `// ws-invalidation-ok` | Duplicated useWorkspaceEvents subscriptions diverge over time — one side gets updated, the other silently misses cache keys — producing stale UI bugs that are hard to reproduce because they depend on event ordering. |
 | 39 | roadmap.json item ID uniqueness | error | custom | `data/roadmap.json` | — | Cross-sprint duplicate IDs caused PR #258 round-4: clicking expand on one row toggled both, and the server PATCH updated whichever sprint came first. |
 | 40 | Legacy surface token in new code | error | pattern | `*.tsx, *.css` | — | Prevents new code from using deprecated token names that bypass the 3-tier surface system. |
-| 41 | Hand-rolled card div (use SectionCard) | error | pattern | `*.tsx` | — | Prevents hand-rolled card divs that bypass the SectionCard primitive and the --surface-N token system. |
+| 41 | Hand-rolled card div (use SectionCard) | error | custom | `*.tsx` | — | Prevents hand-rolled card divs that bypass the SectionCard primitive and the --surface-N token system. |
 | 42 | radius-signature-lg used outside SectionCard | error | pattern | `*.tsx, *.css` | — | The asymmetric corner is a SectionCard-only brand signature. Other components adopting it would dilute the design intent. |
 
 ---
