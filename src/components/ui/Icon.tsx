@@ -1,12 +1,12 @@
 import React from 'react';
 import type { LucideIcon } from 'lucide-react';
+import { cn } from '../../lib/utils';
 
 type IconSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
 
 interface IconProps extends React.HTMLAttributes<HTMLSpanElement> {
   as: LucideIcon;
   size?: IconSize;
-  className?: string;
 }
 
 const SIZE_MAP: Record<IconSize, string> = {
@@ -19,20 +19,29 @@ const SIZE_MAP: Record<IconSize, string> = {
 };
 
 /**
- * Inline icon wrapper around any Lucide component. Renders a <span> so it can
- * be used inline within text or layout-flow containers (e.g. inside <p>, <li>,
- * or alongside text in flex rows). The wrapper is `inline-flex` so the SVG
- * sits flush with surrounding text.
+ * Inline icon wrapper around any Lucide component. Renders a <span> so it is
+ * safe inside <p>, <li>, or any inline-flow container. The wrapper is
+ * `inline-flex` so the SVG sits flush with surrounding text.
+ *
+ * Accessibility: the inner SVG is marked `aria-hidden="true"` (decorative
+ * default — screen readers skip the icon). For a semantic icon that conveys
+ * meaning on its own, pass `aria-label` as a prop — it is forwarded to the
+ * <span> wrapper via the HTMLAttributes rest spread, and assistive tech
+ * will announce the label instead of ignoring the icon.
  */
-export const Icon = React.forwardRef<HTMLSpanElement, IconProps>(
-  ({ as: Component, size = 'md', className = '', ...rest }, ref) => {
-    const sizeClass = SIZE_MAP[size];
-    const combined = `inline-flex items-center justify-center ${sizeClass}${className ? ' ' + className : ''}`;
+export const Icon = React.forwardRef<HTMLSpanElement, IconProps>(function Icon(
+  { as: Component, size = 'md', className, ...rest },
+  ref,
+) {
+  return (
+    <span
+      ref={ref}
+      className={cn('inline-flex items-center justify-center', SIZE_MAP[size], className)}
+      {...rest}
+    >
+      <Component className="w-full h-full" aria-hidden="true" />
+    </span>
+  );
+});
 
-    return (
-      <span ref={ref} className={combined} {...rest}>
-        <Component className="w-full h-full" />
-      </span>
-    );
-  }
-);
+Icon.displayName = 'Icon';

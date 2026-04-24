@@ -47,4 +47,25 @@ describe('Icon', () => {
     // @ts-expect-error - testing that invalid size is rejected
     <Icon as={TrendingUp} size="invalid" />;
   });
+
+  it('inner SVG is aria-hidden by default (decorative)', () => {
+    const { container } = render(<Icon as={TrendingUp} />);
+    const svg = container.querySelector('svg');
+    expect(svg?.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('forwards aria-label to the span wrapper for semantic icons', () => {
+    const { container } = render(<Icon as={TrendingUp} aria-label="Trending up" />);
+    const span = container.firstElementChild;
+    expect(span?.getAttribute('aria-label')).toBe('Trending up');
+  });
+
+  it('spreads rest props (id, data-*, onClick) to the span', () => {
+    const { container } = render(
+      <Icon as={Send} id="send-icon" data-testid="send-x" />
+    );
+    const span = container.firstElementChild!;
+    expect(span.id).toBe('send-icon');
+    expect(span.getAttribute('data-testid')).toBe('send-x');
+  });
 });
