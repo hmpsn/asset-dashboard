@@ -9,6 +9,7 @@ import type {
 } from './types';
 import { ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { fmtNum as formatNum } from '../../utils/formatNumbers';
+import { SectionCard } from '../ui';
 
 // ─── Helpers ───
 
@@ -276,14 +277,8 @@ export function OrganicInsight({ organic, landingPages, newVsReturning }: Organi
   return (
     <div className="space-y-6">
       {/* Organic overview row */}
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="w-6 h-6 rounded-lg bg-emerald-500/15 flex items-center justify-center">
-            <Globe className="w-3.5 h-3.5 text-emerald-400" />
-          </div>
-          <h3 className="text-sm font-semibold text-zinc-300">Organic Search Traffic</h3>
-          <span className="text-[11px] text-zinc-500 ml-auto">{organic.dateRange.start} — {organic.dateRange.end}</span>
-        </div>
+      <SectionCard title="Organic Search Traffic" titleIcon={<Globe className="w-3.5 h-3.5 text-emerald-400" />} titleExtra={<span className="text-[11px] text-zinc-500">{organic.dateRange.start} — {organic.dateRange.end}</span>}>
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="bg-zinc-800/40 rounded-lg px-3 py-2.5">
             <div className="text-[11px] text-zinc-500 mb-0.5">Organic visitors</div>
@@ -317,13 +312,12 @@ export function OrganicInsight({ organic, landingPages, newVsReturning }: Organi
             <span className="text-[11px] text-zinc-500">Other {(100 - organic.shareOfTotalUsers).toFixed(1)}%</span>
           </div>
         </div>
-      </div>
+      </SectionCard>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* New vs returning */}
         {newSeg && retSeg && (
-          <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
-            <h3 className="text-sm font-semibold text-zinc-300 mb-4">New vs Returning Visitors</h3>
+          <SectionCard title="New vs Returning Visitors">
             <div className="flex items-center gap-6 mb-4">
               <div className="flex-1">
                 <div className="text-[11px] text-teal-400 mb-0.5">New visitors</div>
@@ -350,13 +344,13 @@ export function OrganicInsight({ organic, landingPages, newVsReturning }: Organi
                 <div className={`text-sm font-bold ${retSeg.bounceRate > 60 ? 'text-red-400' : 'text-emerald-400'}`}>{retSeg.bounceRate}%</div>
               </div>
             </div>
-          </div>
+          </SectionCard>
         )}
 
         {/* Top organic landing pages */}
         {landingPages.length > 0 && (
-          <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
-            <h3 className="text-sm font-semibold text-zinc-300 mb-3">Top Organic Landing Pages</h3>
+          <SectionCard title="Top Organic Landing Pages">
+
             <div className="space-y-1 max-h-[350px] overflow-y-auto">
               {landingPages.slice(0, 15).map((lp, i) => {
                 const label = lp.landingPage === '/' ? 'Homepage' : lp.landingPage;
@@ -374,7 +368,7 @@ export function OrganicInsight({ organic, landingPages, newVsReturning }: Organi
               <span>Sessions</span>
               <span>Bounce</span>
             </div>
-          </div>
+          </SectionCard>
         )}
       </div>
     </div>
