@@ -4306,6 +4306,8 @@ describe('Meta: customCheck rule name registry', () => {
     // Design-system enforcement rules (Phase 1, PR #277)
     'Non-standard transition duration',
     'Page component missing PageHeader',
+    // SVG shell-quoting fix (Phase 3 follow-up)
+    'SVG with hardcoded dark fill/stroke',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -4797,5 +4799,48 @@ describe('Rule: Page component missing PageHeader', () => {
     const hits = runRule(RULE, [extra]);
     const flaggedPaths = hits.map(h => h.file);
     expect(flaggedPaths).not.toContain(extra);
+  });
+});
+
+describe('Rule: SVG with hardcoded dark fill/stroke', () => {
+  const RULE = 'SVG with hardcoded dark fill/stroke';
+
+  it('flags all five dark hex values in fill/stroke attributes', () => {
+    const file = write(
+      uniqPath('rule-svg-fill', 'src/components/BadChart.tsx'),
+      lines(
+        'export function BadChart() {',
+        '  return (',
+        '    <svg>',
+        '      <circle fill="#18181b" />',
+        '      <line stroke="#27272a" />',
+        '      <rect fill="#0f1219" />',
+        '      <path stroke="#303036" />',
+        '      <text fill="#52525b" />',
+        '    </svg>',
+        '  );',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(5);
+  });
+
+  it('does NOT flag safe SVG color values', () => {
+    const file = write(
+      uniqPath('rule-svg-fill', 'src/components/GoodChart.tsx'),
+      lines(
+        'export function GoodChart() {',
+        '  return (',
+        '    <svg>',
+        '      <circle fill="currentColor" />',
+        '      <line stroke="none" />',
+        '      <rect fill="#ffffff" />',
+        '    </svg>',
+        '  );',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
   });
 });

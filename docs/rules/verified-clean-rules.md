@@ -75,7 +75,7 @@ explicit justification.
 | Bare SUM() without COALESCE in db.prepare | regex-shell | Pattern `(^\|[^(])SUM\(`; standard alternation; grep succeeds; zero hits outside `server/`. |
 | as any on dynamic import results | regex-shell | Pattern `(\([a-z]+:\s*any\)\|as any[);,.])`; standard alternation with char class; grep succeeds. |
 | Hardcoded dark hex in inline styles | regex-shell | Pattern `style=\{[^}]*(#0f1219\|...)`; brace char class; grep succeeds; only Styleguide.tsx (excluded) would match. |
-| SVG with hardcoded dark fill/stroke | regex-shell | Pattern contains `\"` inside outer shell double-quotes; manually confirmed shell escape works (returns 3 Styleguide.tsx matches, all excluded). **Fragile — prefer customCheck if edited.** |
+| SVG with hardcoded dark fill/stroke | customCheck-fixture | Converted from regex-shell; original pattern contained `\"` which the safePattern escaping double-escaped to `\\"`, breaking the shell command. JS regex avoids the shell entirely. |
 | Direct listPages() outside workspace-data | regex-shell | Literal function name; grep succeeds; workspace-data.ts and webflow-pages.ts are excluded as the only legitimate call sites. |
 | Direct buildSeoContext() call | regex-shell | Literal function name; grep succeeds. |
 | formatForPrompt with inline sections literal (use buildIntelPrompt or sections: slices) | regex-shell | Literal function name with nested match; grep succeeds. |

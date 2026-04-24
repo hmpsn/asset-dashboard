@@ -998,7 +998,6 @@ export const CHECKS: Check[] = [
   },
   {
     name: 'SVG with hardcoded dark fill/stroke',
-    pattern: '(fill|stroke)=\\"(#0f1219|#18181b|#27272a|#303036|#52525b)\\"',
     fileGlobs: ['*.tsx'],
     pathFilter: 'src/components/',
     exclude: 'Styleguide.tsx',
@@ -1006,6 +1005,25 @@ export const CHECKS: Check[] = [
     excludeLines: ['chartDotStroke(', 'chartDotFill(', 'chartAxisColor(', 'chartGridColor('],
     message: 'Use chartDotStroke()/chartAxisColor() from ui/constants.ts for SVG colors. Dark hex breaks light mode.',
     severity: 'warn',
+    // Converted from pattern to customCheck — the original pattern contained `\"`
+    // inside outer shell double-quotes. The safePattern escaping would double-escape
+    // these to `\\"`, breaking the shell command silently (swallowed by || true).
+    customCheck: (files) => {
+      const SVG_ATTR = /(?:fill|stroke)="(#0f1219|#18181b|#27272a|#303036|#52525b)"/gi;
+      const hits: CustomCheckMatch[] = [];
+      files.forEach(filePath => {
+        try {
+          const fileLines = readFileSync(filePath, 'utf-8').split('\n');
+          fileLines.forEach((line, i) => {
+            if (SVG_ATTR.test(line)) {
+              hits.push({ file: filePath, line: i + 1, text: line.trim() });
+            }
+            SVG_ATTR.lastIndex = 0;
+          });
+        } catch { /* file not found in worktree */ }
+      });
+      return hits;
+    },
   },
   {
     name: 'Direct listPages() outside workspace-data',
