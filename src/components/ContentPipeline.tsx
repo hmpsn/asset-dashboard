@@ -200,6 +200,7 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
             <ChevronDown className={`w-3 h-3 transition-transform ${exportOpen ? 'rotate-180' : ''}`} />
           </button>
           {exportOpen && (
+            // pr-check-disable-next-line -- export menu dropdown
             <div className="absolute right-0 top-full mt-1 w-56 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl z-20 py-1 overflow-hidden">
               {EXPORTS.map(exp => (
                 <div key={exp.key} className="flex items-center justify-between px-3 py-2 hover:bg-zinc-800/50 group">

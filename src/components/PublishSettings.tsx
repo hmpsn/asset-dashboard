@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import {
   Loader2, Save, Sparkles, Globe, ChevronDown, Check, AlertTriangle,
 } from 'lucide-react';
+import { SectionCard } from './ui';
 import { get, post } from '../api/client';
 
 interface CollectionInfo {
@@ -153,34 +154,27 @@ export function PublishSettings({ workspaceId: _workspaceId, webflowSiteId, publ
 
   if (!webflowSiteId) {
     return (
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6 text-center">
-        <AlertTriangle className="w-5 h-5 text-amber-400/80 mx-auto mb-2" />
-        <p className="text-sm text-zinc-400">Link a Webflow site in Connections to enable publishing.</p>
-      </div>
+      <SectionCard>
+        <div className="text-center">
+          <AlertTriangle className="w-5 h-5 text-amber-400/80 mx-auto mb-2" />
+          <p className="text-sm text-zinc-400">Link a Webflow site in Connections to enable publishing.</p>
+        </div>
+      </SectionCard>
     );
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-2">
-            <Globe className="w-4 h-4 text-teal-400" />
-            Webflow CMS Publish Target
-          </h3>
-          <p className="text-[11px] text-zinc-500 mt-0.5">
-            Choose which CMS collection to publish content posts to
-          </p>
-        </div>
-        {publishTarget && (
-          <span className="flex items-center gap-1 text-[11px] text-emerald-400/80 bg-emerald-500/8 border border-emerald-500/20 px-2 py-1 rounded-md">
-            <Check className="w-3 h-3" /> Configured
-          </span>
-        )}
-      </div>
-
-      {/* Collection selector */}
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 space-y-4">
+    <SectionCard
+      title="Webflow CMS Publish Target"
+      titleIcon={<Globe className="w-4 h-4 text-teal-400" />}
+      action={publishTarget ? (
+        <span className="flex items-center gap-1 text-[11px] text-emerald-400/80 bg-emerald-500/8 border border-emerald-500/20 px-2 py-1 rounded-md">
+          <Check className="w-3 h-3" /> Configured
+        </span>
+      ) : undefined}
+    >
+      <div className="space-y-4">
+        <p className="text-[11px] text-zinc-500">Choose which CMS collection to publish content posts to</p>
         <div>
           <label className="block text-[11px] font-medium text-zinc-400 mb-1.5">CMS Collection</label>
           {loading ? (
@@ -264,6 +258,6 @@ export function PublishSettings({ workspaceId: _workspaceId, webflowSiteId, publ
           </div>
         )}
       </div>
-    </div>
+    </SectionCard>
   );
 }
