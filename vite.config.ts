@@ -1,6 +1,30 @@
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { readFileSync, writeFileSync, mkdirSync } from 'fs'
+import { resolve, dirname } from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+
+/** Copies src/tokens.css → public/tokens.css so the styleguide can
+ *  reference it at /tokens.css in both dev and prod. */
+function copyTokensPlugin(): Plugin {
+  return {
+    name: 'copy-tokens',
+    buildStart() {
+      const src = resolve(__dirname, 'src/tokens.css')
+      const dest = resolve(__dirname, 'public/tokens.css')
+      try {
+        const content = readFileSync(src, 'utf-8')
+        mkdirSync(dirname(dest), { recursive: true })
+        writeFileSync(dest, content, 'utf-8')
+      } catch (e) {
+        this.error(`copy-tokens: failed to copy tokens.css — ${e}`)
+      }
+    },
+  }
+}
 
 // Dynamically load @sentry/vite-plugin only when SENTRY_AUTH_TOKEN is set
 // and the package is installed. This avoids build failures when the package
@@ -38,6 +62,7 @@ export default defineConfig(async () => ({
     },
   },
   plugins: [
+    copyTokensPlugin(),
     react(),
     tailwindcss(),
     ...(await getSentryPlugin()),

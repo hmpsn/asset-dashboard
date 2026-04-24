@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **80** — 43 error, 37 warn.
+Total rules: **81** — 43 error, 38 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -103,6 +103,7 @@ advisory but tracked.
 | 35 | Page component missing PageHeader | warn | custom | `` | — | Enforces consistent page-level header structure across all navigable views. |
 | 36 | Hardcoded card radius outside ui primitives | warn | pattern | `*.tsx` | — | Prevents hardcoded Tailwind radius classes that bypass the --radius-* token system. |
 | 37 | Non-standard transition duration | warn | custom | `*.tsx, *.css` | — | Enforces the three-speed motion system: 120ms (micro), 180ms (standard), 400ms (entrance). |
+| 38 | styleguide-token-parity | warn | custom | `*.css` | — | src/tokens.css is the single canonical token source. public/styleguide.css must import from /tokens.css — not redeclare — so styleguide and app always use identical values. |
 
 ---
 

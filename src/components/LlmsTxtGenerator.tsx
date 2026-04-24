@@ -21,8 +21,8 @@ function formatFreshness(ts: string | null | undefined): { label: string; color:
   if (!ts) return { label: 'Never generated', color: 'text-zinc-500' };
   const ageMs = Date.now() - new Date(ts).getTime();
   const hours = ageMs / (1000 * 60 * 60);
-  if (hours < 1) return { label: 'Generated just now', color: 'text-green-400' };
-  if (hours < 24) return { label: `Generated ${Math.round(hours)}h ago`, color: 'text-green-400' };
+  if (hours < 1) return { label: 'Generated just now', color: 'text-emerald-400' };
+  if (hours < 24) return { label: `Generated ${Math.round(hours)}h ago`, color: 'text-emerald-400' };
   if (hours < 72) return { label: `Generated ${Math.round(hours / 24)}d ago`, color: 'text-amber-400' };
   return { label: `Generated ${Math.round(hours / 24)}d ago — consider regenerating`, color: 'text-amber-400' };
 }
@@ -139,7 +139,7 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
                   onClick={handleCopy}
                   className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors"
                 >
-                  {copied ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
+                  {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                   {copied ? 'Copied!' : 'Copy'}
                 </button>
                 <button

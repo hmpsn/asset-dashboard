@@ -487,8 +487,8 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
       {/* Content Pricing */}
       <SectionCard noPadding>
         <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
-          <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
-            <DollarSign className="w-4 h-4 text-green-400" />
+          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+            <DollarSign className="w-4 h-4 text-emerald-400" />
           </div>
           <div className="flex-1">
             <h3 className="text-sm font-semibold text-zinc-200">Content Pricing</h3>

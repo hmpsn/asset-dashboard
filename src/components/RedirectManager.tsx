@@ -327,7 +327,7 @@ export function RedirectManager({ siteId }: Props) {
             {acceptedRules.length > 0 && (
               <div className="flex items-center gap-2">
                 <button onClick={copyRulesToClipboard} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-[11px] font-medium transition-colors">
-                  {copiedRules ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
+                  {copiedRules ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                   {copiedRules ? 'Copied!' : 'Copy All'}
                 </button>
                 <button onClick={exportCSV} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-[11px] font-medium transition-colors">
@@ -356,16 +356,16 @@ export function RedirectManager({ siteId }: Props) {
                       <button onClick={() => { setEditingRule(null); setEditDraft(''); }} className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 rounded text-[11px] text-zinc-400 transition-colors">Cancel</button>
                     </div>
                   ) : (
-                    <span className={`text-xs font-mono ${rule.accepted ? 'text-green-400' : 'text-teal-400'}`}>{rule.to}</span>
+                    <span className={`text-xs font-mono ${rule.accepted ? 'text-emerald-400' : 'text-teal-400'}`}>{rule.to}</span>
                   )}
                   {rule.accepted && !editingRule && (
-                    <Check className="w-3 h-3 text-green-400 flex-shrink-0" />
+                    <Check className="w-3 h-3 text-emerald-400 flex-shrink-0" />
                   )}
                 </div>
                 <div className="text-[11px] text-zinc-500 mb-2">{rule.reason}</div>
                 {!rule.accepted && editingRule !== rule.from && (
                   <div className="flex items-center gap-1.5">
-                    <button onClick={() => acceptRule(rule.from)} className="flex items-center gap-1 px-2.5 py-1 bg-green-600/80 hover:bg-green-500 rounded text-[11px] font-medium text-white transition-colors">
+                    <button onClick={() => acceptRule(rule.from)} className="flex items-center gap-1 px-2.5 py-1 bg-emerald-600/80 hover:bg-emerald-500 rounded text-[11px] font-medium text-white transition-colors">
                       <Check className="w-3 h-3" /> Accept
                     </button>
                     <button onClick={() => { setEditingRule(rule.from); setEditDraft(rule.to); }} className="flex items-center gap-1 px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-[11px] font-medium text-zinc-300 transition-colors">
@@ -469,7 +469,7 @@ export function RedirectManager({ siteId }: Props) {
                         <Sparkles className="w-3 h-3 text-teal-400 flex-shrink-0" />
                         <span className="text-teal-400">Suggested redirect:</span>
                         <span className="text-zinc-300 font-mono">{rule.to}</span>
-                        {rule.accepted && <Check className="w-3 h-3 text-green-400" />}
+                        {rule.accepted && <Check className="w-3 h-3 text-emerald-400" />}
                       </div>
                     </div>
                   )}

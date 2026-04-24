@@ -21,7 +21,7 @@ interface ContentGap {
   opportunityScore?: number;
 }
 
-const kdColor = (kd?: number) => !kd ? 'text-zinc-500' : kd <= 30 ? 'text-green-400' : kd <= 60 ? 'text-amber-400' : kd <= 80 ? 'text-orange-400' : 'text-red-400';
+const kdColor = (kd?: number) => !kd ? 'text-zinc-500' : kd <= 30 ? 'text-emerald-400' : kd <= 60 ? 'text-amber-400' : kd <= 80 ? 'text-orange-400' : 'text-red-400';
 const fmtNum = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString();
 
 
@@ -120,7 +120,7 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
               {/* Trend + SERP + Competitor badges */}
               <div className="flex items-center gap-2 flex-wrap mt-1">
                 {gap.trendDirection === 'rising' && (
-                  <span className="flex items-center gap-0.5 text-[10px] text-green-400 font-medium"><TrendingUp className="w-3 h-3" />Rising</span>
+                  <span className="flex items-center gap-0.5 text-[10px] text-emerald-400 font-medium"><TrendingUp className="w-3 h-3" />Rising</span>
                 )}
                 {gap.trendDirection === 'declining' && (
                   <span className="flex items-center gap-0.5 text-[10px] text-red-400 font-medium"><TrendingDown className="w-3 h-3" />Declining</span>

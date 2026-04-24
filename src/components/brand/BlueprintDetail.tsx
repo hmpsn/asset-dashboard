@@ -77,7 +77,8 @@ function EntryCardCopyBadge({ workspaceId, entryId }: { workspaceId: string; ent
 
   // Map shared color names to inline badge classes
   const colorClass: Record<string, string> = {
-    green: 'bg-emerald-900/40 text-emerald-400',
+    green: 'bg-emerald-900/40 text-emerald-400',   // legacy alias
+    emerald: 'bg-emerald-900/40 text-emerald-400',
     teal: 'bg-teal-900/40 text-teal-400',
     blue: 'bg-blue-900/40 text-blue-400',
     orange: 'bg-amber-900/40 text-amber-400',

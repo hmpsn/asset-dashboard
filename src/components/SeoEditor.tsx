@@ -849,7 +849,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
           onClick={handlePublish}
           disabled={publishing}
           className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-            published ? 'bg-green-600 text-white' : 'bg-white text-black hover:bg-zinc-200'
+            published ? 'bg-emerald-600 text-white' : 'bg-white text-black hover:bg-zinc-200'
           }`}
         >
           {publishing ? <Loader2 className="w-3 h-3 animate-spin" /> : published ? <Check className="w-3 h-3" /> : <Upload className="w-3 h-3" />}

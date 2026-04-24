@@ -13,13 +13,13 @@ import type { OutcomeWinEntry, DeltaSummary, DeltaDirection } from '../../../sha
 // --- Helpers -----------------------------------------------------------
 
 function deltaDirectionIcon(direction: DeltaDirection) {
-  if (direction === 'improved') return <TrendingUp className="w-4 h-4 text-green-400 flex-shrink-0" />;
+  if (direction === 'improved') return <TrendingUp className="w-4 h-4 text-emerald-400 flex-shrink-0" />;
   if (direction === 'declined') return <TrendingDown className="w-4 h-4 text-red-400 flex-shrink-0" />;
   return <Minus className="w-4 h-4 text-zinc-400 flex-shrink-0" />;
 }
 
 function deltaColor(direction: DeltaDirection): string {
-  if (direction === 'improved') return 'text-green-400';
+  if (direction === 'improved') return 'text-emerald-400';
   if (direction === 'declined') return 'text-red-400';
   return 'text-zinc-400';
 }
@@ -56,7 +56,7 @@ function WinCard({ entry }: { entry: OutcomeWinEntry }) {
       : 'your site';
 
   return (
-    <div className="border border-green-500/20 bg-green-500/5 rounded-xl p-4 space-y-3">
+    <div className="border border-emerald-500/20 bg-emerald-500/5 rounded-xl p-4 space-y-3">
       {/* Header */}
       <div className="flex items-start gap-2">
         <Lightbulb className="w-4 h-4 text-teal-400 flex-shrink-0 mt-0.5" />

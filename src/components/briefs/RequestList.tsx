@@ -129,10 +129,10 @@ export function RequestList({
             requested: { icon: Clock, color: 'text-amber-400', label: 'Awaiting Review' },
             brief_generated: { icon: FileText, color: 'text-blue-400', label: 'Brief Ready' },
             client_review: { icon: Clock, color: 'text-cyan-400', label: 'Client Review' },
-            approved: { icon: CheckCircle2, color: 'text-green-400', label: 'Approved' },
+            approved: { icon: CheckCircle2, color: 'text-emerald-400', label: 'Approved' },
             changes_requested: { icon: Clock, color: 'text-orange-400', label: 'Changes Requested' },
             in_progress: { icon: Zap, color: 'text-teal-400', label: 'In Progress' },
-            delivered: { icon: CheckCircle2, color: 'text-green-400', label: 'Delivered' },
+            delivered: { icon: CheckCircle2, color: 'text-emerald-400', label: 'Delivered' },
             published: { icon: CheckCircle2, color: 'text-teal-400', label: 'Published' },
             declined: { icon: XCircle, color: 'text-zinc-500', label: 'Declined' },
           };
@@ -150,7 +150,7 @@ export function RequestList({
                       <span className="text-xs font-medium text-zinc-200">{req.topic}</span>
                       {req.source === 'client' && <span className="text-[11px] px-1 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20">Client</span>}
                       <span className={`text-[11px] px-1 py-0.5 rounded border ${(req.serviceType || 'brief_only') === 'full_post' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>{(req.serviceType || 'brief_only') === 'full_post' ? 'Full Post' : 'Brief Only'}</span>
-                      {req.upgradedAt && <span className="text-[11px] px-1 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">Upgraded</span>}
+                      {req.upgradedAt && <span className="text-[11px] px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Upgraded</span>}
                     </div>
                     <div className="text-[11px] text-teal-400 mt-0.5">"{req.targetKeyword}"</div>
                     <div className="flex items-center gap-3 mt-1">
@@ -189,19 +189,19 @@ export function RequestList({
                         <button onClick={() => onUpdateRequestStatus(req.id, 'client_review')} className="px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 text-[11px] text-cyan-300 hover:bg-cyan-600/30 transition-colors">Resubmit to Client</button>
                       )}
                       {req.status === 'in_progress' && deliveringReqId !== req.id && (
-                        <button onClick={() => { onSetDeliveringReqId(req.id); onSetDeliveryUrl(req.deliveryUrl || ''); onSetDeliveryNotes(req.deliveryNotes || ''); }} className="px-2 py-1 rounded bg-green-600/20 border border-green-500/30 text-[11px] text-green-300 hover:bg-green-600/30 transition-colors flex items-center gap-1"><Link2 className="w-3 h-3" /> Deliver Content</button>
+                        <button onClick={() => { onSetDeliveringReqId(req.id); onSetDeliveryUrl(req.deliveryUrl || ''); onSetDeliveryNotes(req.deliveryNotes || ''); }} className="px-2 py-1 rounded bg-emerald-600/20 border border-emerald-500/30 text-[11px] text-emerald-300 hover:bg-emerald-600/30 transition-colors flex items-center gap-1"><Link2 className="w-3 h-3" /> Deliver Content</button>
                       )}
                     </div>
                   </div>
                 </div>
                 {/* Delivery form */}
                 {req.status === 'in_progress' && deliveringReqId === req.id && (
-                  <div className="mt-2 bg-green-500/5 border border-green-500/20 rounded-lg p-3 space-y-2">
-                    <div className="flex items-center gap-1.5 mb-1"><Link2 className="w-3.5 h-3.5 text-green-400" /><span className="text-[11px] text-green-400 font-medium uppercase tracking-wider">Attach Deliverable</span></div>
-                    <input type="url" value={deliveryUrl} onChange={e => onSetDeliveryUrl(e.target.value)} placeholder="Google Doc link, Dropbox URL, or any content URL..." className="w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 focus:border-green-500/50 focus:outline-none" />
-                    <textarea value={deliveryNotes} onChange={e => onSetDeliveryNotes(e.target.value)} placeholder="Delivery notes (optional) — e.g. revision notes, word count, etc." className="w-full px-3 py-1.5 bg-zinc-950 border border-zinc-700 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 focus:border-green-500/50 focus:outline-none resize-y" rows={2} />
+                  <div className="mt-2 bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-3 space-y-2">
+                    <div className="flex items-center gap-1.5 mb-1"><Link2 className="w-3.5 h-3.5 text-emerald-400" /><span className="text-[11px] text-emerald-400 font-medium uppercase tracking-wider">Attach Deliverable</span></div>
+                    <input type="url" value={deliveryUrl} onChange={e => onSetDeliveryUrl(e.target.value)} placeholder="Google Doc link, Dropbox URL, or any content URL..." className="w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 focus:border-emerald-500/50 focus:outline-none" />
+                    <textarea value={deliveryNotes} onChange={e => onSetDeliveryNotes(e.target.value)} placeholder="Delivery notes (optional) — e.g. revision notes, word count, etc." className="w-full px-3 py-1.5 bg-zinc-950 border border-zinc-700 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 focus:border-emerald-500/50 focus:outline-none resize-y" rows={2} />
                     <div className="flex items-center gap-2">
-                      <button onClick={async () => { await onUpdateRequestStatus(req.id, 'delivered', { deliveryUrl: deliveryUrl.trim() || undefined, deliveryNotes: deliveryNotes.trim() || undefined }); onSetDeliveringReqId(null); onSetDeliveryUrl(''); onSetDeliveryNotes(''); }} className="px-3 py-1.5 rounded-lg bg-green-600/20 border border-green-500/30 text-[11px] font-medium text-green-300 hover:bg-green-600/30 transition-colors flex items-center gap-1"><Check className="w-3 h-3" /> Mark Delivered</button>
+                      <button onClick={async () => { await onUpdateRequestStatus(req.id, 'delivered', { deliveryUrl: deliveryUrl.trim() || undefined, deliveryNotes: deliveryNotes.trim() || undefined }); onSetDeliveringReqId(null); onSetDeliveryUrl(''); onSetDeliveryNotes(''); }} className="px-3 py-1.5 rounded-lg bg-emerald-600/20 border border-emerald-500/30 text-[11px] font-medium text-emerald-300 hover:bg-emerald-600/30 transition-colors flex items-center gap-1"><Check className="w-3 h-3" /> Mark Delivered</button>
                       <button onClick={() => { onSetDeliveringReqId(null); onSetDeliveryUrl(''); onSetDeliveryNotes(''); }} className="px-3 py-1.5 rounded-lg text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors">Cancel</button>
                     </div>
                   </div>
@@ -215,10 +215,10 @@ export function RequestList({
                 )}
                 {/* Show delivery info */}
                 {(req.status === 'delivered' || req.status === 'published') && req.deliveryUrl && (
-                  <div className="mt-2 bg-green-500/5 border border-green-500/20 rounded-lg px-3 py-2">
+                  <div className="mt-2 bg-emerald-500/5 border border-emerald-500/20 rounded-lg px-3 py-2">
                     <div className="flex items-center gap-2">
-                      <ExternalLink className="w-3 h-3 text-green-400 flex-shrink-0" />
-                      <a href={req.deliveryUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] text-green-400 hover:text-green-300 underline underline-offset-2 truncate">{req.deliveryUrl}</a>
+                      <ExternalLink className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+                      <a href={req.deliveryUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] text-emerald-400 hover:text-emerald-300 underline underline-offset-2 truncate">{req.deliveryUrl}</a>
                     </div>
                     {req.deliveryNotes && <div className="text-[11px] text-zinc-400 mt-1">{req.deliveryNotes}</div>}
                   </div>
@@ -302,7 +302,7 @@ export function RequestList({
                     {inlineBrief.difficultyScore != null && (
                       <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
                         <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-0.5">Difficulty</div>
-                        <div className={`text-sm font-bold ${inlineBrief.difficultyScore <= 30 ? 'text-green-400' : inlineBrief.difficultyScore <= 60 ? 'text-amber-400' : 'text-red-400'}`}>{inlineBrief.difficultyScore}/100</div>
+                        <div className={`text-sm font-bold ${inlineBrief.difficultyScore <= 30 ? 'text-emerald-400' : inlineBrief.difficultyScore <= 60 ? 'text-amber-400' : 'text-red-400'}`}>{inlineBrief.difficultyScore}/100</div>
                       </div>
                     )}
                   </div>
@@ -310,7 +310,7 @@ export function RequestList({
                   {/* Traffic Potential */}
                   {inlineBrief.trafficPotential && (
                     <div className="flex items-start gap-2 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
-                      <TrendingUp className="w-3.5 h-3.5 text-green-400 mt-0.5 flex-shrink-0" />
+                      <TrendingUp className="w-3.5 h-3.5 text-emerald-400 mt-0.5 flex-shrink-0" />
                       <div><div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-0.5">Traffic Potential</div><div className="text-xs text-zinc-300">{inlineBrief.trafficPotential}</div></div>
                     </div>
                   )}
@@ -380,7 +380,7 @@ export function RequestList({
                           <div><span className="text-[11px] text-zinc-500 block mb-1">Common Elements:</span><div className="flex flex-wrap gap-1">{inlineBrief.serpAnalysis.commonElements.map((el, i) => <span key={i} className="text-[11px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400">{el}</span>)}</div></div>
                         )}
                         {inlineBrief.serpAnalysis.gaps.length > 0 && (
-                          <div><span className="text-[11px] text-green-400/80 block mb-1">Opportunities (gaps in existing content):</span><div className="space-y-1">{inlineBrief.serpAnalysis.gaps.map((g, i) => <div key={i} className="text-[11px] text-green-300/80 flex items-start gap-1.5"><span className="text-green-400 mt-0.5">→</span>{g}</div>)}</div></div>
+                          <div><span className="text-[11px] text-emerald-400/80 block mb-1">Opportunities (gaps in existing content):</span><div className="space-y-1">{inlineBrief.serpAnalysis.gaps.map((g, i) => <div key={i} className="text-[11px] text-emerald-300/80 flex items-start gap-1.5"><span className="text-emerald-400 mt-0.5">→</span>{g}</div>)}</div></div>
                         )}
                       </div>
                     </div>

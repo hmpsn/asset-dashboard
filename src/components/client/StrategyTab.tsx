@@ -42,12 +42,12 @@ interface StrategyTabProps {
   onContentRequested?: () => void;
 }
 
-const kdColor = (kd?: number) => !kd ? 'text-zinc-500' : kd <= 30 ? 'text-green-400' : kd <= 60 ? 'text-amber-400' : kd <= 80 ? 'text-orange-400' : 'text-red-400';
+const kdColor = (kd?: number) => !kd ? 'text-zinc-500' : kd <= 30 ? 'text-emerald-400' : kd <= 60 ? 'text-amber-400' : kd <= 80 ? 'text-orange-400' : 'text-red-400';
 const fmtNum = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString();
 const intentColor = (intent?: string) => {
   switch (intent) {
     case 'commercial': return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
-    case 'informational': return 'text-green-400 bg-green-500/10 border-green-500/20';
+    case 'informational': return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
     case 'transactional': return 'text-amber-400 bg-amber-500/10 border-amber-500/20';
     case 'navigational': return 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20';
     default: return 'text-zinc-400 bg-zinc-500/10 border-zinc-500/20';
@@ -654,7 +654,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                       {hasTrendOrSerp && (
                         <div className="flex items-center gap-2 flex-wrap mb-1.5">
                           {gap.trendDirection === 'rising' && (
-                            <span className="flex items-center gap-0.5 text-[10px] text-green-400 font-medium"><TrendingUp className="w-3 h-3" />Rising</span>
+                            <span className="flex items-center gap-0.5 text-[10px] text-emerald-400 font-medium"><TrendingUp className="w-3 h-3" />Rising</span>
                           )}
                           {gap.trendDirection === 'declining' && (
                             <span className="flex items-center gap-0.5 text-[10px] text-red-400 font-medium"><TrendingDown className="w-3 h-3" />Declining</span>
@@ -727,7 +727,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                           (() => {
                             const s = matchingReq?.status;
                             if (s === 'published') return (
-                              <span className="flex items-center gap-1 text-[11px] text-green-400 bg-green-500/10 px-2.5 py-1.5 rounded-lg border border-green-500/20 flex-shrink-0">
+                              <span className="flex items-center gap-1 text-[11px] text-emerald-400 bg-emerald-500/10 px-2.5 py-1.5 rounded-lg border border-emerald-500/20 flex-shrink-0">
                                 <CheckCircle2 className="w-3.5 h-3.5" /> Published
                               </span>
                             );
@@ -896,7 +896,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   </div>
                   <div className="space-y-2">
                     {strategyData.quickWins.slice(0, expandedSections.has('quick-wins-all') ? undefined : 3).map((qw, i) => {
-                      const impactColor = qw.estimatedImpact === 'high' ? 'text-green-400 bg-green-500/15 border-green-500/30' : qw.estimatedImpact === 'medium' ? 'text-amber-400 bg-amber-500/15 border-amber-500/30' : 'text-zinc-400 bg-zinc-700/30 border-zinc-600/20';
+                      const impactColor = qw.estimatedImpact === 'high' ? 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30' : qw.estimatedImpact === 'medium' ? 'text-amber-400 bg-amber-500/15 border-amber-500/30' : 'text-zinc-400 bg-zinc-700/30 border-zinc-600/20';
                       return (
                         <div key={i} className="px-3 py-2.5 rounded-lg bg-zinc-950/50 border border-zinc-800/80">
                           <div className="flex items-center justify-between">

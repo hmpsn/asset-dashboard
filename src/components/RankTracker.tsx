@@ -389,13 +389,13 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
                     <span className="text-xs text-zinc-200 truncate">{rank.query}</span>
                   </div>
                   <div className="text-right">
-                    <span className={`text-sm font-bold ${rank.position <= 3 ? 'text-green-400' : rank.position <= 10 ? 'text-teal-400' : rank.position <= 20 ? 'text-amber-400' : 'text-zinc-400'}`}>
+                    <span className={`text-sm font-bold ${rank.position <= 3 ? 'text-emerald-400' : rank.position <= 10 ? 'text-teal-400' : rank.position <= 20 ? 'text-amber-400' : 'text-zinc-400'}`}>
                       {Math.round(rank.position * 10) / 10}
                     </span>
                   </div>
                   <div className="text-right">
                     {rank.change != null ? (
-                      <span className={`flex items-center justify-end gap-0.5 text-xs font-medium ${rank.change < 0 ? 'text-green-400' : rank.change > 0 ? 'text-red-400' : 'text-zinc-500'}`}>
+                      <span className={`flex items-center justify-end gap-0.5 text-xs font-medium ${rank.change < 0 ? 'text-emerald-400' : rank.change > 0 ? 'text-red-400' : 'text-zinc-500'}`}>
                         {rank.change < 0 ? <ArrowUp className="w-3 h-3" /> : rank.change > 0 ? <ArrowDown className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
                         {rank.change !== 0 ? Math.abs(Math.round(rank.change * 10) / 10) : '—'}
                       </span>

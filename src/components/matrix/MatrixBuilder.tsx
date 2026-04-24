@@ -324,7 +324,7 @@ export function MatrixBuilder({ workspaceId, templates, onComplete, onCancel }: 
       )}
 
       {step === 4 && (
-        <SectionCard title="Confirm" titleIcon={<Check className="w-4 h-4 text-green-400" />}>
+        <SectionCard title="Confirm" titleIcon={<Check className="w-4 h-4 text-emerald-400" />}>
           <div className="space-y-4">
             <div>
               <label className="text-[11px] text-zinc-500 font-medium">Matrix Name</label>

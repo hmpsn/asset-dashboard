@@ -3949,6 +3949,46 @@ export const CHECKS: Check[] = [
       return violations;
     },
   },
+
+  // ─── Phase 5 — Token authority ───────────────────────────────────────────────
+  {
+    name: 'styleguide-token-parity',
+    severity: 'warn', // promoted to error in Phase 3 after Phase 2 clears the backlog
+    fileGlobs: ['*.css'],
+    message:
+      'public/styleguide.css must only @import url(\'/tokens.css\'); redeclaring tokens creates drift. ' +
+      'Run `npx tsx scripts/verify-styleguide-parity.ts` for details.',
+    rationale:
+      'src/tokens.css is the single canonical token source. public/styleguide.css must import ' +
+      'from /tokens.css — not redeclare — so styleguide and app always use identical values.',
+    claudeMdRef: 'Design System — Token source of truth',
+    // customCheck because this requires cross-file parsing (tokens.css vs styleguide.css)
+    // rather than per-file pattern matching.
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+
+      // Only check files in the provided list that look like public/styleguide.css
+      const pathsToCheck = files.filter(f => f.endsWith('public/styleguide.css') || f.endsWith('public' + path.sep + 'styleguide.css'));
+
+      for (const styleguidePath of pathsToCheck) {
+        try {
+          const css = readFileSync(styleguidePath, 'utf-8');
+          const matches = [...css.matchAll(/^\s*(--[\w-]+)\s*:/gm)];
+          for (const m of matches) {
+            const lineNum = (css.slice(0, m.index ?? 0).match(/\n/g) ?? []).length + 1;
+            hits.push({
+              file: styleguidePath,
+              line: lineNum,
+              text: `re-declared token ${m[1]} in public/styleguide.css (must come via @import url('/tokens.css'))`,
+            });
+          }
+        } catch {
+          // File doesn't exist — skip (not an error in Phase 0 before styleguide is created)
+        }
+      }
+      return hits;
+    },
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
@@ -3981,7 +4021,7 @@ function checkFile(file: string, check: Check): string[] {
 }
 
 // Directories that should never be scanned (vendor code, test fixtures, build output)
-const EXCLUDED_DIRS = ['node_modules', 'dist', '.git', '.claude', 'scripts', 'tests'];
+const EXCLUDED_DIRS = ['node_modules', 'dist', '.git', '.claude', '.worktrees', 'scripts', 'tests'];
 // Root-level files to skip (--exclude-dir doesn't work on files)
 const EXCLUDED_FILES = ['test-branding.ts'];
 

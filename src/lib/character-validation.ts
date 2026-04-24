@@ -3,7 +3,7 @@ export interface CharacterValidation {
   count: number;
   percentage: number;
   truncated: string;
-  colorClass: 'green' | 'amber' | 'red';
+  colorClass: 'emerald' | 'amber' | 'red';
   isNearLimit: boolean;
   isOverLimit: boolean;
 }
@@ -12,7 +12,7 @@ export function validateCharacterCount(text: string, max: number): CharacterVali
   const count = text.length;
   const percentage = (count / max) * 100;
   
-  let colorClass: 'green' | 'amber' | 'red' = 'green';
+  let colorClass: 'emerald' | 'amber' | 'red' = 'emerald';
   if (percentage >= 95) {
     colorClass = 'red';
   } else if (percentage >= 80) {

@@ -30,12 +30,12 @@ const ROLE_COLORS: Partial<Record<SchemaPageRole, string>> = {
   blog: 'bg-purple-500/15 text-purple-300 border-purple-500/30',
   about: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30',
   contact: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30',
-  location: 'bg-green-500/15 text-green-300 border-green-500/30',
+  location: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
   product: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
   partnership: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
   faq: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
-  'case-study': 'bg-pink-500/15 text-pink-300 border-pink-500/30',
-  comparison: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+  'case-study': 'bg-blue-500/15 text-blue-300 border-blue-500/30',
+  comparison: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
   generic: 'bg-zinc-500/10 text-zinc-400 border-zinc-600/30',
 };
 const DEFAULT_ROLE_COLOR = 'bg-zinc-500/10 text-zinc-400 border-zinc-600/30';
@@ -144,7 +144,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
     const map: Record<string, { label: string; cls: string }> = {
       draft: { label: 'Draft', cls: 'bg-zinc-500/15 text-zinc-400 border-zinc-500/30' },
       sent_to_client: { label: 'Sent to Client', cls: 'bg-blue-500/15 text-blue-300 border-blue-500/30' },
-      client_approved: { label: 'Client Approved', cls: 'bg-green-500/15 text-green-300 border-green-500/30' },
+      client_approved: { label: 'Client Approved', cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
       client_changes_requested: { label: 'Changes Requested', cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
       active: { label: 'Active', cls: 'bg-teal-500/15 text-teal-300 border-teal-500/30' },
     };

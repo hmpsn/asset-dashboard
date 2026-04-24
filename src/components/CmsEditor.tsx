@@ -490,7 +490,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
               onClick={sendForApproval}
               disabled={sendingApproval || approvalSelected.size === 0}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                approvalSent ? 'bg-green-600 text-white' : 'bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white'
+                approvalSent ? 'bg-emerald-600 text-white' : 'bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white'
               }`}
             >
               {sendingApproval ? <Loader2 className="w-3 h-3 animate-spin" /> : approvalSent ? <Check className="w-3 h-3" /> : <Send className="w-3 h-3" />}
@@ -531,7 +531,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
         <div className="flex items-center gap-3 text-[11px] text-zinc-500">
           <span className="text-zinc-400 font-medium">{summary.total} tracked</span>
           {summary.live > 0 && <><StatusBadge status="live" /><span className="text-teal-400">{summary.live}</span></>}
-          {summary.inReview > 0 && <><StatusBadge status="in-review" /><span className="text-purple-400">{summary.inReview}</span></>}
+          {summary.inReview > 0 && <><StatusBadge status="in-review" /><span className="text-blue-400">{summary.inReview}</span></>}
           {summary.approved > 0 && <><StatusBadge status="approved" /><span className="text-emerald-400/80">{summary.approved}</span></>}
           {summary.rejected > 0 && <><StatusBadge status="rejected" /><span className="text-red-400/80">{summary.rejected}</span></>}
           {summary.issueDetected > 0 && <><StatusBadge status="issue-detected" /><span className="text-amber-400/80">{summary.issueDetected}</span></>}
