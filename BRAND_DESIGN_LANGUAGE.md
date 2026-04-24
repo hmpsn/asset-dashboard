@@ -119,6 +119,12 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **WorkflowStepper** | `ui/WorkflowStepper.tsx` | Current: `bg-teal-500/10 border-teal-500 text-teal-400`; Completed: `bg-green-500/10 border-green-500/40 text-green-400`; Future: `bg-zinc-800/50 border-zinc-700 text-zinc-500` | Horizontal step indicator. Green = success/done state. Teal = active step. |
 | **WorkspaceHealthBar** | `ui/WorkspaceHealthBar.tsx` | Progress bars: `bg-blue-500` (data/read-only); recommendation arrows: `text-teal-500` hover `text-teal-400` (action) | Wraps SectionCard. Blue = data metrics. Teal = actionable next steps. |
 
+| **Row** | `layout/Row.tsx` | No color — structural only | `flex flex-row`. Props: `gap` (xs–xl), `align` (start/center/end/baseline, default: center), `justify` (start/center/end/between/around), `wrap` (bool). `forwardRef`. |
+| **Stack** | `layout/Stack.tsx` | No color — structural only | `flex flex-col` (or `flex-row` with `dir="row"`). Props: `gap`, `align` (start/center/end/stretch), `dir`. `forwardRef`. |
+| **Column** | `layout/Column.tsx` | No color — structural only | Strict `flex flex-col` — never `flex-row`. Convenience alias for vertical stacks. Props: `gap`, `align`, `className`. `forwardRef`. |
+| **Grid** | `layout/Grid.tsx` | No color — structural only | Responsive CSS grid. Props: `cols` (`{ sm?, md?, lg?, xl? }` with values 1–12), `gap`. Uses static `Record<number, string>` maps per breakpoint so Tailwind's scanner can detect all class strings. `forwardRef`. |
+| **Divider** | `layout/Divider.tsx` | `border-[var(--brand-border)]` | Thin rule. `orientation="horizontal"` (default, `border-b w-full`) or `"vertical"` (`border-r h-full`). Role=separator + aria-orientation. `forwardRef`. |
+
 ### Helper Functions (`constants.ts`)
 
 | Function | Returns | Usage |

@@ -231,6 +231,35 @@ describe('Grid', () => {
     render(<Grid cols={{ md: 3 }} ref={ref} />);
     expect(ref.current).toBeInstanceOf(HTMLDivElement);
   });
+
+  // Static map verification — ensures class strings are literal (Tailwind-scannable)
+  // rather than dynamically interpolated (which Tailwind v4 would purge in production).
+  it('produces literal md:grid-cols-7 string for Tailwind scanner', () => {
+    const { container } = render(<Grid cols={{ md: 7 }} />);
+    const cls = container.firstElementChild?.className ?? '';
+    expect(cls).toContain('md:grid-cols-7');
+  });
+
+  it('produces literal xl:grid-cols-5 string for Tailwind scanner', () => {
+    const { container } = render(<Grid cols={{ xl: 5 }} />);
+    const cls = container.firstElementChild?.className ?? '';
+    expect(cls).toContain('xl:grid-cols-5');
+  });
+
+  it('produces literal sm:grid-cols-6 and lg:grid-cols-12 for Tailwind scanner', () => {
+    const { container } = render(<Grid cols={{ sm: 6, lg: 12 }} />);
+    const cls = container.firstElementChild?.className ?? '';
+    expect(cls).toContain('sm:grid-cols-6');
+    expect(cls).toContain('lg:grid-cols-12');
+  });
+
+  it('produces literal base grid-cols-N from first defined breakpoint', () => {
+    const { container } = render(<Grid cols={{ md: 3 }} />);
+    const cls = container.firstElementChild?.className ?? '';
+    // Base (unscoped) class emitted for viewports below the first breakpoint
+    expect(cls).toContain('grid-cols-3');
+    expect(cls).toContain('md:grid-cols-3');
+  });
 });
 
 // ─── Divider ──────────────────────────────────────────────────────────────────
