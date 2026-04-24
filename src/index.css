@@ -10,13 +10,29 @@
 @font-face { font-family: 'DIN Pro'; src: url('/fonts/D-DIN-PRO-900-Heavy.otf') format('opentype'); font-weight: 900; font-style: normal; font-display: swap; }
 
 :root {
-  --brand-bg: #0f1219;
-  --brand-bg-surface: #18181b;
-  --brand-bg-elevated: #18181b;
-  --brand-bg-card: #27272a;
+  /* ─── 3-tier surface system (canonical — use in new code) ─── */
+  --surface-1: #0f1219;       /* page background / absolute base */
+  --surface-2: #18181b;       /* primary card surfaces (bg-zinc-900 equivalent) */
+  --surface-3: #27272a;       /* elevated: inputs, active tabs, hover (bg-zinc-800 equivalent) */
+
+  /* ─── Radius scale ─── */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;          /* cards, panels — use rounded-[var(--radius-lg)] in new code */
+  --radius-xl: 16px;          /* modals, large overlays */
+
+  /* ─── Legacy background aliases (do not use in new code) ─── */
+  --brand-bg: var(--surface-1);
+  --brand-bg-surface: var(--surface-2);
+  --brand-bg-elevated: var(--surface-2);
+  --brand-bg-card: var(--surface-3);
+
+  /* ─── Text ─── */
   --brand-text: #a1a1aa;
   --brand-text-bright: #e4e4e7;
   --brand-text-muted: #71717a;
+
+  /* ─── Brand accent ─── */
   --brand-mint: #2dd4bf;
   --brand-mint-hover: #5eead4;
   --brand-mint-dim: rgba(45, 212, 191, 0.1);
@@ -25,7 +41,7 @@
   --brand-yellow-dim: rgba(255, 182, 0, 0.1);
   --brand-border: #27272a;
   --brand-border-hover: #3f3f46;
-  --radius: 10px;
+  --radius: 10px; /* legacy — prefer --radius-* scale */
 }
 
 body {
@@ -275,6 +291,10 @@ body::after {
 
 /* === Base === */
 .dashboard-light {
+  /* ─── Surface tokens (light-mode overrides) ─── */
+  --surface-1: #f8fafc;
+  --surface-2: #ffffff;
+  --surface-3: #f1f5f9;
   /* Backgrounds */
   --brand-bg: #f8fafc;
   --brand-bg-surface: #ffffff;
