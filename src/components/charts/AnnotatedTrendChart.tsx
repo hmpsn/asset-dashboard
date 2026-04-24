@@ -168,6 +168,7 @@ function AnnotationDot({ x, annotation }: { x: number; annotation: Annotation })
       <circle cx={x} cy={12} r={5} fill={color} stroke={chartDotStroke()} strokeWidth={2} style={{ cursor: 'pointer' }} />
       {hovered && (
         <foreignObject x={x - 100} y={20} width={200} height={80}>
+          {/* pr-check-disable-next-line -- chart tooltip inside SVG foreignObject */}
           <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-2 shadow-lg text-center">
             <span className="text-[10px] font-mono text-zinc-500 block">{annotation.date}</span>
             <span
@@ -224,6 +225,7 @@ function CreatePopover({
   };
 
   return (
+    // pr-check-disable-next-line -- absolute-positioned chart annotation tooltip; not a section card
     <div
       ref={popoverRef}
       className="absolute z-50 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl p-3 w-64"

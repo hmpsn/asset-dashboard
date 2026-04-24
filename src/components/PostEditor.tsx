@@ -8,6 +8,7 @@ import {
 import { contentPosts } from '../api/content';
 import { getText } from '../api/client';
 import { useAdminPost, useAdminPostVersions, usePublishTarget } from '../hooks/admin';
+import { SectionCard } from './ui';
 import { SectionEditor } from './post-editor/SectionEditor';
 import { PostPreview } from './post-editor/PostPreview';
 import { VersionHistory } from './post-editor/VersionHistory';
@@ -258,6 +259,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
       {/* Delete Confirmation */}
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          {/* pr-check-disable-next-line -- modal dialog */}
           <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0">
@@ -360,7 +362,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
 
       {/* Progress bar during generation */}
       {isGenerating && (
-        <div className="bg-zinc-900 rounded-xl border border-amber-500/20 p-4">
+        <SectionCard className="!border-amber-500/20">
           <div className="flex items-center gap-2 mb-2">
             <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
             <span className="text-xs font-medium text-amber-300">Generating post... {completedSections}/{totalSections} sections</span>
@@ -369,7 +371,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
           <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
             <div className="h-full bg-amber-400/60 rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
           </div>
-        </div>
+        </SectionCard>
       )}
 
       {/* Review Checklist + Status controls */}
@@ -406,7 +408,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
       ) : (
         <>
           {/* Introduction */}
-          <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+          <SectionCard noPadding variant="subtle">
             <div className="px-4 py-3 border-b border-zinc-800/50 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-3.5 h-3.5 text-teal-400" />
@@ -434,7 +436,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                 <div className="text-xs text-zinc-300 leading-relaxed [&_p]:mb-2 [&_strong]:text-zinc-100 [&_a]:text-teal-400" dangerouslySetInnerHTML={{ __html: post.introduction }} />
               )}
             </div>
-          </div>
+          </SectionCard>
 
           {/* Body Sections */}
           {post.sections.map((section) => (
@@ -455,7 +457,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
           ))}
 
           {/* Conclusion */}
-          <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+          <SectionCard noPadding variant="subtle">
             <div className="px-4 py-3 border-b border-zinc-800/50 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-3.5 h-3.5 text-teal-400" />
@@ -483,12 +485,13 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                 <div className="text-xs text-zinc-300 leading-relaxed [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:text-zinc-100 [&_h2]:mb-2 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:text-zinc-200 [&_p]:mb-2 [&_ul]:pl-4 [&_ul]:mb-2 [&_ol]:pl-4 [&_ol]:mb-2 [&_li]:mb-1 [&_strong]:text-zinc-100 [&_a]:text-teal-400" dangerouslySetInnerHTML={{ __html: post.conclusion }} />
               )}
             </div>
-          </div>
+          </SectionCard>
         </>
       )}
 
       {/* Publish confirmation dialog */}
       {publishConfirm && post && (
+        // pr-check-disable-next-line -- publish confirmation card with teal accent border; not a standard section card
         <div className="bg-zinc-900 rounded-xl border border-teal-500/30 p-4 space-y-3">
           <div className="flex items-center gap-2">
             <Globe className="w-4 h-4 text-teal-400" />
@@ -534,6 +537,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
 
       {/* SEO Metadata */}
       {!showPreview && (
+        // pr-check-disable-next-line -- SEO metadata summary row with reduced opacity; not a section card
         <div className="bg-zinc-900/50 rounded-xl border border-zinc-800/50 px-4 py-3 space-y-3">
           {post.seoTitle && (
             <div>

@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useCmsEditor } from '../hooks/admin';
-import { EmptyState, LoadingState, ErrorState, CharacterCounter, SerpPreview, SocialPreview } from './ui';
+import { EmptyState, LoadingState, ErrorState, CharacterCounter, SerpPreview, SocialPreview, SectionCard } from './ui';
 import { StatusBadge } from './ui/StatusBadge';
 import { statusBorderClass } from './ui/statusConfig';
 import { patch, post } from '../api/client';
@@ -585,7 +585,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
         const missingNames = coll.items.filter(i => !String(i.fieldData['name'] || '').trim()).length;
 
         return (
-          <div key={coll.collectionId} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+          <SectionCard key={coll.collectionId} noPadding className="overflow-hidden">
             {/* Collection header */}
             <button
               onClick={() => toggleCollection(coll.collectionId)}
@@ -958,7 +958,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                 })}
               </div>
             )}
-          </div>
+          </SectionCard>
         );
       })}
 

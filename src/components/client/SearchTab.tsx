@@ -4,7 +4,7 @@ import {
   ArrowUpDown, Activity, ChevronDown, ChevronRight, Sparkles, Table2,
 } from 'lucide-react';
 import { RankTrackingSection } from '../shared/RankTable';
-import { CompactStatBar, EmptyState } from '../ui';
+import { CompactStatBar, EmptyState, SectionCard } from '../ui';
 import { DualTrendChart, InsightCard } from './helpers';
 import { Explainer } from './SeoGlossary';
 import type {
@@ -85,6 +85,7 @@ export function SearchTab({
     </div>
 
     {/* AI-style takeaway */}
+    {/* pr-check-disable-next-line -- AI takeaway summary bar; compact bar with no section header */}
     <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl px-5 py-3.5 flex items-start gap-3">
       <Sparkles className="w-4 h-4 text-teal-400 mt-0.5 shrink-0" />
       <p className="text-xs text-zinc-300 leading-relaxed">{buildTakeaway(overview, searchComparison, insights)}</p>
@@ -102,8 +103,8 @@ export function SearchTab({
     {insights && (
       <div className="space-y-3">
         {/* Search Health Summary */}
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-          <div className="text-sm font-semibold text-zinc-200 mb-3">Search Health Summary</div>
+        <SectionCard title="Search Health Summary">
+
           <div className="grid grid-cols-4 gap-3">
             <div className="text-center">
               <div className={`text-lg font-bold ${insights.page1 > 5 ? 'text-green-400' : 'text-amber-400'}`}>{insights.page1}</div>
@@ -126,7 +127,7 @@ export function SearchTab({
               <div className={`text-[10px] mt-0.5 ${insights.lowHanging.length > 5 ? 'text-amber-400/70' : insights.lowHanging.length > 0 ? 'text-teal-400/70' : 'text-green-400/70'}`}>{insights.lowHanging.length > 5 ? 'Quick wins available' : insights.lowHanging.length > 0 ? 'A few to capture' : 'Fully optimized'}</div>
             </div>
           </div>
-        </div>
+        </SectionCard>
 
         {/* Insight cards — full-width for 1, 2-col for 2+ */}
         {insightCards.length === 1 ? (
@@ -141,13 +142,9 @@ export function SearchTab({
 
     {/* Trend chart */}
     {trend.length > 2 && (
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-medium text-zinc-400">Performance Trend</span>
-          <span className="text-[11px] text-zinc-500">{overview.dateRange.start} — {overview.dateRange.end}</span>
-        </div>
+      <SectionCard title="Performance Trend" action={<span className="text-[11px] text-zinc-500">{overview.dateRange.start} — {overview.dateRange.end}</span>}>
         <DualTrendChart data={trend} annotations={annotations} />
-      </div>
+      </SectionCard>
     )}
 
     {/* Rank Tracking */}
@@ -155,12 +152,7 @@ export function SearchTab({
 
     {/* Annotations (read-only, managed from admin) */}
     {annotations.length > 0 && (
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Activity className="w-4 h-4 text-zinc-400" />
-          <span className="text-xs font-semibold text-zinc-200">Timeline Annotations</span>
-          <span className="text-[11px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{annotations.length}</span>
-        </div>
+      <SectionCard title="Timeline Annotations" titleIcon={<Activity className="w-4 h-4 text-zinc-400" />} titleExtra={<span className="text-[11px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{annotations.length}</span>}>
         <div className="space-y-1.5">
           {annotations.map(ann => (
             <div key={ann.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-zinc-950/50">
@@ -171,10 +163,11 @@ export function SearchTab({
             </div>
           ))}
         </div>
-      </div>
+      </SectionCard>
     )}
 
     {/* Raw data tables — collapsible, secondary */}
+    {/* pr-check-disable-next-line -- Collapsible raw-data table wrapper with custom toggle button; not a static section card */}
     <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
       <button
         onClick={() => setShowRawData(!showRawData)}

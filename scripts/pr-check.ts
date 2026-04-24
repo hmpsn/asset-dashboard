@@ -998,7 +998,6 @@ export const CHECKS: Check[] = [
   },
   {
     name: 'SVG with hardcoded dark fill/stroke',
-    pattern: '(fill|stroke)=\\"(#0f1219|#18181b|#27272a|#303036|#52525b)\\"',
     fileGlobs: ['*.tsx'],
     pathFilter: 'src/components/',
     exclude: 'Styleguide.tsx',
@@ -1006,6 +1005,25 @@ export const CHECKS: Check[] = [
     excludeLines: ['chartDotStroke(', 'chartDotFill(', 'chartAxisColor(', 'chartGridColor('],
     message: 'Use chartDotStroke()/chartAxisColor() from ui/constants.ts for SVG colors. Dark hex breaks light mode.',
     severity: 'warn',
+    // Converted from pattern to customCheck — the original pattern contained `\"`
+    // inside outer shell double-quotes. The safePattern escaping would double-escape
+    // these to `\\"`, breaking the shell command silently (swallowed by || true).
+    customCheck: (files) => {
+      const SVG_ATTR = /(?:fill|stroke)="(#0f1219|#18181b|#27272a|#303036|#52525b)"/gi;
+      const hits: CustomCheckMatch[] = [];
+      files.forEach(filePath => {
+        try {
+          const fileLines = readFileSync(filePath, 'utf-8').split('\n');
+          fileLines.forEach((line, i) => {
+            if (SVG_ATTR.test(line)) {
+              hits.push({ file: filePath, line: i + 1, text: line.trim() });
+            }
+            SVG_ATTR.lastIndex = 0;
+          });
+        } catch { /* file not found in worktree */ }
+      });
+      return hits;
+    },
   },
   {
     name: 'Direct listPages() outside workspace-data',
@@ -3704,21 +3722,106 @@ export const CHECKS: Check[] = [
     fileGlobs: ['*.tsx', '*.css'],
     exclude: ['src/index.css'],
     message: 'Use var(--surface-1/2/3) instead of var(--brand-bg-*). The --brand-bg-* names are legacy aliases — see DESIGN_SYSTEM.md.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Prevents new code from using deprecated token names that bypass the 3-tier surface system.',
     claudeMdRef: '#design-system--the-three-laws-of-color',
   },
   {
     name: 'Hand-rolled card div (use SectionCard)',
-    pattern: 'className="[^"]*bg-zinc-9[0-9]{2}[^"]*rounded-xl',
+    // customCheck (was pattern) — the original regex contained literal double
+    // quotes which broke the shell `grep -E "..."` invocation in checkDirectory;
+    // the error was swallowed by `2>/dev/null || true`, so the rule silently
+    // reported ✓ despite 26 violations. Converted to customCheck to avoid the
+    // shell-quoting hazard and to support pr-check-disable-next-line with a
+    // 5-line lookback (multi-attribute JSX puts className= 3-4 lines below the
+    // opening tag where the hatch comment sits).
     fileGlobs: ['*.tsx'],
     exclude: [
       'src/components/ui/',
     ],
     message: 'Use <SectionCard> or <SectionCard variant="subtle"> instead of hand-rolling bg-zinc-9xx + rounded-xl. Add a // pr-check-disable-next-line comment with justification for modals and non-card elements.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Prevents hand-rolled card divs that bypass the SectionCard primitive and the --surface-N token system.',
     claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const cardRe = /className="[^"]*bg-zinc-9\d{2}[^"]*rounded-xl/;
+      // Look back up to 5 lines for the hatch comment. Multi-attribute JSX
+      // commonly places className= 3-4 lines below the opening tag where the
+      // disable comment sits, so the standard 1-line lookback in hasHatch() is
+      // insufficient here.
+      const localHasHatch = (lines: string[], i: number) => {
+        for (let j = Math.max(0, i - 5); j <= i; j++) {
+          if (lines[j].includes('pr-check-disable-next-line')) return true;
+        }
+        return false;
+      };
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!cardRe.test(lines[i])) continue;
+          if (localHasHatch(lines, i)) continue;
+          hits.push({ file, line: i + 1, text: lines[i] });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'SectionCard titleExtra with ml-auto (use action prop)',
+    // `titleExtra` renders inside the left-aligned title cluster. The cluster
+    // has no flex-grow, so `ml-auto` on a child has no effect — the content
+    // does NOT push to the right edge. Callers who want right-aligned content
+    // must use the `action` prop instead, which lives on the outer flex row
+    // that uses `justify-between`. This rule catches the recurring migration
+    // bug where `ml-auto` is carried over from a hand-rolled card into
+    // `titleExtra`, silently producing left-clustered content.
+    fileGlobs: ['*.tsx'],
+    exclude: ['src/components/ui/'],
+    message: 'titleExtra renders inside the left-aligned title cluster — ml-auto has no effect there. Use the `action` prop for right-aligned content (date pickers, counts, export links, tier badges). See src/components/ui/SectionCard.tsx JSDoc.',
+    severity: 'error',
+    rationale: 'Prevents the recurring "right-aligned metadata lands on the left" bug seen across 5 SectionCard migrations (OrderStatus, RankTable, DataSnapshots, SearchTab, FixRecommendations).',
+    claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const idx = line.indexOf('titleExtra=');
+          if (idx === -1) continue;
+          if (line.includes('pr-check-disable-next-line')) continue;
+          if (i > 0 && lines[i - 1].includes('pr-check-disable-next-line')) continue;
+          // Scan forward up to 10 lines to find the closing `}` of the prop.
+          // Use brace balancing starting from the `{` that follows `titleExtra=`.
+          const openIdx = line.indexOf('{', idx);
+          if (openIdx === -1) continue;
+          let depth = 0;
+          let sawMlAuto = false;
+          let endLine = i;
+          outer: for (let j = i; j < Math.min(lines.length, i + 15); j++) {
+            const scan = j === i ? lines[j].slice(openIdx) : lines[j];
+            if (scan.includes('ml-auto')) sawMlAuto = true;
+            for (const ch of scan) {
+              if (ch === '{') depth++;
+              else if (ch === '}') {
+                depth--;
+                if (depth === 0) { endLine = j; break outer; }
+              }
+            }
+          }
+          void endLine;
+          if (sawMlAuto) hits.push({ file, line: i + 1, text: line.trim() });
+        }
+      }
+      return hits;
+    },
   },
   {
     name: 'Page component missing PageHeader',
@@ -3846,9 +3949,11 @@ function applyExcludeLines(lines: string[], excludeLines?: string[]): string[] {
 
 function checkFile(file: string, check: Check): string[] {
   if (isExcluded(file, check.exclude)) return [];
+  if (!check.pattern) return [];
   try {
+    const safePattern = check.pattern.replace(/"/g, '\\"');
     const out = execSync(
-      `grep -n -E "${check.pattern}" "${file}" 2>/dev/null || true`,
+      `grep -n -E "${safePattern}" "${file}" 2>/dev/null || true`,
       { cwd: ROOT, encoding: 'utf-8' }
     );
     const lines = out.trim() ? out.trim().split('\n').filter(Boolean).map(l => `${file}:${l}`) : [];
@@ -3867,6 +3972,7 @@ const EXCLUDED_FILES = ['test-branding.ts'];
 // collision' regression test. Not part of the public API; do not import from
 // anywhere except the test harness.
 export function checkDirectory(dir: string, check: Check): string[] {
+  if (!check.pattern) return [];
   const globs = check.fileGlobs.map(g => `--include="${g}"`).join(' ');
   // If the rule opts into a normally-excluded directory via pathFilter (e.g.
   // 'tests/'), that directory must NOT be in the grep --exclude-dir list.
@@ -3878,8 +3984,16 @@ export function checkDirectory(dir: string, check: Check): string[] {
   const excludeDirs = effectiveExcludeDirs.map(d => `--exclude-dir="${d}"`).join(' ');
   const excludeFiles = EXCLUDED_FILES.map(f => `--exclude="${f}"`).join(' ');
   try {
+    // Escape any literal double quotes in the pattern before interpolating into
+    // the shell command string. Without this, patterns like `className="[^"]*...`
+    // break the outer double-quote boundary, causing grep to misparse the
+    // command. The error is swallowed by `2>/dev/null || true`, so the rule
+    // silently reports ✓ — the exact silent-false-negative class this audit
+    // tries to prevent. Rule C ("Hardcoded card radius outside ui primitives")
+    // has this pattern; Rule B was already converted to customCheck.
+    const safePattern = check.pattern.replace(/"/g, '\\"');
     const out = execSync(
-      `grep -rn ${globs} ${excludeDirs} ${excludeFiles} -E "${check.pattern}" "${dir}" 2>/dev/null || true`,
+      `grep -rn ${globs} ${excludeDirs} ${excludeFiles} -E "${safePattern}" "${dir}" 2>/dev/null || true`,
       { cwd: ROOT, encoding: 'utf-8' }
     );
     let lines = out.trim() ? out.trim().split('\n').filter(Boolean) : [];

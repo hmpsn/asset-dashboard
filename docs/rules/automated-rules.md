@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **78** — 40 error, 38 warn.
+Total rules: **79** — 43 error, 36 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -55,7 +55,10 @@ advisory but tracked.
 | 37 | Manual pageMap pairing outside shared helpers — use findPageMapEntry(ForPage) or usePageJoin | error | custom | `src/` | — | Three components independently reimplemented pageMap.find with divergent semantics (SeoEditor, PageIntelligence, ApprovalsTab). The shared helpers in pathUtils.ts and the usePageJoin hook normalize all matching. Direct .find() silently breaks case variants and legacy paths. |
 | 38 | useWorkspaceEvents handler for centralized event | error | custom | `src/` | `// ws-invalidation-ok` | Duplicated useWorkspaceEvents subscriptions diverge over time — one side gets updated, the other silently misses cache keys — producing stale UI bugs that are hard to reproduce because they depend on event ordering. |
 | 39 | roadmap.json item ID uniqueness | error | custom | `data/roadmap.json` | — | Cross-sprint duplicate IDs caused PR #258 round-4: clicking expand on one row toggled both, and the server PATCH updated whichever sprint came first. |
-| 40 | radius-signature-lg used outside SectionCard | error | pattern | `*.tsx, *.css` | — | The asymmetric corner is a SectionCard-only brand signature. Other components adopting it would dilute the design intent. |
+| 40 | Legacy surface token in new code | error | pattern | `*.tsx, *.css` | — | Prevents new code from using deprecated token names that bypass the 3-tier surface system. |
+| 41 | Hand-rolled card div (use SectionCard) | error | custom | `*.tsx` | — | Prevents hand-rolled card divs that bypass the SectionCard primitive and the --surface-N token system. |
+| 42 | SectionCard titleExtra with ml-auto (use action prop) | error | custom | `*.tsx` | — | Prevents the recurring "right-aligned metadata lands on the left" bug seen across 5 SectionCard migrations (OrderStatus, RankTable, DataSnapshots, SearchTab, FixRecommendations). |
+| 43 | radius-signature-lg used outside SectionCard | error | pattern | `*.tsx, *.css` | — | The asymmetric corner is a SectionCard-only brand signature. Other components adopting it would dilute the design intent. |
 
 ---
 
@@ -69,7 +72,7 @@ advisory but tracked.
 | 4 | Bare SUM() without COALESCE in db.prepare | warn | pattern | `server/` | — | Wrap SUM() with COALESCE: COALESCE(SUM(col), 0). SQLite SUM returns NULL (not 0) when no rows match. |
 | 5 | as any on dynamic import results | warn | pattern | `server/` | `// as-any-ok` | Use `import type { T } from "./module.js"` instead of `as any`. Guessed property names are the #1 bug source. Add `// as-any-ok` comment if truly unavoidable. |
 | 6 | Hardcoded dark hex in inline styles | warn | pattern | `src/components/` | — | Use CSS variables or chartColor helpers from ui/constants.ts. Hardcoded dark hex breaks light mode. |
-| 7 | SVG with hardcoded dark fill/stroke | warn | pattern | `src/components/` | — | Use chartDotStroke()/chartAxisColor() from ui/constants.ts for SVG colors. Dark hex breaks light mode. |
+| 7 | SVG with hardcoded dark fill/stroke | warn | custom | `src/components/` | — | Use chartDotStroke()/chartAxisColor() from ui/constants.ts for SVG colors. Dark hex breaks light mode. |
 | 8 | buildWorkspaceIntelligence() without slices (assembles all 8 slices) | warn | pattern | `server/` | `// bwi-all-ok` | Always pass { slices: [...] } to buildWorkspaceIntelligence(). Omitting it assembles all 8 slices (expensive). Add `// bwi-all-ok` if intentional. |
 | 9 | formatForPrompt with inline sections literal (use buildIntelPrompt or sections: slices) | warn | pattern | `server/` | `// bip-ok` | Use buildIntelPrompt(id, slices) when only the formatted string is needed. When raw intel is also needed: const slices = [...]; formatForPrompt(intel, { sections: slices }). Add `// bip-ok` for intentional exceptions. |
 | 10 | Unguarded recordAction() call | warn | pattern | `server/` | `// recordAction-ok` | recordAction() must be gated by `if (workspaceId)`. Add `// recordAction-ok` if verified safe. |
@@ -96,11 +99,9 @@ advisory but tracked.
 | 31 | Raw provider date passed to new Date() | warn | pattern | `server/` | `// provider-date-ok` | Prevents Invalid Date regressions after PR #218 A4 finding: SEMRush emits Unix epoch strings that new Date() cannot parse. |
 | 32 | Competitor keyword push missing serpFeatures | warn | custom | `server/` | `// compkw-serp-ok` | Prevents regression of PR #218 A3 finding: DomainKeyword.serpFeatures was silently dropped in the inline mapping. |
 | 33 | Bare slug used in pagePath construction — use resolvePagePath(page) | warn | custom | `*.ts, *.tsx` | `// slug-path-ok` | Webflow nested pages (`/services/seo`) have slug=`seo` — using `/${page.slug}` directly produces wrong short URLs that break GSC matching and pagePath lookups. |
-| 34 | Legacy surface token in new code | warn | pattern | `*.tsx, *.css` | — | Prevents new code from using deprecated token names that bypass the 3-tier surface system. |
-| 35 | Hand-rolled card div (use SectionCard) | warn | pattern | `*.tsx` | — | Prevents hand-rolled card divs that bypass the SectionCard primitive and the --surface-N token system. |
-| 36 | Page component missing PageHeader | warn | custom | `` | — | Enforces consistent page-level header structure across all navigable views. |
-| 37 | Hardcoded card radius outside ui primitives | warn | pattern | `*.tsx` | — | Prevents hardcoded Tailwind radius classes that bypass the --radius-* token system. |
-| 38 | Non-standard transition duration | warn | custom | `*.tsx, *.css` | — | Enforces the three-speed motion system: 120ms (micro), 180ms (standard), 400ms (entrance). |
+| 34 | Page component missing PageHeader | warn | custom | `` | — | Enforces consistent page-level header structure across all navigable views. |
+| 35 | Hardcoded card radius outside ui primitives | warn | pattern | `*.tsx` | — | Prevents hardcoded Tailwind radius classes that bypass the --radius-* token system. |
+| 36 | Non-standard transition duration | warn | custom | `*.tsx, *.css` | — | Enforces the three-speed motion system: 120ms (micro), 180ms (standard), 400ms (entrance). |
 
 ---
 

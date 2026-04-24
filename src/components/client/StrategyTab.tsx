@@ -1195,6 +1195,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       {/* ── Decline Reason Modal ── */}
       {declineReason && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setDeclineReason(null)}>
+          {/* pr-check-disable-next-line -- Decline Reason modal dialog; floated over fullscreen overlay, not a content card */}
           <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-5 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
             <h3 className="text-sm font-semibold text-zinc-200 mb-1">Decline keyword</h3>
             <p className="text-[11px] text-zinc-500 mb-3">

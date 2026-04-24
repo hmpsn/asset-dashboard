@@ -4,7 +4,7 @@ import {
   Target, ArrowUp, ArrowDown, LineChart, ChevronDown,
 } from 'lucide-react';
 import { get, post, patch, del } from '../api/client';
-import { EmptyState } from './ui';
+import { EmptyState, SectionCard } from './ui';
 import { chartGridColor, chartAxisColor } from './ui/constants';
 
 // ── Trend colors (blue/teal/green family per design system — no violet/indigo) ──
@@ -450,8 +450,9 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
 
       {/* Keywords without rank data */}
       {keywords.filter(k => !latestRanks.find(r => r.query === k.query)).length > 0 && (
-        <div className="bg-zinc-900/50 rounded-xl border border-zinc-800 p-3">
-          <div className="text-[11px] text-zinc-500 mb-2">Tracked but no rank data:</div>
+        <SectionCard variant="subtle">
+          <div className="space-y-2">
+          <p className="text-[11px] text-zinc-500">Tracked but no rank data:</p>
           <div className="flex flex-wrap gap-1.5">
             {keywords.filter(k => !latestRanks.find(r => r.query === k.query)).map(k => (
               <span key={k.query} className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-zinc-800 text-zinc-400">
@@ -460,7 +461,8 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
               </span>
             ))}
           </div>
-        </div>
+          </div>
+        </SectionCard>
       )}
     </div>
   );

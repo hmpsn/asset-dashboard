@@ -177,6 +177,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
             Share Report
           </button>
           {shareOpen && (
+            // pr-check-disable-next-line -- Shareable Reports popover dropdown; positioned absolute, not a content card
             <div className="absolute right-0 top-full mt-2 w-80 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl z-50 overflow-hidden">
               <div className="px-4 py-3 border-b border-zinc-800">
                 <div className="text-xs font-medium text-zinc-200">Shareable Reports</div>
@@ -262,6 +263,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
         const deltaColor = scoreDelta > 0 ? 'text-emerald-400' : scoreDelta < 0 ? 'text-red-400' : 'text-zinc-500';
         const DeltaIcon = scoreDelta > 0 ? TrendingUp : scoreDelta < 0 ? AlertTriangle : Minus;
         return (
+          // pr-check-disable-next-line -- Compact audit-delta status bar; inline row element, not a content card
           <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-[12px]">
             <DeltaIcon className={`w-4 h-4 flex-shrink-0 ${deltaColor}`} />
             <span className="text-zinc-400">Since last audit:</span>

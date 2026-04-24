@@ -79,6 +79,7 @@ export function RevenueDashboard() {
       <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
         <div className="h-8 w-48 bg-zinc-800 rounded animate-pulse" />
         <div className="grid grid-cols-4 gap-4">
+          {/* pr-check-disable-next-line -- loading skeleton animation row; not a content card */}
           {[1, 2, 3, 4].map(i => <div key={i} className="h-24 bg-zinc-900 rounded-xl animate-pulse" />)}
         </div>
       </div>
@@ -119,14 +120,14 @@ export function RevenueDashboard() {
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <SectionCard>
+        <SectionCard noPadding>
           <div className="px-4 py-3">
             <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 mb-1"><DollarSign className="w-3 h-3" /> Total Revenue</div>
             <div className="text-xl font-bold text-teal-400">{fmtCents(data.totalRevenue)}</div>
             <div className="text-[11px] text-zinc-500 mt-0.5">{data.totalTransactions} transactions</div>
           </div>
         </SectionCard>
-        <SectionCard>
+        <SectionCard noPadding>
           <div className="px-4 py-3">
             <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 mb-1"><BarChart3 className="w-3 h-3" /> This Month</div>
             <div className="text-xl font-bold text-zinc-200">{fmtCents(data.currentMonthRevenue)}</div>
@@ -136,14 +137,14 @@ export function RevenueDashboard() {
             </div>
           </div>
         </SectionCard>
-        <SectionCard>
+        <SectionCard noPadding>
           <div className="px-4 py-3">
             <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 mb-1"><Users className="w-3 h-3" /> Active Clients</div>
             <div className="text-xl font-bold text-zinc-200">{data.byWorkspace.length}</div>
             <div className="text-[11px] text-zinc-500 mt-0.5">with paid transactions</div>
           </div>
         </SectionCard>
-        <SectionCard>
+        <SectionCard noPadding>
           <div className="px-4 py-3">
             <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 mb-1"><Package className="w-3 h-3" /> Avg Transaction</div>
             <div className="text-xl font-bold text-zinc-200">{fmtCents(Math.round(data.totalRevenue / data.totalTransactions))}</div>
@@ -153,7 +154,7 @@ export function RevenueDashboard() {
       </div>
 
       {/* Monthly revenue chart */}
-      <SectionCard>
+      <SectionCard noPadding>
         <div className="px-4 py-3">
           <div className="text-xs font-medium text-zinc-200 mb-3">Monthly Revenue (Last 12 Months)</div>
           <RevenueChart months={data.months} />
@@ -162,7 +163,7 @@ export function RevenueDashboard() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Revenue by workspace */}
-        <SectionCard>
+        <SectionCard noPadding>
           <div className="px-4 py-3">
             <div className="text-xs font-medium text-zinc-200 mb-3">Revenue by Client</div>
             <div className="space-y-2 max-h-64 overflow-y-auto">
@@ -180,7 +181,7 @@ export function RevenueDashboard() {
         </SectionCard>
 
         {/* Revenue by product */}
-        <SectionCard>
+        <SectionCard noPadding>
           <div className="px-4 py-3">
             <div className="text-xs font-medium text-zinc-200 mb-3">Revenue by Product</div>
             <div className="space-y-2 max-h-64 overflow-y-auto">
@@ -199,7 +200,7 @@ export function RevenueDashboard() {
       </div>
 
       {/* Recent transactions */}
-      <SectionCard>
+      <SectionCard noPadding>
         <div className="px-4 py-3">
           <div className="text-xs font-medium text-zinc-200 mb-3">Recent Transactions</div>
           <div className="overflow-x-auto">

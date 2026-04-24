@@ -2,7 +2,7 @@ import { CheckCircle2, FileText, MessageSquare, Sparkles, X, Zap, DollarSign, Tr
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { STUDIO_NAME } from '../../constants';
-import type { Tier } from '../ui';
+import { SectionCard, type Tier } from '../ui';
 import type { WorkspaceInfo } from './types';
 import { clientPath } from '../../routes';
 import { useBetaMode } from './BetaContext';
@@ -224,11 +224,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
 
       {/* Content pricing section */}
       {(briefPrice != null || fullPostPrice != null) && (
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
-          <div className="flex items-center gap-2 mb-1">
-            <FileText className="w-5 h-5 text-teal-400" />
-            <h3 className="text-lg font-semibold text-zinc-100">Content Services</h3>
-          </div>
+        <SectionCard title="Content Services" titleIcon={<FileText className="w-5 h-5 text-teal-400" />}>
           <p className="text-xs text-zinc-500 mb-5">Professional content created by {STUDIO_NAME}, tailored to your SEO strategy.</p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -265,16 +261,12 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
               </button>
             </div>
           )}
-        </div>
+        </SectionCard>
       )}
 
       {/* Content subscription packages */}
       {subData && subData.plans.length > 0 && (
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
-          <div className="flex items-center gap-2 mb-1">
-            <RefreshCw className="w-5 h-5 text-teal-400" />
-            <h3 className="text-lg font-semibold text-zinc-100">Monthly Content Packages</h3>
-          </div>
+        <SectionCard title="Monthly Content Packages" titleIcon={<RefreshCw className="w-5 h-5 text-teal-400" />}>
           <p className="text-xs text-zinc-500 mb-5">Recurring SEO-optimized content delivered every month, powered by your keyword strategy.</p>
 
           {/* Active subscription banner */}
@@ -338,7 +330,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
               ))}
             </div>
           )}
-        </div>
+        </SectionCard>
       )}
 
       {/* ROI teaser for free-tier users */}
@@ -373,6 +365,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
       )}
 
       {/* Contact CTA */}
+      {/* pr-check-disable-next-line -- Contact CTA strip; no section header, pure styled row */}
       <div className="text-center py-6 bg-zinc-900/50 rounded-xl border border-zinc-800">
         <p className="text-sm text-zinc-400 mb-3">Have questions about which plan is right for you?</p>
         <button onClick={onOpenChat}

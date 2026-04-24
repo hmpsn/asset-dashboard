@@ -103,6 +103,7 @@ export function ClientHeader({
             {theme === 'dark' ? <Sun className="w-4 h-4 text-zinc-400" /> : <Moon className="w-4 h-4 text-zinc-400" />}
           </button>
           {hasAnalytics && (
+            // pr-check-disable-next-line -- Date-range segmented control toolbar; interactive control, not a content card
             <div className="relative flex items-center gap-1 bg-zinc-900 rounded-lg border border-zinc-800 p-0.5">
               {[7, 28, 90, 180, 365].map(d => (
                 <button key={d} onClick={() => changeDays(d, ws)}
@@ -129,6 +130,7 @@ export function ClientHeader({
               </button>
               {showDatePicker && (<>
                 <div className="fixed inset-0 z-40 sm:bg-transparent bg-black/50" onClick={() => setShowDatePicker(false)} />
+                {/* pr-check-disable-next-line -- Custom date picker popover/bottom-sheet; fixed/absolute positioned floating element, not a content card */}
                 <div className="fixed sm:absolute inset-x-0 bottom-0 sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:mt-2 z-50 bg-zinc-900 border-t sm:border border-zinc-700 rounded-t-2xl sm:rounded-xl shadow-2xl p-4 sm:w-72"
                   onClick={e => e.stopPropagation()}>
                   <div className="sm:hidden w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-3" />

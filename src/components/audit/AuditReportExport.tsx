@@ -161,6 +161,7 @@ interface ReportModalProps {
 export function ReportModal({ onExportHtml, onExportCsv, onClose }: ReportModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={onClose}>
+      {/* pr-check-disable-next-line -- modal dialog */}
       <div className="relative max-w-md w-full mx-4 bg-zinc-900 rounded-xl border border-zinc-700 p-6" onClick={e => e.stopPropagation()}>
         <button onClick={onClose} className="absolute top-4 right-4 text-zinc-400 hover:text-white"><X className="w-4 h-4" /></button>
         <h3 className="text-lg font-semibold mb-1">Export SEO Report</h3>

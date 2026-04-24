@@ -3,6 +3,7 @@
  * Extracted from PostEditor.tsx version history section.
  */
 import { Loader2, X, History, RotateCcw } from 'lucide-react';
+import { SectionCard } from '../ui';
 
 interface Version {
   id: string;
@@ -25,7 +26,7 @@ export function VersionHistory({
   versions, versionsLoading, reverting, onRevert, onClose,
 }: VersionHistoryProps) {
   return (
-    <div className="bg-zinc-900 rounded-xl border border-teal-500/20 overflow-hidden">
+    <SectionCard noPadding className="overflow-hidden !border-teal-500/20">
       <div className="px-4 py-3 border-b border-zinc-800/50 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <History className="w-3.5 h-3.5 text-teal-400" />
@@ -80,6 +81,6 @@ export function VersionHistory({
           </div>
         )}
       </div>
-    </div>
+    </SectionCard>
   );
 }
