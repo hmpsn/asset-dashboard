@@ -225,3 +225,13 @@ export function useClientRawInsights(wsId: string, enabled: boolean) {
     select: (d) => (Array.isArray(d) ? d : []),
   });
 }
+
+// ── Copy Review ───────────────────────────────────────────────────
+export function useClientCopyEntries(wsId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.client.copyEntries(wsId),
+    queryFn: () => getSafe<{ entries: unknown[] }>(`/api/public/copy/${wsId}/entries`, { entries: [] }),
+    enabled,
+    select: (d) => (Array.isArray(d?.entries) ? d.entries.length : 0),
+  });
+}
