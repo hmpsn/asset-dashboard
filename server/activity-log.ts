@@ -99,6 +99,7 @@ export type ActivityType =
   | 'copy_exported'
   | 'copy_suggestion_added'
   | 'copy_section_edited'
+  | 'copy_sent_to_client'
   | 'copy_pattern_removed'
   | 'diagnostic_completed'
   | 'portal_session'
