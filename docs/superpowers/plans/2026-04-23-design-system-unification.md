@@ -607,12 +607,14 @@ PR description must include:
 
 > Rules that prevent new drift. Must ship before Phase 3 so migrated code is verified clean on every commit.
 
-### Task 1.1 — Add three pr-check rules to `scripts/pr-check.ts` (Model: sonnet)
+### Task 1.1 — Add six pr-check rules to `scripts/pr-check.ts` + enforcement doc (Model: sonnet)
 
-**Owns:** `scripts/pr-check.ts`
-**Must not touch:** `src/`, design docs
+**Owns:** `scripts/pr-check.ts`, `docs/rules/design-system-enforcement.md` (new)
+**Must not touch:** `src/`
 
-Add these three entries at the END of the `CHECKS` array before the closing `];` (line 783+).
+All six rules must scope violations to **git-diff'd files only** (not the entire repo) so existing code isn't flagged en masse during the migration period. Use the `fileGlobs` + `exclude` mechanism for pattern-based rules; for `customCheck` rules, filter against `files` (the diff'd file list passed as the first argument).
+
+Add these six entries at the END of the `CHECKS` array before the closing `];` (line 783+).
 
 - [ ] **Step 1: Add Rule A — Legacy surface token in new code**
 
@@ -705,45 +707,149 @@ This rule maintains a curated list of page-level components. New pages are added
   },
 ```
 
-- [ ] **Step 4: Verify rules fire correctly**
+- [ ] **Step 4: Add Rule D — Hardcoded card radius outside ui/***
+
+```typescript
+  {
+    name: 'Hardcoded card radius outside ui primitives',
+    pattern: 'className="[^"]*rounded-xl',
+    fileGlobs: ['*.tsx'],
+    exclude: [
+      'src/components/ui/',        // primitives own their own radius
+      'public/styleguide.html',    // static reference doc
+    ],
+    message: 'Use rounded-[var(--radius-lg)] instead of rounded-xl so the radius is themeable. Add a // pr-check-disable-next-line comment with justification for modals or non-card elements.',
+    severity: 'warn',
+    rationale: 'Prevents hardcoded Tailwind radius classes that bypass the --radius-* token system.',
+    claudeMdRef: '#design-system--the-three-laws-of-color',
+  },
+```
+
+- [ ] **Step 5: Add Rule E — --radius-signature-lg exclusivity**
+
+```typescript
+  {
+    name: 'radius-signature-lg used outside SectionCard',
+    pattern: '--radius-signature-lg',
+    fileGlobs: ['*.tsx', '*.css'],
+    exclude: [
+      'src/components/ui/SectionCard.tsx',
+      'public/styleguide.html',
+      'public/styleguide.css',
+    ],
+    message: '--radius-signature-lg is the brand asymmetric radius (10px 24px 10px 24px) and is only permitted inside SectionCard.tsx. Use --radius-lg for other card elements.',
+    severity: 'error',
+    rationale: 'The asymmetric corner is a SectionCard-only brand signature. Other components adopting it would dilute the design intent.',
+    claudeMdRef: '#design-system--the-three-laws-of-color',
+  },
+```
+
+- [ ] **Step 6: Add Rule F — Non-standard transition-duration**
+
+```typescript
+  {
+    name: 'Non-standard transition duration',
+    pattern: 'transition-duration-\\[(?!120ms|180ms|400ms)',
+    fileGlobs: ['*.tsx', '*.css'],
+    exclude: [
+      'src/components/ui/',
+      'public/styleguide.html',
+      'public/styleguide.css',
+    ],
+    message: 'Use transition-duration-[120ms], transition-duration-[180ms], or transition-duration-[400ms] (or var(--motion-*) when the token system ships). Non-standard durations break motion consistency.',
+    severity: 'warn',
+    rationale: 'Enforces the three-speed motion system: 120ms (micro), 180ms (standard), 400ms (entrance).',
+    claudeMdRef: '#design-system--the-three-laws-of-color',
+  },
+```
+
+- [ ] **Step 7: Verify all six rules fire correctly**
 
 ```bash
-# Rule A: check it fires on a file with --brand-bg- usage
+# Rule A
 echo '.test { background: var(--brand-bg-card); }' > /tmp/test-a.css
 npx tsx scripts/pr-check.ts --all 2>&1 | grep "Legacy surface token"
 rm /tmp/test-a.css
 
-# Rule B: check it fires on a hand-rolled card
+# Rule B
 echo '<div className="bg-zinc-900 rounded-xl border p-4">card</div>' > /tmp/test-b.tsx
 npx tsx scripts/pr-check.ts --all 2>&1 | grep "Hand-rolled card"
 rm /tmp/test-b.tsx
 
-# Rule C: verify the PageHeader rule fires on ContentPipeline (known missing)
-npx tsx scripts/pr-check.ts --all 2>&1 | grep "PageHeader" | head -5
+# Rule C
+npx tsx scripts/pr-check.ts --all 2>&1 | grep "Page component missing PageHeader" | head -5
+
+# Rule D
+echo '<div className="rounded-xl border p-4">card</div>' > /tmp/test-d.tsx
+npx tsx scripts/pr-check.ts --all 2>&1 | grep "Hardcoded card radius"
+rm /tmp/test-d.tsx
+
+# Rule E
+echo '.x { border-radius: var(--radius-signature-lg); }' > /tmp/test-e.css
+npx tsx scripts/pr-check.ts --all 2>&1 | grep "radius-signature-lg"
+rm /tmp/test-e.css
+
+# Rule F
+echo '<div className="transition-duration-[300ms]">x</div>' > /tmp/test-f.tsx
+npx tsx scripts/pr-check.ts --all 2>&1 | grep "Non-standard transition"
+rm /tmp/test-f.tsx
 ```
 
-All three must fire. If Rule B doesn't fire, check the regex — the double-escaped backslash in the pattern string may need adjustment.
+All six must fire. If Rule B or D doesn't fire, check the regex escaping.
 
-- [ ] **Step 5: Count baseline violations (save for Phase 3 tracking)**
+- [ ] **Step 8: Create `docs/rules/design-system-enforcement.md`**
+
+```markdown
+# Design System Enforcement Rules
+
+These rules are mechanized in `scripts/pr-check.ts` and enforced on every PR diff.
+All rules are scoped to files changed in the diff (not the full repo) during the Phase 1–3 migration window.
+
+| Rule | Severity | Pattern | Scope |
+|------|----------|---------|-------|
+| Legacy surface token | warn | `var(--brand-bg-*)` | `*.tsx`, `*.css` |
+| Hand-rolled card div | warn | `bg-zinc-9xx + rounded-xl` | `*.tsx` (excl. `ui/`) |
+| Page component missing PageHeader | warn | customCheck curated list | page components |
+| Hardcoded card radius | warn | `rounded-xl` outside `ui/` | `*.tsx` (excl. `ui/`) |
+| radius-signature-lg exclusivity | **error** | `--radius-signature-lg` | all, excl. SectionCard + styleguide |
+| Non-standard transition duration | warn | duration not 120/180/400ms | `*.tsx`, `*.css` |
+
+## Migration path
+
+- Phase 1: All rules ship as `warn` (except Rule E which is `error` immediately).
+- Phase 3f: Rules A, B, D promoted to `error` once all 47 files are migrated.
+- Phase 4+: Rule F promoted to `error` once `--motion-*` tokens land.
+
+## Escape hatch
+
+Add `// pr-check-disable-next-line` above the offending line with a justification comment.
+Only use for modals, non-card elements, or intentional design exceptions.
+```
+
+- [ ] **Step 9: Count baseline violations (save for Phase 3 tracking)**
 
 ```bash
-npx tsx scripts/pr-check.ts --all 2>&1 | grep -E "(Hand-rolled|Legacy surface|Missing .PageHeader)" | wc -l
+npx tsx scripts/pr-check.ts --all 2>&1 | grep -E "(Hand-rolled|Legacy surface|Missing .PageHeader|Hardcoded card radius|Non-standard transition)" | wc -l
 ```
 
 Record this number. Phase 3 goal: reduce to zero across migrated clusters.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 10: Commit**
 
 ```bash
-git add scripts/pr-check.ts
-git commit -m "feat(pr-check): Phase 1 — surface token, hand-rolled card, and PageHeader rules
+git add scripts/pr-check.ts docs/rules/design-system-enforcement.md
+git commit -m "feat(pr-check): Phase 1 — six design system enforcement rules
 
-Three new warn-level rules:
-- Legacy surface token: flags var(--brand-bg-*) in new tsx/css files
-- Hand-rolled card: flags bg-zinc-9xx + rounded-xl patterns
-- PageHeader: curated list of page components that must use <PageHeader>
+Rules A–F (all scoped to diff'd files):
+- A: Legacy surface token var(--brand-bg-*) → warn
+- B: Hand-rolled bg-zinc-9xx + rounded-xl card → warn
+- C: Page component missing <PageHeader> → warn (curated list)
+- D: Hardcoded rounded-xl outside ui/ → warn
+- E: --radius-signature-lg outside SectionCard → error
+- F: Non-standard transition-duration → warn
 
-Severity is warn during migration. Promote to error after Phase 3 completes."
+Severity warn during Phase 1-3 migration; A/B/D promote to error in Phase 3f.
+Documents rule rationale in docs/rules/design-system-enforcement.md."
 ```
 
 ---
@@ -759,13 +865,13 @@ Severity is warn during migration. Promote to error after Phase 3 completes."
 npm run rules:generate
 ```
 
-- [ ] **Step 2: Verify all three new rules appear**
+- [ ] **Step 2: Verify all six new rules appear**
 
 ```bash
-grep -A 2 "Legacy surface token\|Hand-rolled card\|Page component missing PageHeader" docs/rules/automated-rules.md
+grep -A 2 "Legacy surface token\|Hand-rolled card\|Page component missing PageHeader\|Hardcoded card radius\|radius-signature-lg\|Non-standard transition" docs/rules/automated-rules.md
 ```
 
-Expected: all three rules listed with severity, rationale, and file scope.
+Expected: all six rules listed with severity, rationale, and file scope.
 
 - [ ] **Step 3: Commit and open PR**
 
