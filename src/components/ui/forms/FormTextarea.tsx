@@ -1,4 +1,5 @@
 import React from 'react';
+import { cn } from '../../../lib/utils';
 import { useFormField } from './FormField';
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -44,7 +45,7 @@ export const FormTextarea = React.forwardRef<
         placeholder={placeholder}
         aria-invalid={hasError || undefined}
         aria-describedby={descriptionId || undefined}
-        className={[
+        className={cn(
           'w-full px-3 py-2',
           'bg-zinc-900 rounded-md',
           'border',
@@ -55,20 +56,18 @@ export const FormTextarea = React.forwardRef<
           'focus:ring-2 focus:ring-[var(--brand-mint-glow)]',
           'transition-colors duration-150',
           'resize-none',
-          maxLength !== undefined ? 'pb-6' : '',
+          maxLength !== undefined && 'pb-6',
           className,
-        ]
-          .filter(Boolean)
-          .join(' ')}
+        )}
         {...rest}
       />
       {maxLength !== undefined && (
         <span
-          className={[
+          className={cn(
             'absolute bottom-2 right-3',
             'text-xs select-none',
             nearLimit ? 'text-red-400' : 'text-zinc-500',
-          ].join(' ')}
+          )}
           aria-live="polite"
         >
           {charCount}/{maxLength}

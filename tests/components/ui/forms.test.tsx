@@ -1,12 +1,12 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { FormField } from '../../src/components/ui/forms/FormField';
-import { FormInput } from '../../src/components/ui/forms/FormInput';
-import { FormSelect } from '../../src/components/ui/forms/FormSelect';
-import { FormTextarea } from '../../src/components/ui/forms/FormTextarea';
-import { Checkbox } from '../../src/components/ui/forms/Checkbox';
-import { Toggle } from '../../src/components/ui/forms/Toggle';
+import { FormField } from '../../../src/components/ui/forms/FormField';
+import { FormInput } from '../../../src/components/ui/forms/FormInput';
+import { FormSelect } from '../../../src/components/ui/forms/FormSelect';
+import { FormTextarea } from '../../../src/components/ui/forms/FormTextarea';
+import { Checkbox } from '../../../src/components/ui/forms/Checkbox';
+import { Toggle } from '../../../src/components/ui/forms/Toggle';
 
 // ─── FormField ───────────────────────────────────────────────────────────────
 
@@ -291,5 +291,43 @@ describe('Toggle', () => {
     const ref = React.createRef<HTMLInputElement>();
     render(<Toggle ref={ref} checked={false} onChange={vi.fn()} label="Ref test" />);
     expect(ref.current).toBeInstanceOf(HTMLInputElement);
+  });
+
+  it('disabled sets the input disabled attribute (native click prevention)', () => {
+    // Native browser click-prevention on disabled checkboxes is not simulated
+    // in jsdom — so we assert the disabled ATTRIBUTE rather than trying to
+    // catch a non-invocation. Real browsers handle the behavioral side.
+    const { container } = render(
+      <Toggle checked={false} onChange={vi.fn()} label="Off" disabled />
+    );
+    const input = container.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    expect(input.disabled).toBe(true);
+  });
+
+  it('disabled dims the wrapping label via opacity', () => {
+    const { container } = render(
+      <Toggle checked={false} onChange={vi.fn()} label="Off" disabled />
+    );
+    const label = container.querySelector('label');
+    expect(label?.className).toContain('opacity-50');
+  });
+
+  it('uses role="switch" on the underlying input (WAI-ARIA)', () => {
+    const { container } = render(
+      <Toggle checked={false} onChange={vi.fn()} label="x" />
+    );
+    const input = container.querySelector('input[type="checkbox"]');
+    expect(input?.getAttribute('role')).toBe('switch');
+  });
+
+  it('does NOT set redundant aria-checked (implicit on native checkbox+switch)', () => {
+    const { container } = render(
+      <Toggle checked={true} onChange={vi.fn()} label="x" />
+    );
+    // Native <input type=checkbox role=switch> announces checked state via the
+    // `checked` attribute; an explicit aria-checked is redundant and risks
+    // desyncing if the two ever diverge.
+    const input = container.querySelector('input[type="checkbox"]');
+    expect(input?.hasAttribute('aria-checked')).toBe(false);
   });
 });

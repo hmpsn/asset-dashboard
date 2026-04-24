@@ -1,4 +1,5 @@
 import React from 'react';
+import { cn } from '../../../lib/utils';
 import { useFormField } from './FormField';
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -8,21 +9,19 @@ export interface SelectOption {
   label: string;
 }
 
-export interface FormSelectProps {
+export interface FormSelectProps
+  extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'onChange' | 'children'> {
   options: SelectOption[];
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
-  disabled?: boolean;
-  className?: string;
-  id?: string;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export const FormSelect = React.forwardRef<HTMLSelectElement, FormSelectProps>(
   function FormSelect(
-    { options, value, onChange, placeholder, disabled, className, id },
+    { options, value, onChange, placeholder, disabled, className, id, ...rest },
     ref
   ) {
     const { hasError, inputId, descriptionId } = useFormField();
@@ -41,7 +40,7 @@ export const FormSelect = React.forwardRef<HTMLSelectElement, FormSelectProps>(
         disabled={disabled}
         aria-invalid={hasError || undefined}
         aria-describedby={descriptionId || undefined}
-        className={[
+        className={cn(
           'w-full px-3 py-2',
           'bg-zinc-900 rounded-md',
           'border',
@@ -52,9 +51,8 @@ export const FormSelect = React.forwardRef<HTMLSelectElement, FormSelectProps>(
           'transition-colors duration-150',
           'disabled:opacity-50 disabled:cursor-not-allowed',
           className,
-        ]
-          .filter(Boolean)
-          .join(' ')}
+        )}
+        {...rest}
       >
         {placeholder && (
           <option value="" disabled>

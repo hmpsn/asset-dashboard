@@ -1,4 +1,5 @@
 import React from 'react';
+import { cn } from '../../../lib/utils';
 import { useFormField } from './FormField';
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -36,7 +37,7 @@ export const FormInput = React.forwardRef<HTMLInputElement, FormInputProps>(
         placeholder={placeholder}
         aria-invalid={hasError || undefined}
         aria-describedby={descriptionId || undefined}
-        className={[
+        className={cn(
           'w-full px-3 py-2',
           'bg-zinc-900 rounded-md',
           'border',
@@ -47,9 +48,7 @@ export const FormInput = React.forwardRef<HTMLInputElement, FormInputProps>(
           'focus:ring-2 focus:ring-[var(--brand-mint-glow)]',
           'transition-colors duration-150',
           className,
-        ]
-          .filter(Boolean)
-          .join(' ')}
+        )}
         {...rest}
       />
     );

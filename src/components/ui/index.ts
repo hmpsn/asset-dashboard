@@ -45,15 +45,34 @@ export type { WorkflowStep, WorkflowStepperProps } from './WorkflowStepper';
 export { WorkspaceHealthBar } from './WorkspaceHealthBar';
 export type { HealthMetric, WorkspaceHealthBarProps } from './WorkspaceHealthBar';
 export { ConfirmDialog } from './ConfirmDialog';
-export { FormField } from './forms/FormField';
+export { TrendBadge, type TrendBadgeProps } from './TrendBadge';
+export { ChartCard, type ChartCardProps } from './ChartCard';
+
+// ─── Phase 1 primitives (pre-committed stubs; Phase 1 agents fill implementations) ───
+
+// Typography
+export { Heading, Stat, BodyText, Caption, Label, Mono } from './typography';
+
+// Icon
+export { Icon } from './Icon';
+
+// Actions
+export { Button } from './Button';
+export { IconButton } from './IconButton';
+export { ActionPill } from './ActionPill';
+export { SegmentedControl } from './SegmentedControl';
+
+// Forms
+export { FormField, FormInput, FormSelect, FormTextarea, Checkbox, Toggle } from './forms';
 export type { FormFieldProps, FormFieldContextValue } from './forms/FormField';
-export { FormInput } from './forms/FormInput';
 export type { FormInputProps } from './forms/FormInput';
-export { FormSelect } from './forms/FormSelect';
 export type { FormSelectProps, SelectOption } from './forms/FormSelect';
-export { FormTextarea } from './forms/FormTextarea';
 export type { FormTextareaProps } from './forms/FormTextarea';
-export { Checkbox } from './forms/Checkbox';
 export type { CheckboxProps } from './forms/Checkbox';
-export { Toggle } from './forms/Toggle';
 export type { ToggleProps } from './forms/Toggle';
+
+// Layout
+export { Row, Stack, Column, Grid, Divider } from './layout';
+
+// Overlays
+export { Modal, Popover, Tooltip } from './overlay';

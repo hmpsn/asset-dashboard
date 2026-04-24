@@ -1,4 +1,5 @@
 import React, { useId } from 'react';
+import { cn } from '../../../lib/utils';
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -19,14 +20,12 @@ export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
     return (
       <label
         htmlFor={id}
-        className={[
+        className={cn(
           'inline-flex items-center gap-2.5',
           'cursor-pointer select-none',
-          disabled ? 'opacity-50 cursor-not-allowed' : '',
+          disabled && 'opacity-50 cursor-not-allowed',
           className,
-        ]
-          .filter(Boolean)
-          .join(' ')}
+        )}
       >
         {/* Hidden native checkbox — handles Space key + accessibility */}
         <input
@@ -42,7 +41,7 @@ export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
         {/* Custom visual checkbox */}
         <span
           aria-hidden="true"
-          className={[
+          className={cn(
             'w-4 h-4 rounded',
             'border',
             'flex items-center justify-center',
@@ -51,7 +50,7 @@ export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
             checked
               ? 'bg-[var(--brand-mint)] border-[var(--brand-mint)]'
               : 'bg-zinc-800 border-zinc-700',
-          ].join(' ')}
+          )}
         >
           {checked && (
             <svg
