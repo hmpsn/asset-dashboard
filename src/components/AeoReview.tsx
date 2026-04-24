@@ -74,7 +74,7 @@ const CHANGE_TYPE_CONFIG: Record<AeoChangeType, { label: string; icon: typeof Sp
 };
 
 const EFFORT_CONFIG: Record<AeoEffort, { label: string; color: string; bg: string }> = {
-  quick:       { label: '< 15 min',  color: 'text-green-400',  bg: 'bg-green-500/10 border-green-500/20' },
+  quick:       { label: '< 15 min',  color: 'text-emerald-400',  bg: 'bg-green-500/10 border-green-500/20' },
   moderate:    { label: '15–60 min', color: 'text-amber-400',  bg: 'bg-amber-500/10 border-amber-500/20' },
   significant: { label: '1+ hours',  color: 'text-red-400',    bg: 'bg-red-500/10 border-red-500/20' },
 };
@@ -242,7 +242,7 @@ export function AeoReview({ workspaceId }: Props) {
         </div>
         <div className="bg-zinc-900 p-4 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-1">Quick Wins</div>
-          <div className="text-2xl font-bold text-green-400">{review.quickWins}</div>
+          <div className="text-2xl font-bold text-emerald-400">{review.quickWins}</div>
         </div>
         <div className="bg-zinc-900 p-4 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-1">Est. Time</div>
@@ -361,7 +361,7 @@ export function AeoReview({ workspaceId }: Props) {
                       <div className="text-xs text-zinc-300 leading-relaxed">{page.summary}</div>
                       <div className="flex items-center gap-3 mt-1.5 text-[11px] text-zinc-500">
                         <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> ~{page.estimatedTimeMinutes} min total</span>
-                        <span className="flex items-center gap-1"><Zap className="w-3 h-3 text-green-400" /> {page.quickWinCount} quick wins</span>
+                        <span className="flex items-center gap-1"><Zap className="w-3 h-3 text-emerald-400" /> {page.quickWinCount} quick wins</span>
                         <button
                           onClick={(e) => { e.stopPropagation(); runSinglePageReview(page.pageUrl); }}
                           disabled={isRefreshing}

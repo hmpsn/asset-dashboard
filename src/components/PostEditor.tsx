@@ -74,7 +74,7 @@ function PostStatusBadge({ status }: { status: GeneratedPost['status'] }) {
     generating: { color: 'text-amber-400 bg-amber-500/10 border-amber-500/20', label: 'Generating...' },
     draft: { color: 'text-blue-400 bg-blue-500/10 border-blue-500/20', label: 'Draft' },
     review: { color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20', label: 'In Review' },
-    approved: { color: 'text-green-400 bg-green-500/10 border-green-500/20', label: 'Approved' },
+    approved: { color: 'text-emerald-400 bg-green-500/10 border-green-500/20', label: 'Approved' },
   };
   const c = cfg[status] || cfg.draft;
   return <span className={`text-[11px] px-2 py-0.5 rounded border font-medium ${c.color}`}>{c.label}</span>;
@@ -301,7 +301,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
             <span className="text-[11px] text-zinc-500 flex items-center gap-1"><FileText className="w-3 h-3" />{post.totalWordCount.toLocaleString()}{post.targetWordCount ? `/${post.targetWordCount.toLocaleString()}` : ''} words</span>
             {post.unificationStatus && post.unificationStatus !== 'pending' && (
               <span title={post.unificationNote || ''} className={`text-[11px] px-1.5 py-0.5 rounded border font-medium flex items-center gap-1 ${
-                post.unificationStatus === 'success' ? 'text-green-400 bg-green-500/10 border-green-500/20' :
+                post.unificationStatus === 'success' ? 'text-emerald-400 bg-green-500/10 border-green-500/20' :
                 post.unificationStatus === 'failed' ? 'text-red-400 bg-red-500/10 border-red-500/20' :
                 'text-zinc-400 bg-zinc-500/10 border-zinc-500/20'
               }`}>
@@ -319,7 +319,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                 <Eye className="w-3 h-3" /> Preview
               </button>
               <button onClick={copyAllHTML} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors">
-                {copied ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />} {copied ? 'Copied' : 'Copy'}
+                {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />} {copied ? 'Copied' : 'Copy'}
               </button>
               <button onClick={exportMarkdown} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors">
                 <Download className="w-3 h-3" /> .md
@@ -335,7 +335,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
               </button>
               {hasPublishTarget && (post.status === 'approved' || post.status === 'draft' || post.status === 'review') && (
                 post.publishedAt ? (
-                  <span className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-green-500/10 border border-green-500/20 text-green-400">
+                  <span className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-green-500/10 border border-green-500/20 text-emerald-400">
                     <Check className="w-3 h-3" /> Published {post.publishedSlug && <ExternalLink className="w-3 h-3 ml-0.5" />}
                   </span>
                 ) : (

@@ -57,7 +57,7 @@ const STEPS = [
     number: 4,
     title: 'Interpret Rankings',
     icon: BarChart3,
-    color: 'text-green-400',
+    color: 'text-emerald-400',
     bg: 'bg-green-500/10 border-green-500/20',
     description: 'The rank distribution chart breaks down pages by position tier. Understanding this spread tells you where to focus effort first.',
     actions: [
@@ -73,8 +73,8 @@ const STEPS = [
     number: 5,
     title: 'Quick Wins',
     icon: Zap,
-    color: 'text-rose-400',
-    bg: 'bg-rose-500/10 border-rose-500/20',
+    color: 'text-teal-400',
+    bg: 'bg-teal-500/10 border-teal-500/20',
     description: 'Quick wins are pages with low keyword difficulty, existing GSC impressions, and positions in the 4–20 range — meaning Google already sees them as relevant, just not quite page-1 quality.',
     actions: [
       'Sort by impressions to find the highest-traffic near-miss pages',

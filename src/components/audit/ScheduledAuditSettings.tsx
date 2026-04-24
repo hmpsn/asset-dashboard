@@ -49,7 +49,7 @@ export function ScheduledAuditSettings({ workspaceId }: ScheduledAuditSettingsPr
           <Clock className="w-4 h-4 text-zinc-400" />
           <span className="text-xs font-medium text-zinc-300">Scheduled Audits</span>
           {schedule?.enabled && (
-            <span className="text-[11px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">Active</span>
+            <span className="text-[11px] px-1.5 py-0.5 rounded bg-green-500/10 text-emerald-400 border border-green-500/20">Active</span>
           )}
           {schedule?.lastRunAt && (
             <span className="text-[11px] text-zinc-500">Last: {new Date(schedule.lastRunAt).toLocaleDateString()}</span>

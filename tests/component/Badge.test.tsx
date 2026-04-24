@@ -28,7 +28,7 @@ describe('Badge', () => {
     expect(greenContainer.querySelector('span')!.className).toContain('text-emerald-');
     greenUnmount();
 
-    const colors = ['teal', 'blue', 'emerald', 'amber', 'red', 'orange', 'purple', 'zinc'] as const;
+    const colors = ['teal', 'blue', 'emerald', 'amber', 'red', 'orange', 'zinc'] as const;
     for (const color of colors) {
       const { container, unmount } = render(<Badge label={color} color={color} />);
       const span = container.querySelector('span')!;

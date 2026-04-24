@@ -17,6 +17,9 @@
      §11 · utilities (motion, print, reduced-motion)
    ════════════════════════════════════════════════════════════════════ */
 
+  /* ─── Tokens via canonical source ─── */
+  @import url('/tokens.css');
+
   /* ─── D-DIN PRO (self-hosted, from /public/fonts) ───
      700 is the hot-path weight (every StatCard value). Preload in <head>; use
      font-display: optional to avoid a layout-shift reflow on slow connections. */
@@ -25,95 +28,6 @@
   @font-face { font-family:'DIN Pro'; src:url('fonts/D-DIN-PRO-600-SemiBold.otf') format('opentype'); font-weight:600; font-display:optional; }
   @font-face { font-family:'DIN Pro'; src:url('fonts/D-DIN-PRO-700-Bold.otf')    format('opentype'); font-weight:700; font-display:optional; }
   @font-face { font-family:'DIN Pro'; src:url('fonts/D-DIN-PRO-800-ExtraBold.otf') format('opentype'); font-weight:800; font-display:optional; }
-
-  :root{
-    /* ═══ Surface hierarchy — 3 tiers, ONE value each ═══
-       Every card in the product uses --surface-2. Nested cards (card-in-card)
-       use --surface-3. The legacy names below are aliased so existing
-       selectors keep working while we migrate callers. */
-    --surface-1:#0f1219;  /* page background */
-    --surface-2:#18181b;  /* every card, every panel, every section */
-    --surface-3:#27272a;  /* nested cards, form inputs, code blocks */
-
-    /* Legacy aliases — DO NOT USE in new code. Point all four at the tier
-       they semantically belong to so historical callsites stay in sync. */
-    --brand-bg:var(--surface-1);
-    --brand-bg-surface:var(--surface-2);
-    --brand-bg-elevated:var(--surface-3);
-    --brand-bg-card:var(--surface-2);
-    /* Text hierarchy — 2 tiers of muted, never 3 */
-    --brand-text:#a1a1aa;         /* body copy, list items, table cells */
-    --brand-text-bright:#e4e4e7;  /* headlines, stat values, emphasized */
-    --brand-text-muted:#a1a1aa;   /* bumped from #71717a — now an alias for body */
-    --brand-text-dim:#71717a;     /* icons, placeholder chrome, borders — NEVER body copy */
-    --brand-mint:#2dd4bf;
-    --brand-mint-hover:#5eead4;
-    --brand-mint-dim:rgba(45,212,191,.1);
-    --brand-mint-glow:rgba(45,212,191,.18);
-    --brand-yellow:#ffb600;
-    --brand-yellow-dim:rgba(255,182,0,.1);
-    --brand-border:#27272a;
-    --brand-border-hover:#3f3f46;
-
-    /* Radius scale — single source of truth */
-    --radius-sm:4px;       /* badges, pills */
-    --radius-md:8px;       /* buttons, inputs, segmented */
-    --radius-lg:10px;      /* wrapper cards, sectioncard chrome */
-    --radius-xl:12px;      /* elevated cards, modals */
-    --radius-pill:9999px;  /* chips, progress bars */
-    --radius:var(--radius-lg);               /* legacy alias */
-    --radius-signature:6px 12px 6px 12px;    /* StatCard, CompactStatBar */
-    --radius-signature-lg:10px 24px 10px 24px; /* SectionCard */
-
-    /* Icon size scale */
-    --icon-sm:14px;
-    --icon-md:18px;
-    --icon-lg:24px;
-
-    /* Neutral scale (zinc) */
-    --zinc-100:#f4f4f5; --zinc-200:#e4e4e7; --zinc-300:#d4d4d8; --zinc-400:#a1a1aa;
-    --zinc-500:#71717a; --zinc-600:#52525b; --zinc-700:#3f3f46; --zinc-800:#27272a; --zinc-900:#18181b; --zinc-950:#09090b;
-
-    /* Accent family (dark) */
-    --teal:#2dd4bf; --blue:#60a5fa; --emerald:#10b981; --green:#10b981;
-    --amber:#fbbf24; --red:#f87171; --orange:#fb923c; --cyan:#22d3ee;
-    --sky:#38bdf8; --yellow:#eab308; --purple:#a78bfa;
-
-    --metric-ring-track:#303036;
-  }
-
-  /* NOTE: Light-mode overrides INVERT the zinc scale intentionally so dark-mode component
-     CSS (e.g. color:var(--zinc-400)) reads as the correct polarity in both themes.
-     Do NOT rely on zinc-N values meaning "a specific grey" — they mean "step N in the
-     current theme's text hierarchy." For true-value neutral, use hex directly. */
-  .light{
-    --surface-1:#f8fafc;
-    --surface-2:#ffffff;
-    --surface-3:#f1f5f9;
-    /* legacy aliases re-point */
-    --brand-bg:var(--surface-1);
-    --brand-bg-surface:var(--surface-2);
-    --brand-bg-elevated:var(--surface-3);
-    --brand-bg-card:var(--surface-2);
-    --brand-text:#334155;
-    --brand-text-bright:#0f172a;
-    --brand-text-muted:#334155;  /* aliased to body; dim is separate */
-    --brand-text-dim:#64748b;
-    --brand-mint:#0d9488;
-    --brand-mint-hover:#0f766e;
-    --brand-mint-dim:rgba(13,148,136,.08);
-    --brand-border:rgba(148,163,184,.2);
-    --brand-border-hover:rgba(148,163,184,.35);
-
-    --zinc-100:#0f172a; --zinc-200:#0f172a; --zinc-300:#1e293b; --zinc-400:#334155;
-    --zinc-500:#475569; --zinc-600:#475569; --zinc-700:#334155; --zinc-800:#f1f5f9; --zinc-900:#ffffff; --zinc-950:#f8fafc;
-
-    --teal:#0d9488; --blue:#2563eb; --emerald:#047857; --green:#047857;
-    --amber:#b45309; --red:#dc2626; --orange:#c2410c; --cyan:#0e7490;
-    --sky:#0369a1; --yellow:#a16207; --purple:#7c3aed;
-
-    --metric-ring-track:#e2e8f0;
-  }
 
   *{ box-sizing:border-box; }
   html,body{ margin:0; padding:0; }
@@ -978,27 +892,7 @@ var(--surface-2);
   .sub-section + .sub-section{ margin-top:28px; }
 
   /* ─── 06 · DATA VIZ ─── */
-  /* Blue scale + chart tokens (dark) */
-  :root{
-    --blue-100:#dbeafe; --blue-200:#bfdbfe; --blue-300:#93c5fd;
-    --blue-400:#60a5fa; --blue-500:#3b82f6; --blue-600:#2563eb;
-    --blue-ghost:rgba(96,165,250,.4);
-    --ann-site:#3b82f6; --ann-algo:#f59e0b; --ann-camp:#a855f7; --ann-other:#71717a;
-    --chart-grid:rgba(63,63,70,.55);
-    --chart-axis:#71717a;
-    --chart-area-top:.18;            /* top gradient stop opacity */
-    --chart-area-bot:0;
-    --chart-stroke-width:1.5;
-    --chart-dot-ring:#18181b;        /* matches page bg */
-  }
-  .light{
-    --blue-100:#1e3a8a; --blue-200:#1d4ed8; --blue-300:#2563eb;
-    --blue-400:#3b82f6; --blue-500:#60a5fa; --blue-600:#93c5fd;
-    --blue-ghost:rgba(37,99,235,.3);
-    --chart-grid:rgba(148,163,184,.4); --chart-axis:#64748b;
-    --chart-area-top:.14;
-    --chart-dot-ring:#ffffff;
-  }
+  /* Blue scale + chart tokens come from /tokens.css via @import */
 
   .dv-grid2{ display:grid; grid-template-columns:1fr 1fr; gap:20px; }
   .dv-grid3{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }

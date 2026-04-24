@@ -475,7 +475,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
 
       {/* ── Needs Attention ── */}
       {(urgentActions.length > 0 || setupActions.length > 0) && (() => {
-        const colorMap = { red: 'text-red-400', amber: 'text-amber-400', teal: 'text-teal-400', green: 'text-green-400' };
+        const colorMap = { red: 'text-red-400', amber: 'text-amber-400', teal: 'text-teal-400', green: 'text-emerald-400' };
         const visibleUrgent = showMoreActions ? urgentActions : urgentActions.slice(0, 5);
         const hiddenCount = urgentActions.length - visibleUrgent.length;
         return (

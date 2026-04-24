@@ -136,7 +136,7 @@ export function BriefList({
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-medium text-zinc-200 truncate">{brief.targetKeyword}</span>
                     {brief.difficultyScore != null && (
-                      <span className={`text-[11px] px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${brief.difficultyScore <= 30 ? 'bg-green-500/10 text-green-400 border border-green-500/20' : brief.difficultyScore <= 60 ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>{brief.difficultyScore}/100</span>
+                      <span className={`text-[11px] px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${brief.difficultyScore <= 30 ? 'bg-green-500/10 text-emerald-400 border border-green-500/20' : brief.difficultyScore <= 60 ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>{brief.difficultyScore}/100</span>
                     )}
                   </div>
                   <div className="text-[11px] text-zinc-500 mt-0.5 truncate">{brief.suggestedTitle}</div>

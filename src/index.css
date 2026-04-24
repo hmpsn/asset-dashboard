@@ -1,3 +1,4 @@
+@import './tokens.css';
 @import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
@@ -8,41 +9,6 @@
 @font-face { font-family: 'DIN Pro'; src: url('/fonts/D-DIN-PRO-700-Bold.otf') format('opentype'); font-weight: 700; font-style: normal; font-display: swap; }
 @font-face { font-family: 'DIN Pro'; src: url('/fonts/D-DIN-PRO-800-ExtraBold.otf') format('opentype'); font-weight: 800; font-style: normal; font-display: swap; }
 @font-face { font-family: 'DIN Pro'; src: url('/fonts/D-DIN-PRO-900-Heavy.otf') format('opentype'); font-weight: 900; font-style: normal; font-display: swap; }
-
-:root {
-  /* ─── 3-tier surface system (canonical — use in new code) ─── */
-  --surface-1: #0f1219;       /* page background / absolute base */
-  --surface-2: #18181b;       /* primary card surfaces (bg-zinc-900 equivalent) */
-  --surface-3: #27272a;       /* elevated: inputs, active tabs, hover (bg-zinc-800 equivalent) */
-
-  /* ─── Radius scale ─── */
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;          /* cards, panels — use rounded-[var(--radius-lg)] in new code */
-  --radius-xl: 16px;          /* modals, large overlays */
-
-  /* ─── Legacy background aliases (do not use in new code) ─── */
-  --brand-bg: var(--surface-1);
-  --brand-bg-surface: var(--surface-2);
-  --brand-bg-elevated: var(--surface-2);
-  --brand-bg-card: var(--surface-3);
-
-  /* ─── Text ─── */
-  --brand-text: #a1a1aa;
-  --brand-text-bright: #e4e4e7;
-  --brand-text-muted: #71717a;
-
-  /* ─── Brand accent ─── */
-  --brand-mint: #2dd4bf;
-  --brand-mint-hover: #5eead4;
-  --brand-mint-dim: rgba(45, 212, 191, 0.1);
-  --brand-mint-glow: rgba(45, 212, 191, 0.18);
-  --brand-yellow: #ffb600;
-  --brand-yellow-dim: rgba(255, 182, 0, 0.1);
-  --brand-border: #27272a;
-  --brand-border-hover: #3f3f46;
-  --radius: 10px; /* legacy — prefer --radius-* scale */
-}
 
 body {
   margin: 0;
@@ -287,49 +253,138 @@ body::after {
 }
 
 
+/* ─── Typography utilities (canonical) ────────────────────────────────────────
+   These classes (.t-*) are the Phase 5 type system. Use them instead of
+   arbitrary text-[Npx] values. They are globally available from any .tsx.
+
+   Law: Phase 2 codemods replace arbitrary text sizes → .t-* classes.
+         Phase 3 pr-check blocks new text-[Npx] usages.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Display / Hero */
+.t-hero {
+  font-family: 'DIN Pro', 'Inter', sans-serif;
+  font-size: 42px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+/* Headings */
+.t-h1 {
+  font-family: 'DIN Pro', 'Inter', sans-serif;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+
+.t-h2 {
+  font-family: 'DIN Pro', 'Inter', sans-serif;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+/* Stat values */
+.t-stat-lg {
+  font-family: 'DIN Pro', 'Inter', sans-serif;
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.t-stat {
+  font-family: 'DIN Pro', 'Inter', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.t-stat-sm {
+  font-family: 'DIN Pro', 'Inter', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Body text */
+.t-page {
+  font-family: 'Inter', sans-serif;
+  font-size: 15.5px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.t-body {
+  font-family: 'Inter', sans-serif;
+  font-size: 14.5px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.t-ui {
+  font-family: 'Inter', sans-serif;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+/* Labels & captions */
+.t-label {
+  font-family: 'DIN Pro', 'Inter', sans-serif;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.4;
+}
+
+.t-caption {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.t-caption-sm {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+/* Monospace */
+.t-mono {
+  font-family: 'Fira Code', 'JetBrains Mono', 'Menlo', 'Courier New', monospace;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Micro */
+.t-micro {
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
 /* ─── Client Dashboard Light Theme ─── */
 
-/* === Base === */
+/* === Base ===
+   All --* tokens for .dashboard-light are declared in src/tokens.css.
+   Only non-token overrides belong here. */
 .dashboard-light {
-  /* ─── Surface tokens (light-mode overrides) ─── */
-  --surface-1: #f8fafc;
-  --surface-2: #ffffff;
-  --surface-3: #f1f5f9;
-  /* Backgrounds */
-  --brand-bg: #f8fafc;
-  --brand-bg-surface: #ffffff;
-  --brand-bg-elevated: #ffffff;
-  --brand-bg-card: #f1f5f9;
-  --brand-bg-hover: #e8edf3;
-  --brand-bg-active: #dde4ee;
-  /* Text */
-  --brand-text: #334155;
-  --brand-text-bright: #0f172a;
-  --brand-text-muted: #475569;
-  --brand-text-disabled: #94a3b8;
-  /* Borders */
-  --brand-border: rgba(148, 163, 184, 0.2);
-  --brand-border-hover: rgba(148, 163, 184, 0.35);
-  --brand-border-strong: #cbd5e1;
-  /* Shadows */
-  --brand-shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.08);
-  --brand-shadow-md: 0 4px 16px rgba(15, 23, 42, 0.10);
-  /* Scrollbar */
-  --scrollbar-thumb: rgba(148, 163, 184, 0.55);
-  --scrollbar-thumb-hover: rgba(100, 116, 139, 0.75);
-  /* Charts */
-  --chart-grid: #e2e8f0;
-  --chart-tooltip-bg: #ffffff;
-  --chart-tooltip-text: #0f172a;
-  /* Overlays */
-  --brand-overlay: rgba(15, 23, 42, 0.35);
-  /* Brand teal — deeper in light mode for contrast */
-  --brand-mint: #0d9488;
-  --brand-mint-hover: #0f766e;
-  --brand-mint-dim: rgba(13, 148, 136, 0.08);
-  /* Metric ring */
-  --metric-ring-track: #e2e8f0;
-  /* Layout defaults */
+  /* Layout defaults — not a CSS variable, can't live in tokens.css */
   background-color: #f8fafc !important;
   color: #1e293b !important;
 }
@@ -670,9 +725,6 @@ body::after {
 /* ── Missing gradient stops ── */
 .dashboard-light .from-zinc-900 { --tw-gradient-from: #ffffff !important; }
 .dashboard-light .to-zinc-900\/50 { --tw-gradient-to: rgba(255,255,255,0.8) !important; }
-
-/* ── MetricRing track color ── */
-.dashboard-light { --metric-ring-track: #e2e8f0; }
 
 /* ── Skeleton shimmer — visible pulse on light backgrounds ── */
 .dashboard-light .animate-pulse.bg-zinc-800 {

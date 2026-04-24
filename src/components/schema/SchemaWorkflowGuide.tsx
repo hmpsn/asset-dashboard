@@ -83,8 +83,8 @@ const STEPS = [
     number: 6,
     title: 'Check Competitors',
     icon: Users,
-    color: 'text-rose-400',
-    bg: 'bg-rose-500/10 border-rose-500/20',
+    color: 'text-amber-400',
+    bg: 'bg-amber-500/10 border-amber-500/20',
     description: 'Crawl competitor sites to see what schema types they use. Identify gaps in your coverage.',
     actions: [
       'Run competitor schema analysis from the Competitors tab',
@@ -97,7 +97,7 @@ const STEPS = [
     number: 7,
     title: 'Monitor Impact',
     icon: TrendingUp,
-    color: 'text-green-400',
+    color: 'text-emerald-400',
     bg: 'bg-green-500/10 border-green-500/20',
     description: 'Track GSC metrics before vs after each schema deployment. See clicks, impressions, CTR, and position deltas.',
     actions: [

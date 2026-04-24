@@ -37,14 +37,14 @@ const STATUS_ICONS: Record<string, { icon: typeof Clock; color: string }> = {
   generating:       { icon: Sparkles,     color: 'text-amber-400' },
   draft:            { icon: PenLine,      color: 'text-blue-400' },
   review:           { icon: Eye,          color: 'text-cyan-400' },
-  approved:         { icon: CheckCircle2, color: 'text-green-400' },
+  approved:         { icon: CheckCircle2, color: 'text-emerald-400' },
   requested:        { icon: Send,         color: 'text-blue-400' },
   pending_payment:  { icon: Clock,        color: 'text-zinc-400' },
   brief_generated:  { icon: Clipboard,    color: 'text-teal-400' },
   client_review:    { icon: Eye,          color: 'text-cyan-400' },
   in_progress:      { icon: Sparkles,     color: 'text-amber-400' },
-  delivered:        { icon: CheckCircle2, color: 'text-green-400' },
-  published:        { icon: Globe,        color: 'text-green-400' },
+  delivered:        { icon: CheckCircle2, color: 'text-emerald-400' },
+  published:        { icon: Globe,        color: 'text-emerald-400' },
   declined:         { icon: Clock,        color: 'text-red-400' },
 };
 
@@ -201,7 +201,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
           { label: 'Posts', value: stats.posts, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
           { label: 'Requests', value: stats.requests, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
           { label: 'Matrix Cells', value: stats.matrixCells, color: 'text-teal-400', bg: 'bg-teal-500/10', border: 'border-teal-500/20' },
-          { label: 'Published', value: stats.published, color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
+          { label: 'Published', value: stats.published, color: 'text-emerald-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
         ].map(s => (
           <div key={s.label} className={`border ${s.border} ${s.bg} px-4 py-3`} style={{ borderRadius: '6px 12px 6px 12px' }}>
             <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>

@@ -32,7 +32,7 @@ describe('statusConfig', () => {
   it('uses distinct color families per status', () => {
     expect(statusConfig['issue-detected']!.text).toContain('amber');
     expect(statusConfig['fix-proposed']!.text).toContain('blue');
-    expect(statusConfig['in-review']!.text).toContain('purple');
+    expect(statusConfig['in-review']!.text).toContain('blue');
     // approved uses emerald (refined from green) per visual polish spec
     expect(statusConfig.approved!.text).toContain('emerald');
     expect(statusConfig.rejected!.text).toContain('red');

@@ -449,7 +449,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
                 generating: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
                 draft: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
                 review: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
-                approved: 'text-green-400 bg-green-500/10 border-green-500/20',
+                approved: 'text-emerald-400 bg-green-500/10 border-green-500/20',
               };
               return (
                 <button

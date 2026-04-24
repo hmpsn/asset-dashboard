@@ -1,0 +1,208 @@
+/* ═══════════════════════════════════════════════════════════════
+   src/tokens.css — CANONICAL TOKEN SOURCE OF TRUTH
+   ───────────────────────────────────────────────────────────────
+   This file is the ONE place where every --* CSS custom property
+   is defined. Do NOT redefine tokens anywhere else.
+
+   Consumed by:
+     - src/index.css   (@import './tokens.css')
+     - public/tokens.css  (build-copied mirror for styleguide at /tokens.css)
+
+   Never add tokens to src/index.css directly.
+   Never add tokens to public/styleguide.css.
+   See CLAUDE.md "Design System — Token source of truth".
+   ═══════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ─── Surface ─── */
+  --surface-1: #0f1219;        /* Page / app background */
+  --surface-2: #18181b;        /* Card surfaces */
+  --surface-3: #27272a;        /* Elevated / inner panels */
+
+  /* ─── Text ─── */
+  --brand-text: #a1a1aa;
+  --brand-text-bright: #e4e4e7;
+  --brand-text-muted: #71717a;
+  --brand-text-dim: #52525b;
+
+  /* ─── Brand colors ─── */
+  --brand-bg: #0f1219;
+  --brand-bg-surface: #18181b;
+  --brand-bg-elevated: #18181b;
+  --brand-bg-card: #27272a;
+
+  --brand-mint: #2dd4bf;
+  --brand-mint-hover: #5eead4;
+  --brand-mint-dim: rgba(45, 212, 191, 0.1);
+  --brand-mint-glow: rgba(45, 212, 191, 0.18);
+
+  --brand-yellow: #ffb600;
+  --brand-yellow-dim: rgba(255, 182, 0, 0.1);
+
+  /* ─── Border ─── */
+  --brand-border: #27272a;
+  --brand-border-hover: #3f3f46;
+
+  /* ─── Border-radius ─── */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-pill: 9999px;
+  --radius-signature: 6px 12px 6px 12px;
+  --radius-signature-lg: 10px 24px 10px 24px;
+
+  /* ─── Legacy alias (deprecated — use --radius-lg) ─── */
+  --radius: 10px;
+
+  /* ─── Icon sizes ─── */
+  --icon-sm: 14px;
+  --icon-md: 18px;
+  --icon-lg: 24px;
+
+  /* ─── Zinc scale (dark mode values) ─── */
+  --zinc-100: #f4f4f5;
+  --zinc-200: #e4e4e7;
+  --zinc-300: #d4d4d8;
+  --zinc-400: #a1a1aa;
+  --zinc-500: #71717a;
+  --zinc-600: #52525b;
+  --zinc-700: #3f3f46;
+  --zinc-800: #27272a;
+  --zinc-900: #18181b;
+  --zinc-950: #0f1219;
+
+  /* ─── Accent hues (dark mode) ─── */
+  --teal: #2dd4bf;
+  --blue: #60a5fa;
+  --emerald: #34d399;
+  --purple: #a78bfa;
+  --amber: #fbbf24;
+  --red: #f87171;
+  --orange: #fb923c;
+  --cyan: #22d3ee;
+  --sky: #38bdf8;
+  --yellow: #eab308;
+
+  /* ─── Chart tokens ─── */
+  --metric-ring-track: #27272a;
+  --blue-ghost: rgba(96, 165, 250, 0.08);
+  --chart-grid: #27272a;
+  --chart-axis: #71717a;
+  --chart-area-top: 0.18;
+  --chart-area-bot: 0;
+  --chart-stroke-width: 1.5;
+  --chart-dot-ring: #18181b;
+
+  /* Blue scale (dark mode) — used by chart demos and data-viz specimens */
+  --blue-100: #dbeafe;
+  --blue-200: #bfdbfe;
+  --blue-300: #93c5fd;
+  --blue-400: #60a5fa;
+  --blue-500: #3b82f6;
+  --blue-600: #2563eb;
+
+  /* Annotation colors for traffic/algorithm/campaign overlays */
+  --ann-site: #3b82f6;
+  --ann-algo: #f59e0b;
+  --ann-camp: #a855f7;
+  --ann-other: #71717a;
+
+  /* ─── Z-index scale ─── */
+  --z-sticky: 10;
+  --z-dropdown: 20;
+  --z-tooltip: 30;
+  --z-modal-backdrop: 40;
+  --z-modal: 50;
+  --z-toast: 60;
+}
+
+/* ─── Light mode token overrides ─── */
+/* .light is the public styleguide's toggle class; .dashboard-light is the React app's class */
+.dashboard-light, .light {
+  /* Surfaces */
+  --surface-1: #f8fafc;
+  --surface-2: #ffffff;
+  --surface-3: #f1f5f9;
+
+  /* Text */
+  --brand-text: #334155;
+  --brand-text-bright: #0f172a;
+  --brand-text-muted: #475569;
+  --brand-text-dim: #64748b;
+  --brand-text-disabled: #94a3b8;
+
+  /* Brand backgrounds */
+  --brand-bg: #f8fafc;
+  --brand-bg-surface: #ffffff;
+  --brand-bg-elevated: #ffffff;
+  --brand-bg-card: #f1f5f9;
+  --brand-bg-hover: #e8edf3;
+  --brand-bg-active: #dde4ee;
+
+  /* Brand teal — deeper in light mode for contrast */
+  --brand-mint: #0d9488;
+  --brand-mint-hover: #0f766e;
+  --brand-mint-dim: rgba(13, 148, 136, 0.08);
+
+  /* Border */
+  --brand-border: rgba(148, 163, 184, 0.2);
+  --brand-border-hover: rgba(148, 163, 184, 0.35);
+  --brand-border-strong: #cbd5e1;
+
+  /* Shadows */
+  --brand-shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.08);
+  --brand-shadow-md: 0 4px 16px rgba(15, 23, 42, 0.10);
+
+  /* Scrollbar */
+  --scrollbar-thumb: rgba(148, 163, 184, 0.55);
+  --scrollbar-thumb-hover: rgba(100, 116, 139, 0.75);
+
+  /* Charts */
+  --chart-grid: #e2e8f0;
+  --chart-tooltip-bg: #ffffff;
+  --chart-tooltip-text: #0f172a;
+  --metric-ring-track: #e2e8f0;
+
+  /* Overlays */
+  --brand-overlay: rgba(15, 23, 42, 0.35);
+
+  /* Zinc scale (light mode — inverted) */
+  --zinc-100: #0f172a;
+  --zinc-200: #1e293b;
+  --zinc-300: #334155;
+  --zinc-400: #475569;
+  --zinc-500: #64748b;
+  --zinc-600: #94a3b8;
+  --zinc-700: #cbd5e1;
+  --zinc-800: #e2e8f0;
+  --zinc-900: #f1f5f9;
+  --zinc-950: #f8fafc;
+
+  /* Accent hues (light mode — darker for WCAG contrast) */
+  --teal: #0d9488;
+  --blue: #2563eb;
+  --emerald: #047857;
+  --purple: #7c3aed;
+  --amber: #b45309;
+  --red: #dc2626;
+  --orange: #c2410c;
+  --cyan: #0e7490;
+  --sky: #0369a1;
+  --yellow: #a16207;
+
+  /* Blue scale (light mode — darkened for contrast) */
+  --blue-100: #1e3a8a;
+  --blue-200: #1d4ed8;
+  --blue-300: #2563eb;
+  --blue-400: #3b82f6;
+  --blue-500: #60a5fa;
+  --blue-600: #93c5fd;
+  --blue-ghost: rgba(37, 99, 235, 0.3);
+
+  /* Chart tokens (light mode) */
+  --chart-grid: rgba(148, 163, 184, 0.4);
+  --chart-axis: #64748b;
+  --chart-area-top: 0.14;
+  --chart-dot-ring: #ffffff;
+}

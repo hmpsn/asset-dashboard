@@ -225,7 +225,7 @@ export function BriefDetail({
         {brief.difficultyScore != null && (
           <div className="bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
             <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-0.5">Difficulty</div>
-            <div className={`text-sm font-bold ${brief.difficultyScore <= 30 ? 'text-green-400' : brief.difficultyScore <= 60 ? 'text-amber-400' : 'text-red-400'}`}>{brief.difficultyScore}/100</div>
+            <div className={`text-sm font-bold ${brief.difficultyScore <= 30 ? 'text-emerald-400' : brief.difficultyScore <= 60 ? 'text-amber-400' : 'text-red-400'}`}>{brief.difficultyScore}/100</div>
           </div>
         )}
       </div>
@@ -233,7 +233,7 @@ export function BriefDetail({
       {/* Traffic Potential */}
       {brief.trafficPotential && (
         <div className="flex items-start gap-2 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">
-          <TrendingUp className="w-3.5 h-3.5 text-green-400 mt-0.5 flex-shrink-0" />
+          <TrendingUp className="w-3.5 h-3.5 text-emerald-400 mt-0.5 flex-shrink-0" />
           <div><div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-0.5">Traffic Potential</div><div className="text-xs text-zinc-300">{brief.trafficPotential}</div></div>
         </div>
       )}
@@ -311,7 +311,7 @@ export function BriefDetail({
               <div><span className="text-[11px] text-zinc-500 block mb-1">Common Elements:</span><div className="flex flex-wrap gap-1">{brief.serpAnalysis.commonElements.map((el, i) => <span key={i} className="text-[11px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400">{el}</span>)}</div></div>
             )}
             {brief.serpAnalysis.gaps.length > 0 && (
-              <div><span className="text-[11px] text-green-400/80 block mb-1">Opportunities (gaps in existing content):</span><div className="space-y-1">{brief.serpAnalysis.gaps.map((g, i) => <div key={i} className="text-[11px] text-green-300/80 flex items-start gap-1.5"><span className="text-green-400 mt-0.5">&rarr;</span>{g}</div>)}</div></div>
+              <div><span className="text-[11px] text-emerald-400/80 block mb-1">Opportunities (gaps in existing content):</span><div className="space-y-1">{brief.serpAnalysis.gaps.map((g, i) => <div key={i} className="text-[11px] text-green-300/80 flex items-start gap-1.5"><span className="text-emerald-400 mt-0.5">&rarr;</span>{g}</div>)}</div></div>
             )}
           </div>
         </div>

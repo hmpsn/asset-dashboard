@@ -53,7 +53,7 @@ export function StrategyDiff({ workspaceId }: StrategyDiffProps) {
               <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium mb-1.5">New Keywords</div>
               <div className="flex flex-wrap gap-1">
                 {diff.newKeywords.map(kw => (
-                  <span key={kw} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-[11px] text-green-400">
+                  <span key={kw} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-[11px] text-emerald-400">
                     <Plus className="w-2.5 h-2.5" />{kw}
                   </span>
                 ))}
@@ -81,7 +81,7 @@ export function StrategyDiff({ workspaceId }: StrategyDiffProps) {
               <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium mb-1.5">New Content Gaps</div>
               <div className="flex flex-wrap gap-1">
                 {diff.newGaps.map(kw => (
-                  <span key={kw} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-[11px] text-green-400">
+                  <span key={kw} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-[11px] text-emerald-400">
                     <Plus className="w-2.5 h-2.5" />{kw}
                   </span>
                 ))}

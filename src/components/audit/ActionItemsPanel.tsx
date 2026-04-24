@@ -23,7 +23,7 @@ interface ActionItem {
 const STATUS_CONFIG = {
   planned: { label: 'Planned', color: 'text-zinc-400', bg: 'bg-zinc-500/10 border-zinc-500/30', icon: Circle },
   'in-progress': { label: 'In Progress', color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/30', icon: Loader2 },
-  completed: { label: 'Done', color: 'text-green-400', bg: 'bg-green-500/10 border-green-500/30', icon: CheckCircle },
+  completed: { label: 'Done', color: 'text-emerald-400', bg: 'bg-green-500/10 border-green-500/30', icon: CheckCircle },
 } as const;
 
 const PRIORITY_CONFIG = {

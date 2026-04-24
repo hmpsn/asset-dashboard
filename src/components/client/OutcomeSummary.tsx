@@ -24,13 +24,13 @@ const ACTION_TYPE_LABELS: Record<ActionType, string> = {
 };
 
 function TrendIcon({ trend }: { trend: LearningsTrend }) {
-  if (trend === 'improving') return <TrendingUp className="w-4 h-4 text-green-400" />;
+  if (trend === 'improving') return <TrendingUp className="w-4 h-4 text-emerald-400" />;
   if (trend === 'declining') return <TrendingDown className="w-4 h-4 text-red-400" />;
   return <Minus className="w-4 h-4 text-zinc-400" />;
 }
 
 function winRateColor(rate: number): string {
-  if (rate >= 0.6) return 'text-green-400';
+  if (rate >= 0.6) return 'text-emerald-400';
   if (rate >= 0.4) return 'text-amber-400';
   return 'text-red-400';
 }
@@ -66,7 +66,7 @@ function TopThreeWins({ scorecard }: { scorecard: OutcomeScorecard }) {
     <ul className="space-y-2">
       {topCategories.map(cat => (
         <li key={cat.actionType} className="flex items-start gap-2 text-sm text-zinc-300">
-          <CheckCircle2 className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
           <span>
             <span className="font-medium text-zinc-100">
               {ACTION_TYPE_LABELS[cat.actionType]}
@@ -172,7 +172,7 @@ function PremiumBreakdown({ scorecard }: { scorecard: OutcomeScorecard }) {
           </div>
           <div className="space-y-1">
             <p className="text-xs text-zinc-500">Confirmed wins</p>
-            <p className="text-xl font-semibold text-green-400">{totalWins}</p>
+            <p className="text-xl font-semibold text-emerald-400">{totalWins}</p>
           </div>
           <div className="space-y-1">
             <p className="text-xs text-zinc-500">Pending measurement</p>

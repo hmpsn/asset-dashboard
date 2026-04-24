@@ -93,7 +93,7 @@ function BatchProgressBar({ job }: BatchProgressProps) {
     pending:  'text-zinc-400',
     running:  'text-blue-400',
     paused:   'text-amber-400',
-    complete: 'text-green-400',
+    complete: 'text-emerald-400',
     failed:   'text-red-400',
   };
 

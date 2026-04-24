@@ -39,7 +39,7 @@ function getSizeColor(bytes: number): string {
   if (bytes > 5 * 1024 * 1024) return 'text-red-400';
   if (bytes > 2 * 1024 * 1024) return 'text-orange-400';
   if (bytes > 1 * 1024 * 1024) return 'text-amber-400';
-  return 'text-green-400';
+  return 'text-emerald-400';
 }
 
 function getBarWidth(size: number, max: number): number {
@@ -173,7 +173,7 @@ function PageWeight({ siteId }: Props) {
           <div className="text-xs text-zinc-500 mt-1">Total Asset Size</div>
         </div>
         <div className="bg-zinc-900 p-5 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
-          <div className={`text-3xl font-bold ${heavyPages > 0 ? 'text-orange-400' : 'text-green-400'}`}>{heavyPages}</div>
+          <div className={`text-3xl font-bold ${heavyPages > 0 ? 'text-orange-400' : 'text-emerald-400'}`}>{heavyPages}</div>
           <div className="text-xs text-zinc-500 mt-1">Heavy Pages (&gt;2MB)</div>
         </div>
         <div className="bg-zinc-900 p-5 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>

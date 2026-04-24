@@ -47,8 +47,8 @@ const ROLE_COLORS: Partial<Record<SchemaPageRole, string>> = {
   product: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
   partnership: 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30',
   faq: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
-  'case-study': 'bg-pink-500/15 text-pink-300 border-pink-500/30',
-  comparison: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+  'case-study': 'bg-blue-500/15 text-blue-300 border-blue-500/30',
+  comparison: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
   generic: 'bg-zinc-500/10 text-zinc-400 border-zinc-600/30',
 };
 const DEFAULT_ROLE_COLOR = 'bg-zinc-500/10 text-zinc-400 border-zinc-600/30';
@@ -311,12 +311,12 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
 
           {/* Already approved / active */}
           {plan.status === 'client_approved' && (
-            <div className="px-5 py-3 border-t border-zinc-800 flex items-center gap-2 text-xs text-green-400">
+            <div className="px-5 py-3 border-t border-zinc-800 flex items-center gap-2 text-xs text-emerald-400">
               <CheckCircle className="w-3.5 h-3.5" /> You approved this strategy. Your agency is implementing it.
             </div>
           )}
           {plan.status === 'active' && (
-            <div className="px-5 py-3 border-t border-zinc-800 flex items-center gap-2 text-xs text-green-400">
+            <div className="px-5 py-3 border-t border-zinc-800 flex items-center gap-2 text-xs text-emerald-400">
               <CheckCircle className="w-3.5 h-3.5" /> This schema strategy is live on your website.
             </div>
           )}
@@ -357,7 +357,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap justify-end">
                   {page.existingSchemas.length > 0 && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-emerald-400 border border-green-500/20">
                       {page.existingSchemas.length} live
                     </span>
                   )}

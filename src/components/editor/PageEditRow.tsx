@@ -180,7 +180,7 @@ export function PageEditRow({
                 </div>
                 <div className="text-[11px] text-zinc-400 mt-1">{rec.insight}</div>
                 {rec.estimatedGain && (
-                  <div className="text-[10px] text-green-400/70 mt-1">
+                  <div className="text-[10px] text-emerald-400/70 mt-1">
                     Potential: {rec.estimatedGain}
                   </div>
                 )}
@@ -220,7 +220,7 @@ export function PageEditRow({
                 </button>
               )}
               {hasAnalysis && (
-                <span className="text-[10px] text-green-400/70 flex items-center gap-1">
+                <span className="text-[10px] text-emerald-400/70 flex items-center gap-1">
                   <Check className="w-2.5 h-2.5" /> Analysis on file
                 </span>
               )}
