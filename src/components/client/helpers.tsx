@@ -299,7 +299,7 @@ export function InsightCard({ icon: Icon, color, title, count, desc, items }: {
   items: Array<{ label: string; value: string; sub: string }>;
 }) {
   const colorMap: Record<string, { text: string }> = {
-    amber: { text: 'text-amber-400' }, green: { text: 'text-emerald-400' },
+    amber: { text: 'text-amber-400' }, green: { text: 'text-emerald-400' }, emerald: { text: 'text-emerald-400' },
     red: { text: 'text-red-400' }, orange: { text: 'text-orange-400' },
   };
   const c = colorMap[color] || colorMap.amber;

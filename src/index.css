@@ -429,8 +429,7 @@ body::after {
 .dashboard-light .text-teal-300 { color: #0d9488 !important; }       /* map up   · 4.5:1 */
 .dashboard-light .text-teal-200 { color: #0d9488 !important; }       /* map up   · 4.5:1 */
 .dashboard-light .text-emerald-400 { color: #047857 !important; }    /* emrld-700 · 5.5:1 */
-.dashboard-light .text-green-400 { color: #15803d !important; }      /* green-700 · 5.2:1 */
-.dashboard-light .text-green-300 { color: #15803d !important; }      /* map up   · 5.2:1 */
+
 .dashboard-light .text-blue-400 { color: #2563eb !important; }       /* blue-600  · 4.6:1 */
 .dashboard-light .text-amber-400 { color: #b45309 !important; }      /* amber-700 · 5.4:1 */
 .dashboard-light .text-amber-300 { color: #b45309 !important; }      /* map up   · 5.4:1 */
@@ -457,9 +456,8 @@ body::after {
 .dashboard-light .bg-teal-400\/40 { background-color: rgba(13,148,136,0.18) !important; }
 .dashboard-light .bg-emerald-400\/60 { background-color: rgba(4,120,87,0.2) !important; }
 .dashboard-light .bg-emerald-500\/10 { background-color: rgba(4,120,87,0.08) !important; }
-.dashboard-light .bg-green-500\/10 { background-color: rgba(21,128,61,0.08) !important; }
-.dashboard-light .bg-green-600 { background-color: #15803d !important; }
-.dashboard-light .bg-green-600\/80 { background-color: rgba(21,128,61,0.8) !important; }
+.dashboard-light .bg-emerald-600 { background-color: #047857 !important; }
+.dashboard-light .bg-emerald-600\/80 { background-color: rgba(4,120,87,0.8) !important; }
 .dashboard-light .bg-blue-400 { background-color: #2563eb !important; }
 .dashboard-light .bg-blue-400\/40 { background-color: rgba(37,99,235,0.18) !important; }
 .dashboard-light .bg-blue-500\/5 { background-color: rgba(37,99,235,0.05) !important; }
@@ -488,7 +486,7 @@ body::after {
 .dashboard-light .text-yellow-400 { color: #a16207 !important; }
 .dashboard-light .hover\:bg-cyan-600:hover { background-color: #0e7490 !important; }
 .dashboard-light .hover\:bg-cyan-600\/30:hover { background-color: rgba(14,116,144,0.18) !important; }
-.dashboard-light .hover\:bg-green-600\/30:hover { background-color: rgba(21,128,61,0.18) !important; }
+.dashboard-light .hover\:bg-emerald-600\/30:hover { background-color: rgba(4,120,87,0.18) !important; }
 
 /* === Accent Borders === */
 .dashboard-light .border-teal-500 { border-color: #0d9488 !important; }
@@ -499,7 +497,7 @@ body::after {
 .dashboard-light .border-amber-500\/30 { border-color: rgba(180,83,9,0.22) !important; }
 .dashboard-light .border-blue-500\/20 { border-color: rgba(37,99,235,0.15) !important; }
 .dashboard-light .border-blue-500\/30 { border-color: rgba(37,99,235,0.22) !important; }
-.dashboard-light .border-green-500\/30 { border-color: rgba(21,128,61,0.22) !important; }
+.dashboard-light .border-emerald-500\/30 { border-color: rgba(4,120,87,0.22) !important; }
 .dashboard-light .border-red-500\/10 { border-color: rgba(220,38,38,0.1) !important; }
 .dashboard-light .border-red-500\/20 { border-color: rgba(220,38,38,0.15) !important; }
 .dashboard-light .border-red-500\/30 { border-color: rgba(220,38,38,0.22) !important; }
@@ -524,7 +522,7 @@ body::after {
 .dashboard-light .hover\:bg-zinc-800\/30:hover { background-color: rgba(241,245,249,0.6) !important; }
 .dashboard-light .hover\:bg-zinc-800\/50:hover { background-color: rgba(241,245,249,0.8) !important; }
 .dashboard-light .hover\:bg-teal-500:hover { background-color: #0d9488 !important; }
-.dashboard-light .hover\:bg-green-500:hover { background-color: #15803d !important; }
+.dashboard-light .hover\:bg-emerald-500:hover { background-color: #047857 !important; }
 /* === Hover: Borders === */
 .dashboard-light .hover\:border-zinc-700:hover { border-color: #94a3b8 !important; }
 .dashboard-light .hover\:border-zinc-600:hover { border-color: #64748b !important; }
@@ -634,7 +632,6 @@ body::after {
 .dashboard-light .border-teal-500\/25 { border-color: rgba(13,148,136,0.2) !important; }
 
 /* ── Impact/priority pill backgrounds ── */
-.dashboard-light .bg-green-500\/15 { background-color: rgba(21,128,61,0.1) !important; }
 .dashboard-light .bg-amber-500\/15 { background-color: rgba(180,83,9,0.1) !important; }
 .dashboard-light .bg-red-500\/15 { background-color: rgba(220,38,38,0.1) !important; }
 
@@ -660,8 +657,8 @@ body::after {
 .dashboard-light .hover\:border-teal-500\/30:hover { border-color: rgba(13,148,136,0.28) !important; }
 .dashboard-light .hover\:bg-teal-500:hover { background-color: #0f766e !important; }
 /* Action pill buttons (approve, request changes, deliver) */
-.dashboard-light .bg-green-600\/20 { background-color: rgba(21,128,61,0.1) !important; }
-.dashboard-light .hover\:bg-green-600\/30:hover { background-color: rgba(21,128,61,0.15) !important; }
+.dashboard-light .bg-emerald-600\/20 { background-color: rgba(4,120,87,0.1) !important; }
+
 .dashboard-light .bg-orange-600\/20 { background-color: rgba(194,65,12,0.1) !important; }
 .dashboard-light .hover\:bg-orange-600\/30:hover { background-color: rgba(194,65,12,0.15) !important; }
 .dashboard-light .border-orange-500\/30 { border-color: rgba(194,65,12,0.22) !important; }
@@ -671,9 +668,8 @@ body::after {
 
 /* ── Search intent badges (keyword map) ── */
 .dashboard-light .bg-amber-500\/10 { background-color: rgba(180,83,9,0.08) !important; }
-.dashboard-light .bg-green-500\/10 { background-color: rgba(21,128,61,0.08) !important; }
 .dashboard-light .bg-blue-500\/10 { background-color: rgba(37,99,235,0.08) !important; }
-.dashboard-light .border-green-500\/20 { border-color: rgba(21,128,61,0.18) !important; }
+.dashboard-light .border-emerald-500\/20 { border-color: rgba(4,120,87,0.18) !important; }
 
 /* ── Focus states for new inputs ── */
 .dashboard-light .focus\:border-teal-500\/50:focus { border-color: rgba(13,148,136,0.4) !important; }
@@ -685,13 +681,7 @@ body::after {
 .dashboard-light .to-emerald-600 { --tw-gradient-to: #047857 !important; }
 .dashboard-light .shadow-teal-900\/30 { --tw-shadow-color: rgba(13,148,136,0.12) !important; }
 
-/* ── Approval / action buttons ── */
-.dashboard-light .bg-green-600 { background-color: #15803d !important; }
-.dashboard-light .bg-green-600\/80 { background-color: rgba(21,128,61,0.8) !important; }
-.dashboard-light .hover\:bg-green-500:hover { background-color: #16a34a !important; }
-
 /* ── Misc accent borders/backgrounds ── */
-.dashboard-light .border-green-500\/30 { border-color: rgba(21,128,61,0.22) !important; }
 .dashboard-light .border-zinc-800\/50 { border-color: rgba(226,232,240,0.6) !important; }
 .dashboard-light .bg-zinc-800\/50 { background-color: rgba(241,245,249,0.7) !important; }
 
