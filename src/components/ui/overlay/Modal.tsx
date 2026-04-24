@@ -216,9 +216,12 @@ function ModalInner({
     backdropMouseDownRef.current = false;
   };
 
+  // Uses the existing @keyframes scaleIn in src/index.css (fade + 0.95→1
+  // scale). Prior revision referenced a non-existent `modal-in` keyframe,
+  // so the animation was silently a no-op.
   const motionClass = reducedMotion
     ? ''
-    : 'motion-safe:animate-[modal-in_150ms_ease-out]';
+    : 'motion-safe:animate-[scaleIn_150ms_ease-out]';
 
   return createPortal(
     <div
