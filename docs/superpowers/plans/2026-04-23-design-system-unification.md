@@ -210,7 +210,7 @@ brand asymmetric-radius note. Updates both design docs."
 > - `/public/styleguide.html` — full v9 HTML
 > - `/public/styleguide.css` — styleguide styles
 > - `/public/assets/logo-mint.svg`, `/public/assets/logo-navy.svg`
-> - `src/components/Styleguide.tsx` — 8-line redirect (named export only, no default export)
+> - `src/App.tsx` — `StyleguideRedirect` inline component (lines ~75–78), not lazy-loaded (`src/components/Styleguide.tsx` was deleted)
 >
 > Skip to Task 0.5.
 
@@ -357,7 +357,7 @@ Add these six entries at the END of the `CHECKS` array before the closing `];` (
     name: 'Legacy surface token in new code',
     pattern: 'var\\(--brand-bg-',
     fileGlobs: ['*.tsx', '*.css'],
-    exclude: ['src/index.css', 'src/components/Styleguide.tsx'],
+    exclude: ['src/index.css'],
     message: 'Use var(--surface-1/2/3) instead of var(--brand-bg-*). The --brand-bg-* names are legacy aliases — see DESIGN_SYSTEM.md.',
     severity: 'warn',
     rationale: 'Prevents new code from using deprecated token names that bypass the 3-tier surface system.',
@@ -373,7 +373,6 @@ Add these six entries at the END of the `CHECKS` array before the closing `];` (
     pattern: 'className="[^"]*bg-zinc-9[0-9]{2}[^"]*rounded-xl',
     fileGlobs: ['*.tsx'],
     exclude: [
-      'src/components/Styleguide.tsx',
       'src/components/ui/', // ConfirmDialog (modal), ProgressIndicator (not a card) — correct use of rounded-xl
     ],
     message: 'Use <SectionCard> or <SectionCard variant="subtle"> instead of hand-rolling bg-zinc-9xx + rounded-xl. Add a // pr-check-disable-next-line comment with justification for modals and non-card elements.',
@@ -848,7 +847,7 @@ export function Surface({ tier = 2, children, className }: SurfaceProps) {
 
 - [ ] Create `src/components/ui/<Name>.tsx`
 - [ ] Export from `src/components/ui/index.ts` barrel
-- [ ] Add demonstration section + TOC entry to `src/components/Styleguide.tsx`
+- [ ] Add demonstration section to `/public/styleguide.html` (the static v9 file — edit the HTML directly, not a React component)
 - [ ] Add pr-check rule (warn → error after adoption period)
 - [ ] `npm run rules:generate`
 - [ ] `npm run typecheck && npx vite build && npx vitest run && npx tsx scripts/pr-check.ts`
@@ -911,7 +910,7 @@ Phase 4 (new primitives)      ─→ informed by Phase 3 findings
 | Phase | Verification |
 |---|---|
 | Phase 0 | `/styleguide` dark mode: zero visual change, TOC + new sections visible. Light mode: all primitive cards white (confirms Task 0.5). |
-| Phase 1 | `npx tsx scripts/pr-check.ts --all` fires on known violations; clean on Styleguide.tsx and ui/ directory. |
+| Phase 1 | `npx tsx scripts/pr-check.ts --all` fires on known violations; clean on `src/components/ui/` directory. |
 | Phase 2 | `docs/UI_AUDIT.md` covers all 47 files, each instance has a decision (default/subtle/hatch). |
 | Phase 3 (each cluster) | Before/after browser screenshots in PR (dark + light). `npx tsx scripts/pr-check.ts` shows zero hand-rolled card warnings for the cluster's files. |
 | Phase 3f | `npx tsx scripts/pr-check.ts --all` zero violations anywhere in `src/components/`. |
