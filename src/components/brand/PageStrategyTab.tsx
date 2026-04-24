@@ -7,6 +7,7 @@ import { useToast } from '../Toast';
 import { useBlueprints } from '../../hooks/admin/useBlueprints';
 import { queryKeys } from '../../lib/queryKeys';
 import { EmptyState } from '../ui/EmptyState';
+import { SectionCard } from '../ui/SectionCard';
 
 interface Props {
   workspaceId: string;
@@ -99,76 +100,76 @@ export function PageStrategyTab({ workspaceId, onSelectBlueprint }: Props) {
 
       {/* Create form */}
       {showCreateForm && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4">
-          <h3 className="text-sm font-semibold text-zinc-200">New Blueprint</h3>
+        <SectionCard title="New Blueprint">
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <label htmlFor="bp-name" className="text-xs text-zinc-400">Name</label>
+              <input
+                id="bp-name"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="e.g. Main Site Blueprint"
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-teal-500"
+                disabled={isCreating || isGenerating}
+              />
+            </div>
 
-          <div className="space-y-1">
-            <label htmlFor="bp-name" className="text-xs text-zinc-400">Name</label>
-            <input
-              id="bp-name"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="e.g. Main Site Blueprint"
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-teal-500"
-              disabled={isCreating || isGenerating}
-            />
+            <div className="space-y-1">
+              <label htmlFor="bp-industry" className="text-xs text-zinc-400">Industry Type</label>
+              <input
+                id="bp-industry"
+                value={industryType}
+                onChange={e => setIndustryType(e.target.value)}
+                placeholder="e.g. SaaS, E-commerce, Agency"
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-teal-500"
+                disabled={isCreating || isGenerating}
+              />
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={handleCreateEmpty}
+                disabled={!name.trim() || isCreating || isGenerating}
+                className="px-3 py-1.5 bg-zinc-700 text-zinc-200 text-sm rounded-lg font-medium hover:bg-zinc-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {isCreating ? (
+                  <span className="flex items-center gap-1.5">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Creating...
+                  </span>
+                ) : (
+                  'Create Empty'
+                )}
+              </button>
+
+              <button
+                onClick={handleGenerateWithAI}
+                disabled={!industryType.trim() || isCreating || isGenerating}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white text-sm rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    Generate with AI
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={resetForm}
+                disabled={isCreating || isGenerating}
+                className="ml-auto px-3 py-1.5 text-zinc-500 text-sm hover:text-zinc-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
-
-          <div className="space-y-1">
-            <label htmlFor="bp-industry" className="text-xs text-zinc-400">Industry Type</label>
-            <input
-              id="bp-industry"
-              value={industryType}
-              onChange={e => setIndustryType(e.target.value)}
-              placeholder="e.g. SaaS, E-commerce, Agency"
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-teal-500"
-              disabled={isCreating || isGenerating}
-            />
-          </div>
-
-          <div className="flex gap-2 pt-1">
-            <button
-              onClick={handleCreateEmpty}
-              disabled={!name.trim() || isCreating || isGenerating}
-              className="px-3 py-1.5 bg-zinc-700 text-zinc-200 text-sm rounded-lg font-medium hover:bg-zinc-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {isCreating ? (
-                <span className="flex items-center gap-1.5">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Creating...
-                </span>
-              ) : (
-                'Create Empty'
-              )}
-            </button>
-
-            <button
-              onClick={handleGenerateWithAI}
-              disabled={!industryType.trim() || isCreating || isGenerating}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white text-sm rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {isGenerating ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4" />
-                  Generate with AI
-                </>
-              )}
-            </button>
-
-            <button
-              onClick={resetForm}
-              disabled={isCreating || isGenerating}
-              className="ml-auto px-3 py-1.5 text-zinc-500 text-sm hover:text-zinc-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
+        </SectionCard>
       )}
 
       {/* Blueprint list */}
@@ -195,6 +196,7 @@ export function PageStrategyTab({ workspaceId, onSelectBlueprint }: Props) {
       ) : (
         <div className="space-y-2">
           {blueprintList.map(bp => (
+            // pr-check-disable-next-line -- list item row used as a clickable navigation element, not a section card
             <div
               key={bp.id}
               className="group flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 cursor-pointer hover:border-zinc-700 transition-colors"
