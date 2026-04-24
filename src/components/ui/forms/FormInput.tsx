@@ -16,10 +16,11 @@ export interface FormInputProps
 
 export const FormInput = React.forwardRef<HTMLInputElement, FormInputProps>(
   function FormInput(
-    { value, onChange, type = 'text', placeholder, className, ...rest },
+    { value, onChange, type = 'text', placeholder, className, id, ...rest },
     ref
   ) {
-    const { hasError } = useFormField();
+    const { hasError, inputId, descriptionId } = useFormField();
+    const resolvedId = id ?? (inputId || undefined);
 
     const borderClass = hasError
       ? 'border-red-500/50'
@@ -28,11 +29,13 @@ export const FormInput = React.forwardRef<HTMLInputElement, FormInputProps>(
     return (
       <input
         ref={ref}
+        id={resolvedId}
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-invalid={hasError || undefined}
+        aria-describedby={descriptionId || undefined}
         className={[
           'w-full px-3 py-2',
           'bg-zinc-900 rounded-md',

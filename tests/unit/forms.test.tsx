@@ -58,6 +58,40 @@ describe('FormField', () => {
     expect(input?.getAttribute('aria-invalid')).toBe('true');
     expect(input?.className).toContain('border-red-500/50');
   });
+
+  it('wires label htmlFor to child input id (clicking label focuses input)', () => {
+    render(
+      <FormField label="Email">
+        <FormInput value="" onChange={vi.fn()} />
+      </FormField>
+    );
+    // getByLabelText resolves the htmlFor↔id pairing — passing here
+    // confirms the label is semantically associated with the input.
+    const input = screen.getByLabelText('Email') as HTMLInputElement;
+    expect(input.tagName).toBe('INPUT');
+  });
+
+  it('caller-provided id wins over auto-generated id', () => {
+    const { container } = render(
+      <FormField label="Email">
+        <FormInput id="custom-id" value="" onChange={vi.fn()} />
+      </FormField>
+    );
+    expect(container.querySelector('input')?.id).toBe('custom-id');
+  });
+
+  it('wires aria-describedby to error message id', () => {
+    const { container } = render(
+      <FormField label="Email" error="Required">
+        <FormInput value="" onChange={vi.fn()} />
+      </FormField>
+    );
+    const input = container.querySelector('input');
+    const describedBy = input?.getAttribute('aria-describedby');
+    expect(describedBy).toBeTruthy();
+    const errorEl = container.querySelector(`#${describedBy}`);
+    expect(errorEl?.textContent).toBe('Required');
+  });
 });
 
 // ─── FormInput ───────────────────────────────────────────────────────────────

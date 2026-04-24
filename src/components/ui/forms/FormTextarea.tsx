@@ -19,10 +19,11 @@ export const FormTextarea = React.forwardRef<
   HTMLTextAreaElement,
   FormTextareaProps
 >(function FormTextarea(
-  { value, onChange, rows = 4, maxLength, placeholder, className, ...rest },
+  { value, onChange, rows = 4, maxLength, placeholder, className, id, ...rest },
   ref
 ) {
-  const { hasError } = useFormField();
+  const { hasError, inputId, descriptionId } = useFormField();
+  const resolvedId = id ?? (inputId || undefined);
 
   const borderClass = hasError
     ? 'border-red-500/50'
@@ -35,12 +36,14 @@ export const FormTextarea = React.forwardRef<
     <div className="relative">
       <textarea
         ref={ref}
+        id={resolvedId}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         rows={rows}
         maxLength={maxLength}
         placeholder={placeholder}
         aria-invalid={hasError || undefined}
+        aria-describedby={descriptionId || undefined}
         className={[
           'w-full px-3 py-2',
           'bg-zinc-900 rounded-md',

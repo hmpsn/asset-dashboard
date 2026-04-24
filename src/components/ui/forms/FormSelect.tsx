@@ -15,16 +15,18 @@ export interface FormSelectProps {
   placeholder?: string;
   disabled?: boolean;
   className?: string;
+  id?: string;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export const FormSelect = React.forwardRef<HTMLSelectElement, FormSelectProps>(
   function FormSelect(
-    { options, value, onChange, placeholder, disabled, className },
+    { options, value, onChange, placeholder, disabled, className, id },
     ref
   ) {
-    const { hasError } = useFormField();
+    const { hasError, inputId, descriptionId } = useFormField();
+    const resolvedId = id ?? (inputId || undefined);
 
     const borderClass = hasError
       ? 'border-red-500/50'
@@ -33,10 +35,12 @@ export const FormSelect = React.forwardRef<HTMLSelectElement, FormSelectProps>(
     return (
       <select
         ref={ref}
+        id={resolvedId}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
         aria-invalid={hasError || undefined}
+        aria-describedby={descriptionId || undefined}
         className={[
           'w-full px-3 py-2',
           'bg-zinc-900 rounded-md',
