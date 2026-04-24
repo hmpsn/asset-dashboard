@@ -47,21 +47,36 @@ Inter loaded from Google Fonts: 300–700.
 
 ---
 
+## Radius Scale
+
+| Token | Value | Tailwind Equivalent | Usage |
+|-------|-------|---------------------|-------|
+| `--radius-sm` | `6px` | `rounded` | Small controls, pills, badges |
+| `--radius-md` | `8px` | `rounded-md` | Buttons, inputs |
+| `--radius-lg` | `12px` | `rounded-xl` | Cards, panels — new code uses `rounded-[var(--radius-lg)]` |
+| `--radius-xl` | `16px` | `rounded-2xl` | Modals, large overlays |
+
+**Brand asymmetric radius:** `SectionCard` default variant uses `10px 24px 10px 24px` (the brand signature). This is intentional and correct. The `--radius-lg` token governs new generic cards; the asymmetric radius is a SectionCard-specific design decision, not a token.
+
+**Rule for new card elements:** use `rounded-[var(--radius-lg)]` not the hardcoded Tailwind class `rounded-xl`. This makes the radius system themeable.
+
+---
+
 ## Color System
 
 ### Dark Mode (default)
 
-| Token | Value | Tailwind | Usage |
-|-------|-------|----------|-------|
-| `--bg-base` | #0f1219 | — | Page background |
-| `--bg-card` | #18181b | bg-zinc-900 | Card backgrounds |
-| `--bg-elevated` | #27272a | bg-zinc-800 | Inputs, active tabs, hover states |
-| `--border-default` | #27272a | border-zinc-800 | Card borders |
-| `--border-hover` | #3f3f46 | border-zinc-700 | Hover border state |
-| `--text-primary` | #f4f4f5 | text-zinc-100/200 | Headings, key content |
-| `--text-secondary` | #b4b4bc | text-zinc-400 | Descriptions, supporting text |
-| `--text-muted` | #a1a1aa | text-zinc-500 | Captions, timestamps, labels |
-| `--text-subtle` | #71717a | text-zinc-600/700 | Disabled, dividers |
+| Canonical Token | Legacy Name | Value | Tailwind | Usage |
+|-----------------|-------------|-------|----------|-------|
+| `--surface-1` | `--brand-bg` | #0f1219 | — | Page background |
+| `--surface-2` | `--brand-bg-surface/elevated` | #18181b | bg-zinc-900 | Card backgrounds |
+| `--surface-3` | `--brand-bg-card` | #27272a | bg-zinc-800 | Inputs, active tabs, hover states |
+| — | `--brand-border` | #27272a | border-zinc-800 | Card borders |
+| — | `--brand-border-hover` | #3f3f46 | border-zinc-700 | Hover border state |
+| — | — | #f4f4f5 | text-zinc-100/200 | Headings, key content |
+| — | — | #b4b4bc | text-zinc-400 | Descriptions, supporting text |
+| — | — | #a1a1aa | text-zinc-500 | Captions, timestamps, labels |
+| — | — | #71717a | text-zinc-600/700 | Disabled, dividers |
 
 ### Light Mode (.dashboard-light)
 
