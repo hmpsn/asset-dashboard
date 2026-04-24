@@ -14,9 +14,9 @@ interface SectionCardProps {
   staggerIndex?: number;
   /**
    * Visual variant.
-   * - `'default'` — solid `bg-zinc-900` with the brand asymmetric `10px 24px 10px 24px` border-radius.
+   * - `'default'` — solid `bg-[var(--surface-2)]` with the brand asymmetric `10px 24px 10px 24px` border-radius.
    *   Use for top-level page sections (the canonical look).
-   * - `'subtle'` — semi-transparent `bg-zinc-900/40` with standard symmetric `rounded-lg`.
+   * - `'subtle'` — semi-transparent `bg-[var(--surface-2)]/40` with standard symmetric `rounded-lg`.
    *   Use as a wrapper around dense tables / row lists where the asymmetric corners would clash
    *   with internal rows or where the card sits inside another section. Adds `overflow-hidden`
    *   so child tables clip cleanly against the rounded corners.
@@ -33,8 +33,8 @@ export function SectionCard({ title, titleIcon, titleExtra, action, children, cl
 
   const isSubtle = variant === 'subtle';
   const containerClasses = isSubtle
-    ? 'bg-zinc-900/40 border border-zinc-800 rounded-lg overflow-hidden transition-colors duration-200'
-    : 'bg-zinc-900 border border-zinc-800 transition-colors duration-200';
+    ? 'bg-[var(--surface-2)]/40 border border-zinc-800 rounded-lg overflow-hidden transition-colors duration-200'
+    : 'bg-[var(--surface-2)] border border-zinc-800 transition-colors duration-200';
   const interactiveClasses = interactive ? 'hover:border-zinc-700 hover:border-l-teal-500/40 cursor-pointer' : '';
   const containerStyle = isSubtle
     ? staggerStyle
