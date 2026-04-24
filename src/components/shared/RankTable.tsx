@@ -1,4 +1,5 @@
 import { TrendingUp } from 'lucide-react';
+import { SectionCard } from '../ui';
 
 // ── Shared position color helper ──
 export function positionColor(pos: number): string {
@@ -135,14 +136,13 @@ export function RankTrackingSection({ rankHistory, latestRanks, limit = 10, show
   if (rankHistory.length < 2 && latestRanks.length === 0) return null;
 
   return (
-    <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <TrendingUp className="w-4 h-4 text-teal-400" />
-        <span className="text-sm font-semibold text-zinc-200">{title}</span>
-        <span className="text-[11px] text-zinc-500 ml-auto">{rankHistory.length} snapshots</span>
-      </div>
+    <SectionCard
+      title={title}
+      titleIcon={<TrendingUp className="w-4 h-4 text-teal-400" />}
+      titleExtra={<span className="text-[11px] text-zinc-500 ml-auto">{rankHistory.length} snapshots</span>}
+    >
       <RankHistoryChart rankHistory={rankHistory} />
       <RankTable ranks={latestRanks} limit={limit} showClicks={showClicks} />
-    </div>
+    </SectionCard>
   );
 }

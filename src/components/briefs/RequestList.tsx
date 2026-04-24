@@ -4,6 +4,7 @@ import {
   Copy, Download, Search, Target, MessageSquare, BarChart3,
   BookOpen, Users, TrendingUp, Check, ExternalLink, Link2,
 } from 'lucide-react';
+import { SectionCard } from '../ui';
 
 interface ContentBrief {
   id: string;
@@ -111,14 +112,16 @@ export function RequestList({
   if (clientRequests.length === 0) return null;
 
   return (
-    <div className="bg-zinc-900 rounded-xl border border-amber-500/20 p-4 space-y-3">
-      <div className="flex items-center gap-2 mb-1">
-        <Inbox className="w-4 h-4 text-amber-400" />
-        <span className="text-xs font-medium text-zinc-300">Client Content Requests</span>
+    <SectionCard
+      title="Client Content Requests"
+      titleIcon={<Inbox className="w-4 h-4 text-amber-400" />}
+      titleExtra={
         <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
           {clientRequests.filter(r => r.status === 'requested').length} new
         </span>
-      </div>
+      }
+      className="!border-amber-500/20 space-y-3"
+    >
       <div className="space-y-2">
         {clientRequests.map(req => {
           const statusConfig: Record<string, { icon: typeof Clock; color: string; label: string }> = {
@@ -493,6 +496,6 @@ export function RequestList({
           );
         })}
       </div>
-    </div>
+    </SectionCard>
   );
 }

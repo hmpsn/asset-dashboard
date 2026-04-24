@@ -23,6 +23,7 @@ export function PagePicker({
   );
 
   return (
+    // pr-check-disable-next-line -- dropdown popover
     <div className="absolute right-0 top-full mt-1 w-72 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-xl z-20">
       <div className="px-3 py-2 border-b border-zinc-800">
         <div className="relative">

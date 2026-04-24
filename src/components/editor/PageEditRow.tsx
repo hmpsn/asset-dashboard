@@ -6,7 +6,7 @@ import {
   Loader2, Save, Sparkles, ChevronDown, ChevronRight,
   Check, AlertTriangle, CheckSquare, Square, Send, X, Search,
 } from 'lucide-react';
-import { StatusBadge, CharacterCounter, SerpPreview, SocialPreview } from '../ui';
+import { StatusBadge, CharacterCounter, SerpPreview, SocialPreview, SectionCard } from '../ui';
 import { statusBorderClass } from '../ui/statusConfig';
 
 interface PageMeta {
@@ -95,7 +95,11 @@ export function PageEditRow({
   const trackingBorder = statusBorderClass(pageState?.status as any);
 
   return (
-    <div id={`seo-editor-page-${page.id}`} className={`bg-zinc-900 rounded-xl border overflow-hidden ${trackingBorder || (hasRecFlag ? 'border-amber-500/30' : isSelected ? 'border-teal-500/40 bg-teal-500/5' : 'border-zinc-800')}`}>
+    <div id={`seo-editor-page-${page.id}`}>
+    <SectionCard
+      noPadding
+      className={`overflow-hidden ${trackingBorder || (hasRecFlag ? '!border-amber-500/30' : isSelected ? '!border-teal-500/40 bg-teal-500/5' : '')}`}
+    >
       <div className="flex items-center">
         {showApprovalCheckbox && (
           <button
@@ -441,6 +445,7 @@ export function PageEditRow({
           </div>
         </div>
       )}
+    </SectionCard>
     </div>
   );
 }
