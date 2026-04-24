@@ -45,3 +45,5 @@ export type { WorkflowStep, WorkflowStepperProps } from './WorkflowStepper';
 export { WorkspaceHealthBar } from './WorkspaceHealthBar';
 export type { HealthMetric, WorkspaceHealthBarProps } from './WorkspaceHealthBar';
 export { ConfirmDialog } from './ConfirmDialog';
+export { Row, Stack, Column, Grid, Divider } from './layout';
+export type { RowProps, GapSize, RowAlign, RowJustify, StackProps, StackDir, StackAlign, ColumnProps, GridProps, GridCols, DividerProps, DividerOrientation } from './layout';
