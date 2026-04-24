@@ -466,7 +466,7 @@ A comprehensive value assessment of every feature in the platform — **310 feat
 ---
 
 ### 33. Component Styleguide
-**What it does:** Dedicated `/styleguide` route showcasing every UI primitive and pattern in one place — color palette, typography scale, MetricRings, StatCards, CompactStatBar, Badges, EmptyState, LoadingState, ErrorState, TabBar, DateRangeSelector, DataList, PageHeader, SectionCard, Line/Area Charts (single + dual trend), ChartPointDetail popovers, data tables, modals/dialogs, toast notifications (global + inline), form inputs (text, search, textarea, select, segmented toggle), loading states (page/inline/button/typing), progress bars (segmented, severity, bulk), and sidebar navigation. Includes a dark/light theme toggle for visual verification. **New UI primitives**: LoadingState with contextual messages and size variants, ErrorState with type-specific handling (network/data/permission) and recovery actions, TableSkeleton for structured loading states.
+**What it does:** Dedicated `/styleguide` route that redirects to a static HTML design reference at `/styleguide.html` (served from `/public/`). The static file is Styleguide v9 — the canonical source from Claude Design — covering the 3-tier surface token system, all UI primitives, color palette, typography (D-DIN-PRO), motion reference, dark/light theme toggle, manifesto, and scroll-spy TOC. Kept as static HTML/CSS to prevent JSX drift from the authoritative design spec. The `/styleguide` React route is a non-lazy inline redirect (`window.location.replace`) with no auth requirement (design reference, not sensitive).
 
 **Agency value:** Single reference page for all UI patterns — accelerates development, catches inconsistencies, and onboards new team members instantly.
 
