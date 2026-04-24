@@ -1306,6 +1306,89 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
   // Always prune stale competitor_gap rows — outside liveDomain guard so cleanup runs when liveDomain is cleared
   deleteStaleInsightsByType(workspaceId, 'competitor_gap', cycleStart);
 
+  // Phase 3C: Conversion attribution (GA4 organic landing pages)
+  if (ga4Id) {
+    try {
+      const landingPages = await apiCache.wrap(workspaceId, 'ga4LandingPages_organic', { days: 30 }, () =>
+        getGA4LandingPages(ga4Id, 30, 100, true),
+      );
+      if (landingPages.length > 0) {
+        const conversionInsights = computeConversionAttributionInsights(landingPages);
+        for (const insight of conversionInsights.slice(0, 20)) {
+          enrichAndUpsert({
+            insightType: 'conversion_attribution',
+            pageId: insight.pageId,
+            data: insight.data,
+            severity: insight.severity,
+          });
+        }
+        log.info({ workspaceId, count: Math.min(conversionInsights.length, 20) }, 'Computed conversion attribution insights');
+      }
+    } catch (err) {
+      log.warn({ err, workspaceId }, 'Failed to compute conversion attribution insights');
+    }
+  }
+  // Always prune stale conversion_attribution rows — outside ga4Id guard so cleanup runs when GA4 is disconnected
+  deleteStaleInsightsByType(workspaceId, 'conversion_attribution', cycleStart);
+
+  // Phase 4: ranking_mover, ctr_opportunity, serp_opportunity
+  if (normQueryPageData.length > 0 && normPrevQueryPageData.length > 0) {
+    const movers = computeRankingMovers(normQueryPageData, normPrevQueryPageData);
+    for (const insight of movers) {
+      enrichAndUpsert({
+        insightType: 'ranking_mover',
+        pageId: insight.pageId,
+        data: insight.data,
+        severity: insight.severity,
+      });
+    }
+    log.info({ workspaceId, count: movers.length }, 'Computed ranking movers');
+  }
+  // Always prune stale ranking_mover rows — outside GSC-data guard so cleanup runs when GSC is disconnected
+  deleteStaleInsightsByType(workspaceId, 'ranking_mover', cycleStart);
+
+  if (normQueryPageData.length > 0) {
+    const ctrOpps = computeCtrOpportunities(normQueryPageData);
+    for (const insight of ctrOpps) {
+      enrichAndUpsert({
+        insightType: 'ctr_opportunity',
+        pageId: insight.pageId,
+        data: insight.data,
+        severity: insight.severity,
+      });
+    }
+    log.info({ workspaceId, count: ctrOpps.length }, 'Computed CTR opportunities');
+  }
+  // Always prune stale ctr_opportunity rows — outside GSC-data guard so cleanup runs when GSC is disconnected
+  deleteStaleInsightsByType(workspaceId, 'ctr_opportunity', cycleStart);
+
+  if (normGscPages.length > 0) {
+    // Load pages that already have schema markup from the DB (graceful fallback)
+    let pagesWithSchema = new Set<string>();
+    try {
+      const schemaDb = await import('./db/index.js'); // dynamic-import-ok — circular dep prevention, default export is typed
+      const rows = schemaDb.default.prepare(
+        `SELECT DISTINCT page_path FROM schema_page_types WHERE workspace_id = ?`,
+      ).all(workspaceId) as Array<{ page_path: string }>;
+      pagesWithSchema = new Set(rows.map(r => r.page_path));
+    } catch (err) {
+      if (isProgrammingError(err)) log.warn({ err }, 'analytics-intelligence: programming error');
+      // schema_page_types table may not exist — proceed with empty set
+    }
+    const serpOpps = computeSerpOpportunities(normGscPages, pagesWithSchema);
+    for (const insight of serpOpps) {
+      enrichAndUpsert({
+        insightType: 'serp_opportunity',
+        pageId: insight.pageId,
+        data: insight.data,
+        severity: insight.severity,
+      });
+    }
+    log.info({ workspaceId, count: serpOpps.length }, 'Computed SERP opportunities');
+  }
+  // Always prune stale serp_opportunity rows — outside GSC-data guard so cleanup runs when GSC is disconnected
+  deleteStaleInsightsByType(workspaceId, 'serp_opportunity', cycleStart);
+
   // Phase 5: Emerging keyword detection (SEMRush trend analysis)
   if (ws.liveDomain) {
     try {
@@ -1387,86 +1470,6 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
     }
     // Always prune stale freshness_alert rows — outside try so it runs even if listPageKeywords throws
     deleteStaleInsightsByType(workspaceId, 'freshness_alert', cycleStart);
-  }
-
-  // Phase 3C: Conversion attribution (GA4 organic landing pages)
-  if (ga4Id) {
-    try {
-      const landingPages = await apiCache.wrap(workspaceId, 'ga4LandingPages_organic', { days: 30 }, () =>
-        getGA4LandingPages(ga4Id, 30, 100, true),
-      );
-      if (landingPages.length > 0) {
-        const conversionInsights = computeConversionAttributionInsights(landingPages);
-        for (const insight of conversionInsights.slice(0, 20)) {
-          enrichAndUpsert({
-            insightType: 'conversion_attribution',
-            pageId: insight.pageId,
-            data: insight.data,
-            severity: insight.severity,
-          });
-        }
-        log.info({ workspaceId, count: Math.min(conversionInsights.length, 20) }, 'Computed conversion attribution insights');
-      }
-    } catch (err) {
-      log.warn({ err, workspaceId }, 'Failed to compute conversion attribution insights');
-    }
-  }
-  // Always prune stale conversion_attribution rows — outside ga4Id guard so cleanup runs when GA4 is disconnected
-  deleteStaleInsightsByType(workspaceId, 'conversion_attribution', cycleStart);
-
-  // Phase 4: New insight types
-  if (normQueryPageData.length > 0 && normPrevQueryPageData.length > 0) {
-    const movers = computeRankingMovers(normQueryPageData, normPrevQueryPageData);
-    for (const insight of movers) {
-      enrichAndUpsert({
-        insightType: 'ranking_mover',
-        pageId: insight.pageId,
-        data: insight.data,
-        severity: insight.severity,
-      });
-    }
-    deleteStaleInsightsByType(workspaceId, 'ranking_mover', cycleStart);
-    log.info({ workspaceId, count: movers.length }, 'Computed ranking movers');
-  }
-
-  if (normQueryPageData.length > 0) {
-    const ctrOpps = computeCtrOpportunities(normQueryPageData);
-    for (const insight of ctrOpps) {
-      enrichAndUpsert({
-        insightType: 'ctr_opportunity',
-        pageId: insight.pageId,
-        data: insight.data,
-        severity: insight.severity,
-      });
-    }
-    deleteStaleInsightsByType(workspaceId, 'ctr_opportunity', cycleStart);
-    log.info({ workspaceId, count: ctrOpps.length }, 'Computed CTR opportunities');
-  }
-
-  if (normGscPages.length > 0) {
-    // Load pages that already have schema markup from the DB (graceful fallback)
-    let pagesWithSchema = new Set<string>();
-    try {
-      const schemaDb = await import('./db/index.js'); // dynamic-import-ok — circular dep prevention, default export is typed
-      const rows = schemaDb.default.prepare(
-        `SELECT DISTINCT page_path FROM schema_page_types WHERE workspace_id = ?`,
-      ).all(workspaceId) as Array<{ page_path: string }>;
-      pagesWithSchema = new Set(rows.map(r => r.page_path));
-    } catch (err) {
-      if (isProgrammingError(err)) log.warn({ err }, 'analytics-intelligence: programming error');
-      // schema_page_types table may not exist — proceed with empty set
-    }
-    const serpOpps = computeSerpOpportunities(normGscPages, pagesWithSchema);
-    for (const insight of serpOpps) {
-      enrichAndUpsert({
-        insightType: 'serp_opportunity',
-        pageId: insight.pageId,
-        data: insight.data,
-        severity: insight.severity,
-      });
-    }
-    deleteStaleInsightsByType(workspaceId, 'serp_opportunity', cycleStart);
-    log.info({ workspaceId, count: serpOpps.length }, 'Computed SERP opportunities');
   }
 
   // Quality gate: suppress contradictory/duplicate/low-confidence insights

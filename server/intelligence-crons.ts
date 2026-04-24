@@ -105,8 +105,10 @@ async function runCompetitorCheck(): Promise<void> {
       }
 
       let anyDomainFailed = false;
+      let anyDomainProcessed = false;
       for (const domain of ws.competitorDomains) {
         if (snapshotExistsForDate(ws.id, domain, today)) continue;
+        anyDomainProcessed = true;
         try {
           // Read previous snapshot BEFORE saving current so diff is meaningful
           const previous = getLatestCompetitorSnapshot(ws.id, domain);
@@ -149,7 +151,10 @@ async function runCompetitorCheck(): Promise<void> {
       // Skip stale cleanup if any domain failed — transient provider errors shouldn't wipe
       // prior-week alerts that simply weren't refreshed this cycle. Mirrors the failedCategories
       // guard in server/recommendations.ts:1237-1238.
-      if (!anyDomainFailed) {
+      // Also skip if no domains were processed this cycle (e.g. server restarted mid-Monday and
+      // all domains were skipped via snapshotExistsForDate). Running cleanup with a fresh cycleStart
+      // in that case would delete valid insights written by the pre-restart run.
+      if (anyDomainProcessed && !anyDomainFailed) {
         deleteStaleInsightsByType(ws.id, 'competitor_alert', cycleStart);
       }
     }
