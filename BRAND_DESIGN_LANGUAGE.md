@@ -67,18 +67,36 @@
 | **Purple** | `#a78bfa` | `#7c3aed` | `purple-400`/`purple-600` | **Admin AI chat only** — FAB, messages, input focus, send button. Also admin "Flag for Client" in SeoAudit |
 | **Zinc** | `#a1a1aa` | `#475569` | `zinc-400`/`zinc-500` | Muted text, inactive states, disabled UI, free-tier badges |
 
-### Surface Colors (Dark Mode — Default)
+### Surface Colors
 
-| Token | Value | Tailwind | Usage |
-|-------|-------|----------|-------|
-| `--bg-base` | `#0f1219` | — | Page background |
-| `--bg-card` | `#18181b` | `bg-zinc-900` | Card backgrounds |
-| `--bg-elevated` | `#27272a` | `bg-zinc-800` | Inputs, active tabs, hover states |
-| `--border-default` | `#27272a` | `border-zinc-800` | Card borders |
-| `--border-hover` | `#3f3f46` | `border-zinc-700` | Hover border state |
-| `--text-primary` | `#f4f4f5` | `text-zinc-100` | Headings, key content |
-| `--text-secondary` | `#b4b4bc` | `text-zinc-400` | Descriptions |
-| `--text-muted` | `#a1a1aa` | `text-zinc-500` | Captions, labels |
+> **Canonical tokens are `--surface-N`.** The `--brand-bg-*` names are legacy aliases kept for backward compatibility — do not use them in new code.
+
+#### Dark Mode (default)
+
+| Canonical Token | Value | Tailwind Equivalent | Legacy Alias | Usage |
+|-----------------|-------|---------------------|--------------|-------|
+| `--surface-1` | `#0f1219` | body background | `--brand-bg` | Page background / absolute base |
+| `--surface-2` | `#18181b` | `bg-zinc-900` | `--brand-bg-surface`, `--brand-bg-elevated` | Primary card surfaces |
+| `--surface-3` | `#27272a` | `bg-zinc-800` | `--brand-bg-card` | Elevated: inputs, active tabs, hover states |
+| `--border-default` | `#27272a` | `border-zinc-800` | `--brand-border` | Card borders |
+| `--border-hover` | `#3f3f46` | `border-zinc-700` | `--brand-border-hover` | Hover border state |
+| `--text-primary` | `#f4f4f5` | `text-zinc-100` | — | Headings, key content |
+| `--text-secondary` | `#b4b4bc` | `text-zinc-400` | — | Descriptions, supporting text |
+| `--text-muted` | `#a1a1aa` | `text-zinc-500` | — | Captions, timestamps, labels |
+| `--text-subtle` | `#71717a` | `text-zinc-600/700` | — | Disabled, dividers |
+
+#### Light Mode (`.dashboard-light`)
+
+| Canonical Token | Value | Usage |
+|-----------------|-------|-------|
+| `--surface-1` | `#f8fafc` | Page background |
+| `--surface-2` | `#ffffff` | Card backgrounds |
+| `--surface-3` | `#f1f5f9` | Inputs, active tabs |
+| `--border-default` | `#e2e8f0` | Card borders |
+| `--text-primary` | `#0f172a` | Dark navy — headings, key content |
+| `--text-secondary` | `#334155` | Descriptions |
+| `--text-muted` | `#475569` | Captions, labels |
+| `--text-subtle` | `#64748b` | Disabled |
 
 ### Tier Color Rules
 
