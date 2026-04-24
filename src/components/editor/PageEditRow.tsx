@@ -98,7 +98,7 @@ export function PageEditRow({
     <div id={`seo-editor-page-${page.id}`}>
     <SectionCard
       noPadding
-      className={`overflow-hidden ${trackingBorder || (hasRecFlag ? '!border-amber-500/30' : isSelected ? '!border-teal-500/40 bg-teal-500/5' : '')}`}
+      className={`overflow-hidden ${trackingBorder || (hasRecFlag ? '!border-amber-500/30' : isSelected ? '!border-teal-500/40 !bg-teal-500/5' : '')}`}
     >
       <div className="flex items-center">
         {showApprovalCheckbox && (

@@ -120,7 +120,7 @@ export function RequestList({
           {clientRequests.filter(r => r.status === 'requested').length} new
         </span>
       }
-      className="!border-amber-500/20 space-y-3"
+      className="!border-amber-500/20"
     >
       <div className="space-y-2">
         {clientRequests.map(req => {
