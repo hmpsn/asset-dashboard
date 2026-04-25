@@ -8,9 +8,9 @@ import { ClientCopyReview } from './ClientCopyReview';
 import type { Tier } from '../ui';
 import type { ClientContentRequest, ClientRequest, ApprovalBatch } from './types';
 import type { ContentPlanReviewCell, ApprovalPageKeyword } from '../../hooks/useClientData';
-import { useBetaMode } from './BetaContext';
 import { STUDIO_NAME } from '../../constants';
 import { post } from '../../api/client';
+import { useBetaMode } from './BetaContext';
 
 type InboxFilter = 'all' | 'approvals' | 'requests' | 'copy' | 'content' | 'content-plan';
 
@@ -57,6 +57,8 @@ interface InboxTabProps {
   initialFilter?: InboxFilter;
   // Page keyword hints for approval card targeting chips (independent of seoClientView)
   pageMap?: ApprovalPageKeyword[];
+  /** When true (external billing), hide price chips on request/upgrade buttons. */
+  hidePrices?: boolean;
 }
 
 export function InboxTab({
@@ -68,13 +70,14 @@ export function InboxTab({
   contentPlanReviewCells = [],
   hasCopyEntries = false,
   initialFilter,
+  hidePrices = false,
   pageMap,
 }: InboxTabProps) {
-  const betaMode = useBetaMode();
   const [filter, setFilter] = useState<InboxFilter>(initialFilter || 'all');
   const [flaggingCell, setFlaggingCell] = useState<string | null>(null);
   const [flagComment, setFlagComment] = useState('');
   const [flagSubmitting, setFlagSubmitting] = useState(false);
+  const betaMode = useBetaMode();
 
   const pendingRequests = requests.filter(r => r.status !== 'completed' && r.status !== 'closed').length;
   const contentReviews = contentRequests.filter(r => r.status === 'client_review').length;
@@ -319,6 +322,7 @@ export function InboxTab({
             pricingConfirming={pricingConfirming}
             workspaceId={workspaceId}
             setToast={setToast}
+            hidePrices={hidePrices}
           />
         </div>
       )}

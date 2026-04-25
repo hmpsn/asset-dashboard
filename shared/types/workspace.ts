@@ -241,6 +241,10 @@ export interface Workspace {
   trialEndsAt?: string;              // ISO date — 14-day Growth trial
   stripeCustomerId?: string;         // Stripe Customer ID for subscriptions
   stripeSubscriptionId?: string;     // Active Stripe Subscription ID (Growth/Premium recurring)
+  /** Billing mode for per-item content purchases (briefs, full posts, upgrades).
+   *  'platform' (default) routes through Stripe; 'external' bypasses payment so the
+   *  client portal submits the request directly. Used for clients billed off-platform. */
+  billingMode?: 'platform' | 'external';
   // Client onboarding
   onboardingEnabled?: boolean;       // admin toggle — show questionnaire to clients
   onboardingCompleted?: boolean;     // set true after client submits questionnaire

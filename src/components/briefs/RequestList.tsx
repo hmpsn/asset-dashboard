@@ -2,9 +2,10 @@ import {
   Loader2, Trash2, Sparkles, FileText,
   Inbox, CheckCircle2, XCircle, Clock, Zap,
   Copy, Download, Search, Target, MessageSquare, BarChart3,
-  BookOpen, Users, TrendingUp, Check, ExternalLink, Link2,
+  BookOpen, Users, TrendingUp, Check, ExternalLink, Link2, PenLine,
 } from 'lucide-react';
 import { SectionCard } from '../ui';
+import type { PostSummary } from '../../../shared/types/content';
 
 interface ContentBrief {
   id: string;
@@ -64,6 +65,11 @@ interface ContentTopicRequest {
   updatedAt: string;
 }
 
+// Subset of PostSummary that RequestList needs. Pick keeps it in lock-step with the
+// canonical type — if PostSummary changes, TypeScript catches mismatches here.
+// (PostSummary import is at top of file with other imports.)
+export type RequestPostSummary = Pick<PostSummary, 'id' | 'briefId' | 'status' | 'totalWordCount'>;
+
 export interface RequestListProps {
   clientRequests: ContentTopicRequest[];
   expandedRequest: string | null;
@@ -85,6 +91,13 @@ export interface RequestListProps {
   onSetExpandedRequest: (value: string | null) => void;
   onCopyAsMarkdown: (brief: ContentBrief) => void;
   onExportClientHTML: (brief: ContentBrief) => void;
+  // Post production (full_post requests after brief approval)
+  posts?: RequestPostSummary[];
+  generatingPostFor?: string | null;
+  /** Returns true on success, false on failure. Caller must check before advancing
+   *  request status, otherwise a generation failure leaves the request stuck. */
+  onGeneratePost?: (briefId: string) => Promise<boolean>;
+  onOpenPost?: (postId: string) => void;
 }
 
 export function RequestList({
@@ -108,6 +121,10 @@ export function RequestList({
   onSetExpandedRequest,
   onCopyAsMarkdown,
   onExportClientHTML,
+  posts = [],
+  generatingPostFor = null,
+  onGeneratePost,
+  onOpenPost,
 }: RequestListProps) {
   if (clientRequests.length === 0) return null;
 
@@ -182,12 +199,57 @@ export function RequestList({
                       {req.status === 'client_review' && (
                         <span className="text-[11px] text-cyan-400/60 italic">Awaiting client feedback</span>
                       )}
-                      {req.status === 'approved' && (
-                        <button onClick={() => onUpdateRequestStatus(req.id, 'in_progress')} className="px-2 py-1 rounded bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 hover:bg-teal-600/30 transition-colors">Start Production</button>
+                      {req.status === 'approved' && (req.serviceType || 'brief_only') === 'full_post' && req.briefId && (() => {
+                        const existingPost = posts.find(p => p.briefId === req.briefId);
+                        if (existingPost) {
+                          return (
+                            <button
+                              onClick={() => onOpenPost?.(existingPost.id)}
+                              className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 hover:bg-teal-600/30 transition-colors"
+                              title="Open post in editor"
+                            >
+                              <PenLine className="w-3 h-3" /> Open Post
+                            </button>
+                          );
+                        }
+                        const isGeneratingPost = generatingPostFor === req.briefId;
+                        return (
+                          <button
+                            onClick={async () => {
+                              if (!req.briefId || !onGeneratePost) return;
+                              // Only advance status to in_progress if generation actually succeeded.
+                              // Otherwise a transient failure would leave the request stuck:
+                              // approved → in_progress with no post and no UI to recover.
+                              const ok = await onGeneratePost(req.briefId);
+                              if (ok) onUpdateRequestStatus(req.id, 'in_progress');
+                            }}
+                            disabled={isGeneratingPost || !onGeneratePost}
+                            className="flex items-center gap-1 px-2 py-1 rounded bg-gradient-to-r from-teal-600/30 to-emerald-600/30 border border-teal-500/40 text-[11px] text-teal-200 font-medium hover:from-teal-600/50 hover:to-emerald-600/50 transition-all disabled:opacity-50"
+                          >
+                            {isGeneratingPost ? <Loader2 className="w-3 h-3 animate-spin" /> : <PenLine className="w-3 h-3" />}
+                            {isGeneratingPost ? 'Generating…' : 'Generate Post'}
+                          </button>
+                        );
+                      })()}
+                      {req.status === 'approved' && (req.serviceType || 'brief_only') === 'brief_only' && !req.upgradedAt && deliveringReqId !== req.id && (
+                        <button onClick={() => { onSetDeliveringReqId(req.id); onSetDeliveryUrl(req.deliveryUrl || ''); onSetDeliveryNotes(req.deliveryNotes || ''); }} className="px-2 py-1 rounded bg-green-600/20 border border-green-500/30 text-[11px] text-green-300 hover:bg-green-600/30 transition-colors flex items-center gap-1"><Link2 className="w-3 h-3" /> Deliver Brief</button>
                       )}
                       {req.status === 'changes_requested' && (
                         <button onClick={() => onUpdateRequestStatus(req.id, 'client_review')} className="px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 text-[11px] text-cyan-300 hover:bg-cyan-600/30 transition-colors">Resubmit to Client</button>
                       )}
+                      {req.status === 'in_progress' && req.briefId && (() => {
+                        const existingPost = posts.find(p => p.briefId === req.briefId);
+                        if (!existingPost) return null;
+                        return (
+                          <button
+                            onClick={() => onOpenPost?.(existingPost.id)}
+                            className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 hover:bg-teal-600/30 transition-colors"
+                            title="Open post in editor"
+                          >
+                            <PenLine className="w-3 h-3" /> Open Post
+                          </button>
+                        );
+                      })()}
                       {req.status === 'in_progress' && deliveringReqId !== req.id && (
                         <button onClick={() => { onSetDeliveringReqId(req.id); onSetDeliveryUrl(req.deliveryUrl || ''); onSetDeliveryNotes(req.deliveryNotes || ''); }} className="px-2 py-1 rounded bg-emerald-600/20 border border-emerald-500/30 text-[11px] text-emerald-300 hover:bg-emerald-600/30 transition-colors flex items-center gap-1"><Link2 className="w-3 h-3" /> Deliver Content</button>
                       )}
@@ -195,7 +257,7 @@ export function RequestList({
                   </div>
                 </div>
                 {/* Delivery form */}
-                {req.status === 'in_progress' && deliveringReqId === req.id && (
+                {(req.status === 'in_progress' || (req.status === 'approved' && (req.serviceType || 'brief_only') === 'brief_only' && !req.upgradedAt)) && deliveringReqId === req.id && (
                   <div className="mt-2 bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-3 space-y-2">
                     <div className="flex items-center gap-1.5 mb-1"><Link2 className="w-3.5 h-3.5 text-emerald-400" /><span className="text-[11px] text-emerald-400 font-medium uppercase tracking-wider">Attach Deliverable</span></div>
                     <input type="url" value={deliveryUrl} onChange={e => onSetDeliveryUrl(e.target.value)} placeholder="Google Doc link, Dropbox URL, or any content URL..." className="w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 focus:border-emerald-500/50 focus:outline-none" />

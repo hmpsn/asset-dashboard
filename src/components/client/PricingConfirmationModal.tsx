@@ -11,7 +11,9 @@ import type { WorkspaceInfo, ClientContentRequest } from './types';
 const LazyStripePaymentModal = lazyWithRetry(() => import('../StripePaymentForm').then(m => ({ default: m.StripePaymentModal })));
 
 interface Props {
-  betaMode: boolean;
+  /** @deprecated Kept for call-site compat; no longer gates rendering. */
+  betaMode?: boolean;
+  billingMode?: 'platform' | 'external';
   pricingModal: PricingModalData | null;
   setPricingModal: React.Dispatch<React.SetStateAction<PricingModalData | null>>;
   pricingConfirming: boolean;
@@ -28,7 +30,9 @@ interface Props {
 }
 
 export function PricingConfirmationModal({
-  betaMode,
+  // betaMode kept in props for prop-spread call sites; no longer gates rendering since
+  // returning null here left the request stuck (setPricingModal was set, modal absent).
+  billingMode,
   pricingModal,
   setPricingModal,
   pricingConfirming,
@@ -43,8 +47,8 @@ export function PricingConfirmationModal({
   setContentRequests,
   setToast,
 }: Props) {
-  if (betaMode) return null;
   if (!pricingModal && !stripePayment) return null;
+  const isExternal = billingMode === 'external';
 
   return (
     <>
@@ -55,7 +59,10 @@ export function PricingConfirmationModal({
         const isFull = pricingModal.serviceType === 'full_post';
         const price = isFull ? fullPostPrice : briefPrice;
         const upgradePrice = isUpgrade && briefPrice != null && fullPostPrice != null ? Math.max(0, fullPostPrice - briefPrice) : null;
-        const displayPrice = isUpgrade ? upgradePrice : price;
+        // External-billing workspaces don't show a price — they pay off-platform — so
+        // we route through the existing "Confirm Request" branch by forcing displayPrice
+        // to null. The CTA below picks the no-price branch automatically.
+        const displayPrice = isExternal ? null : (isUpgrade ? upgradePrice : price);
         const fmt = fmtPrice;
         return (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[70] flex items-center justify-center p-4" onClick={() => !pricingConfirming && setPricingModal(null)}>
@@ -115,7 +122,9 @@ export function PricingConfirmationModal({
               {displayPrice == null && (
                 <div className="mx-6 mt-0 mb-0 text-[11px] text-zinc-500 bg-zinc-800/40 px-4 py-3 border border-zinc-700/30" style={{ borderRadius: '6px 12px 6px 12px' }}>
                   <Lock className="w-3 h-3 inline mr-1.5 -mt-0.5" />
-                  Pricing will be confirmed by {STUDIO_NAME} after submission.
+                  {isExternal
+                    ? `Billing for this request is handled separately by ${STUDIO_NAME}.`
+                    : `Pricing will be confirmed by ${STUDIO_NAME} after submission.`}
                 </div>
               )}
 
@@ -151,18 +160,20 @@ export function PricingConfirmationModal({
                   Cancel
                 </button>
 
-                {/* Trust footer */}
-                <div className="flex items-center justify-center gap-4 pt-1">
-                  <div className="flex items-center gap-1.5">
-                    <Shield className="w-3 h-3 text-zinc-600" />
-                    <span className="text-[10px] text-zinc-600">SSL Encrypted</span>
+                {/* Trust footer — hidden for external billing (no Stripe path) */}
+                {!isExternal && (
+                  <div className="flex items-center justify-center gap-4 pt-1">
+                    <div className="flex items-center gap-1.5">
+                      <Shield className="w-3 h-3 text-zinc-600" />
+                      <span className="text-[10px] text-zinc-600">SSL Encrypted</span>
+                    </div>
+                    <div className="w-px h-3 bg-zinc-800" />
+                    <div className="flex items-center gap-1.5">
+                      <svg className="w-3 h-3 text-zinc-600" viewBox="0 0 24 24" fill="currentColor"><path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z"/></svg>
+                      <span className="text-[10px] text-zinc-600">Powered by Stripe</span>
+                    </div>
                   </div>
-                  <div className="w-px h-3 bg-zinc-800" />
-                  <div className="flex items-center gap-1.5">
-                    <svg className="w-3 h-3 text-zinc-600" viewBox="0 0 24 24" fill="currentColor"><path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z"/></svg>
-                    <span className="text-[10px] text-zinc-600">Powered by Stripe</span>
-                  </div>
-                </div>
+                )}
               </div>
             </div>
           </div>

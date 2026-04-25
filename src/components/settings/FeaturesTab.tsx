@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   BarChart3, Mail, Image as ImageIcon, Sparkles,
-  Users, Shield, SlidersHorizontal, Brain,
+  Users, Shield, SlidersHorizontal, Brain, CreditCard,
 } from 'lucide-react';
 import { post } from '../../api/client';
 import { SectionCard } from '../ui';
@@ -10,6 +10,7 @@ interface WorkspaceData {
   tier?: 'free' | 'growth' | 'premium';
   trialEndsAt?: string;
   clientPortalEnabled?: boolean;
+  billingMode?: 'platform' | 'external';
   seoClientView?: boolean;
   analyticsClientView?: boolean;
   siteIntelligenceClientView?: boolean;
@@ -117,6 +118,29 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
               }`}>
               <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
                 ws?.clientPortalEnabled !== false ? 'translate-x-4' : 'translate-x-0.5'
+              }`} />
+            </button>
+          </label>
+          {/* External Billing */}
+          <label className="flex items-center justify-between cursor-pointer group">
+            <div className="flex items-center gap-3">
+              <CreditCard className="w-4 h-4 text-zinc-500" />
+              <div>
+                <div className="text-xs font-medium text-zinc-200">External Billing</div>
+                <div className="text-[11px] text-zinc-500">Bypass payment for content requests — billed off-platform</div>
+              </div>
+            </div>
+            <button onClick={async () => {
+              const isExternal = ws?.billingMode === 'external';
+              const next = isExternal ? 'platform' : 'external';
+              await patchWorkspace({ billingMode: next });
+              toast(next === 'external' ? 'External billing enabled — payment bypassed' : 'External billing disabled');
+            }}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                ws?.billingMode === 'external' ? 'bg-teal-500' : 'bg-zinc-700'
+              }`}>
+              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                ws?.billingMode === 'external' ? 'translate-x-4' : 'translate-x-0.5'
               }`} />
             </button>
           </label>

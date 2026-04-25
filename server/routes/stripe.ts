@@ -82,6 +82,7 @@ router.post('/api/stripe/create-payment-intent', checkoutLimiter, async (req, re
   if (!workspaceId || !productType) return res.status(400).json({ error: 'workspaceId and productType are required' });
   const ws = getWorkspace(workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (ws.billingMode === 'external') return res.status(403).json({ error: 'This workspace is billed externally — Stripe payments are disabled' });
 
   try {
     const result = await createPaymentIntentForProduct({
@@ -107,6 +108,7 @@ router.post('/api/stripe/create-checkout', checkoutLimiter, async (req, res) => 
   if (!workspaceId || !productType) return res.status(400).json({ error: 'workspaceId and productType are required' });
   const ws = getWorkspace(workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (ws.billingMode === 'external') return res.status(403).json({ error: 'This workspace is billed externally — Stripe payments are disabled' });
   const config = getProductConfig(productType);
   if (!config) return res.status(400).json({ error: `Unknown product type: ${productType}` });
 
@@ -139,6 +141,7 @@ router.post('/api/stripe/cart-checkout', checkoutLimiter, async (req, res) => {
   if (!workspaceId || !Array.isArray(items) || !items.length) return res.status(400).json({ error: 'workspaceId and items[] are required' });
   const ws = getWorkspace(workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (ws.billingMode === 'external') return res.status(403).json({ error: 'This workspace is billed externally — Stripe payments are disabled' });
 
   const baseUrl = `${req.protocol}://${req.get('host')}`;
   const successUrl = `${baseUrl}/client/${workspaceId}/health?payment=success&session_id={CHECKOUT_SESSION_ID}`;
@@ -168,6 +171,7 @@ router.post('/api/public/upgrade-checkout/:workspaceId', checkoutLimiter, async 
   const wsId = req.params.workspaceId;
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (ws.billingMode === 'external') return res.status(403).json({ error: 'This workspace is billed externally — Stripe payments are disabled' });
 
   const { planId } = req.body;
   const productType = planId === 'growth' ? 'plan_growth' : planId === 'premium' ? 'plan_premium' : null;

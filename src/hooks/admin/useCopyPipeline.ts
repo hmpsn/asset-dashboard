@@ -101,6 +101,20 @@ export function useRegenerateCopySection(wsId: string, blueprintId: string) {
   });
 }
 
+export function useSendEntryToClientReview(wsId: string, blueprintId: string) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: (entryId: string) => copyReview.sendEntryToClientReview(wsId, blueprintId, entryId),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.copySectionsAll(wsId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.copyStatusAll(wsId) });
+      toast(`${data?.sent ?? 0} section${(data?.sent ?? 0) !== 1 ? 's' : ''} sent for client review`, 'success');
+    },
+    onError: () => { toast('Failed to send for client review', 'error'); },
+  });
+}
+
 export function useUpdateSectionStatus(wsId: string) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
