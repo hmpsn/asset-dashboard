@@ -8,7 +8,7 @@ import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
 import { post, get } from '../api/client';
 import { RenderMarkdown } from './client/helpers';
 import { queryKeys } from '../lib/queryKeys';
-import { Icon, Button } from './ui';
+import { Icon, IconButton } from './ui';
 
 interface SeoIssue {
   check: string;
@@ -842,14 +842,14 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                 className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-none min-h-[40px] max-h-[120px]"
                 rows={2}
               />
-              <Button
-                variant="primary"
-                size="sm"
+              <IconButton
                 icon={Send}
-                aria-label="Send message"
+                size="md"
+                variant="solid"
+                label="Send message"
                 onClick={() => sendMessage()}
                 disabled={sending || !input.trim()}
-                className="flex-shrink-0"
+                className="flex-shrink-0 bg-teal-600 hover:bg-teal-500 text-white disabled:opacity-40"
               />
             </div>
           </div>
