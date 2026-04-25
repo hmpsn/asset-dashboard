@@ -175,7 +175,7 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
                       {isAdmin && (
                         <button onClick={e => { e.stopPropagation(); handleDismiss(anomaly.id); }} aria-label="Dismiss"
                           className="p-1 text-[var(--brand-text-dim)] hover:text-[var(--brand-text)] transition-colors">
-                          <Icon as={X} size="xs" />
+                          <Icon as={X} size="sm" />
                         </button>
                       )}
                     </div>

@@ -294,7 +294,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                         <td className="py-2.5 px-4 text-[var(--brand-text-bright)] font-medium">
                           {q.query}
                           {badge && (
-                            <span className={`t-caption-sm font-semibold px-1 py-0.5 rounded ${badge.color} ${badge.bgColor} ml-1 whitespace-nowrap`}>
+                            <span className={`t-micro font-semibold px-1 py-0.5 rounded ${badge.color} ${badge.bgColor} ml-1 whitespace-nowrap`}>
                               {badge.label}
                             </span>
                           )}
@@ -322,7 +322,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                             <Icon as={ExternalLink} size="sm" className="flex-shrink-0 text-[var(--brand-text-muted)]" />
                           </a>
                           {badge && (
-                            <span className={`t-caption-sm font-semibold px-1 py-0.5 rounded ${badge.color} ${badge.bgColor} ml-1 whitespace-nowrap`}>
+                            <span className={`t-micro font-semibold px-1 py-0.5 rounded ${badge.color} ${badge.bgColor} ml-1 whitespace-nowrap`}>
                               {badge.label}
                             </span>
                           )}
