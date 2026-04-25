@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { get } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
+import { SectionCard, StatCard, Icon } from '../ui';
 import {
   Loader2, TrendingUp, Globe, Search, Link2,
   DollarSign, Target, ChevronDown, ChevronRight,
 } from 'lucide-react';
-import { SectionCard, StatCard } from '../ui';
 
 interface DomainOverview {
   domain: string;
@@ -79,12 +79,12 @@ function ComparisonBar({ myVal, theirVal, label }: { myVal: number; theirVal: nu
   const myPct = Math.round((myVal / total) * 100);
   return (
     <div className="space-y-1">
-      <div className="flex justify-between text-[11px]">
+      <div className="flex justify-between t-caption-sm">
         <span className="text-teal-400 font-medium">{fmtNum(myVal)}</span>
-        <span className="text-zinc-500">{label}</span>
+        <span className="text-[var(--brand-text-muted)]">{label}</span>
         <span className="text-orange-400 font-medium">{fmtNum(theirVal)}</span>
       </div>
-      <div className="h-2 bg-zinc-800 rounded-full overflow-hidden flex">
+      <div className="h-2 bg-[var(--surface-3)] rounded-full overflow-hidden flex">
         <div className="h-full bg-teal-500/70 rounded-l-full transition-all" style={{ width: `${myPct}%` }} />
         <div className="h-full bg-orange-500/70 rounded-r-full transition-all" style={{ width: `${100 - myPct}%` }} />
       </div>
@@ -111,10 +111,10 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
     return (
       <SectionCard>
         <div className="flex items-center gap-3 py-6 justify-center">
-          <Target className="w-5 h-5 text-zinc-500" />
+          <Icon as={Target} size="lg" className="text-[var(--brand-text-muted)]" />
           <div>
-            <p className="text-sm text-zinc-400">Competitive Intelligence requires SEMRush</p>
-            <p className="text-xs text-zinc-500 mt-0.5">Configure your SEMRush API key in Settings to unlock this feature.</p>
+            <p className="t-ui text-[var(--brand-text)]">Competitive Intelligence requires SEMRush</p>
+            <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">Configure your SEMRush API key in Settings to unlock this feature.</p>
           </div>
         </div>
       </SectionCard>
@@ -125,10 +125,10 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
     return (
       <SectionCard>
         <div className="flex items-center gap-3 py-6 justify-center">
-          <Globe className="w-5 h-5 text-zinc-500" />
+          <Icon as={Globe} size="lg" className="text-[var(--brand-text-muted)]" />
           <div>
-            <p className="text-sm text-zinc-400">Add competitor domains above</p>
-            <p className="text-xs text-zinc-500 mt-0.5">Enter competitors in Strategy Settings → Competitor Domains, then generate a strategy.</p>
+            <p className="t-ui text-[var(--brand-text)]">Add competitor domains above</p>
+            <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">Enter competitors in Strategy Settings → Competitor Domains, then generate a strategy.</p>
           </div>
         </div>
       </SectionCard>
@@ -139,9 +139,9 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
     return (
       <SectionCard>
         <div className="flex flex-col items-center justify-center py-10 gap-2">
-          <Loader2 className="w-5 h-5 animate-spin text-teal-400" />
-          <p className="text-sm text-zinc-400">Fetching competitive intelligence...</p>
-          <p className="text-[11px] text-zinc-500">Comparing domain metrics, keywords, and backlinks</p>
+          <Icon as={Loader2} size="lg" className="animate-spin text-teal-400" />
+          <p className="t-ui text-[var(--brand-text)]">Fetching competitive intelligence...</p>
+          <p className="t-caption-sm text-[var(--brand-text-muted)]">Comparing domain metrics, keywords, and backlinks</p>
         </div>
       </SectionCard>
     );
@@ -155,8 +155,8 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
     return (
       <SectionCard>
         <div className="text-center py-6">
-          <p className="text-sm text-red-400">{errorMsg}</p>
-          <button onClick={() => refetch()} className="mt-2 text-xs text-teal-400 hover:underline">Retry</button>
+          <p className="t-ui text-red-400">{errorMsg}</p>
+          <button onClick={() => refetch()} className="mt-2 t-caption text-teal-400 hover:underline">Retry</button>
         </div>
       </SectionCard>
     );
@@ -180,10 +180,10 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Target className="w-4 h-4 text-teal-400" />
-          <h3 className="text-sm font-semibold text-zinc-200">Competitive Intelligence</h3>
+          <Icon as={Target} size="md" className="text-teal-400" />
+          <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Competitive Intelligence</h3>
         </div>
-        <button onClick={() => { queryClient.invalidateQueries({ queryKey: queryKeys.admin.competitorIntelAll(workspaceId) }); }} className="text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors">
+        <button onClick={() => { queryClient.invalidateQueries({ queryKey: queryKeys.admin.competitorIntelAll(workspaceId) }); }} className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
           Refresh
         </button>
       </div>
@@ -205,16 +205,17 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
         const compOv = comp.overview;
 
         return (
-          <div key={comp.domain} className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
+          // pr-check-disable-next-line -- brand asymmetric signature on collapsible per-competitor card; non-SectionCard chrome (button-as-first-child)
+          <div key={comp.domain} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
             <button
               onClick={() => toggleExpand(comp.domain)}
-              className="w-full px-4 py-3 flex items-center gap-3 hover:bg-zinc-800/50 transition-colors"
+              className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[var(--surface-3)]/50 transition-colors"
             >
-              {isExpanded ? <ChevronDown className="w-4 h-4 text-zinc-500" /> : <ChevronRight className="w-4 h-4 text-zinc-500" />}
-              <Globe className="w-4 h-4 text-orange-400" />
-              <span className="text-sm font-medium text-zinc-200 flex-1 text-left">{comp.domain}</span>
+              <Icon as={isExpanded ? ChevronDown : ChevronRight} size="sm" className="text-[var(--brand-text-muted)]" />
+              <Icon as={Globe} size="md" className="text-orange-400" />
+              <span className="t-ui font-medium text-[var(--brand-text-bright)] flex-1 text-left">{comp.domain}</span>
               {compOv && (
-                <div className="flex items-center gap-4 text-[11px] text-zinc-500">
+                <div className="flex items-center gap-4 t-caption-sm text-[var(--brand-text-muted)]">
                   <span>{fmtNum(compOv.organicTraffic)} traffic</span>
                   <span>{fmtNum(compOv.organicKeywords)} keywords</span>
                   <span>{fmtNum(comp.backlinks?.referringDomains || 0)} ref. domains</span>
@@ -223,11 +224,11 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
             </button>
 
             {isExpanded && myOv && compOv && (
-              <div className="px-4 pb-4 space-y-4 border-t border-zinc-800 pt-3">
+              <div className="px-4 pb-4 space-y-4 border-t border-[var(--brand-border)] pt-3">
                 {/* Side-by-side bars */}
-                <div className="flex items-center gap-6 text-[11px] mb-2">
+                <div className="flex items-center gap-6 t-caption-sm mb-2">
                   <span className="text-teal-400 font-medium">{myDomain?.domain}</span>
-                  <span className="text-zinc-600">vs</span>
+                  <span className="text-[var(--brand-text-dim)]">vs</span>
                   <span className="text-orange-400 font-medium">{comp.domain}</span>
                 </div>
                 <div className="space-y-3">
@@ -240,13 +241,13 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
                 {/* Competitor's top keywords */}
                 {comp.topKeywords.length > 0 && (
                   <div>
-                    <h5 className="text-[11px] uppercase tracking-wider text-zinc-500 font-semibold mb-2">Their Top Keywords</h5>
+                    <h5 className="t-micro uppercase tracking-wider text-[var(--brand-text-muted)] font-semibold mb-2">Their Top Keywords</h5>
                     <div className="space-y-1">
                       {comp.topKeywords.slice(0, 10).map((kw, i) => (
-                        <div key={i} className="flex items-center gap-2 text-xs px-2 py-1.5 bg-zinc-950/50 rounded-lg">
-                          <span className="text-zinc-500 w-5 text-right font-mono">#{kw.position}</span>
-                          <span className="flex-1 text-zinc-300 truncate">{kw.keyword}</span>
-                          <span className="text-zinc-500 font-mono">{fmtNum(kw.volume)}/mo</span>
+                        <div key={i} className="flex items-center gap-2 t-caption px-2 py-1.5 bg-[var(--surface-1)]/50 rounded-[var(--radius-lg)]">
+                          <span className="text-[var(--brand-text-muted)] w-5 text-right font-mono">#{kw.position}</span>
+                          <span className="flex-1 text-[var(--brand-text-bright)] truncate">{kw.keyword}</span>
+                          <span className="text-[var(--brand-text-muted)] font-mono">{fmtNum(kw.volume)}/mo</span>
                           <span className={`font-mono ${difficultyColor(kw.difficulty)}`}>KD {kw.difficulty}%</span>
                         </div>
                       ))}
@@ -261,27 +262,28 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
 
       {/* Keyword Gaps */}
       {effectiveGaps.length > 0 && (
-        <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
+        // pr-check-disable-next-line -- brand asymmetric signature on Keyword Gaps collapsible section; non-SectionCard chrome
+        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
           <button
             onClick={() => toggleExpand('gaps')}
-            className="w-full px-4 py-3 flex items-center gap-3 hover:bg-zinc-800/50 transition-colors"
+            className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[var(--surface-3)]/50 transition-colors"
           >
-            {expanded.has('gaps') ? <ChevronDown className="w-4 h-4 text-zinc-500" /> : <ChevronRight className="w-4 h-4 text-zinc-500" />}
-            <Target className="w-4 h-4 text-amber-400" />
-            <span className="text-sm font-medium text-zinc-200 flex-1 text-left">Keyword Gaps</span>
-            {usingFallbackGaps && <span className="text-[10px] text-amber-500/70 px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20">from strategy</span>}
-            <span className="text-[11px] text-zinc-500">{effectiveGaps.length} opportunities</span>
+            <Icon as={expanded.has('gaps') ? ChevronDown : ChevronRight} size="sm" className="text-[var(--brand-text-muted)]" />
+            <Icon as={Target} size="md" className="text-amber-400" />
+            <span className="t-ui font-medium text-[var(--brand-text-bright)] flex-1 text-left">Keyword Gaps</span>
+            {usingFallbackGaps && <span className="t-micro text-amber-500/70 px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20">from strategy</span>}
+            <span className="t-caption-sm text-[var(--brand-text-muted)]">{effectiveGaps.length} opportunities</span>
           </button>
           {expanded.has('gaps') && (
-            <div className="px-4 pb-4 border-t border-zinc-800 pt-3">
-              <p className="text-[11px] text-zinc-500 mb-3">Keywords your competitors rank for that you don't — sorted by traffic potential.</p>
+            <div className="px-4 pb-4 border-t border-[var(--brand-border)] pt-3">
+              <p className="t-caption-sm text-[var(--brand-text-muted)] mb-3">Keywords your competitors rank for that you don't — sorted by traffic potential.</p>
               <div className="space-y-1 max-h-[300px] overflow-y-auto">
                 {effectiveGaps.map((gap, i) => (
-                  <div key={i} className="flex items-center gap-2 text-xs px-2 py-1.5 bg-zinc-950/50 rounded-lg">
-                    <span className="flex-1 text-zinc-300 truncate">{gap.keyword}</span>
-                    <span className="text-zinc-500 font-mono">{fmtNum(gap.volume)}/mo</span>
+                  <div key={i} className="flex items-center gap-2 t-caption px-2 py-1.5 bg-[var(--surface-1)]/50 rounded-[var(--radius-lg)]">
+                    <span className="flex-1 text-[var(--brand-text-bright)] truncate">{gap.keyword}</span>
+                    <span className="text-[var(--brand-text-muted)] font-mono">{fmtNum(gap.volume)}/mo</span>
                     <span className={`font-mono ${difficultyColor(gap.difficulty)}`}>KD {gap.difficulty}%</span>
-                    <span className="text-orange-400/80 text-[11px]">{gap.competitorDomain} #{gap.competitorPosition}</span>
+                    <span className="text-orange-400/80 t-caption-sm">{gap.competitorDomain} #{gap.competitorPosition}</span>
                   </div>
                 ))}
               </div>
@@ -292,12 +294,12 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
 
       <div className="flex items-center justify-between">
         {errorMsg && effectiveGaps.length > 0 && (
-          <p className="text-[11px] text-amber-500/70">
+          <p className="t-caption-sm text-amber-500/70">
             Live fetch failed — showing cached data.{' '}
             <button onClick={() => refetch()} className="text-teal-400 hover:underline">Retry</button>
           </p>
         )}
-        <p className="text-[11px] text-zinc-600 text-right ml-auto">
+        <p className="t-caption-sm text-[var(--brand-text-dim)] text-right ml-auto">
           Data via SEMRush · {usingFallbackGaps
             ? 'Keyword gaps from last strategy run'
             : data?.fetchedAt ? `Cached 48h · ${new Date(data.fetchedAt).toLocaleString()}` : ''}
