@@ -3,6 +3,14 @@
 Reference suite for Gate 4 of the Phase 2 kickoff plan
 ([`docs/superpowers/plans/2026-04-24-phase-2-kickoff.md`](../../../docs/superpowers/plans/2026-04-24-phase-2-kickoff.md#phase-2-visual-baseline)).
 
+> **Status (2026-04-24):** Harness shipped, **baselines not yet captured**.
+> The PNG baselines under `phase2-baseline/` need to be generated against the
+> staging deploy before any Phase 2 worker PR opens. See
+> [§ One-time: capture the baseline against staging](#one-time-capture-the-baseline-against-staging)
+> below — operator will run this from a Claude Desktop terminal session with
+> staging credentials, then commit the resulting PNGs as a follow-up.
+> Phase 2 dispatch is gated on this completing.
+
 ## What this is
 
 Playwright visual-regression suite that captures full-page screenshots of the
