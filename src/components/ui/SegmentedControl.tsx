@@ -28,24 +28,55 @@ export const SegmentedControl = React.forwardRef<HTMLDivElement, SegmentedContro
   function SegmentedControl({ options, value, onChange, size = 'md', className, label }, ref) {
     const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-    const onKey = (e: React.KeyboardEvent<HTMLButtonElement>, idx: number) => {
-      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-      e.preventDefault();
+    const activeIdx = options.findIndex((o) => o.id === value);
+    const hasActive = activeIdx !== -1;
+
+    const focusFirstEnabled = (start: number, dir: 1 | -1) => {
       const len = options.length;
-      if (len === 0) return; // Guard: empty options list must not crash on arrow key
-      const dir = e.key === 'ArrowRight' ? 1 : -1;
-      let next = idx;
-      let found = false;
+      let probe = start;
       for (let i = 0; i < len; i++) {
-        next = (next + dir + len) % len;
-        if (!options[next].disabled) {
-          found = true;
-          break;
+        if (!options[probe].disabled) {
+          onChange(options[probe].id);
+          buttonRefs.current[probe]?.focus();
+          return;
         }
+        probe = (probe + dir + len) % len;
       }
-      if (!found) return; // All options disabled — do not fire onChange with a disabled id
-      onChange(options[next].id);
-      buttonRefs.current[next]?.focus();
+    };
+
+    const onKey = (e: React.KeyboardEvent<HTMLButtonElement>, idx: number) => {
+      const len = options.length;
+      if (len === 0) return;
+
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        const dir = e.key === 'ArrowRight' ? 1 : -1;
+        let next = idx;
+        let found = false;
+        for (let i = 0; i < len; i++) {
+          next = (next + dir + len) % len;
+          if (!options[next].disabled) {
+            found = true;
+            break;
+          }
+        }
+        if (!found) return;
+        onChange(options[next].id);
+        buttonRefs.current[next]?.focus();
+        return;
+      }
+
+      if (e.key === 'Home') {
+        e.preventDefault();
+        focusFirstEnabled(0, 1);
+        return;
+      }
+
+      if (e.key === 'End') {
+        e.preventDefault();
+        focusFirstEnabled(len - 1, -1);
+        return;
+      }
     };
 
     return (
@@ -60,13 +91,17 @@ export const SegmentedControl = React.forwardRef<HTMLDivElement, SegmentedContro
       >
         {options.map((opt, idx) => {
           const active = opt.id === value;
+          // WAI-ARIA radiogroup must always have one tab stop. If no option matches
+          // the current value, fall back to the first non-disabled option so the
+          // widget remains keyboard-reachable.
+          const fallbackTabStop = !hasActive && idx === options.findIndex((o) => !o.disabled);
           return (
             <button
               key={opt.id}
               type="button"
               role="radio"
               aria-checked={active}
-              tabIndex={active ? 0 : -1}
+              tabIndex={active || fallbackTabStop ? 0 : -1}
               disabled={opt.disabled}
               ref={(el) => {
                 buttonRefs.current[idx] = el;

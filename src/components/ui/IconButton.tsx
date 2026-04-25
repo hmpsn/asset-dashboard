@@ -32,13 +32,13 @@ const VARIANT: Record<IconButtonVariant, string> = {
 };
 
 export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
-  { icon: Icon, size = 'md', variant = 'ghost', label, disabled, className, ...rest },
+  { icon: Icon, size = 'md', variant = 'ghost', label, disabled, className, type = 'button', ...rest },
   ref,
 ) {
   return (
     <button
       ref={ref}
-      type={rest.type ?? 'button'}
+      type={type}
       aria-label={label}
       disabled={disabled}
       className={cn(

@@ -26,13 +26,13 @@ const VARIANT: Record<ActionPillVariant, string> = {
 };
 
 export const ActionPill = React.forwardRef<HTMLButtonElement, ActionPillProps>(function ActionPill(
-  { variant, icon: Icon, disabled, className, children, ...rest },
+  { variant, icon: Icon, disabled, className, children, type = 'button', ...rest },
   ref,
 ) {
   return (
     <button
       ref={ref}
-      type={rest.type ?? 'button'}
+      type={type}
       disabled={disabled}
       className={cn(
         'inline-flex items-center gap-1 px-2.5 py-1 border rounded-md text-[11px] font-medium transition-colors',
