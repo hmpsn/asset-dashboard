@@ -68,4 +68,19 @@ describe('Icon', () => {
     expect(span.id).toBe('send-icon');
     expect(span.getAttribute('data-testid')).toBe('send-x');
   });
+
+  it('applies role="img" when aria-label is provided (semantic icon)', () => {
+    const { container } = render(<Icon as={TrendingUp} aria-label="Trending up" />);
+    expect(container.firstElementChild?.getAttribute('role')).toBe('img');
+  });
+
+  it('applies role="img" when aria-labelledby is provided (semantic icon)', () => {
+    const { container } = render(<Icon as={TrendingUp} aria-labelledby="trend-label" />);
+    expect(container.firstElementChild?.getAttribute('role')).toBe('img');
+  });
+
+  it('omits role when no aria-label/aria-labelledby (decorative icon)', () => {
+    const { container } = render(<Icon as={TrendingUp} />);
+    expect(container.firstElementChild?.getAttribute('role')).toBeNull();
+  });
 });

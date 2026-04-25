@@ -55,6 +55,7 @@ export { Heading, Stat, BodyText, Caption, Label, Mono } from './typography';
 
 // Icon
 export { Icon } from './Icon';
+export type { IconSize, IconProps } from './Icon';
 
 // Actions
 export { Button } from './Button';
