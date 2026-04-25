@@ -4006,7 +4006,10 @@ function applyExcludeLines(lines: string[], excludeLines?: string[]): string[] {
   return lines.filter(line => !excludeLines.some(ex => line.includes(ex)));
 }
 
-function checkFile(file: string, check: Check): string[] {
+// Exported for tests/pr-check.test.ts — regression-test harness for the
+// `-`-prefix-pattern silent-bug class fixed in PR #299. Not part of the public
+// API; do not import from anywhere except the test harness.
+export function checkFile(file: string, check: Check): string[] {
   if (isExcluded(file, check.exclude)) return [];
   if (!check.pattern) return [];
   try {
