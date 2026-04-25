@@ -38,7 +38,7 @@ Ground-truth verified via repo-wide grep:
 | Hand-rolled buttons | 1,132 | → `<Button>` / `<IconButton>` |
 | Hand-rolled form controls | 303 | → `<FormInput>` / `<FormSelect>` / etc. |
 | Inline `flex items-center gap-*` | ~1,200 | → `<Row>` / `<Stack>` |
-| Inline asymmetric `borderRadius: '...'` | 263 | → wrap in `<SectionCard>` if card-like, else `rounded-[var(--radius-lg)]` (the asymmetric `--radius-signature-lg` is reserved for `SectionCard.tsx`; pr-check enforces) |
+| Inline asymmetric `borderRadius: '...'` | 263 | → wrap in `<SectionCard>` if card-like and structurally compatible. Non-SectionCard containers MAY keep `rounded-[var(--radius-signature-lg)]` if the asymmetric brand signature is intentional — they must declare intent with `// pr-check-disable-next-line -- <reason>` per site. Cards without specific brand intent should use `rounded-[var(--radius-lg)]`. |
 | Hand-rolled modals (`fixed inset-0`) | 21 | → `<Modal>` |
 | Hand-rolled dropdowns | 15+ | → `<Popover>` |
 | Hand-rolled pills bypassing Badge | 30+ | → `<StatusPill>` or `<Badge>` |
@@ -461,7 +461,7 @@ Every Phase 2 PR MUST:
 
 - [ ] Run all 6 codemods over domain in apply mode (`--write`)
 - [ ] Manual pass: remove residual raw `text-zinc-*` / `bg-zinc-*` / `border-zinc-*` / `rounded-lg` / arbitrary `text-[Npx]`
-- [ ] Replace every `borderRadius: '...'` inline style. **The asymmetric brand signature is reserved for `<SectionCard>`** — if a container wants the brand asymmetric corner, wrap it in `<SectionCard>` (the primitive owns `--radius-signature-lg`). For non-SectionCard containers (collapsible panels, sticky tables, hand-rolled chrome) use `rounded-[var(--radius-lg)]`. Row-level asymmetric `--radius-signature` (the `6px 12px 6px 12px` variant) remains permitted for sub-card row elements that adopt the StatCard-style accent — pr-check does not currently gate the smaller variant.
+- [ ] Replace every `borderRadius: '...'` inline style. **The asymmetric brand signature is the SectionCard primitive's canonical chrome** — prefer wrapping in `<SectionCard>` when structurally compatible. Non-SectionCard containers (collapsible panels, sticky tables, hand-rolled chrome with intentional brand asymmetric corners) MAY use `rounded-[var(--radius-signature-lg)]` directly — they must declare intent with `// pr-check-disable-next-line -- <reason>` per site. Cards without specific brand intent (interior surfaces, sub-cards) use `rounded-[var(--radius-lg)]`. Row-level asymmetric `--radius-signature` (the `6px 12px 6px 12px` variant) remains permitted unconditionally for sub-card row elements that adopt the StatCard-style accent.
 - [ ] Migrate hand-rolled trend icons to `<TrendBadge>` (expect ~15–20 in this domain)
 - [ ] Migrate hand-rolled modals/dropdowns in this domain to `<Modal>`/`<Popover>`
 - [ ] Preview-verify each page: open preview, compare to pre-edit screenshot, capture new screenshot for PR
@@ -528,7 +528,7 @@ Each rule below MUST include: `name`, `severity`, `pattern` (regex) OR `customCh
 | 3 | `no-raw-bg-zinc` | `bg-zinc-\d+` | `src/components/ui/**`, `public/styleguide.*` | error | Use `var(--surface-1 / --surface-2 / --surface-3)`. |
 | 4 | `no-raw-border-zinc` | `border-zinc-\d+` | `src/components/ui/**`, `public/styleguide.*` | error | Use `var(--brand-border)` or `var(--brand-border-hover)`. |
 | 5 | `no-rounded-literal` | `rounded-(sm\|md\|lg\|xl\|2xl\|3xl\|full)` | `src/components/ui/**`, `public/styleguide.*` | error | Use `rounded-[var(--radius-sm/md/lg/xl/pill)]` or `rounded-[var(--radius-signature*)]` for asymmetric card signatures. |
-| 6 | `no-inline-asymmetric-radius` | `borderRadius:\s*['"]\d+px\s+\d+px` | `src/components/ui/**`, `public/styleguide.*` | error | Wrap in `<SectionCard>` for the brand asymmetric signature, or use `className="rounded-[var(--radius-lg)]"` for non-SectionCard containers. The `--radius-signature-lg` token is SectionCard-only (separate rule enforces). The smaller `--radius-signature` is permitted at the row level. |
+| 6 | `no-inline-asymmetric-radius` | `borderRadius:\s*['"]\d+px\s+\d+px` | `src/components/ui/**`, `public/styleguide.*` | error | Wrap in `<SectionCard>` when structurally compatible. Otherwise use `className="rounded-[var(--radius-lg)]"` for interior surfaces, or `rounded-[var(--radius-signature-lg)]` with `// pr-check-disable-next-line -- <reason>` for non-SectionCard containers that legitimately want the brand asymmetric corner. The smaller `--radius-signature` is permitted at the row level without justification. |
 | 7 | `no-purple-in-client` | `(purple\|violet)-\d+` | N/A | error | Purple is admin-AI only (Law 04). Use teal (action), blue (data), or emerald (success). Scope: `src/components/client/**`. |
 | 8 | `no-rose-pink` | `(rose\|pink)-\d+` | `public/styleguide.*` | error | Not in styleguide palette. Use red (error) or amber (warning). Scope: `src/components/**`. |
 | 9 | `no-trend-icon-outside-trendbadge` | `import.*\b(TrendingUp\|TrendingDown\|ArrowUp\|ArrowDown)\b.*from\s+['"]lucide-react['"]` | `src/components/ui/TrendBadge.tsx`, `src/components/ui/__tests__/**` | error | Use `<TrendBadge value={n} />` — it encodes direction, color, and sign automatically. |

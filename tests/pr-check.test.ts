@@ -31,6 +31,7 @@ import { fileURLToPath } from 'url';
 import {
   CHECKS,
   checkDirectory,
+  checkFile,
   buildWorkspaceScopedTables,
   extractDbPrepareArg,
   findUnrenderedSliceFields,
@@ -4408,6 +4409,12 @@ describe('Meta: customCheck rule name registry', () => {
     'SectionCard titleExtra with ml-auto (use action prop)',
     // Phase 5 design-system token authority (2026-04-24)
     'styleguide-token-parity',
+    // Phase 2 Batch 1 follow-up — converted from pattern to customCheck so
+    // disable-comments work (Devin re-review on PRs #301/#302 flagged that
+    // forcing --radius-signature-lg into SectionCard-only was an over-tight
+    // rule; relaxing with per-site justification preserves the brand
+    // signature where intentional)
+    'radius-signature-lg used outside SectionCard',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -5028,6 +5035,83 @@ describe('Pattern rule: Hand-rolled trend badge', () => {
 // Rule: styleguide-token-parity
 // ════════════════════════════════════════════════════════════════════════════
 
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: radius-signature-lg used outside SectionCard
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Converted from pattern-based to customCheck so consumer files can opt into
+// the brand asymmetric signature with a `// pr-check-disable-next-line --
+// <reason>` justification. The pattern-based version did not honor disable
+// comments (see PR #303 regression test for that silent-failure class).
+
+describe('Rule: radius-signature-lg used outside SectionCard', () => {
+  const RULE = 'radius-signature-lg used outside SectionCard';
+
+  it('flags a consumer file that uses --radius-signature-lg without a hatch', () => {
+    const file = write(
+      uniqPath('rule-rsl', 'src/components/Probe.tsx'),
+      lines(
+        "export function Probe() {",
+        "  return <div className=\"rounded-[var(--radius-signature-lg)]\">x</div>;",
+        "}",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBe(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('respects an inline // pr-check-disable-next-line comment', () => {
+    const file = write(
+      uniqPath('rule-rsl', 'src/components/Probe.tsx'),
+      lines(
+        "export function Probe() {",
+        "  return <div className=\"rounded-[var(--radius-signature-lg)]\">x</div>; // pr-check-disable-next-line -- collapsible card",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects a // pr-check-disable-next-line on the line above', () => {
+    const file = write(
+      uniqPath('rule-rsl', 'src/components/Probe.tsx'),
+      lines(
+        "export function Probe() {",
+        "  // pr-check-disable-next-line -- intentional brand signature on this surface",
+        "  return <div className=\"rounded-[var(--radius-signature-lg)]\">x</div>;",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects a hatch up to 5 lines above (multi-attribute JSX)', () => {
+    const file = write(
+      uniqPath('rule-rsl', 'src/components/Probe.tsx'),
+      lines(
+        "export function Probe() {",
+        "  // pr-check-disable-next-line -- multi-line JSX",
+        "  return (",
+        "    <div",
+        "      role=\"region\"",
+        "      aria-label=\"Card\"",
+        "      className=\"rounded-[var(--radius-signature-lg)]\"",
+        "    >x</div>",
+        "  );",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  // The rule's exclude list (SectionCard.tsx, tokens.css, styleguide.*) is
+  // applied by the runner before calling customCheck (see resolveCheckFileList
+  // in pr-check.ts). The customCheck function itself doesn't see those files
+  // in production, so testing exclude behavior via runRule (which bypasses the
+  // runner's filter) is a no-op. Trust the runner's exclude pipeline.
+});
+
 describe('Rule: styleguide-token-parity', () => {
   const RULE = 'styleguide-token-parity';
 
@@ -5079,5 +5163,64 @@ describe('Rule: styleguide-token-parity', () => {
     // Passing a path to a non-existent file should not throw
     const hits = runRule(RULE, ['/nonexistent/public/styleguide.css']);
     expect(hits).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Runner: pattern-based rules with `-`-prefix patterns
+// ════════════════════════════════════════════════════════════════════════════
+//
+// REGRESSION: PR #299 — silent-failure class.
+//
+// Before #299, `checkFile` and `checkDirectory` invoked grep as
+// `grep -n -E "$pattern" "$file"`. When `pattern` started with `-` (e.g.
+// `--radius-signature-lg`), grep parsed it as an unknown long option, errored
+// out, and the error was swallowed by `2>/dev/null || true` — so the rule
+// reported ✓ silently. The rule `radius-signature-lg used outside SectionCard`
+// was silently broken from the day it was added until #299; Phase 2 Batch 1
+// surfaced it because workers introduced 24+ violations and pr-check still
+// passed.
+//
+// Fix in #299: pass the pattern via `grep -e <pattern>` so leading `-` is
+// treated as a literal regex character.
+//
+// These tests fail loudly if a future refactor drops `-e` (or breaks the
+// equivalent fix). The probe pattern starts with two literal hyphens to
+// reproduce the exact failure mode and is intentionally weird so it can never
+// match real code.
+describe('Runner: pattern-rule with leading-`-` pattern (#299 regression)', () => {
+  const PROBE_PATTERN = '--probe-prefix-leading-dashes-x9k';
+  const PROBE_LINE = `// ${PROBE_PATTERN} — synthetic probe`;
+
+  function makeProbeCheck(): Check {
+    return {
+      name: 'probe-leading-dashes',
+      pattern: PROBE_PATTERN,
+      fileGlobs: ['*.tsx'],
+      message: 'probe',
+      severity: 'error',
+      rationale: 'regression test for leading-`-` pattern parsing',
+      claudeMdRef: '#',
+    };
+  }
+
+  it('checkFile: returns a match when the file contains the leading-`-` pattern', () => {
+    const probe = write(uniqPath('runner-prefix-dash', 'probe.tsx'), PROBE_LINE);
+    const hits = checkFile(probe, makeProbeCheck());
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0]).toContain('probe.tsx');
+    expect(hits[0]).toContain(PROBE_PATTERN);
+  });
+
+  it('checkDirectory: returns a match when a file in the dir contains the leading-`-` pattern', () => {
+    // Use a tmpdir-rooted absolute path so the run is isolated from the
+    // real tree's grep --exclude-dir filters.
+    const dir = path.join(TMPDIR, 'runner-prefix-dash-dir');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'probe.tsx'), PROBE_LINE);
+    const hits = checkDirectory(dir, makeProbeCheck());
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0]).toContain('probe.tsx');
+    expect(hits[0]).toContain(PROBE_PATTERN);
   });
 });
