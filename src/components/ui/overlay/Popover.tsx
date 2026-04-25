@@ -232,6 +232,13 @@ function PopoverInner({
         close();
         return;
       }
+      // WAI-ARIA APG menu pattern: Tab closes the menu and lets focus move
+      // naturally to the next/previous focusable element. Without this, the
+      // menu stays open while focus drifts to surrounding page chrome.
+      if (e.key === 'Tab') {
+        close();
+        return;
+      }
       const items = itemRefs.current.filter((el): el is HTMLButtonElement => !!el);
       if (items.length === 0) return;
       const activeIdx = items.findIndex((el) => el === document.activeElement);

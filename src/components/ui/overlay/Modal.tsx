@@ -226,7 +226,7 @@ function ModalInner({
   return createPortal(
     <div
       className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-      style={{ zIndex: 'var(--z-modal)' }}
+      style={{ zIndex: 'var(--z-modal-backdrop)' }}
       onMouseDown={handleBackdropMouseDown}
       onClick={handleBackdropClick}
       data-modal-backdrop="true"
@@ -237,7 +237,8 @@ function ModalInner({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`bg-zinc-900 border border-zinc-800 rounded-lg shadow-2xl w-full ${SIZE_MAX_WIDTH[size]} outline-none ${motionClass}`}
+        style={{ zIndex: 'var(--z-modal)' }}
+        className={`relative bg-zinc-900 border border-zinc-800 rounded-lg shadow-2xl w-full ${SIZE_MAX_WIDTH[size]} outline-none ${motionClass}`}
       >
         {injectTitleId(children, titleId, Boolean(labelledById))}
       </div>

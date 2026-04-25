@@ -442,44 +442,6 @@ import { Icon } from '@/components/ui';
 
 ---
 
-### 20. Overlay primitives (Phase 5)
-
-All three overlay primitives portal into `document.body` so `position: fixed` resolves relative to the viewport regardless of ancestor `transform` / `filter` / `contain` / `will-change`.
-
-**`<Modal>`** — `src/components/ui/overlay/Modal.tsx`
-
-| Prop | Type | Notes |
-|------|------|-------|
-| `open` | `boolean` | Controls visibility |
-| `onClose` | `() => void` | Called on Escape, backdrop click, or header × button |
-| `size` | `'sm' \| 'md' \| 'lg' \| 'xl'` | Max-width: 24rem / 32rem / 48rem / 64rem. Default `md` |
-| `labelledById` | `string?` | Override for `aria-labelledby`; auto-generated otherwise |
-
-Compound sub-components: `<Modal.Header title onClose?>`, `<Modal.Body>`, `<Modal.Footer>`. Focus trap (Tab / Shift+Tab wraps), Escape to close, backdrop-click closes (drag-out safe), body-scroll lock, focus restores to trigger on close. Respects `prefers-reduced-motion`.
-
-**`<Popover>`** — `src/components/ui/overlay/Popover.tsx`
-
-| Prop | Type | Notes |
-|------|------|-------|
-| `trigger` | `ReactElement` | Cloned to receive `aria-haspopup`, `aria-expanded`, `aria-controls` |
-| `placement` | `PopoverPlacement` | 8 values: `bottom-start` (default), `bottom-end`, `bottom`, `top-*`, `left`, `right` |
-| `closeOnSelect` | `boolean` | Default `true` |
-| `offset` | `number` | Gap from trigger in px. Default `8` |
-
-Compound sub-components: `<Popover.Item onClick danger?>`, `<Popover.Separator>`. Arrow key navigation (ArrowDown/Up/Home/End), Escape + outside-click to close, focus returns to trigger. Viewport-clamped positioning with scroll/resize tracking.
-
-**`<Tooltip>`** — `src/components/ui/overlay/Tooltip.tsx`
-
-| Prop | Type | Notes |
-|------|------|-------|
-| `content` | `ReactNode` | Tooltip body |
-| `placement` | `'top' \| 'bottom' \| 'left' \| 'right'` | Default `top` |
-| `delay` | `number` | Hover show delay in ms. Default `500`. Focus shows instantly |
-
-Wraps a single child element (cloned to add `aria-describedby` while visible). `role="tooltip"`, `pointerEvents: none`. Respects `prefers-reduced-motion`. Known limitation: stacked modals requiring a scroll-lock counter are a future enhancement.
-
----
-
 ## Spacing
 
 | Context | Value |
@@ -571,6 +533,44 @@ Context so `<label htmlFor>` ↔ `<input id>` is wired automatically.
 ### `required` flag
 
 Adds a visible red asterisk after the label text and propagates `required` into the Context. Does NOT set the native `required` attribute automatically — callers pass it to the input as needed.
+
+---
+
+## § 20 Overlay Primitives (Phase 5 — 2026-04-24)
+
+All three overlay primitives portal into `document.body` so `position: fixed` resolves relative to the viewport regardless of ancestor `transform` / `filter` / `contain` / `will-change`.
+
+**`<Modal>`** — `src/components/ui/overlay/Modal.tsx`
+
+| Prop | Type | Notes |
+|------|------|-------|
+| `open` | `boolean` | Controls visibility |
+| `onClose` | `() => void` | Called on Escape, backdrop click, or header × button |
+| `size` | `'sm' \| 'md' \| 'lg' \| 'xl'` | Max-width: 24rem / 32rem / 48rem / 64rem. Default `md` |
+| `labelledById` | `string?` | Override for `aria-labelledby`; auto-generated otherwise |
+
+Compound sub-components: `<Modal.Header title onClose?>`, `<Modal.Body>`, `<Modal.Footer>`. Focus trap (Tab / Shift+Tab wraps), Escape to close, backdrop-click closes (drag-out safe), body-scroll lock, focus restores to trigger on close. Respects `prefers-reduced-motion`. Backdrop sits at `var(--z-modal-backdrop)` (40); panel at `var(--z-modal)` (50).
+
+**`<Popover>`** — `src/components/ui/overlay/Popover.tsx`
+
+| Prop | Type | Notes |
+|------|------|-------|
+| `trigger` | `ReactElement` | Cloned to receive `aria-haspopup`, `aria-expanded`, `aria-controls` |
+| `placement` | `PopoverPlacement` | 8 values: `bottom-start` (default), `bottom-end`, `bottom`, `top-*`, `left`, `right` |
+| `closeOnSelect` | `boolean` | Default `true` |
+| `offset` | `number` | Gap from trigger in px. Default `8` |
+
+Compound sub-components: `<Popover.Item onClick danger?>`, `<Popover.Separator>`. Keyboard: ArrowDown/Up cycle items, Home/End jump to first/last, Tab closes (focus moves naturally to next page element), Escape + outside-click close. Focus returns to trigger on close. Viewport-clamped positioning with scroll/resize tracking.
+
+**`<Tooltip>`** — `src/components/ui/overlay/Tooltip.tsx`
+
+| Prop | Type | Notes |
+|------|------|-------|
+| `content` | `ReactNode` | Tooltip body |
+| `placement` | `'top' \| 'bottom' \| 'left' \| 'right'` | Default `top` |
+| `delay` | `number` | Hover show delay in ms. Default `500`. Focus shows instantly |
+
+Wraps a single child element (cloned to add `aria-describedby` while visible). `role="tooltip"`, `pointerEvents: none`. Respects `prefers-reduced-motion`.
 
 ---
 

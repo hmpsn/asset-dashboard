@@ -178,4 +178,8 @@ function main(): void {
   // Exit with 0 regardless — this scaffold is informational-only in Phase 1.
 }
 
-main();
+// Only execute when invoked directly (not when imported). Without this guard,
+// any module that ends up importing this file would trigger a filesystem scan.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main();
+}
