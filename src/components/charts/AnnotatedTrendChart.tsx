@@ -7,6 +7,7 @@ import {
 import { Plus, X } from 'lucide-react';
 import type { Annotation } from '../../hooks/admin/useAnalyticsAnnotations';
 import { chartGridColor, chartAxisColor, chartDotStroke, chartTooltipStyle, chartTooltipLabelStyle } from '../ui/constants';
+import { Icon, Button } from '../ui';
 
 // ── Category colors (matches AnalyticsAnnotations badges) ──
 const ANNOTATION_COLORS: Record<string, string> = {
@@ -169,15 +170,15 @@ function AnnotationDot({ x, annotation }: { x: number; annotation: Annotation })
       {hovered && (
         <foreignObject x={x - 100} y={20} width={200} height={80}>
           {/* pr-check-disable-next-line -- chart tooltip inside SVG foreignObject */}
-          <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-2 shadow-lg text-center">
-            <span className="text-[10px] font-mono text-zinc-500 block">{annotation.date}</span>
+          <div className="bg-[var(--surface-2)] border border-[var(--brand-border-hover)] rounded-[var(--radius-sm)] p-2 shadow-lg text-center">
+            <span className="t-caption-sm font-mono text-[var(--brand-text-muted)] block">{annotation.date}</span>
             <span
-              className="text-[10px] px-1.5 py-0.5 rounded-md font-medium inline-block mt-0.5"
+              className="t-caption-sm px-1.5 py-0.5 rounded-md font-medium inline-block mt-0.5"
               style={{ backgroundColor: `${color}33`, color }}
             >
               {catLabel}
             </span>
-            <span className="text-[11px] text-zinc-200 block mt-1 truncate">{annotation.label}</span>
+            <span className="t-caption-sm text-[var(--zinc-200)] block mt-1 truncate">{annotation.label}</span>
           </div>
         </foreignObject>
       )}
@@ -228,12 +229,12 @@ function CreatePopover({
     // pr-check-disable-next-line -- absolute-positioned chart annotation tooltip; not a section card
     <div
       ref={popoverRef}
-      className="absolute z-50 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl p-3 w-64"
+      className="absolute z-50 bg-[var(--surface-2)] border border-[var(--brand-border-hover)] rounded-[var(--radius-md)] shadow-xl p-3 w-64"
       style={{ left: Math.min(state.x, (containerWidth ?? 600) - 270), top: state.y + 10 }}
     >
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[11px] font-mono text-zinc-500">{state.date}</span>
-        <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 p-0.5"><X className="w-3.5 h-3.5" /></button>
+        <span className="t-caption-sm font-mono text-[var(--brand-text-muted)]">{state.date}</span>
+        <button onClick={onClose} className="text-[var(--brand-text-muted)] hover:text-[var(--zinc-300)] p-0.5" aria-label="Close"><Icon as={X} size="sm" /></button>
       </div>
       <input
         type="text"
@@ -242,25 +243,21 @@ function CreatePopover({
         onChange={e => setLabel(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') onClose(); }}
         autoFocus
-        className="w-full px-2 py-1.5 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 mb-2"
+        className="w-full px-2 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--zinc-300)] placeholder-[var(--brand-text-dim)] mb-2"
       />
       <select
         value={category}
         onChange={e => setCategory(e.target.value as Category)}
-        className="w-full px-2 py-1.5 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 mb-2"
+        className="w-full px-2 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--zinc-300)] mb-2"
       >
         <option value="site_change">Site Change</option>
         <option value="algorithm_update">Algorithm</option>
         <option value="campaign">Campaign</option>
         <option value="other">Other</option>
       </select>
-      <button
-        onClick={handleSave}
-        disabled={!label.trim()}
-        className="flex items-center gap-1 w-full justify-center px-3 py-1.5 rounded-lg text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 transition-colors"
-      >
-        <Plus className="w-3 h-3" /> Add
-      </button>
+      <Button variant="primary" size="sm" icon={Plus} disabled={!label.trim()} onClick={handleSave} className="w-full justify-center">
+        Add
+      </Button>
     </div>
   );
 }
@@ -404,19 +401,19 @@ export function AnnotatedTrendChart({
                 return (
                   <foreignObject x={vx - 70} y={24} width={140} height={56}>
                     <div
-                      className="rounded-lg px-2 py-1.5 shadow-lg text-center border"
+                      className="rounded-[var(--radius-sm)] px-2 py-1.5 shadow-lg text-center border"
                       style={{
                         backgroundColor: `${callout.color}18`,
                         borderColor: `${callout.color}40`,
                       }}
                     >
                       <span
-                        className="text-[10px] font-semibold block truncate"
+                        className="t-caption-sm font-semibold block truncate"
                         style={{ color: callout.color }}
                       >
                         {callout.label}
                       </span>
-                      <span className="text-[9px] text-zinc-400 block truncate">
+                      <span className="t-caption-sm text-[var(--brand-text)] block truncate">
                         {callout.detail}
                       </span>
                     </div>

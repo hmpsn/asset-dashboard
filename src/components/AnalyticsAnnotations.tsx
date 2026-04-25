@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Flag, Plus, Trash2, Pencil, Loader2, Check, X } from 'lucide-react';
-import { EmptyState } from './ui';
+import { EmptyState, Icon, Button } from './ui';
+import { cn } from '../lib/utils';
 import {
   useAnalyticsAnnotations,
   useCreateAnnotation,
@@ -22,14 +23,14 @@ const BADGE: Record<Category, string> = {
   site_change: 'bg-blue-500/20 text-blue-400',
   algorithm_update: 'bg-amber-500/20 text-amber-400/80',
   campaign: 'bg-purple-500/20 text-purple-400',
-  other: 'bg-zinc-700/50 text-zinc-400',
+  other: 'bg-[var(--surface-3)]/50 text-[var(--brand-text)]',
 };
 
 function CategoryBadge({ category }: { category: string }) {
   const cls = BADGE[category as Category] ?? BADGE.other;
   const label = CATEGORIES.find(c => c.id === category)?.label ?? category;
   return (
-    <span className={`text-[11px] px-1.5 py-0.5 rounded-md font-medium ${cls}`}>{label}</span>
+    <span className={cn('t-caption px-1.5 py-0.5 rounded-md font-medium', cls)}>{label}</span>
   );
 }
 
@@ -72,7 +73,7 @@ export function AnalyticsAnnotations({ workspaceId }: { workspaceId: string }) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-5 h-5 animate-spin text-teal-400" />
+        <Icon as={Loader2} size="md" className="animate-spin text-teal-400" />
       </div>
     );
   }
@@ -80,48 +81,60 @@ export function AnalyticsAnnotations({ workspaceId }: { workspaceId: string }) {
   return (
     <div className="space-y-8">
       <div className="flex items-center gap-2">
-        <Flag className="w-5 h-5 text-amber-400/80" />
-        <h2 className="text-sm font-semibold text-zinc-200">Annotations</h2>
-        <span className="text-[11px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{annotations.length}</span>
+        <Icon as={Flag} size="md" className="text-amber-400/80" />
+        <h2 className="text-sm font-semibold text-[var(--zinc-200)]">Annotations</h2>
+        <span className="t-caption px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{annotations.length}</span>
       </div>
-      <p className="text-xs text-zinc-500">Track key events — algorithm updates, site launches, and campaigns — as markers on your timeline.</p>
+      <p className="t-caption text-[var(--brand-text-muted)]">Track key events — algorithm updates, site launches, and campaigns — as markers on your timeline.</p>
 
       {/* Create form */}
-      <div className="bg-zinc-900 border border-zinc-800 p-4 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      {/* pr-check-disable-next-line -- asymmetric signature radius for annotation form; not a section card */}
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 space-y-3 rounded-[var(--radius-signature-lg)]">
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-[11px] text-zinc-500 block mb-1">Date *</label>
+            <label className="t-caption text-[var(--brand-text-muted)] block mb-1">Date *</label>
             <input type="date" value={newAnn.date} onChange={e => setNewAnn(p => ({ ...p, date: e.target.value }))}
-              className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300" />
+              className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--zinc-300)]" />
           </div>
           <div>
-            <label className="text-[11px] text-zinc-500 block mb-1">Category</label>
+            <label className="t-caption text-[var(--brand-text-muted)] block mb-1">Category</label>
             <select value={newAnn.category} onChange={e => setNewAnn(p => ({ ...p, category: e.target.value as Category }))}
-              className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300">
+              className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--zinc-300)]">
               {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
             </select>
           </div>
         </div>
         <div>
-          <label className="text-[11px] text-zinc-500 block mb-1">Label *</label>
+          <label className="t-caption text-[var(--brand-text-muted)] block mb-1">Label *</label>
           <input type="text" value={newAnn.label} onChange={e => setNewAnn(p => ({ ...p, label: e.target.value }))} placeholder="e.g. Launched new landing pages"
-            className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600" />
+            className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--zinc-300)] placeholder-[var(--brand-text-dim)]" />
         </div>
-        <button onClick={create} disabled={!newAnn.date || !newAnn.label || createMutation.isPending}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 transition-colors">
-          <Plus className="w-3.5 h-3.5" /> Add Annotation
-        </button>
+        <Button
+          variant="primary"
+          size="sm"
+          icon={Plus}
+          disabled={!newAnn.date || !newAnn.label || createMutation.isPending}
+          onClick={create}
+        >
+          Add Annotation
+        </Button>
       </div>
 
       {/* Category filter pills */}
       <div className="flex items-center gap-2 flex-wrap">
         <button onClick={() => setFilter('all')}
-          className={`text-[11px] px-2.5 py-1 rounded-full border transition-colors ${filter === 'all' ? 'border-zinc-600 bg-zinc-800 text-zinc-200' : 'border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}>
+          className={cn(
+            't-caption px-2.5 py-1 rounded-full border transition-colors',
+            filter === 'all' ? 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--zinc-200)]' : 'border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:border-[var(--brand-border-hover)]',
+          )}>
           All
         </button>
         {CATEGORIES.map(c => (
           <button key={c.id} onClick={() => setFilter(c.id)}
-            className={`text-[11px] px-2.5 py-1 rounded-full border transition-colors ${filter === c.id ? 'border-zinc-600 bg-zinc-800 text-zinc-200' : 'border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}>
+            className={cn(
+              't-caption px-2.5 py-1 rounded-full border transition-colors',
+              filter === c.id ? 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--zinc-200)]' : 'border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:border-[var(--brand-border-hover)]',
+            )}>
             {c.label}
           </button>
         ))}
@@ -131,32 +144,36 @@ export function AnalyticsAnnotations({ workspaceId }: { workspaceId: string }) {
       {visible.length > 0 ? (
         <div className="space-y-2">
           {visible.map(ann => (
-            <div key={ann.id} className="flex items-center gap-3 px-4 py-3 bg-zinc-900 border border-zinc-800 group hover:border-zinc-700 transition-colors" style={{ borderRadius: '6px 12px 6px 12px' }}>
+            <div key={ann.id} className="flex items-center gap-3 px-4 py-3 bg-[var(--surface-2)] border border-[var(--brand-border)] group hover:border-[var(--brand-border-hover)] transition-colors rounded-[var(--radius-signature)]">
               {editId === ann.id ? (
                 <>
                   <input type="date" value={editDraft.date} onChange={e => setEditDraft(p => ({ ...p, date: e.target.value }))}
-                    className="px-2 py-1 bg-zinc-950 border border-zinc-700 rounded text-xs text-zinc-300 flex-shrink-0" />
+                    className="px-2 py-1 bg-[var(--surface-1)] border border-[var(--brand-border-hover)] rounded-[var(--radius-sm)] text-xs text-[var(--zinc-300)] flex-shrink-0" />
                   <select value={editDraft.category} onChange={e => setEditDraft(p => ({ ...p, category: e.target.value as Category }))}
-                    className="px-2 py-1 bg-zinc-950 border border-zinc-700 rounded text-xs text-zinc-300 flex-shrink-0">
+                    className="px-2 py-1 bg-[var(--surface-1)] border border-[var(--brand-border-hover)] rounded-[var(--radius-sm)] text-xs text-[var(--zinc-300)] flex-shrink-0">
                     {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
                   </select>
                   <input type="text" value={editDraft.label} onChange={e => setEditDraft(p => ({ ...p, label: e.target.value }))}
-                    className="flex-1 min-w-0 px-2 py-1 bg-zinc-950 border border-zinc-700 rounded text-xs text-zinc-300" />
-                  <button onClick={saveEdit} disabled={updateMutation.isPending} className="text-teal-400 hover:text-teal-300 flex-shrink-0 p-1"><Check className="w-3.5 h-3.5" /></button>
-                  <button onClick={() => setEditId(null)} className="text-zinc-500 hover:text-zinc-300 flex-shrink-0 p-1"><X className="w-3.5 h-3.5" /></button>
+                    className="flex-1 min-w-0 px-2 py-1 bg-[var(--surface-1)] border border-[var(--brand-border-hover)] rounded-[var(--radius-sm)] text-xs text-[var(--zinc-300)]" />
+                  <button onClick={saveEdit} disabled={updateMutation.isPending} className="text-teal-400 hover:text-teal-300 flex-shrink-0 p-1" aria-label="Save edit">
+                    <Icon as={Check} size="sm" />
+                  </button>
+                  <button onClick={() => setEditId(null)} className="text-[var(--brand-text-muted)] hover:text-[var(--zinc-300)] flex-shrink-0 p-1" aria-label="Cancel edit">
+                    <Icon as={X} size="sm" />
+                  </button>
                 </>
               ) : (
                 <>
-                  <span className="text-xs text-zinc-500 flex-shrink-0 font-mono">{ann.date}</span>
+                  <span className="text-xs text-[var(--brand-text-muted)] flex-shrink-0 font-mono">{ann.date}</span>
                   <CategoryBadge category={ann.category} />
-                  <span className="text-xs text-zinc-200 font-medium flex-1 min-w-0 truncate">{ann.label}</span>
+                  <span className="text-xs text-[var(--zinc-200)] font-medium flex-1 min-w-0 truncate">{ann.label}</span>
                   <button onClick={() => startEdit(ann)}
-                    className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-zinc-300 transition-all flex-shrink-0 p-1">
-                    <Pencil className="w-3.5 h-3.5" />
+                    className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-muted)] hover:text-[var(--zinc-300)] transition-all flex-shrink-0 p-1" aria-label="Edit annotation">
+                    <Icon as={Pencil} size="sm" />
                   </button>
                   <button onClick={() => remove(ann.id)}
-                    className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 transition-all flex-shrink-0 p-1">
-                    <Trash2 className="w-3.5 h-3.5" />
+                    className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-muted)] hover:text-red-400 transition-all flex-shrink-0 p-1" aria-label="Delete annotation">
+                    <Icon as={Trash2} size="sm" />
                   </button>
                 </>
               )}

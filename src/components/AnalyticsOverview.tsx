@@ -1,7 +1,7 @@
 // src/components/AnalyticsOverview.tsx
 import { useState } from 'react';
 import { BarChart3, Loader2 } from 'lucide-react';
-import { MetricToggleCard, SectionCard, DateRangeSelector, EmptyState, DATE_PRESETS_SEARCH } from './ui';
+import { MetricToggleCard, SectionCard, DateRangeSelector, EmptyState, DATE_PRESETS_SEARCH, Icon } from './ui';
 import { AnnotatedTrendChart, type TrendLine } from './charts/AnnotatedTrendChart';
 import { InsightFeed } from './insights';
 import { useAnalyticsOverview } from '../hooks/admin/useAnalyticsOverview';
@@ -112,8 +112,8 @@ export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4Prop
   if (overview.isLoading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Loader2 className="w-5 h-5 animate-spin text-teal-400" />
-        <span className="ml-2 text-sm text-zinc-500">Loading analytics...</span>
+        <Icon as={Loader2} size="md" className="animate-spin text-teal-400" />
+        <span className="ml-2 text-sm text-[var(--brand-text-muted)]">Loading analytics...</span>
       </div>
     );
   }
@@ -182,7 +182,7 @@ export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4Prop
       {overview.trendData.length > 0 && (
         <SectionCard
           title="Performance Trend"
-          titleExtra={<span className="text-[11px] text-zinc-500">{days}d</span>}
+          titleExtra={<span className="t-caption text-[var(--brand-text-muted)]">{days}d</span>}
         >
           <AnnotatedTrendChart
             data={overview.trendData}
