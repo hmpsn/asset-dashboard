@@ -545,6 +545,35 @@ src/components/ui/
 
 ---
 
+## § 17 Form Primitives (Phase 5 — 2026-04-24)
+
+Thin wrappers over dark-theme inputs with mint focus ring + error states.
+Live in `src/components/ui/forms/`. Each forwards refs and merges `className`
+via `cn()`. FormField generates a `useId()` and pipes it to child inputs via
+Context so `<label htmlFor>` ↔ `<input id>` is wired automatically.
+
+| Primitive | API | Behavior |
+|-----------|-----|----------|
+| **FormField** | `label`, `error?`, `hint?`, `required?`, `children` | Wraps input with label above + error/hint below. Generates `inputId` + `descriptionId` via Context for a11y. forwardRef to the wrapping div. |
+| **FormInput** | `value`, `onChange(value)`, `type?`, `placeholder?`, plus HTMLInput attrs (minus `onChange`) | Native input with mint focus ring. Reads error state + id from FormFieldContext. |
+| **FormSelect** | `options={[{value,label}]}`, `value`, `onChange(value)`, `placeholder?`, plus HTMLSelect attrs (minus `onChange`, `children`, `multiple`) | Select with the same dark-theme styling. Accepts `size`, `autoFocus`, `form`, `name`, etc. through rest spread. `multiple` is intentionally Omit'd — the single-string onChange can't represent multi-select; build a dedicated MultiSelect primitive if needed. |
+| **FormTextarea** | `value`, `onChange(value)`, `rows?`, `maxLength?` | Textarea with optional character counter (turns red at ≥90% of limit). |
+| **Checkbox** | `checked`, `onChange(boolean)`, `label` (required), `disabled?` | Custom visual checkbox over hidden native input — Space-key + a11y preserved. Mint on checked (Law 01). |
+| **Toggle** | `checked`, `onChange(boolean)`, `label` (required), `disabled?` | `role="switch"` with implicit aria-checked. Mint track on (Law 01), knob slides with transition. |
+
+### Validation states
+
+- **Default**: `border-zinc-700`, `focus:border-[var(--brand-mint)]` + `focus:ring-2 focus:ring-[var(--brand-mint-glow)]`
+- **Error** (FormField `error="…"` set): `border-red-500/50`, `aria-invalid="true"`, `aria-describedby` → error id. Error message `text-red-400 role="alert"`.
+- **Hint** (FormField `hint="…"` set, no error): `aria-describedby` → hint id. Hint `text-zinc-500`.
+- **Disabled**: `opacity-50`, `cursor-not-allowed` on the wrapping label and the input.
+
+### `required` flag
+
+Adds a visible red asterisk after the label text and propagates `required` into the Context. Does NOT set the native `required` attribute automatically — callers pass it to the input as needed.
+
+---
+
 ## Text Casing Conventions
 
 | Context | Casing | CSS Classes |

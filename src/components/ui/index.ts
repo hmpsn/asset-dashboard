@@ -64,6 +64,12 @@ export { SegmentedControl } from './SegmentedControl';
 
 // Forms
 export { FormField, FormInput, FormSelect, FormTextarea, Checkbox, Toggle } from './forms';
+export type { FormFieldProps, FormFieldContextValue } from './forms/FormField';
+export type { FormInputProps } from './forms/FormInput';
+export type { FormSelectProps, SelectOption } from './forms/FormSelect';
+export type { FormTextareaProps } from './forms/FormTextarea';
+export type { CheckboxProps } from './forms/Checkbox';
+export type { ToggleProps } from './forms/Toggle';
 
 // Layout
 export { Row, Stack, Column, Grid, Divider } from './layout';

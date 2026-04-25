@@ -79,6 +79,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     activityLog, rankHistory, latestRanks, annotations,
     requests, requestsLoading, contentRequests, setContentRequests,
     sectionErrors, contentPlanSummary, contentPlanKeywords, contentPlanReviewCells,
+    hasCopyEntries,
     loadDashboardData, loadRequests, loadApprovals,
     changeDays, applyCustomRange, refetchClient,
   } = useClientData(workspaceId);
@@ -184,6 +185,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     'request:update': () => refetchClient('requests', `/api/public/requests/${workspaceId}`),
     'content-request:created': () => refetchClient('content', `/api/public/content-requests/${workspaceId}`),
     'content-request:update': () => refetchClient('content', `/api/public/content-requests/${workspaceId}`),
+    'copy:section_updated': () => refetchClient('copy', `/api/public/copy/${workspaceId}/entries`),
     'audit:complete': () => {
       refetchClient('audit', '');
       refetchClient('activity', '');
@@ -545,7 +547,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
         {/* ════════════ INBOX TAB (Approvals + Requests + Content) ════════════ */}
         {tab === 'inbox' && (
-          <InboxTab workspaceId={workspaceId} effectiveTier={effectiveTier} approvalBatches={approvalBatches} approvalsLoading={approvalsLoading} pendingApprovals={pendingApprovals} setApprovalBatches={setApprovalBatches} loadApprovals={loadApprovals} requests={requests} requestsLoading={requestsLoading} clientUser={clientUser} loadRequests={loadRequests} contentRequests={contentRequests} setContentRequests={setContentRequests} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} pricingConfirming={pricingConfirming} setToast={setToast} contentPlanReviewCells={contentPlanReviewCells} pageMap={approvalPageKeywords ?? strategyData?.pageMap} />
+          <InboxTab workspaceId={workspaceId} effectiveTier={effectiveTier} approvalBatches={approvalBatches} approvalsLoading={approvalsLoading} pendingApprovals={pendingApprovals} setApprovalBatches={setApprovalBatches} loadApprovals={loadApprovals} requests={requests} requestsLoading={requestsLoading} clientUser={clientUser} loadRequests={loadRequests} contentRequests={contentRequests} setContentRequests={setContentRequests} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} pricingConfirming={pricingConfirming} setToast={setToast} contentPlanReviewCells={contentPlanReviewCells} pageMap={approvalPageKeywords ?? strategyData?.pageMap} hasCopyEntries={hasCopyEntries} />
         )}
 
 
