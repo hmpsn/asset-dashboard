@@ -156,10 +156,10 @@ export function AnalyticsAnnotations({ workspaceId }: { workspaceId: string }) {
                   <input type="text" value={editDraft.label} onChange={e => setEditDraft(p => ({ ...p, label: e.target.value }))}
                     className="flex-1 min-w-0 px-2 py-1 bg-[var(--surface-1)] border border-[var(--brand-border-hover)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)]" />
                   <button onClick={saveEdit} disabled={updateMutation.isPending} className="text-teal-400 hover:text-teal-300 flex-shrink-0 p-1" aria-label="Save edit">
-                    <Icon as={Check} size="sm" />
+                    <Icon as={Check} size="md" />
                   </button>
                   <button onClick={() => setEditId(null)} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] flex-shrink-0 p-1" aria-label="Cancel edit">
-                    <Icon as={X} size="sm" />
+                    <Icon as={X} size="md" />
                   </button>
                 </>
               ) : (
@@ -169,11 +169,11 @@ export function AnalyticsAnnotations({ workspaceId }: { workspaceId: string }) {
                   <span className="text-xs text-[var(--brand-text-bright)] font-medium flex-1 min-w-0 truncate">{ann.label}</span>
                   <button onClick={() => startEdit(ann)}
                     className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-all flex-shrink-0 p-1" aria-label="Edit annotation">
-                    <Icon as={Pencil} size="sm" />
+                    <Icon as={Pencil} size="md" />
                   </button>
                   <button onClick={() => remove(ann.id)}
                     className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-muted)] hover:text-red-400 transition-all flex-shrink-0 p-1" aria-label="Delete annotation">
-                    <Icon as={Trash2} size="sm" />
+                    <Icon as={Trash2} size="md" />
                   </button>
                 </>
               )}

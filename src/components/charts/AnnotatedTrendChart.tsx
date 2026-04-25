@@ -232,7 +232,7 @@ function CreatePopover({
     >
       <div className="flex items-center justify-between mb-2">
         <span className="t-caption-sm font-mono text-[var(--brand-text-muted)]">{state.date}</span>
-        <button onClick={onClose} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] p-0.5" aria-label="Close"><Icon as={X} size="sm" /></button>
+        <button onClick={onClose} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] p-0.5" aria-label="Close"><Icon as={X} size="md" /></button>
       </div>
       <input
         type="text"

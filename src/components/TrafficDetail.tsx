@@ -24,10 +24,10 @@ interface Props {
 
 const DeviceIcon = ({ device }: { device: string }) => {
   const d = device.toLowerCase();
-  if (d === 'desktop') return <Icon as={Monitor} size="sm" />;
-  if (d === 'mobile') return <Icon as={Smartphone} size="sm" />;
-  if (d === 'tablet') return <Icon as={Tablet} size="sm" />;
-  return <Icon as={Globe} size="sm" />;
+  if (d === 'desktop') return <Icon as={Monitor} size="md" />;
+  if (d === 'mobile') return <Icon as={Smartphone} size="md" />;
+  if (d === 'tablet') return <Icon as={Tablet} size="md" />;
+  return <Icon as={Globe} size="md" />;
 };
 
 function formatDuration(seconds: number): string {
@@ -117,7 +117,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
       <div className="flex items-center justify-between">
         <p className="text-xs text-[var(--brand-text-muted)]">{overview.dateRange.start} — {overview.dateRange.end}</p>
         <div className="flex items-center gap-2">
-          {loading && <Icon as={Loader2} size="sm" className="animate-spin text-[var(--brand-text-muted)]" />}
+          {loading && <Icon as={Loader2} size="md" className="animate-spin text-[var(--brand-text-muted)]" />}
           <DateRangeSelector options={DATE_PRESETS_FULL} selected={days} onChange={setDays} />
         </div>
       </div>
@@ -424,7 +424,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
             {conversions.length > 0 ? (
               <div>
                 <div className="text-xs text-[var(--brand-text-muted)] font-medium mb-2 flex items-center gap-1.5">
-                  <Icon as={Zap} size="sm" className="text-amber-400" /> Key Events
+                  <Icon as={Zap} size="md" className="text-amber-400" /> Key Events
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                   {conversions.map((c, i) => (
@@ -450,7 +450,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
             {landingPages.length > 0 && (
               <div>
                 <div className="text-xs text-[var(--brand-text-muted)] font-medium mb-2 flex items-center gap-1.5">
-                  <Icon as={ArrowRight} size="sm" className="text-teal-400" /> Top Landing Pages
+                  <Icon as={ArrowRight} size="md" className="text-teal-400" /> Top Landing Pages
                 </div>
                 {/* pr-check-disable-next-line -- brand asymmetric signature on TrafficDetail landing-pages table card; non-SectionCard chrome */}
                 <div className="border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">

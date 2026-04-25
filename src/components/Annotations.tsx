@@ -118,7 +118,7 @@ export function Annotations({ workspaceId }: { workspaceId: string }) {
               </div>
               <button onClick={() => deleteAnnotation(ann.id)}
                 className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-muted)] hover:text-red-400 transition-all flex-shrink-0 p-1" aria-label="Delete annotation">
-                <Icon as={Trash2} size="sm" />
+                <Icon as={Trash2} size="md" />
               </button>
             </div>
           ))}

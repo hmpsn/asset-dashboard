@@ -103,7 +103,7 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
         'border-emerald-500/30 bg-emerald-500/5'
       }`}>
         <div className="flex items-center gap-2">
-          <Icon as={Activity} size="sm" className={
+          <Icon as={Activity} size="md" className={
             critical.length > 0 ? 'text-red-400/80' :
             warnings.length > 0 ? 'text-amber-400/80' :
             'text-emerald-400/80'
@@ -123,7 +123,7 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
       {/* Header */}
       <div className="flex items-center justify-between">
         <button onClick={() => setCollapsed(!collapsed)} className="flex items-center gap-2 text-xs font-medium text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
-          <Icon as={Activity} size="sm" className="text-[var(--brand-text)]" />
+          <Icon as={Activity} size="md" className="text-[var(--brand-text)]" />
           Anomaly Alerts
           {critical.length > 0 && <span className="px-1.5 py-0.5 rounded t-caption-sm bg-red-500/20 text-red-400/80">{critical.length}</span>}
           {warnings.length > 0 && <span className="px-1.5 py-0.5 rounded t-caption-sm bg-amber-500/20 text-amber-400/80">{warnings.length}</span>}
@@ -133,8 +133,9 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
         {isAdmin && (
           <Tooltip content="Re-scan now">
             <button onClick={handleScan} disabled={isLoading}
+              aria-label="Re-scan now"
               className="p-1 text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors disabled:opacity-50">
-              <Icon as={RefreshCw} size="sm" className={isLoading ? 'animate-spin' : ''} />
+              <Icon as={RefreshCw} size="md" className={isLoading ? 'animate-spin' : ''} />
             </button>
           </Tooltip>
         )}
@@ -145,7 +146,7 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
           {/* AI Summary */}
           {aiSummary && (
             <div className="flex gap-2 px-3 py-2 rounded-[var(--radius-sm)] bg-[var(--surface-3)]/50 border border-[var(--brand-border-hover)]/50">
-              <Icon as={Sparkles} size="sm" className="text-purple-400 flex-shrink-0 mt-0.5" />
+              <Icon as={Sparkles} size="md" className="text-purple-400 flex-shrink-0 mt-0.5" />
               <p className="t-caption text-[var(--brand-text)] leading-relaxed">{aiSummary}</p>
             </div>
           )}
