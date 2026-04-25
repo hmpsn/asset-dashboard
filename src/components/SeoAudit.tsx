@@ -14,7 +14,7 @@ import {
   TrendingDown, Sparkles, EyeOff, AlertTriangle, Link2Off,
   BookOpen,
 } from 'lucide-react';
-import { StatCard, scoreColorClass, scoreBgBarClass, ErrorState, LoadingState, NextStepsCard } from './ui';
+import { StatCard, scoreColorClass, scoreBgBarClass, ErrorState, LoadingState, NextStepsCard, Icon, SectionCard, cn } from './ui';
 import { StatusBadge } from './ui/StatusBadge';
 import { ErrorBoundary } from './ErrorBoundary';
 import { statusBorderClass } from './ui/statusConfig';
@@ -461,7 +461,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
 
   // ── Audit view — with sub-tabs ──
   const auditTabBar = (
-    <div className="flex items-center gap-1 border-b border-zinc-800 pb-0 mb-4">
+    <div className="flex items-center gap-1 border-b border-[var(--brand-border)] pb-0 mb-4">
       {([
         { id: 'audit' as const, label: 'Site Audit', icon: Globe },
         { id: 'history' as const, label: 'History', icon: Clock },
@@ -469,13 +469,9 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         <button
           key={t.id}
           onClick={() => setAuditSubTab(t.id)}
-          className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px ${
-            auditSubTab === t.id
-              ? 'border-teal-500 text-teal-300'
-              : 'border-transparent text-zinc-500 hover:text-zinc-300'
-          }`}
+          className={cn('flex items-center gap-1.5 px-3 py-2 t-caption font-medium border-b-2 transition-colors -mb-px', auditSubTab === t.id ? 'border-teal-500 text-teal-300' : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}
         >
-          <t.icon className="w-3.5 h-3.5" />
+          <Icon as={t.icon} size="md" />
           {t.label}
         </button>
       ))}
@@ -487,26 +483,18 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         <button
           key={t.id}
           onClick={() => setAuditSubTab(t.id)}
-          className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px ${
-            auditSubTab === t.id
-              ? 'border-teal-500 text-teal-300'
-              : 'border-transparent text-zinc-500 hover:text-zinc-300'
-          }`}
+          className={cn('flex items-center gap-1.5 px-3 py-2 t-caption font-medium border-b-2 transition-colors -mb-px', auditSubTab === t.id ? 'border-teal-500 text-teal-300' : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}
         >
-          <t.icon className="w-3.5 h-3.5" />
+          <Icon as={t.icon} size="md" />
           {t.label}
         </button>
       ))}
       <div className="w-px h-4 bg-zinc-700 mx-1 self-center" />
       <button
         onClick={() => setAuditSubTab('guide')}
-        className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px ${
-          auditSubTab === 'guide'
-            ? 'border-teal-500 text-teal-300'
-            : 'border-transparent text-zinc-500 hover:text-zinc-300'
-        }`}
+        className={cn('flex items-center gap-1.5 px-3 py-2 t-caption font-medium border-b-2 transition-colors -mb-px', auditSubTab === 'guide' ? 'border-teal-500 text-teal-300' : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}
       >
-        <BookOpen className="w-3.5 h-3.5" />
+        <Icon as={BookOpen} size="md" />
         Guide
       </button>
     </div>
@@ -515,10 +503,10 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   if (auditSubTab === 'guide') return <div>{auditTabBar}<SeoAuditGuide /></div>;
 
   if (auditSubTab === 'content-decay' && workspaceId) {
-    return <div>{auditTabBar}<Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-amber-400" /></div>}><ContentDecay workspaceId={workspaceId} /></Suspense></div>;
+    return <div>{auditTabBar}<Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-full animate-spin border-[var(--brand-border)] border-t-amber-400" /></div>}><ContentDecay workspaceId={workspaceId} /></Suspense></div>;
   }
   if (auditSubTab === 'aeo-review' && workspaceId) {
-    return <div>{auditTabBar}<Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-purple-400" /></div>}><AeoReview workspaceId={workspaceId} /></Suspense></div>;
+    return <div>{auditTabBar}<Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-full animate-spin border-[var(--brand-border)] border-t-purple-400" /></div>}><AeoReview workspaceId={workspaceId} /></Suspense></div>;
   }
   if (auditSubTab === 'history') {
     return <div>{auditTabBar}<AuditHistory siteId={siteId} history={history} onRefresh={loadHistory} /></div>;
@@ -529,11 +517,11 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
       <div>
         {auditTabBar}
         <div className="flex flex-col items-center justify-center py-16 gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center">
-            <Globe className="w-8 h-8 text-zinc-500" />
+          <div className="w-16 h-16 rounded-2xl bg-[var(--surface-2)] flex items-center justify-center">
+            <Icon as={Globe} size="xl" className="text-[var(--brand-text-muted)]" />
           </div>
-          <p className="text-zinc-400 text-sm">Comprehensive SEO audit for your Webflow site</p>
-          <p className="text-xs text-zinc-500 max-w-md text-center">
+          <p className="text-[var(--brand-text)] t-body">Comprehensive SEO audit for your Webflow site</p>
+          <p className="t-caption text-[var(--brand-text-muted)] max-w-md text-center">
             Checks titles, meta descriptions, headings, Open Graph, canonical tags, structured data, content length, and more
           </p>
           <button
@@ -542,7 +530,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
           >
             Run SEO Audit
           </button>
-          <label className="flex items-center gap-2 text-xs text-zinc-500 cursor-pointer select-none">
+          <label className="flex items-center gap-2 t-caption text-[var(--brand-text-muted)] cursor-pointer select-none">
             <input
               type="checkbox"
               checked={!skipLinkCheck}
@@ -643,7 +631,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
             size="hero"
             staggerIndex={0}
           />
-          <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+          <div className="h-1.5 bg-[var(--surface-2)] rounded-full overflow-hidden">
             <div className={`h-full rounded-full ${scoreBgBarClass(effectiveData!.siteScore)}`} style={{ width: `${effectiveData!.siteScore}%` }} />
           </div>
         </div>
@@ -679,11 +667,11 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         if (hasPerformanceIssues) tips.push({ icon: TrendingDown, label: 'Check page weight & speed in the Performance tab', tool: 'Performance' });
         if (tips.length === 0) return null;
         return (
-          <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-zinc-900/50 border border-zinc-800 flex-wrap">
-            <span className="text-[11px] text-zinc-500 font-medium tracking-wider mr-1">Quick fixes →</span>
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[var(--surface-2)]/50 border border-[var(--brand-border)] flex-wrap">
+            <span className="t-caption-sm text-[var(--brand-text-muted)] font-medium tracking-wider mr-1">Quick fixes →</span>
             {tips.map(tip => (
-              <span key={tip.tool} className="flex items-center gap-1 text-[11px] text-teal-400/80 bg-teal-500/5 px-2 py-1 rounded border border-teal-500/10">
-                <tip.icon className="w-3 h-3" /> {tip.label}
+              <span key={tip.tool} className="flex items-center gap-1 t-caption-sm text-teal-400/80 bg-teal-500/5 px-2 py-1 rounded border border-teal-500/10">
+                <Icon as={tip.icon} size="sm" /> {tip.label}
               </span>
             ))}
           </div>
@@ -700,32 +688,32 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
 
       {/* Site-wide issues */}
       {data.siteWideIssues.length > 0 && (
-        <div className="bg-zinc-900 border border-zinc-800 p-5 space-y-2" style={{ borderRadius: '10px 24px 10px 24px' }}>
-          <div className="text-sm font-medium text-zinc-300 mb-2">Site-Wide Issues</div>
+        <SectionCard className="space-y-2">
+          <div className="t-body font-medium text-[var(--brand-text-bright)] mb-2">Site-Wide Issues</div>
           {data.siteWideIssues.map((issue, idx) => {
             const cfg = SEVERITY_CONFIG[issue.severity];
-            const Icon = cfg.icon;
+            const SeverityIcon = cfg.icon;
             return (
               <div key={idx} className="flex items-start gap-3 px-3 py-2 rounded-lg bg-zinc-950/50">
-                <Icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${cfg.color}`} />
+                <SeverityIcon className={cn('w-4 h-4 mt-0.5 flex-shrink-0', cfg.color)} />
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm text-zinc-300">{issue.message}</div>
-                  <div className="text-xs text-zinc-500 mt-0.5">{issue.recommendation}</div>
-                  {issue.value && <div className="text-xs text-zinc-500 mt-0.5 italic truncate">{issue.value}</div>}
+                  <div className="t-body text-[var(--brand-text-bright)]">{issue.message}</div>
+                  <div className="t-caption text-[var(--brand-text-muted)] mt-0.5">{issue.recommendation}</div>
+                  {issue.value && <div className="t-caption text-[var(--brand-text-muted)] mt-0.5 italic truncate">{issue.value}</div>}
                   {issue.suggestedFix && (
                     <div className="mt-1.5 px-2 py-1.5 rounded bg-emerald-950/40 border border-emerald-800/30">
-                      <div className="text-[11px] text-emerald-500 font-semibold uppercase tracking-wider mb-0.5">AI Suggestion</div>
-                      <div className="text-xs text-emerald-300">{issue.suggestedFix}</div>
+                      <div className="t-caption-sm text-emerald-500 font-semibold uppercase tracking-wider mb-0.5">AI Suggestion</div>
+                      <div className="t-caption text-emerald-300">{issue.suggestedFix}</div>
                     </div>
                   )}
                 </div>
-                <span className={`text-[11px] px-1.5 py-0.5 rounded border flex-shrink-0 ${cfg.bg} ${cfg.color}`}>
+                <span className={cn('t-caption-sm px-1.5 py-0.5 rounded border flex-shrink-0', cfg.bg, cfg.color)}>
                   {cfg.label}
                 </span>
               </div>
             );
           })}
-        </div>
+        </SectionCard>
       )}
 
       {/* Dead Link Details Panel */}
@@ -772,19 +760,19 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
       {/* Share URL banner */}
       {shareUrl && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-lg" style={{ backgroundColor: 'rgba(45,212,191,0.1)', border: '1px solid rgba(46,217,195,0.2)' }}>
-          <Share2 className="w-4 h-4 flex-shrink-0 text-teal-400" />
+          <Icon as={Share2} size="md" className="flex-shrink-0 text-teal-400" />
           <div className="flex-1 min-w-0">
-            <div className="text-xs font-medium text-teal-400">Report saved! Share this link with clients:</div>
-            <div className="text-xs text-zinc-300 truncate mt-0.5 font-mono">{shareUrl}</div>
+            <div className="t-caption font-medium text-teal-400">Report saved! Share this link with clients:</div>
+            <div className="t-caption text-[var(--brand-text-bright)] truncate mt-0.5 font-mono">{shareUrl}</div>
           </div>
-          <button onClick={copyShareUrl} className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors bg-teal-400 text-[#0f1219]">
-            <Copy className="w-3 h-3" /> {copied ? 'Copied!' : 'Copy'}
+          <button onClick={copyShareUrl} className="flex items-center gap-1 px-2.5 py-1.5 rounded-md t-caption font-medium transition-colors bg-teal-400 text-[#0f1219]">
+            <Icon as={Copy} size="sm" /> {copied ? 'Copied!' : 'Copy'}
           </button>
           <a href={shareUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md hover:bg-white/10 text-teal-400">
-            <ExternalLink className="w-3.5 h-3.5" />
+            <Icon as={ExternalLink} size="md" />
           </a>
           <button onClick={() => setShareUrl(null)} className="p-1 rounded hover:bg-white/10" aria-label="Dismiss share URL">
-            <X className="w-3.5 h-3.5 text-zinc-400" />
+            <Icon as={X} size="md" className="text-[var(--brand-text)]" />
           </button>
         </div>
       )}
@@ -824,8 +812,8 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
 
       {/* Edit status summary bar */}
       {summary.total > 0 && (
-        <div className="flex items-center gap-3 text-[11px] text-zinc-500 mb-2">
-          <span className="text-zinc-400 font-medium">{summary.total} tracked</span>
+        <div className="flex items-center gap-3 t-caption-sm text-[var(--brand-text-muted)] mb-2">
+          <span className="text-[var(--brand-text)] font-medium">{summary.total} tracked</span>
           {summary.live > 0 && <><StatusBadge status="live" /><span className="text-teal-400">{summary.live}</span></>}
           {summary.inReview > 0 && <><StatusBadge status="in-review" /><span className="text-blue-400">{summary.inReview}</span></>}
           {summary.approved > 0 && <><StatusBadge status="approved" /><span className="text-emerald-400">{summary.approved}</span></>}
@@ -846,47 +834,47 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
           const trackBorder = statusBorderClass(pageState?.status);
 
           return (
-            <div key={page.slug || page.page} className={`bg-zinc-900 border ${trackBorder || 'border-zinc-800'}`} style={{ borderRadius: '6px 12px 6px 12px' }}>
+            <div key={page.slug || page.page} className={cn('bg-[var(--surface-2)] border', trackBorder || 'border-[var(--brand-border)]')} style={{ borderRadius: '6px 12px 6px 12px' }}>
               <button
                 onClick={() => toggleExpand(page.page)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/50 transition-colors text-left"
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors text-left"
               >
                 {isExpanded ? (
-                  <ChevronDown className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
+                  <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
                 ) : (
-                  <ChevronRight className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
+                  <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-sm font-medium text-zinc-200 truncate">{page.page}</span>
-                    {page.noindex && <span className="text-[10px] px-1 py-px rounded bg-zinc-700 text-zinc-400 border border-zinc-600 flex-shrink-0">noindex</span>}
+                    <span className="t-body font-medium text-[var(--brand-text-bright)] truncate">{page.page}</span>
+                    {page.noindex && <span className="t-micro px-1 py-px rounded bg-[var(--surface-3)] text-[var(--brand-text)] border border-[var(--brand-border)] flex-shrink-0">noindex</span>}
                   </div>
-                  <div className="text-xs text-zinc-500 truncate">/{page.slug}</div>
+                  <div className="t-caption text-[var(--brand-text-muted)] truncate">/{page.slug}</div>
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
                   <StatusBadge status={pageState?.status} />
                   {pageTraffic && (pageTraffic.clicks > 0 || pageTraffic.pageviews > 0) && (
-                    <span className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400 tabular-nums" title={`${pageTraffic.clicks} clicks, ${pageTraffic.impressions} impressions, ${pageTraffic.pageviews} pageviews (28d)`}>
+                    <span className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400 tabular-nums" title={`${pageTraffic.clicks} clicks, ${pageTraffic.impressions} impressions, ${pageTraffic.pageviews} pageviews (28d)`}>
                       {pageTraffic.clicks > 0 ? `${pageTraffic.clicks.toLocaleString()} clicks` : ''}{pageTraffic.clicks > 0 && pageTraffic.pageviews > 0 ? ' · ' : ''}{pageTraffic.pageviews > 0 ? `${pageTraffic.pageviews.toLocaleString()} views` : ''}
                     </span>
                   )}
-                  {errorCount > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400">{errorCount} error{errorCount > 1 ? 's' : ''}</span>}
-                  {warningCount > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">{warningCount} warn</span>}
-                  {page.issues.length === 0 && <CheckCircle className="w-4 h-4 text-emerald-400" />}
-                  <span className={`text-sm font-bold tabular-nums ${scoreColorClass(page.score)}`}>{page.score}</span>
+                  {errorCount > 0 && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400">{errorCount} error{errorCount > 1 ? 's' : ''}</span>}
+                  {warningCount > 0 && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">{warningCount} warn</span>}
+                  {page.issues.length === 0 && <Icon as={CheckCircle} size="md" className="text-emerald-400" />}
+                  <span className={cn('t-body font-bold tabular-nums', scoreColorClass(page.score))}>{page.score}</span>
                 </div>
               </button>
 
               {isExpanded && (
                 <div className="ml-8 mb-2 space-y-1">
                   {page.noindex && (
-                    <div className="mx-4 mb-1 px-3 py-1.5 rounded-lg bg-zinc-800/60 border border-zinc-700 text-[11px] text-zinc-400 flex items-center gap-1.5">
-                      <EyeOff className="w-3 h-3 flex-shrink-0" />
-                      This page is marked <span className="font-medium text-zinc-300">noindex</span> — issues listed below won't affect crawlability or search rankings and are excluded from the site health score.
+                    <div className="mx-4 mb-1 px-3 py-1.5 rounded-lg bg-[var(--surface-2)]/60 border border-[var(--brand-border)] t-caption-sm text-[var(--brand-text)] flex items-center gap-1.5">
+                      <Icon as={EyeOff} size="sm" className="flex-shrink-0" />
+                      This page is marked <span className="font-medium text-[var(--brand-text-bright)]">noindex</span> — issues listed below won't affect crawlability or search rankings and are excluded from the site health score.
                     </div>
                   )}
                   {page.issues.length === 0 ? (
-                    <div className="text-xs text-emerald-400 px-4 py-2">No issues found</div>
+                    <div className="t-caption text-emerald-400 px-4 py-2">No issues found</div>
                   ) : (
                     page.issues
                       .filter(i => severityFilter === 'all' || i.severity === severityFilter)

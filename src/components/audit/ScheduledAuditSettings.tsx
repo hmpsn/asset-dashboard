@@ -5,6 +5,7 @@ import { put } from '../../api/client';
 import { useAuditSchedule } from '../../hooks/admin';
 import type { AuditSchedule } from '../../hooks/admin/useAdminSeo';
 import { queryKeys } from '../../lib/queryKeys';
+import { Icon, SectionCard, Button } from '../ui';
 
 interface ScheduledAuditSettingsProps {
   workspaceId: string;
@@ -43,31 +44,31 @@ export function ScheduledAuditSettings({ workspaceId }: ScheduledAuditSettingsPr
   };
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
+    <SectionCard>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Clock className="w-4 h-4 text-zinc-400" />
-          <span className="text-xs font-medium text-zinc-300">Scheduled Audits</span>
+          <Icon as={Clock} size="md" className="text-[var(--brand-text)]" />
+          <span className="t-caption font-medium text-[var(--brand-text-bright)]">Scheduled Audits</span>
           {schedule?.enabled && (
-            <span className="text-[11px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Active</span>
+            <span className="t-caption-sm px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Active</span>
           )}
           {schedule?.lastRunAt && (
-            <span className="text-[11px] text-zinc-500">Last: {new Date(schedule.lastRunAt).toLocaleDateString()}</span>
+            <span className="t-caption-sm text-[var(--brand-text-muted)]">Last: {new Date(schedule.lastRunAt).toLocaleDateString()}</span>
           )}
         </div>
-        <button onClick={() => setShowSchedule(!showSchedule)} className="text-[11px] text-teal-400 hover:text-teal-300">
+        <button onClick={() => setShowSchedule(!showSchedule)} className="t-caption-sm text-teal-400 hover:text-teal-300">
           {showSchedule ? 'Hide' : 'Configure'}
         </button>
       </div>
       {showSchedule && (
-        <div className="mt-3 pt-3 border-t border-zinc-800 space-y-3">
+        <div className="mt-3 pt-3 border-t border-[var(--brand-border)] space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] text-zinc-500 block mb-1">Run Every</label>
+              <label className="t-caption-sm text-[var(--brand-text-muted)] block mb-1">Run Every</label>
               <select
                 value={scheduleInterval}
                 onChange={e => setScheduleInterval(Number(e.target.value))}
-                className="w-full px-2 py-1.5 bg-zinc-950 border border-zinc-800 rounded text-xs text-zinc-300"
+                className="w-full px-2 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded t-caption text-[var(--brand-text-bright)]"
               >
                 <option value={1}>Daily</option>
                 <option value={7}>Weekly</option>
@@ -76,11 +77,11 @@ export function ScheduledAuditSettings({ workspaceId }: ScheduledAuditSettingsPr
               </select>
             </div>
             <div>
-              <label className="text-[11px] text-zinc-500 block mb-1">Alert on Score Drop &gt;</label>
+              <label className="t-caption-sm text-[var(--brand-text-muted)] block mb-1">Alert on Score Drop &gt;</label>
               <select
                 value={scheduleThreshold}
                 onChange={e => setScheduleThreshold(Number(e.target.value))}
-                className="w-full px-2 py-1.5 bg-zinc-950 border border-zinc-800 rounded text-xs text-zinc-300"
+                className="w-full px-2 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded t-caption text-[var(--brand-text-bright)]"
               >
                 <option value={3}>3 points</option>
                 <option value={5}>5 points</option>
@@ -91,34 +92,37 @@ export function ScheduledAuditSettings({ workspaceId }: ScheduledAuditSettingsPr
           </div>
           <div className="flex items-center gap-2">
             {!schedule?.enabled ? (
-              <button
+              <Button
+                variant="primary"
+                size="sm"
+                loading={scheduleSaving}
                 onClick={() => saveSchedule(true)}
-                disabled={scheduleSaving}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 transition-colors"
               >
                 {scheduleSaving ? 'Saving...' : 'Enable Schedule'}
-              </button>
+              </Button>
             ) : (
               <>
-                <button
+                <Button
+                  variant="primary"
+                  size="sm"
+                  loading={scheduleSaving}
                   onClick={() => saveSchedule(true)}
-                  disabled={scheduleSaving}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 transition-colors"
                 >
                   {scheduleSaving ? 'Saving...' : 'Update'}
-                </button>
-                <button
-                  onClick={() => saveSchedule(false)}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
                   disabled={scheduleSaving}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-400 disabled:opacity-50 transition-colors"
+                  onClick={() => saveSchedule(false)}
                 >
                   Disable
-                </button>
+                </Button>
               </>
             )}
           </div>
         </div>
       )}
-    </div>
+    </SectionCard>
   );
 }

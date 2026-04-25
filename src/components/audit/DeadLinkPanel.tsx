@@ -4,6 +4,7 @@ import { Link2Off, Download, ArrowRight, Wrench, Plus, X } from 'lucide-react';
 import { redirects as redirectsApi } from '../../api/misc';
 import { adminPath, type Page } from '../../routes';
 import type { DeadLinkItem } from './types';
+import { Icon, SectionCard, cn } from '../ui';
 
 interface DeadLinkPanelProps {
   deadLinkDetails: DeadLinkItem[];
@@ -53,25 +54,25 @@ export function DeadLinkPanel({ deadLinkDetails, siteId, workspaceId }: DeadLink
   };
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
+    <SectionCard>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Link2Off className="w-4 h-4 text-red-400" />
-          <span className="text-sm font-medium text-zinc-300">Broken Links</span>
-          <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">
+          <Icon as={Link2Off} size="md" className="text-red-400" />
+          <span className="t-body font-medium text-[var(--brand-text-bright)]">Broken Links</span>
+          <span className="t-caption-sm px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">
             {deadLinkDetails.length}
           </span>
           {pendingRedirects.size > 0 && (
-            <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+            <span className="t-caption-sm px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
               {pendingRedirects.size} redirect{pendingRedirects.size !== 1 ? 's' : ''} queued
             </span>
           )}
         </div>
         <button
           onClick={exportDeadLinksCSV}
-          className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 transition-colors"
+          className="flex items-center gap-1 t-caption-sm px-2 py-1 rounded bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 transition-colors"
         >
-          <Download className="w-3 h-3" /> Export CSV
+          <Icon as={Download} size="sm" /> Export CSV
         </button>
       </div>
       <div className="space-y-1.5">
@@ -79,32 +80,32 @@ export function DeadLinkPanel({ deadLinkDetails, siteId, workspaceId }: DeadLink
           const isFormOpen = redirectFormUrl === link.url;
           const hasRedirect = pendingRedirects.has(link.url);
           return (
-            <div key={idx} className="rounded-lg border border-zinc-800 bg-zinc-950/40 overflow-hidden">
+            <div key={idx} className="rounded-lg border border-[var(--brand-border)] bg-zinc-950/40 overflow-hidden">
               <div className="flex items-start gap-2 px-3 py-2">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className={`text-[11px] px-1 py-px rounded border font-mono flex-shrink-0 ${link.status === 404 || link.status === '404' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>
+                    <span className={cn('t-caption-sm px-1 py-px rounded border font-mono flex-shrink-0', link.status === 404 || link.status === '404' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20')}>
                       {link.status}
                     </span>
-                    <span className={`text-[10px] px-1 py-px rounded border flex-shrink-0 ${link.type === 'internal' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-zinc-700/50 text-zinc-400 border-zinc-600/50'}`}>
+                    <span className={cn('t-micro px-1 py-px rounded border flex-shrink-0', link.type === 'internal' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-[var(--surface-2)] text-[var(--brand-text)] border-[var(--brand-border)]')}>
                       {link.type}
                     </span>
-                    <span className="text-xs text-zinc-300 font-mono truncate">{link.url}</span>
+                    <span className="t-caption text-[var(--brand-text-bright)] font-mono truncate">{link.url}</span>
                   </div>
                   <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                    <span className="text-[11px] text-zinc-500">Found on:</span>
-                    <span className="text-[11px] text-zinc-400 truncate">{link.foundOn || link.foundOnSlug}</span>
+                    <span className="t-caption-sm text-[var(--brand-text-muted)]">Found on:</span>
+                    <span className="t-caption-sm text-[var(--brand-text)] truncate">{link.foundOn || link.foundOnSlug}</span>
                     {link.anchorText && (
                       <>
-                        <span className="text-[11px] text-zinc-600">·</span>
-                        <span className="text-[11px] text-zinc-500 italic truncate">"{link.anchorText}"</span>
+                        <span className="t-caption-sm text-zinc-600">·</span>
+                        <span className="t-caption-sm text-[var(--brand-text-muted)] italic truncate">"{link.anchorText}"</span>
                       </>
                     )}
                   </div>
                   {hasRedirect && !isFormOpen && (
                     <div className="flex items-center gap-1 mt-0.5">
-                      <ArrowRight className="w-3 h-3 text-teal-400" />
-                      <span className="text-[11px] text-teal-400 font-mono">{pendingRedirects.get(link.url)}</span>
+                      <Icon as={ArrowRight} size="sm" className="text-teal-400" />
+                      <span className="t-caption-sm text-teal-400 font-mono">{pendingRedirects.get(link.url)}</span>
                     </div>
                   )}
                 </div>
@@ -114,10 +115,10 @@ export function DeadLinkPanel({ deadLinkDetails, siteId, workspaceId }: DeadLink
                       onClick={() => navigate(adminPath(workspaceId, 'seo-editor' as Page), {
                         state: { fixContext: { targetRoute: 'seo-editor', pageSlug: link.foundOnSlug, pageName: link.foundOn, issueCheck: 'broken_link', issueMessage: `Broken link: ${link.url}` } },
                       })}
-                      className="flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 transition-colors"
+                      className="flex items-center gap-0.5 t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 transition-colors"
                       title="Open source page in SEO Editor"
                     >
-                      <Wrench className="w-2.5 h-2.5" /> Fix
+                      <Icon as={Wrench} size="xs" /> Fix
                     </button>
                   )}
                   <button
@@ -130,16 +131,16 @@ export function DeadLinkPanel({ deadLinkDetails, siteId, workspaceId }: DeadLink
                         setRedirectFormTo(hasRedirect ? pendingRedirects.get(link.url)! : '');
                       }
                     }}
-                    className={`flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded border transition-colors ${hasRedirect ? 'bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border-blue-500/20' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400 border-zinc-700'}`}
+                    className={cn('flex items-center gap-0.5 t-caption-sm px-1.5 py-0.5 rounded border transition-colors', hasRedirect ? 'bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border-blue-500/20' : 'bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--brand-text)] border-[var(--brand-border)]')}
                     title="Create a redirect for this URL"
                   >
-                    <Plus className="w-2.5 h-2.5" /> {hasRedirect ? 'Edit Redirect' : 'Add Redirect'}
+                    <Icon as={Plus} size="xs" /> {hasRedirect ? 'Edit Redirect' : 'Add Redirect'}
                   </button>
                 </div>
               </div>
               {isFormOpen && (
-                <div className="px-3 py-2 border-t border-zinc-800 bg-zinc-900/50 flex items-center gap-2">
-                  <ArrowRight className="w-3 h-3 text-zinc-500 flex-shrink-0" />
+                <div className="px-3 py-2 border-t border-[var(--brand-border)] bg-[var(--surface-2)] flex items-center gap-2">
+                  <Icon as={ArrowRight} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
                   <input
                     type="text"
                     value={redirectFormTo}
@@ -149,21 +150,21 @@ export function DeadLinkPanel({ deadLinkDetails, siteId, workspaceId }: DeadLink
                       if (e.key === 'Escape') { setRedirectFormUrl(null); setRedirectFormTo(''); }
                     }}
                     placeholder="/new-path or https://example.com/new"
-                    className="flex-1 bg-zinc-950 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-teal-500"
+                    className="flex-1 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded px-2 py-1 t-caption text-[var(--brand-text-bright)] placeholder-zinc-600 focus:outline-none focus:border-teal-500"
                     autoFocus
                   />
                   <button
                     onClick={() => saveRedirect(link.url)}
                     disabled={!redirectFormTo.trim() || savingRedirect}
-                    className="px-2.5 py-1 rounded text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 transition-colors"
+                    className="px-2.5 py-1 rounded t-caption font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 transition-colors"
                   >
                     {savingRedirect ? 'Saving...' : 'Save'}
                   </button>
                   <button
                     onClick={() => { setRedirectFormUrl(null); setRedirectFormTo(''); }}
-                    className="p-1 rounded hover:bg-zinc-700 text-zinc-500"
+                    className="p-1 rounded hover:bg-[var(--surface-3)] text-[var(--brand-text-muted)]"
                   >
-                    <X className="w-3 h-3" />
+                    <Icon as={X} size="sm" />
                   </button>
                 </div>
               )}
@@ -171,6 +172,6 @@ export function DeadLinkPanel({ deadLinkDetails, siteId, workspaceId }: DeadLink
           );
         })}
       </div>
-    </div>
+    </SectionCard>
   );
 }

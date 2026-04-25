@@ -6,7 +6,7 @@ import {
   Loader2, CheckCircle, Plus, ListChecks, Trash2, Circle,
 } from 'lucide-react';
 import { get, post, patch, del } from '../../api/client';
-import { EmptyState } from '../ui';
+import { EmptyState, Icon, SectionCard, cn } from '../ui';
 
 interface ActionItem {
   id: string;
@@ -21,7 +21,7 @@ interface ActionItem {
 }
 
 const STATUS_CONFIG = {
-  planned: { label: 'Planned', color: 'text-zinc-400', bg: 'bg-zinc-500/10 border-zinc-500/30', icon: Circle },
+  planned: { label: 'Planned', color: 'text-[var(--brand-text)]', bg: 'bg-[var(--surface-2)] border-[var(--brand-border)]', icon: Circle },
   'in-progress': { label: 'In Progress', color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/30', icon: Loader2 },
   completed: { label: 'Done', color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/30', icon: CheckCircle },
 } as const;
@@ -84,29 +84,29 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
   };
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
-      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
+    <SectionCard noPadding>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--brand-border)]">
         <div className="flex items-center gap-2">
-          <ListChecks className="w-4 h-4 text-teal-400" />
-          <span className="text-sm font-medium text-zinc-300">Action Items</span>
+          <Icon as={ListChecks} size="md" className="text-teal-400" />
+          <span className="t-body font-medium text-[var(--brand-text-bright)]">Action Items</span>
           {items.length > 0 && (
-            <span className="text-xs text-zinc-500">
+            <span className="t-caption text-[var(--brand-text-muted)]">
               {counts.completed}/{items.length} done
             </span>
           )}
         </div>
         <button
           onClick={() => setAdding(!adding)}
-          className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium hover:bg-zinc-800 transition-colors text-teal-400"
+          className="flex items-center gap-1 px-2 py-1 rounded-md t-caption font-medium hover:bg-[var(--surface-2)] transition-colors text-teal-400"
         >
-          <Plus className="w-3 h-3" /> Add
+          <Icon as={Plus} size="sm" /> Add
         </button>
       </div>
 
       {/* Progress bar */}
       {items.length > 0 && (
         <div className="px-4 pt-3">
-          <div className="flex gap-1 h-1.5 rounded-full overflow-hidden bg-zinc-800">
+          <div className="flex gap-1 h-1.5 rounded-full overflow-hidden bg-[var(--surface-2)]">
             {counts.completed > 0 && <div className="bg-emerald-500 rounded-full" style={{ width: `${(counts.completed / items.length) * 100}%` }} />}
             {counts['in-progress'] > 0 && <div className="bg-blue-500 rounded-full" style={{ width: `${(counts['in-progress'] / items.length) * 100}%` }} />}
           </div>
@@ -115,12 +115,12 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
 
       {/* Add form */}
       {adding && (
-        <div className="px-4 py-3 border-b border-zinc-800 space-y-2">
+        <div className="px-4 py-3 border-b border-[var(--brand-border)] space-y-2">
           <input
             value={newTitle}
             onChange={e => setNewTitle(e.target.value)}
             placeholder="What needs to be done?"
-            className="w-full px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-zinc-600"
+            className="w-full px-3 py-2 rounded-lg bg-[var(--surface-2)] border border-[var(--brand-border)] t-body text-[var(--brand-text-bright)] placeholder-zinc-500 focus:outline-none focus:border-zinc-600"
             onKeyDown={e => e.key === 'Enter' && addItem()}
             autoFocus
           />
@@ -128,7 +128,7 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
             value={newDesc}
             onChange={e => setNewDesc(e.target.value)}
             placeholder="Description (optional)"
-            className="w-full px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-zinc-600"
+            className="w-full px-3 py-2 rounded-lg bg-[var(--surface-2)] border border-[var(--brand-border)] t-body text-[var(--brand-text-bright)] placeholder-zinc-500 focus:outline-none focus:border-zinc-600"
           />
           <div className="flex items-center justify-between">
             <div className="flex gap-1">
@@ -136,16 +136,16 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
                 <button
                   key={p}
                   onClick={() => setNewPriority(p)}
-                  className={`px-2 py-1 rounded text-xs font-medium border ${newPriority === p ? 'border-zinc-600 bg-zinc-800 text-zinc-200' : 'border-transparent text-zinc-500'}`}
+                  className={cn('px-2 py-1 rounded t-caption font-medium border', newPriority === p ? 'border-[var(--brand-border)] bg-[var(--surface-2)] text-[var(--brand-text-bright)]' : 'border-transparent text-[var(--brand-text-muted)]')}
                 >
-                  <span className={`inline-block w-1.5 h-1.5 rounded-full ${PRIORITY_CONFIG[p].dot} mr-1`} />
+                  <span className={cn('inline-block w-1.5 h-1.5 rounded-full mr-1', PRIORITY_CONFIG[p].dot)} />
                   {PRIORITY_CONFIG[p].label}
                 </button>
               ))}
             </div>
             <div className="flex gap-2">
-              <button onClick={() => setAdding(false)} className="px-3 py-1.5 rounded-md text-xs text-zinc-400 hover:text-zinc-200">Cancel</button>
-              <button onClick={addItem} className="px-3 py-1.5 rounded-md text-xs font-medium bg-teal-400 text-[#0f1219]">Add</button>
+              <button onClick={() => setAdding(false)} className="px-3 py-1.5 rounded-md t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]">Cancel</button>
+              <button onClick={addItem} className="px-3 py-1.5 rounded-md t-caption font-medium bg-teal-400 text-[#0f1219]">Add</button>
             </div>
           </div>
         </div>
@@ -153,7 +153,7 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
 
       {/* Load error */}
       {loadError && (
-        <div className="px-4 py-2 border-b border-zinc-800 text-[11px] text-red-400/80">
+        <div className="px-4 py-2 border-b border-[var(--brand-border)] t-caption-sm text-red-400/80">
           Couldn't load action items. <button onClick={load} className="underline hover:text-red-400">Retry</button>
         </div>
       )}
@@ -162,20 +162,20 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
       <div className="divide-y divide-zinc-800/50">
         {sorted.map(item => {
           const cfg = STATUS_CONFIG[item.status];
-          const Icon = cfg.icon;
+          const StatusIcon = cfg.icon;
           return (
             <div key={item.id} className="flex items-start gap-3 px-4 py-3 group">
-              <button onClick={() => cycleStatus(item)} className={`mt-0.5 ${cfg.color}`} title={`Click to change status (${cfg.label})`}>
-                <Icon className={`w-4 h-4 ${item.status === 'in-progress' ? 'animate-spin' : ''}`} />
+              <button onClick={() => cycleStatus(item)} className={cn('mt-0.5', cfg.color)} title={`Click to change status (${cfg.label})`}>
+                <StatusIcon className={cn('w-4 h-4', item.status === 'in-progress' && 'animate-spin')} />
               </button>
               <div className="flex-1 min-w-0">
-                <div className={`text-sm ${item.status === 'completed' ? 'line-through text-zinc-500' : 'text-zinc-200'}`}>{item.title}</div>
-                {item.description && <div className="text-xs text-zinc-500 mt-0.5">{item.description}</div>}
+                <div className={cn('t-body', item.status === 'completed' ? 'line-through text-[var(--brand-text-muted)]' : 'text-[var(--brand-text-bright)]')}>{item.title}</div>
+                {item.description && <div className="t-caption text-[var(--brand-text-muted)] mt-0.5">{item.description}</div>}
               </div>
               <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <span className={`w-1.5 h-1.5 rounded-full ${PRIORITY_CONFIG[item.priority]?.dot || 'bg-zinc-500'}`} title={item.priority} />
-                <button onClick={() => deleteItem(item.id)} className="text-zinc-500 hover:text-red-400">
-                  <Trash2 className="w-3 h-3" />
+                <span className={cn('w-1.5 h-1.5 rounded-full', PRIORITY_CONFIG[item.priority]?.dot || 'bg-[var(--brand-text-muted)]')} title={item.priority} />
+                <button onClick={() => deleteItem(item.id)} className="text-[var(--brand-text-muted)] hover:text-red-400">
+                  <Icon as={Trash2} size="sm" />
                 </button>
               </div>
             </div>
@@ -190,15 +190,15 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
             action={
               <button
                 onClick={() => setAdding(true)}
-                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 transition-colors"
+                className="flex items-center gap-1.5 t-caption px-3 py-1.5 rounded-lg bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 transition-colors"
               >
-                <Plus className="w-3 h-3" />
+                <Icon as={Plus} size="sm" />
                 Add Item
               </button>
             }
           />
         )}
       </div>
-    </div>
+    </SectionCard>
   );
 }

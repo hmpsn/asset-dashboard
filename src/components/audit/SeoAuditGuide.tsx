@@ -6,6 +6,7 @@ import {
   AlertTriangle, CheckCircle, ArrowRight, Filter, ListChecks,
   Sparkles, TrendingDown, Layers, Info,
 } from 'lucide-react';
+import { Icon, SectionCard, cn } from '../ui';
 
 const SECTIONS = [
   {
@@ -86,8 +87,8 @@ export function SeoAuditGuide() {
     <div className="space-y-8 max-w-3xl">
       {/* Header */}
       <div className="space-y-2">
-        <h2 className="text-lg font-semibold text-zinc-200">SEO Audit Guide</h2>
-        <p className="text-sm text-zinc-400">
+        <h2 className="t-h2 text-[var(--brand-text-bright)]">SEO Audit Guide</h2>
+        <p className="t-body text-[var(--brand-text)]">
           How to read audit results, prioritize fixes, and use each sub-tool to maintain site health.
         </p>
       </div>
@@ -95,27 +96,27 @@ export function SeoAuditGuide() {
       {/* Sections */}
       <div className="space-y-3">
         {SECTIONS.map((section, idx) => {
-          const Icon = section.icon;
+          const SectionIcon = section.icon;
           return (
-            <div key={idx} className={`border p-5 ${section.bg}`} style={{ borderRadius: '6px 12px 6px 12px' }}>
+            <div key={idx} className={cn('border p-5', section.bg)} style={{ borderRadius: '6px 12px 6px 12px' }}>
               <div className="flex items-start gap-3">
-                <div className={`flex items-center justify-center w-8 h-8 rounded-lg bg-zinc-900/60 flex-shrink-0 ${section.color}`}>
-                  <Icon className="w-4 h-4" />
+                <div className={cn('flex items-center justify-center w-8 h-8 rounded-lg bg-zinc-900/60 flex-shrink-0', section.color)}>
+                  <Icon as={SectionIcon} size="md" />
                 </div>
                 <div className="flex-1 min-w-0 space-y-2">
-                  <h3 className="text-sm font-medium text-zinc-200">{section.title}</h3>
-                  <p className="text-xs text-zinc-400 leading-relaxed">{section.description}</p>
+                  <h3 className="t-body font-medium text-[var(--brand-text-bright)]">{section.title}</h3>
+                  <p className="t-caption text-[var(--brand-text)] leading-relaxed">{section.description}</p>
                   <ul className="space-y-1">
                     {section.actions.map((a, i) => (
-                      <li key={i} className="flex items-start gap-2 text-xs text-zinc-300">
-                        <ArrowRight className="w-3 h-3 text-zinc-600 mt-0.5 flex-shrink-0" />
+                      <li key={i} className="flex items-start gap-2 t-caption text-[var(--brand-text-bright)]">
+                        <Icon as={ArrowRight} size="sm" className="text-[var(--brand-border)] mt-0.5 flex-shrink-0" />
                         <span>{a}</span>
                       </li>
                     ))}
                   </ul>
                   <div className="flex items-start gap-1.5 mt-1 pt-1.5 border-t border-zinc-800/30">
-                    <CheckCircle className="w-3 h-3 text-zinc-600 mt-0.5 flex-shrink-0" />
-                    <span className="text-[11px] text-zinc-500 italic">{section.tip}</span>
+                    <Icon as={CheckCircle} size="sm" className="text-[var(--brand-border)] mt-0.5 flex-shrink-0" />
+                    <span className="t-caption-sm text-[var(--brand-text-muted)] italic">{section.tip}</span>
                   </div>
                 </div>
               </div>
@@ -125,12 +126,12 @@ export function SeoAuditGuide() {
       </div>
 
       {/* Score reference panel */}
-      <div className="bg-zinc-900 border border-zinc-800 p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      <SectionCard className="space-y-3">
         <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-teal-400" />
-          <h3 className="text-sm font-medium text-zinc-200">Filter and Sort Controls</h3>
+          <Icon as={Filter} size="md" className="text-teal-400" />
+          <h3 className="t-body font-medium text-[var(--brand-text-bright)]">Filter and Sort Controls</h3>
         </div>
-        <p className="text-xs text-zinc-400">
+        <p className="t-caption text-[var(--brand-text)]">
           Use the toolbar above the results table to narrow focus:
         </p>
         <div className="grid grid-cols-2 gap-2">
@@ -142,51 +143,51 @@ export function SeoAuditGuide() {
             { label: 'Sort by Traffic', desc: 'Rank pages by organic traffic — fix high-traffic pages first' },
             { label: 'Batch actions', desc: 'Accept or suppress multiple issues at once after filtering' },
           ].map(f => (
-            <div key={f.label} className="flex items-start gap-2 px-3 py-2 bg-zinc-800/40 rounded-lg">
-              <CheckCircle className="w-3 h-3 text-teal-500 mt-0.5 flex-shrink-0" />
+            <div key={f.label} className="flex items-start gap-2 px-3 py-2 bg-[var(--surface-2)] rounded-lg">
+              <Icon as={CheckCircle} size="sm" className="text-teal-500 mt-0.5 flex-shrink-0" />
               <div>
-                <div className="text-[11px] font-medium text-zinc-300">{f.label}</div>
-                <div className="text-[10px] text-zinc-500">{f.desc}</div>
+                <div className="t-caption-sm font-medium text-[var(--brand-text-bright)]">{f.label}</div>
+                <div className="t-micro text-[var(--brand-text-muted)]">{f.desc}</div>
               </div>
             </div>
           ))}
         </div>
-      </div>
+      </SectionCard>
 
       {/* Scheduling note */}
-      <div className="bg-zinc-900 border border-zinc-800 p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      <SectionCard className="space-y-3">
         <div className="flex items-center gap-2">
-          <Layers className="w-4 h-4 text-amber-400" />
-          <h3 className="text-sm font-medium text-zinc-200">Audit History and Scheduling</h3>
+          <Icon as={Layers} size="md" className="text-amber-400" />
+          <h3 className="t-body font-medium text-[var(--brand-text-bright)]">Audit History and Scheduling</h3>
         </div>
-        <div className="space-y-2 text-xs text-zinc-400">
+        <div className="space-y-2 t-caption text-[var(--brand-text)]">
           <p>Use the History tab to compare audit snapshots over time and track score trends.</p>
           <ul className="space-y-1.5">
             <li className="flex items-start gap-2">
               <span className="text-amber-400 font-bold">1.</span>
-              <span><strong className="text-zinc-300">Snapshots are saved automatically</strong> — each run creates a timestamped snapshot you can revisit later.</span>
+              <span><strong className="text-[var(--brand-text-bright)]">Snapshots are saved automatically</strong> — each run creates a timestamped snapshot you can revisit later.</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-amber-400 font-bold">2.</span>
-              <span><strong className="text-zinc-300">Score trends</strong> — the History tab shows score change over time so you can demonstrate progress to clients.</span>
+              <span><strong className="text-[var(--brand-text-bright)]">Score trends</strong> — the History tab shows score change over time so you can demonstrate progress to clients.</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-amber-400 font-bold">3.</span>
-              <span><strong className="text-zinc-300">Scheduled audits</strong> — configure an automatic run cadence from the audit settings so you never miss a regression.</span>
+              <span><strong className="text-[var(--brand-text-bright)]">Scheduled audits</strong> — configure an automatic run cadence from the audit settings so you never miss a regression.</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-amber-400 font-bold">4.</span>
-              <span><strong className="text-zinc-300">Export reports</strong> — generate a PDF or CSV snapshot to share with clients from the Share button.</span>
+              <span><strong className="text-[var(--brand-text-bright)]">Export reports</strong> — generate a PDF or CSV snapshot to share with clients from the Share button.</span>
             </li>
           </ul>
         </div>
-      </div>
+      </SectionCard>
 
       {/* Quick workflow */}
-      <div className="bg-zinc-900 border border-zinc-800 p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      <SectionCard className="space-y-3">
         <div className="flex items-center gap-2">
-          <Info className="w-4 h-4 text-blue-400" />
-          <h3 className="text-sm font-medium text-zinc-200">Typical Monthly Workflow</h3>
+          <Icon as={Info} size="md" className="text-blue-400" />
+          <h3 className="t-body font-medium text-[var(--brand-text-bright)]">Typical Monthly Workflow</h3>
         </div>
         <div className="flex flex-wrap gap-1.5">
           {[
@@ -199,13 +200,13 @@ export function SeoAuditGuide() {
             'Save snapshot → share report',
             'Schedule next run in 30 days',
           ].map((step, i) => (
-            <div key={i} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-zinc-800/50 rounded-lg text-[11px] text-zinc-400">
+            <div key={i} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--surface-2)] rounded-lg t-caption-sm text-[var(--brand-text)]">
               <span className="text-teal-400 font-bold">{i + 1}.</span>
               {step}
             </div>
           ))}
         </div>
-      </div>
+      </SectionCard>
     </div>
   );
 }
