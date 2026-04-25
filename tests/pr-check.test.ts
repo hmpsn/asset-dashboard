@@ -4409,6 +4409,12 @@ describe('Meta: customCheck rule name registry', () => {
     'SectionCard titleExtra with ml-auto (use action prop)',
     // Phase 5 design-system token authority (2026-04-24)
     'styleguide-token-parity',
+    // Phase 2 Batch 1 follow-up — converted from pattern to customCheck so
+    // disable-comments work (Devin re-review on PRs #301/#302 flagged that
+    // forcing --radius-signature-lg into SectionCard-only was an over-tight
+    // rule; relaxing with per-site justification preserves the brand
+    // signature where intentional)
+    'radius-signature-lg used outside SectionCard',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -5028,6 +5034,83 @@ describe('Pattern rule: Hand-rolled trend badge', () => {
 // ════════════════════════════════════════════════════════════════════════════
 // Rule: styleguide-token-parity
 // ════════════════════════════════════════════════════════════════════════════
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: radius-signature-lg used outside SectionCard
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Converted from pattern-based to customCheck so consumer files can opt into
+// the brand asymmetric signature with a `// pr-check-disable-next-line --
+// <reason>` justification. The pattern-based version did not honor disable
+// comments (see PR #303 regression test for that silent-failure class).
+
+describe('Rule: radius-signature-lg used outside SectionCard', () => {
+  const RULE = 'radius-signature-lg used outside SectionCard';
+
+  it('flags a consumer file that uses --radius-signature-lg without a hatch', () => {
+    const file = write(
+      uniqPath('rule-rsl', 'src/components/Probe.tsx'),
+      lines(
+        "export function Probe() {",
+        "  return <div className=\"rounded-[var(--radius-signature-lg)]\">x</div>;",
+        "}",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBe(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('respects an inline // pr-check-disable-next-line comment', () => {
+    const file = write(
+      uniqPath('rule-rsl', 'src/components/Probe.tsx'),
+      lines(
+        "export function Probe() {",
+        "  return <div className=\"rounded-[var(--radius-signature-lg)]\">x</div>; // pr-check-disable-next-line -- collapsible card",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects a // pr-check-disable-next-line on the line above', () => {
+    const file = write(
+      uniqPath('rule-rsl', 'src/components/Probe.tsx'),
+      lines(
+        "export function Probe() {",
+        "  // pr-check-disable-next-line -- intentional brand signature on this surface",
+        "  return <div className=\"rounded-[var(--radius-signature-lg)]\">x</div>;",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects a hatch up to 5 lines above (multi-attribute JSX)', () => {
+    const file = write(
+      uniqPath('rule-rsl', 'src/components/Probe.tsx'),
+      lines(
+        "export function Probe() {",
+        "  // pr-check-disable-next-line -- multi-line JSX",
+        "  return (",
+        "    <div",
+        "      role=\"region\"",
+        "      aria-label=\"Card\"",
+        "      className=\"rounded-[var(--radius-signature-lg)]\"",
+        "    >x</div>",
+        "  );",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  // The rule's exclude list (SectionCard.tsx, tokens.css, styleguide.*) is
+  // applied by the runner before calling customCheck (see resolveCheckFileList
+  // in pr-check.ts). The customCheck function itself doesn't see those files
+  // in production, so testing exclude behavior via runRule (which bypasses the
+  // runner's filter) is a no-op. Trust the runner's exclude pipeline.
+});
 
 describe('Rule: styleguide-token-parity', () => {
   const RULE = 'styleguide-token-parity';

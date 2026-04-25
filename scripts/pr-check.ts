@@ -3903,7 +3903,13 @@ export const CHECKS: Check[] = [
   },
   {
     name: 'radius-signature-lg used outside SectionCard',
-    pattern: '--radius-signature-lg',
+    // Converted from pattern-based to customCheck so that
+    // `// pr-check-disable-next-line` escape hatches work — the pattern runner
+    // does not honor disable comments. SectionCard.tsx owns the canonical
+    // implementation; consumer files using the asymmetric radius directly
+    // must declare intent with a hatch comment so design-system stewards can
+    // audit which surfaces have brand-asymmetric chrome and which are
+    // accidentally bypassing SectionCard.
     fileGlobs: ['*.tsx', '*.css'],
     exclude: [
       'src/components/ui/SectionCard.tsx',
@@ -3912,10 +3918,38 @@ export const CHECKS: Check[] = [
       'public/styleguide.html',
       'public/styleguide.css',
     ],
-    message: '--radius-signature-lg is the brand asymmetric radius (10px 24px 10px 24px) and is only permitted inside SectionCard.tsx. Use --radius-lg for other card elements.',
+    message: '--radius-signature-lg outside SectionCard is the brand asymmetric radius (10px 24px 10px 24px). Either use SectionCard, or add a // pr-check-disable-next-line -- <reason> comment justifying why this surface needs the brand signature.',
     severity: 'error',
-    rationale: 'The asymmetric corner is a SectionCard-only brand signature. Other components adopting it would dilute the design intent.',
+    rationale: 'The asymmetric corner is the brand visual signature. SectionCard.tsx owns the canonical implementation; consumer files MAY use --radius-signature-lg directly when the asymmetric look is intentional, but they must justify the choice with a hatch comment per site so design-system stewards can audit drift.',
     claudeMdRef: '#design-system--the-three-laws-of-color',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('.tsx') && !file.endsWith('.css')) continue;
+        let content: string;
+        try { content = readFileSync(file, 'utf-8'); } catch { continue; }
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (!line.includes('--radius-signature-lg')) continue;
+          // Inline disable: same line as the violation
+          if (line.includes('pr-check-disable-next-line')) continue;
+          // Lookback: 5 prior lines may carry the hatch comment (multi-attribute
+          // JSX often pushes className= 3-4 lines below the opening tag)
+          let isDisabled = false;
+          for (let j = Math.max(0, i - 5); j < i; j++) {
+            if (lines[j].includes('pr-check-disable-next-line')) {
+              isDisabled = true;
+              break;
+            }
+          }
+          if (!isDisabled) {
+            hits.push({ file, line: i + 1, text: line });
+          }
+        }
+      }
+      return hits;
+    },
   },
   {
     name: 'Non-standard transition duration',
