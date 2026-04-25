@@ -4,6 +4,7 @@ import {
   Copy, Download, Search, Target, MessageSquare, BarChart3,
   BookOpen, Users, TrendingUp, Check, ExternalLink, Link2, PenLine,
 } from 'lucide-react';
+import type { PostSummary } from '../ContentBriefs';
 
 interface ContentBrief {
   id: string;
@@ -65,7 +66,7 @@ interface ContentTopicRequest {
 
 // Subset of PostSummary that RequestList needs. Pick keeps it in lock-step with the
 // canonical type — if PostSummary changes, TypeScript catches mismatches here.
-import type { PostSummary } from '../ContentBriefs';
+// (PostSummary import is at top of file with other imports.)
 export type RequestPostSummary = Pick<PostSummary, 'id' | 'briefId' | 'status' | 'totalWordCount'>;
 
 export interface RequestListProps {
