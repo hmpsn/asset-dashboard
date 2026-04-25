@@ -3857,6 +3857,97 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // SectionCard wraps children in `<div className={noPadding ? '' : 'p-4'}>`,
+    // so the outer div ALWAYS has exactly one direct child: the inner wrapper.
+    // Two consequences of passing layout-affecting utilities via `className`:
+    //
+    // 1. `space-y-N` / `space-x-N` adds margin-top to the 2nd+ direct children.
+    //    With only one direct child (the inner wrapper), space-y-* has ZERO
+    //    effect on the actual content elements. ALWAYS a bug — no `noPadding`
+    //    escape; the fix is to wrap children in a spaced div.
+    //
+    // 2. `p-N` / `px-N` / `py-N` compounds with the inner `p-4`, doubling
+    //    padding. Fix: add the `noPadding` prop so the inner wrapper drops its
+    //    p-4, leaving the outer custom padding as the sole padding layer.
+    //
+    // Devin caught 6 sites in PR #307 (SeoAudit, SeoAuditGuide×3, RedirectManager×2)
+    // and the LinkChecker asymmetric-radius regression in the same review pass.
+    // This rule mechanizes the SectionCard className traps so future migrations
+    // fail at PR time, not at deploy.
+    //
+    // Hatch: `// sectioncard-className-ok` on the `<SectionCard` line or the
+    // line immediately above. Used for rare legitimate overrides (e.g.
+    // `mt-N` for an offset margin against a parent; `mx-auto` for centering
+    // when the parent doesn't already do it).
+    name: 'SectionCard className double-wrap trap (space-y-* always wrong; p[xy]?-* needs noPadding)',
+    fileGlobs: ['*.tsx'],
+    exclude: ['src/components/ui/'],
+    message: 'SectionCard wraps children in `<div className={noPadding ? \'\' : \'p-4\'}>`. (a) `space-y-*`/`space-x-*` on outer never reaches children — wrap children in a spaced div instead. (b) `p[xy]?-*` doubles with the inner p-4 — add `noPadding` prop. Hatch with `// sectioncard-className-ok` if the override is legitimate (rare).',
+    severity: 'error',
+    rationale: 'Devin Phase 2.3a flagged 6 instances of this trap in PR #307 (SeoAudit, SeoAuditGuide×3, RedirectManager×2). Memorialized in feedback_sectioncard_classname_double_wrap.md.',
+    claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const SPACE_RE = /\bspace-[xy]-\d/;
+      const PAD_RE = /\bp[xy]?-(?:\d|\[)/;
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const idx = line.indexOf('<SectionCard');
+          if (idx === -1) continue;
+          // Skip if it's actually `<SectionCardProps` or `<SectionCardX` etc.
+          const after = line[idx + '<SectionCard'.length] ?? '';
+          if (after && /[A-Za-z0-9_]/.test(after)) continue;
+          // Hatch checks
+          if (line.includes('sectioncard-className-ok')) continue;
+          if (i > 0 && lines[i - 1].includes('sectioncard-className-ok')) continue;
+          // Walk forward up to 15 lines, tracking `{` `}` depth, looking for
+          // the closing `>` of the opening tag. Capture the entire opening
+          // tag span as `tagText`.
+          let tagText = '';
+          let braceDepth = 0;
+          let endLine = -1;
+          outer: for (let j = i; j < Math.min(lines.length, i + 15); j++) {
+            const scan = j === i ? lines[j].slice(idx) : lines[j];
+            tagText += (j === i ? '' : '\n') + scan;
+            for (let k = 0; k < scan.length; k++) {
+              const ch = scan[k];
+              if (ch === '{') braceDepth++;
+              else if (ch === '}') braceDepth--;
+              else if (ch === '>' && braceDepth === 0) {
+                // Could be `>` or `/>`; either way the opening tag is closed
+                endLine = j;
+                break outer;
+              }
+            }
+          }
+          if (endLine === -1) continue;
+          // Look for className=... and noPadding presence on the captured tag
+          const hasNoPadding = /\bnoPadding\b/.test(tagText);
+          // Extract the className value — handles className="..." and
+          // className={...}. For className={cn('a', cond && 'b', ...)} we
+          // run the regex over the entire expression (string-literal args
+          // will match if they contain the forbidden tokens).
+          const clsMatch = tagText.match(/className=(?:"([^"]*)"|\{([^}]*(?:\{[^}]*\}[^}]*)*)\})/);
+          if (!clsMatch) continue;
+          const cls = clsMatch[1] ?? clsMatch[2] ?? '';
+          const hasSpace = SPACE_RE.test(cls);
+          const hasPad = PAD_RE.test(cls);
+          if (hasSpace) {
+            hits.push({ file, line: i + 1, text: `<SectionCard ... className contains space-[xy]-* (always ineffective — wrap children instead)` });
+          } else if (hasPad && !hasNoPadding) {
+            hits.push({ file, line: i + 1, text: `<SectionCard ... className contains p[xy]?-* without noPadding (doubles inner p-4)` });
+          }
+        }
+      }
+      return hits;
+    },
+  },
+  {
     name: 'Page component missing PageHeader',
     fileGlobs: [],
     message: 'Top-level page components must use <PageHeader>. Add <PageHeader title="..." subtitle="..." /> or add this file to the exclude list in pr-check.ts with a justification comment.',

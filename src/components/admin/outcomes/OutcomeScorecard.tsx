@@ -92,7 +92,7 @@ export default function OutcomeScorecard({ workspaceId }: Props) {
       {/* Top row: ring + stat cards */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         {/* Win rate ring */}
-        <SectionCard className="flex flex-col items-center justify-center gap-3 py-6">
+        <SectionCard noPadding className="flex flex-col items-center justify-center gap-3 py-6 px-4">
           <MetricRing score={winRateScore} size={144} />
           <div className="flex flex-col items-center gap-1">
             <span className="text-xs text-zinc-500 uppercase tracking-wider font-medium">Overall Win Rate</span>
