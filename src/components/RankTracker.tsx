@@ -278,7 +278,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Icon as={Loader2} size="md" className="animate-spin text-teal-400" />
+        <Icon as={Loader2} size="lg" className="animate-spin text-teal-400" />
       </div>
     );
   }
@@ -293,7 +293,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Icon as={Target} size="md" className="text-teal-400" />
+          <Icon as={Target} size="lg" className="text-teal-400" />
           <h2 className="text-sm font-semibold text-[var(--brand-text-bright)]">Rank Tracker</h2>
           <span className="t-caption px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{keywords.length} keywords</span>
         </div>
@@ -363,7 +363,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
       )}
       {showTrends && trendsLoading && (
         <div className="flex items-center justify-center py-8 gap-2 text-[var(--brand-text-muted)] text-xs">
-          <Icon as={Loader2} size="sm" className="animate-spin text-blue-400" /> Loading trend data...
+          <Icon as={Loader2} size="md" className="animate-spin text-blue-400" /> Loading trend data...
         </div>
       )}
 

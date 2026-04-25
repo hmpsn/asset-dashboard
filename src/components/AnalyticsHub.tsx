@@ -31,7 +31,7 @@ export function AnalyticsHub({ workspaceId, siteId, gscPropertyUrl, ga4PropertyI
       <PageHeader
         title="Analytics"
         subtitle="Search performance, traffic insights, and annotations"
-        icon={<Icon as={BarChart3} size="md" className="text-teal-400" />}
+        icon={<Icon as={BarChart3} size="lg" className="text-teal-400" />}
       />
 
       {/* tab-deeplink-ok — analytics tabs are not navigated to via ?tab= from other components */}

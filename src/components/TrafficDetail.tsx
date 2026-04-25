@@ -91,7 +91,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
   if (loading && !overview) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3 text-[var(--brand-text-muted)]">
-        <Icon as={Loader2} size="lg" className="animate-spin text-teal-400" />
+        <Icon as={Loader2} size="xl" className="animate-spin text-teal-400" />
         <p className="text-sm">Loading analytics data...</p>
       </div>
     );

@@ -112,7 +112,7 @@ export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4Prop
   if (overview.isLoading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Icon as={Loader2} size="md" className="animate-spin text-teal-400" />
+        <Icon as={Loader2} size="lg" className="animate-spin text-teal-400" />
         <span className="ml-2 text-sm text-[var(--brand-text-muted)]">Loading analytics...</span>
       </div>
     );

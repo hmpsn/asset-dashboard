@@ -42,9 +42,9 @@ const SOURCE_LABELS: Record<string, string> = {
 
 function SeverityIcon({ severity }: { severity: 'critical' | 'warning' | 'positive' }) {
   const cls = SEVERITY_STYLES[severity].icon;
-  if (severity === 'positive') return <Icon as={TrendingUp} size="sm" className={cls} />;
-  if (severity === 'critical') return <Icon as={TrendingDown} size="sm" className={cls} />;
-  return <Icon as={AlertTriangle} size="sm" className={cls} />;
+  if (severity === 'positive') return <Icon as={TrendingUp} size="md" className={cls} />;
+  if (severity === 'critical') return <Icon as={TrendingDown} size="md" className={cls} />;
+  return <Icon as={AlertTriangle} size="md" className={cls} />;
 }
 
 export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }: AnomalyAlertsProps) {
@@ -103,7 +103,7 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
         'border-emerald-500/30 bg-emerald-500/5'
       }`}>
         <div className="flex items-center gap-2">
-          <Icon as={Activity} size="xs" className={
+          <Icon as={Activity} size="sm" className={
             critical.length > 0 ? 'text-red-400/80' :
             warnings.length > 0 ? 'text-amber-400/80' :
             'text-emerald-400/80'
@@ -122,7 +122,7 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
     <div className="space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <button onClick={() => setCollapsed(!collapsed)} className="flex items-center gap-2 text-xs font-medium text-[var(--brand-text-bright)] hover:text-[var(--brand-text-bright)] transition-colors">
+        <button onClick={() => setCollapsed(!collapsed)} className="flex items-center gap-2 text-xs font-medium text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
           <Icon as={Activity} size="sm" className="text-[var(--brand-text)]" />
           Anomaly Alerts
           {critical.length > 0 && <span className="px-1.5 py-0.5 rounded t-caption-sm bg-red-500/20 text-red-400/80">{critical.length}</span>}

@@ -73,7 +73,7 @@ export function AnalyticsAnnotations({ workspaceId }: { workspaceId: string }) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Icon as={Loader2} size="md" className="animate-spin text-teal-400" />
+        <Icon as={Loader2} size="lg" className="animate-spin text-teal-400" />
       </div>
     );
   }
@@ -81,7 +81,7 @@ export function AnalyticsAnnotations({ workspaceId }: { workspaceId: string }) {
   return (
     <div className="space-y-8">
       <div className="flex items-center gap-2">
-        <Icon as={Flag} size="md" className="text-amber-400/80" />
+        <Icon as={Flag} size="lg" className="text-amber-400/80" />
         <h2 className="text-sm font-semibold text-[var(--brand-text-bright)]">Annotations</h2>
         <span className="t-caption px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{annotations.length}</span>
       </div>
