@@ -846,6 +846,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                 variant="primary"
                 size="sm"
                 icon={Send}
+                aria-label="Send message"
                 onClick={() => sendMessage()}
                 disabled={sending || !input.trim()}
                 className="flex-shrink-0"
