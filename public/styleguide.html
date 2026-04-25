@@ -851,6 +851,71 @@
         <div><b>Light mode</b>Swap <span class="t-mono">--teal</span> (#2dd4bf) → (#0d9488) for AA contrast on light surfaces.</div>
       </div>
     </div>
+
+    <!-- Phase5:Icon START -->
+    <div class="sub-section">
+      <div class="col-label">Icons · six fixed sizes, strict enum</div>
+      <div class="icon-grid" style="display:grid; grid-template-columns:repeat(6, 1fr); gap:24px; align-items:center; justify-items:center; padding:20px 0;">
+        <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+          <svg class="i" style="width:8px; height:8px; color:var(--teal);"><use href="#i-trend"/></svg>
+          <span class="t-caption">xs · 8px</span>
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+          <svg class="i" style="width:12px; height:12px; color:var(--teal);"><use href="#i-trend"/></svg>
+          <span class="t-caption">sm · 12px</span>
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+          <svg class="i" style="width:16px; height:16px; color:var(--teal);"><use href="#i-trend"/></svg>
+          <span class="t-caption">md · 16px</span>
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+          <svg class="i" style="width:20px; height:20px; color:var(--teal);"><use href="#i-trend"/></svg>
+          <span class="t-caption">lg · 20px</span>
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+          <svg class="i" style="width:24px; height:24px; color:var(--teal);"><use href="#i-trend"/></svg>
+          <span class="t-caption">xl · 24px</span>
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+          <svg class="i" style="width:32px; height:32px; color:var(--teal);"><use href="#i-trend"/></svg>
+          <span class="t-caption">2xl · 32px</span>
+        </div>
+      </div>
+      <div style="margin-top:28px;">
+        <div class="t-label" style="margin-bottom:12px;">Color via className · currentColor inheritance</div>
+        <div style="display:flex; gap:24px; align-items:center;">
+          <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+            <svg class="i" style="width:16px; height:16px; color:var(--teal);"><use href="#i-trend"/></svg>
+            <span class="t-mono" style="font-size:11px;">className="text-teal-400"</span>
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+            <svg class="i" style="width:16px; height:16px; color:var(--blue-data);"><use href="#i-trend"/></svg>
+            <span class="t-mono" style="font-size:11px;">className="text-blue-400"</span>
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+            <svg class="i" style="width:16px; height:16px; color:var(--emerald);"><use href="#i-trend"/></svg>
+            <span class="t-mono" style="font-size:11px;">className="text-emerald-400"</span>
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+            <svg class="i" style="width:16px; height:16px; color:var(--red);"><use href="#i-trend"/></svg>
+            <span class="t-mono" style="font-size:11px;">className="text-red-400"</span>
+          </div>
+        </div>
+      </div>
+      <div class="usage-strip" style="margin-top:20px;">
+        <div style="display:flex; gap:16px;">
+          <div style="flex:1;">
+            <b>Don't</b>
+            <div class="t-mono" style="margin-top:4px; padding:8px; background:rgba(239, 68, 68, 0.1); border-radius:4px; color:var(--brand-text); font-size:11px;">&lt;TrendingUp className="w-3 h-3" /&gt;</div>
+          </div>
+          <div style="flex:1;">
+            <b>Do</b>
+            <div class="t-mono" style="margin-top:4px; padding:8px; background:rgba(34, 197, 94, 0.1); border-radius:4px; color:var(--brand-text); font-size:11px;">&lt;Icon as={TrendingUp} size="sm" /&gt;</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Phase5:Icon END -->
   </section>
 
   <!-- ══════ 05 · COMPONENTS ══════ -->
