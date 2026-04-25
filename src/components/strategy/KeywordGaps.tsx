@@ -26,7 +26,7 @@ export function KeywordGaps({ keywordGaps, difficultyColor }: KeywordGapsProps) 
       <div className="space-y-1">
         {keywordGaps.map((gap, i) => (
           <div key={i} className="flex items-center justify-between px-2.5 py-1.5 bg-[var(--surface-3)]/50 rounded-[var(--radius-lg)]">
-            <span className="t-caption-sm text-[var(--zinc-300)]">{gap.keyword}</span>
+            <span className="t-caption-sm text-[var(--brand-text-bright)]">{gap.keyword}</span>
             <div className="flex items-center gap-2">
               <span className="t-mono text-[var(--brand-text-muted)]">{gap.volume.toLocaleString()}/mo</span>
               <span className={`t-mono ${difficultyColor(gap.difficulty)}`}>KD {gap.difficulty}%</span>

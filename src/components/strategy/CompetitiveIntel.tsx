@@ -183,7 +183,7 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
           <Icon as={Target} size="sm" className="text-teal-400" />
           <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Competitive Intelligence</h3>
         </div>
-        <button onClick={() => { queryClient.invalidateQueries({ queryKey: queryKeys.admin.competitorIntelAll(workspaceId) }); }} className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--zinc-300)] transition-colors">
+        <button onClick={() => { queryClient.invalidateQueries({ queryKey: queryKeys.admin.competitorIntelAll(workspaceId) }); }} className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
           Refresh
         </button>
       </div>
@@ -205,8 +205,7 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
         const compOv = comp.overview;
 
         return (
-          <div key={comp.domain} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
-            {/* pr-check-disable-next-line — SectionCard-style outer container with signature-lg radius */}
+          <div key={comp.domain} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-lg)]">
             <button
               onClick={() => toggleExpand(comp.domain)}
               className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[var(--surface-3)]/50 transition-colors"
@@ -246,7 +245,7 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
                       {comp.topKeywords.slice(0, 10).map((kw, i) => (
                         <div key={i} className="flex items-center gap-2 t-caption px-2 py-1.5 bg-[var(--surface-1)]/50 rounded-[var(--radius-lg)]">
                           <span className="text-[var(--brand-text-muted)] w-5 text-right font-mono">#{kw.position}</span>
-                          <span className="flex-1 text-[var(--zinc-300)] truncate">{kw.keyword}</span>
+                          <span className="flex-1 text-[var(--brand-text-bright)] truncate">{kw.keyword}</span>
                           <span className="text-[var(--brand-text-muted)] font-mono">{fmtNum(kw.volume)}/mo</span>
                           <span className={`font-mono ${difficultyColor(kw.difficulty)}`}>KD {kw.difficulty}%</span>
                         </div>
@@ -262,8 +261,7 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
 
       {/* Keyword Gaps */}
       {effectiveGaps.length > 0 && (
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
-          {/* pr-check-disable-next-line — SectionCard-style outer container with signature-lg radius */}
+        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-lg)]">
           <button
             onClick={() => toggleExpand('gaps')}
             className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[var(--surface-3)]/50 transition-colors"
@@ -280,7 +278,7 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
               <div className="space-y-1 max-h-[300px] overflow-y-auto">
                 {effectiveGaps.map((gap, i) => (
                   <div key={i} className="flex items-center gap-2 t-caption px-2 py-1.5 bg-[var(--surface-1)]/50 rounded-[var(--radius-lg)]">
-                    <span className="flex-1 text-[var(--zinc-300)] truncate">{gap.keyword}</span>
+                    <span className="flex-1 text-[var(--brand-text-bright)] truncate">{gap.keyword}</span>
                     <span className="text-[var(--brand-text-muted)] font-mono">{fmtNum(gap.volume)}/mo</span>
                     <span className={`font-mono ${difficultyColor(gap.difficulty)}`}>KD {gap.difficulty}%</span>
                     <span className="text-orange-400/80 t-caption-sm">{gap.competitorDomain} #{gap.competitorPosition}</span>

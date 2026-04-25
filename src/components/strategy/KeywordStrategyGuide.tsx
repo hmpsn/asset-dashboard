@@ -141,7 +141,7 @@ export function KeywordStrategyGuide() {
                   <p className="t-caption text-[var(--brand-text)] leading-relaxed">{step.description}</p>
                   <ul className="space-y-1">
                     {step.actions.map((a, i) => (
-                      <li key={i} className="flex items-start gap-2 t-caption text-[var(--zinc-300)]">
+                      <li key={i} className="flex items-start gap-2 t-caption text-[var(--brand-text-bright)]">
                         <Icon as={ArrowRight} size="xs" className="text-[var(--brand-text-dim)] mt-0.5 flex-shrink-0" />
                         <span>{a}</span>
                       </li>
@@ -183,19 +183,19 @@ export function KeywordStrategyGuide() {
           <ul className="space-y-1.5">
             <li className="flex items-start gap-2">
               <span className="text-amber-400 font-bold">1.</span>
-              <span><strong className="text-[var(--zinc-300)]">Content Gaps → new page briefs</strong> — gaps represent keywords you don't rank for. Each gap can become a new page in the content pipeline.</span>
+              <span><strong className="text-[var(--brand-text-bright)]">Content Gaps → new page briefs</strong> — gaps represent keywords you don't rank for. Each gap can become a new page in the content pipeline.</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-amber-400 font-bold">2.</span>
-              <span><strong className="text-[var(--zinc-300)]">Quick Wins → improve existing pages</strong> — Quick Win pages already exist; the brief optimizes titles, H1s, and meta descriptions around the target keyword.</span>
+              <span><strong className="text-[var(--brand-text-bright)]">Quick Wins → improve existing pages</strong> — Quick Win pages already exist; the brief optimizes titles, H1s, and meta descriptions around the target keyword.</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-amber-400 font-bold">3.</span>
-              <span><strong className="text-[var(--zinc-300)]">Site keywords auto-populate briefs</strong> — when you create a brief for a page, the mapped primary keyword pre-fills the brief's keyword field.</span>
+              <span><strong className="text-[var(--brand-text-bright)]">Site keywords auto-populate briefs</strong> — when you create a brief for a page, the mapped primary keyword pre-fills the brief's keyword field.</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-amber-400 font-bold">4.</span>
-              <span><strong className="text-[var(--zinc-300)]">Re-run after publishing</strong> — once new content goes live, re-run the strategy to see if rankings moved and update the keyword map.</span>
+              <span><strong className="text-[var(--brand-text-bright)]">Re-run after publishing</strong> — once new content goes live, re-run the strategy to see if rankings moved and update the keyword map.</span>
             </li>
           </ul>
         </div>

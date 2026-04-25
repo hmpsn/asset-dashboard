@@ -47,7 +47,7 @@ export function TopicClusters({ clusters }: TopicClustersProps) {
               </div>
             </div>
             {/* Coverage bar */}
-            <div className="mt-1.5 h-1.5 bg-[var(--zinc-700)] rounded-full overflow-hidden">
+            <div className="mt-1.5 h-1.5 bg-zinc-700 rounded-full overflow-hidden">
               <div className={`h-full rounded-full transition-all ${coverageBarColor(cluster.coveragePercent)}`} style={{ width: `${cluster.coveragePercent}%` }} />
             </div>
             <div className="flex items-center justify-between mt-1.5">

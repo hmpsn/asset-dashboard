@@ -93,7 +93,7 @@ export function SeoCopyPanel({
                       {copiedField === 'metaDesc' ? 'Copied!' : 'Copy'}
                     </button>
                   </div>
-                  <p className="t-caption text-[var(--zinc-300)]">{copy.metaDescription}</p>
+                  <p className="t-caption text-[var(--brand-text-bright)]">{copy.metaDescription}</p>
                   <span className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 block">{copy.metaDescription.length} chars</span>
                 </div>
                 {/* H1 */}
@@ -116,7 +116,7 @@ export function SeoCopyPanel({
                       {copiedField === 'intro' ? 'Copied!' : 'Copy'}
                     </button>
                   </div>
-                  <p className="t-caption text-[var(--zinc-300)] leading-relaxed">{copy.introParagraph}</p>
+                  <p className="t-caption text-[var(--brand-text-bright)] leading-relaxed">{copy.introParagraph}</p>
                 </div>
                 {/* Internal Link Suggestions */}
                 {copy.internalLinkSuggestions && copy.internalLinkSuggestions.length > 0 && (

@@ -142,7 +142,7 @@ export function BacklinkProfile({ workspaceId }: Props) {
                           <Icon as={ExternalLink} size="xs" className="opacity-50" />
                         </a>
                       </td>
-                      <td className="py-2 text-[var(--zinc-300)] text-right font-medium">{fmtNum(rd.backlinksCount)}</td>
+                      <td className="py-2 text-[var(--brand-text-bright)] text-right font-medium">{fmtNum(rd.backlinksCount)}</td>
                       <td className="py-2 text-[var(--brand-text-muted)] text-right">{rd.firstSeen ? new Date(rd.firstSeen).toLocaleDateString() : '—'}</td>
                       <td className="py-2 text-[var(--brand-text-muted)] text-right">{rd.lastSeen ? new Date(rd.lastSeen).toLocaleDateString() : '—'}</td>
                     </tr>

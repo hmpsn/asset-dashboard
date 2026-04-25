@@ -34,7 +34,7 @@ export function LowHangingFruit({ pages, positionColor }: LowHangingFruitProps) 
         {pages.map((page, i) => (
           <div key={i} className="flex items-center justify-between px-3 py-2 bg-[var(--surface-3)]/50 rounded-[var(--radius-lg)]">
             <div className="flex-1 min-w-0">
-              <div className="t-caption-sm text-[var(--zinc-300)] truncate">{page.pageTitle}</div>
+              <div className="t-caption-sm text-[var(--brand-text-bright)] truncate">{page.pageTitle}</div>
               <div className="t-mono text-[var(--brand-text-muted)]">{page.pagePath}</div>
             </div>
             <div className="flex items-center gap-3 flex-shrink-0 ml-3">

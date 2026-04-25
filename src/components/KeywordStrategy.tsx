@@ -6,7 +6,7 @@ import {
   BarChart3, Users, Search, FileText,
   Eye, MousePointerClick, Trophy, AlertTriangle, Plus, Check,
 } from 'lucide-react';
-import { StatCard, AIContextIndicator, TabBar, ErrorState, ProgressIndicator, NextStepsCard, LoadingState, Icon } from './ui';
+import { StatCard, SectionCard, AIContextIndicator, TabBar, ErrorState, ProgressIndicator, NextStepsCard, LoadingState, Icon } from './ui';
 import { KeywordStrategyGuide } from './strategy/KeywordStrategyGuide';
 import { useKeywordStrategy } from '../hooks/admin';
 import { useQueryClient } from '@tanstack/react-query';
@@ -228,7 +228,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       case 'informational': return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
       case 'transactional': return 'text-amber-400 bg-amber-500/10 border-amber-500/20';
       case 'navigational': return 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20';
-      default: return 'text-[var(--brand-text)] bg-[var(--zinc-500)]/10 border-[var(--zinc-500)]/20';
+      default: return 'text-[var(--brand-text)] bg-zinc-500/10 border-zinc-500/20';
     }
   };
 
@@ -297,7 +297,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
               onClick={() => generateStrategy('incremental')}
               disabled={generating}
               title="Re-analyzes only pages not updated in the last 7 days. Faster and lower cost than a full regeneration."
-              className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption border border-[var(--brand-border-hover)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--zinc-600)] transition-colors disabled:opacity-50"
+              className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption border border-[var(--brand-border-hover)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)] transition-colors disabled:opacity-50"
             >
               Update changed pages
             </button>
@@ -323,15 +323,14 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       )}
 
       {/* Settings Panel */}
-      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
-        {/* pr-check-disable-next-line — settings panel uses signature-lg radius */}
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-lg)]">
         <button
           onClick={() => setSettingsOpen(!settingsOpen)}
           className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[var(--surface-3)]/20 transition-colors text-left"
         >
           <div className="flex items-center gap-2">
             <Icon as={Briefcase} size="xs" className="text-teal-400" />
-            <span className="t-caption font-semibold text-[var(--zinc-300)]">Strategy Settings</span>
+            <span className="t-caption font-semibold text-[var(--brand-text-bright)]">Strategy Settings</span>
             {!settingsOpen && (
               <span className="t-caption-sm text-[var(--brand-text-muted)]">
                 {semrushMode !== 'none' ? `SEMRush: ${semrushMode}` : ''}
@@ -363,7 +362,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                       className={`px-3 py-2 rounded-[var(--radius-lg)] border t-caption font-medium transition-all ${
                         (activeProvider || 'semrush') === p.name
                           ? 'border-teal-500/50 bg-teal-500/10 text-teal-300'
-                          : 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--zinc-300)]'
+                          : 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
                       }`}
                     >
                       <div className="font-semibold capitalize">{p.name === 'dataforseo' ? 'DataForSEO' : 'SEMRush'}</div>
@@ -396,7 +395,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                       className={`px-3 py-2 rounded-[var(--radius-lg)] border t-caption font-medium transition-all ${
                         semrushMode === mode
                           ? 'border-orange-500/50 bg-orange-500/10 text-orange-300'
-                          : 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--zinc-300)]'
+                          : 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
                       }`}
                     >
                       <div className="font-semibold capitalize">{mode === 'none' ? 'Off' : mode}</div>
@@ -469,7 +468,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                     className={`px-3 py-2 rounded-[var(--radius-lg)] border t-caption font-medium transition-all ${
                       maxPages === cap
                         ? 'border-teal-500/50 bg-teal-500/10 text-teal-300'
-                        : 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--zinc-300)]'
+                        : 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
                     }`}
                   >
                     <div className="font-semibold">{cap === 0 ? 'All' : cap}</div>
@@ -552,15 +551,16 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       )}
 
       {!isRealStrategy && !generating && (
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] px-6 py-12 text-center rounded-[var(--radius-signature-lg)]">
-          {/* pr-check-disable-next-line — empty state container uses signature-lg radius */}
-          <Icon as={Target} size="xl" className="text-[var(--brand-text-muted)] mx-auto mb-3" />
-          <p className="t-ui text-[var(--brand-text)] mb-1">No keyword strategy yet</p>
-          <p className="t-caption-sm text-[var(--brand-text-muted)] max-w-md mx-auto">
-            Generate an AI-powered keyword strategy based on your site's pages and Google Search Console data.
-            This will map target keywords to each page and guide all future AI rewrites.
-          </p>
-        </div>
+        <SectionCard noPadding>
+          <div className="px-6 py-12 text-center">
+            <Icon as={Target} size="xl" className="text-[var(--brand-text-muted)] mx-auto mb-3" />
+            <p className="t-ui text-[var(--brand-text)] mb-1">No keyword strategy yet</p>
+            <p className="t-caption-sm text-[var(--brand-text-muted)] max-w-md mx-auto">
+              Generate an AI-powered keyword strategy based on your site's pages and Google Search Console data.
+              This will map target keywords to each page and guide all future AI rewrites.
+            </p>
+          </div>
+        </SectionCard>
       )}
 
       {isRealStrategy && strategy && (
@@ -586,25 +586,23 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
 
           {/* ── Performance Tiers Bar ── */}
           {ranked.length > 0 && (
-            <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 rounded-[var(--radius-signature-lg)]">
-              {/* pr-check-disable-next-line — ranking distribution card uses signature-lg radius */}
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="t-caption font-semibold text-[var(--zinc-300)]">Ranking Distribution</h4>
-                <span className="t-caption-sm text-[var(--brand-text-muted)]">{ranked.length} of {filteredPageMap.length} pages with ranking data</span>
-              </div>
+            <SectionCard
+              title="Ranking Distribution"
+              titleExtra={<span className="t-caption-sm text-[var(--brand-text-muted)] ml-2">{ranked.length} of {filteredPageMap.length} pages with ranking data</span>}
+            >
               <div className="flex h-4 rounded-full overflow-hidden bg-[var(--surface-3)]">
                 {top3.length > 0 && <div className="bg-emerald-500 h-full transition-all" style={{ width: `${(top3.length / filteredPageMap.length) * 100}%` }} />}
                 {top10.length > 0 && <div className="bg-teal-500 h-full transition-all" style={{ width: `${(top10.length / filteredPageMap.length) * 100}%` }} />}
                 {top20.length > 0 && <div className="bg-amber-500 h-full transition-all" style={{ width: `${(top20.length / filteredPageMap.length) * 100}%` }} />}
                 {beyond20.length > 0 && <div className="bg-red-500/60 h-full transition-all" style={{ width: `${(beyond20.length / filteredPageMap.length) * 100}%` }} />}
-                {notRankingCount > 0 && <div className="bg-[var(--zinc-700)] h-full transition-all" style={{ width: `${(notRankingCount / filteredPageMap.length) * 100}%` }} />}
+                {notRankingCount > 0 && <div className="bg-zinc-700 h-full transition-all" style={{ width: `${(notRankingCount / filteredPageMap.length) * 100}%` }} />}
               </div>
               <div className="flex items-center gap-4 mt-2 flex-wrap">
                 <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" /> <span className="text-emerald-400 font-medium">{top3.length}</span> <span className="text-[var(--brand-text-muted)]">Top 3</span></span>
                 <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-full bg-teal-500 inline-block" /> <span className="text-teal-400 font-medium">{top10.length}</span> <span className="text-[var(--brand-text-muted)]">4–10</span></span>
                 <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" /> <span className="text-amber-400 font-medium">{top20.length}</span> <span className="text-[var(--brand-text-muted)]">11–20</span></span>
                 <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-full bg-red-500/60 inline-block" /> <span className="text-red-400 font-medium">{beyond20.length}</span> <span className="text-[var(--brand-text-muted)]">20+</span></span>
-                <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-full bg-[var(--zinc-700)] inline-block" /> <span className="text-[var(--brand-text-muted)] font-medium">{notRankingCount}</span> <span className="text-[var(--brand-text-muted)]">Not ranking</span></span>
+                <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-full bg-zinc-700 inline-block" /> <span className="text-[var(--brand-text-muted)] font-medium">{notRankingCount}</span> <span className="text-[var(--brand-text-muted)]">Not ranking</span></span>
               </div>
               {Object.keys(intentCounts).length > 1 && (
                 <div className="mt-3 pt-3 border-t border-[var(--brand-border)]">
@@ -618,7 +616,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                   </div>
                 </div>
               )}
-            </div>
+            </SectionCard>
           )}
 
           {/* ── Quick Wins ── */}
@@ -666,11 +664,10 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           />
 
           {/* ── Site Keywords ── */}
-          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 rounded-[var(--radius-signature-lg)]">
-            {/* pr-check-disable-next-line — site keywords card uses signature-lg radius */}
-            <h4 className="t-caption font-semibold text-[var(--zinc-300)] mb-2 flex items-center gap-1.5">
-              <Icon as={Target} size="xs" className="text-teal-400" /> Site Target Keywords
-            </h4>
+          <SectionCard
+            title="Site Target Keywords"
+            titleIcon={<Icon as={Target} size="xs" className="text-teal-400" />}
+          >
             <div className="flex flex-wrap gap-1.5">
               {strategy.siteKeywords.map((kw: string, i: number) => {
                 const metrics = strategy.siteKeywordMetrics?.find((m: { keyword: string; volume: number; difficulty: number }) => m.keyword.toLowerCase() === kw.toLowerCase());
@@ -695,15 +692,14 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                 );
               })}
             </div>
-          </div>
+          </SectionCard>
 
           {/* ── Opportunities ── */}
           {strategy.opportunities.length > 0 && (
-            <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 rounded-[var(--radius-signature-lg)]">
-              {/* pr-check-disable-next-line — opportunities card uses signature-lg radius */}
-              <h4 className="t-caption font-semibold text-[var(--zinc-300)] mb-2 flex items-center gap-1.5">
-                <Icon as={Sparkles} size="xs" className="text-teal-400" /> Keyword Opportunities
-              </h4>
+            <SectionCard
+              title="Keyword Opportunities"
+              titleIcon={<Icon as={Sparkles} size="xs" className="text-teal-400" />}
+            >
               <p className="text-[var(--brand-text-muted)] t-micro mb-2">
                 These opportunities are AI-generated suggestions based on your site's content and competitive landscape. Validate with keyword research before acting.
               </p>
@@ -715,7 +711,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                   </div>
                 ))}
               </div>
-            </div>
+            </SectionCard>
           )}
 
           {/* How it works */}

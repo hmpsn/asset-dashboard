@@ -90,12 +90,11 @@ export function PageKeywordMapPanel({
   onCopyText,
 }: PageKeywordMapProps) {
   return (
-    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
-      {/* pr-check-disable-next-line — page map outer container uses signature-lg radius */}
+    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-lg)]">
       <div className="px-4 py-3 border-b border-[var(--brand-border)]">
         <div className="flex items-center justify-between">
           <div>
-            <h4 className="t-caption-sm font-semibold text-[var(--zinc-300)]">Page Keyword Map</h4>
+            <h4 className="t-caption-sm font-semibold text-[var(--brand-text-bright)]">Page Keyword Map</h4>
             <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{filteredPages.length} pages · Click to expand · Pencil to edit</p>
           </div>
         </div>
@@ -116,7 +115,7 @@ export function PageKeywordMapPanel({
                 key={s}
                 onClick={() => { if (sortBy === s) onSetSortDir(d => d === 'desc' ? 'asc' : 'desc'); else { onSetSortBy(s); onSetSortDir(() => 'desc'); } }}
                 className={`px-2 py-1 rounded t-caption-sm font-medium transition-colors flex items-center gap-0.5 ${
-                  sortBy === s ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border-hover)] hover:text-[var(--zinc-300)]'
+                  sortBy === s ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border-hover)] hover:text-[var(--brand-text-bright)]'
                 }`}
               >
                 {s === 'opportunity' ? 'Priority' : s.charAt(0).toUpperCase() + s.slice(1)}
@@ -140,7 +139,7 @@ export function PageKeywordMapPanel({
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <Icon as={isExpanded ? ChevronDown : ChevronRight} size="xs" className="text-[var(--brand-text-muted)] flex-shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <span className="t-caption text-[var(--zinc-300)] truncate block">{page.pageTitle}</span>
+                  <span className="t-caption text-[var(--brand-text-bright)] truncate block">{page.pageTitle}</span>
                   <span className="t-mono text-[var(--brand-text-muted)]">{page.pagePath}</span>
                 </div>
               </div>
@@ -219,7 +218,7 @@ export function PageKeywordMapPanel({
                       {page.volume != null && page.volume > 0 && (
                         <div className="t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-1">
                           <Icon as={BarChart3} size="xs" className="text-orange-400" />
-                          <span className="text-[var(--zinc-300)] font-medium">{page.volume.toLocaleString()}</span>/mo
+                          <span className="text-[var(--brand-text-bright)] font-medium">{page.volume.toLocaleString()}</span>/mo
                         </div>
                       )}
                       {page.difficulty != null && page.difficulty > 0 && (
@@ -305,7 +304,7 @@ export function PageKeywordMapPanel({
                       </button>
                       <button
                         onClick={() => onSetEditingPage(null)}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded bg-[var(--surface-3)] hover:bg-[var(--zinc-700)] text-[var(--zinc-300)] t-caption-sm font-medium"
+                        className="flex items-center gap-1 px-2.5 py-1 rounded bg-[var(--surface-3)] hover:bg-zinc-700 text-[var(--brand-text-bright)] t-caption-sm font-medium"
                       >
                         <Icon as={X} size="xs" /> Cancel
                       </button>

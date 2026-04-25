@@ -18,14 +18,14 @@ export interface CannibalizationAlertProps {
 const sevColor = (sev: string) =>
   sev === 'high' ? 'text-red-400 bg-red-500/10 border-red-500/20'
   : sev === 'medium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
-  : 'text-[var(--brand-text)] bg-[var(--zinc-700)]/30 border-[var(--zinc-600)]/20';
+  : 'text-[var(--brand-text)] bg-zinc-700/30 border-zinc-600/20';
 
 const actionLabel = (action?: string) => {
   switch (action) {
     case 'canonical_tag': return { label: 'Canonical Tag', icon: Link2, color: 'text-blue-400 bg-blue-500/10' };
     case 'redirect_301': return { label: '301 Redirect', icon: ArrowRight, color: 'text-orange-400 bg-orange-500/10' };
-    case 'differentiate': return { label: 'Differentiate', icon: GitBranch, color: 'text-[var(--zinc-400)] bg-[var(--zinc-500)]/10' };
-    case 'noindex': return { label: 'Noindex', icon: EyeOff, color: 'text-[var(--brand-text)] bg-[var(--zinc-700)]/30' };
+    case 'differentiate': return { label: 'Differentiate', icon: GitBranch, color: 'text-[var(--brand-text)] bg-[var(--brand-text-muted)]/10' };
+    case 'noindex': return { label: 'Noindex', icon: EyeOff, color: 'text-[var(--brand-text)] bg-zinc-700/30' };
     default: return null;
   }
 };
@@ -63,7 +63,7 @@ export function CannibalizationAlert({ items }: CannibalizationAlertProps) {
                   {page.position && <span className="text-[var(--brand-text-muted)]">pos #{Math.round(page.position)}</span>}
                   {page.impressions != null && page.impressions > 0 && <span className="text-blue-400">{page.impressions} impr</span>}
                   {page.clicks != null && page.clicks > 0 && <span className="text-teal-400">{page.clicks} clicks</span>}
-                  <span className={`px-1 rounded ${page.source === 'gsc' ? 'bg-blue-500/10 text-blue-400' : 'bg-[var(--zinc-700)]/50 text-[var(--brand-text)]'}`}>
+                  <span className={`px-1 rounded ${page.source === 'gsc' ? 'bg-blue-500/10 text-blue-400' : 'bg-zinc-700/50 text-[var(--brand-text)]'}`}>
                     {page.source === 'gsc' ? 'GSC' : 'map'}
                   </span>
                 </div>
