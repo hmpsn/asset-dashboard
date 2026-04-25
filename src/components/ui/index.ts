@@ -84,3 +84,10 @@ export type {
 
 // Overlays
 export { Modal, Popover, Tooltip } from './overlay';
+
+// className merge helper — re-exported so Phase 2 consumers can write
+// `import { cn } from '../ui'` alongside the primitives they're using
+// (per playbook §6.1). The canonical implementation lives in
+// `src/lib/utils.ts`; ui primitives import from there directly to avoid a
+// circular dependency through this barrel.
+export { cn } from '../../lib/utils';
