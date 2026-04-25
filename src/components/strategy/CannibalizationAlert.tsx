@@ -75,7 +75,7 @@ export function CannibalizationAlert({ items }: CannibalizationAlertProps) {
               const ActionIcon = a.icon;
               return (
                 <div className={`flex items-center gap-1 mt-1.5 px-1.5 py-0.5 rounded t-caption-sm font-medium ${a.color} w-fit`}>
-                  <Icon as={ActionIcon} size="xs" />
+                  <Icon as={ActionIcon} size="sm" />
                   {a.label}
                   {item.canonicalPath && <span className="font-mono ml-1 opacity-70">→ {item.canonicalPath}</span>}
                 </div>

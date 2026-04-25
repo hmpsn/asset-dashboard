@@ -699,7 +699,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           {strategy.opportunities.length > 0 && (
             <SectionCard
               title="Keyword Opportunities"
-              titleIcon={<Icon as={Sparkles} size="sm" className="text-teal-400" />}
+              titleIcon={<Icon as={Sparkles} size="md" className="text-teal-400" />}
             >
               <p className="text-[var(--brand-text-muted)] t-caption-sm mb-2">
                 These opportunities are AI-generated suggestions based on your site's content and competitive landscape. Validate with keyword research before acting.
@@ -718,7 +718,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           {/* How it works */}
           <div className="bg-[var(--surface-3)]/30 rounded-[var(--radius-lg)] border border-[var(--brand-border)] px-4 py-3">
             <div className="flex items-start gap-2">
-              <Icon as={Sparkles} size="sm" className="text-teal-400 mt-0.5 flex-shrink-0" />
+              <Icon as={Sparkles} size="md" className="text-teal-400 mt-0.5 flex-shrink-0" />
               <div className="t-caption-sm text-[var(--brand-text-muted)]">
                 <strong className="text-[var(--brand-text)]">How it works:</strong> This strategy is automatically used when you generate AI rewrites
                 in the Edit SEO and CMS SEO tabs. The AI will incorporate your target keywords naturally into titles and descriptions.

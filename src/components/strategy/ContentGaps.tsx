@@ -50,7 +50,7 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
   return (
     <div className="bg-[var(--surface-2)] border border-blue-500/20 p-5 rounded-[var(--radius-signature)]">
       <h4 className="t-caption-sm font-semibold text-blue-300 mb-1 flex items-center gap-1.5">
-        <Icon as={FileText} size="sm" className="text-blue-300" /> Content Gaps
+        <Icon as={FileText} size="md" className="text-blue-300" /> Content Gaps
       </h4>
       <p className="t-caption-sm text-[var(--brand-text-muted)] mb-3">New content to create — topics with search demand but no page on the site.</p>
       <div className="space-y-2">
