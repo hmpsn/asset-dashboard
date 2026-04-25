@@ -17,40 +17,44 @@ import { readFileSync, readdirSync, statSync } from 'fs';
 import { join, relative } from 'path';
 
 // ─── Pattern definitions ───────────────────────────────────────────────────
+//
+// Gate 3 fix from phase-2-kickoff.md §1: patterns are now token-set based
+// rather than exact-substring regex. The previous exact-match regexes missed
+// real-world classNames like `flex items-center gap-2 justify-between`
+// (additional classes beyond the minimum required for a Row migration).
 
 interface Pattern {
   name: string;
-  regex: RegExp;
+  /** All tokens must be present in the className attribute to match. */
+  tokens?: string[];
+  /** Fallback for complex patterns that need regex (e.g. tag-level matches). */
+  regex?: RegExp;
   replacement: string;
 }
 
 const PATTERNS: Pattern[] = [
-  {
-    name: 'Row gap="sm"',
-    regex: /className="flex items-center gap-2"/g,
-    replacement: '<Row gap="sm">',
-  },
-  {
-    name: 'Row gap="md"',
-    regex: /className="flex items-center gap-3"/g,
-    replacement: '<Row gap="md">',
-  },
-  {
-    name: 'Stack gap="md"',
-    regex: /className="flex flex-col gap-3"/g,
-    replacement: '<Stack gap="md">',
-  },
-  {
-    name: 'Stack gap="lg"',
-    regex: /className="flex flex-col gap-4"/g,
-    replacement: '<Stack gap="lg">',
-  },
-  {
-    name: 'Divider',
-    regex: /<hr\s+className="border-zinc-800[^"]*"/g,
-    replacement: '<Divider />',
-  },
+  { name: 'Row gap="sm"',   tokens: ['flex', 'items-center', 'gap-2'], replacement: '<Row gap="sm">' },
+  { name: 'Row gap="md"',   tokens: ['flex', 'items-center', 'gap-3'], replacement: '<Row gap="md">' },
+  { name: 'Stack gap="md"', tokens: ['flex', 'flex-col', 'gap-3'],     replacement: '<Stack gap="md">' },
+  { name: 'Stack gap="lg"', tokens: ['flex', 'flex-col', 'gap-4'],     replacement: '<Stack gap="lg">' },
+  { name: 'Divider',        regex: /<hr\s+className="[^"]*\bborder-zinc-800\b[^"]*"/g, replacement: '<Divider />' },
 ];
+
+/**
+ * Check whether a line contains any className attribute whose token set
+ * includes every required token. Additional Tailwind classes beyond the
+ * required set are allowed (order-insensitive). Multiple className attrs on
+ * the same line each get checked independently.
+ */
+function lineMatchesTokens(line: string, required: string[]): boolean {
+  const classRe = /className\s*=\s*"([^"]*)"/g;
+  let cm: RegExpExecArray | null;
+  while ((cm = classRe.exec(line)) !== null) {
+    const tokens = new Set(cm[1].split(/\s+/).filter(Boolean));
+    if (required.every((t) => tokens.has(t))) return true;
+  }
+  return false;
+}
 
 // ─── File walker ───────────────────────────────────────────────────────────
 
@@ -82,18 +86,22 @@ function scanFile(filePath: string): FileMatches {
   const matches: FileMatches['matches'] = [];
 
   for (const pattern of PATTERNS) {
-    // Reset lastIndex for global regexes
-    pattern.regex.lastIndex = 0;
     for (let i = 0; i < lines.length; i++) {
-      if (pattern.regex.test(lines[i])) {
+      let hit = false;
+      if (pattern.tokens) {
+        hit = lineMatchesTokens(lines[i], pattern.tokens);
+      } else if (pattern.regex) {
+        // Reset state since the regex is reused across lines.
+        pattern.regex.lastIndex = 0;
+        hit = pattern.regex.test(lines[i]);
+      }
+      if (hit) {
         matches.push({
           pattern: pattern.name,
           line: i + 1,
           text: lines[i].trim().slice(0, 120),
         });
       }
-      // Reset after each line test (global regex maintains state)
-      pattern.regex.lastIndex = 0;
     }
   }
 

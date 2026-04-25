@@ -16,6 +16,8 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
+    "phase2:baseline": "playwright test --config=playwright.visual.config.ts",
+    "phase2:baseline:update": "playwright test --config=playwright.visual.config.ts --update-snapshots",
     "pr-check": "tsx scripts/pr-check.ts",
     "pr-check:all": "tsx scripts/pr-check.ts --all",
     "rules:generate": "tsx scripts/generate-rules-doc.ts",
