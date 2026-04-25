@@ -135,7 +135,7 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
             <button onClick={handleScan} disabled={isLoading}
               aria-label="Re-scan now"
               className="p-1 text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors disabled:opacity-50">
-              <Icon as={RefreshCw} size="md" className={isLoading ? 'animate-spin' : ''} />
+              <Icon as={RefreshCw} size="sm" className={isLoading ? 'animate-spin' : ''} />
             </button>
           </Tooltip>
         )}
