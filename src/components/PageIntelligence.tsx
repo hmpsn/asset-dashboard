@@ -838,7 +838,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                           className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500" />
                       </div>
                       <div className="flex gap-2">
-                        <Button variant="primary" size="sm" icon={saving ? Loader2 : Check} disabled={saving} onClick={() => saveEdit(page)}>
+                        <Button variant="primary" size="sm" icon={Check} loading={saving} disabled={saving} onClick={() => saveEdit(page)}>
                           Save
                         </Button>
                         <Button variant="secondary" size="sm" icon={X} onClick={() => setEditingPageId(null)}>
@@ -981,7 +981,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                           {kw.contentGaps.length > 0 && (
                             <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                               <div className="flex items-center gap-2 mb-2">
-                                <Icon as={AlertCircle} size="sm" className="text-orange-400" />
+                                <Icon as={AlertCircle} size="md" className="text-orange-400" />
                                 <span className="text-xs font-medium text-[var(--brand-text-bright)]">Content Gaps</span>
                               </div>
                               <ul className="space-y-1">
@@ -998,7 +998,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                             {kw.optimizationIssues.length > 0 && (
                               <div className="bg-[var(--surface-2)] p-3 border border-red-500/20 rounded-[var(--radius-signature)]">
                                 <div className="flex items-center gap-2 mb-2">
-                                  <Icon as={AlertCircle} size="sm" className="text-red-400" />
+                                  <Icon as={AlertCircle} size="md" className="text-red-400" />
                                   <span className="text-xs font-medium text-[var(--brand-text-bright)]">Issues</span>
                                 </div>
                                 <ul className="space-y-1">
@@ -1011,7 +1011,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                             {kw.recommendations.length > 0 && (
                               <div className="bg-[var(--surface-2)] p-3 border border-emerald-500/20 rounded-[var(--radius-signature)]">
                                 <div className="flex items-center gap-2 mb-2">
-                                  <Icon as={Sparkles} size="sm" className="text-emerald-400" />
+                                  <Icon as={Sparkles} size="md" className="text-emerald-400" />
                                   <span className="text-xs font-medium text-[var(--brand-text-bright)]">Recommendations</span>
                                 </div>
                                 <ul className="space-y-1">
@@ -1029,7 +1029,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                       {cs && (
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                           <div className="flex items-center gap-2 mb-3">
-                            <Icon as={BarChart3} size="sm" className="text-cyan-400" />
+                            <Icon as={BarChart3} size="md" className="text-cyan-400" />
                             <span className="text-xs font-medium text-[var(--brand-text-bright)]">Content Metrics</span>
                           </div>
                           <div className="grid grid-cols-4 gap-3 mb-3">

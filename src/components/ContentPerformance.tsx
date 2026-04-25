@@ -197,7 +197,7 @@ export function ContentPerformance({ workspaceId }: Props) {
           <div className="grid grid-cols-4 gap-3">
             <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] px-4 py-3 rounded-[var(--radius-signature)]">
               <div className="flex items-center gap-2 mb-1">
-                <Icon as={MousePointer} size="sm" className="text-blue-400" />
+                <Icon as={MousePointer} size="md" className="text-blue-400" />
                 <span className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider">Total Clicks</span>
               </div>
               <p className="text-xl font-semibold text-[var(--brand-text-bright)]">{totalClicks.toLocaleString()}</p>
@@ -211,7 +211,7 @@ export function ContentPerformance({ workspaceId }: Props) {
             </div>
             <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] px-4 py-3 rounded-[var(--radius-signature)]">
               <div className="flex items-center gap-2 mb-1">
-                <Icon as={Users} size="sm" className="text-teal-400" />
+                <Icon as={Users} size="md" className="text-teal-400" />
                 <span className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider">Sessions</span>
               </div>
               <p className="text-xl font-semibold text-[var(--brand-text-bright)]">{totalSessions.toLocaleString()}</p>

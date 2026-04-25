@@ -414,7 +414,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                       {kw.contentGaps.length > 0 && (
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                           <div className="flex items-center gap-2 mb-2">
-                            <Icon as={AlertCircle} size="sm" className="text-orange-400" />
+                            <Icon as={AlertCircle} size="md" className="text-orange-400" />
                             <span className="text-xs font-medium text-[var(--brand-text-bright)]">Content Gaps</span>
                           </div>
                           <ul className="space-y-1">
@@ -432,7 +432,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                         {kw.optimizationIssues.length > 0 && (
                           <div className="bg-[var(--surface-2)] rounded-[var(--radius-lg)] p-3 border border-red-500/20">
                             <div className="flex items-center gap-2 mb-2">
-                              <Icon as={AlertCircle} size="sm" className="text-red-400" />
+                              <Icon as={AlertCircle} size="md" className="text-red-400" />
                               <span className="text-xs font-medium text-[var(--brand-text-bright)]">Issues</span>
                             </div>
                             <ul className="space-y-1">

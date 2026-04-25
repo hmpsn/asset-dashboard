@@ -462,7 +462,7 @@ export function PageSpeedPanel({ siteId }: Props) {
                 onClick={() => setExpandedPage(isOpen ? null : page.url)}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-2)]/50 transition-colors text-left"
               >
-                {isOpen ? <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronRight} size="sm" className="text-[var(--brand-text-muted)]" />}
+                {isOpen ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)]" />}
                 <div className={`text-lg font-bold tabular-nums w-10 ${scoreColor(page.score)}`}>{page.score}</div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm text-[var(--brand-text-bright)] truncate">{page.page}</div>
