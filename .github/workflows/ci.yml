@@ -19,7 +19,9 @@ jobs:
       # pr-check.ts falls back to a full codebase scan gracefully.
       - name: Fetch base branch for diff
         if: github.event_name == 'pull_request'
-        run: git fetch origin ${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }} --depth=1 || true
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: git fetch origin "$BASE_REF:refs/remotes/origin/$BASE_REF" --depth=1 || true
 
       - uses: actions/setup-node@v5
         with:
