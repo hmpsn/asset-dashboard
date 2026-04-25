@@ -6,7 +6,7 @@ import {
   BarChart3, Users, Search, FileText,
   Eye, MousePointerClick, Trophy, AlertTriangle, Plus, Check,
 } from 'lucide-react';
-import { StatCard, AIContextIndicator, TabBar, ErrorState, ProgressIndicator, NextStepsCard, LoadingState } from './ui';
+import { StatCard, AIContextIndicator, TabBar, ErrorState, ProgressIndicator, NextStepsCard, LoadingState, Icon } from './ui';
 import { KeywordStrategyGuide } from './strategy/KeywordStrategyGuide';
 import { useKeywordStrategy } from '../hooks/admin';
 import { useQueryClient } from '@tanstack/react-query';
@@ -110,7 +110,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     complete: 'Complete',
   };
 
-  
+
   // Initialize SEMRush availability from React Query hook
   useEffect(() => {
     if (semrushAvailableFromHook) {
@@ -207,7 +207,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   };
 
   const positionColor = (pos?: number) => {
-    if (!pos) return 'text-zinc-500';
+    if (!pos) return 'text-[var(--brand-text-muted)]';
     if (pos <= 3) return 'text-emerald-400';
     if (pos <= 10) return 'text-teal-400';
     if (pos <= 20) return 'text-amber-400';
@@ -215,7 +215,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   };
 
   const difficultyColor = (kd?: number) => {
-    if (kd === undefined) return 'text-zinc-500';
+    if (kd === undefined) return 'text-[var(--brand-text-muted)]';
     if (kd <= 30) return 'text-emerald-400';
     if (kd <= 50) return 'text-amber-400';
     if (kd <= 70) return 'text-orange-400';
@@ -228,7 +228,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       case 'informational': return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
       case 'transactional': return 'text-amber-400 bg-amber-500/10 border-amber-500/20';
       case 'navigational': return 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20';
-      default: return 'text-zinc-400 bg-zinc-500/10 border-zinc-500/20';
+      default: return 'text-[var(--brand-text)] bg-[var(--zinc-500)]/10 border-[var(--zinc-500)]/20';
     }
   };
 
@@ -266,7 +266,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
 
   if (!workspaceId) {
     return (
-      <div className="text-center py-16 text-zinc-500 text-sm">
+      <div className="text-center py-16 text-[var(--brand-text-muted)] t-ui">
         No workspace selected. Link a workspace to generate a keyword strategy.
       </div>
     );
@@ -284,8 +284,8 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       {strategyTab === 'analysis' && <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-zinc-200">Keyword Strategy</h3>
-          <p className="text-[11px] text-zinc-500 mt-0.5">
+          <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Keyword Strategy</h3>
+          <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
             {isRealStrategy
               ? `Generated ${new Date(strategy.generatedAt).toLocaleDateString()} · ${strategy.pageMap?.length ?? 0} pages mapped`
               : 'AI-powered keyword mapping for your entire site'}
@@ -297,7 +297,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
               onClick={() => generateStrategy('incremental')}
               disabled={generating}
               title="Re-analyzes only pages not updated in the last 7 days. Faster and lower cost than a full regeneration."
-              className="px-3 py-1.5 rounded-lg text-xs border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-600 transition-colors disabled:opacity-50"
+              className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption border border-[var(--brand-border-hover)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--zinc-600)] transition-colors disabled:opacity-50"
             >
               Update changed pages
             </button>
@@ -305,14 +305,14 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           <button
             onClick={() => generateStrategy('full')}
             disabled={generating}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-xs font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white t-caption font-medium transition-colors"
           >
             {generating ? (
-              <><Loader2 className="w-3 h-3 animate-spin" /> Generating...</>
+              <><Icon as={Loader2} size="xs" className="animate-spin" /> Generating...</>
             ) : isRealStrategy ? (
-              <><RefreshCw className="w-3 h-3" /> Regenerate</>
+              <><Icon as={RefreshCw} size="xs" /> Regenerate</>
             ) : (
-              <><Sparkles className="w-3 h-3" /> Generate Strategy</>
+              <><Icon as={Sparkles} size="xs" /> Generate Strategy</>
             )}
           </button>
         </div>
@@ -323,16 +323,17 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       )}
 
       {/* Settings Panel */}
-      <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
+        {/* pr-check-disable-next-line — settings panel uses signature-lg radius */}
         <button
           onClick={() => setSettingsOpen(!settingsOpen)}
-          className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-zinc-800/20 transition-colors text-left"
+          className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[var(--surface-3)]/20 transition-colors text-left"
         >
           <div className="flex items-center gap-2">
-            <Briefcase className="w-3.5 h-3.5 text-teal-400" />
-            <span className="text-xs font-semibold text-zinc-300">Strategy Settings</span>
+            <Icon as={Briefcase} size="xs" className="text-teal-400" />
+            <span className="t-caption font-semibold text-[var(--zinc-300)]">Strategy Settings</span>
             {!settingsOpen && (
-              <span className="text-[11px] text-zinc-500">
+              <span className="t-caption-sm text-[var(--brand-text-muted)]">
                 {semrushMode !== 'none' ? `SEMRush: ${semrushMode}` : ''}
                 {maxPages > 0 ? `${semrushMode !== 'none' ? ' · ' : ''}${maxPages} pages max` : `${semrushMode !== 'none' ? ' · ' : ''}All pages`}
                 {businessContext ? ` · Context set` : ''}
@@ -340,7 +341,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
               </span>
             )}
           </div>
-          {settingsOpen ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-500" />}
+          <Icon as={settingsOpen ? ChevronDown : ChevronRight} size="xs" className="text-[var(--brand-text-muted)]" />
         </button>
         {settingsOpen && (
           <div className="px-4 pb-4 space-y-6">
@@ -348,8 +349,8 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             {providerList.filter(p => p.configured).length > 1 && (
               <div>
                 <div className="flex items-center gap-1.5 mb-2">
-                  <BarChart3 className="w-3.5 h-3.5 text-teal-400" />
-                  <span className="text-[11px] text-zinc-400 font-semibold uppercase tracking-wider">SEO Data Provider</span>
+                  <Icon as={BarChart3} size="xs" className="text-teal-400" />
+                  <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">SEO Data Provider</span>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   {providerList.filter(p => p.configured).map(p => (
@@ -359,20 +360,20 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                         setActiveProvider(p.name);
                         workspaces.update(workspaceId, { seoDataProvider: p.name }).catch(() => {});
                       }}
-                      className={`px-3 py-2 rounded-lg border text-xs font-medium transition-all ${
+                      className={`px-3 py-2 rounded-[var(--radius-lg)] border t-caption font-medium transition-all ${
                         (activeProvider || 'semrush') === p.name
                           ? 'border-teal-500/50 bg-teal-500/10 text-teal-300'
-                          : 'border-zinc-700 bg-zinc-800 text-zinc-500 hover:text-zinc-300'
+                          : 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--zinc-300)]'
                       }`}
                     >
                       <div className="font-semibold capitalize">{p.name === 'dataforseo' ? 'DataForSEO' : 'SEMRush'}</div>
-                      <div className="text-[10px] mt-0.5 opacity-70">
+                      <div className="t-micro mt-0.5 opacity-70">
                         {p.name === 'dataforseo' ? 'Pay-as-you-go' : 'Subscription'}
                       </div>
                     </button>
                   ))}
                 </div>
-                <p className="text-[11px] text-zinc-500 mt-1.5">
+                <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1.5">
                   {(activeProvider || 'semrush') === 'dataforseo'
                     ? 'DataForSEO: pay-per-call pricing (~$0.01-0.08/call). Uses same cache layer.'
                     : 'SEMRush: subscription-based. Traditional keyword intelligence provider.'}
@@ -384,22 +385,22 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             {semrushAvailable && (
               <div>
                 <div className="flex items-center gap-1.5 mb-2">
-                  <BarChart3 className="w-3.5 h-3.5 text-orange-400" />
-                  <span className="text-[11px] text-zinc-400 font-semibold uppercase tracking-wider">SEMRush Data Mode</span>
+                  <Icon as={BarChart3} size="xs" className="text-orange-400" />
+                  <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">SEMRush Data Mode</span>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   {(['none', 'quick', 'full'] as const).map(mode => (
                     <button
                       key={mode}
                       onClick={() => setSemrushMode(mode)}
-                      className={`px-3 py-2 rounded-lg border text-xs font-medium transition-all ${
+                      className={`px-3 py-2 rounded-[var(--radius-lg)] border t-caption font-medium transition-all ${
                         semrushMode === mode
                           ? 'border-orange-500/50 bg-orange-500/10 text-orange-300'
-                          : 'border-zinc-700 bg-zinc-800 text-zinc-500 hover:text-zinc-300'
+                          : 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--zinc-300)]'
                       }`}
                     >
                       <div className="font-semibold capitalize">{mode === 'none' ? 'Off' : mode}</div>
-                      <div className="text-[11px] mt-0.5 opacity-70">
+                      <div className="t-caption-sm mt-0.5 opacity-70">
                         {mode === 'none' && 'AI + GSC only'}
                         {mode === 'quick' && '~500 credits'}
                         {mode === 'full' && '~7,500 credits'}
@@ -407,7 +408,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                     </button>
                   ))}
                 </div>
-                <p className="text-[11px] text-zinc-500 mt-1.5">
+                <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1.5">
                   {semrushMode === 'quick' && 'Enriches keywords with real search volume + difficulty scores from SEMRush.'}
                   {semrushMode === 'full' && 'Full competitive analysis: domain keywords, competitor gaps, related keywords, volume + difficulty.'}
                   {semrushMode === 'none' && 'Uses AI + Google Search Console data only. No SEMRush API credits used.'}
@@ -420,8 +421,8 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5 text-orange-400" />
-                    <span className="text-[11px] text-zinc-400 font-semibold uppercase tracking-wider">Competitor Domains</span>
+                    <Icon as={Users} size="xs" className="text-orange-400" />
+                    <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">Competitor Domains</span>
                   </div>
                   <button
                     onClick={async () => {
@@ -437,9 +438,9 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                       setDiscoveringCompetitors(false);
                     }}
                     disabled={discoveringCompetitors}
-                    className="flex items-center gap-1 px-2 py-0.5 rounded bg-orange-500/10 border border-orange-500/20 text-[10px] text-orange-400 font-medium hover:bg-orange-500/20 transition-all disabled:opacity-50"
+                    className="flex items-center gap-1 px-2 py-0.5 rounded bg-orange-500/10 border border-orange-500/20 t-micro text-orange-400 font-medium hover:bg-orange-500/20 transition-all disabled:opacity-50"
                   >
-                    {discoveringCompetitors ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
+                    {discoveringCompetitors ? <Icon as={Loader2} size="xs" className="animate-spin" /> : <Icon as={Search} size="xs" className="text-orange-400" />}
                     {discoveringCompetitors ? 'Discovering...' : 'Auto-Discover'}
                   </button>
                 </div>
@@ -448,31 +449,31 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                   value={competitors}
                   onChange={e => setCompetitors(e.target.value)}
                   placeholder="e.g. competitor1.com, competitor2.com"
-                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-orange-500"
+                  className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-orange-500"
                 />
-                <p className="text-[11px] text-zinc-500 mt-1">Comma-separated (max 5). Auto-discover uses SEMRush to find your organic competitors. These persist between strategy runs.</p>
+                <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">Comma-separated (max 5). Auto-discover uses SEMRush to find your organic competitors. These persist between strategy runs.</p>
               </div>
             )}
 
             {/* Page Limit */}
             <div>
               <div className="flex items-center gap-1.5 mb-2">
-                <FileText className="w-3.5 h-3.5 text-teal-400" />
-                <span className="text-[11px] text-zinc-400 font-semibold uppercase tracking-wider">Page Limit</span>
+                <Icon as={FileText} size="xs" className="text-teal-400" />
+                <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">Page Limit</span>
               </div>
               <div className="grid grid-cols-4 gap-3">
                 {([200, 500, 1000, 0] as const).map(cap => (
                   <button
                     key={cap}
                     onClick={() => setMaxPages(cap)}
-                    className={`px-3 py-2 rounded-lg border text-xs font-medium transition-all ${
+                    className={`px-3 py-2 rounded-[var(--radius-lg)] border t-caption font-medium transition-all ${
                       maxPages === cap
                         ? 'border-teal-500/50 bg-teal-500/10 text-teal-300'
-                        : 'border-zinc-700 bg-zinc-800 text-zinc-500 hover:text-zinc-300'
+                        : 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--zinc-300)]'
                     }`}
                   >
                     <div className="font-semibold">{cap === 0 ? 'All' : cap}</div>
-                    <div className="text-[11px] mt-0.5 opacity-70">
+                    <div className="t-caption-sm mt-0.5 opacity-70">
                       {cap === 200 && '~2-3 min'}
                       {cap === 500 && '~5-7 min'}
                       {cap === 1000 && '~10-15 min'}
@@ -481,7 +482,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                   </button>
                 ))}
               </div>
-              <p className="text-[11px] text-zinc-500 mt-1.5">
+              <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1.5">
                 {maxPages === 0
                   ? 'Processes every page on the site. May be slow for 500+ page sites.'
                   : `Prioritizes the top ${maxPages} pages by importance (homepage, key service pages, pages with metadata). Skips utility pages.`}
@@ -494,9 +495,9 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                 onClick={() => setContextOpen(!contextOpen)}
                 className="flex items-center gap-1.5 mb-1"
               >
-                <Briefcase className="w-3.5 h-3.5 text-teal-400" />
-                <span className="text-[11px] text-zinc-400 font-semibold uppercase tracking-wider">Business Context</span>
-                {contextOpen ? <ChevronDown className="w-3 h-3 text-zinc-500" /> : <ChevronRight className="w-3 h-3 text-zinc-500" />}
+                <Icon as={Briefcase} size="xs" className="text-teal-400" />
+                <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">Business Context</span>
+                <Icon as={contextOpen ? ChevronDown : ChevronRight} size="xs" className="text-[var(--brand-text-muted)]" />
               </button>
               {contextOpen && (
                 <div className="space-y-1.5">
@@ -505,9 +506,9 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                     onChange={e => setBusinessContext(e.target.value)}
                     placeholder={`Example: We are a dental practice in Austin, TX. We offer general, cosmetic, and pediatric dentistry. Target audience: families 25-55. Competitors: Aspen Dental, local practices.`}
                     rows={3}
-                    className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-teal-500 resize-y"
+                    className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-y"
                   />
-                  <p className="text-[11px] text-zinc-500">Saved with your strategy. Include: locations, services, audience, differentiators.</p>
+                  <p className="t-caption-sm text-[var(--brand-text-muted)]">Saved with your strategy. Include: locations, services, audience, differentiators.</p>
                 </div>
               )}
             </div>
@@ -551,10 +552,11 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       )}
 
       {!isRealStrategy && !generating && (
-        <div className="bg-zinc-900 border border-zinc-800 px-6 py-12 text-center" style={{ borderRadius: '10px 24px 10px 24px' }}>
-          <Target className="w-10 h-10 text-zinc-500 mx-auto mb-3" />
-          <p className="text-sm text-zinc-400 mb-1">No keyword strategy yet</p>
-          <p className="text-[11px] text-zinc-500 max-w-md mx-auto">
+        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] px-6 py-12 text-center rounded-[var(--radius-signature-lg)]">
+          {/* pr-check-disable-next-line — empty state container uses signature-lg radius */}
+          <Icon as={Target} size="xl" className="text-[var(--brand-text-muted)] mx-auto mb-3" />
+          <p className="t-ui text-[var(--brand-text)] mb-1">No keyword strategy yet</p>
+          <p className="t-caption-sm text-[var(--brand-text-muted)] max-w-md mx-auto">
             Generate an AI-powered keyword strategy based on your site's pages and Google Search Console data.
             This will map target keywords to each page and guide all future AI rewrites.
           </p>
@@ -565,9 +567,9 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         <>
           {/* ── Unvalidated Strategy Warning ── */}
           {!(strategy.pageMap ?? []).some((p: PageKeywordMap) => p.volume && p.volume > 0) && (
-            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3 flex items-start gap-2.5">
-              <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-              <div className="text-xs text-amber-300/90 leading-relaxed">
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-[var(--radius-lg)] px-4 py-3 flex items-start gap-2.5">
+              <Icon as={AlertTriangle} size="sm" className="text-amber-400 flex-shrink-0 mt-0.5" />
+              <div className="t-caption text-amber-300/90 leading-relaxed">
                 <strong className="text-amber-300">This strategy was generated without keyword volume validation.</strong>{' '}
                 Keywords, volume, and difficulty data may not reflect real search demand. Enable SEMRush integration for validated keyword recommendations.
               </div>
@@ -584,31 +586,32 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
 
           {/* ── Performance Tiers Bar ── */}
           {ranked.length > 0 && (
-            <div className="bg-zinc-900 border border-zinc-800 p-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
+            <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 rounded-[var(--radius-signature-lg)]">
+              {/* pr-check-disable-next-line — ranking distribution card uses signature-lg radius */}
               <div className="flex items-center justify-between mb-2">
-                <h4 className="text-xs font-semibold text-zinc-300">Ranking Distribution</h4>
-                <span className="text-[11px] text-zinc-500">{ranked.length} of {filteredPageMap.length} pages with ranking data</span>
+                <h4 className="t-caption font-semibold text-[var(--zinc-300)]">Ranking Distribution</h4>
+                <span className="t-caption-sm text-[var(--brand-text-muted)]">{ranked.length} of {filteredPageMap.length} pages with ranking data</span>
               </div>
-              <div className="flex h-4 rounded-full overflow-hidden bg-zinc-800">
+              <div className="flex h-4 rounded-full overflow-hidden bg-[var(--surface-3)]">
                 {top3.length > 0 && <div className="bg-emerald-500 h-full transition-all" style={{ width: `${(top3.length / filteredPageMap.length) * 100}%` }} />}
                 {top10.length > 0 && <div className="bg-teal-500 h-full transition-all" style={{ width: `${(top10.length / filteredPageMap.length) * 100}%` }} />}
                 {top20.length > 0 && <div className="bg-amber-500 h-full transition-all" style={{ width: `${(top20.length / filteredPageMap.length) * 100}%` }} />}
                 {beyond20.length > 0 && <div className="bg-red-500/60 h-full transition-all" style={{ width: `${(beyond20.length / filteredPageMap.length) * 100}%` }} />}
-                {notRankingCount > 0 && <div className="bg-zinc-700 h-full transition-all" style={{ width: `${(notRankingCount / filteredPageMap.length) * 100}%` }} />}
+                {notRankingCount > 0 && <div className="bg-[var(--zinc-700)] h-full transition-all" style={{ width: `${(notRankingCount / filteredPageMap.length) * 100}%` }} />}
               </div>
               <div className="flex items-center gap-4 mt-2 flex-wrap">
-                <span className="flex items-center gap-1.5 text-[11px]"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" /> <span className="text-emerald-400 font-medium">{top3.length}</span> <span className="text-zinc-500">Top 3</span></span>
-                <span className="flex items-center gap-1.5 text-[11px]"><span className="w-2.5 h-2.5 rounded-full bg-teal-500 inline-block" /> <span className="text-teal-400 font-medium">{top10.length}</span> <span className="text-zinc-500">4–10</span></span>
-                <span className="flex items-center gap-1.5 text-[11px]"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" /> <span className="text-amber-400 font-medium">{top20.length}</span> <span className="text-zinc-500">11–20</span></span>
-                <span className="flex items-center gap-1.5 text-[11px]"><span className="w-2.5 h-2.5 rounded-full bg-red-500/60 inline-block" /> <span className="text-red-400 font-medium">{beyond20.length}</span> <span className="text-zinc-500">20+</span></span>
-                <span className="flex items-center gap-1.5 text-[11px]"><span className="w-2.5 h-2.5 rounded-full bg-zinc-700 inline-block" /> <span className="text-zinc-500 font-medium">{notRankingCount}</span> <span className="text-zinc-500">Not ranking</span></span>
+                <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" /> <span className="text-emerald-400 font-medium">{top3.length}</span> <span className="text-[var(--brand-text-muted)]">Top 3</span></span>
+                <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-full bg-teal-500 inline-block" /> <span className="text-teal-400 font-medium">{top10.length}</span> <span className="text-[var(--brand-text-muted)]">4–10</span></span>
+                <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" /> <span className="text-amber-400 font-medium">{top20.length}</span> <span className="text-[var(--brand-text-muted)]">11–20</span></span>
+                <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-full bg-red-500/60 inline-block" /> <span className="text-red-400 font-medium">{beyond20.length}</span> <span className="text-[var(--brand-text-muted)]">20+</span></span>
+                <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-full bg-[var(--zinc-700)] inline-block" /> <span className="text-[var(--brand-text-muted)] font-medium">{notRankingCount}</span> <span className="text-[var(--brand-text-muted)]">Not ranking</span></span>
               </div>
               {Object.keys(intentCounts).length > 1 && (
-                <div className="mt-3 pt-3 border-t border-zinc-800">
-                  <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1.5">Search Intent Mix</div>
+                <div className="mt-3 pt-3 border-t border-[var(--brand-border)]">
+                  <div className="t-caption-sm text-[var(--brand-text-muted)] uppercase tracking-wider mb-1.5">Search Intent Mix</div>
                   <div className="flex items-center gap-2 flex-wrap">
                     {Object.entries(intentCounts).sort((a, b) => b[1] - a[1]).map(([intent, count]) => (
-                      <span key={intent} className={`text-[11px] px-2 py-0.5 rounded-full border font-medium ${intentColor(intent)}`}>
+                      <span key={intent} className={`t-caption-sm px-2 py-0.5 rounded-full border font-medium ${intentColor(intent)}`}>
                         {intent} ({count})
                       </span>
                     ))}
@@ -633,9 +636,9 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           <KeywordGaps keywordGaps={strategy.keywordGaps || []} difficultyColor={difficultyColor} />
 
           {/* ── Reference & Analysis ── */}
-          <div className="border-t border-zinc-800 my-6 flex items-center gap-3">
-            <span className="text-xs text-zinc-500 uppercase tracking-wide">Reference & Analysis</span>
-            <div className="flex-1 border-t border-zinc-800" />
+          <div className="border-t border-[var(--brand-border)] my-6 flex items-center gap-3">
+            <span className="t-caption text-[var(--brand-text-muted)] uppercase tracking-wide">Reference & Analysis</span>
+            <div className="flex-1 border-t border-[var(--brand-border)]" />
           </div>
 
           {/* ── Topical Authority ── */}
@@ -663,29 +666,30 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           />
 
           {/* ── Site Keywords ── */}
-          <div className="bg-zinc-900 border border-zinc-800 p-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
-            <h4 className="text-xs font-semibold text-zinc-300 mb-2 flex items-center gap-1.5">
-              <Target className="w-3.5 h-3.5 text-teal-400" /> Site Target Keywords
+          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 rounded-[var(--radius-signature-lg)]">
+            {/* pr-check-disable-next-line — site keywords card uses signature-lg radius */}
+            <h4 className="t-caption font-semibold text-[var(--zinc-300)] mb-2 flex items-center gap-1.5">
+              <Icon as={Target} size="xs" className="text-teal-400" /> Site Target Keywords
             </h4>
             <div className="flex flex-wrap gap-1.5">
               {strategy.siteKeywords.map((kw: string, i: number) => {
                 const metrics = strategy.siteKeywordMetrics?.find((m: { keyword: string; volume: number; difficulty: number }) => m.keyword.toLowerCase() === kw.toLowerCase());
                 const tracked = trackedKeywords.has(kw);
                 return (
-                  <span key={i} className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-teal-500/10 border border-teal-500/20 rounded text-[11px] text-teal-300">
+                  <span key={i} className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-teal-500/10 border border-teal-500/20 rounded t-caption-sm text-teal-300">
                     {kw}
                     {metrics && (metrics.volume > 0 || metrics.difficulty > 0) && (
                       <>
-                        {metrics.volume > 0 && <span className="text-[11px] text-zinc-500 font-mono">{metrics.volume.toLocaleString()}/mo</span>}
-                        {metrics.difficulty > 0 && <span className={`text-[11px] font-mono ${difficultyColor(metrics.difficulty)}`}>KD {metrics.difficulty}%</span>}
+                        {metrics.volume > 0 && <span className="t-caption-sm text-[var(--brand-text-muted)] font-mono">{metrics.volume.toLocaleString()}/mo</span>}
+                        {metrics.difficulty > 0 && <span className={`t-caption-sm font-mono ${difficultyColor(metrics.difficulty)}`}>KD {metrics.difficulty}%</span>}
                       </>
                     )}
                     <button
                       onClick={() => trackKeyword(kw)}
                       title={tracked ? 'Tracking' : 'Track in Rank Tracker'}
-                      className={`ml-0.5 transition-colors ${tracked ? 'text-emerald-400' : 'text-zinc-500 hover:text-teal-400'}`}
+                      className={`ml-0.5 transition-colors ${tracked ? 'text-emerald-400' : 'text-[var(--brand-text-muted)] hover:text-teal-400'}`}
                     >
-                      {tracked ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+                      {tracked ? <Icon as={Check} size="xs" className="text-emerald-400" /> : <Icon as={Plus} size="xs" />}
                     </button>
                   </span>
                 );
@@ -695,17 +699,18 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
 
           {/* ── Opportunities ── */}
           {strategy.opportunities.length > 0 && (
-            <div className="bg-zinc-900 border border-zinc-800 p-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
-              <h4 className="text-xs font-semibold text-zinc-300 mb-2 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-teal-400" /> Keyword Opportunities
+            <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 rounded-[var(--radius-signature-lg)]">
+              {/* pr-check-disable-next-line — opportunities card uses signature-lg radius */}
+              <h4 className="t-caption font-semibold text-[var(--zinc-300)] mb-2 flex items-center gap-1.5">
+                <Icon as={Sparkles} size="xs" className="text-teal-400" /> Keyword Opportunities
               </h4>
-              <p className="text-zinc-500 text-[10px] mb-2">
+              <p className="text-[var(--brand-text-muted)] t-micro mb-2">
                 These opportunities are AI-generated suggestions based on your site's content and competitive landscape. Validate with keyword research before acting.
               </p>
               <div className="space-y-1.5">
                 {strategy.opportunities.map((opp: string, i: number) => (
-                  <div key={i} className="flex items-start gap-2 text-[11px] text-zinc-400">
-                    <span className="w-4 h-4 rounded-full bg-teal-500/10 border border-teal-500/20 flex items-center justify-center flex-shrink-0 mt-0.5 text-[11px] text-teal-400 font-bold">{i + 1}</span>
+                  <div key={i} className="flex items-start gap-2 t-caption-sm text-[var(--brand-text)]">
+                    <span className="w-4 h-4 rounded-full bg-teal-500/10 border border-teal-500/20 flex items-center justify-center flex-shrink-0 mt-0.5 t-caption-sm text-teal-400 font-bold">{i + 1}</span>
                     {opp}
                   </div>
                 ))}
@@ -714,11 +719,11 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           )}
 
           {/* How it works */}
-          <div className="bg-zinc-800/30 rounded-lg border border-zinc-800 px-4 py-3">
+          <div className="bg-[var(--surface-3)]/30 rounded-[var(--radius-lg)] border border-[var(--brand-border)] px-4 py-3">
             <div className="flex items-start gap-2">
-              <Sparkles className="w-3.5 h-3.5 text-teal-400 mt-0.5 flex-shrink-0" />
-              <div className="text-[11px] text-zinc-500">
-                <strong className="text-zinc-400">How it works:</strong> This strategy is automatically used when you generate AI rewrites
+              <Icon as={Sparkles} size="xs" className="text-teal-400 mt-0.5 flex-shrink-0" />
+              <div className="t-caption-sm text-[var(--brand-text-muted)]">
+                <strong className="text-[var(--brand-text)]">How it works:</strong> This strategy is automatically used when you generate AI rewrites
                 in the Edit SEO and CMS SEO tabs. The AI will incorporate your target keywords naturally into titles and descriptions.
                 Use <strong className="text-teal-400">Page Intelligence</strong> to analyze individual pages, edit keywords, and generate SEO copy.
                 {strategy.semrushMode && strategy.semrushMode !== 'none' && (
