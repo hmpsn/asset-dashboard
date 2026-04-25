@@ -82,7 +82,10 @@ export default defineConfig(async () => ({
     environment: 'jsdom',
     globalSetup: ['tests/global-setup.ts'],
     setupFiles: ['tests/db-setup.ts', 'tests/component/setup.ts'],
-    include: ['tests/**/*.test.{ts,tsx}', 'server/__tests__/**/*.test.ts'],
+    include: [
+      'tests/**/*.test.{ts,tsx}',
+      'server/__tests__/**/*.test.ts',
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'text-summary', 'lcov'],
