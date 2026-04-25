@@ -299,8 +299,9 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
       {/* ── 6. Two-column layout — table left, sidebar right ── */}
       <div className="flex flex-col lg:flex-row lg:items-start gap-3">
         {/* Left: Top Pages — height matches sidebar via ref measurement */}
+        {/* pr-check-disable-next-line -- brand asymmetric signature on TrafficDetail top-pages card; non-SectionCard chrome */}
         <div
-          className="bg-[var(--surface-2)] border border-[var(--brand-border)] flex flex-col overflow-hidden min-w-0 lg:flex-[2] rounded-[var(--radius-lg)]"
+          className="bg-[var(--surface-2)] border border-[var(--brand-border)] flex flex-col overflow-hidden min-w-0 lg:flex-[2] rounded-[var(--radius-signature-lg)]"
           style={{ maxHeight: sidebarHeight > 0 ? `${sidebarHeight}px` : undefined }}
         >
           <div className="flex items-center px-4 py-3 border-b border-[var(--brand-border)] shrink-0">
@@ -451,7 +452,8 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
                 <div className="text-xs text-[var(--brand-text-muted)] font-medium mb-2 flex items-center gap-1.5">
                   <Icon as={ArrowRight} size="sm" className="text-teal-400" /> Top Landing Pages
                 </div>
-                <div className="border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-lg)]">
+                {/* pr-check-disable-next-line -- brand asymmetric signature on TrafficDetail landing-pages table card; non-SectionCard chrome */}
+                <div className="border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-[var(--brand-border)] bg-[var(--surface-2)]/50">

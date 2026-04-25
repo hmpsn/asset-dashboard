@@ -90,7 +90,8 @@ function TrendsChart({ data, keywords }: { data: HistoryPoint[]; keywords: strin
     { idx: data.length - 1, date: data[data.length - 1].date },
   ];
   return (
-    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 rounded-[var(--radius-lg)]">
+    // pr-check-disable-next-line -- brand asymmetric signature on RankTracker trends-chart card; non-SectionCard chrome
+    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 rounded-[var(--radius-signature-lg)]">
       <div className="flex items-center justify-between mb-3">
         <h4 className="text-xs font-semibold text-[var(--brand-text-bright)]">Position History — Pinned Keywords</h4>
         <span className="t-caption-sm text-[var(--brand-text-dim)]">{data.length} snapshots · lower is better</span>
@@ -369,7 +370,8 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
 
       {/* Rankings table */}
       {sorted.length > 0 ? (
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-lg)]">
+        // pr-check-disable-next-line -- brand asymmetric signature on RankTracker rank-table card; non-SectionCard chrome
+        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
           <div className="grid grid-cols-[1fr,80px,80px,80px,80px,60px] gap-2 px-4 py-2 t-caption font-medium text-[var(--brand-text-muted)] uppercase tracking-wider border-b border-[var(--brand-border)]">
             <span>Keyword</span>
             <span className="text-right">Position</span>
@@ -390,7 +392,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
                     <button onClick={(e) => { e.stopPropagation(); togglePin(rank.query); }} className={cn('flex-shrink-0', rank.pinned ? 'text-amber-400' : 'text-[var(--brand-border-hover)] hover:text-[var(--brand-text)]')} aria-label={rank.pinned ? 'Unpin keyword' : 'Pin keyword'}>
                       <Icon as={Pin} size="sm" />
                     </button>
-                    <Icon as={ChevronDown} size="xs" className={cn('text-[var(--brand-text-dim)] flex-shrink-0 transition-transform', isExpanded && 'rotate-180')} />
+                    <Icon as={ChevronDown} size="sm" className={cn('text-[var(--brand-text-dim)] flex-shrink-0 transition-transform', isExpanded && 'rotate-180')} />
                     <span className="text-xs text-[var(--brand-text-bright)] truncate">{rank.query}</span>
                   </div>
                   <div className="text-right">

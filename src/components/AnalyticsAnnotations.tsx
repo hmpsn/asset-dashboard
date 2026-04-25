@@ -88,7 +88,8 @@ export function AnalyticsAnnotations({ workspaceId }: { workspaceId: string }) {
       <p className="t-caption text-[var(--brand-text-muted)]">Track key events — algorithm updates, site launches, and campaigns — as markers on your timeline.</p>
 
       {/* Create form */}
-      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 space-y-3 rounded-[var(--radius-lg)]">
+      {/* pr-check-disable-next-line -- brand asymmetric signature on annotation create-form card; non-SectionCard chrome */}
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 space-y-3 rounded-[var(--radius-signature-lg)]">
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="t-caption text-[var(--brand-text-muted)] block mb-1">Date *</label>

@@ -249,8 +249,9 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
           {/* Step 5+6+7: Two-column layout — table left, sidebar right */}
           <div className="flex flex-col lg:flex-row lg:items-start gap-3">
             {/* Left: Data table — height matches sidebar via ref measurement */}
+            {/* pr-check-disable-next-line -- brand asymmetric signature on SearchDetail data-table card; non-SectionCard chrome */}
             <div
-              className="bg-[var(--surface-2)] border border-[var(--brand-border)] flex flex-col min-w-0 lg:flex-[2] overflow-hidden rounded-[var(--radius-lg)]"
+              className="bg-[var(--surface-2)] border border-[var(--brand-border)] flex flex-col min-w-0 lg:flex-[2] overflow-hidden rounded-[var(--radius-signature-lg)]"
               style={{ maxHeight: sidebarHeight > 0 ? `${sidebarHeight}px` : undefined }}
             >
               {/* Inline toggle header */}

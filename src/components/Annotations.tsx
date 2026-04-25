@@ -62,7 +62,8 @@ export function Annotations({ workspaceId }: { workspaceId: string }) {
       <p className="t-caption text-[var(--brand-text-muted)]">Add markers to track key events. Annotations appear on timeline charts in both the admin and client dashboards.</p>
 
       {/* Add annotation form */}
-      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 space-y-3 rounded-[var(--radius-lg)]">
+      {/* pr-check-disable-next-line -- brand asymmetric signature on annotation add-form card; non-SectionCard chrome */}
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 space-y-3 rounded-[var(--radius-signature-lg)]">
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="t-caption text-[var(--brand-text-muted)] block mb-1">Date *</label>
