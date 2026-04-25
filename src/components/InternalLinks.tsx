@@ -4,9 +4,8 @@ import {
   Link, AlertCircle, ChevronDown, ChevronRight, ArrowUpRight,
   AlertTriangle, Copy, Check, LayoutList, List,
 } from 'lucide-react';
-import { PageHeader, StatCard } from './ui';
+import { PageHeader, StatCard, Icon, Button } from './ui';
 import { webflow } from '../api/seo';
-import { themeColor } from './ui/constants';
 
 interface LinkSuggestion {
   fromPage: string;
@@ -119,21 +118,18 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
   if (!data && !loading) {
     return (
       <div className="space-y-8">
-        <div className="bg-zinc-900 border border-zinc-800 px-6 py-12 text-center" style={{ borderRadius: '10px 24px 10px 24px' }}>
-          <Link className="w-10 h-10 text-zinc-500 mx-auto mb-3" />
-          <p className="text-sm text-zinc-400 mb-1">Internal Linking Suggestions</p>
-          <p className="text-[11px] text-zinc-500 max-w-md mx-auto mb-4">
+        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] px-6 py-12 text-center rounded-[var(--radius-signature-lg)]">
+          <Icon as={Link} size="xl" className="text-[var(--brand-text-muted)] mx-auto mb-3" />
+          <p className="text-sm text-[var(--brand-text)] mb-1">Internal Linking Suggestions</p>
+          <p className="text-[11px] text-[var(--brand-text-muted)] max-w-md mx-auto mb-4">
             Analyze your site's content and discover missing internal links.
             AI finds topically related pages that should link to each other to boost SEO and user navigation.
           </p>
-          <button
-            onClick={runAnalysis}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-medium mx-auto transition-colors"
-          >
-            <ArrowUpRight className="w-3.5 h-3.5" /> Analyze Internal Links
-          </button>
+          <Button variant="primary" onClick={runAnalysis} icon={ArrowUpRight} className="mx-auto">
+            Analyze Internal Links
+          </Button>
           {error && (
-            <div className="mt-4 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-2 text-xs text-red-400">
+            <div className="mt-4 bg-red-500/10 border border-red-500/30 rounded-[var(--radius-lg)] px-4 py-2 text-xs text-red-400">
               {error}
             </div>
           )}
@@ -146,8 +142,8 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-2">
         <Loader2 className="w-6 h-6 animate-spin text-teal-400" />
-        <span className="text-sm text-zinc-400">Analyzing page content & finding link opportunities...</span>
-        <span className="text-[11px] text-zinc-500">This fetches and reads every page — may take 30-60 seconds</span>
+        <span className="text-sm text-[var(--brand-text)]">Analyzing page content &amp; finding link opportunities...</span>
+        <span className="text-[11px] text-[var(--brand-text-muted)]">This fetches and reads every page — may take 30-60 seconds</span>
       </div>
     );
   }
@@ -161,9 +157,9 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
         title="Internal Linking Suggestions"
         subtitle={`Analyzed ${data.pageCount}${data.attemptedPageCount && data.attemptedPageCount !== data.pageCount ? `/${data.attemptedPageCount}` : ''} pages · ${data.existingLinkCount} existing internal links · ${data.suggestions.length} suggestions`}
         actions={
-          <button onClick={runAnalysis} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium transition-colors">
-            <RefreshCw className="w-3 h-3" /> Reanalyze
-          </button>
+          <Button variant="secondary" size="sm" icon={RefreshCw} onClick={runAnalysis} disabled={loading}>
+            Reanalyze
+          </Button>
         }
       />
 
@@ -172,30 +168,30 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
         <StatCard staggerIndex={0} size="hero" label="High Priority" value={counts.high} valueColor="text-red-400" />
         <StatCard staggerIndex={1} size="hero" label="Medium Priority" value={counts.medium} valueColor="text-amber-400" />
         <StatCard staggerIndex={2} size="hero" label="Low Priority" value={counts.low} valueColor="text-blue-400" />
-        <StatCard staggerIndex={3} size="hero" label="Orphan Pages" value={data.orphanCount || 0} valueColor={data.orphanCount ? 'text-orange-400' : 'text-zinc-400'} />
+        <StatCard staggerIndex={3} size="hero" label="Orphan Pages" value={data.orphanCount || 0} valueColor={data.orphanCount ? 'text-orange-400' : 'text-[var(--brand-text)]'} />
         <StatCard staggerIndex={4} size="hero" label="Avg Link Score" value={data.pageHealth?.length ? Math.round(data.pageHealth.reduce((s, p) => s + p.score, 0) / data.pageHealth.length) : '—'} sub="/100" />
       </div>
 
       {/* Orphan Pages Warning */}
       {data.orphanCount && data.orphanCount > 0 && (
-        <div className="bg-zinc-900 border border-orange-500/20 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
+        <div className="bg-[var(--surface-2)] border border-orange-500/20 overflow-hidden rounded-[var(--radius-signature-lg)]">
           <button
             onClick={() => setShowOrphans(!showOrphans)}
-            className="w-full px-4 py-3 flex items-center gap-2 hover:bg-zinc-800/30 transition-colors"
+            className="w-full px-4 py-3 flex items-center gap-2 hover:bg-[var(--surface-3)]/30 transition-colors"
           >
-            {showOrphans ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-500" />}
-            <AlertTriangle className="w-4 h-4 text-orange-400" />
+            {showOrphans ? <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronRight} size="sm" className="text-[var(--brand-text-muted)]" />}
+            <Icon as={AlertTriangle} size="md" className="text-orange-400" />
             <span className="text-sm font-medium text-orange-300 flex-1 text-left">{data.orphanCount} Orphan Pages</span>
-            <span className="text-[11px] text-zinc-500">No internal links point to these pages</span>
+            <span className="text-[11px] text-[var(--brand-text-muted)]">No internal links point to these pages</span>
           </button>
           {showOrphans && data.pageHealth && (
-            <div className="px-4 pb-3 border-t border-zinc-800 pt-2 space-y-1 max-h-[250px] overflow-y-auto">
+            <div className="px-4 pb-3 border-t border-[var(--brand-border)] pt-2 space-y-1 max-h-[250px] overflow-y-auto">
               {data.pageHealth.filter(p => p.isOrphan).map((p, i) => (
-                <div key={i} className="flex items-center gap-3 px-2 py-1.5 bg-zinc-950/50 rounded-lg text-xs">
-                  <span className="text-zinc-500 font-mono flex-1 truncate">{p.path}</span>
-                  <span className="text-zinc-400 truncate max-w-[200px]">{p.title}</span>
+                <div key={i} className="flex items-center gap-3 px-2 py-1.5 bg-[var(--surface-1)]/50 rounded-[var(--radius-lg)] text-xs">
+                  <span className="text-[var(--brand-text-muted)] font-mono flex-1 truncate">{p.path}</span>
+                  <span className="text-[var(--brand-text)] truncate max-w-[200px]">{p.title}</span>
                   <span className="text-orange-400">0 inbound</span>
-                  <span className="text-zinc-500">{p.outboundLinks} outbound</span>
+                  <span className="text-[var(--brand-text-muted)]">{p.outboundLinks} outbound</span>
                 </div>
               ))}
             </div>
@@ -215,42 +211,40 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
             <button
               key={f.id}
               onClick={() => setFilter(f.id)}
-              className="px-2.5 py-1 rounded text-[11px] font-medium transition-colors"
-              style={filter === f.id ? {
-                backgroundColor: 'rgba(45,212,191,0.1)',
-                color: '#2dd4bf',
-              } : {
-                color: themeColor('#71717a', '#94a3b8'),
-              }}
+              className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
+                filter === f.id
+                  ? 'bg-teal-500/10 text-teal-400'
+                  : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
+              }`}
             >
               {f.label}
             </button>
           ))}
         </div>
         <div className="flex-1 relative">
-          <SearchIcon className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+          <Icon as={SearchIcon} size="sm" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
           <input
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Filter by page or anchor text..."
-            className="w-full pl-7 pr-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
+            className="w-full pl-7 pr-3 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
           />
         </div>
-        <div className="flex items-center gap-0.5 bg-zinc-800 rounded-lg p-0.5">
-          <button onClick={() => setViewMode('list')} className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500'}`} title="List view">
-            <List className="w-3.5 h-3.5" />
+        <div className="flex items-center gap-0.5 bg-[var(--surface-3)] rounded-[var(--radius-lg)] p-0.5">
+          <button onClick={() => setViewMode('list')} className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-[var(--surface-2)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)]'}`} title="List view">
+            <Icon as={List} size="sm" />
           </button>
-          <button onClick={() => setViewMode('grouped')} className={`p-1.5 rounded ${viewMode === 'grouped' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500'}`} title="Group by page">
-            <LayoutList className="w-3.5 h-3.5" />
+          <button onClick={() => setViewMode('grouped')} className={`p-1.5 rounded ${viewMode === 'grouped' ? 'bg-[var(--surface-2)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)]'}`} title="Group by page">
+            <Icon as={LayoutList} size="sm" />
           </button>
         </div>
       </div>
 
       {/* Suggestions list */}
-      <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
         {filtered.length === 0 ? (
-          <div className="px-4 py-8 text-center text-xs text-zinc-500">
+          <div className="px-4 py-8 text-center text-xs text-[var(--brand-text-muted)]">
             No suggestions match your filter
           </div>
         ) : viewMode === 'grouped' ? (
@@ -263,29 +257,29 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
               groups.get(key)!.push(s);
             }
             return Array.from(groups.entries()).map(([fromPage, suggestions]) => (
-              <div key={fromPage} className="border-b border-zinc-800/50 last:border-b-0">
-                <div className="px-4 py-2.5 bg-zinc-800/30">
+              <div key={fromPage} className="border-b border-[var(--brand-border)]/50 last:border-b-0">
+                <div className="px-4 py-2.5 bg-[var(--surface-3)]/30">
                   <div className="flex items-center gap-2">
-                    <Link className="w-3.5 h-3.5 text-teal-400" />
-                    <span className="text-xs font-medium text-zinc-200">{suggestions[0].fromTitle}</span>
-                    <span className="text-[11px] text-zinc-500 font-mono">{fromPage}</span>
-                    <span className="text-[11px] text-zinc-500 ml-auto">{suggestions.length} links to add</span>
+                    <Icon as={Link} size="sm" className="text-teal-400" />
+                    <span className="text-xs font-medium text-[var(--brand-text-bright)]">{suggestions[0].fromTitle}</span>
+                    <span className="text-[11px] text-[var(--brand-text-muted)] font-mono">{fromPage}</span>
+                    <span className="text-[11px] text-[var(--brand-text-muted)] ml-auto">{suggestions.length} links to add</span>
                   </div>
                 </div>
                 {suggestions.map((s, i) => {
                   const cfg = priorityConfig[s.priority];
                   return (
-                    <div key={i} className="flex items-center gap-3 px-4 py-2 pl-10 hover:bg-zinc-800/20 transition-colors">
-                      <ArrowRight className="w-3 h-3 text-zinc-500 flex-shrink-0" />
-                      <span className="text-xs text-zinc-300 font-mono truncate max-w-[160px]">{s.toPage}</span>
+                    <div key={i} className="flex items-center gap-3 px-4 py-2 pl-10 hover:bg-[var(--surface-3)]/20 transition-colors">
+                      <Icon as={ArrowRight} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
+                      <span className="text-xs text-[var(--brand-text-bright)] font-mono truncate max-w-[160px]">{s.toPage}</span>
                       <span className="text-[11px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded truncate max-w-[180px]">"{s.anchorText}"</span>
                       <span className={`text-[11px] px-1.5 py-0.5 rounded border ${cfg.bg} ${cfg.color}`}>{cfg.label}</span>
                       <button
                         onClick={() => { navigator.clipboard.writeText(`<a href="${s.toPage}">${s.anchorText}</a>`); setCopied(i); setTimeout(() => setCopied(null), 2000); }}
-                        className="ml-auto text-zinc-500 hover:text-zinc-300 transition-colors"
+                        className="ml-auto text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"
                         title="Copy HTML link"
                       >
-                        {copied === i ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        {copied === i ? <Icon as={Check} size="sm" className="text-emerald-400" /> : <Icon as={Copy} size="sm" />}
                       </button>
                     </div>
                   );
@@ -299,16 +293,16 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
             const cfg = priorityConfig[s.priority];
 
             return (
-              <div key={idx} className="border-b border-zinc-800/50 last:border-b-0">
+              <div key={idx} className="border-b border-[var(--brand-border)]/50 last:border-b-0">
                 <button
                   onClick={() => toggleExpanded(idx)}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/20 transition-colors text-left"
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)]/20 transition-colors text-left"
                 >
-                  {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />}
+                  {isExpanded ? <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" /> : <Icon as={ChevronRight} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />}
                   <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <span className="text-xs text-zinc-300 font-mono truncate max-w-[140px]">{s.fromPage}</span>
-                    <ArrowRight className="w-3 h-3 text-zinc-500 flex-shrink-0" />
-                    <span className="text-xs text-zinc-300 font-mono truncate max-w-[140px]">{s.toPage}</span>
+                    <span className="text-xs text-[var(--brand-text-bright)] font-mono truncate max-w-[140px]">{s.fromPage}</span>
+                    <Icon as={ArrowRight} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
+                    <span className="text-xs text-[var(--brand-text-bright)] font-mono truncate max-w-[140px]">{s.toPage}</span>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <span className="text-[11px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded truncate max-w-[160px]">
@@ -319,10 +313,10 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
                     </span>
                     <button
                       onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(`<a href="${s.toPage}">${s.anchorText}</a>`); setCopied(idx); setTimeout(() => setCopied(null), 2000); }}
-                      className="text-zinc-500 hover:text-zinc-300 transition-colors"
+                      className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"
                       title="Copy HTML link"
                     >
-                      {copied === idx ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                      {copied === idx ? <Icon as={Check} size="sm" className="text-emerald-400" /> : <Icon as={Copy} size="sm" />}
                     </button>
                   </div>
                 </button>
@@ -330,25 +324,25 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
                   <div className="px-4 pb-3 pl-10 space-y-2">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">From Page</span>
-                        <p className="text-xs text-zinc-300 mt-0.5">{s.fromTitle}</p>
-                        <p className="text-[11px] text-zinc-500 font-mono">{s.fromPage}</p>
+                        <span className="text-[11px] text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">From Page</span>
+                        <p className="text-xs text-[var(--brand-text-bright)] mt-0.5">{s.fromTitle}</p>
+                        <p className="text-[11px] text-[var(--brand-text-muted)] font-mono">{s.fromPage}</p>
                       </div>
                       <div>
-                        <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Link To</span>
-                        <p className="text-xs text-zinc-300 mt-0.5">{s.toTitle}</p>
-                        <p className="text-[11px] text-zinc-500 font-mono">{s.toPage}</p>
+                        <span className="text-[11px] text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Link To</span>
+                        <p className="text-xs text-[var(--brand-text-bright)] mt-0.5">{s.toTitle}</p>
+                        <p className="text-[11px] text-[var(--brand-text-muted)] font-mono">{s.toPage}</p>
                       </div>
                     </div>
                     <div>
-                      <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Suggested Anchor Text</span>
+                      <span className="text-[11px] text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Suggested Anchor Text</span>
                       <p className="text-xs text-teal-300 mt-0.5 bg-teal-500/5 border border-teal-500/10 rounded px-2 py-1 inline-block">
                         {s.anchorText}
                       </p>
                     </div>
                     <div>
-                      <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Why This Link</span>
-                      <p className="text-[11px] text-zinc-400 mt-0.5">{s.reason}</p>
+                      <span className="text-[11px] text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Why This Link</span>
+                      <p className="text-[11px] text-[var(--brand-text)] mt-0.5">{s.reason}</p>
                     </div>
                   </div>
                 )}
@@ -360,12 +354,12 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
 
       {/* Tips */}
       {data.suggestions.length > 0 && (
-        <div className="bg-zinc-800/30 rounded-lg border border-zinc-800 px-4 py-3">
+        <div className="bg-[var(--surface-3)]/30 rounded-[var(--radius-lg)] border border-[var(--brand-border)] px-4 py-3">
           <div className="flex items-start gap-2">
-            <AlertCircle className="w-3.5 h-3.5 text-teal-400 mt-0.5 flex-shrink-0" />
-            <div className="text-[11px] text-zinc-500 space-y-1">
-              <p><strong className="text-zinc-400">How to implement:</strong> Open each page in the Webflow Designer and add links using the suggested anchor text. Place links naturally within the page's body content where they make contextual sense.</p>
-              <p><strong className="text-zinc-400">SEO impact:</strong> Internal links help search engines discover and understand page relationships. They also distribute page authority (PageRank) across your site, which can improve rankings for linked pages.</p>
+            <Icon as={AlertCircle} size="sm" className="text-teal-400 mt-0.5 flex-shrink-0" />
+            <div className="text-[11px] text-[var(--brand-text-muted)] space-y-1">
+              <p><strong className="text-[var(--brand-text)]">How to implement:</strong> Open each page in the Webflow Designer and add links using the suggested anchor text. Place links naturally within the page's body content where they make contextual sense.</p>
+              <p><strong className="text-[var(--brand-text)]">SEO impact:</strong> Internal links help search engines discover and understand page relationships. They also distribute page authority (PageRank) across your site, which can improve rankings for linked pages.</p>
               <p><strong className="text-teal-400">Tip:</strong> Use the <strong className="text-teal-400">SEO Editor</strong> from the sidebar to update page content directly, or run a <strong className="text-teal-400">Site Audit</strong> to validate the changes.</p>
             </div>
           </div>
@@ -373,8 +367,8 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
       )}
 
       {data.suggestions.length === 0 && data.attemptedPageCount && data.pageCount < data.attemptedPageCount * 0.5 ? (
-        <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg px-4 py-3 text-xs text-amber-400 flex items-center gap-2">
-          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+        <div className="bg-amber-500/5 border border-amber-500/20 rounded-[var(--radius-lg)] px-4 py-3 text-xs text-amber-400 flex items-center gap-2">
+          <Icon as={AlertTriangle} size="sm" className="flex-shrink-0" />
           <div>
             <strong>Content fetch issue:</strong> Only {data.pageCount} of {data.attemptedPageCount} pages could be loaded.
             {data.pageCount === 0
@@ -383,13 +377,13 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
           </div>
         </div>
       ) : data.suggestions.length === 0 && data.pageCount < 2 ? (
-        <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg px-4 py-3 text-xs text-amber-400 flex items-center gap-2">
-          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+        <div className="bg-amber-500/5 border border-amber-500/20 rounded-[var(--radius-lg)] px-4 py-3 text-xs text-amber-400 flex items-center gap-2">
+          <Icon as={AlertTriangle} size="sm" className="flex-shrink-0" />
           Not enough pages to analyze. At least 2 published pages with fetchable content are required.
         </div>
       ) : data.suggestions.length === 0 ? (
-        <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg px-4 py-3 text-xs text-emerald-400 flex items-center gap-2">
-          <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
+        <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-[var(--radius-lg)] px-4 py-3 text-xs text-emerald-400 flex items-center gap-2">
+          <Icon as={ExternalLink} size="sm" className="flex-shrink-0" />
           Your site has good internal linking coverage. No major gaps detected.
         </div>
       ) : null}

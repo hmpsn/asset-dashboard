@@ -4,7 +4,7 @@ import {
   Clock, FileText, Loader2, ChevronDown, ChevronRight, Users, Layers, TrendingUp, Search,
 } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } from 'recharts';
-import { PageHeader, SectionCard, EmptyState, Badge } from './ui';
+import { PageHeader, SectionCard, EmptyState, Badge, Icon } from './ui';
 import { contentPerformance } from '../api/seo';
 
 interface GscMetrics {
@@ -67,8 +67,8 @@ function TrendChart({ trend }: { trend: TrendPoint[] }) {
   return (
     <div className="mt-3">
       <div className="flex items-center gap-4 mb-2">
-        <span className="flex items-center gap-1 text-[10px] text-zinc-400"><span className="w-3 h-0.5 bg-blue-400 inline-block" /> Clicks</span>
-        <span className="flex items-center gap-1 text-[10px] text-zinc-400"><span className="w-3 h-0.5 bg-cyan-400 inline-block" /> Impressions</span>
+        <span className="flex items-center gap-1 text-[10px] text-[var(--brand-text)]"><span className="w-3 h-0.5 bg-blue-400 inline-block" /> Clicks</span>
+        <span className="flex items-center gap-1 text-[10px] text-[var(--brand-text)]"><span className="w-3 h-0.5 bg-cyan-400 inline-block" /> Impressions</span>
       </div>
       <ResponsiveContainer width="100%" height={120}>
         <LineChart data={trend} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
@@ -80,11 +80,11 @@ function TrendChart({ trend }: { trend: TrendPoint[] }) {
             const row = payload[0]?.payload as TrendPoint | undefined;
             if (!row) return null;
             return (
-              <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl shadow-black/40 min-w-[120px] overflow-hidden">
-                <div className="px-3 py-1.5 border-b border-zinc-800 text-[11px] font-semibold text-zinc-200">{row.date}</div>
+              <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl shadow-black/40 min-w-[120px] overflow-hidden">
+                <div className="px-3 py-1.5 border-b border-[var(--brand-border)] text-[11px] font-semibold text-[var(--brand-text-bright)]">{row.date}</div>
                 <div className="px-3 py-1.5 space-y-1">
-                  <div className="flex justify-between text-[11px]"><span className="text-blue-400">Clicks</span><span className="text-zinc-200 font-medium">{row.clicks.toLocaleString()}</span></div>
-                  <div className="flex justify-between text-[11px]"><span className="text-cyan-400">Impressions</span><span className="text-zinc-200 font-medium">{row.impressions.toLocaleString()}</span></div>
+                  <div className="flex justify-between text-[11px]"><span className="text-blue-400">Clicks</span><span className="text-[var(--brand-text-bright)] font-medium">{row.clicks.toLocaleString()}</span></div>
+                  <div className="flex justify-between text-[11px]"><span className="text-cyan-400">Impressions</span><span className="text-[var(--brand-text-bright)] font-medium">{row.impressions.toLocaleString()}</span></div>
                 </div>
               </div>
             );
@@ -93,7 +93,7 @@ function TrendChart({ trend }: { trend: TrendPoint[] }) {
           <Line yAxisId="clicks" type="monotone" dataKey="clicks" stroke="#60a5fa" strokeWidth={2} dot={false} />
         </LineChart>
       </ResponsiveContainer>
-      <div className="flex justify-between text-[10px] text-zinc-600 mt-1">
+      <div className="flex justify-between text-[10px] text-[var(--brand-text-dim)] mt-1">
         <span>{trend[0].date}</span>
         <span>{trend[trend.length - 1].date}</span>
       </div>
@@ -168,7 +168,7 @@ export function ContentPerformance({ workspaceId }: Props) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-6 h-6 text-zinc-500 animate-spin" />
+        <Loader2 className="w-6 h-6 text-[var(--brand-text-muted)] animate-spin" />
       </div>
     );
   }
@@ -182,7 +182,7 @@ export function ContentPerformance({ workspaceId }: Props) {
       />
 
       {error && (
-        <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">{error}</div>
+        <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-[var(--radius-lg)] px-4 py-3">{error}</div>
       )}
 
       {items.length === 0 && !error ? (
@@ -195,47 +195,47 @@ export function ContentPerformance({ workspaceId }: Props) {
         <>
           {/* Summary cards */}
           <div className="grid grid-cols-4 gap-3">
-            <div className="bg-zinc-900 border border-zinc-800 px-4 py-3" style={{ borderRadius: '6px 12px 6px 12px' }}>
+            <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] px-4 py-3 rounded-[var(--radius-signature)]">
               <div className="flex items-center gap-2 mb-1">
-                <MousePointer className="w-3.5 h-3.5 text-blue-400" />
-                <span className="text-[11px] text-zinc-500 uppercase tracking-wider">Total Clicks</span>
+                <Icon as={MousePointer} size="sm" className="text-blue-400" />
+                <span className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider">Total Clicks</span>
               </div>
-              <p className="text-xl font-semibold text-zinc-100">{totalClicks.toLocaleString()}</p>
+              <p className="text-xl font-semibold text-[var(--brand-text-bright)]">{totalClicks.toLocaleString()}</p>
             </div>
-            <div className="bg-zinc-900 border border-zinc-800 px-4 py-3" style={{ borderRadius: '6px 12px 6px 12px' }}>
+            <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] px-4 py-3 rounded-[var(--radius-signature)]">
               <div className="flex items-center gap-2 mb-1">
-                <Eye className="w-3.5 h-3.5 text-cyan-400" />
-                <span className="text-[11px] text-zinc-500 uppercase tracking-wider">Impressions</span>
+                <Icon as={Eye} size="sm" className="text-cyan-400" />
+                <span className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider">Impressions</span>
               </div>
-              <p className="text-xl font-semibold text-zinc-100">{totalImpressions.toLocaleString()}</p>
+              <p className="text-xl font-semibold text-[var(--brand-text-bright)]">{totalImpressions.toLocaleString()}</p>
             </div>
-            <div className="bg-zinc-900 border border-zinc-800 px-4 py-3" style={{ borderRadius: '6px 12px 6px 12px' }}>
+            <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] px-4 py-3 rounded-[var(--radius-signature)]">
               <div className="flex items-center gap-2 mb-1">
-                <Users className="w-3.5 h-3.5 text-teal-400" />
-                <span className="text-[11px] text-zinc-500 uppercase tracking-wider">Sessions</span>
+                <Icon as={Users} size="sm" className="text-teal-400" />
+                <span className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider">Sessions</span>
               </div>
-              <p className="text-xl font-semibold text-zinc-100">{totalSessions.toLocaleString()}</p>
+              <p className="text-xl font-semibold text-[var(--brand-text-bright)]">{totalSessions.toLocaleString()}</p>
             </div>
-            <div className="bg-zinc-900 border border-zinc-800 px-4 py-3" style={{ borderRadius: '6px 12px 6px 12px' }}>
+            <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] px-4 py-3 rounded-[var(--radius-signature)]">
               <div className="flex items-center gap-2 mb-1">
-                <Target className="w-3.5 h-3.5 text-amber-400" />
-                <span className="text-[11px] text-zinc-500 uppercase tracking-wider">Avg Position</span>
+                <Icon as={Target} size="sm" className="text-amber-400" />
+                <span className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider">Avg Position</span>
               </div>
-              <p className="text-xl font-semibold text-zinc-100">{avgPosition > 0 ? avgPosition.toFixed(1) : '—'}</p>
+              <p className="text-xl font-semibold text-[var(--brand-text-bright)]">{avgPosition > 0 ? avgPosition.toFixed(1) : '—'}</p>
             </div>
           </div>
 
           {/* Sort controls */}
           <div className="flex items-center gap-2">
-            <span className="text-[11px] text-zinc-500">Sort by:</span>
+            <span className="text-[11px] text-[var(--brand-text-muted)]">Sort by:</span>
             {(['clicks', 'impressions', 'sessions', 'days'] as const).map(key => (
               <button
                 key={key}
                 onClick={() => setSortKey(key)}
                 className={`px-2.5 py-1 rounded text-[11px] transition-colors ${
                   sortKey === key
-                    ? 'bg-zinc-700 text-zinc-200'
-                    : 'text-zinc-500 hover:text-zinc-300'
+                    ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]'
+                    : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
                 }`}
               >
                 {key === 'days' ? 'Age' : key.charAt(0).toUpperCase() + key.slice(1)}
@@ -254,17 +254,17 @@ export function ContentPerformance({ workspaceId }: Props) {
                   {/* Row header */}
                   <button
                     onClick={() => toggleExpand(item.requestId)}
-                    className="w-full flex items-center gap-4 px-4 py-3 hover:bg-zinc-800/30 transition-colors text-left"
+                    className="w-full flex items-center gap-4 px-4 py-3 hover:bg-[var(--surface-3)]/30 transition-colors text-left"
                   >
                     {isExpanded
-                      ? <ChevronDown className="w-4 h-4 text-zinc-500 flex-shrink-0" />
-                      : <ChevronRight className="w-4 h-4 text-zinc-500 flex-shrink-0" />
+                      ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
+                      : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
                     }
 
                     {/* Title + keyword + badges */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-zinc-200 truncate">{item.topic}</span>
+                        <span className="text-sm font-medium text-[var(--brand-text-bright)] truncate">{item.topic}</span>
                         {ptColor && (
                           <span className={`text-[10px] px-1.5 py-0.5 rounded border ${ptColor}`}>
                             {item.pageType}
@@ -273,14 +273,14 @@ export function ContentPerformance({ workspaceId }: Props) {
                         <Badge label={item.status} color={item.status === 'published' ? 'emerald' : 'blue'} />
                         {item.source === 'matrix' && (
                           <span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/20">
-                            <Layers className="w-2.5 h-2.5" /> Content Plan
+                            <Icon as={Layers} size="xs" /> Content Plan
                           </span>
                         )}
                       </div>
                       <div className="flex items-center gap-3 mt-0.5">
-                        <span className="text-[11px] text-zinc-500">{item.targetKeyword}</span>
+                        <span className="text-[11px] text-[var(--brand-text-muted)]">{item.targetKeyword}</span>
                         {item.targetPageSlug && (
-                          <span className="text-[11px] text-zinc-600">{item.targetPageSlug}</span>
+                          <span className="text-[11px] text-[var(--brand-text-dim)]">{item.targetPageSlug}</span>
                         )}
                       </div>
                     </div>
@@ -290,27 +290,27 @@ export function ContentPerformance({ workspaceId }: Props) {
                       {item.gsc ? (
                         <>
                           <div className="text-right">
-                            <p className="text-xs font-medium text-zinc-200">{item.gsc.clicks.toLocaleString()}</p>
-                            <p className="text-[10px] text-zinc-500">clicks</p>
+                            <p className="text-xs font-medium text-[var(--brand-text-bright)]">{item.gsc.clicks.toLocaleString()}</p>
+                            <p className="text-[10px] text-[var(--brand-text-muted)]">clicks</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-xs font-medium text-zinc-200">{item.gsc.impressions.toLocaleString()}</p>
-                            <p className="text-[10px] text-zinc-500">impressions</p>
+                            <p className="text-xs font-medium text-[var(--brand-text-bright)]">{item.gsc.impressions.toLocaleString()}</p>
+                            <p className="text-[10px] text-[var(--brand-text-muted)]">impressions</p>
                           </div>
                           <div className="text-right">
-                            <p className={`text-xs font-medium ${item.gsc.position <= 10 ? 'text-emerald-400' : item.gsc.position <= 20 ? 'text-amber-400' : 'text-zinc-400'}`}>
+                            <p className={`text-xs font-medium ${item.gsc.position <= 10 ? 'text-emerald-400' : item.gsc.position <= 20 ? 'text-amber-400' : 'text-[var(--brand-text)]'}`}>
                               #{item.gsc.position.toFixed(1)}
                             </p>
-                            <p className="text-[10px] text-zinc-500">position</p>
+                            <p className="text-[10px] text-[var(--brand-text-muted)]">position</p>
                           </div>
                         </>
                       ) : (
-                        <span className="text-[11px] text-zinc-600">No GSC data</span>
+                        <span className="text-[11px] text-[var(--brand-text-dim)]">No GSC data</span>
                       )}
 
-                      <div className="text-right pl-3 border-l border-zinc-800">
-                        <div className="flex items-center gap-1 text-[11px] text-zinc-500">
-                          <Clock className="w-3 h-3" />
+                      <div className="text-right pl-3 border-l border-[var(--brand-border)]">
+                        <div className="flex items-center gap-1 text-[11px] text-[var(--brand-text-muted)]">
+                          <Icon as={Clock} size="sm" />
                           {item.daysSincePublish}d
                         </div>
                       </div>
@@ -328,32 +328,32 @@ export function ContentPerformance({ workspaceId }: Props) {
 
                   {/* Expanded detail */}
                   {isExpanded && (
-                    <div className="px-4 pb-4 pt-1 border-t border-zinc-800/50">
+                    <div className="px-4 pb-4 pt-1 border-t border-[var(--brand-border)]/50">
                       <div className="grid grid-cols-2 gap-4 mt-3">
                         {/* GSC detail */}
-                        <div className="bg-zinc-800/30 rounded-lg p-3">
-                          <h4 className="text-[11px] text-zinc-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                            <MousePointer className="w-3 h-3" /> Search Performance (90d)
+                        <div className="bg-[var(--surface-3)]/30 rounded-[var(--radius-lg)] p-3">
+                          <h4 className="text-[11px] text-[var(--brand-text)] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                            <Icon as={MousePointer} size="sm" /> Search Performance (90d)
                           </h4>
                           {item.gsc ? (
                             <div className="grid grid-cols-2 gap-3">
                               <div>
-                                <p className="text-lg font-semibold text-zinc-100">{item.gsc.clicks.toLocaleString()}</p>
-                                <p className="text-[10px] text-zinc-500">Clicks</p>
+                                <p className="text-lg font-semibold text-[var(--brand-text-bright)]">{item.gsc.clicks.toLocaleString()}</p>
+                                <p className="text-[10px] text-[var(--brand-text-muted)]">Clicks</p>
                               </div>
                               <div>
-                                <p className="text-lg font-semibold text-zinc-100">{item.gsc.impressions.toLocaleString()}</p>
-                                <p className="text-[10px] text-zinc-500">Impressions</p>
+                                <p className="text-lg font-semibold text-[var(--brand-text-bright)]">{item.gsc.impressions.toLocaleString()}</p>
+                                <p className="text-[10px] text-[var(--brand-text-muted)]">Impressions</p>
                               </div>
                               <div>
-                                <p className="text-lg font-semibold text-zinc-100">{item.gsc.ctr}%</p>
-                                <p className="text-[10px] text-zinc-500">CTR</p>
+                                <p className="text-lg font-semibold text-[var(--brand-text-bright)]">{item.gsc.ctr}%</p>
+                                <p className="text-[10px] text-[var(--brand-text-muted)]">CTR</p>
                               </div>
                               <div>
-                                <p className={`text-lg font-semibold ${item.gsc.position <= 10 ? 'text-emerald-400' : item.gsc.position <= 20 ? 'text-amber-400' : 'text-zinc-100'}`}>
+                                <p className={`text-lg font-semibold ${item.gsc.position <= 10 ? 'text-emerald-400' : item.gsc.position <= 20 ? 'text-amber-400' : 'text-[var(--brand-text-bright)]'}`}>
                                   #{item.gsc.position.toFixed(1)}
                                 </p>
-                                <p className="text-[10px] text-zinc-500">Avg Position</p>
+                                <p className="text-[10px] text-[var(--brand-text-muted)]">Avg Position</p>
                               </div>
                             </div>
                           ) : (
@@ -362,27 +362,27 @@ export function ContentPerformance({ workspaceId }: Props) {
                         </div>
 
                         {/* GA4 detail */}
-                        <div className="bg-zinc-800/30 rounded-lg p-3">
-                          <h4 className="text-[11px] text-zinc-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                            <Users className="w-3 h-3" /> Site Analytics (90d)
+                        <div className="bg-[var(--surface-3)]/30 rounded-[var(--radius-lg)] p-3">
+                          <h4 className="text-[11px] text-[var(--brand-text)] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                            <Icon as={Users} size="sm" /> Site Analytics (90d)
                           </h4>
                           {item.ga4 ? (
                             <div className="grid grid-cols-2 gap-3">
                               <div>
-                                <p className="text-lg font-semibold text-zinc-100">{item.ga4.sessions.toLocaleString()}</p>
-                                <p className="text-[10px] text-zinc-500">Sessions</p>
+                                <p className="text-lg font-semibold text-[var(--brand-text-bright)]">{item.ga4.sessions.toLocaleString()}</p>
+                                <p className="text-[10px] text-[var(--brand-text-muted)]">Sessions</p>
                               </div>
                               <div>
-                                <p className="text-lg font-semibold text-zinc-100">{item.ga4.users.toLocaleString()}</p>
-                                <p className="text-[10px] text-zinc-500">Users</p>
+                                <p className="text-lg font-semibold text-[var(--brand-text-bright)]">{item.ga4.users.toLocaleString()}</p>
+                                <p className="text-[10px] text-[var(--brand-text-muted)]">Users</p>
                               </div>
                               <div>
-                                <p className="text-lg font-semibold text-zinc-100">{item.ga4.bounceRate.toFixed(1)}%</p>
-                                <p className="text-[10px] text-zinc-500">Bounce Rate</p>
+                                <p className="text-lg font-semibold text-[var(--brand-text-bright)]">{item.ga4.bounceRate.toFixed(1)}%</p>
+                                <p className="text-[10px] text-[var(--brand-text-muted)]">Bounce Rate</p>
                               </div>
                               <div>
-                                <p className="text-lg font-semibold text-zinc-100">{formatEngagement(item.ga4.avgEngagementTime)}</p>
-                                <p className="text-[10px] text-zinc-500">Avg Engagement</p>
+                                <p className="text-lg font-semibold text-[var(--brand-text-bright)]">{formatEngagement(item.ga4.avgEngagementTime)}</p>
+                                <p className="text-[10px] text-[var(--brand-text-muted)]">Avg Engagement</p>
                               </div>
                             </div>
                           ) : (
@@ -393,7 +393,7 @@ export function ContentPerformance({ workspaceId }: Props) {
 
                       {/* Trend chart */}
                       {trendLoading === item.requestId ? (
-                        <div className="flex items-center gap-2 mt-4 text-xs text-zinc-500">
+                        <div className="flex items-center gap-2 mt-4 text-xs text-[var(--brand-text-muted)]">
                           <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading trend data...
                         </div>
                       ) : trendData[item.requestId] ? (

@@ -6,6 +6,7 @@ import {
   CheckCircle, BarChart3, ArrowRight, Target, Eye, TrendingUp,
   FileText, Layers, AlertTriangle, Pencil, Search, Network,
 } from 'lucide-react';
+import { Icon } from './ui';
 
 const SECTIONS = [
   {
@@ -189,8 +190,8 @@ export function PageIntelligenceGuide() {
     <div className="space-y-8 max-w-3xl">
       {/* Header */}
       <div className="space-y-2">
-        <h2 className="text-lg font-semibold text-zinc-200">Page Intelligence Guide</h2>
-        <p className="text-sm text-zinc-400">
+        <h2 className="text-lg font-semibold text-[var(--brand-text-bright)]">Page Intelligence Guide</h2>
+        <p className="text-sm text-[var(--brand-text)]">
           How to read scores, understand page analysis, and take action on every page in the site.
         </p>
       </div>
@@ -198,9 +199,9 @@ export function PageIntelligenceGuide() {
       {/* Score thresholds quick-reference */}
       <div className="flex gap-3">
         {SCORE_THRESHOLDS.map(t => (
-          <div key={t.label} className={`flex-1 border px-3 py-2.5 ${t.bg}`} style={{ borderRadius: '6px 12px 6px 12px' }}>
+          <div key={t.label} className={`flex-1 border px-3 py-2.5 rounded-[var(--radius-signature)] ${t.bg}`}>
             <div className={`text-sm font-bold ${t.color}`}>{t.range}</div>
-            <div className="text-[11px] text-zinc-400 mt-0.5">{t.label}</div>
+            <div className="text-[11px] text-[var(--brand-text)] mt-0.5">{t.label}</div>
           </div>
         ))}
       </div>
@@ -208,31 +209,31 @@ export function PageIntelligenceGuide() {
       {/* Main sections */}
       <div className="space-y-3">
         {SECTIONS.map(section => {
-          const Icon = section.icon;
+          const SectionIcon = section.icon;
           return (
-            <div key={section.title} className={`border p-5 ${section.bg}`} style={{ borderRadius: '6px 12px 6px 12px' }}>
+            <div key={section.title} className={`border p-5 rounded-[var(--radius-signature)] ${section.bg}`}>
               <div className="flex items-start gap-3">
-                <div className={`flex items-center justify-center w-8 h-8 rounded-lg bg-zinc-900/60 flex-shrink-0 ${section.color}`}>
-                  <Icon className="w-4 h-4" />
+                <div className={`flex items-center justify-center w-8 h-8 rounded-[var(--radius-lg)] bg-[var(--surface-2)]/60 flex-shrink-0 ${section.color}`}>
+                  <Icon as={SectionIcon} size="md" />
                 </div>
                 <div className="flex-1 min-w-0 space-y-2">
-                  <h3 className="text-sm font-medium text-zinc-200">{section.title}</h3>
-                  <p className="text-xs text-zinc-400 leading-relaxed">{section.description}</p>
+                  <h3 className="text-sm font-medium text-[var(--brand-text-bright)]">{section.title}</h3>
+                  <p className="text-xs text-[var(--brand-text)] leading-relaxed">{section.description}</p>
                   <ul className="space-y-1.5">
                     {section.items.map((item, i) => (
                       <li key={i} className="flex items-start gap-2 text-xs">
-                        <ArrowRight className="w-3 h-3 text-zinc-600 mt-0.5 flex-shrink-0" />
+                        <Icon as={ArrowRight} size="sm" className="text-[var(--brand-text-dim)] mt-0.5 flex-shrink-0" />
                         <span>
-                          <strong className="text-zinc-300">{item.label}</strong>
+                          <strong className="text-[var(--brand-text-bright)]">{item.label}</strong>
                           {' — '}
-                          <span className="text-zinc-400">{item.desc}</span>
+                          <span className="text-[var(--brand-text)]">{item.desc}</span>
                         </span>
                       </li>
                     ))}
                   </ul>
-                  <div className="flex items-start gap-1.5 mt-1 pt-1.5 border-t border-zinc-800/30">
-                    <CheckCircle className="w-3 h-3 text-zinc-600 mt-0.5 flex-shrink-0" />
-                    <span className="text-[11px] text-zinc-500 italic">{section.tip}</span>
+                  <div className="flex items-start gap-1.5 mt-1 pt-1.5 border-t border-[var(--brand-border)]/30">
+                    <Icon as={CheckCircle} size="sm" className="text-[var(--brand-text-dim)] mt-0.5 flex-shrink-0" />
+                    <span className="text-[11px] text-[var(--brand-text-muted)] italic">{section.tip}</span>
                   </div>
                 </div>
               </div>
@@ -242,12 +243,12 @@ export function PageIntelligenceGuide() {
       </div>
 
       {/* Data sources summary */}
-      <div className="bg-zinc-900 border border-zinc-800 p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 space-y-3 rounded-[var(--radius-signature-lg)]">
         <div className="flex items-center gap-2">
-          <Layers className="w-4 h-4 text-teal-400" />
-          <h3 className="text-sm font-medium text-zinc-200">What Gets Analyzed Automatically</h3>
+          <Icon as={Layers} size="md" className="text-teal-400" />
+          <h3 className="text-sm font-medium text-[var(--brand-text-bright)]">What Gets Analyzed Automatically</h3>
         </div>
-        <p className="text-xs text-zinc-400">
+        <p className="text-xs text-[var(--brand-text)]">
           Each analysis run checks the following and factors them into the optimization score:
         </p>
         <div className="grid grid-cols-2 gap-2">
@@ -261,11 +262,11 @@ export function PageIntelligenceGuide() {
             { label: 'Internal link count', desc: 'Inbound links from site pages' },
             { label: 'GSC performance signals', desc: 'Clicks + impressions weighting' },
           ].map(f => (
-            <div key={f.label} className="flex items-start gap-2 px-3 py-2 bg-zinc-800/40 rounded-lg">
-              <CheckCircle className="w-3 h-3 text-teal-500 mt-0.5 flex-shrink-0" />
+            <div key={f.label} className="flex items-start gap-2 px-3 py-2 bg-[var(--surface-3)]/40 rounded-[var(--radius-lg)]">
+              <Icon as={CheckCircle} size="sm" className="text-teal-500 mt-0.5 flex-shrink-0" />
               <div>
-                <div className="text-[11px] font-medium text-zinc-300">{f.label}</div>
-                <div className="text-[10px] text-zinc-500">{f.desc}</div>
+                <div className="text-[11px] font-medium text-[var(--brand-text-bright)]">{f.label}</div>
+                <div className="text-[10px] text-[var(--brand-text-muted)]">{f.desc}</div>
               </div>
             </div>
           ))}
@@ -273,10 +274,10 @@ export function PageIntelligenceGuide() {
       </div>
 
       {/* Recommended workflow */}
-      <div className="bg-zinc-900 border border-zinc-800 p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 space-y-3 rounded-[var(--radius-signature-lg)]">
         <div className="flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-amber-400" />
-          <h3 className="text-sm font-medium text-zinc-200">Recommended Optimization Workflow</h3>
+          <Icon as={TrendingUp} size="md" className="text-amber-400" />
+          <h3 className="text-sm font-medium text-[var(--brand-text-bright)]">Recommended Optimization Workflow</h3>
         </div>
         <div className="flex flex-wrap gap-1.5">
           {[
@@ -289,7 +290,7 @@ export function PageIntelligenceGuide() {
             'Move to next priority page',
             'Check Architecture tab for orphaned pages',
           ].map((step, i) => (
-            <div key={i} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-zinc-800/50 rounded-lg text-[11px] text-zinc-400">
+            <div key={i} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--surface-3)]/50 rounded-[var(--radius-lg)] text-[11px] text-[var(--brand-text)]">
               <span className="text-amber-400 font-bold">{i + 1}.</span>
               {step}
             </div>
@@ -298,12 +299,12 @@ export function PageIntelligenceGuide() {
       </div>
 
       {/* Score interpretation callout */}
-      <div className="bg-zinc-900 border border-zinc-800 p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 space-y-3 rounded-[var(--radius-signature-lg)]">
         <div className="flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-sky-400" />
-          <h3 className="text-sm font-medium text-zinc-200">Score Limitations to Know</h3>
+          <Icon as={AlertTriangle} size="md" className="text-sky-400" />
+          <h3 className="text-sm font-medium text-[var(--brand-text-bright)]">Score Limitations to Know</h3>
         </div>
-        <div className="space-y-2 text-xs text-zinc-400">
+        <div className="space-y-2 text-xs text-[var(--brand-text)]">
           <ul className="space-y-1.5">
             {[
               {
@@ -324,9 +325,9 @@ export function PageIntelligenceGuide() {
               },
             ].map((item, i) => (
               <li key={i} className="flex items-start gap-2">
-                <BarChart3 className="w-3 h-3 text-sky-400 mt-0.5 flex-shrink-0" />
+                <Icon as={BarChart3} size="sm" className="text-sky-400 mt-0.5 flex-shrink-0" />
                 <span>
-                  <strong className="text-zinc-300">{item.label}</strong>
+                  <strong className="text-[var(--brand-text-bright)]">{item.label}</strong>
                   {' — '}
                   {item.desc}
                 </span>

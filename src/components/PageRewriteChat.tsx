@@ -8,6 +8,7 @@ import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
 import { post, get } from '../api/client';
 import { RenderMarkdown } from './client/helpers';
 import { queryKeys } from '../lib/queryKeys';
+import { Icon, Button } from './ui';
 
 interface SeoIssue {
   check: string;
@@ -595,17 +596,17 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-zinc-800 bg-zinc-900/80 backdrop-blur-sm flex-shrink-0">
+      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-[var(--brand-border)] bg-[var(--surface-2)]/80 backdrop-blur-sm flex-shrink-0">
         <button
           onClick={onBack}
-          className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+          className="p-1.5 rounded-[var(--radius-lg)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)] transition-colors"
           title="Back"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <Icon as={ArrowLeft} size="md" />
         </button>
         <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-teal-400" />
-          <h1 className="text-sm font-semibold text-zinc-200">AI Page Rewriter</h1>
+          <Icon as={Sparkles} size="md" className="text-teal-400" />
+          <h1 className="text-sm font-semibold text-[var(--brand-text-bright)]">AI Page Rewriter</h1>
         </div>
 
         {/* Sitemap combobox */}
@@ -613,9 +614,9 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
 
           {/* Collapsed: page loaded */}
           {pageData && !comboOpen && (
-            <div className="flex items-center gap-2 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5">
-              <FileText className="w-3 h-3 text-zinc-500 flex-shrink-0" />
-              <span className="text-xs text-zinc-300 flex-1 truncate">{pageData.slug ? `/${pageData.slug}` : pageUrl}</span>
+            <div className="flex items-center gap-2 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-1.5">
+              <Icon as={FileText} size="xs" className="text-[var(--brand-text-muted)] flex-shrink-0" />
+              <span className="text-xs text-[var(--brand-text-bright)] flex-1 truncate">{pageData.slug ? `/${pageData.slug}` : pageUrl}</span>
               <button onClick={openCombo} className="text-[10px] text-teal-400 hover:text-teal-300 font-medium flex-shrink-0">Change</button>
             </div>
           )}
@@ -624,18 +625,18 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
           {!pageData && !comboOpen && (
             <button
               onClick={openCombo}
-              className="w-full flex items-center gap-2 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-500 hover:border-teal-500/50 hover:text-zinc-300 transition-colors"
+              className="w-full flex items-center gap-2 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-1.5 text-xs text-[var(--brand-text-muted)] hover:border-teal-500/50 hover:text-[var(--brand-text-bright)] transition-colors"
             >
-              <FileText className="w-3 h-3" />
+              <Icon as={FileText} size="xs" />
               Search pages or paste a URL…
             </button>
           )}
 
           {/* Open */}
           {comboOpen && (
-            <div className="flex flex-col bg-zinc-800 border border-teal-500/50 rounded-lg overflow-hidden shadow-xl">
-              <div className="flex items-center gap-2 px-3 py-1.5 border-b border-zinc-700">
-                <FileText className="w-3 h-3 text-zinc-500 flex-shrink-0" />
+            <div className="flex flex-col bg-[var(--surface-3)] border border-teal-500/50 rounded-[var(--radius-lg)] overflow-hidden shadow-xl">
+              <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[var(--brand-border)]">
+                <Icon as={FileText} size="xs" className="text-[var(--brand-text-muted)] flex-shrink-0" />
                 <input
                   ref={comboInputRef}
                   role="combobox"
@@ -647,7 +648,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                   onChange={e => { setComboQuery(e.target.value); setComboIdx(0); }}
                   onKeyDown={handleComboKeyDown}
                   placeholder="Search pages or paste a URL…"
-                  className="flex-1 bg-transparent text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none"
+                  className="flex-1 bg-transparent text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none"
                 />
                 {loadingPage && <Loader2 className="w-3 h-3 animate-spin text-teal-400 flex-shrink-0" />}
               </div>
@@ -675,8 +676,8 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                       onMouseEnter={() => setComboIdx(i)}
                       className={`w-full flex items-center gap-2 py-1.5 text-xs text-left transition-colors border-l-2 ${
                         i === comboIdx
-                          ? 'bg-teal-500/10 text-zinc-100 border-teal-500'
-                          : 'text-zinc-400 hover:bg-zinc-700/50 hover:text-zinc-200 border-transparent'
+                          ? 'bg-teal-500/10 text-[var(--brand-text-bright)] border-teal-500'
+                          : 'text-[var(--brand-text)] hover:bg-[var(--surface-1)]/50 hover:text-[var(--brand-text-bright)] border-transparent'
                       }`}
                       style={{ paddingLeft: `${12 + getIndentLevel(page.slug) * 12}px` }}
                     >
@@ -688,7 +689,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
               )}
 
               {!isUrlQuery && filteredPages.length === 0 && (
-                <div className="px-3 py-2 text-[11px] text-zinc-500">
+                <div className="px-3 py-2 text-[11px] text-[var(--brand-text-muted)]">
                   {sitemapPages.length > 0 ? `No pages match "${comboQuery}"` : 'No sitemap — paste a full URL above'}
                 </div>
               )}
@@ -701,13 +702,13 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
           <button
             onClick={onFocusModeToggle}
             title={focusMode ? 'Exit focus mode (Esc)' : 'Enter focus mode'}
-            className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${
+            className={`p-1.5 rounded-[var(--radius-lg)] transition-colors flex-shrink-0 ${
               focusMode
                 ? 'text-teal-400 bg-teal-500/10 hover:bg-teal-500/20'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
+                : 'text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)]'
             }`}
           >
-            <Maximize2 className={`w-3.5 h-3.5 transition-transform ${focusMode ? 'rotate-180' : ''}`} />
+            <Icon as={Maximize2} size="sm" className={`transition-transform ${focusMode ? 'rotate-180' : ''}`} />
           </button>
         )}
       </div>
@@ -715,7 +716,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
       {/* Main two-pane layout */}
       <div className="flex flex-1 overflow-hidden">
         {/* ═══ LEFT PANE: Chat ═══ */}
-        <div className="flex flex-col w-1/2 border-r border-zinc-800">
+        <div className="flex flex-col w-1/2 border-r border-[var(--brand-border)]">
           {/* Chat messages */}
           <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
             {messages.length === 0 && (
@@ -724,8 +725,8 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                   <Sparkles className="w-6 h-6 text-teal-400" />
                 </div>
                 <div>
-                  <h2 className="text-sm font-semibold text-zinc-200 mb-1">AI Page Rewriter</h2>
-                  <p className="text-xs text-zinc-500 max-w-sm">
+                  <h2 className="text-sm font-semibold text-[var(--brand-text-bright)] mb-1">AI Page Rewriter</h2>
+                  <p className="text-xs text-[var(--brand-text-muted)] max-w-sm">
                     {pageData
                       ? `"${pageData.title}" is loaded. Ask me to rewrite sections, optimize headings, add FAQ blocks, or improve AEO.`
                       : 'Load a page above, then ask me to rewrite sections, optimize for AEO, or suggest improvements.'}
@@ -739,7 +740,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                       <button
                         key={i}
                         onClick={() => sendMessage(prompt)}
-                        className="text-left px-3 py-2 rounded-lg bg-zinc-800/50 border border-zinc-700/50 hover:border-teal-500/30 hover:bg-zinc-800 text-[11px] text-zinc-400 hover:text-zinc-200 transition-colors"
+                        className="text-left px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/50 border border-[var(--brand-border)]/50 hover:border-teal-500/30 hover:bg-[var(--surface-3)] text-[11px] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
                       >
                         {prompt}
                       </button>
@@ -753,8 +754,8 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
               <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[85%] rounded-xl px-4 py-3 ${
                   msg.role === 'user'
-                    ? 'bg-teal-600/20 border border-teal-500/20 text-zinc-200'
-                    : 'bg-zinc-800/80 border border-zinc-700/50 text-zinc-300'
+                    ? 'bg-teal-600/20 border border-teal-500/20 text-[var(--brand-text-bright)]'
+                    : 'bg-[var(--surface-3)]/80 border border-[var(--brand-border)]/50 text-[var(--brand-text-bright)]'
                 }`}>
                   {msg.role === 'assistant' ? (
                     msg.sectionTarget ? (
@@ -763,7 +764,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                         <div
                           contentEditable
                           suppressContentEditableWarning
-                          className="text-xs leading-relaxed focus:outline-none border border-transparent focus:border-zinc-600 rounded p-1 -m-1 transition-colors"
+                          className="text-xs leading-relaxed focus:outline-none border border-transparent focus:border-[var(--brand-border-hover)] rounded p-1 -m-1 transition-colors"
                           onInput={e => setMsgEdits(prev => ({ ...prev, [i]: (e.currentTarget as HTMLDivElement).innerText }))}
                           ref={(el) => {
                             // Initialize content once; do NOT use dangerouslySetInnerHTML (React would overwrite on re-render)
@@ -773,19 +774,19 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                             }
                           }}
                         />
-                        <div className="flex items-center gap-1 mt-2 pt-2 border-t border-zinc-700/30">
+                        <div className="flex items-center gap-1 mt-2 pt-2 border-t border-[var(--brand-border)]/30">
                           <button
                             onClick={() => applyToSection(msgEdits[i] ?? extractRewriteOnly(msg.content), msg.sectionTarget!)}
                             className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-teal-500/10 text-teal-400 border border-teal-500/30 hover:bg-teal-500/20 transition-colors"
                           >
-                            <Check className="w-3 h-3" />
+                            <Icon as={Check} size="xs" />
                             Apply to {msg.sectionTarget}
                           </button>
                           <button
                             onClick={() => copyToClipboard(msgEdits[i] ?? extractRewriteOnly(msg.content), i)}
-                            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-zinc-500 hover:text-zinc-300 hover:bg-zinc-700/50 transition-colors"
+                            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)]/50 transition-colors"
                           >
-                            {copiedIdx === i ? <Check className="w-3 h-3 text-teal-400" /> : <Copy className="w-3 h-3" />}
+                            {copiedIdx === i ? <Icon as={Check} size="xs" className="text-teal-400" /> : <Icon as={Copy} size="xs" />}
                             {copiedIdx === i ? 'Copied' : 'Copy'}
                           </button>
                         </div>
@@ -796,12 +797,12 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                         <div className="text-xs leading-relaxed">
                           <RenderMarkdown text={msg.content} />
                         </div>
-                        <div className="flex items-center gap-1 mt-2 pt-2 border-t border-zinc-700/30">
+                        <div className="flex items-center gap-1 mt-2 pt-2 border-t border-[var(--brand-border)]/30">
                           <button
                             onClick={() => copyToClipboard(msg.content, i)}
-                            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-zinc-500 hover:text-zinc-300 hover:bg-zinc-700/50 transition-colors"
+                            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)]/50 transition-colors"
                           >
-                            {copiedIdx === i ? <Check className="w-3 h-3 text-teal-400" /> : <Copy className="w-3 h-3" />}
+                            {copiedIdx === i ? <Icon as={Check} size="xs" className="text-teal-400" /> : <Icon as={Copy} size="xs" />}
                             {copiedIdx === i ? 'Copied' : 'Copy'}
                           </button>
                         </div>
@@ -816,9 +817,9 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
 
             {sending && (
               <div className="flex justify-start">
-                <div className="bg-zinc-800/80 border border-zinc-700/50 rounded-xl px-4 py-3 flex items-center gap-2">
+                <div className="bg-[var(--surface-3)]/80 border border-[var(--brand-border)]/50 rounded-xl px-4 py-3 flex items-center gap-2">
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400" />
-                  <span className="text-xs text-zinc-400">Analyzing and writing...</span>
+                  <span className="text-xs text-[var(--brand-text)]">Analyzing and writing...</span>
                 </div>
               </div>
             )}
@@ -827,7 +828,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
           </div>
 
           {/* Input area */}
-          <div className="flex-shrink-0 border-t border-zinc-800 px-4 py-3 bg-zinc-900/50">
+          <div className="flex-shrink-0 border-t border-[var(--brand-border)] px-4 py-3 bg-[var(--surface-2)]/50">
             <div className="flex items-end gap-2">
               <textarea
                 ref={inputRef}
@@ -835,30 +836,31 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={pageData ? 'Ask me to rewrite a section, optimize headings, add FAQs...' : 'Load a page first, or ask a general rewriting question...'}
-                className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 resize-none min-h-[40px] max-h-[120px]"
+                className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-none min-h-[40px] max-h-[120px]"
                 rows={2}
               />
-              <button
+              <Button
+                variant="primary"
+                size="sm"
+                icon={Send}
                 onClick={() => sendMessage()}
                 disabled={sending || !input.trim()}
-                className="p-2 rounded-lg bg-teal-600 hover:bg-teal-500 disabled:opacity-40 text-white transition-colors flex-shrink-0"
-              >
-                <Send className="w-4 h-4" />
-              </button>
+                className="flex-shrink-0"
+              />
             </div>
           </div>
         </div>
 
         {/* ═══ RIGHT PANE: Editable Document ═══ */}
-        <div ref={docPanelRef} className="flex flex-col w-1/2 overflow-hidden bg-zinc-950/50 relative">
+        <div ref={docPanelRef} className="flex flex-col w-1/2 overflow-hidden bg-[var(--surface-1)]/50 relative">
 
           {/* Empty state */}
           {!pageData && !loadingPage && !pageError && (
             <div className="flex flex-col items-center justify-center h-full text-center space-y-3 px-8">
-              <FileText className="w-8 h-8 text-zinc-600" />
+              <Icon as={FileText} size="2xl" className="text-[var(--brand-text-dim)]" />
               <div>
-                <h3 className="text-sm font-medium text-zinc-400">No page loaded</h3>
-                <p className="text-xs text-zinc-600 mt-1">Search for a page above or paste a URL to see the content here.</p>
+                <h3 className="text-sm font-medium text-[var(--brand-text)]">No page loaded</h3>
+                <p className="text-xs text-[var(--brand-text-dim)] mt-1">Search for a page above or paste a URL to see the content here.</p>
               </div>
             </div>
           )}
@@ -866,58 +868,58 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
           {loadingPage && (
             <div className="flex flex-col items-center justify-center h-full gap-3">
               <Loader2 className="w-6 h-6 animate-spin text-teal-400" />
-              <span className="text-xs text-zinc-400">Loading page content...</span>
+              <span className="text-xs text-[var(--brand-text)]">Loading page content...</span>
             </div>
           )}
 
           {pageError && (
             <div className="flex flex-col items-center justify-center h-full gap-3 px-8">
               <AlertTriangle className="w-6 h-6 text-amber-400/80" />
-              <p className="text-xs text-zinc-400 text-center">{pageError}</p>
+              <p className="text-xs text-[var(--brand-text)] text-center">{pageError}</p>
             </div>
           )}
 
           {pageData && !loadingPage && (
             <>
               {/* Panel header */}
-              <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2 border-b border-zinc-800 bg-zinc-900/60">
+              <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2 border-b border-[var(--brand-border)] bg-[var(--surface-2)]/60">
                 <a
                   href={pageUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-[11px] text-zinc-400 hover:text-teal-400 transition-colors flex-1 min-w-0"
+                  className="flex items-center gap-1 text-[11px] text-[var(--brand-text)] hover:text-teal-400 transition-colors flex-1 min-w-0"
                 >
                   <span className="truncate">{pageData.slug ? `/${pageData.slug}` : pageUrl}</span>
-                  <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                  <Icon as={ExternalLink} size="xs" className="flex-shrink-0" />
                 </a>
                 {/* Export popover */}
                 <div className="relative flex-shrink-0" ref={exportPopoverRef}>
                   <button
                     ref={exportBtnRef}
                     onClick={() => setExportOpen(o => !o)}
-                    className="flex items-center gap-1 px-2 py-1 rounded text-[10px] text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+                    className="flex items-center gap-1 px-2 py-1 rounded text-[10px] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)] transition-colors"
                   >
                     Export brief
                   </button>
                   {exportOpen && (
-                    <div className="absolute right-0 top-7 z-50 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl p-1 flex flex-col gap-0.5 min-w-[170px]">
+                    <div className="absolute right-0 top-7 z-50 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl p-1 flex flex-col gap-0.5 min-w-[170px]">
                       <button
                         onClick={() => handleExport('copy')}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded text-[11px] text-zinc-300 hover:bg-zinc-700 transition-colors text-left"
+                        className="flex items-center gap-2 px-3 py-1.5 rounded text-[11px] text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] transition-colors text-left"
                       >
-                        <Copy className="w-3 h-3" /> Copy as Markdown
+                        <Icon as={Copy} size="xs" /> Copy as Markdown
                       </button>
                       <button
                         onClick={() => handleExport('download')}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded text-[11px] text-zinc-300 hover:bg-zinc-700 transition-colors text-left"
+                        className="flex items-center gap-2 px-3 py-1.5 rounded text-[11px] text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] transition-colors text-left"
                       >
-                        <FileText className="w-3 h-3" /> Download .md
+                        <Icon as={FileText} size="xs" /> Download .md
                       </button>
                       <button
                         onClick={() => handleExport('docx')}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded text-[11px] text-zinc-300 hover:bg-zinc-700 transition-colors text-left"
+                        className="flex items-center gap-2 px-3 py-1.5 rounded text-[11px] text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] transition-colors text-left"
                       >
-                        <FileText className="w-3 h-3" /> Download .docx
+                        <Icon as={FileText} size="xs" /> Download .docx
                       </button>
                     </div>
                   )}
@@ -926,7 +928,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
 
               {/* Audit issue chips — always visible, non-collapsible */}
               {pageData.issues.length > 0 && (
-                <div className="flex-shrink-0 flex flex-wrap gap-1.5 px-4 py-2 border-b border-zinc-800 bg-zinc-900/30">
+                <div className="flex-shrink-0 flex flex-wrap gap-1.5 px-4 py-2 border-b border-[var(--brand-border)] bg-[var(--surface-2)]/30">
                   {pageData.issues.slice(0, 20).map((issue, i) => (
                     <span
                       key={i}
@@ -967,17 +969,17 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
               {/* Floating formatting toolbar — appears above text selection */}
               {toolbarPos && (
                 <div
-                  className="absolute z-50 flex items-center gap-0.5 bg-zinc-700 border border-zinc-600 rounded-md shadow-xl px-1 py-0.5 pointer-events-auto"
+                  className="absolute z-50 flex items-center gap-0.5 bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded-md shadow-xl px-1 py-0.5 pointer-events-auto"
                   style={{ top: toolbarPos.top, left: toolbarPos.left }}
                   onMouseDown={e => e.preventDefault()}
                 >
-                  <button onClick={() => execFormat('bold')} className="px-2 py-1 text-[11px] font-bold text-zinc-200 hover:bg-zinc-600 rounded transition-colors">B</button>
-                  <button onClick={() => execFormat('italic')} className="px-2 py-1 text-[11px] italic text-zinc-200 hover:bg-zinc-600 rounded transition-colors">I</button>
-                  <div className="w-px h-3 bg-zinc-600 mx-0.5" />
-                  <button onClick={() => wrapHeading('h2')} className="px-2 py-1 text-[10px] text-zinc-200 hover:bg-zinc-600 rounded transition-colors">H2</button>
-                  <button onClick={() => wrapHeading('h3')} className="px-2 py-1 text-[10px] text-zinc-200 hover:bg-zinc-600 rounded transition-colors">H3</button>
-                  <div className="w-px h-3 bg-zinc-600 mx-0.5" />
-                  <button onClick={clearFormatting} className="px-2 py-1 text-[11px] text-zinc-400 hover:bg-zinc-600 rounded transition-colors">&times;</button>
+                  <button onClick={() => execFormat('bold')} className="px-2 py-1 text-[11px] font-bold text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded transition-colors">B</button>
+                  <button onClick={() => execFormat('italic')} className="px-2 py-1 text-[11px] italic text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded transition-colors">I</button>
+                  <div className="w-px h-3 bg-[var(--brand-border-hover)] mx-0.5" />
+                  <button onClick={() => wrapHeading('h2')} className="px-2 py-1 text-[10px] text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded transition-colors">H2</button>
+                  <button onClick={() => wrapHeading('h3')} className="px-2 py-1 text-[10px] text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded transition-colors">H3</button>
+                  <div className="w-px h-3 bg-[var(--brand-border-hover)] mx-0.5" />
+                  <button onClick={clearFormatting} className="px-2 py-1 text-[11px] text-[var(--brand-text-muted)] hover:bg-[var(--surface-1)] rounded transition-colors">&times;</button>
                 </div>
               )}
             </>

@@ -8,7 +8,7 @@ import {
   FileText, User, Calendar, Quote, ListChecks, LayoutList, Table2,
   BookOpen, EyeOff, RefreshCw,
 } from 'lucide-react';
-import { aeoScoreColorClass, aeoScoreBgBarClass } from './ui';
+import { aeoScoreColorClass, aeoScoreBgBarClass, Icon as UIIcon, Button } from './ui';
 import { aeoReview as aeoReviewApi } from '../api/seo';
 
 // ─── Types ────────────────────────────────────────────────────────
@@ -70,7 +70,7 @@ const CHANGE_TYPE_CONFIG: Record<AeoChangeType, { label: string; icon: typeof Sp
   add_definition:      { label: 'Add Definition',       icon: BookOpen,       color: 'text-teal-400' },
   restructure_content: { label: 'Restructure',          icon: LayoutList,     color: 'text-orange-400' },
   remove_dark_pattern: { label: 'Remove Dark Pattern',  icon: EyeOff,        color: 'text-red-400' },
-  copy_edit:           { label: 'Copy Edit',            icon: FileText,       color: 'text-zinc-400' },
+  copy_edit:           { label: 'Copy Edit',            icon: FileText,       color: 'text-[var(--brand-text)]' },
 };
 
 const EFFORT_CONFIG: Record<AeoEffort, { label: string; color: string; bg: string }> = {
@@ -171,25 +171,26 @@ export function AeoReview({ workspaceId }: Props) {
           <Sparkles className="w-8 h-8 text-purple-400" />
         </div>
         <div className="text-center max-w-md">
-          <h3 className="text-sm font-semibold text-zinc-200 mb-1">AEO Page Review</h3>
-          <p className="text-xs text-zinc-500 leading-relaxed">
+          <h3 className="text-sm font-semibold text-[var(--brand-text-bright)] mb-1">AEO Page Review</h3>
+          <p className="text-xs text-[var(--brand-text-muted)] leading-relaxed">
             AI-powered analysis of your existing pages with specific copy rewrites, section additions,
             citation recommendations, and structural changes to maximize AI citation likelihood.
           </p>
-          <p className="text-[11px] text-zinc-600 mt-2">
+          <p className="text-[11px] text-[var(--brand-text-dim)] mt-2">
             Requires a completed SEO audit. Reviews pages with AEO issues first, prioritized by traffic.
           </p>
         </div>
         {error && (
-          <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-2 text-xs text-red-400 max-w-md text-center">
+          <div className="bg-red-500/10 border border-red-500/30 rounded-[var(--radius-lg)] px-4 py-2 text-xs text-red-400 max-w-md text-center">
             {error}
           </div>
         )}
+        {/* purple is valid: admin AI surface (Run AEO Review CTA) */}
         <button
           onClick={runSiteReview}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-colors bg-purple-600 hover:bg-purple-500 text-white"
+          className="flex items-center gap-2 px-5 py-2.5 rounded-[var(--radius-lg)] text-sm font-medium transition-colors bg-purple-600 hover:bg-purple-500 text-white"
         >
-          <Sparkles className="w-4 h-4" /> Run AEO Review
+          <UIIcon as={Sparkles} size="md" /> Run AEO Review
         </button>
       </div>
     );
@@ -200,8 +201,8 @@ export function AeoReview({ workspaceId }: Props) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3">
         <Loader2 className="w-6 h-6 animate-spin text-purple-400" />
-        <p className="text-sm text-zinc-400">Running AEO review across site pages...</p>
-        <p className="text-xs text-zinc-600">This may take 1-2 minutes depending on the number of pages</p>
+        <p className="text-sm text-[var(--brand-text)]">Running AEO review across site pages...</p>
+        <p className="text-xs text-[var(--brand-text-dim)]">This may take 1-2 minutes depending on the number of pages</p>
       </div>
     );
   }
@@ -225,28 +226,29 @@ export function AeoReview({ workspaceId }: Props) {
     <div className="space-y-8">
       {/* Summary bar */}
       <div className="grid grid-cols-5 gap-3">
-        <div className="bg-zinc-900 p-4 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
-          <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-1">Avg AEO Score</div>
+        <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
+          <div className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider font-medium mb-1">Avg AEO Score</div>
           <div className={`text-3xl font-bold ${aeoScoreColorClass(avgScore)}`}>{avgScore}</div>
-          <div className="mt-2 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+          <div className="mt-2 h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden">
             <div className={`h-full rounded-full ${aeoScoreBgBarClass(avgScore)}`} style={{ width: `${avgScore}%` }} />
           </div>
         </div>
-        <div className="bg-zinc-900 p-4 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
-          <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-1">Pages Reviewed</div>
-          <div className="text-2xl font-bold text-zinc-200">{review.pages.length}</div>
+        <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
+          <div className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider font-medium mb-1">Pages Reviewed</div>
+          <div className="text-2xl font-bold text-[var(--brand-text-bright)]">{review.pages.length}</div>
         </div>
-        <div className="bg-zinc-900 p-4 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
-          <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-1">Total Changes</div>
+        <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
+          <div className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider font-medium mb-1">Total Changes</div>
+          {/* purple is valid: admin AI surface (AEO review total) */}
           <div className="text-2xl font-bold text-purple-400">{review.totalChanges}</div>
         </div>
-        <div className="bg-zinc-900 p-4 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
-          <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-1">Quick Wins</div>
+        <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
+          <div className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider font-medium mb-1">Quick Wins</div>
           <div className="text-2xl font-bold text-emerald-400">{review.quickWins}</div>
         </div>
-        <div className="bg-zinc-900 p-4 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
-          <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-1">Est. Time</div>
-          <div className="text-2xl font-bold text-zinc-200">
+        <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
+          <div className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider font-medium mb-1">Est. Time</div>
+          <div className="text-2xl font-bold text-[var(--brand-text-bright)]">
             {(() => {
               const mins = review.pages.reduce((s, p) => s + p.estimatedTimeMinutes, 0);
               return mins >= 60 ? `${Math.round(mins / 60)}h` : `${mins}m`;
@@ -256,9 +258,10 @@ export function AeoReview({ workspaceId }: Props) {
       </div>
 
       {/* Site summary */}
-      <div className="bg-purple-500/5 border border-purple-500/20 px-4 py-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      {/* purple is valid: admin AI surface (AEO site summary) */}
+      <div className="bg-purple-500/5 border border-purple-500/20 px-4 py-3 rounded-[var(--radius-signature-lg)]">
         <div className="text-xs text-purple-300">{review.sitewideSummary}</div>
-        <div className="text-[11px] text-zinc-500 mt-1">
+        <div className="text-[11px] text-[var(--brand-text-muted)] mt-1">
           Last reviewed: {new Date(review.generatedAt).toLocaleString()}
         </div>
       </div>
@@ -267,15 +270,15 @@ export function AeoReview({ workspaceId }: Props) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1">
-            <span className="text-[11px] text-zinc-500 mr-1">Effort:</span>
+            <span className="text-[11px] text-[var(--brand-text-muted)] mr-1">Effort:</span>
             {(['all', 'quick', 'moderate', 'significant'] as const).map(e => (
               <button
                 key={e}
                 onClick={() => setFilterEffort(e)}
                 className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors border ${
                   filterEffort === e
-                    ? 'border-zinc-500 bg-zinc-800 text-zinc-200'
-                    : 'border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-400'
+                    ? 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--brand-text-bright)]'
+                    : 'border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:border-[var(--brand-border-hover)] hover:text-[var(--brand-text)]'
                 }`}
               >
                 {e === 'all' ? 'All' : e === 'quick' ? 'Quick' : e === 'moderate' ? 'Moderate' : '1h+'}
@@ -283,34 +286,36 @@ export function AeoReview({ workspaceId }: Props) {
             ))}
           </div>
           <div className="flex items-center gap-1">
-            <span className="text-[11px] text-zinc-500 mr-1">Priority:</span>
+            <span className="text-[11px] text-[var(--brand-text-muted)] mr-1">Priority:</span>
             {(['all', 'high', 'medium', 'low'] as const).map(p => (
               <button
                 key={p}
                 onClick={() => setFilterPriority(p)}
                 className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors border ${
                   filterPriority === p
-                    ? 'border-zinc-500 bg-zinc-800 text-zinc-200'
-                    : 'border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-400'
+                    ? 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--brand-text-bright)]'
+                    : 'border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:border-[var(--brand-border-hover)] hover:text-[var(--brand-text)]'
                 }`}
               >
                 {p === 'all' ? 'All' : p.charAt(0).toUpperCase() + p.slice(1)}
               </button>
             ))}
           </div>
-          <span className="text-[11px] text-zinc-500">{totalFilteredChanges} changes</span>
+          <span className="text-[11px] text-[var(--brand-text-muted)]">{totalFilteredChanges} changes</span>
         </div>
-        <button
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={RefreshCw}
           onClick={runSiteReview}
           disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-medium transition-colors"
         >
-          <RefreshCw className="w-3.5 h-3.5" /> Re-run Review
-        </button>
+          Re-run Review
+        </Button>
       </div>
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-2 text-xs text-red-400">
+        <div className="bg-red-500/10 border border-red-500/30 rounded-[var(--radius-lg)] px-4 py-2 text-xs text-red-400">
           {error}
         </div>
       )}
@@ -324,17 +329,17 @@ export function AeoReview({ workspaceId }: Props) {
           const isRefreshing = loadingPage === page.pageUrl;
 
           return (
-            <div key={page.pageUrl} className="bg-zinc-900 border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
+            <div key={page.pageUrl} className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-signature-lg)]">
               <button
                 onClick={() => togglePage(page.pageUrl)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/50 transition-colors text-left"
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors text-left"
               >
                 {isExpanded
-                  ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
-                  : <ChevronRight className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />}
+                  ? <UIIcon as={ChevronDown} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
+                  : <UIIcon as={ChevronRight} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />}
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-zinc-200 truncate">{page.pageTitle}</div>
-                  <div className="text-xs text-zinc-500 truncate">{page.pageUrl}</div>
+                  <div className="text-sm font-medium text-[var(--brand-text-bright)] truncate">{page.pageTitle}</div>
+                  <div className="text-xs text-[var(--brand-text-muted)] truncate">{page.pageUrl}</div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <span className={`text-[11px] px-1.5 py-0.5 rounded border ${EFFORT_CONFIG.quick.bg} ${EFFORT_CONFIG.quick.color}`}>
@@ -345,7 +350,7 @@ export function AeoReview({ workspaceId }: Props) {
                       {highCount} high priority
                     </span>
                   )}
-                  <span className="text-[11px] text-zinc-500">{page.changes.length} changes</span>
+                  <span className="text-[11px] text-[var(--brand-text-muted)]">{page.changes.length} changes</span>
                   <span className={`text-sm font-bold tabular-nums ${aeoScoreColorClass(page.overallScore)}`}>
                     {page.overallScore}
                   </span>
@@ -355,21 +360,22 @@ export function AeoReview({ workspaceId }: Props) {
               {isExpanded && (
                 <div className="px-4 pb-4 space-y-3">
                   {/* Page summary */}
-                  <div className="flex items-start gap-3 px-3 py-2.5 rounded-lg bg-zinc-800/50 border border-zinc-700/50">
-                    <Sparkles className="w-3.5 h-3.5 text-purple-400 flex-shrink-0 mt-0.5" />
+                  {/* purple is valid: admin AI surface (AEO sparkles icon) */}
+                  <div className="flex items-start gap-3 px-3 py-2.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/50 border border-[var(--brand-border)]/50">
+                    <UIIcon as={Sparkles} size="sm" className="text-purple-400 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
-                      <div className="text-xs text-zinc-300 leading-relaxed">{page.summary}</div>
-                      <div className="flex items-center gap-3 mt-1.5 text-[11px] text-zinc-500">
-                        <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> ~{page.estimatedTimeMinutes} min total</span>
-                        <span className="flex items-center gap-1"><Zap className="w-3 h-3 text-emerald-400" /> {page.quickWinCount} quick wins</span>
+                      <div className="text-xs text-[var(--brand-text-bright)] leading-relaxed">{page.summary}</div>
+                      <div className="flex items-center gap-3 mt-1.5 text-[11px] text-[var(--brand-text-muted)]">
+                        <span className="flex items-center gap-1"><UIIcon as={Clock} size="xs" /> ~{page.estimatedTimeMinutes} min total</span>
+                        <span className="flex items-center gap-1"><UIIcon as={Zap} size="xs" className="text-emerald-400" /> {page.quickWinCount} quick wins</span>
                         <button
                           onClick={(e) => { e.stopPropagation(); runSinglePageReview(page.pageUrl); }}
                           disabled={isRefreshing}
-                          className="flex items-center gap-1 text-zinc-500 hover:text-zinc-300 transition-colors ml-auto"
+                          className="flex items-center gap-1 text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors ml-auto"
                         >
                           {isRefreshing
                             ? <Loader2 className="w-3 h-3 animate-spin" />
-                            : <RefreshCw className="w-3 h-3" />}
+                            : <UIIcon as={RefreshCw} size="xs" />}
                           Re-review
                         </button>
                       </div>
@@ -386,7 +392,7 @@ export function AeoReview({ workspaceId }: Props) {
                       const isChangeExpanded = expandedChanges.has(change.id);
 
                       return (
-                        <div key={change.id} className="rounded-lg border border-zinc-800 hover:border-zinc-700 transition-colors">
+                        <div key={change.id} className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] transition-colors">
                           <button
                             onClick={() => toggleChange(change.id)}
                             className="w-full flex items-start gap-2.5 px-3 py-2.5 text-left"
@@ -394,10 +400,10 @@ export function AeoReview({ workspaceId }: Props) {
                             <Icon className={`w-3.5 h-3.5 flex-shrink-0 mt-0.5 ${typeCfg.color}`} />
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="text-xs font-medium text-zinc-200">{typeCfg.label}</span>
-                                <span className="text-[11px] text-zinc-500">· {change.location}</span>
+                                <span className="text-xs font-medium text-[var(--brand-text-bright)]">{typeCfg.label}</span>
+                                <span className="text-[11px] text-[var(--brand-text-muted)]">· {change.location}</span>
                               </div>
-                              <div className="text-[11px] text-zinc-400 mt-0.5 line-clamp-1">{change.rationale}</div>
+                              <div className="text-[11px] text-[var(--brand-text)] mt-0.5 line-clamp-1">{change.rationale}</div>
                             </div>
                             <div className="flex items-center gap-1.5 flex-shrink-0">
                               <span className={`text-[10px] px-1.5 py-0.5 rounded border ${prioCfg.bg} ${prioCfg.color}`}>
@@ -407,8 +413,8 @@ export function AeoReview({ workspaceId }: Props) {
                                 {effortCfg.label}
                               </span>
                               {isChangeExpanded
-                                ? <ChevronDown className="w-3 h-3 text-zinc-600" />
-                                : <ChevronRight className="w-3 h-3 text-zinc-600" />}
+                                ? <UIIcon as={ChevronDown} size="xs" className="text-[var(--brand-text-dim)]" />
+                                : <UIIcon as={ChevronRight} size="xs" className="text-[var(--brand-text-dim)]" />}
                             </div>
                           </button>
 
@@ -416,26 +422,26 @@ export function AeoReview({ workspaceId }: Props) {
                             <div className="px-3 pb-3 ml-6 space-y-2">
                               {/* Current content (if applicable) */}
                               {change.currentContent && (
-                                <div className="rounded-lg bg-red-500/5 border border-red-500/15 px-3 py-2">
+                                <div className="rounded-[var(--radius-lg)] bg-red-500/5 border border-red-500/15 px-3 py-2">
                                   <div className="text-[10px] text-red-400 font-semibold uppercase tracking-wider mb-1">Current</div>
-                                  <div className="text-[11px] text-zinc-400 italic leading-relaxed">"{change.currentContent}"</div>
+                                  <div className="text-[11px] text-[var(--brand-text)] italic leading-relaxed">"{change.currentContent}"</div>
                                 </div>
                               )}
 
                               {/* Suggested change */}
-                              <div className="rounded-lg bg-emerald-500/5 border border-emerald-500/15 px-3 py-2">
+                              <div className="rounded-[var(--radius-lg)] bg-emerald-500/5 border border-emerald-500/15 px-3 py-2">
                                 <div className="text-[10px] text-emerald-400 font-semibold uppercase tracking-wider mb-1">Recommended Change</div>
-                                <div className="text-[11px] text-zinc-300 leading-relaxed whitespace-pre-wrap">{change.suggestedChange}</div>
+                                <div className="text-[11px] text-[var(--brand-text-bright)] leading-relaxed whitespace-pre-wrap">{change.suggestedChange}</div>
                               </div>
 
                               {/* Rationale */}
-                              <div className="text-[11px] text-zinc-500 leading-relaxed">
-                                <span className="font-medium text-zinc-400">Why:</span> {change.rationale}
+                              <div className="text-[11px] text-[var(--brand-text-muted)] leading-relaxed">
+                                <span className="font-medium text-[var(--brand-text)]">Why:</span> {change.rationale}
                               </div>
 
-                              {/* AEO Impact */}
+                              {/* AEO Impact — purple is valid: admin AI surface */}
                               <div className="flex items-start gap-1.5 text-[11px]">
-                                <Sparkles className="w-3 h-3 text-purple-400 flex-shrink-0 mt-0.5" />
+                                <UIIcon as={Sparkles} size="xs" className="text-purple-400 flex-shrink-0 mt-0.5" />
                                 <span className="text-purple-300">{change.aeoImpact}</span>
                               </div>
                             </div>
@@ -451,7 +457,7 @@ export function AeoReview({ workspaceId }: Props) {
         })}
 
         {filteredPages.length === 0 && review.pages.length > 0 && (
-          <div className="text-center py-8 text-xs text-zinc-500">
+          <div className="text-center py-8 text-xs text-[var(--brand-text-muted)]">
             No changes match your current filters.
           </div>
         )}
