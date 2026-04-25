@@ -535,7 +535,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
           <div className="flex items-center gap-2 px-3 py-2 bg-teal-500/10 border border-teal-500/30 rounded-[var(--radius-lg)]">
             <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400" />
             <span className="text-xs text-[var(--brand-text-bright)]">Analyzing {bulkProgress.done}/{bulkProgress.total}...</span>
-            <button onClick={() => { if (bulkJobIdRef.current) cancelBgJob(bulkJobIdRef.current); else cancelBulkRef.current = true; }} className="text-[11px] text-red-400 hover:text-red-300 ml-2">Cancel</button>
+            <Button variant="ghost" size="sm" className="ml-2 text-red-400 hover:text-red-300" onClick={() => { if (bulkJobIdRef.current) cancelBgJob(bulkJobIdRef.current); else cancelBulkRef.current = true; }}>Cancel</Button>
           </div>
         ) : (
           <div className="flex items-center gap-2">
@@ -658,7 +658,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
       </div>
 
       {/* Page List */}
-      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-lg)]">
         {filtered.map(page => {
           const isExpanded = expanded === page.id;
           const isAnalyzing = analyzing.has(page.id);

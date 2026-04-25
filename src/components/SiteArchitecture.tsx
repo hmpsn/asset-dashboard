@@ -144,12 +144,12 @@ function TreeNode({ node, defaultExpanded, coverageMap }: { node: SiteNode; defa
         {cov && (
           cov.hasSchema ? (
             <span className="flex items-center gap-0.5 text-[10px] text-emerald-400" title={`Schema: ${cov.schemaTypes.join(', ')}`}>
-              <CheckCircle2 className="w-3 h-3" />
+              <Icon as={CheckCircle2} size="sm" />
               <span className="hidden lg:inline">{cov.schemaTypes.length}</span>
             </span>
           ) : (
             <span className="flex items-center gap-0.5 text-[10px] text-[var(--brand-text-dim)]" title="No schema">
-              <XCircle className="w-3 h-3" />
+              <Icon as={XCircle} size="sm" />
             </span>
           )
         )}

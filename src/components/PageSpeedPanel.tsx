@@ -225,7 +225,7 @@ export function PageSpeedPanel({ siteId }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-[auto_1fr] gap-6 bg-[var(--surface-2)] p-6 border border-[var(--brand-border)] rounded-[var(--radius-signature-lg)]">
+      <div className="grid grid-cols-[auto_1fr] gap-6 bg-[var(--surface-2)] p-6 border border-[var(--brand-border)] rounded-[var(--radius-lg)]">
         <div className="flex flex-col items-center gap-2">
           <MetricRing score={result.score} size={100} />
           <div className="text-xs text-[var(--brand-text-muted)]">{strategy === 'mobile' ? 'Mobile' : 'Desktop'}</div>
@@ -434,7 +434,7 @@ export function PageSpeedPanel({ siteId }: Props) {
       </div>
 
       {/* Average score + vitals */}
-      <div className="grid grid-cols-[auto_1fr] gap-6 bg-[var(--surface-2)] p-6 border border-[var(--brand-border)] rounded-[var(--radius-signature-lg)]">
+      <div className="grid grid-cols-[auto_1fr] gap-6 bg-[var(--surface-2)] p-6 border border-[var(--brand-border)] rounded-[var(--radius-lg)]">
         <div className="flex flex-col items-center gap-2">
           <MetricRing score={data.averageScore} size={100} />
           <div className="text-xs text-[var(--brand-text-muted)]">Avg Score</div>
@@ -454,7 +454,7 @@ export function PageSpeedPanel({ siteId }: Props) {
         {data.pages.map(page => {
           const isOpen = expandedPage === page.url;
           return (
-            <div key={page.url} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
+            <div key={page.url} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-lg)]">
               <button
                 onClick={() => setExpandedPage(isOpen ? null : page.url)}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-2)]/50 transition-colors text-left"

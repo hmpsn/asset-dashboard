@@ -55,6 +55,9 @@ interface Props {
   onBack: () => void;
 }
 
+// Document-body rendering classes — applied to contenteditable DOM nodes via
+// className assignment, not to React UI chrome. Exempt from Phase 5
+// arbitrary-px rule (kickoff §6.4 document-content exception).
 const HEADING_CLASSES: Record<string, string> = {
   h1: 'text-[20px] font-bold text-slate-100 mb-2 mt-5',
   h2: 'text-[15px] font-semibold text-slate-300 mb-2 mt-5',
@@ -752,7 +755,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
 
             {messages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] rounded-xl px-4 py-3 ${
+                <div className={`max-w-[85%] rounded-[var(--radius-xl)] px-4 py-3 ${
                   msg.role === 'user'
                     ? 'bg-teal-600/20 border border-teal-500/20 text-[var(--brand-text-bright)]'
                     : 'bg-[var(--surface-3)]/80 border border-[var(--brand-border)]/50 text-[var(--brand-text-bright)]'
@@ -817,7 +820,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
 
             {sending && (
               <div className="flex justify-start">
-                <div className="bg-[var(--surface-3)]/80 border border-[var(--brand-border)]/50 rounded-xl px-4 py-3 flex items-center gap-2">
+                <div className="bg-[var(--surface-3)]/80 border border-[var(--brand-border)]/50 rounded-[var(--radius-lg)] px-4 py-3 flex items-center gap-2">
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400" />
                   <span className="text-xs text-[var(--brand-text)]">Analyzing and writing...</span>
                 </div>

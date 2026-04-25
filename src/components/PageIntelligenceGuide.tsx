@@ -243,7 +243,7 @@ export function PageIntelligenceGuide() {
       </div>
 
       {/* Data sources summary */}
-      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 space-y-3 rounded-[var(--radius-signature-lg)]">
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 space-y-3 rounded-[var(--radius-lg)]">
         <div className="flex items-center gap-2">
           <Icon as={Layers} size="md" className="text-teal-400" />
           <h3 className="text-sm font-medium text-[var(--brand-text-bright)]">What Gets Analyzed Automatically</h3>
@@ -274,7 +274,7 @@ export function PageIntelligenceGuide() {
       </div>
 
       {/* Recommended workflow */}
-      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 space-y-3 rounded-[var(--radius-signature-lg)]">
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 space-y-3 rounded-[var(--radius-lg)]">
         <div className="flex items-center gap-2">
           <Icon as={TrendingUp} size="md" className="text-amber-400" />
           <h3 className="text-sm font-medium text-[var(--brand-text-bright)]">Recommended Optimization Workflow</h3>
@@ -299,7 +299,7 @@ export function PageIntelligenceGuide() {
       </div>
 
       {/* Score interpretation callout */}
-      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 space-y-3 rounded-[var(--radius-signature-lg)]">
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 space-y-3 rounded-[var(--radius-lg)]">
         <div className="flex items-center gap-2">
           <Icon as={AlertTriangle} size="md" className="text-sky-400" />
           <h3 className="text-sm font-medium text-[var(--brand-text-bright)]">Score Limitations to Know</h3>

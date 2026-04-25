@@ -167,8 +167,9 @@ export function AeoReview({ workspaceId }: Props) {
   if (!review && !loading) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
+        {/* pr-check-disable-next-line -- intentional decorative shape: hero icon container, not card chrome; no --radius-2xl token defined */}
         <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500/20 to-teal-500/20 border border-purple-500/30 flex items-center justify-center">
-          <Sparkles className="w-8 h-8 text-purple-400" />
+          <UIIcon as={Sparkles} size="2xl" className="text-purple-400" />
         </div>
         <div className="text-center max-w-md">
           <h3 className="text-sm font-semibold text-[var(--brand-text-bright)] mb-1">AEO Page Review</h3>
@@ -259,7 +260,7 @@ export function AeoReview({ workspaceId }: Props) {
 
       {/* Site summary */}
       {/* purple is valid: admin AI surface (AEO site summary) */}
-      <div className="bg-purple-500/5 border border-purple-500/20 px-4 py-3 rounded-[var(--radius-signature-lg)]">
+      <div className="bg-purple-500/5 border border-purple-500/20 px-4 py-3 rounded-[var(--radius-lg)]">
         <div className="text-xs text-purple-300">{review.sitewideSummary}</div>
         <div className="text-[11px] text-[var(--brand-text-muted)] mt-1">
           Last reviewed: {new Date(review.generatedAt).toLocaleString()}
@@ -329,7 +330,7 @@ export function AeoReview({ workspaceId }: Props) {
           const isRefreshing = loadingPage === page.pageUrl;
 
           return (
-            <div key={page.pageUrl} className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-signature-lg)]">
+            <div key={page.pageUrl} className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)]">
               <button
                 onClick={() => togglePage(page.pageUrl)}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors text-left"

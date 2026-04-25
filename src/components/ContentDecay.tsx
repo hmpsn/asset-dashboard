@@ -120,7 +120,7 @@ export default function ContentDecay({ workspaceId }: Props) {
       </div>
 
       {!analysis && !analyzing && (
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-signature-lg)]">
+        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)]">
           <EmptyState icon={TrendingDown} title="No decay analysis yet" description="Run an analysis to detect content losing search traffic" className="py-12" />
         </div>
       )}
@@ -149,7 +149,7 @@ export default function ContentDecay({ workspaceId }: Props) {
           {/* AI recommendations button - purple is valid: admin AI surface */}
           {analysis.summary.totalDecaying > 0 && !analysis.decayingPages.some(p => p.refreshRecommendation) && (
             <button onClick={generateRecommendations} disabled={generatingRecs}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-purple-600/10 border border-purple-500/20 text-purple-300 hover:bg-purple-600/20 transition-colors text-xs font-medium disabled:opacity-50">
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-[var(--radius-lg)] bg-purple-600/10 border border-purple-500/20 text-purple-300 hover:bg-purple-600/20 transition-colors text-xs font-medium disabled:opacity-50">
               <Icon as={Sparkles} size="md" className={generatingRecs ? 'animate-pulse' : ''} />
               {generatingRecs ? 'Generating AI refresh recommendations...' : 'Generate AI Refresh Recommendations'}
             </button>
@@ -157,7 +157,7 @@ export default function ContentDecay({ workspaceId }: Props) {
 
           {/* Decaying pages list */}
           {filtered.length > 0 && (
-            <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
+            <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-lg)]">
               <div className="px-4 py-3 border-b border-[var(--brand-border)] flex items-center justify-between">
                 <span className="text-xs font-medium text-[var(--brand-text-bright)]">
                   {severityFilter === 'all' ? 'All Declining Pages' : `${SEV_CONFIG[severityFilter].label} Pages`}
@@ -233,7 +233,7 @@ export default function ContentDecay({ workspaceId }: Props) {
           )}
 
           {filtered.length === 0 && analysis.summary.totalDecaying === 0 && (
-            <div className="text-center py-8 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-signature-lg)]">
+            <div className="text-center py-8 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)]">
               <div className="text-emerald-400 text-sm font-medium">All content performing well</div>
               <p className="text-xs text-[var(--brand-text-muted)] mt-1">No pages showing significant traffic decline</p>
             </div>
