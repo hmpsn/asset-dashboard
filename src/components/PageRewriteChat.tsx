@@ -618,7 +618,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
           {/* Collapsed: page loaded */}
           {pageData && !comboOpen && (
             <div className="flex items-center gap-2 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-1.5">
-              <Icon as={FileText} size="xs" className="text-[var(--brand-text-muted)] flex-shrink-0" />
+              <Icon as={FileText} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
               <span className="text-xs text-[var(--brand-text-bright)] flex-1 truncate">{pageData.slug ? `/${pageData.slug}` : pageUrl}</span>
               <button onClick={openCombo} className="text-[10px] text-teal-400 hover:text-teal-300 font-medium flex-shrink-0">Change</button>
             </div>
@@ -630,7 +630,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
               onClick={openCombo}
               className="w-full flex items-center gap-2 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-1.5 text-xs text-[var(--brand-text-muted)] hover:border-teal-500/50 hover:text-[var(--brand-text-bright)] transition-colors"
             >
-              <Icon as={FileText} size="xs" />
+              <Icon as={FileText} size="sm" />
               Search pages or paste a URL…
             </button>
           )}
@@ -639,7 +639,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
           {comboOpen && (
             <div className="flex flex-col bg-[var(--surface-3)] border border-teal-500/50 rounded-[var(--radius-lg)] overflow-hidden shadow-xl">
               <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[var(--brand-border)]">
-                <Icon as={FileText} size="xs" className="text-[var(--brand-text-muted)] flex-shrink-0" />
+                <Icon as={FileText} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
                 <input
                   ref={comboInputRef}
                   role="combobox"
@@ -782,14 +782,14 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                             onClick={() => applyToSection(msgEdits[i] ?? extractRewriteOnly(msg.content), msg.sectionTarget!)}
                             className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-teal-500/10 text-teal-400 border border-teal-500/30 hover:bg-teal-500/20 transition-colors"
                           >
-                            <Icon as={Check} size="xs" />
+                            <Icon as={Check} size="sm" />
                             Apply to {msg.sectionTarget}
                           </button>
                           <button
                             onClick={() => copyToClipboard(msgEdits[i] ?? extractRewriteOnly(msg.content), i)}
                             className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)]/50 transition-colors"
                           >
-                            {copiedIdx === i ? <Icon as={Check} size="xs" className="text-teal-400" /> : <Icon as={Copy} size="xs" />}
+                            {copiedIdx === i ? <Icon as={Check} size="sm" className="text-teal-400" /> : <Icon as={Copy} size="sm" />}
                             {copiedIdx === i ? 'Copied' : 'Copy'}
                           </button>
                         </div>
@@ -805,7 +805,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                             onClick={() => copyToClipboard(msg.content, i)}
                             className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)]/50 transition-colors"
                           >
-                            {copiedIdx === i ? <Icon as={Check} size="xs" className="text-teal-400" /> : <Icon as={Copy} size="xs" />}
+                            {copiedIdx === i ? <Icon as={Check} size="sm" className="text-teal-400" /> : <Icon as={Copy} size="sm" />}
                             {copiedIdx === i ? 'Copied' : 'Copy'}
                           </button>
                         </div>
@@ -893,7 +893,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                   className="flex items-center gap-1 text-[11px] text-[var(--brand-text)] hover:text-teal-400 transition-colors flex-1 min-w-0"
                 >
                   <span className="truncate">{pageData.slug ? `/${pageData.slug}` : pageUrl}</span>
-                  <Icon as={ExternalLink} size="xs" className="flex-shrink-0" />
+                  <Icon as={ExternalLink} size="sm" className="flex-shrink-0" />
                 </a>
                 {/* Export popover */}
                 <div className="relative flex-shrink-0" ref={exportPopoverRef}>
@@ -910,19 +910,19 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                         onClick={() => handleExport('copy')}
                         className="flex items-center gap-2 px-3 py-1.5 rounded text-[11px] text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] transition-colors text-left"
                       >
-                        <Icon as={Copy} size="xs" /> Copy as Markdown
+                        <Icon as={Copy} size="sm" /> Copy as Markdown
                       </button>
                       <button
                         onClick={() => handleExport('download')}
                         className="flex items-center gap-2 px-3 py-1.5 rounded text-[11px] text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] transition-colors text-left"
                       >
-                        <Icon as={FileText} size="xs" /> Download .md
+                        <Icon as={FileText} size="sm" /> Download .md
                       </button>
                       <button
                         onClick={() => handleExport('docx')}
                         className="flex items-center gap-2 px-3 py-1.5 rounded text-[11px] text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] transition-colors text-left"
                       >
-                        <Icon as={FileText} size="xs" /> Download .docx
+                        <Icon as={FileText} size="sm" /> Download .docx
                       </button>
                     </div>
                   )}

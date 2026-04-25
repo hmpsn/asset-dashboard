@@ -182,7 +182,7 @@ function PageWeight({ siteId }: Props) {
       <div className="sticky top-0 z-10 bg-[var(--surface-1)]/95 backdrop-blur-sm py-2">
         <div className="flex items-center gap-3">
           <div className="relative flex-1">
-            <Icon as={Search} size="sm" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
+            <Icon as={Search} size="md" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
             <input
               type="text"
               value={search}
@@ -261,7 +261,7 @@ function PageWeight({ siteId }: Props) {
         <div className="flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] bg-teal-500/5 border border-teal-500/20 text-xs text-teal-300">
           <Icon as={Images} size="sm" className="flex-shrink-0" />
           <span className="flex-1"><strong>{heavyPages} heavy page{heavyPages !== 1 ? 's' : ''}</strong> found. Use the <strong>Asset Manager</strong> tab to compress images and reduce page weight.</span>
-          <Icon as={ArrowRight} size="xs" className="flex-shrink-0 text-teal-400" />
+          <Icon as={ArrowRight} size="sm" className="flex-shrink-0 text-teal-400" />
         </div>
       )}
     </div>

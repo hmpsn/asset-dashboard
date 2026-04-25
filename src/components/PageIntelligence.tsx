@@ -771,20 +771,20 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                       <div className="flex flex-wrap gap-3 mt-1">
                         {sp.volume != null && sp.volume > 0 && (
                           <div className="text-[11px] text-[var(--brand-text-muted)] flex items-center gap-1">
-                            <Icon as={BarChart3} size="xs" className="text-orange-400" />
+                            <Icon as={BarChart3} size="sm" className="text-orange-400" />
                             <span className="text-[var(--brand-text-bright)] font-medium">{sp.volume.toLocaleString()}</span>/mo
                           </div>
                         )}
                         {sp.difficulty != null && sp.difficulty > 0 && (
                           <div className="text-[11px] text-[var(--brand-text-muted)] flex items-center gap-1">
-                            <Icon as={Shield} size="xs" />
+                            <Icon as={Shield} size="sm" />
                             KD: <span className={`font-medium ${kdColor(sp.difficulty)}`}>{sp.difficulty}%</span>
                             <span className={kdColor(sp.difficulty)}>({kdLabel(sp.difficulty)})</span>
                           </div>
                         )}
                         {sp.cpc !== undefined && sp.cpc > 0 && (
                           <div className="text-[11px] text-[var(--brand-text-muted)] flex items-center gap-1">
-                            <Icon as={DollarSign} size="xs" className="text-emerald-400" />
+                            <Icon as={DollarSign} size="sm" className="text-emerald-400" />
                             CPC: <span className="text-emerald-400 font-medium">${sp.cpc.toFixed(2)}</span>
                           </div>
                         )}
@@ -923,7 +923,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                             const present = kw.primaryKeywordPresence[key];
                             return (
                               <div key={key} className="flex items-center gap-1">
-                                {present ? <Icon as={CheckCircle} size="xs" className="text-emerald-400" /> : <Icon as={AlertCircle} size="xs" className="text-red-400" />}
+                                {present ? <Icon as={CheckCircle} size="sm" className="text-emerald-400" /> : <Icon as={AlertCircle} size="sm" className="text-red-400" />}
                                 <span className={`text-[11px] ${present ? 'text-emerald-400' : 'text-red-400'}`}>{labels[key]}</span>
                               </div>
                             );
@@ -1070,15 +1070,15 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                           )}
                           <div className="flex items-center gap-4 mt-3">
                             <div className="flex items-center gap-1.5">
-                              {cs.titleOk ? <Icon as={CheckCircle} size="xs" className="text-emerald-400" /> : <Icon as={AlertCircle} size="xs" className="text-amber-400" />}
+                              {cs.titleOk ? <Icon as={CheckCircle} size="sm" className="text-emerald-400" /> : <Icon as={AlertCircle} size="sm" className="text-amber-400" />}
                               <span className="text-[11px] text-[var(--brand-text)]">Title: {cs.titleLength} chars</span>
                             </div>
                             <div className="flex items-center gap-1.5">
-                              {cs.descOk ? <Icon as={CheckCircle} size="xs" className="text-emerald-400" /> : <Icon as={AlertCircle} size="xs" className="text-amber-400" />}
+                              {cs.descOk ? <Icon as={CheckCircle} size="sm" className="text-emerald-400" /> : <Icon as={AlertCircle} size="sm" className="text-amber-400" />}
                               <span className="text-[11px] text-[var(--brand-text)]">Desc: {cs.descLength} chars</span>
                             </div>
                             <div className="flex items-center gap-1.5">
-                              <Icon as={BookOpen} size="xs" className="text-[var(--brand-text-muted)]" />
+                              <Icon as={BookOpen} size="sm" className="text-[var(--brand-text-muted)]" />
                               <span className="text-[11px] text-[var(--brand-text)]">{cs.readabilityGrade} ({cs.readabilityScore})</span>
                             </div>
                           </div>
@@ -1123,7 +1123,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                       onClick={() => navigate(adminPath(workspaceId, 'seo-editor'), { state: { fixContext: { targetRoute: 'seo-editor', pageSlug: page.slug, pageName: page.title } } })}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-[11px] font-medium text-teal-400 bg-teal-500/10 hover:bg-teal-500/15 border border-teal-500/20 transition-all"
                     >
-                      <Icon as={Pencil} size="xs" /> Fix in SEO Editor
+                      <Icon as={Pencil} size="sm" /> Fix in SEO Editor
                     </button>
                     <button
                       onClick={() => {
@@ -1146,14 +1146,14 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                       }}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-[11px] font-medium text-teal-400 bg-teal-500/10 hover:bg-teal-500/15 border border-teal-500/20 transition-all"
                     >
-                      <Icon as={BookOpen} size="xs" /> Create Brief
+                      <Icon as={BookOpen} size="sm" /> Create Brief
                     </button>
                     {(kw?.optimizationIssues?.some(i => /schema|structured data/i.test(i)) || sp?.optimizationIssues?.some(i => /schema|structured data/i.test(i))) && (
                       <button
                         onClick={() => navigate(adminPath(workspaceId, 'seo-schema'), { state: { fixContext: { targetRoute: 'seo-schema', pageSlug: page.slug, pageName: page.title } } })}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-[11px] font-medium text-teal-400 bg-teal-500/10 hover:bg-teal-500/15 border border-teal-500/20 transition-all"
                       >
-                        <Icon as={Code2} size="xs" /> Add Schema
+                        <Icon as={Code2} size="sm" /> Add Schema
                       </button>
                     )}
                     <div className="flex-1" />
@@ -1161,7 +1161,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                       onClick={() => navigate(adminPath(workspaceId, 'page-intelligence'))}
                       className="flex items-center gap-1 text-[11px] text-[var(--brand-text-dim)] hover:text-[var(--brand-text)] transition-colors"
                     >
-                      View full analysis <Icon as={ArrowUpRight} size="xs" />
+                      View full analysis <Icon as={ArrowUpRight} size="sm" />
                     </button>
                   </div>
                 </div>

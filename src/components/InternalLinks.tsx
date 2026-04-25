@@ -119,7 +119,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
     return (
       <div className="space-y-8">
         <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] px-6 py-12 text-center rounded-[var(--radius-lg)]">
-          <Icon as={Link} size="xl" className="text-[var(--brand-text-muted)] mx-auto mb-3" />
+          <Icon as={Link} size="2xl" className="text-[var(--brand-text-muted)] mx-auto mb-3" />
           <p className="text-sm text-[var(--brand-text)] mb-1">Internal Linking Suggestions</p>
           <p className="text-[11px] text-[var(--brand-text-muted)] max-w-md mx-auto mb-4">
             Analyze your site's content and discover missing internal links.

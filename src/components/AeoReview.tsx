@@ -367,8 +367,8 @@ export function AeoReview({ workspaceId }: Props) {
                     <div className="flex-1">
                       <div className="text-xs text-[var(--brand-text-bright)] leading-relaxed">{page.summary}</div>
                       <div className="flex items-center gap-3 mt-1.5 text-[11px] text-[var(--brand-text-muted)]">
-                        <span className="flex items-center gap-1"><UIIcon as={Clock} size="xs" /> ~{page.estimatedTimeMinutes} min total</span>
-                        <span className="flex items-center gap-1"><UIIcon as={Zap} size="xs" className="text-emerald-400" /> {page.quickWinCount} quick wins</span>
+                        <span className="flex items-center gap-1"><UIIcon as={Clock} size="sm" /> ~{page.estimatedTimeMinutes} min total</span>
+                        <span className="flex items-center gap-1"><UIIcon as={Zap} size="sm" className="text-emerald-400" /> {page.quickWinCount} quick wins</span>
                         <button
                           onClick={(e) => { e.stopPropagation(); runSinglePageReview(page.pageUrl); }}
                           disabled={isRefreshing}
@@ -376,7 +376,7 @@ export function AeoReview({ workspaceId }: Props) {
                         >
                           {isRefreshing
                             ? <Loader2 className="w-3 h-3 animate-spin" />
-                            : <UIIcon as={RefreshCw} size="xs" />}
+                            : <UIIcon as={RefreshCw} size="sm" />}
                           Re-review
                         </button>
                       </div>
@@ -414,8 +414,8 @@ export function AeoReview({ workspaceId }: Props) {
                                 {effortCfg.label}
                               </span>
                               {isChangeExpanded
-                                ? <UIIcon as={ChevronDown} size="xs" className="text-[var(--brand-text-dim)]" />
-                                : <UIIcon as={ChevronRight} size="xs" className="text-[var(--brand-text-dim)]" />}
+                                ? <UIIcon as={ChevronDown} size="sm" className="text-[var(--brand-text-dim)]" />
+                                : <UIIcon as={ChevronRight} size="sm" className="text-[var(--brand-text-dim)]" />}
                             </div>
                           </button>
 
@@ -442,7 +442,7 @@ export function AeoReview({ workspaceId }: Props) {
 
                               {/* AEO Impact — purple is valid: admin AI surface */}
                               <div className="flex items-start gap-1.5 text-[11px]">
-                                <UIIcon as={Sparkles} size="xs" className="text-purple-400 flex-shrink-0 mt-0.5" />
+                                <UIIcon as={Sparkles} size="sm" className="text-purple-400 flex-shrink-0 mt-0.5" />
                                 <span className="text-purple-300">{change.aeoImpact}</span>
                               </div>
                             </div>
