@@ -309,7 +309,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
                   : 'bg-[var(--surface-3)]/50 border-[var(--brand-border-hover)]/50 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)]',
               )}
             >
-              {trendsLoading ? <Icon as={Loader2} size="xs" className="animate-spin" /> : <Icon as={LineChart} size="xs" />}
+              {trendsLoading ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={LineChart} size="sm" />}
               Trends
             </button>
           )}
@@ -388,7 +388,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <button onClick={(e) => { e.stopPropagation(); togglePin(rank.query); }} className={cn('flex-shrink-0', rank.pinned ? 'text-amber-400' : 'text-[var(--brand-border-hover)] hover:text-[var(--brand-text)]')} aria-label={rank.pinned ? 'Unpin keyword' : 'Pin keyword'}>
-                      <Icon as={Pin} size="xs" />
+                      <Icon as={Pin} size="sm" />
                     </button>
                     <Icon as={ChevronDown} size="xs" className={cn('text-[var(--brand-text-dim)] flex-shrink-0 transition-transform', isExpanded && 'rotate-180')} />
                     <span className="text-xs text-[var(--brand-text-bright)] truncate">{rank.query}</span>
@@ -401,7 +401,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
                   <div className="text-right">
                     {rank.change != null ? (
                       <span className={cn('flex items-center justify-end gap-0.5 text-xs font-medium', rank.change < 0 ? 'text-emerald-400' : rank.change > 0 ? 'text-red-400' : 'text-[var(--brand-text-muted)]')}>
-                        {rank.change < 0 ? <Icon as={ArrowUp} size="xs" /> : rank.change > 0 ? <Icon as={ArrowDown} size="xs" /> : <Icon as={Minus} size="xs" />}
+                        {rank.change < 0 ? <Icon as={ArrowUp} size="sm" /> : rank.change > 0 ? <Icon as={ArrowDown} size="sm" /> : <Icon as={Minus} size="sm" />}
                         {rank.change !== 0 ? Math.abs(Math.round(rank.change * 10) / 10) : '—'}
                       </span>
                     ) : (
@@ -412,7 +412,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
                   <div className="text-right text-xs text-[var(--brand-text-muted)]">{rank.impressions.toLocaleString()}</div>
                   <div className="text-right">
                     <button onClick={(e) => { e.stopPropagation(); removeKeyword(rank.query); }} className="text-[var(--brand-border-hover)] hover:text-red-400 transition-colors" aria-label="Remove keyword">
-                      <Icon as={Trash2} size="xs" />
+                      <Icon as={Trash2} size="sm" />
                     </button>
                   </div>
                 </div>
@@ -420,7 +420,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
                   <div className="px-4 py-3 border-b border-[var(--brand-border)]/50 bg-[var(--surface-1)]/40">
                     {historyLoading ? (
                       <div className="flex items-center gap-2 py-2 text-[var(--brand-text-muted)] text-xs">
-                        <Icon as={Loader2} size="xs" className="animate-spin text-blue-400" /> Loading history...
+                        <Icon as={Loader2} size="sm" className="animate-spin text-blue-400" /> Loading history...
                       </div>
                     ) : (
                       <PositionSparkline data={queryHistory} />

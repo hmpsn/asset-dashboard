@@ -170,7 +170,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
 
       {isLoading && (
         <div className="flex items-center justify-center py-12 gap-3 text-[var(--brand-text-muted)]">
-          <Icon as={Loader2} size="md" className="animate-spin" />
+          <Icon as={Loader2} size="lg" className="animate-spin" />
           <p className="text-sm">Loading search data...</p>
         </div>
       )}
@@ -279,7 +279,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                           className="flex items-center gap-1 ml-auto hover:text-[var(--brand-text-bright)] transition-colors"
                         >
                           {key === 'ctr' ? 'CTR' : key.charAt(0).toUpperCase() + key.slice(1)}
-                          {sortKey === key && <Icon as={ArrowUpDown} size="xs" />}
+                          {sortKey === key && <Icon as={ArrowUpDown} size="sm" />}
                         </button>
                       </th>
                     ))}
@@ -318,7 +318,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                         <td className="py-2.5 px-4 text-[var(--brand-text-bright)] font-medium max-w-xs truncate">
                           <a href={p.page} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-blue-400 transition-colors">
                             {pagePath}
-                            <Icon as={ExternalLink} size="xs" className="flex-shrink-0 text-[var(--brand-text-muted)]" />
+                            <Icon as={ExternalLink} size="sm" className="flex-shrink-0 text-[var(--brand-text-muted)]" />
                           </a>
                           {badge && (
                             <span className={`t-caption-sm font-semibold px-1 py-0.5 rounded ${badge.color} ${badge.bgColor} ml-1 whitespace-nowrap`}>

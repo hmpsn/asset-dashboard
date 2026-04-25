@@ -28,7 +28,7 @@ export function ChartPointDetail({ date, metrics, onClose, xPct }: Props) {
         <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--brand-border)]">
           <span className="t-caption-sm font-semibold text-[var(--brand-text-bright)]">{date}</span>
           <button onClick={onClose} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] -mr-1" aria-label="Close">
-            <Icon as={X} size="xs" />
+            <Icon as={X} size="sm" />
           </button>
         </div>
         <div className="px-3 py-2 space-y-1.5">

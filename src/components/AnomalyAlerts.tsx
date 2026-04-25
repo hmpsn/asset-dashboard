@@ -128,13 +128,13 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
           {critical.length > 0 && <span className="px-1.5 py-0.5 rounded t-caption-sm bg-red-500/20 text-red-400/80">{critical.length}</span>}
           {warnings.length > 0 && <span className="px-1.5 py-0.5 rounded t-caption-sm bg-amber-500/20 text-amber-400/80">{warnings.length}</span>}
           {positive.length > 0 && <span className="px-1.5 py-0.5 rounded t-caption-sm bg-emerald-500/20 text-emerald-400/80">{positive.length}</span>}
-          {collapsed ? <Icon as={ChevronDown} size="xs" /> : <Icon as={ChevronUp} size="xs" />}
+          {collapsed ? <Icon as={ChevronDown} size="sm" /> : <Icon as={ChevronUp} size="sm" />}
         </button>
         {isAdmin && (
           <Tooltip content="Re-scan now">
             <button onClick={handleScan} disabled={isLoading}
               className="p-1 text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors disabled:opacity-50">
-              <Icon as={RefreshCw} size="xs" className={isLoading ? 'animate-spin' : ''} />
+              <Icon as={RefreshCw} size="sm" className={isLoading ? 'animate-spin' : ''} />
             </button>
           </Tooltip>
         )}
@@ -163,7 +163,7 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="t-caption font-medium text-[var(--brand-text-bright)] truncate">{anomaly.title}</span>
-                        {anomaly.acknowledgedAt && <Icon as={Check} size="xs" className="text-[var(--brand-text-muted)] flex-shrink-0" />}
+                        {anomaly.acknowledgedAt && <Icon as={Check} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />}
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className={`t-caption-sm px-1.5 py-0.5 rounded ${style.badge}`}>{SOURCE_LABELS[anomaly.source]}</span>
