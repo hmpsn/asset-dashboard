@@ -4,8 +4,7 @@ import {
   AlertTriangle, Map, RefreshCw, ArrowUpRight, Layers, Code2, CheckCircle2, XCircle,
   Zap, Link2,
 } from 'lucide-react';
-import { SectionCard, StatCard, Badge, EmptyState, PageHeader } from './ui';
-import { themeColor } from './ui/constants';
+import { SectionCard, StatCard, Badge, EmptyState, PageHeader, Icon, Button } from './ui';
 import { siteArchitecture } from '../api/content';
 
 // ── Schema coverage types ──
@@ -121,22 +120,22 @@ function TreeNode({ node, defaultExpanded, coverageMap }: { node: SiteNode; defa
     <div>
       <button
         onClick={() => hasChildren && setExpanded(!expanded)}
-        className={`w-full flex items-center gap-2 px-3 py-2 text-left rounded-lg transition-colors group ${
-          hasChildren ? 'hover:bg-zinc-800/50 cursor-pointer' : 'cursor-default'
+        className={`w-full flex items-center gap-2 px-3 py-2 text-left rounded-[var(--radius-lg)] transition-colors group ${
+          hasChildren ? 'hover:bg-[var(--surface-3)]/50 cursor-pointer' : 'cursor-default'
         } ${!node.hasContent ? 'opacity-60' : ''}`}
         style={{ paddingLeft: `${node.depth * 20 + 12}px` }}
       >
         {hasChildren ? (
-          expanded ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
+          expanded ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" /> : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
         ) : (
-          <FileText className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" />
+          <Icon as={FileText} size="md" className="text-[var(--brand-text-dim)] flex-shrink-0" />
         )}
 
-        <span className="text-xs font-medium text-zinc-200 truncate flex-1">{node.name}</span>
+        <span className="text-xs font-medium text-[var(--brand-text-bright)] truncate flex-1">{node.name}</span>
 
         {node.keyword && (
-          <span className="text-[10px] text-zinc-500 truncate max-w-[150px] hidden sm:block" title={node.keyword}>
-            <Target className="w-2.5 h-2.5 inline mr-0.5 -mt-px" />{node.keyword}
+          <span className="text-[10px] text-[var(--brand-text-muted)] truncate max-w-[150px] hidden sm:block" title={node.keyword}>
+            <Icon as={Target} size="sm" className="mr-0.5 -mt-px" />{node.keyword}
           </span>
         )}
 
@@ -145,22 +144,22 @@ function TreeNode({ node, defaultExpanded, coverageMap }: { node: SiteNode; defa
         {cov && (
           cov.hasSchema ? (
             <span className="flex items-center gap-0.5 text-[10px] text-emerald-400" title={`Schema: ${cov.schemaTypes.join(', ')}`}>
-              <CheckCircle2 className="w-3 h-3" />
+              <Icon as={CheckCircle2} size="sm" />
               <span className="hidden lg:inline">{cov.schemaTypes.length}</span>
             </span>
           ) : (
-            <span className="flex items-center gap-0.5 text-[10px] text-zinc-600" title="No schema">
-              <XCircle className="w-3 h-3" />
+            <span className="flex items-center gap-0.5 text-[10px] text-[var(--brand-text-dim)]" title="No schema">
+              <Icon as={XCircle} size="sm" />
             </span>
           )
         )}
 
-        <span className="text-[10px] text-zinc-600 font-mono min-w-0 truncate hidden md:block max-w-[160px]" title={node.path}>
+        <span className="text-[10px] text-[var(--brand-text-dim)] font-mono min-w-0 truncate hidden md:block max-w-[160px]" title={node.path}>
           {node.path}
         </span>
 
         {hasChildren && (
-          <span className="text-[10px] text-zinc-600 flex-shrink-0">
+          <span className="text-[10px] text-[var(--brand-text-dim)] flex-shrink-0">
             {node.children.length}
           </span>
         )}
@@ -187,14 +186,14 @@ function DepthChart({ distribution }: { distribution: Record<number, number> }) 
     <div className="space-y-1.5">
       {entries.map(e => (
         <div key={e.depth} className="flex items-center gap-2">
-          <span className="text-[10px] text-zinc-500 w-16 text-right flex-shrink-0">Depth {e.depth}</span>
-          <div className="flex-1 h-4 bg-zinc-800 rounded overflow-hidden">
+          <span className="text-[10px] text-[var(--brand-text-muted)] w-16 text-right flex-shrink-0">Depth {e.depth}</span>
+          <div className="flex-1 h-4 bg-[var(--surface-3)] rounded overflow-hidden">
             <div
               className="h-full bg-teal-500/30 rounded"
               style={{ width: `${(e.count / maxCount) * 100}%` }}
             />
           </div>
-          <span className="text-[10px] text-zinc-400 w-8 text-right tabular-nums">{e.count}</span>
+          <span className="text-[10px] text-[var(--brand-text)] w-8 text-right tabular-nums">{e.count}</span>
         </div>
       ))}
     </div>
@@ -268,7 +267,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
     return (
       <div className="flex items-center justify-center py-24 gap-3">
         <Loader2 className="w-5 h-5 animate-spin text-teal-400" />
-        <span className="text-sm text-zinc-400">Building site architecture…</span>
+        <span className="text-sm text-[var(--brand-text)]">Building site architecture…</span>
       </div>
     );
   }
@@ -280,9 +279,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
         title="Failed to load architecture"
         description={error}
         action={
-          <button onClick={load} className="text-xs px-3 py-1.5 rounded-lg bg-teal-500/10 text-teal-400 hover:bg-teal-500/15 transition-colors">
-            Retry
-          </button>
+          <Button variant="primary" size="sm" onClick={load}>Retry</Button>
         }
       />
     );
@@ -295,9 +292,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
         title="No architecture data"
         description="Click 'Analyze' to build a visual URL tree from your Webflow pages, planned content, and keyword strategy."
         action={
-          <button onClick={load} className="text-xs px-3 py-1.5 rounded-lg bg-teal-500/10 text-teal-400 hover:bg-teal-500/15 transition-colors">
-            Analyze Site Architecture
-          </button>
+          <Button variant="primary" size="sm" onClick={load}>Analyze Site Architecture</Button>
         }
       />
     );
@@ -311,14 +306,16 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
         subtitle={`${data.totalPages} pages · Analyzed ${new Date(data.analyzedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`}
         icon={<Map className="w-5 h-5 text-teal-400" />}
         actions={
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={RefreshCw}
             onClick={load}
             disabled={loading}
-            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-teal-500/10 text-teal-400 hover:bg-teal-500/15 transition-colors disabled:opacity-50"
+            loading={loading}
           >
-            <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
             {loading ? 'Analyzing…' : 'Re-analyze'}
-          </button>
+          </Button>
         }
       />
 
@@ -332,7 +329,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
           label="Gaps Found"
           value={data.gaps.length}
           icon={AlertTriangle}
-          iconColor={data.gaps.length > 0 ? '#fbbf24' : themeColor('#71717a', '#94a3b8')}
+          iconColor={data.gaps.length > 0 ? '#fbbf24' : 'var(--brand-text-muted)'}
           sub={data.orphanPaths.length > 0 ? `${data.orphanPaths.length} orphan${data.orphanPaths.length !== 1 ? 's' : ''}` : 'No orphans'}
           size="hero"
           staggerIndex={4}
@@ -358,15 +355,15 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
           titleExtra={<Badge label={`${data.gaps.length}`} color="amber" />}
           noPadding
         >
-          <div className="divide-y divide-zinc-800/50">
+          <div className="divide-y divide-[var(--brand-border)]/50">
             {data.gaps.map((gap, i) => (
               <div key={i} className="flex items-start gap-3 px-4 py-3">
                 <Badge label={gap.priority} color={PRIORITY_COLOR[gap.priority] || 'zinc'} className="mt-0.5" />
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs font-medium text-zinc-200 font-mono">{gap.suggestedPath}</div>
-                  <div className="text-[11px] text-zinc-500 mt-0.5">{gap.reason}</div>
+                  <div className="text-xs font-medium text-[var(--brand-text-bright)] font-mono">{gap.suggestedPath}</div>
+                  <div className="text-[11px] text-[var(--brand-text-muted)] mt-0.5">{gap.reason}</div>
                 </div>
-                <ArrowUpRight className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0 mt-0.5" />
+                <Icon as={ArrowUpRight} size="md" className="text-[var(--brand-text-dim)] flex-shrink-0 mt-0.5" />
               </div>
             ))}
           </div>
@@ -382,10 +379,10 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
         >
           <div className="space-y-1">
             {data.orphanPaths.map(p => (
-              <div key={p} className="text-xs font-mono text-zinc-400 px-2 py-1 rounded bg-zinc-800/50">{p}</div>
+              <div key={p} className="text-xs font-mono text-[var(--brand-text)] px-2 py-1 rounded bg-[var(--surface-3)]/50">{p}</div>
             ))}
           </div>
-          <p className="text-[11px] text-zinc-500 mt-3">
+          <p className="text-[11px] text-[var(--brand-text-muted)] mt-3">
             Orphan pages have content but their parent directory has no hub/landing page, making them harder for search engines to discover.
           </p>
         </SectionCard>
@@ -400,13 +397,13 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
           noPadding
         >
           {/* Filters */}
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-zinc-800">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--brand-border)]">
             <input
               type="text"
               placeholder="Search pages…"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="flex-1 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-teal-500/50"
+              className="flex-1 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-1.5 text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500/50"
             />
             <div className="flex items-center gap-1">
               {(['all', 'existing', 'planned', 'strategy', 'gap'] as const).map(f => (
@@ -416,7 +413,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
                   className={`text-[11px] px-2 py-1 rounded-md font-medium transition-colors ${
                     filter === f
                       ? 'bg-teal-500/15 text-teal-300 border border-teal-500/30'
-                      : 'text-zinc-500 hover:text-zinc-300 border border-transparent'
+                      : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] border border-transparent'
                   }`}
                 >
                   {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
@@ -435,10 +432,10 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
                   ))}
                 </div>
               ) : (
-                <div className="py-12 text-center text-xs text-zinc-500">No pages match the current filter.</div>
+                <div className="py-12 text-center text-xs text-[var(--brand-text-muted)]">No pages match the current filter.</div>
               )
             ) : (
-              <div className="py-12 text-center text-xs text-zinc-500">No pages match the current filter.</div>
+              <div className="py-12 text-center text-xs text-[var(--brand-text-muted)]">No pages match the current filter.</div>
             )}
           </div>
         </SectionCard>
@@ -452,23 +449,23 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
             titleExtra={<Badge label={`${coverage.priorityQueue.length}`} color="amber" />}
             noPadding
           >
-            <div className="max-h-[280px] overflow-y-auto divide-y divide-zinc-800/50">
+            <div className="max-h-[280px] overflow-y-auto divide-y divide-[var(--brand-border)]/50">
               {coverage.priorityQueue.map(p => {
                 const pb = PRIORITY_BADGE[p.priority];
                 return (
                   <div key={p.path} className="flex items-center gap-2 px-4 py-2">
                     {p.hasSchema ? (
-                      <Link2 className="w-3 h-3 text-zinc-600 flex-shrink-0" />
+                      <Icon as={Link2} size="sm" className="text-[var(--brand-text-dim)] flex-shrink-0" />
                     ) : (
-                      <XCircle className="w-3 h-3 text-zinc-600 flex-shrink-0" />
+                      <Icon as={XCircle} size="sm" className="text-[var(--brand-text-dim)] flex-shrink-0" />
                     )}
-                    <span className="text-xs text-zinc-300 truncate flex-1" title={p.path}>{p.name}</span>
+                    <span className="text-xs text-[var(--brand-text-bright)] truncate flex-1" title={p.path}>{p.name}</span>
                     <Badge label={pb.label} color={pb.color} />
                     {p.isOrphan && (
                       <span className="text-[10px] text-red-400" title="Orphan page — no inbound links">orphan</span>
                     )}
                     {p.inboundLinks !== null && !p.isOrphan && (
-                      <span className="text-[10px] text-zinc-600" title={`${p.inboundLinks} inbound links`}>
+                      <span className="text-[10px] text-[var(--brand-text-dim)]" title={`${p.inboundLinks} inbound links`}>
                         {p.inboundLinks} in
                       </span>
                     )}
@@ -477,7 +474,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
               })}
             </div>
             {coverage.hasLinkData && (
-              <div className="px-4 py-2 border-t border-zinc-800 text-[11px] text-zinc-500">
+              <div className="px-4 py-2 border-t border-[var(--brand-border)] text-[11px] text-[var(--brand-text-muted)]">
                 Priority based on schema coverage + internal link health. Critical = orphan + no schema.
               </div>
             )}
@@ -489,12 +486,12 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
           titleIcon={<Layers className="w-4 h-4 text-teal-400" />}
         >
           <DepthChart distribution={data.depthDistribution} />
-          <p className="text-[11px] text-zinc-500 mt-4">
+          <p className="text-[11px] text-[var(--brand-text-muted)] mt-4">
             Ideal site architecture keeps most pages within 3 clicks of the homepage (depth ≤ 3).
           </p>
           {Object.keys(data.depthDistribution).some(d => Number(d) > 3) && (
-            <div className="mt-3 flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-500/5 border border-amber-500/15">
-              <AlertTriangle className="w-3 h-3 text-amber-400 flex-shrink-0 mt-0.5" />
+            <div className="mt-3 flex items-start gap-2 px-3 py-2 rounded-[var(--radius-lg)] bg-amber-500/5 border border-amber-500/15">
+              <Icon as={AlertTriangle} size="sm" className="text-amber-400 flex-shrink-0 mt-0.5" />
               <span className="text-[11px] text-amber-300">
                 Some pages are deeper than 3 levels. Consider adding hub pages to flatten the hierarchy.
               </span>
