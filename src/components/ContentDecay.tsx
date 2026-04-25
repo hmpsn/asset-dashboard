@@ -120,7 +120,8 @@ export default function ContentDecay({ workspaceId }: Props) {
       </div>
 
       {!analysis && !analyzing && (
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)]">
+        // pr-check-disable-next-line -- brand asymmetric signature on decay analytics summary; intentional non-SectionCard chrome
+        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-signature-lg)]">
           <EmptyState icon={TrendingDown} title="No decay analysis yet" description="Run an analysis to detect content losing search traffic" className="py-12" />
         </div>
       )}
@@ -157,7 +158,8 @@ export default function ContentDecay({ workspaceId }: Props) {
 
           {/* Decaying pages list */}
           {filtered.length > 0 && (
-            <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-lg)]">
+            // pr-check-disable-next-line -- brand asymmetric signature on decaying-pages list outer card; intentional non-SectionCard chrome
+            <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
               <div className="px-4 py-3 border-b border-[var(--brand-border)] flex items-center justify-between">
                 <span className="text-xs font-medium text-[var(--brand-text-bright)]">
                   {severityFilter === 'all' ? 'All Declining Pages' : `${SEV_CONFIG[severityFilter].label} Pages`}
@@ -233,7 +235,8 @@ export default function ContentDecay({ workspaceId }: Props) {
           )}
 
           {filtered.length === 0 && analysis.summary.totalDecaying === 0 && (
-            <div className="text-center py-8 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)]">
+            // pr-check-disable-next-line -- brand asymmetric signature on no-decay empty state; intentional non-SectionCard chrome
+            <div className="text-center py-8 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-signature-lg)]">
               <div className="text-emerald-400 text-sm font-medium">All content performing well</div>
               <p className="text-xs text-[var(--brand-text-muted)] mt-1">No pages showing significant traffic decline</p>
             </div>

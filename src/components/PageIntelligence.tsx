@@ -658,7 +658,8 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
       </div>
 
       {/* Page List */}
-      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-lg)]">
+      {/* pr-check-disable-next-line -- brand asymmetric signature on page list outer card; intentional non-SectionCard chrome */}
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
         {filtered.map(page => {
           const isExpanded = expanded === page.id;
           const isAnalyzing = analyzing.has(page.id);

@@ -118,7 +118,8 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
   if (!data && !loading) {
     return (
       <div className="space-y-8">
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] px-6 py-12 text-center rounded-[var(--radius-lg)]">
+        {/* pr-check-disable-next-line -- brand asymmetric signature on internal-links empty state; intentional non-SectionCard chrome */}
+        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] px-6 py-12 text-center rounded-[var(--radius-signature-lg)]">
           <Icon as={Link} size="2xl" className="text-[var(--brand-text-muted)] mx-auto mb-3" />
           <p className="text-sm text-[var(--brand-text)] mb-1">Internal Linking Suggestions</p>
           <p className="text-[11px] text-[var(--brand-text-muted)] max-w-md mx-auto mb-4">
@@ -174,7 +175,8 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
 
       {/* Orphan Pages Warning */}
       {data.orphanCount && data.orphanCount > 0 && (
-        <div className="bg-[var(--surface-2)] border border-orange-500/20 overflow-hidden rounded-[var(--radius-lg)]">
+        // pr-check-disable-next-line -- brand asymmetric signature on orphan-links callout; intentional non-SectionCard chrome
+        <div className="bg-[var(--surface-2)] border border-orange-500/20 overflow-hidden rounded-[var(--radius-signature-lg)]">
           <button
             onClick={() => setShowOrphans(!showOrphans)}
             className="w-full px-4 py-3 flex items-center gap-2 hover:bg-[var(--surface-3)]/30 transition-colors"
@@ -242,7 +244,8 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
       </div>
 
       {/* Suggestions list */}
-      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-lg)]">
+      {/* pr-check-disable-next-line -- brand asymmetric signature on internal-links table outer; intentional non-SectionCard chrome */}
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
         {filtered.length === 0 ? (
           <div className="px-4 py-8 text-center text-xs text-[var(--brand-text-muted)]">
             No suggestions match your filter

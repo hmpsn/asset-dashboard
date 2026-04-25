@@ -260,7 +260,8 @@ export function AeoReview({ workspaceId }: Props) {
 
       {/* Site summary */}
       {/* purple is valid: admin AI surface (AEO site summary) */}
-      <div className="bg-purple-500/5 border border-purple-500/20 px-4 py-3 rounded-[var(--radius-lg)]">
+      {/* pr-check-disable-next-line -- brand asymmetric signature on AEO summary stats block; intentional non-SectionCard chrome */}
+      <div className="bg-purple-500/5 border border-purple-500/20 px-4 py-3 rounded-[var(--radius-signature-lg)]">
         <div className="text-xs text-purple-300">{review.sitewideSummary}</div>
         <div className="text-[11px] text-[var(--brand-text-muted)] mt-1">
           Last reviewed: {new Date(review.generatedAt).toLocaleString()}
@@ -330,7 +331,8 @@ export function AeoReview({ workspaceId }: Props) {
           const isRefreshing = loadingPage === page.pageUrl;
 
           return (
-            <div key={page.pageUrl} className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)]">
+            // pr-check-disable-next-line -- brand asymmetric signature on AEO page review card; intentional non-SectionCard chrome
+            <div key={page.pageUrl} className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-signature-lg)]">
               <button
                 onClick={() => togglePage(page.pageUrl)}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors text-left"

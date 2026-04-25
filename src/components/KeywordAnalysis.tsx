@@ -258,7 +258,8 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
           const cs = contentScores[page.id];
 
           return (
-            <div key={page.id} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-lg)]">
+            // pr-check-disable-next-line -- brand asymmetric signature on page-level keyword analysis card; intentional non-SectionCard chrome
+            <div key={page.id} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
               <button
                 onClick={() => toggleExpand(page.id, page)}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-2)]/50 transition-colors text-left"
