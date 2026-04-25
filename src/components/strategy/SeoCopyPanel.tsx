@@ -51,14 +51,14 @@ export function SeoCopyPanel({
           {generatingCopy === page.pagePath ? (
             <><Icon as={Loader2} size="xs" className="animate-spin" /> Generating SEO Copy...</>
           ) : (
-            <><Icon as={Wand2} size="xs" className="text-teal-300" /> Generate SEO Copy</>
+            <><Icon as={Wand2} size="sm" className="text-teal-300" /> Generate SEO Copy</>
           )}
         </button>
       ) : (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <h5 className="t-caption-sm font-semibold text-teal-300 uppercase tracking-wider flex items-center gap-1">
-              <Icon as={Wand2} size="xs" className="text-teal-300" /> Generated SEO Copy
+              <Icon as={Wand2} size="sm" className="text-teal-300" /> Generated SEO Copy
             </h5>
             <button
               onClick={(e) => { e.stopPropagation(); onGenerateSeoCopy(page); }}

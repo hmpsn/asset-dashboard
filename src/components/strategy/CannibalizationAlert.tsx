@@ -82,8 +82,8 @@ export function CannibalizationAlert({ items }: CannibalizationAlertProps) {
               );
             })()}
             <div className="flex items-start gap-1 mt-1">
-              <Icon as={AlertTriangle} size="xs" className="text-amber-400 flex-shrink-0 mt-0.5" />
-              <span className="t-micro text-amber-400">{item.recommendation}</span>
+              <Icon as={AlertTriangle} size="sm" className="text-amber-400 flex-shrink-0 mt-0.5" />
+              <span className="t-caption-sm text-amber-400">{item.recommendation}</span>
             </div>
           </div>
         ))}

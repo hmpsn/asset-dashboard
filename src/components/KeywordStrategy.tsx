@@ -308,11 +308,11 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white t-caption font-medium transition-colors"
           >
             {generating ? (
-              <><Icon as={Loader2} size="xs" className="animate-spin" /> Generating...</>
+              <><Icon as={Loader2} size="sm" className="animate-spin" /> Generating...</>
             ) : isRealStrategy ? (
-              <><Icon as={RefreshCw} size="xs" /> Regenerate</>
+              <><Icon as={RefreshCw} size="sm" /> Regenerate</>
             ) : (
-              <><Icon as={Sparkles} size="xs" /> Generate Strategy</>
+              <><Icon as={Sparkles} size="sm" /> Generate Strategy</>
             )}
           </button>
         </div>
@@ -329,7 +329,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[var(--surface-3)]/20 transition-colors text-left"
         >
           <div className="flex items-center gap-2">
-            <Icon as={Briefcase} size="xs" className="text-teal-400" />
+            <Icon as={Briefcase} size="sm" className="text-teal-400" />
             <span className="t-caption font-semibold text-[var(--brand-text-bright)]">Strategy Settings</span>
             {!settingsOpen && (
               <span className="t-caption-sm text-[var(--brand-text-muted)]">
@@ -348,7 +348,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             {providerList.filter(p => p.configured).length > 1 && (
               <div>
                 <div className="flex items-center gap-1.5 mb-2">
-                  <Icon as={BarChart3} size="xs" className="text-teal-400" />
+                  <Icon as={BarChart3} size="sm" className="text-teal-400" />
                   <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">SEO Data Provider</span>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -366,7 +366,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                       }`}
                     >
                       <div className="font-semibold capitalize">{p.name === 'dataforseo' ? 'DataForSEO' : 'SEMRush'}</div>
-                      <div className="t-micro mt-0.5 opacity-70">
+                      <div className="t-caption-sm mt-0.5 opacity-70">
                         {p.name === 'dataforseo' ? 'Pay-as-you-go' : 'Subscription'}
                       </div>
                     </button>
@@ -384,7 +384,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             {semrushAvailable && (
               <div>
                 <div className="flex items-center gap-1.5 mb-2">
-                  <Icon as={BarChart3} size="xs" className="text-orange-400" />
+                  <Icon as={BarChart3} size="sm" className="text-orange-400" />
                   <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">SEMRush Data Mode</span>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
@@ -420,7 +420,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-1.5">
-                    <Icon as={Users} size="xs" className="text-orange-400" />
+                    <Icon as={Users} size="sm" className="text-orange-400" />
                     <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">Competitor Domains</span>
                   </div>
                   <button
@@ -439,7 +439,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                     disabled={discoveringCompetitors}
                     className="flex items-center gap-1 px-2 py-0.5 rounded bg-orange-500/10 border border-orange-500/20 t-micro text-orange-400 font-medium hover:bg-orange-500/20 transition-all disabled:opacity-50"
                   >
-                    {discoveringCompetitors ? <Icon as={Loader2} size="xs" className="animate-spin" /> : <Icon as={Search} size="xs" className="text-orange-400" />}
+                    {discoveringCompetitors ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Search} size="sm" className="text-orange-400" />}
                     {discoveringCompetitors ? 'Discovering...' : 'Auto-Discover'}
                   </button>
                 </div>
@@ -457,7 +457,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             {/* Page Limit */}
             <div>
               <div className="flex items-center gap-1.5 mb-2">
-                <Icon as={FileText} size="xs" className="text-teal-400" />
+                <Icon as={FileText} size="sm" className="text-teal-400" />
                 <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">Page Limit</span>
               </div>
               <div className="grid grid-cols-4 gap-3">
@@ -494,7 +494,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                 onClick={() => setContextOpen(!contextOpen)}
                 className="flex items-center gap-1.5 mb-1"
               >
-                <Icon as={Briefcase} size="xs" className="text-teal-400" />
+                <Icon as={Briefcase} size="sm" className="text-teal-400" />
                 <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">Business Context</span>
                 <Icon as={contextOpen ? ChevronDown : ChevronRight} size="xs" className="text-[var(--brand-text-muted)]" />
               </button>
@@ -553,7 +553,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       {!isRealStrategy && !generating && (
         <SectionCard noPadding>
           <div className="px-6 py-12 text-center">
-            <Icon as={Target} size="xl" className="text-[var(--brand-text-muted)] mx-auto mb-3" />
+            <Icon as={Target} size="2xl" className="text-[var(--brand-text-muted)] mx-auto mb-3" />
             <p className="t-ui text-[var(--brand-text)] mb-1">No keyword strategy yet</p>
             <p className="t-caption-sm text-[var(--brand-text-muted)] max-w-md mx-auto">
               Generate an AI-powered keyword strategy based on your site's pages and Google Search Console data.
@@ -568,7 +568,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           {/* ── Unvalidated Strategy Warning ── */}
           {!(strategy.pageMap ?? []).some((p: PageKeywordMap) => p.volume && p.volume > 0) && (
             <div className="bg-amber-500/10 border border-amber-500/30 rounded-[var(--radius-lg)] px-4 py-3 flex items-start gap-2.5">
-              <Icon as={AlertTriangle} size="sm" className="text-amber-400 flex-shrink-0 mt-0.5" />
+              <Icon as={AlertTriangle} size="md" className="text-amber-400 flex-shrink-0 mt-0.5" />
               <div className="t-caption text-amber-300/90 leading-relaxed">
                 <strong className="text-amber-300">This strategy was generated without keyword volume validation.</strong>{' '}
                 Keywords, volume, and difficulty data may not reflect real search demand. Enable SEMRush integration for validated keyword recommendations.
@@ -666,7 +666,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           {/* ── Site Keywords ── */}
           <SectionCard
             title="Site Target Keywords"
-            titleIcon={<Icon as={Target} size="xs" className="text-teal-400" />}
+            titleIcon={<Icon as={Target} size="sm" className="text-teal-400" />}
           >
             <div className="flex flex-wrap gap-1.5">
               {strategy.siteKeywords.map((kw: string, i: number) => {
@@ -686,7 +686,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                       title={tracked ? 'Tracking' : 'Track in Rank Tracker'}
                       className={`ml-0.5 transition-colors ${tracked ? 'text-emerald-400' : 'text-[var(--brand-text-muted)] hover:text-teal-400'}`}
                     >
-                      {tracked ? <Icon as={Check} size="xs" className="text-emerald-400" /> : <Icon as={Plus} size="xs" />}
+                      {tracked ? <Icon as={Check} size="sm" className="text-emerald-400" /> : <Icon as={Plus} size="sm" />}
                     </button>
                   </span>
                 );
@@ -698,9 +698,9 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           {strategy.opportunities.length > 0 && (
             <SectionCard
               title="Keyword Opportunities"
-              titleIcon={<Icon as={Sparkles} size="xs" className="text-teal-400" />}
+              titleIcon={<Icon as={Sparkles} size="sm" className="text-teal-400" />}
             >
-              <p className="text-[var(--brand-text-muted)] t-micro mb-2">
+              <p className="text-[var(--brand-text-muted)] t-caption-sm mb-2">
                 These opportunities are AI-generated suggestions based on your site's content and competitive landscape. Validate with keyword research before acting.
               </p>
               <div className="space-y-1.5">
@@ -717,7 +717,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           {/* How it works */}
           <div className="bg-[var(--surface-3)]/30 rounded-[var(--radius-lg)] border border-[var(--brand-border)] px-4 py-3">
             <div className="flex items-start gap-2">
-              <Icon as={Sparkles} size="xs" className="text-teal-400 mt-0.5 flex-shrink-0" />
+              <Icon as={Sparkles} size="sm" className="text-teal-400 mt-0.5 flex-shrink-0" />
               <div className="t-caption-sm text-[var(--brand-text-muted)]">
                 <strong className="text-[var(--brand-text)]">How it works:</strong> This strategy is automatically used when you generate AI rewrites
                 in the Edit SEO and CMS SEO tabs. The AI will incorporate your target keywords naturally into titles and descriptions.

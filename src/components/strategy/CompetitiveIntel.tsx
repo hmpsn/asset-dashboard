@@ -111,7 +111,7 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
     return (
       <SectionCard>
         <div className="flex items-center gap-3 py-6 justify-center">
-          <Icon as={Target} size="md" className="text-[var(--brand-text-muted)]" />
+          <Icon as={Target} size="lg" className="text-[var(--brand-text-muted)]" />
           <div>
             <p className="t-ui text-[var(--brand-text)]">Competitive Intelligence requires SEMRush</p>
             <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">Configure your SEMRush API key in Settings to unlock this feature.</p>
@@ -125,7 +125,7 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
     return (
       <SectionCard>
         <div className="flex items-center gap-3 py-6 justify-center">
-          <Icon as={Globe} size="md" className="text-[var(--brand-text-muted)]" />
+          <Icon as={Globe} size="lg" className="text-[var(--brand-text-muted)]" />
           <div>
             <p className="t-ui text-[var(--brand-text)]">Add competitor domains above</p>
             <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">Enter competitors in Strategy Settings → Competitor Domains, then generate a strategy.</p>
@@ -139,7 +139,7 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
     return (
       <SectionCard>
         <div className="flex flex-col items-center justify-center py-10 gap-2">
-          <Icon as={Loader2} size="md" className="animate-spin text-teal-400" />
+          <Icon as={Loader2} size="lg" className="animate-spin text-teal-400" />
           <p className="t-ui text-[var(--brand-text)]">Fetching competitive intelligence...</p>
           <p className="t-caption-sm text-[var(--brand-text-muted)]">Comparing domain metrics, keywords, and backlinks</p>
         </div>
@@ -180,7 +180,7 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Icon as={Target} size="sm" className="text-teal-400" />
+          <Icon as={Target} size="md" className="text-teal-400" />
           <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Competitive Intelligence</h3>
         </div>
         <button onClick={() => { queryClient.invalidateQueries({ queryKey: queryKeys.admin.competitorIntelAll(workspaceId) }); }} className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
@@ -211,7 +211,7 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
               className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[var(--surface-3)]/50 transition-colors"
             >
               <Icon as={isExpanded ? ChevronDown : ChevronRight} size="sm" className="text-[var(--brand-text-muted)]" />
-              <Icon as={Globe} size="sm" className="text-orange-400" />
+              <Icon as={Globe} size="md" className="text-orange-400" />
               <span className="t-ui font-medium text-[var(--brand-text-bright)] flex-1 text-left">{comp.domain}</span>
               {compOv && (
                 <div className="flex items-center gap-4 t-caption-sm text-[var(--brand-text-muted)]">
@@ -267,7 +267,7 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
             className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[var(--surface-3)]/50 transition-colors"
           >
             <Icon as={expanded.has('gaps') ? ChevronDown : ChevronRight} size="sm" className="text-[var(--brand-text-muted)]" />
-            <Icon as={Target} size="sm" className="text-amber-400" />
+            <Icon as={Target} size="md" className="text-amber-400" />
             <span className="t-ui font-medium text-[var(--brand-text-bright)] flex-1 text-left">Keyword Gaps</span>
             {usingFallbackGaps && <span className="t-micro text-amber-500/70 px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20">from strategy</span>}
             <span className="t-caption-sm text-[var(--brand-text-muted)]">{effectiveGaps.length} opportunities</span>

@@ -100,7 +100,7 @@ export function PageKeywordMapPanel({
         </div>
         <div className="flex items-center gap-2 mt-2">
           <div className="relative flex-1">
-            <Icon as={Search} size="xs" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
+            <Icon as={Search} size="sm" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
             <input
               type="text"
               value={pageSearch}
@@ -200,7 +200,7 @@ export function PageKeywordMapPanel({
                         className="p-1 text-[var(--brand-text-muted)] hover:text-teal-400 transition-colors"
                         title="Edit keywords"
                       >
-                        <Icon as={Pencil} size="xs" />
+                        <Icon as={Pencil} size="sm" />
                       </button>
                     </div>
                     <div>
@@ -217,20 +217,20 @@ export function PageKeywordMapPanel({
                     <div className="flex flex-wrap gap-3 mt-1">
                       {page.volume != null && page.volume > 0 && (
                         <div className="t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-1">
-                          <Icon as={BarChart3} size="xs" className="text-orange-400" />
+                          <Icon as={BarChart3} size="sm" className="text-orange-400" />
                           <span className="text-[var(--brand-text-bright)] font-medium">{page.volume.toLocaleString()}</span>/mo
                         </div>
                       )}
                       {page.difficulty != null && page.difficulty > 0 && (
                         <div className="t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-1">
-                          <Icon as={Shield} size="xs" />
+                          <Icon as={Shield} size="sm" />
                           KD: <span className={`font-medium ${difficultyColor(page.difficulty)}`}>{page.difficulty}%</span>
                           <span className={`t-caption-sm ${difficultyColor(page.difficulty)}`}>({difficultyLabel(page.difficulty)})</span>
                         </div>
                       )}
                       {page.cpc !== undefined && page.cpc > 0 && (
                         <div className="t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-1">
-                          <Icon as={DollarSign} size="xs" className="text-emerald-400" />
+                          <Icon as={DollarSign} size="sm" className="text-emerald-400" />
                           CPC: <span className="text-emerald-400 font-medium">${page.cpc.toFixed(2)}</span>
                         </div>
                       )}
@@ -300,7 +300,7 @@ export function PageKeywordMapPanel({
                         disabled={saving}
                         className="flex items-center gap-1 px-2.5 py-1 rounded bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white t-caption-sm font-medium"
                       >
-                        {saving ? <Icon as={Loader2} size="xs" className="animate-spin" /> : <Icon as={Check} size="xs" />} Save
+                        {saving ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Check} size="sm" />} Save
                       </button>
                       <button
                         onClick={() => onSetEditingPage(null)}

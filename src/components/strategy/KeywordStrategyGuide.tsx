@@ -142,13 +142,13 @@ export function KeywordStrategyGuide() {
                   <ul className="space-y-1">
                     {step.actions.map((a, i) => (
                       <li key={i} className="flex items-start gap-2 t-caption text-[var(--brand-text-bright)]">
-                        <Icon as={ArrowRight} size="xs" className="text-[var(--brand-text-dim)] mt-0.5 flex-shrink-0" />
+                        <Icon as={ArrowRight} size="sm" className="text-[var(--brand-text-dim)] mt-0.5 flex-shrink-0" />
                         <span>{a}</span>
                       </li>
                     ))}
                   </ul>
                   <div className="flex items-start gap-1.5 mt-1 pt-1.5 border-t border-[var(--brand-border)]/30">
-                    <Icon as={CheckCircle} size="xs" className="text-[var(--brand-text-dim)] mt-0.5 flex-shrink-0" />
+                    <Icon as={CheckCircle} size="sm" className="text-[var(--brand-text-dim)] mt-0.5 flex-shrink-0" />
                     <span className="t-caption-sm text-[var(--brand-text-muted)] italic">{step.tip}</span>
                   </div>
                 </div>
@@ -161,7 +161,7 @@ export function KeywordStrategyGuide() {
       {/* Metric Glossary */}
       <SectionCard
         title="Metric Glossary"
-        titleIcon={<Icon as={BarChart3} size="sm" className="text-sky-400" />}
+        titleIcon={<Icon as={BarChart3} size="md" className="text-sky-400" />}
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {METRIC_GLOSSARY.map(m => (
@@ -176,7 +176,7 @@ export function KeywordStrategyGuide() {
       {/* Content Pipeline integration */}
       <SectionCard
         title="Strategy → Content Pipeline"
-        titleIcon={<Icon as={FileText} size="sm" className="text-amber-400" />}
+        titleIcon={<Icon as={FileText} size="md" className="text-amber-400" />}
       >
         <div className="space-y-2 t-caption text-[var(--brand-text)]">
           <p>The keyword strategy is the upstream source for all content work. Here's how it connects:</p>

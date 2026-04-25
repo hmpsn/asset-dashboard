@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { SectionCard, Icon } from '../ui';
+import { Icon } from '../ui';
 import { RefreshCw, Plus, Minus, ArrowRight, ChevronDown } from 'lucide-react';
 import { keywords } from '../../api/seo';
 import type { StrategyDiff as StrategyDiffType } from '../../api/seo';
@@ -31,7 +31,7 @@ export function StrategyDiff({ workspaceId }: StrategyDiffProps) {
     diff.newGaps.length + diff.resolvedGaps.length + diff.keywordChanges.length;
 
   return (
-    <SectionCard noPadding>
+    <div className="bg-[var(--surface-2)] border border-amber-500/20 overflow-hidden rounded-[var(--radius-lg)]">
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors"
@@ -39,7 +39,7 @@ export function StrategyDiff({ workspaceId }: StrategyDiffProps) {
         <div className="flex items-center gap-2">
           <Icon as={RefreshCw} size="sm" className="text-amber-400" />
           <span className="t-ui font-semibold text-amber-300">What Changed</span>
-          <span className="t-micro text-[var(--brand-text-muted)]">
+          <span className="t-caption-sm text-[var(--brand-text-muted)]">
             {totalChanges} change{totalChanges !== 1 ? 's' : ''} since {new Date(diff.previousGeneratedAt).toLocaleDateString()}
           </span>
         </div>
@@ -113,7 +113,7 @@ export function StrategyDiff({ workspaceId }: StrategyDiffProps) {
                   <div key={i} className="flex items-center gap-2 t-caption-sm px-2 py-1 bg-[var(--surface-3)]/40 rounded border border-[var(--brand-border)]">
                     <span className="t-mono text-[var(--brand-text-muted)] truncate max-w-[200px]">{ch.pagePath}</span>
                     <span className="text-amber-400">{ch.oldKeyword}</span>
-                    <Icon as={ArrowRight} size="xs" className="text-[var(--brand-text-dim)] flex-shrink-0" />
+                    <Icon as={ArrowRight} size="sm" className="text-[var(--brand-text-dim)] flex-shrink-0" />
                     <span className="text-teal-400">{ch.newKeyword}</span>
                   </div>
                 ))}
@@ -122,6 +122,6 @@ export function StrategyDiff({ workspaceId }: StrategyDiffProps) {
           )}
         </div>
       )}
-    </SectionCard>
+    </div>
   );
 }

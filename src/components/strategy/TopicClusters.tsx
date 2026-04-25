@@ -54,12 +54,12 @@ export function TopicClusters({ clusters }: TopicClustersProps) {
               <div className="flex items-center gap-2 flex-wrap">
                 {cluster.avgPosition && (
                   <span className="t-micro text-[var(--brand-text)] flex items-center gap-0.5">
-                    <Icon as={TrendingUp} size="xs" />Avg pos #{cluster.avgPosition}
+                    <Icon as={TrendingUp} size="sm" />Avg pos #{cluster.avgPosition}
                   </span>
                 )}
                 {cluster.topCompetitor && cluster.topCompetitorCoverage && (
                   <span className="t-micro text-orange-400 flex items-center gap-0.5">
-                    <Icon as={AlertTriangle} size="xs" className="text-orange-400" />{cluster.topCompetitor}: {cluster.topCompetitorCoverage}%
+                    <Icon as={AlertTriangle} size="sm" className="text-orange-400" />{cluster.topCompetitor}: {cluster.topCompetitorCoverage}%
                   </span>
                 )}
               </div>

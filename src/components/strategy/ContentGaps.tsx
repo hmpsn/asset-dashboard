@@ -75,7 +75,7 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
               <div className="flex items-center justify-between mt-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="t-caption-sm text-teal-400">Target keyword: &ldquo;{gap.targetKeyword}&rdquo;</span>
-                  {gap.volume != null && <span className="t-micro text-[var(--brand-text)] flex items-center gap-0.5"><Icon as={BarChart3} size="xs" />{fmtNum(gap.volume)}/mo</span>}
+                  {gap.volume != null && <span className="t-micro text-[var(--brand-text)] flex items-center gap-0.5"><Icon as={BarChart3} size="sm" />{fmtNum(gap.volume)}/mo</span>}
                   {gap.difficulty != null && gap.difficulty > 0 && (
                     <span
                       className={`t-micro font-medium ${kdColor(gap.difficulty)} cursor-help`}
@@ -89,12 +89,12 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
                       {kdFraming(gap.difficulty)}
                     </span>
                   )}
-                  {gap.impressions != null && gap.impressions > 0 && <span className="t-micro text-blue-400 flex items-center gap-0.5"><Icon as={Eye} size="xs" className="text-blue-400" />{fmtNum(gap.impressions)} impr</span>}
+                  {gap.impressions != null && gap.impressions > 0 && <span className="t-micro text-blue-400 flex items-center gap-0.5"><Icon as={Eye} size="sm" className="text-blue-400" />{fmtNum(gap.impressions)} impr</span>}
                   {gap.volume && gap.volume > 0 && (() => {
                     const impact = Math.round(gap.volume * 0.103); // position-3 CTR floor (10.3%)
                     if (impact < 10) return null;
                     return (
-                      <span className="t-micro text-blue-400/70 flex items-center gap-0.5">
+                      <span className="t-caption-sm text-blue-400/70 flex items-center gap-0.5">
                         <Icon as={TrendingUp} size="xs" className="text-blue-400/70" />
                         ~{fmtNum(impact)}/mo est. clicks at rank #3
                       </span>
@@ -107,13 +107,13 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
                       onClick={() => navigate(adminPath(workspaceId, 'content-pipeline'), { state: { fixContext: { targetRoute: 'content-pipeline', primaryKeyword: gap.targetKeyword, pageType: gap.suggestedPageType || undefined, autoGenerate: true } } })}
                       className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 font-medium hover:bg-teal-600/40 transition-all"
                     >
-                      <Icon as={FileText} size="xs" className="text-teal-300" /> Draft Brief
+                      <Icon as={FileText} size="sm" className="text-teal-300" /> Draft Brief
                     </button>
                     <button
                       onClick={() => navigate(adminPath(workspaceId, 'seo-briefs'), { state: { fixContext: { targetRoute: 'seo-briefs', pageName: gap.targetKeyword, pageType: gap.suggestedPageType || undefined } } })}
                       className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 font-medium hover:bg-teal-600/40 transition-all"
                     >
-                      <Icon as={Sparkles} size="xs" className="text-teal-300" /> Generate Brief
+                      <Icon as={Sparkles} size="sm" className="text-teal-300" /> Generate Brief
                     </button>
                   </div>
                 )}
@@ -124,10 +124,10 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
                   <span className="flex items-center gap-0.5 t-micro text-emerald-400 font-medium"><Icon as={TrendingUp} size="xs" className="text-emerald-400" />Rising</span>
                 )}
                 {gap.trendDirection === 'declining' && (
-                  <span className="flex items-center gap-0.5 t-micro text-red-400 font-medium"><Icon as={TrendingDown} size="xs" className="text-red-400" />Declining</span>
+                  <span className="flex items-center gap-0.5 t-micro text-red-400 font-medium"><Icon as={TrendingDown} size="sm" className="text-red-400" />Declining</span>
                 )}
                 {gap.trendDirection === 'stable' && gap.volume && gap.volume > 0 && (
-                  <span className="flex items-center gap-0.5 t-micro text-[var(--brand-text)] font-medium"><Icon as={Minus} size="xs" />Stable</span>
+                  <span className="flex items-center gap-0.5 t-micro text-[var(--brand-text)] font-medium"><Icon as={Minus} size="sm" />Stable</span>
                 )}
                 {Array.isArray(gap.serpFeatures) && gap.serpFeatures.length > 0 && (
                   <div className="flex flex-wrap gap-1">
@@ -154,21 +154,21 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
                   </div>
                 )}
                 {gap.competitorProof && (
-                  <span className="flex items-center gap-0.5 t-micro text-orange-400 font-medium"><Icon as={Swords} size="xs" className="text-orange-400" />{gap.competitorProof}</span>
+                  <span className="flex items-center gap-0.5 t-micro text-orange-400 font-medium"><Icon as={Swords} size="sm" className="text-orange-400" />{gap.competitorProof}</span>
                 )}
               </div>
               {gap.serpTargeting && gap.serpTargeting.length > 0 && (
                 <div className="mt-1.5 pl-2 border-l-2 border-yellow-500/20">
                   {gap.serpTargeting.map((rec, ri) => (
-                    <div key={ri} className="t-micro text-yellow-400/80 leading-relaxed">→ {rec}</div>
+                    <div key={ri} className="t-caption-sm text-yellow-400/80 leading-relaxed">→ {rec}</div>
                   ))}
                 </div>
               )}
               {gap.questionKeywords && gap.questionKeywords.length > 0 && (
                 <div className="flex items-center gap-1.5 flex-wrap mt-1">
-                  <Icon as={MessageCircleQuestion} size="xs" className="text-cyan-400 flex-shrink-0" />
+                  <Icon as={MessageCircleQuestion} size="sm" className="text-cyan-400 flex-shrink-0" />
                   {gap.questionKeywords.map((q, qi) => (
-                    <span key={qi} className="t-micro text-cyan-400/80 italic">&ldquo;{q}&rdquo;</span>
+                    <span key={qi} className="t-caption-sm text-cyan-400/80 italic">&ldquo;{q}&rdquo;</span>
                   ))}
                 </div>
               )}
