@@ -58,7 +58,7 @@ advisory but tracked.
 | 40 | Legacy surface token in new code | error | pattern | `*.tsx, *.css` | — | Prevents new code from using deprecated token names that bypass the 3-tier surface system. |
 | 41 | Hand-rolled card div (use SectionCard) | error | custom | `*.tsx` | — | Prevents hand-rolled card divs that bypass the SectionCard primitive and the --surface-N token system. |
 | 42 | SectionCard titleExtra with ml-auto (use action prop) | error | custom | `*.tsx` | — | Prevents the recurring "right-aligned metadata lands on the left" bug seen across 5 SectionCard migrations (OrderStatus, RankTable, DataSnapshots, SearchTab, FixRecommendations). |
-| 43 | radius-signature-lg used outside SectionCard | error | pattern | `*.tsx, *.css` | — | The asymmetric corner is a SectionCard-only brand signature. Other components adopting it would dilute the design intent. |
+| 43 | radius-signature-lg used outside SectionCard | error | custom | `*.tsx, *.css` | — | The asymmetric corner is the brand visual signature. SectionCard.tsx owns the canonical implementation; consumer files MAY use --radius-signature-lg directly when the asymmetric look is intentional, but they must justify the choice with a hatch comment per site so design-system stewards can audit drift. |
 
 ---
 
