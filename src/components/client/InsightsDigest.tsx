@@ -139,7 +139,7 @@ function generateInsights(props: InsightsDigestProps): DigestInsight[] {
     cards.push({
       id: 'rankings-wins',
       icon: CheckCircle2,
-      color: 'green',
+      color: 'emerald',
       headline: `${top.length} keyword${top.length !== 1 ? 's' : ''} ranking in the top 3`,
       body: `Your strongest positions: ${topNames}. These are driving real clicks — keep building on them.`,
       detail: top.slice(0, 5).map(q => `${q.query} → #${q.position} (${q.clicks} clicks)`),
@@ -178,7 +178,7 @@ function generateInsights(props: InsightsDigestProps): DigestInsight[] {
     cards.push({
       id: 'site-health',
       icon: Shield,
-      color: healthy ? 'green' : audit.siteScore >= 60 ? 'amber' : 'red',
+      color: healthy ? 'emerald' : audit.siteScore >= 60 ? 'amber' : 'red',
       headline: `Site health: ${audit.siteScore}/100${healthy ? ' — looking good' : errors > 0 ? ` — ${errors} issues need attention` : ''}`,
       body,
       action: { label: 'View site health', tab: 'health' },
@@ -202,7 +202,7 @@ function generateInsights(props: InsightsDigestProps): DigestInsight[] {
     cards.push({
       id: 'cwv',
       icon: Globe,
-      color: allGood ? 'green' : anyBad ? 'amber' : 'blue',
+      color: allGood ? 'emerald' : anyBad ? 'amber' : 'blue',
       headline: `Page speed: ${parts.join(' · ')}`,
       body: allGood
         ? 'Your Core Web Vitals are passing — page speed is not holding back your rankings.'
@@ -297,7 +297,7 @@ function generateInsights(props: InsightsDigestProps): DigestInsight[] {
       cards.push({
         id: 'organic-share',
         icon: Globe,
-        color: 'green',
+        color: 'emerald',
         headline: `Organic search drives ${ga4Organic.shareOfTotalUsers}% of your traffic`,
         body: `${fmtNum(ga4Organic.organicUsers)} organic visitors with ${ga4Organic.engagementRate}% engagement rate. SEO is working — keep investing in content.`,
         action: { label: 'View organic data', tab: 'performance' },
@@ -326,7 +326,7 @@ function generateInsights(props: InsightsDigestProps): DigestInsight[] {
       cards.push({
         id: 'content-plan-progress',
         icon: Layers,
-        color: completionPct >= 80 ? 'green' : completionPct >= 40 ? 'teal' : 'blue',
+        color: completionPct >= 80 ? 'emerald' : completionPct >= 40 ? 'teal' : 'blue',
         headline: `Content plan is ${completionPct}% complete`,
         body: `${cp.publishedCells} of ${cp.totalCells} pages published across ${cp.matrixCount} plan${cp.matrixCount !== 1 ? 's' : ''}.${cp.inProgressCells > 0 ? ` ${cp.inProgressCells} currently in progress.` : ''}${cp.approvedCells > 0 ? ` ${cp.approvedCells} approved and queued.` : ''}`,
         action: { label: 'View content plan', tab: 'content-plan' },
@@ -337,7 +337,7 @@ function generateInsights(props: InsightsDigestProps): DigestInsight[] {
       cards.push({
         id: 'content-plan-complete',
         icon: Layers,
-        color: 'green',
+        color: 'emerald',
         headline: 'Content plan fully published',
         body: `All ${cp.totalCells} planned pages are live across ${cp.matrixCount} plan${cp.matrixCount !== 1 ? 's' : ''}. Great work!`,
         action: { label: 'View content plan', tab: 'content-plan' },
@@ -353,7 +353,7 @@ function generateInsights(props: InsightsDigestProps): DigestInsight[] {
     cards.push({
       id: 'position-jump',
       icon: TrendingUp,
-      color: 'green',
+      color: 'emerald',
       headline: `Average position improved by ${Math.abs(searchComparison.change.position).toFixed(1)} spots`,
       body: `Your rankings are climbing. This should translate to more clicks and traffic over the coming weeks.`,
       action: { label: 'View search trends', tab: 'performance' },
@@ -399,7 +399,7 @@ const SEVERITY_TO_SENTIMENT: Record<string, DigestInsight['sentiment']> = {
 };
 
 const SEVERITY_TO_COLOR: Record<string, string> = {
-  positive: 'green',
+  positive: 'emerald',
   opportunity: 'amber',
   warning: 'amber',
   critical: 'red',
@@ -465,11 +465,11 @@ function mergeInsights(local: DigestInsight[], server: DigestInsight[]): DigestI
 // ─── Color Maps ───
 
 const COLORS: Record<string, { text: string; badge: string }> = {
-  teal:  { text: 'text-teal-400',    badge: 'bg-teal-500/10 text-teal-400' },
-  blue:  { text: 'text-blue-400',    badge: 'bg-blue-500/10 text-blue-400' },
-  green: { text: 'text-emerald-400', badge: 'bg-emerald-500/10 text-emerald-400' },
-  amber: { text: 'text-amber-400',   badge: 'bg-amber-500/10 text-amber-400' },
-  red:   { text: 'text-red-400',     badge: 'bg-red-500/10 text-red-400' },
+  teal:    { text: 'text-teal-400',    badge: 'bg-teal-500/10 text-teal-400' },
+  blue:    { text: 'text-blue-400',    badge: 'bg-blue-500/10 text-blue-400' },
+  emerald: { text: 'text-emerald-400', badge: 'bg-emerald-500/10 text-emerald-400' },
+  amber:   { text: 'text-amber-400',   badge: 'bg-amber-500/10 text-amber-400' },
+  red:     { text: 'text-red-400',     badge: 'bg-red-500/10 text-red-400' },
 };
 
 const SENTIMENT_LABELS: Record<string, string> = {

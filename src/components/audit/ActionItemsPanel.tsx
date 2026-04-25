@@ -23,13 +23,13 @@ interface ActionItem {
 const STATUS_CONFIG = {
   planned: { label: 'Planned', color: 'text-zinc-400', bg: 'bg-zinc-500/10 border-zinc-500/30', icon: Circle },
   'in-progress': { label: 'In Progress', color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/30', icon: Loader2 },
-  completed: { label: 'Done', color: 'text-green-400', bg: 'bg-green-500/10 border-green-500/30', icon: CheckCircle },
+  completed: { label: 'Done', color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/30', icon: CheckCircle },
 } as const;
 
 const PRIORITY_CONFIG = {
   high: { label: 'High', dot: 'bg-red-400' },
   medium: { label: 'Med', dot: 'bg-amber-400' },
-  low: { label: 'Low', dot: 'bg-green-400' },
+  low: { label: 'Low', dot: 'bg-emerald-400' },
 } as const;
 
 export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
@@ -107,7 +107,7 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
       {items.length > 0 && (
         <div className="px-4 pt-3">
           <div className="flex gap-1 h-1.5 rounded-full overflow-hidden bg-zinc-800">
-            {counts.completed > 0 && <div className="bg-green-500 rounded-full" style={{ width: `${(counts.completed / items.length) * 100}%` }} />}
+            {counts.completed > 0 && <div className="bg-emerald-500 rounded-full" style={{ width: `${(counts.completed / items.length) * 100}%` }} />}
             {counts['in-progress'] > 0 && <div className="bg-blue-500 rounded-full" style={{ width: `${(counts['in-progress'] / items.length) * 100}%` }} />}
           </div>
         </div>

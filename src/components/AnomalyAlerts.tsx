@@ -26,9 +26,9 @@ const SEVERITY_STYLES = {
     icon: 'text-amber-400/80',
   },
   positive: {
-    border: 'border-green-500/30',
-    bg: 'bg-green-500/5',
-    badge: 'bg-green-500/20 text-emerald-400/80',
+    border: 'border-emerald-500/30',
+    bg: 'bg-emerald-500/5',
+    badge: 'bg-emerald-500/20 text-emerald-400/80',
     icon: 'text-emerald-400/80',
   },
 };
@@ -98,7 +98,7 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
       <div className={`border px-3 py-2 ${
         critical.length > 0 ? 'border-red-500/30 bg-red-500/5' :
         warnings.length > 0 ? 'border-amber-500/30 bg-amber-500/5' :
-        'border-green-500/30 bg-green-500/5'
+        'border-emerald-500/30 bg-emerald-500/5'
       }`} style={{ borderRadius: '6px 12px 6px 12px' }}>
         <div className="flex items-center gap-2">
           <Activity className={`w-3.5 h-3.5 ${
@@ -125,7 +125,7 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
           Anomaly Alerts
           {critical.length > 0 && <span className="px-1.5 py-0.5 rounded text-[10px] bg-red-500/20 text-red-400/80">{critical.length}</span>}
           {warnings.length > 0 && <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-400/80">{warnings.length}</span>}
-          {positive.length > 0 && <span className="px-1.5 py-0.5 rounded text-[10px] bg-green-500/20 text-emerald-400/80">{positive.length}</span>}
+          {positive.length > 0 && <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-400/80">{positive.length}</span>}
           {collapsed ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
         </button>
         {isAdmin && (

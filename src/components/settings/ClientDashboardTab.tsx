@@ -7,6 +7,7 @@ import {
 import SearchableSelect from '../SearchableSelect';
 import { get, post, patch, del, getSafe } from '../../api/client';
 import { themeColor } from '../ui/constants';
+import { SectionCard } from '../ui';
 
 import type { SafeClientUser as ClientUserSafe } from '../../../shared/types/users.ts';
 import type { EventGroup, EventDisplayConfig } from '../../../shared/types/workspace.ts';
@@ -240,7 +241,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
   return (
     <div className="space-y-8">
       {/* Dashboard link + password */}
-      <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+      <SectionCard noPadding>
         <div className="px-5 py-4 border-b border-zinc-800">
           <div className="flex items-center gap-2">
             <Users className="w-4 h-4 text-teal-400" />
@@ -320,10 +321,10 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
             </div>
           </div>
         </div>
-      </section>
+      </SectionCard>
 
       {/* Client Users */}
-      <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+      <SectionCard noPadding>
         <div className="px-5 py-4 border-b border-zinc-800">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
@@ -481,13 +482,13 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
             </div>
           )}
         </div>
-      </section>
+      </SectionCard>
 
       {/* Content Pricing */}
-      <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+      <SectionCard noPadding>
         <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
-          <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
-            <DollarSign className="w-4 h-4 text-green-400" />
+          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+            <DollarSign className="w-4 h-4 text-emerald-400" />
           </div>
           <div className="flex-1">
             <h3 className="text-sm font-semibold text-zinc-200">Content Pricing</h3>
@@ -604,11 +605,11 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
             </div>
           </div>
         )}
-      </section>
+      </SectionCard>
 
       {/* Event Configuration */}
       {ws?.ga4PropertyId && (
-        <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+        <SectionCard noPadding>
           <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
             <Pin className="w-4 h-4 text-teal-400" />
             <div className="flex-1">
@@ -785,7 +786,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
               </>)}
             </div>
           )}
-        </section>
+        </SectionCard>
       )}
     </div>
   );

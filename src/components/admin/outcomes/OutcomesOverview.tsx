@@ -145,7 +145,7 @@ function WorkspaceRow({ ws }: { ws: WorkspaceOutcomeOverview }) {
         {ws.attentionNeeded ? (
           <Badge label="Review" color="amber" />
         ) : (
-          <Badge label="On track" color="green" />
+          <Badge label="On track" color="emerald" />
         )}
       </td>
     </tr>

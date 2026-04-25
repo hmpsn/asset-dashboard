@@ -107,7 +107,7 @@ export function AuditIssueRow({
                 )}
               </div>
               {isApplied ? (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 font-medium flex items-center gap-1">
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-medium flex items-center gap-1">
                   <CheckCircle className="w-2.5 h-2.5" /> Applied
                 </span>
               ) : sentForReview.has(fixKey) ? (
@@ -220,7 +220,7 @@ export function AuditIssueRow({
           </span>
         )}
         {isCreated && (
-          <span className="text-[10px] px-1 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20 flex items-center gap-0.5">
+          <span className="text-[10px] px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-0.5">
             <CheckCircle className="w-2.5 h-2.5" /> Added
           </span>
         )}

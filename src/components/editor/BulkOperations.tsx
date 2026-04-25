@@ -5,6 +5,7 @@
 import {
   Loader2, Sparkles, Check, X, Type, ArrowRight, Eye, CheckSquare, Square,
 } from 'lucide-react';
+import { SectionCard } from '../ui';
 
 interface PageMeta {
   id: string;
@@ -77,13 +78,14 @@ export function BulkOperations({
 
       {/* Pattern Apply Modal */}
       {bulkMode === 'pattern' && (
-        <div className="bg-zinc-900 rounded-xl border border-teal-500/30 p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-zinc-200 flex items-center gap-2">
-              <Type className="w-4 h-4 text-teal-400" /> Pattern Apply — {approvalSelected.size} pages
-            </h4>
-            <button onClick={() => { onSetBulkMode('idle'); onSetPatternText(''); }} className="text-zinc-500 hover:text-zinc-300"><X className="w-4 h-4" /></button>
-          </div>
+        <SectionCard
+          title={`Pattern Apply — ${approvalSelected.size} pages`}
+          titleIcon={<Type className="w-4 h-4 text-teal-400" />}
+          action={<button onClick={() => { onSetBulkMode('idle'); onSetPatternText(''); }} className="text-zinc-500 hover:text-zinc-300"><X className="w-4 h-4" /></button>}
+          className="!border-teal-500/30"
+          noPadding
+        >
+          <div className="p-4 space-y-3">
           <div className="flex items-center gap-2">
             <select
               value={bulkField}
@@ -121,19 +123,16 @@ export function BulkOperations({
             {patternAction === 'append' ? 'Text will be added after' : 'Text will be added before'} each page's {bulkField === 'title' ? 'SEO title' : 'meta description'}.
             {bulkField === 'title' && ' Titles will be truncated to 60 characters.'}
           </p>
-        </div>
+          </div>
+        </SectionCard>
       )}
 
       {/* Bulk Rewrite Preview / Diff */}
       {bulkMode === 'rewrite-preview' && bulkPreview.length > 0 && (
-        <div className="bg-zinc-900 rounded-xl border border-teal-500/30 overflow-hidden">
-          <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
-            <div>
-              <h4 className="text-sm font-semibold text-zinc-200 flex items-center gap-2">
-                <Eye className="w-4 h-4 text-teal-400" /> Preview Changes — {bulkPreview.length} pages
-              </h4>
-              <p className="text-[11px] text-zinc-500 mt-0.5">Review before applying to Webflow</p>
-            </div>
+        <SectionCard
+          title={`Preview Changes — ${bulkPreview.length} pages`}
+          titleIcon={<Eye className="w-4 h-4 text-teal-400" />}
+          action={
             <div className="flex items-center gap-2">
               <button onClick={bulkSource === 'ai' ? onApplyBulkRewrite : onApplyPattern} className="flex items-center gap-1 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded text-xs font-medium text-white transition-colors">
                 <Check className="w-3 h-3" /> Apply All
@@ -142,7 +141,11 @@ export function BulkOperations({
                 <X className="w-3 h-3" /> Cancel
               </button>
             </div>
-          </div>
+          }
+          className="!border-teal-500/30"
+          noPadding
+        >
+          <p className="text-[11px] text-zinc-500 px-4 pb-2">Review before applying to Webflow</p>
           <div className="max-h-[350px] overflow-y-auto divide-y divide-zinc-800/50">
             {bulkPreview.map(item => {
               const page = pages.find(p => p.id === item.pageId);
@@ -152,13 +155,13 @@ export function BulkOperations({
                   <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-start">
                     <div className="text-[11px] text-red-400/80 bg-red-500/5 rounded px-2 py-1 font-mono leading-relaxed line-through">{item.oldValue || '(empty)'}</div>
                     <ArrowRight className="w-3 h-3 text-zinc-500 mt-1.5 flex-shrink-0" />
-                    <div className="text-[11px] text-green-400/80 bg-green-500/5 rounded px-2 py-1 font-mono leading-relaxed">{item.newValue} <span className="text-zinc-500">({item.newValue.length})</span></div>
+                    <div className="text-[11px] text-emerald-400/80 bg-emerald-500/5 rounded px-2 py-1 font-mono leading-relaxed">{item.newValue} <span className="text-zinc-500">({item.newValue.length})</span></div>
                   </div>
                 </div>
               );
             })}
           </div>
-        </div>
+        </SectionCard>
       )}
 
       {/* Bulk operation progress */}

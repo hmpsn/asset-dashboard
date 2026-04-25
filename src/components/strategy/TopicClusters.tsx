@@ -17,12 +17,12 @@ export interface TopicClustersProps {
 }
 
 const coverageColor = (pct: number) =>
-  pct >= 70 ? 'text-green-400 bg-green-500/10 border-green-500/20'
+  pct >= 70 ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
   : pct >= 40 ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
   : 'text-red-400 bg-red-500/10 border-red-500/20';
 
 const coverageBarColor = (pct: number) =>
-  pct >= 70 ? 'bg-green-500' : pct >= 40 ? 'bg-amber-500' : 'bg-red-500';
+  pct >= 70 ? 'bg-emerald-500' : pct >= 40 ? 'bg-amber-500' : 'bg-red-500';
 
 export function TopicClusters({ clusters }: TopicClustersProps) {
   if (clusters.length === 0) return null;

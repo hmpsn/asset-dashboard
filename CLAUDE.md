@@ -91,11 +91,12 @@ Every completed task must include:
 
 ---
 
-## Design System — The Three Laws of Color
+## Design System — The Four Laws of Color
 
 1. **Teal for actions** — every CTA, toggle, active state, tier badge, interactive highlight
 2. **Blue for data** — clicks, sessions, impressions, info badges, progress bars (read-only, never actionable)
-3. **Purple for admin AI only** — `AdminChat.tsx` and `SeoAudit.tsx` "Flag for Client". Never in client-facing views.
+3. **Emerald for success** — `scoreColorClass()` returns `text-emerald-400` for score ≥80; `scoreColor()` hex is `#34d399` (emerald-400). Never `text-green-400` for success/score indicators — green and emerald are distinct hues, emerald is canonical.
+4. **Purple for admin AI only** — `AdminChat.tsx` and `SeoAudit.tsx` "Flag for Client". Never in client-facing views. Purple removed from `Badge.tsx` color union — use teal/blue/emerald/amber/red instead.
 
 ### Color quick reference
 
@@ -103,18 +104,34 @@ Every completed task must include:
 Button / CTA / toggle?      → Teal (from-teal-600 to-emerald-600)
 Data metric?                 → Blue (text-blue-400, bg-blue-500/10)
 Admin AI feature?            → Purple (purple-400/purple-600)
-Score (health/perf)?         → scoreColor() from ui/constants.ts
+Score (health/perf)?         → scoreColor() / scoreColorClass() from ui/constants.ts
+  ≥80 → emerald (text-emerald-400, #34d399)
+  ≥60 → amber   (text-amber-400)
+  <60 → red     (text-red-400)
 Status badge?                → green=success, amber=warning, red=error, orange=changes-requested, blue=info, teal=client-requested
 Tier badge (client)?         → Teal (all tiers) or zinc (free)
 ```
 
+### Token authority (Phase 5 — 2026-04-24)
+
+- **Single source of truth:** `src/tokens.css` — every `--*` CSS custom property lives here. Never redefine a `--*` token outside `src/tokens.css`.
+- **App bundle:** `src/index.css` `@import`s `src/tokens.css`. No `--*` declarations in `src/index.css`.
+- **Styleguide:** `public/styleguide.css` `@import url('/tokens.css')`. No `--*` declarations in `public/styleguide.css`.
+- **Build mirror:** `public/tokens.css` is copied from `src/tokens.css` by `copyTokensPlugin()` in `vite.config.ts` at build time.
+- **Typography utilities:** 14 `.t-*` classes (`.t-hero`, `.t-h1`, `.t-h2`, `.t-stat-lg`, `.t-stat`, `.t-stat-sm`, `.t-page`, `.t-body`, `.t-ui`, `.t-label`, `.t-caption`, `.t-caption-sm`, `.t-mono`, `.t-micro`) defined in `src/index.css` and available globally.
+- **Visual source of truth:** `/styleguide` React route (or `/styleguide.html` static) demos all tokens + primitives.
+- **Verification:** `npx tsx scripts/verify-styleguide-parity.ts` asserts zero token duplication between `src/index.css` and `src/tokens.css`.
+
 ### Forbidden
 
 - **Never** use `violet`, `indigo`, or new hue families without explicit approval
+- **Never** use `rose-` or `pink-` — not in the design system hue palette
 - **Never** hand-roll card markup — use `<SectionCard>`
 - **Never** hand-roll stat displays — use `<StatCard>` or `<CompactStatBar>`
 - **Never** hard-code score colors — use `scoreColor()` / `scoreColorClass()`
 - **Never** use purple in any client-facing component
+- **Never** use `text-green-400` for success/score indicators — use `text-emerald-400`
+- **Never** redefine a `--*` token outside `src/tokens.css`
 
 ### UI Primitives — always check before hand-rolling
 

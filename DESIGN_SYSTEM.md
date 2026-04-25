@@ -47,21 +47,36 @@ Inter loaded from Google Fonts: 300–700.
 
 ---
 
+## Radius Scale
+
+| Token | Value | Tailwind Equivalent | Usage |
+|-------|-------|---------------------|-------|
+| `--radius-sm` | `6px` | `rounded` | Small controls, pills, badges |
+| `--radius-md` | `8px` | `rounded-md` | Buttons, inputs |
+| `--radius-lg` | `12px` | `rounded-xl` | Cards, panels — new code uses `rounded-[var(--radius-lg)]` |
+| `--radius-xl` | `16px` | `rounded-2xl` | Modals, large overlays |
+
+**Brand asymmetric radius:** `SectionCard` default variant uses `10px 24px 10px 24px` (the brand signature). This is intentional and correct. The `--radius-lg` token governs new generic cards; the asymmetric radius is a SectionCard-specific design decision, not a token.
+
+**Rule for new card elements:** use `rounded-[var(--radius-lg)]` not the hardcoded Tailwind class `rounded-xl`. This makes the radius system themeable.
+
+---
+
 ## Color System
 
 ### Dark Mode (default)
 
-| Token | Value | Tailwind | Usage |
-|-------|-------|----------|-------|
-| `--bg-base` | #0f1219 | — | Page background |
-| `--bg-card` | #18181b | bg-zinc-900 | Card backgrounds |
-| `--bg-elevated` | #27272a | bg-zinc-800 | Inputs, active tabs, hover states |
-| `--border-default` | #27272a | border-zinc-800 | Card borders |
-| `--border-hover` | #3f3f46 | border-zinc-700 | Hover border state |
-| `--text-primary` | #f4f4f5 | text-zinc-100/200 | Headings, key content |
-| `--text-secondary` | #b4b4bc | text-zinc-400 | Descriptions, supporting text |
-| `--text-muted` | #a1a1aa | text-zinc-500 | Captions, timestamps, labels |
-| `--text-subtle` | #71717a | text-zinc-600/700 | Disabled, dividers |
+| Canonical Token | Legacy Name | Value | Tailwind | Usage |
+|-----------------|-------------|-------|----------|-------|
+| `--surface-1` | `--brand-bg` | #0f1219 | — | Page background |
+| `--surface-2` | `--brand-bg-surface/elevated` | #18181b | bg-zinc-900 | Card backgrounds |
+| `--surface-3` | `--brand-bg-card` | #27272a | bg-zinc-800 | Inputs, active tabs, hover states |
+| — | `--brand-border` | #27272a | border-zinc-800 | Card borders |
+| — | `--brand-border-hover` | #3f3f46 | border-zinc-700 | Hover border state |
+| — | — | #f4f4f5 | text-zinc-100/200 | Headings, key content |
+| — | — | #b4b4bc | text-zinc-400 | Descriptions, supporting text |
+| — | — | #a1a1aa | text-zinc-500 | Captions, timestamps, labels |
+| — | — | #71717a | text-zinc-600/700 | Disabled, dividers |
 
 ### Light Mode (.dashboard-light)
 
@@ -196,6 +211,13 @@ Standard card container for content sections.
 
 Thin `SectionCard` wrapper with chart-friendly defaults. Used for sparkline/mini-chart panels where the header needs to fit a title plus a directional trend indicator inline.
 
+```
+┌──────────────────────────────────────────────────────┐
+│ Title  ↗ +12.4%                        [optional action]│  ← inline title + TrendBadge
+│ <chart body>                                          │
+└──────────────────────────────────────────────────────┘
+```
+
 - Container: same `bg-[var(--surface-2)] border-zinc-800` + signature `10px 24px 10px 24px` radius as SectionCard
 - Tighter padding than SectionCard: header `px-4 py-3`, body `px-4 pb-3`
 - No `border-b` separator — chart visuals flow directly under header
@@ -206,10 +228,21 @@ Thin `SectionCard` wrapper with chart-friendly defaults. Used for sparkline/mini
 
 Canonical directional delta indicator. Replaces hand-rolled `TrendingUp/Down + emerald/red-400` ternaries across the app.
 
+```
+↗ +12.4%        ↘ -3.2%        — 0%
+```
+
 - Positive (or negative with `invert`): `text-emerald-400` + `TrendingUp` icon
 - Negative (or positive with `invert`): `text-red-400` + `TrendingDown` icon
 - Zero (only when `hideOnZero={false}`): `text-zinc-400` + `Minus` icon
-- Props: `value: number`, `suffix='%'`, `invert=false` (use when lower=better), `showSign=false`, `label?`, `size='sm'|'md'`, `hideOnZero=true`
+- Props:
+  - `value: number` — raw delta (e.g. `-12.4` or `3`)
+  - `suffix='%'` — unit string appended after the number
+  - `invert=false` — flip color mapping (use when lower = better, e.g. position, error count)
+  - `showSign=false` — show `+`/`-` sign prefix (default shows `Math.abs(value)`)
+  - `label?: string` — optional trailing context string (e.g. `"vs last month"`)
+  - `size='sm' | 'md'` — `sm` = `text-[11px]` + `w-3 h-3` icon (default), `md` = `text-xs` + `w-3.5 h-3.5`
+  - `hideOnZero=true` — return `null` when `value === 0` (override to `false` to keep a neutral Minus visible)
 - Always use `<TrendBadge>` instead of inlining `TrendingUp/Down` + emerald/red. Enforced by the pr-check `Hand-rolled trend badge` warn rule.
 
 ### 5. DateRangeSelector
@@ -367,6 +400,21 @@ Centered modal overlay for confirming destructive or irreversible actions. Repla
 | **Ghost** | `text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 rounded-md px-2 py-1 text-xs font-medium` |
 | **Accent text** | `text-teal-400 hover:bg-zinc-800 rounded-md px-2 py-1 text-xs font-medium` |
 
+### 16. Typography primitives (Phase 5)
+
+Thin wrappers over `.t-*` utilities. Each forwards refs and merges `className`. Live in `src/components/ui/typography/`.
+
+| Primitive | API | Renders | Notes |
+|-----------|-----|---------|-------|
+| **Heading** | `level={1\|2\|3}`, `as?="h1\|h2\|h3\|div"` | `.t-h1` (level=1) / `.t-h2` (level=2) / `.t-page` (level=3) | Default tag tracks `level`; `as="div"` for semantic-heading nesting issues. |
+| **Stat** | `size?="hero"\|"default"\|"sm"` | `.t-stat-lg` / `.t-stat` / `.t-stat-sm` | DIN Pro numerals. Use for KPIs / dashboard numbers. |
+| **BodyText** | `tone?="default"\|"muted"\|"dim"` | `.t-body` + inline `style.color` from CSS var | Tone is the color API. Tailwind color utilities via `className` are overridden by the inline tone style — pass `tone="default"` and let parent context drive color if you need a custom hue. |
+| **Caption** | `size?="default"\|"sm"` | `.t-caption` / `.t-caption-sm` | Secondary metadata, timestamps. |
+| **Label** | (no props) | `.t-label` (uppercase DIN) | Form labels, uppercase section markers. |
+| **Mono** | `size?="default"\|"micro"` | `.t-mono` (12px) / `.t-micro` (10px) | Both monospace (Fira Code → JetBrains Mono → Menlo fallback). IDs, slugs, tokens, timestamps. |
+
+Codemod scaffold: `scripts/codemods/phase5-typography.ts` (dry-run) reports candidate sites. Phase 2 applies migrations.
+
 ---
 
 ## Spacing
@@ -403,6 +451,8 @@ src/components/ui/
 ├── MetricToggleCard.tsx    # Toggleable stat card for chart series visibility (active/inactive states)
 ├── PageHeader.tsx          # Consistent page header
 ├── SectionCard.tsx         # Standard card container
+├── ChartCard.tsx           # SectionCard variant for charts (inline title+TrendBadge)
+├── TrendBadge.tsx          # Canonical directional delta indicator (emerald/red/zinc)
 ├── DateRangeSelector.tsx   # Unified date/period picker
 ├── DataList.tsx            # Ranked list display
 ├── Badge.tsx               # Status/category pill

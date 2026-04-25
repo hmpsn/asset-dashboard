@@ -827,8 +827,8 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         <div className="flex items-center gap-3 text-[11px] text-zinc-500 mb-2">
           <span className="text-zinc-400 font-medium">{summary.total} tracked</span>
           {summary.live > 0 && <><StatusBadge status="live" /><span className="text-teal-400">{summary.live}</span></>}
-          {summary.inReview > 0 && <><StatusBadge status="in-review" /><span className="text-purple-400">{summary.inReview}</span></>}
-          {summary.approved > 0 && <><StatusBadge status="approved" /><span className="text-green-400">{summary.approved}</span></>}
+          {summary.inReview > 0 && <><StatusBadge status="in-review" /><span className="text-blue-400">{summary.inReview}</span></>}
+          {summary.approved > 0 && <><StatusBadge status="approved" /><span className="text-emerald-400">{summary.approved}</span></>}
           {summary.rejected > 0 && <><StatusBadge status="rejected" /><span className="text-red-400">{summary.rejected}</span></>}
           {summary.issueDetected > 0 && <><StatusBadge status="issue-detected" /><span className="text-amber-400">{summary.issueDetected}</span></>}
           {summary.fixProposed > 0 && <><StatusBadge status="fix-proposed" /><span className="text-blue-400">{summary.fixProposed}</span></>}
@@ -872,7 +872,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
                   )}
                   {errorCount > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400">{errorCount} error{errorCount > 1 ? 's' : ''}</span>}
                   {warningCount > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">{warningCount} warn</span>}
-                  {page.issues.length === 0 && <CheckCircle className="w-4 h-4 text-green-500" />}
+                  {page.issues.length === 0 && <CheckCircle className="w-4 h-4 text-emerald-400" />}
                   <span className={`text-sm font-bold tabular-nums ${scoreColorClass(page.score)}`}>{page.score}</span>
                 </div>
               </button>
@@ -886,7 +886,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
                     </div>
                   )}
                   {page.issues.length === 0 ? (
-                    <div className="text-xs text-green-500 px-4 py-2">No issues found</div>
+                    <div className="text-xs text-emerald-400 px-4 py-2">No issues found</div>
                   ) : (
                     page.issues
                       .filter(i => severityFilter === 'all' || i.severity === severityFilter)

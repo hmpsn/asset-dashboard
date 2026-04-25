@@ -305,7 +305,7 @@ export function SettingsPanel() {
                 {storage.breakdown.slice(0, 6).map((d, i) => {
                   const pct = storage.totalBytes > 0 ? (d.bytes / storage.totalBytes) * 100 : 0;
                   if (pct < 0.5) return null;
-                  const colors = ['bg-amber-500', 'bg-teal-500', 'bg-blue-500', 'bg-purple-500', 'bg-rose-500', 'bg-emerald-500'];
+                  const colors = ['bg-amber-500', 'bg-teal-500', 'bg-blue-500', 'bg-orange-500', 'bg-red-500', 'bg-emerald-500'];
                   return <div key={d.name} className={`h-full ${colors[i % colors.length]} transition-all`} style={{ width: `${pct}%` }} title={`${d.label}: ${formatBytes(d.bytes)}`} />;
                 })}
               </div>
@@ -315,7 +315,7 @@ export function SettingsPanel() {
             <div className="space-y-1">
               {storage.breakdown.map((d, i) => {
                 const pct = storage.totalBytes > 0 ? (d.bytes / storage.totalBytes) * 100 : 0;
-                const colors = ['text-amber-400', 'text-teal-400', 'text-blue-400', 'text-purple-400', 'text-rose-400', 'text-emerald-400'];
+                const colors = ['text-amber-400', 'text-teal-400', 'text-blue-400', 'text-orange-400', 'text-red-400', 'text-emerald-400'];
                 return (
                   <div key={d.name} className="flex items-center gap-2 py-1">
                     <span className={`w-1.5 h-1.5 rounded-full ${colors[i % colors.length].replace('text-', 'bg-')}`} />

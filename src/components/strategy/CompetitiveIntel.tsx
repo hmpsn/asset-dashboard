@@ -69,7 +69,7 @@ function fmtNum(n: number): string {
 }
 
 function difficultyColor(kd: number): string {
-  if (kd < 30) return 'text-green-400';
+  if (kd < 30) return 'text-emerald-400';
   if (kd < 60) return 'text-amber-400';
   return 'text-red-400';
 }

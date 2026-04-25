@@ -40,8 +40,8 @@ const SECTIONS = [
   {
     title: 'Fix Options',
     icon: CheckCircle,
-    color: 'text-green-400',
-    bg: 'bg-green-500/10 border-green-500/20',
+    color: 'text-emerald-400',
+    bg: 'bg-emerald-500/10 border-emerald-500/20',
     description: 'Each issue in the audit has three action options in its action menu. Use them to keep the audit clean and actionable.',
     actions: [
       'Accept — marks the issue as a known won\'t-fix. It stays in the audit but no longer affects the score.',
@@ -67,8 +67,8 @@ const SECTIONS = [
   {
     title: 'Content Decay Tab',
     icon: TrendingDown,
-    color: 'text-rose-400',
-    bg: 'bg-rose-500/10 border-rose-500/20',
+    color: 'text-amber-400',
+    bg: 'bg-amber-500/10 border-amber-500/20',
     description: 'Content decay tracks pages that are losing organic traffic or impressions over time — an early signal that content needs a refresh before rankings drop further.',
     actions: [
       'Critical decay — pages losing traffic fast; should be prioritized for refresh or consolidation immediately',

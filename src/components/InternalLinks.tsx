@@ -285,7 +285,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
                         className="ml-auto text-zinc-500 hover:text-zinc-300 transition-colors"
                         title="Copy HTML link"
                       >
-                        {copied === i ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
+                        {copied === i ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                       </button>
                     </div>
                   );
@@ -322,7 +322,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
                       className="text-zinc-500 hover:text-zinc-300 transition-colors"
                       title="Copy HTML link"
                     >
-                      {copied === idx ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
+                      {copied === idx ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                     </button>
                   </div>
                 </button>

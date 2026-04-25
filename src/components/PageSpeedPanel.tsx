@@ -59,7 +59,7 @@ interface Props {
 }
 
 function scoreColor(score: number): string {
-  if (score >= 90) return 'text-green-400';
+  if (score >= 90) return 'text-emerald-400';
   if (score >= 50) return 'text-amber-400';
   return 'text-red-400';
 }
@@ -93,11 +93,11 @@ function vitalRating(key: string, val: number | null): 'good' | 'needs-improveme
 }
 
 function ratingColor(r: 'good' | 'needs-improvement' | 'poor'): string {
-  return r === 'good' ? 'text-green-400' : r === 'needs-improvement' ? 'text-amber-400' : 'text-red-400';
+  return r === 'good' ? 'text-emerald-400' : r === 'needs-improvement' ? 'text-amber-400' : 'text-red-400';
 }
 
 function ratingBg(r: 'good' | 'needs-improvement' | 'poor'): string {
-  return r === 'good' ? 'bg-green-500/10 border-green-500/30' : r === 'needs-improvement' ? 'bg-amber-500/10 border-amber-500/30' : 'bg-red-500/10 border-red-500/30';
+  return r === 'good' ? 'bg-emerald-500/10 border-emerald-500/30' : r === 'needs-improvement' ? 'bg-amber-500/10 border-amber-500/30' : 'bg-red-500/10 border-red-500/30';
 }
 
 // ScoreRing replaced by unified <MetricRing /> from ./ui
@@ -229,7 +229,7 @@ export function PageSpeedPanel({ siteId }: Props) {
         <div className="flex flex-col items-center gap-2">
           <MetricRing score={result.score} size={100} />
           <div className="text-xs text-zinc-500">{strategy === 'mobile' ? 'Mobile' : 'Desktop'}</div>
-          {result.fieldDataAvailable && <div className="px-1.5 py-0.5 rounded text-[10px] bg-green-500/10 border border-green-500/20 text-green-400">Real users</div>}
+          {result.fieldDataAvailable && <div className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">Real users</div>}
           {!result.fieldDataAvailable && <div className="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 border border-amber-500/20 text-amber-400">Lab test</div>}
         </div>
         <div className="grid grid-cols-3 gap-2">

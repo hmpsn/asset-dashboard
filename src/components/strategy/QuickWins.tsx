@@ -23,7 +23,7 @@ export function QuickWins({ quickWins }: QuickWinsProps) {
       <p className="text-[11px] text-zinc-500 mb-3">High-impact changes that can be implemented immediately.</p>
       <div className="space-y-2">
         {quickWins.map((qw, i) => {
-          const impactColor = qw.estimatedImpact === 'high' ? 'text-green-400 bg-green-500/10 border-green-500/20' : qw.estimatedImpact === 'medium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-zinc-400 bg-zinc-700/30 border-zinc-600/20';
+          const impactColor = qw.estimatedImpact === 'high' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : qw.estimatedImpact === 'medium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-zinc-400 bg-zinc-700/30 border-zinc-600/20';
           return (
             <div key={i} className="px-3 py-2.5 bg-zinc-800/40 rounded-lg border border-zinc-800">
               <div className="flex items-center justify-between">

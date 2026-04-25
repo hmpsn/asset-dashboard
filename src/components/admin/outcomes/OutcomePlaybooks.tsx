@@ -8,8 +8,8 @@ interface Props {
   workspaceId: string;
 }
 
-function confidenceColor(confidence: PlaybookConfidence): 'green' | 'amber' | 'red' {
-  if (confidence === 'high') return 'green';
+function confidenceColor(confidence: PlaybookConfidence): 'emerald' | 'amber' | 'red' {
+  if (confidence === 'high') return 'emerald';
   if (confidence === 'medium') return 'amber';
   return 'red';
 }

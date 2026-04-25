@@ -67,18 +67,36 @@
 | **Purple** | `#a78bfa` | `#7c3aed` | `purple-400`/`purple-600` | **Admin AI chat only** — FAB, messages, input focus, send button. Also admin "Flag for Client" in SeoAudit |
 | **Zinc** | `#a1a1aa` | `#475569` | `zinc-400`/`zinc-500` | Muted text, inactive states, disabled UI, free-tier badges |
 
-### Surface Colors (Dark Mode — Default)
+### Surface Colors
 
-| Token | Value | Tailwind | Usage |
-|-------|-------|----------|-------|
-| `--bg-base` | `#0f1219` | — | Page background |
-| `--bg-card` | `#18181b` | `bg-zinc-900` | Card backgrounds |
-| `--bg-elevated` | `#27272a` | `bg-zinc-800` | Inputs, active tabs, hover states |
-| `--border-default` | `#27272a` | `border-zinc-800` | Card borders |
-| `--border-hover` | `#3f3f46` | `border-zinc-700` | Hover border state |
-| `--text-primary` | `#f4f4f5` | `text-zinc-100` | Headings, key content |
-| `--text-secondary` | `#b4b4bc` | `text-zinc-400` | Descriptions |
-| `--text-muted` | `#a1a1aa` | `text-zinc-500` | Captions, labels |
+> **Canonical tokens are `--surface-N`.** The `--brand-bg-*` names are legacy aliases kept for backward compatibility — do not use them in new code.
+
+#### Dark Mode (default)
+
+| Canonical Token | Value | Tailwind Equivalent | Legacy Alias | Usage |
+|-----------------|-------|---------------------|--------------|-------|
+| `--surface-1` | `#0f1219` | body background | `--brand-bg` | Page background / absolute base |
+| `--surface-2` | `#18181b` | `bg-zinc-900` | `--brand-bg-surface`, `--brand-bg-elevated` | Primary card surfaces |
+| `--surface-3` | `#27272a` | `bg-zinc-800` | `--brand-bg-card` | Elevated: inputs, active tabs, hover states |
+| `--border-default` | `#27272a` | `border-zinc-800` | `--brand-border` | Card borders |
+| `--border-hover` | `#3f3f46` | `border-zinc-700` | `--brand-border-hover` | Hover border state |
+| `--text-primary` | `#f4f4f5` | `text-zinc-100` | — | Headings, key content |
+| `--text-secondary` | `#b4b4bc` | `text-zinc-400` | — | Descriptions, supporting text |
+| `--text-muted` | `#a1a1aa` | `text-zinc-500` | — | Captions, timestamps, labels |
+| `--text-subtle` | `#71717a` | `text-zinc-600/700` | — | Disabled, dividers |
+
+#### Light Mode (`.dashboard-light`)
+
+| Canonical Token | Value | Usage |
+|-----------------|-------|-------|
+| `--surface-1` | `#f8fafc` | Page background |
+| `--surface-2` | `#ffffff` | Card backgrounds |
+| `--surface-3` | `#f1f5f9` | Inputs, active tabs |
+| `--border-default` | `#e2e8f0` | Card borders |
+| `--text-primary` | `#0f172a` | Dark navy — headings, key content |
+| `--text-secondary` | `#334155` | Descriptions |
+| `--text-muted` | `#475569` | Captions, labels |
+| `--text-subtle` | `#64748b` | Disabled |
 
 ### Tier Color Rules
 
@@ -102,6 +120,8 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **MetricRing** | `MetricRing.tsx` | Auto from `scoreColor()`: ≥80 green, ≥60 amber, <60 red | DIN Pro 700, font size = `0.38 × ring size` |
 | **MetricRingSvg** | `MetricRing.tsx` | Same as MetricRing | Smaller inline SVG variant for tight spaces |
 | **SectionCard** | `SectionCard.tsx` | `bg-zinc-900 border-zinc-800` | Header row optional; title: `text-sm font-semibold text-zinc-200` |
+| **ChartCard** | `ChartCard.tsx` | Same as SectionCard (`bg-[var(--surface-2)] border-zinc-800`) | Thin SectionCard wrapper for chart-friendly defaults: tighter padding (`px-4 py-3`), inline title + optional `<TrendBadge>` row, no `border-b` separator. Preserves signature `10px 24px` radius. |
+| **TrendBadge** | `TrendBadge.tsx` | Positive: `text-emerald-400` + `TrendingUp`; Negative: `text-red-400` + `TrendingDown`; Zero (when `hideOnZero={false}`): `text-zinc-400` + `Minus` | Canonical directional delta indicator. Props: `value`, `suffix='%'`, `invert`, `showSign`, `label`, `size='sm'\|'md'`, `hideOnZero=true`. Replaces all hand-rolled `TrendingUp/Down + emerald/red` ternaries. Use `invert` when lower=better (positions, error counts). |
 | **PageHeader** | `PageHeader.tsx` | `text-lg font-semibold text-zinc-100` | Title + optional subtitle + action slot |
 | **Badge** | `Badge.tsx` | 9 colors: `teal`, `blue`, `emerald`, `green`, `amber`, `red`, `orange`, `purple`, `zinc` | Pattern: `bg-{color}-500/10 text-{color}-400` |
 | **TabBar** | `TabBar.tsx` | Active: `border-teal-500 text-teal-200` | Underline style, `border-b-2` |
@@ -120,7 +140,12 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **WorkspaceHealthBar** | `ui/WorkspaceHealthBar.tsx` | Progress bars: `bg-blue-500` (data/read-only); recommendation arrows: `text-teal-500` hover `text-teal-400` (action) | Wraps SectionCard. Blue = data metrics. Teal = actionable next steps. |
 | **ChartCard** | `ui/ChartCard.tsx` | Same as SectionCard (`bg-[var(--surface-2)] border-zinc-800`) | Thin SectionCard wrapper for chart-friendly defaults: tighter padding (`px-4 py-3`), inline title + optional `<TrendBadge>` row, no `border-b` separator. Preserves signature `10px 24px` radius. |
 | **TrendBadge** | `ui/TrendBadge.tsx` | Positive: `text-emerald-400` + `TrendingUp`; Negative: `text-red-400` + `TrendingDown`; Zero (when `hideOnZero={false}`): `text-zinc-400` + `Minus` | Canonical directional delta indicator. Props: `value`, `suffix='%'`, `invert`, `showSign`, `label`, `size='sm'\|'md'`, `hideOnZero=true`. Replaces all hand-rolled `TrendingUp/Down + emerald/red` ternaries. Use `invert` when lower=better (positions, error counts). |
-
+| **Heading** | `ui/typography/Heading.tsx` | Inherits `var(--brand-text-bright)`; `level={1\|2\|3}` → `.t-h1` / `.t-h2` / `.t-page` | Phase 5. `as` prop overrides HTML tag. forwardRef. |
+| **Stat** | `ui/typography/Stat.tsx` | Inherits text color (caller controls via parent `text-*`); `size="hero"\|"default"\|"sm"` → `.t-stat-lg` / `.t-stat` / `.t-stat-sm` | Phase 5. DIN Pro numerals. forwardRef. |
+| **BodyText** | `ui/typography/BodyText.tsx` | `tone="default"` → `var(--brand-text)` (zinc-400); `tone="muted"` → `var(--brand-text-muted)` (zinc-500); `tone="dim"` → `var(--brand-text-dim)` (zinc-600). Tone is the API for color — Tailwind color utilities passed via `className` are overridden by inline tone style. | Phase 5. Renders `.t-body`. forwardRef. |
+| **Caption** | `ui/typography/Caption.tsx` | Inherits muted text (`var(--brand-text-muted)`); `size="default"\|"sm"` → `.t-caption` / `.t-caption-sm` | Phase 5. Secondary metadata, timestamps. forwardRef. |
+| **Label** | `ui/typography/Label.tsx` | Inherits muted text; uppercase DIN Pro via `.t-label` | Phase 5. Form labels, uppercase section markers. forwardRef. |
+| **Mono** | `ui/typography/Mono.tsx` | Fira Code / JetBrains Mono / Menlo. `size="default"\|"micro"` → `.t-mono` (12px) / `.t-micro` (10px). Both monospace. | Phase 5. IDs, slugs, tokens, timestamps. forwardRef. |
 | **Row** | `layout/Row.tsx` | No color — structural only | `flex flex-row`. Props: `gap` (xs–xl), `align` (start/center/end/baseline, default: center), `justify` (start/center/end/between/around), `wrap` (bool). `forwardRef`. |
 | **Stack** | `layout/Stack.tsx` | No color — structural only | `flex flex-col` (or `flex-row` with `dir="row"`). Props: `gap`, `align` (start/center/end/stretch), `dir`. `forwardRef`. |
 | **Column** | `layout/Column.tsx` | No color — structural only | Strict `flex flex-col` — never `flex-row`. Convenience alias for vertical stacks. Props: `gap`, `align`, `className`. `forwardRef`. |
@@ -368,6 +393,8 @@ The platform's signature shape is an asymmetric diagonal radius — tight top-le
 | `src/components/ui/StatCard.tsx` | Default + CompactStatBar |
 | `src/components/ui/MetricRing.tsx` | MetricRing + MetricRingSvg |
 | `src/components/ui/SectionCard.tsx` | Standard card container |
+| `src/components/ui/ChartCard.tsx` | SectionCard variant for charts (tighter padding, inline title+trend) |
+| `src/components/ui/TrendBadge.tsx` | Canonical directional delta indicator (emerald/red/zinc) |
 | `src/components/ui/PageHeader.tsx` | Consistent page header |
 | `src/components/ui/TabBar.tsx` | Underline tab navigation |
 | `src/components/ui/DateRangeSelector.tsx` | Segmented date picker |

@@ -55,7 +55,7 @@ export function BacklinkProfile({ workspaceId }: Props) {
 
   if (loading) {
     return (
-      <SectionCard>
+      <SectionCard noPadding>
         <div className="px-4 py-6 flex items-center justify-center gap-2 text-zinc-500 text-sm">
           <Loader2 className="w-4 h-4 animate-spin" /> Loading backlink profile…
         </div>
@@ -66,7 +66,7 @@ export function BacklinkProfile({ workspaceId }: Props) {
   if (error) {
     if (error.includes('No SEO data provider configured')) {
       return (
-        <SectionCard>
+        <SectionCard noPadding>
           <div className="px-4 py-4 flex items-center gap-2 text-zinc-500 text-xs">
             <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
             <span>Backlink data requires an SEO provider. Set <code className="text-zinc-400">SEMRUSH_API_KEY</code> or <code className="text-zinc-400">DATAFORSEO_LOGIN</code> in environment to enable.</span>
@@ -75,7 +75,7 @@ export function BacklinkProfile({ workspaceId }: Props) {
       );
     }
     return (
-      <SectionCard>
+      <SectionCard noPadding>
         <div className="px-4 py-4 flex items-center gap-2 text-red-400 text-xs">
           <AlertTriangle className="w-3.5 h-3.5" /> {error}
         </div>
@@ -114,7 +114,7 @@ export function BacklinkProfile({ workspaceId }: Props) {
 
       {/* Referring domains table */}
       {referringDomains.length > 0 && (
-        <SectionCard>
+        <SectionCard noPadding>
           <div className="px-4 py-3">
             <div className="text-xs font-medium text-zinc-200 mb-3">Top Referring Domains</div>
             <div className="overflow-x-auto">

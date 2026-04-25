@@ -7,6 +7,7 @@ import {
   Check, ChevronDown, ChevronUp, Eye, ClipboardCheck, Square, CheckSquare,
   Sparkles, Loader2,
 } from 'lucide-react';
+import { SectionCard } from '../ui';
 
 interface ReviewChecklistState {
   factual_accuracy: boolean;
@@ -82,7 +83,7 @@ export function ReviewChecklist({
   return (
     <div className="space-y-3">
       {postStatus === 'draft' && (
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+        <SectionCard noPadding className="overflow-hidden">
           <button
             onClick={onToggleShowChecklist}
             className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-zinc-800/50 transition-colors"
@@ -135,7 +136,7 @@ export function ReviewChecklist({
               ))}
             </div>
           )}
-        </div>
+        </SectionCard>
       )}
 
       <div className="flex items-center gap-2">
@@ -155,7 +156,7 @@ export function ReviewChecklist({
         )}
         {postStatus === 'review' && (
           <>
-            <button onClick={() => onChangeStatus('approved')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-green-600/20 border border-green-500/30 text-green-300 hover:bg-green-600/30 transition-colors">
+            <button onClick={() => onChangeStatus('approved')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-emerald-600/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-600/30 transition-colors">
               <Check className="w-3 h-3" /> Approve
             </button>
             <button onClick={() => onChangeStatus('draft')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors">
