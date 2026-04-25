@@ -57,7 +57,7 @@ interface FileMatch {
   file: string;
   classMatches: number;
   numericMatches: number;
-  hasException: boolean;
+  skippedMatches: number; // matches excluded by match-level exception filter
 }
 
 const fileMatches: FileMatch[] = [];
@@ -82,6 +82,24 @@ function extractLucideImports(content: string): Set<string> {
   return set;
 }
 
+/**
+ * Returns the line of `content` that contains `index`. Used for match-level
+ * exception filtering — a file with `<EmptyState icon={Clock} />` on one line
+ * should not cause unrelated direct-render icons elsewhere in the same file to
+ * be skipped (Gate 3 fix from phase-2-kickoff.md §1).
+ */
+function lineContaining(content: string, index: number): string {
+  const lineStart = content.lastIndexOf('\n', index - 1) + 1;
+  const newlineIdx = content.indexOf('\n', index);
+  const lineEnd = newlineIdx === -1 ? content.length : newlineIdx;
+  return content.slice(lineStart, lineEnd);
+}
+
+function isMatchInExceptionContext(content: string, matchIndex: number): boolean {
+  const line = lineContaining(content, matchIndex);
+  return EXCEPTION_PATTERNS.some((pattern) => pattern.test(line));
+}
+
 const files = globSync('src/**/*.tsx', { ignore: 'node_modules/**' });
 
 for (const file of files) {
@@ -90,16 +108,28 @@ for (const file of files) {
 
   const content = fs.readFileSync(file, 'utf-8');
 
-  // Pattern 1 — <X className="w-N h-N [extra-classes]" /> (handles both
-  // empty and non-empty trailing classes; Pattern 3 from the original
-  // scaffold was redundant with this and double-counted matches).
-  const classPattern =
-    /<(\w+)\s+className\s*=\s*"((?:w-[2-8])\s+(?:h-[2-8]))([^"]*)"\s*\/>/g;
+  // Pattern 1 — <X className="...w-N h-N..." /> with size classes appearing
+  // ANYWHERE in the className (Gate 3 fix: the previous regex required w-N h-N
+  // to be the first tokens, missing real-world cases like
+  // `<X className="text-zinc-400 w-4 h-4" />`).
+  const jsxSelfClosingPattern = /<(\w+)\s+className\s*=\s*"([^"]*)"\s*\/>/g;
   let classCount = 0;
+  let skippedCount = 0;
   let m: RegExpExecArray | null;
-  while ((m = classPattern.exec(content)) !== null) {
-    const sizeClass = m[2];
-    if (SIZE_CLASS_TO_ENUM[sizeClass]) classCount++;
+  while ((m = jsxSelfClosingPattern.exec(content)) !== null) {
+    const className = m[2];
+    // Find any w-N h-N pair where N matches (adjacent or with other classes
+    // between them). Tailwind auto-sorts but human-written code may not.
+    const sizeMatch = className.match(/\bw-([2-8])\b[^"]*\bh-\1\b/) ??
+                      className.match(/\bh-([2-8])\b[^"]*\bw-\1\b/);
+    if (!sizeMatch) continue;
+    const sizeKey = `w-${sizeMatch[1]} h-${sizeMatch[1]}`;
+    if (!SIZE_CLASS_TO_ENUM[sizeKey]) continue;
+    if (isMatchInExceptionContext(content, m.index)) {
+      skippedCount++;
+    } else {
+      classCount++;
+    }
   }
 
   // Pattern 2 — Lucide-style numeric size: <Icon size={N} /> — narrowed
@@ -115,22 +145,24 @@ for (const file of files) {
       lucideNames.has(componentName) &&
       NUMERIC_SIZE_TO_ENUM[numericSize] !== undefined
     ) {
-      numericCount++;
+      if (isMatchInExceptionContext(content, m.index)) {
+        skippedCount++;
+      } else {
+        numericCount++;
+      }
     }
   }
 
-  if (classCount + numericCount === 0) continue;
-
-  const hasException = EXCEPTION_PATTERNS.some((pattern) => pattern.test(content));
+  if (classCount + numericCount + skippedCount === 0) continue;
 
   fileMatches.push({
     file,
     classMatches: classCount,
     numericMatches: numericCount,
-    hasException,
+    skippedMatches: skippedCount,
   });
 
-  if (!hasException) totalMatches += classCount + numericCount;
+  totalMatches += classCount + numericCount;
 }
 
 // ── Report ────────────────────────────────────────────────────────────
@@ -145,13 +177,15 @@ const sorted = fileMatches.sort(
 
 for (const m of sorted) {
   const total = m.classMatches + m.numericMatches;
-  const skip = m.hasException ? ' [SKIP — contains exception patterns]' : '';
+  const skip = m.skippedMatches > 0
+    ? ` [${m.skippedMatches} skipped in exception context]`
+    : '';
   console.log(
     `  ${total.toString().padStart(3)}  ${m.file}` +
       `  (class:${m.classMatches}, numeric:${m.numericMatches})${skip}`,
   );
 }
 
-console.log(`\nTotal matches (excluding skipped files): ${totalMatches}`);
-console.log(`Files affected: ${fileMatches.filter((f) => !f.hasException).length}`);
+console.log(`\nTotal matches: ${totalMatches}`);
+console.log(`Files affected: ${fileMatches.filter((f) => f.classMatches + f.numericMatches > 0).length}`);
 console.log('\n(Dry-run only. --write is disabled — see file header for rationale.)\n');
