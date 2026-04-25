@@ -96,7 +96,10 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
   const briefs = (briefsQ.data ?? []) as ContentBrief[];
   const clientRequests = (requestsQ.data ?? []) as ContentTopicRequest[];
   const posts = (postsQ.data ?? []) as PostSummary[];
-  const loading = briefsQ.isLoading || requestsQ.isLoading;
+  // Include postsQ — RequestList uses posts to decide between "Generate Post" and
+  // "Open Post" buttons. If posts hasn't loaded yet we'd mistakenly show "Generate
+  // Post" for briefs that already have one, causing duplicate post creation on click.
+  const loading = briefsQ.isLoading || requestsQ.isLoading || postsQ.isLoading;
 
   // Notify parent of pending request count whenever requests data changes
   useEffect(() => {
