@@ -3907,6 +3907,8 @@ export const CHECKS: Check[] = [
     fileGlobs: ['*.tsx', '*.css'],
     exclude: [
       'src/components/ui/SectionCard.tsx',
+      'src/tokens.css',
+      'public/tokens.css',
       'public/styleguide.html',
       'public/styleguide.css',
     ],
@@ -4009,8 +4011,13 @@ function checkFile(file: string, check: Check): string[] {
   if (!check.pattern) return [];
   try {
     const safePattern = check.pattern.replace(/"/g, '\\"');
+    // Pass the pattern via `-e` so grep does not interpret patterns that
+    // start with `-` (e.g. `--radius-signature-lg`) as command-line flags.
+    // Without `-e`, grep errors with "unrecognized option `--…`", the error
+    // is swallowed by `2>/dev/null || true`, and the rule silently reports
+    // ✓ — the exact silent-false-negative class the audit prevents.
     const out = execSync(
-      `grep -n -E "${safePattern}" "${file}" 2>/dev/null || true`,
+      `grep -n -E -e "${safePattern}" "${file}" 2>/dev/null || true`,
       { cwd: ROOT, encoding: 'utf-8' }
     );
     const lines = out.trim() ? out.trim().split('\n').filter(Boolean).map(l => `${file}:${l}`) : [];
@@ -4048,9 +4055,15 @@ export function checkDirectory(dir: string, check: Check): string[] {
     // silently reports ✓ — the exact silent-false-negative class this audit
     // tries to prevent. Rule C ("Hardcoded card radius outside ui primitives")
     // has this pattern; Rule B was already converted to customCheck.
+    //
+    // Pass the pattern via `-e` so grep does not interpret patterns that start
+    // with `-` (e.g. `--radius-signature-lg`) as command-line flags. Same
+    // silent-false-negative class as above; this one bit `radius-signature-lg
+    // used outside SectionCard` from its introduction until the Phase 2 prep
+    // hotfix discovered it.
     const safePattern = check.pattern.replace(/"/g, '\\"');
     const out = execSync(
-      `grep -rn ${globs} ${excludeDirs} ${excludeFiles} -E "${safePattern}" "${dir}" 2>/dev/null || true`,
+      `grep -rn ${globs} ${excludeDirs} ${excludeFiles} -E -e "${safePattern}" "${dir}" 2>/dev/null || true`,
       { cwd: ROOT, encoding: 'utf-8' }
     );
     let lines = out.trim() ? out.trim().split('\n').filter(Boolean) : [];

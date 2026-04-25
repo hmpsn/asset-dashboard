@@ -304,9 +304,12 @@ the hard way in Phase 1 — don't re-discover them.
 ### 6.1 className merge — ALWAYS `cn()`
 
 ```tsx
-// ✓ correct
-import { cn } from '@/lib/utils';
+// ✓ correct — re-exported from the ui barrel for convenience
+import { cn } from '../ui';
 <div className={cn('flex flex-row gap-2', active && 'bg-teal-500/10', className)} />
+
+// ✓ also correct — direct import from the canonical implementation
+import { cn } from '../../lib/utils';
 
 // ✗ wrong — template literal
 <div className={`flex flex-row gap-2 ${active ? 'bg-teal-500/10' : ''} ${className ?? ''}`} />
@@ -317,6 +320,11 @@ import { cn } from '@/lib/utils';
 // ✗ wrong — string concat
 <div className={baseClass + ' ' + (className ?? '')} />
 ```
+
+> **Path note.** This codebase has no `@/`-style tsconfig path alias. Use the
+> relative path that matches your file's depth: `'../ui'` from
+> `src/components/`, `'../../ui'` from `src/components/<subdir>/`. The form
+> `'@/lib/utils'` shown in older docs is incorrect — it would fail to resolve.
 
 ### 6.2 Test file location — ALWAYS `tests/components/ui/`
 
@@ -338,8 +346,8 @@ If Phase 2 adds a test file for a consumer migration:
 ### 6.4 Icon sizing — use the primitive, not template literals
 
 ```tsx
-// ✓ correct
-import { Icon } from '@/components/ui';
+// ✓ correct (path is relative — see §6.1 path note)
+import { Icon } from '../ui';
 import { TrendingUp } from 'lucide-react';
 <Icon as={TrendingUp} size="sm" className="text-teal-400" />
 
@@ -354,7 +362,7 @@ import { TrendingUp } from 'lucide-react';
 
 ```tsx
 // ✓ correct
-import { Button } from '@/components/ui';
+import { Button } from '../ui';
 <Button variant="primary" icon={Send} onClick={handleSend}>Send</Button>
 
 // ✗ wrong
@@ -365,7 +373,7 @@ import { Button } from '@/components/ui';
 
 ```tsx
 // ✓ correct
-import { scoreColor, scoreColorClass } from '@/components/ui/constants';
+import { scoreColor, scoreColorClass } from '../ui/constants';
 const color = scoreColor(score);             // hex for SVG fills
 const cls = scoreColorClass(score);          // Tailwind class for text
 
@@ -383,14 +391,41 @@ const color = score >= 80 ? '#34d399' : score >= 60 ? '#fbbf24' : '#f87171';
 Forbidden hues in consumers: `violet-`, `indigo-`, `rose-`, `pink-`, `text-green-400`
 for success. Enforced by pr-check.
 
-### 6.8 Token usage — prefer CSS vars over raw `zinc-*` where Phase 1 primitives use them
+### 6.8 Token usage — full migration of raw zinc/borderRadius/text-[Npx] in your domain
 
-**Note:** Phase 2 is a migration, not a full token rewrite. If a consumer file
-already uses `text-zinc-500` and the migration replaces a button with `<Button>`,
-you do NOT need to migrate the surrounding `text-zinc-500` to `var(--brand-text-muted)`
-in the same PR. That's Phase 3 work.
+A Phase 2 worker's domain must end with **zero** raw `text-zinc-*`, `bg-zinc-*`,
+`border-zinc-*`, `rounded-lg`, `text-[Npx]`, or inline `borderRadius:` in any
+file in the worker's scope. The parent plan's "Phase 2 Acceptance Checklist —
+Domain grep audit" enforces this; pr-check will fail any PR that lets one slip
+through.
 
-Do use `var(--*)` in any NEW code you write inside the migration (rare).
+> **Earlier draft of this section said the opposite.** It claimed Phase 2 was
+> "migration, not full token rewrite" and that surrounding zinc could stay.
+> That note conflicted with the parent plan's domain grep audit — workers
+> following it would fail acceptance. The parent plan's stricter rule wins.
+
+#### Token mapping (use these — do NOT invent `var(--zinc-*)`)
+
+The project does **not** define `--zinc-300`, `--zinc-400`, `--zinc-500`,
+`--zinc-600`, or `--zinc-700` as CSS custom properties. `var(--zinc-N)` resolves
+to empty string at runtime — text becomes the browser default and backgrounds
+become transparent. **This is a runtime regression and Playwright visual diff is
+the only gate that catches it.**
+
+The legitimate replacements:
+
+| Raw zinc class | Semantic CSS var (preferred) | Notes |
+|---|---|---|
+| `text-zinc-100`, `text-zinc-200`, `text-zinc-300` | `text-[var(--brand-text-bright)]` | Headings, primary emphasis |
+| `text-zinc-400` | `text-[var(--brand-text)]` | Body text |
+| `text-zinc-500` | `text-[var(--brand-text-muted)]` | Muted/secondary text |
+| `bg-zinc-800`, `bg-zinc-900` | `bg-[var(--surface-1)]` / `bg-[var(--surface-2)]` / `bg-[var(--surface-3)]` | Pick the surface tier that matches the visual layer |
+| `border-zinc-700`, `border-zinc-800` | `border-[var(--brand-border)]` | All non-accent borders |
+
+If a site has no semantic equivalent (e.g. a one-off zinc-700 used for a legend
+swatch where a colored accent would be wrong), keep the original Tailwind
+utility class — it's defined as a CSS override in `src/index.css`. Do NOT
+escape into `text-[var(--zinc-700)]`; the variable does not exist.
 
 ---
 
