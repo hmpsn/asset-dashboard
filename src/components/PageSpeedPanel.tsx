@@ -4,7 +4,7 @@ import {
   Zap, AlertTriangle, Info,
 } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
-import { MetricRing, EmptyState } from './ui';
+import { MetricRing, EmptyState, Icon, Button } from './ui';
 import { pageWeight, webflow } from '../api/seo';
 
 interface CoreWebVitals {
@@ -105,8 +105,8 @@ function ratingBg(r: 'good' | 'needs-improvement' | 'poor'): string {
 function VitalCard({ label, value, formatted, vitalKey }: { label: string; value: number | null; formatted: string; vitalKey: string }) {
   const rating = vitalRating(vitalKey, value);
   return (
-    <div className={`rounded-lg border p-3 ${ratingBg(rating)}`}>
-      <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">{label}</div>
+    <div className={`rounded-[var(--radius-lg)] border p-3 ${ratingBg(rating)}`}>
+      <div className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider mb-1">{label}</div>
       <div className={`text-lg font-bold tabular-nums ${ratingColor(rating)}`}>{formatted}</div>
     </div>
   );
@@ -206,29 +206,30 @@ export function PageSpeedPanel({ siteId }: Props) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="px-2 py-0.5 rounded text-xs bg-teal-500/10 border border-teal-500/20 text-teal-400">Single Page</span>
-          <span className="text-xs text-zinc-500">{result.page}</span>
+          <span className="text-xs text-[var(--brand-text-muted)]">{result.page}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => runSingleTest(strategy === 'mobile' ? 'desktop' : 'mobile')}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs text-zinc-500 hover:text-zinc-300"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
           >
-            {strategy === 'mobile' ? <Monitor className="w-3 h-3" /> : <Smartphone className="w-3 h-3" />}
+            {strategy === 'mobile' ? <Icon as={Monitor} size="sm" /> : <Icon as={Smartphone} size="sm" />}
             Test {strategy === 'mobile' ? 'Desktop' : 'Mobile'}
           </button>
           <button
             onClick={() => { setHasRun(false); setSingleResult(null); setData(null); }}
-            className="text-xs text-zinc-500 hover:text-zinc-300 px-2 py-1"
+            className="text-xs text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] px-2 py-1"
           >
             ← Back
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-[auto_1fr] gap-6 bg-zinc-900 p-6 border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      {/* pr-check-disable-next-line -- brand asymmetric signature on PageSpeed score panel; intentional non-SectionCard chrome */}
+      <div className="grid grid-cols-[auto_1fr] gap-6 bg-[var(--surface-2)] p-6 border border-[var(--brand-border)] rounded-[var(--radius-signature-lg)]">
         <div className="flex flex-col items-center gap-2">
           <MetricRing score={result.score} size={100} />
-          <div className="text-xs text-zinc-500">{strategy === 'mobile' ? 'Mobile' : 'Desktop'}</div>
+          <div className="text-xs text-[var(--brand-text-muted)]">{strategy === 'mobile' ? 'Mobile' : 'Desktop'}</div>
           {result.fieldDataAvailable && <div className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">Real users</div>}
           {!result.fieldDataAvailable && <div className="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 border border-amber-500/20 text-amber-400">Lab test</div>}
         </div>
@@ -244,16 +245,16 @@ export function PageSpeedPanel({ siteId }: Props) {
 
       {result.opportunities.length > 0 && (
         <div>
-          <div className="flex items-center gap-2 text-xs font-medium text-zinc-400 mb-2">
-            <Zap className="w-3 h-3 text-amber-400" /> Opportunities ({result.opportunities.length})
+          <div className="flex items-center gap-2 text-xs font-medium text-[var(--brand-text)] mb-2">
+            <Icon as={Zap} size="sm" className="text-amber-400" /> Opportunities ({result.opportunities.length})
           </div>
           <div className="space-y-1">
             {result.opportunities.map(opp => (
-              <div key={opp.id} className="flex items-start gap-3 px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-800">
-                <AlertTriangle className="w-3 h-3 mt-0.5 text-amber-400 flex-shrink-0" />
+              <div key={opp.id} className="flex items-start gap-3 px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-2)] border border-[var(--brand-border)]">
+                <Icon as={AlertTriangle} size="sm" className="mt-0.5 text-amber-400 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs text-zinc-300">{opp.title}</div>
-                  <div className="text-[11px] text-zinc-500 mt-0.5 line-clamp-2">{opp.description}</div>
+                  <div className="text-xs text-[var(--brand-text-bright)]">{opp.title}</div>
+                  <div className="text-[11px] text-[var(--brand-text-muted)] mt-0.5 line-clamp-2">{opp.description}</div>
                 </div>
                 {opp.savings && (
                   <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 flex-shrink-0">
@@ -268,19 +269,19 @@ export function PageSpeedPanel({ siteId }: Props) {
 
       {result.diagnostics.length > 0 && (
         <div>
-          <div className="flex items-center gap-2 text-xs font-medium text-zinc-400 mb-2">
-            <Info className="w-3 h-3 text-blue-400" /> Diagnostics ({result.diagnostics.length})
+          <div className="flex items-center gap-2 text-xs font-medium text-[var(--brand-text)] mb-2">
+            <Icon as={Info} size="sm" className="text-blue-400" /> Diagnostics ({result.diagnostics.length})
           </div>
           <div className="space-y-1">
             {result.diagnostics.map(diag => (
-              <div key={diag.id} className="flex items-start gap-3 px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-800">
-                <Info className="w-3 h-3 mt-0.5 text-blue-400 flex-shrink-0" />
+              <div key={diag.id} className="flex items-start gap-3 px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-2)] border border-[var(--brand-border)]">
+                <Icon as={Info} size="sm" className="mt-0.5 text-blue-400 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs text-zinc-300">{diag.title}</div>
-                  <div className="text-[11px] text-zinc-500 mt-0.5 line-clamp-2">{diag.description}</div>
+                  <div className="text-xs text-[var(--brand-text-bright)]">{diag.title}</div>
+                  <div className="text-[11px] text-[var(--brand-text-muted)] mt-0.5 line-clamp-2">{diag.description}</div>
                 </div>
                 {diag.displayValue && (
-                  <span className="text-[11px] text-zinc-500 flex-shrink-0">{diag.displayValue}</span>
+                  <span className="text-[11px] text-[var(--brand-text-muted)] flex-shrink-0">{diag.displayValue}</span>
                 )}
               </div>
             ))}
@@ -293,22 +294,22 @@ export function PageSpeedPanel({ siteId }: Props) {
   if (!hasRun) {
     return (
       <div className="flex flex-col items-center justify-center py-12 gap-5">
-        <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center">
-          <Gauge className="w-8 h-8 text-zinc-500" />
+        <div className="w-16 h-16 rounded-2xl bg-[var(--surface-2)] flex items-center justify-center">
+          <Icon as={Gauge} size="2xl" className="text-[var(--brand-text-muted)]" />
         </div>
-        <p className="text-zinc-400 text-sm">Core Web Vitals & Performance</p>
+        <p className="text-[var(--brand-text)] text-sm">Core Web Vitals &amp; Performance</p>
 
         {/* Mode toggle */}
-        <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-zinc-900 border border-zinc-800">
+        <div className="flex items-center gap-0.5 p-0.5 rounded-[var(--radius-lg)] bg-[var(--surface-2)] border border-[var(--brand-border)]">
           <button
             onClick={() => setMode('single')}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${mode === 'single' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+            className={`px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium transition-colors ${mode === 'single' ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'}`}
           >
             Single Page
           </button>
           <button
             onClick={() => setMode('bulk')}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${mode === 'bulk' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+            className={`px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium transition-colors ${mode === 'bulk' ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'}`}
           >
             Bulk Test (Top 3)
           </button>
@@ -325,40 +326,44 @@ export function PageSpeedPanel({ siteId }: Props) {
               size="md"
             />
             <div className="flex gap-2 justify-center">
-              <button
+              <Button
+                variant="primary"
                 onClick={() => runSingleTest('mobile')}
                 disabled={!selectedPage}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors disabled:opacity-50 bg-teal-400 text-[#0f1219] hover:bg-teal-300"
+                icon={Smartphone}
               >
-                <Smartphone className="w-4 h-4" /> Test Mobile
-              </button>
-              <button
+                Test Mobile
+              </Button>
+              <Button
+                variant="secondary"
                 onClick={() => runSingleTest('desktop')}
                 disabled={!selectedPage}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors disabled:opacity-50"
+                icon={Monitor}
               >
-                <Monitor className="w-4 h-4" /> Test Desktop
-              </button>
+                Test Desktop
+              </Button>
             </div>
           </div>
         ) : (
           <div className="space-y-2 text-center">
-            <p className="text-xs text-zinc-500 max-w-md">
+            <p className="text-xs text-[var(--brand-text-muted)] max-w-md">
               Tests the top 3 most important pages automatically (homepage + key pages).
             </p>
             <div className="flex gap-2 justify-center">
-              <button
+              <Button
+                variant="primary"
                 onClick={() => runBulkTest('mobile')}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors bg-teal-400 text-[#0f1219] hover:bg-teal-300"
+                icon={Smartphone}
               >
-                <Smartphone className="w-4 h-4" /> Test Mobile
-              </button>
-              <button
+                Test Mobile
+              </Button>
+              <Button
+                variant="secondary"
                 onClick={() => runBulkTest('desktop')}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors"
+                icon={Monitor}
               >
-                <Monitor className="w-4 h-4" /> Test Desktop
-              </button>
+                Test Desktop
+              </Button>
             </div>
           </div>
         )}
@@ -370,9 +375,9 @@ export function PageSpeedPanel({ siteId }: Props) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3">
         <Loader2 className="w-8 h-8 animate-spin text-teal-400" />
-        <p className="text-sm text-zinc-400">Running PageSpeed analysis...</p>
-        <p className="text-xs text-zinc-500">Testing via Google PageSpeed Insights API</p>
-        <p className="text-xs text-zinc-500">This may take 30–60 seconds</p>
+        <p className="text-sm text-[var(--brand-text)]">Running PageSpeed analysis...</p>
+        <p className="text-xs text-[var(--brand-text-muted)]">Testing via Google PageSpeed Insights API</p>
+        <p className="text-xs text-[var(--brand-text-muted)]">This may take 30–60 seconds</p>
       </div>
     );
   }
@@ -386,19 +391,16 @@ export function PageSpeedPanel({ siteId }: Props) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
         {error ? (
-          <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 max-w-md text-center">
+          <div className="bg-red-500/10 border border-red-500/30 rounded-[var(--radius-lg)] px-4 py-3 max-w-md text-center">
             <p className="text-red-400 text-sm font-medium mb-1">PageSpeed Analysis Failed</p>
             <p className="text-xs text-red-400/70">{error}</p>
           </div>
         ) : (
           <EmptyState icon={Zap} title="No results available" description="Run a PageSpeed test to see performance metrics." className="py-4" />
         )}
-        <button
-          onClick={() => { setHasRun(false); setError(null); }}
-          className="px-4 py-2 rounded-lg text-sm font-medium bg-teal-400 text-[#0f1219] hover:bg-teal-300"
-        >
+        <Button variant="primary" onClick={() => { setHasRun(false); setError(null); }}>
           Try Again
-        </button>
+        </Button>
       </div>
     );
   }
@@ -409,34 +411,35 @@ export function PageSpeedPanel({ siteId }: Props) {
     <div className="space-y-8">
       {/* Strategy toggle + re-run */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1 p-0.5 rounded-lg bg-zinc-900 border border-zinc-800">
+        <div className="flex items-center gap-1 p-0.5 rounded-[var(--radius-lg)] bg-[var(--surface-2)] border border-[var(--brand-border)]">
           <button
             onClick={() => { if (strategy !== 'mobile') runBulkTest('mobile'); }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              strategy === 'mobile' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium transition-colors ${
+              strategy === 'mobile' ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
             }`}
           >
-            <Smartphone className="w-3 h-3" /> Mobile
+            <Icon as={Smartphone} size="sm" /> Mobile
           </button>
           <button
             onClick={() => { if (strategy !== 'desktop') runBulkTest('desktop'); }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              strategy === 'desktop' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium transition-colors ${
+              strategy === 'desktop' ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
             }`}
           >
-            <Monitor className="w-3 h-3" /> Desktop
+            <Icon as={Monitor} size="sm" /> Desktop
           </button>
         </div>
-        <div className="text-xs text-zinc-500">
+        <div className="text-xs text-[var(--brand-text-muted)]">
           {data.pages.length} pages tested · {new Date(data.testedAt).toLocaleTimeString()}
         </div>
       </div>
 
       {/* Average score + vitals */}
-      <div className="grid grid-cols-[auto_1fr] gap-6 bg-zinc-900 p-6 border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      {/* pr-check-disable-next-line -- brand asymmetric signature on PageSpeed score panel; intentional non-SectionCard chrome */}
+      <div className="grid grid-cols-[auto_1fr] gap-6 bg-[var(--surface-2)] p-6 border border-[var(--brand-border)] rounded-[var(--radius-signature-lg)]">
         <div className="flex flex-col items-center gap-2">
           <MetricRing score={data.averageScore} size={100} />
-          <div className="text-xs text-zinc-500">Avg Score</div>
+          <div className="text-xs text-[var(--brand-text-muted)]">Avg Score</div>
         </div>
         <div className="grid grid-cols-3 gap-2">
           <VitalCard label="LCP" value={v.LCP} formatted={formatMs(v.LCP)} vitalKey="LCP" />
@@ -453,18 +456,19 @@ export function PageSpeedPanel({ siteId }: Props) {
         {data.pages.map(page => {
           const isOpen = expandedPage === page.url;
           return (
-            <div key={page.url} className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
+            // pr-check-disable-next-line -- brand asymmetric signature on page-level result card; intentional non-SectionCard chrome
+            <div key={page.url} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
               <button
                 onClick={() => setExpandedPage(isOpen ? null : page.url)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-900/50 transition-colors text-left"
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-2)]/50 transition-colors text-left"
               >
-                {isOpen ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-500" />}
+                {isOpen ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)]" />}
                 <div className={`text-lg font-bold tabular-nums w-10 ${scoreColor(page.score)}`}>{page.score}</div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm text-zinc-300 truncate">{page.page}</div>
-                  <div className="text-xs text-zinc-500 truncate">{page.url}</div>
+                  <div className="text-sm text-[var(--brand-text-bright)] truncate">{page.page}</div>
+                  <div className="text-xs text-[var(--brand-text-muted)] truncate">{page.url}</div>
                 </div>
-                <div className="flex items-center gap-3 text-xs text-zinc-500">
+                <div className="flex items-center gap-3 text-xs text-[var(--brand-text-muted)]">
                   <span>LCP {formatMs(page.vitals.LCP)}</span>
                   <span>CLS {formatCLS(page.vitals.CLS)}</span>
                   <span>INP {formatMs(page.vitals.INP)}</span>
@@ -472,7 +476,7 @@ export function PageSpeedPanel({ siteId }: Props) {
               </button>
 
               {isOpen && (
-                <div className="border-t border-zinc-800 bg-zinc-950/50">
+                <div className="border-t border-[var(--brand-border)] bg-[var(--surface-1)]/50">
                   {/* Page vitals */}
                   <div className="grid grid-cols-6 gap-2 p-4">
                     <VitalCard label="LCP" value={page.vitals.LCP} formatted={formatMs(page.vitals.LCP)} vitalKey="LCP" />
@@ -488,20 +492,20 @@ export function PageSpeedPanel({ siteId }: Props) {
                     <div className="px-4 pb-3">
                       <button
                         onClick={() => toggleExpand(`opp-${page.url}`)}
-                        className="flex items-center gap-2 text-xs font-medium text-zinc-400 mb-2"
+                        className="flex items-center gap-2 text-xs font-medium text-[var(--brand-text)] mb-2"
                       >
-                        <Zap className="w-3 h-3 text-amber-400" />
+                        <Icon as={Zap} size="sm" className="text-amber-400" />
                         Opportunities ({page.opportunities.length})
-                        {expanded.has(`opp-${page.url}`) ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                        {expanded.has(`opp-${page.url}`) ? <Icon as={ChevronDown} size="sm" /> : <Icon as={ChevronRight} size="sm" />}
                       </button>
                       {expanded.has(`opp-${page.url}`) && (
                         <div className="space-y-1 ml-5">
                           {page.opportunities.map(opp => (
-                            <div key={opp.id} className="flex items-start gap-3 px-3 py-2 rounded hover:bg-zinc-900/30">
-                              <AlertTriangle className="w-3 h-3 mt-0.5 text-amber-400 flex-shrink-0" />
+                            <div key={opp.id} className="flex items-start gap-3 px-3 py-2 rounded hover:bg-[var(--surface-2)]/30">
+                              <Icon as={AlertTriangle} size="sm" className="mt-0.5 text-amber-400 flex-shrink-0" />
                               <div className="flex-1 min-w-0">
-                                <div className="text-xs text-zinc-300">{opp.title}</div>
-                                <div className="text-[11px] text-zinc-500 mt-0.5 line-clamp-2">{opp.description}</div>
+                                <div className="text-xs text-[var(--brand-text-bright)]">{opp.title}</div>
+                                <div className="text-[11px] text-[var(--brand-text-muted)] mt-0.5 line-clamp-2">{opp.description}</div>
                               </div>
                               {opp.savings && (
                                 <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 flex-shrink-0">
@@ -520,23 +524,23 @@ export function PageSpeedPanel({ siteId }: Props) {
                     <div className="px-4 pb-4">
                       <button
                         onClick={() => toggleExpand(`diag-${page.url}`)}
-                        className="flex items-center gap-2 text-xs font-medium text-zinc-400 mb-2"
+                        className="flex items-center gap-2 text-xs font-medium text-[var(--brand-text)] mb-2"
                       >
-                        <Info className="w-3 h-3 text-blue-400" />
+                        <Icon as={Info} size="sm" className="text-blue-400" />
                         Diagnostics ({page.diagnostics.length})
-                        {expanded.has(`diag-${page.url}`) ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                        {expanded.has(`diag-${page.url}`) ? <Icon as={ChevronDown} size="sm" /> : <Icon as={ChevronRight} size="sm" />}
                       </button>
                       {expanded.has(`diag-${page.url}`) && (
                         <div className="space-y-1 ml-5">
                           {page.diagnostics.map(diag => (
-                            <div key={diag.id} className="flex items-start gap-3 px-3 py-2 rounded hover:bg-zinc-900/30">
-                              <Info className="w-3 h-3 mt-0.5 text-blue-400 flex-shrink-0" />
+                            <div key={diag.id} className="flex items-start gap-3 px-3 py-2 rounded hover:bg-[var(--surface-2)]/30">
+                              <Icon as={Info} size="sm" className="mt-0.5 text-blue-400 flex-shrink-0" />
                               <div className="flex-1 min-w-0">
-                                <div className="text-xs text-zinc-300">{diag.title}</div>
-                                <div className="text-[11px] text-zinc-500 mt-0.5 line-clamp-2">{diag.description}</div>
+                                <div className="text-xs text-[var(--brand-text-bright)]">{diag.title}</div>
+                                <div className="text-[11px] text-[var(--brand-text-muted)] mt-0.5 line-clamp-2">{diag.description}</div>
                               </div>
                               {diag.displayValue && (
-                                <span className="text-[11px] text-zinc-500 flex-shrink-0">{diag.displayValue}</span>
+                                <span className="text-[11px] text-[var(--brand-text-muted)] flex-shrink-0">{diag.displayValue}</span>
                               )}
                             </div>
                           ))}
