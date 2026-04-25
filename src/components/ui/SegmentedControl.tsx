@@ -112,7 +112,7 @@ export const SegmentedControl = React.forwardRef<HTMLDivElement, SegmentedContro
                 'rounded-sm transition-colors font-medium',
                 SIZE[size],
                 active ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-zinc-200',
-                opt.disabled && 'opacity-50 cursor-not-allowed',
+                opt.disabled && 'opacity-50 cursor-not-allowed pointer-events-none',
               )}
             >
               {opt.label}

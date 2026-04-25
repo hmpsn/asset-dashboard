@@ -502,6 +502,41 @@ src/components/ui/
 ├── SocialPreview.tsx       # Social sharing card preview for Facebook and Twitter/X
 ├── constants.ts            # scoreColor, scoreColorClass, scoreBgBarClass, DATE_PRESETS
 ├── statusConfig.ts         # Status→color mapping for StatusBadge
+├── Icon.tsx                # Strict-enum wrapper around Lucide components (Phase 5)
+├── Button.tsx              # Primary/secondary/ghost/danger/link button (Phase 5)
+├── IconButton.tsx          # Square icon button with required a11y label (Phase 5)
+├── ActionPill.tsx          # Workflow pill: start/approve/decline/send/request-changes (Phase 5)
+├── SegmentedControl.tsx    # Radiogroup with roving tabIndex (Phase 5)
+├── typography/
+│   ├── Heading.tsx
+│   ├── Stat.tsx
+│   ├── BodyText.tsx
+│   ├── Caption.tsx
+│   ├── Label.tsx
+│   ├── Mono.tsx
+│   └── index.ts
+├── forms/
+│   ├── FormField.tsx
+│   ├── FormInput.tsx
+│   ├── FormSelect.tsx
+│   ├── FormTextarea.tsx
+│   ├── Checkbox.tsx
+│   ├── Toggle.tsx
+│   └── index.ts
+├── layout/
+│   ├── Row.tsx
+│   ├── Stack.tsx
+│   ├── Column.tsx
+│   ├── Grid.tsx
+│   ├── Divider.tsx
+│   ├── utils.ts            # Shared GapSize + gapMap
+│   └── index.ts
+├── overlay/
+│   ├── Modal.tsx
+│   ├── Popover.tsx
+│   ├── Tooltip.tsx
+│   ├── reducedMotion.ts
+│   └── index.ts
 ├── index.ts                # Barrel export
 ```
 
