@@ -144,6 +144,7 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **Caption** | `ui/typography/Caption.tsx` | Inherits muted text (`var(--brand-text-muted)`); `size="default"\|"sm"` → `.t-caption` / `.t-caption-sm` | Phase 5. Secondary metadata, timestamps. forwardRef. |
 | **Label** | `ui/typography/Label.tsx` | Inherits muted text; uppercase DIN Pro via `.t-label` | Phase 5. Form labels, uppercase section markers. forwardRef. |
 | **Mono** | `ui/typography/Mono.tsx` | Fira Code / JetBrains Mono / Menlo. `size="default"\|"micro"` → `.t-mono` (12px) / `.t-micro` (10px). Both monospace. | Phase 5. IDs, slugs, tokens, timestamps. forwardRef. |
+| **Icon** | `ui/Icon.tsx` | Inherits `currentColor`; consumer supplies hue via `className` (e.g. `text-teal-400`). Inner SVG `aria-hidden="true"` by default — pass `aria-label` for semantic icons. | Phase 5. Wraps any Lucide component. Strict size enum: `xs\|sm\|md\|lg\|xl\|2xl` (8/12/16/20/24/32px). Inline-flex `<span>` wrapper so it is safe inside `<p>`, `<li>`, flex rows. forwardRef. |
 
 ### Helper Functions (`constants.ts`)
 
