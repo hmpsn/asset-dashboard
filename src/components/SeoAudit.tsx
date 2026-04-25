@@ -688,7 +688,8 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
 
       {/* Site-wide issues */}
       {data.siteWideIssues.length > 0 && (
-        <SectionCard className="space-y-2">
+        <SectionCard>
+          <div className="space-y-2">
           <div className="t-body font-medium text-[var(--brand-text-bright)] mb-2">Site-Wide Issues</div>
           {data.siteWideIssues.map((issue, idx) => {
             const cfg = SEVERITY_CONFIG[issue.severity];
@@ -713,6 +714,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
               </div>
             );
           })}
+          </div>
         </SectionCard>
       )}
 

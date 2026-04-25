@@ -126,7 +126,8 @@ export function SeoAuditGuide() {
       </div>
 
       {/* Score reference panel */}
-      <SectionCard className="space-y-3">
+      <SectionCard>
+        <div className="space-y-3">
         <div className="flex items-center gap-2">
           <Icon as={Filter} size="md" className="text-teal-400" />
           <h3 className="t-body font-medium text-[var(--brand-text-bright)]">Filter and Sort Controls</h3>
@@ -152,10 +153,12 @@ export function SeoAuditGuide() {
             </div>
           ))}
         </div>
+        </div>
       </SectionCard>
 
       {/* Scheduling note */}
-      <SectionCard className="space-y-3">
+      <SectionCard>
+        <div className="space-y-3">
         <div className="flex items-center gap-2">
           <Icon as={Layers} size="md" className="text-amber-400" />
           <h3 className="t-body font-medium text-[var(--brand-text-bright)]">Audit History and Scheduling</h3>
@@ -181,10 +184,12 @@ export function SeoAuditGuide() {
             </li>
           </ul>
         </div>
+        </div>
       </SectionCard>
 
       {/* Quick workflow */}
-      <SectionCard className="space-y-3">
+      <SectionCard>
+        <div className="space-y-3">
         <div className="flex items-center gap-2">
           <Icon as={Info} size="md" className="text-blue-400" />
           <h3 className="t-body font-medium text-[var(--brand-text-bright)]">Typical Monthly Workflow</h3>
@@ -205,6 +210,7 @@ export function SeoAuditGuide() {
               {step}
             </div>
           ))}
+        </div>
         </div>
       </SectionCard>
     </div>

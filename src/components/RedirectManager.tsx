@@ -192,7 +192,7 @@ export function RedirectManager({ siteId }: Props) {
   if (!data && !loading) {
     return (
       <div className="space-y-8">
-        <SectionCard className="px-6 py-12 text-center">
+        <SectionCard noPadding className="px-6 py-12 text-center">
           <Icon as={CornerDownRight} size="2xl" className="text-[var(--brand-text-muted)] mx-auto mb-3" />
           <p className="t-body text-[var(--brand-text)] mb-1">Redirect Scanner</p>
           <p className="t-caption-sm text-[var(--brand-text-muted)] max-w-md mx-auto mb-4">
@@ -484,7 +484,7 @@ export function RedirectManager({ siteId }: Props) {
 
       {/* Tips */}
       {(summary.chainsDetected > 0 || summary.notFound > 0) && (
-        <SectionCard className="px-4 py-3">
+        <SectionCard noPadding className="px-4 py-3">
           <div className="flex items-start gap-2">
             <Icon as={AlertCircle} size="md" className="text-amber-400 mt-0.5 flex-shrink-0" />
             <div className="t-caption-sm text-[var(--brand-text-muted)] space-y-1">

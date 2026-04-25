@@ -149,19 +149,19 @@ export function LinkChecker({ siteId }: Props) {
     <div className="space-y-8">
       {/* Summary cards */}
       <div className="grid grid-cols-4 gap-3">
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg p-4">
+        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4" style={{ borderRadius: 'var(--radius-signature)' }}>
           <div className="text-3xl font-bold text-[var(--brand-text-bright)]">{data.totalLinks}</div>
           <div className="t-caption text-[var(--brand-text-muted)] mt-1">Total Links</div>
         </div>
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg p-4">
+        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4" style={{ borderRadius: 'var(--radius-signature)' }}>
           <div className="text-3xl font-bold text-emerald-400">{data.healthy}</div>
           <div className="t-caption text-[var(--brand-text-muted)] mt-1">Healthy</div>
         </div>
-        <div className="bg-[var(--surface-2)] p-4 border border-red-500/30 rounded-lg">
+        <div className="bg-[var(--surface-2)] p-4 border border-red-500/30" style={{ borderRadius: 'var(--radius-signature)' }}>
           <div className="text-3xl font-bold text-red-400">{data.deadLinks.length}</div>
           <div className="t-caption text-[var(--brand-text-muted)] mt-1">Dead Links</div>
         </div>
-        <div className="bg-[var(--surface-2)] p-4 border border-amber-500/30 rounded-lg">
+        <div className="bg-[var(--surface-2)] p-4 border border-amber-500/30" style={{ borderRadius: 'var(--radius-signature)' }}>
           <div className="text-3xl font-bold text-amber-400">{data.redirects.length}</div>
           <div className="t-caption text-[var(--brand-text-muted)] mt-1">Redirects</div>
         </div>
