@@ -75,7 +75,7 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
               <div className="flex items-center justify-between mt-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="t-caption-sm text-teal-400">Target keyword: &ldquo;{gap.targetKeyword}&rdquo;</span>
-                  {gap.volume != null && <span className="t-micro text-[var(--brand-text)] flex items-center gap-0.5"><Icon as={BarChart3} size="sm" />{fmtNum(gap.volume)}/mo</span>}
+                  {gap.volume != null && <span className="t-caption-sm text-[var(--brand-text)] flex items-center gap-0.5"><Icon as={BarChart3} size="sm" />{fmtNum(gap.volume)}/mo</span>}
                   {gap.difficulty != null && gap.difficulty > 0 && (
                     <span
                       className={`t-micro font-medium ${kdColor(gap.difficulty)} cursor-help`}
@@ -85,11 +85,11 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
                     </span>
                   )}
                   {gap.difficulty != null && gap.difficulty > 0 && kdFraming(gap.difficulty) && (
-                    <span className="t-micro text-[var(--brand-text-muted)] leading-none">
+                    <span className="t-caption-sm text-[var(--brand-text-muted)] leading-none">
                       {kdFraming(gap.difficulty)}
                     </span>
                   )}
-                  {gap.impressions != null && gap.impressions > 0 && <span className="t-micro text-blue-400 flex items-center gap-0.5"><Icon as={Eye} size="sm" className="text-blue-400" />{fmtNum(gap.impressions)} impr</span>}
+                  {gap.impressions != null && gap.impressions > 0 && <span className="t-caption-sm text-blue-400 flex items-center gap-0.5"><Icon as={Eye} size="sm" className="text-blue-400" />{fmtNum(gap.impressions)} impr</span>}
                   {gap.volume && gap.volume > 0 && (() => {
                     const impact = Math.round(gap.volume * 0.103); // position-3 CTR floor (10.3%)
                     if (impact < 10) return null;
@@ -154,7 +154,7 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
                   </div>
                 )}
                 {gap.competitorProof && (
-                  <span className="flex items-center gap-0.5 t-micro text-orange-400 font-medium"><Icon as={Swords} size="sm" className="text-orange-400" />{gap.competitorProof}</span>
+                  <span className="flex items-center gap-0.5 t-caption-sm text-orange-400 font-medium"><Icon as={Swords} size="sm" className="text-orange-400" />{gap.competitorProof}</span>
                 )}
               </div>
               {gap.serpTargeting && gap.serpTargeting.length > 0 && (

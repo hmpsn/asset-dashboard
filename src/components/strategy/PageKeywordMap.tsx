@@ -154,7 +154,7 @@ export function PageKeywordMapPanel({
                   {page.primaryKeyword}
                 </span>
                 {page.validated === false && (
-                  <span className="t-micro text-amber-400 bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/20" title="This keyword has no confirmed search volume in SEMRush">
+                  <span className="t-caption-sm text-amber-400 bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/20" title="This keyword has no confirmed search volume in SEMRush">
                     Unvalidated
                   </span>
                 )}
