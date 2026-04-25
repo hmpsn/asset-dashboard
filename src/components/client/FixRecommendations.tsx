@@ -485,13 +485,13 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
                       </button>
                       {isExpanded && (
                         <div className="rounded-lg bg-zinc-800/40 border border-zinc-800 overflow-hidden">
-                          <div className="grid grid-cols-[1fr,auto,auto] gap-x-4 px-3 py-1.5 text-[10px] text-zinc-500 uppercase tracking-wider border-b border-zinc-800">
+                          <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 px-3 py-1.5 text-[10px] text-zinc-500 uppercase tracking-wider border-b border-zinc-800">
                             <span>Page</span>
                             <span className="text-right">Clicks</span>
                             <span className="text-right">Impressions</span>
                           </div>
                           {topPages.filter(p => p.clicks > 0 || p.impressions > 0).slice(0, 5).map((p, i) => (
-                            <div key={i} className="grid grid-cols-[1fr,auto,auto] gap-x-4 px-3 py-2 text-[11px] border-b border-zinc-800/50 last:border-b-0">
+                            <div key={i} className="grid grid-cols-[1fr_auto_auto] gap-x-4 px-3 py-2 text-[11px] border-b border-zinc-800/50 last:border-b-0">
                               <div className="truncate">
                                 <span className="text-zinc-300">{p.name}</span>
                                 <span className="text-zinc-600 ml-1.5">{p.slug}</span>

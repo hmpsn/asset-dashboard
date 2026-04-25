@@ -797,6 +797,22 @@ export const CHECKS: Check[] = [
     severity: 'error',
   },
   {
+    // Tailwind v4 emits the substring inside `[...]` verbatim, with `_` -> space.
+    // Commas are NOT replaced. So `grid-cols-[1fr,80px,80px]` emits invalid CSS
+    // (`grid-template-columns: 1fr,80px,80px`) and the browser falls back to a
+    // single column — items stack vertically. v3 silently swapped commas for
+    // spaces; v4 does not. Typecheck and build do not flag it.
+    //
+    // The match `[^(]*,` allows commas INSIDE a CSS function like
+    // `minmax(100px,1fr)` or `repeat(3,1fr)` (commas are valid as function args)
+    // while still catching top-level track-list commas like `[1fr,80px]`.
+    name: 'Comma in arbitrary grid-cols/grid-rows (Tailwind v4)',
+    pattern: 'grid-(cols|rows)-\\[[^(]*,',
+    fileGlobs: ['*.ts', '*.tsx'],
+    message: 'Tailwind v4 needs underscores, not commas, in arbitrary grid track lists. Replace `,` with `_` inside the `[...]` (e.g. `grid-cols-[1fr_80px_80px]`). Commas inside CSS functions like `minmax(100px,1fr)` are fine.',
+    severity: 'error',
+  },
+  {
     name: 'Bare JSON.parse on server',
     pattern: 'JSON\\.parse\\(',
     fileGlobs: ['*.ts'],

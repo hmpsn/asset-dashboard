@@ -5224,3 +5224,70 @@ describe('Runner: pattern-rule with leading-`-` pattern (#299 regression)', () =
     expect(hits[0]).toContain(PROBE_PATTERN);
   });
 });
+
+// ════════════════════════════════════════════════════════════════════════════
+// 'Comma in arbitrary grid-cols/grid-rows (Tailwind v4)' rule
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Tailwind v4 emits the substring inside `[...]` verbatim, swapping `_` for
+// space. Commas are NOT swapped, so `grid-cols-[1fr,80px,80px]` produces
+// invalid `grid-template-columns: 1fr,80px,80px` and the browser silently
+// collapses to a single column. Discovered post-Phase-2.1a merge during
+// staging smoke-test (RankTracker rows visibly stacked vertically).
+//
+// Allowed: commas inside CSS functions like `minmax(100px,1fr)` or
+// `repeat(3,1fr)` — the rule's `[^(]*,` lookahead skips function-internal
+// commas.
+describe('Rule: Comma in arbitrary grid-cols/grid-rows (Tailwind v4)', () => {
+  function makeRule(): Check {
+    const rule = CHECKS.find((c) => c.name === 'Comma in arbitrary grid-cols/grid-rows (Tailwind v4)');
+    if (!rule) throw new Error('rule not found in CHECKS');
+    return rule;
+  }
+
+  it('flags comma-separated grid-cols arbitrary value', () => {
+    const probe = write(
+      uniqPath('grid-comma', 'probe.tsx'),
+      '<div className="grid grid-cols-[1fr,80px,80px,60px] gap-2"></div>\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0]).toContain('grid-cols-[1fr,80px');
+  });
+
+  it('flags comma-separated grid-rows arbitrary value', () => {
+    const probe = write(
+      uniqPath('grid-rows-comma', 'probe.tsx'),
+      '<div className="grid grid-rows-[auto,1fr,auto]"></div>\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('does NOT flag underscore-separated grid-cols (correct Tailwind v4 syntax)', () => {
+    const probe = write(
+      uniqPath('grid-underscore', 'probe.tsx'),
+      '<div className="grid grid-cols-[1fr_80px_80px_60px] gap-2"></div>\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBe(0);
+  });
+
+  it('does NOT flag commas inside CSS function arguments (e.g. minmax)', () => {
+    const probe = write(
+      uniqPath('grid-minmax', 'probe.tsx'),
+      '<div className="grid grid-cols-[minmax(100px,1fr)_80px]"></div>\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBe(0);
+  });
+
+  it('does NOT flag commas inside repeat() function arguments', () => {
+    const probe = write(
+      uniqPath('grid-repeat', 'probe.tsx'),
+      '<div className="grid grid-cols-[repeat(3,1fr)]"></div>\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBe(0);
+  });
+});
