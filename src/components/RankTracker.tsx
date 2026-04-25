@@ -467,7 +467,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
               <span key={k.query} className="flex items-center gap-1 t-caption px-2 py-1 rounded-[var(--radius-sm)] bg-[var(--surface-3)] text-[var(--brand-text)]">
                 {k.query}
                 <button onClick={() => removeKeyword(k.query)} className="text-[var(--brand-text-muted)] hover:text-red-400" aria-label={`Remove ${k.query}`}>
-                  <Icon as={Trash2} size="xs" />
+                  <Icon as={Trash2} size="sm" />
                 </button>
               </span>
             ))}

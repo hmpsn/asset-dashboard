@@ -197,7 +197,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
       <div className={`grid gap-4 ${comparison ? 'grid-cols-2' : 'grid-cols-1'}`}>
         {/* Growth Signals */}
         {comparison && (
-          <SectionCard title="Growth Signals" titleIcon={<Icon as={TrendingUp} size="sm" className="text-emerald-400" />}>
+          <SectionCard title="Growth Signals" titleIcon={<Icon as={TrendingUp} size="md" className="text-emerald-400" />}>
             <div className="space-y-2">
               {[
                 { label: 'User growth', value: comparison.changePercent.users },
@@ -224,7 +224,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
         )}
 
         {/* Engagement Analysis */}
-        <SectionCard title="Engagement Analysis" titleIcon={<Icon as={Eye} size="sm" className="text-blue-400" />}>
+        <SectionCard title="Engagement Analysis" titleIcon={<Icon as={Eye} size="md" className="text-blue-400" />}>
           <div className="space-y-2">
             {newVsReturning.map(seg => (
               <div key={seg.segment} className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-[var(--surface-3)]/30">
@@ -252,7 +252,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
 
       {/* ── 5. Organic vs All Traffic ── */}
       {organic && (
-        <SectionCard title="Organic vs All Traffic" titleIcon={<Icon as={Leaf} size="sm" className="text-emerald-400" />}>
+        <SectionCard title="Organic vs All Traffic" titleIcon={<Icon as={Leaf} size="md" className="text-emerald-400" />}>
           <div className="grid grid-cols-3 gap-4">
             <div>
               <div className="t-caption-sm text-[var(--brand-text-muted)] mb-2">Users</div>

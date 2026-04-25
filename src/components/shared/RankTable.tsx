@@ -138,7 +138,7 @@ export function RankTrackingSection({ rankHistory, latestRanks, limit = 10, show
   return (
     <SectionCard
       title={title}
-      titleIcon={<Icon as={TrendingUp} size="sm" className="text-teal-400" />}
+      titleIcon={<Icon as={TrendingUp} size="md" className="text-teal-400" />}
       action={<span className="t-caption-sm text-[var(--brand-text-muted)]">{rankHistory.length} snapshots</span>}
     >
       <RankHistoryChart rankHistory={rankHistory} />
