@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useCmsEditor } from '../hooks/admin';
-import { EmptyState, LoadingState, ErrorState, CharacterCounter, SerpPreview, SocialPreview, SectionCard } from './ui';
+import { EmptyState, LoadingState, ErrorState, CharacterCounter, SerpPreview, SocialPreview, SectionCard, Icon } from './ui';
 import { StatusBadge } from './ui/StatusBadge';
 import { statusBorderClass } from './ui/statusConfig';
 import { patch, post } from '../api/client';
@@ -454,34 +454,34 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-zinc-200">CMS Collection SEO</h3>
-          <p className="text-[11px] text-zinc-500 mt-0.5">
+          <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">CMS Collection SEO</h3>
+          <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
             Edit SEO-relevant fields on collection items &middot; {collections.length} collections &middot; {totalItems} items
           </p>
         </div>
         <div className="flex items-center gap-2">
           {dirtyCount > 0 && (
-            <span className="text-[11px] text-amber-400/80 bg-amber-500/8 px-2 py-0.5 rounded">
+            <span className="t-caption-sm text-amber-400/80 bg-amber-500/8 px-2 py-0.5 rounded">
               {dirtyCount} unsaved
             </span>
           )}
           {savedCount > 0 && (
-            <span className="text-[11px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
+            <span className="t-caption-sm text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
               {savedCount} saved (draft)
             </span>
           )}
           {approvalSelected.size > 0 && bulkMode === 'idle' && (
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] text-zinc-500 mr-1">AI Rewrite:</span>
-              <button onClick={() => bulkAiRewrite('name')} className="px-2 py-1 rounded text-[11px] font-medium bg-teal-600/20 text-teal-400 hover:bg-teal-600/30 transition-colors">Names</button>
-              <button onClick={() => bulkAiRewrite('title')} className="px-2 py-1 rounded text-[11px] font-medium bg-teal-600/20 text-teal-400 hover:bg-teal-600/30 transition-colors">Titles</button>
-              <button onClick={() => bulkAiRewrite('description')} className="px-2 py-1 rounded text-[11px] font-medium bg-teal-600/20 text-teal-400 hover:bg-teal-600/30 transition-colors">Descriptions</button>
-              <button onClick={() => bulkAiRewrite('all')} className="px-2 py-1 rounded text-[11px] font-medium bg-teal-500/20 text-teal-300 hover:bg-teal-500/30 transition-colors">All SEO</button>
+              <span className="t-caption-sm text-[var(--brand-text-muted)] mr-1">AI Rewrite:</span>
+              <button onClick={() => bulkAiRewrite('name')} className="px-2 py-1 rounded t-caption-sm font-medium bg-teal-600/20 text-teal-400 hover:bg-teal-600/30 transition-colors">Names</button>
+              <button onClick={() => bulkAiRewrite('title')} className="px-2 py-1 rounded t-caption-sm font-medium bg-teal-600/20 text-teal-400 hover:bg-teal-600/30 transition-colors">Titles</button>
+              <button onClick={() => bulkAiRewrite('description')} className="px-2 py-1 rounded t-caption-sm font-medium bg-teal-600/20 text-teal-400 hover:bg-teal-600/30 transition-colors">Descriptions</button>
+              <button onClick={() => bulkAiRewrite('all')} className="px-2 py-1 rounded t-caption-sm font-medium bg-teal-500/20 text-teal-300 hover:bg-teal-500/30 transition-colors">All SEO</button>
             </div>
           )}
           {bulkMode === 'rewriting' && (
-            <div className="flex items-center gap-2 text-[11px] text-teal-400">
-              <Loader2 className="w-3 h-3 animate-spin" />
+            <div className="flex items-center gap-2 t-caption-sm text-teal-400">
+              <Icon as={Loader2} size="sm" className="animate-spin" />
               Rewriting {bulkProgress.done}/{bulkProgress.total} items…
             </div>
           )}
@@ -493,7 +493,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                 approvalSent ? 'bg-emerald-600 text-white' : 'bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white'
               }`}
             >
-              {sendingApproval ? <Loader2 className="w-3 h-3 animate-spin" /> : approvalSent ? <Check className="w-3 h-3" /> : <Send className="w-3 h-3" />}
+              <Icon as={sendingApproval ? Loader2 : approvalSent ? Check : Send} size="sm" className={sendingApproval ? 'animate-spin' : ''} />
               {approvalSent ? 'Sent!' : sendingApproval ? 'Sending...' : `Send for Approval (${approvalSelected.size})`}
             </button>
           )}
@@ -503,7 +503,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
       {/* Bulk rewrite results */}
       {bulkResults && (
         <div className="bg-teal-500/10 border border-teal-500/30 rounded-lg px-3 py-2 text-xs text-teal-300 flex items-center gap-2">
-          <Sparkles className="w-3.5 h-3.5 flex-shrink-0" />
+          <Icon as={Sparkles} size="md" className="flex-shrink-0" />
           {bulkResults}
         </div>
       )}
@@ -528,8 +528,8 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
 
       {/* Edit status summary bar */}
       {summary.total > 0 && (
-        <div className="flex items-center gap-3 text-[11px] text-zinc-500">
-          <span className="text-zinc-400 font-medium">{summary.total} tracked</span>
+        <div className="flex items-center gap-3 t-caption-sm text-[var(--brand-text-muted)]">
+          <span className="text-[var(--brand-text)] font-medium">{summary.total} tracked</span>
           {summary.live > 0 && <><StatusBadge status="live" /><span className="text-teal-400">{summary.live}</span></>}
           {summary.inReview > 0 && <><StatusBadge status="in-review" /><span className="text-blue-400">{summary.inReview}</span></>}
           {summary.approved > 0 && <><StatusBadge status="approved" /><span className="text-emerald-400/80">{summary.approved}</span></>}
@@ -541,13 +541,13 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
 
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+        <Icon as={Search} size="md" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
         <input
           type="text"
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search items..."
-          className="w-full pl-9 pr-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500"
+          className="w-full pl-9 pr-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
         />
       </div>
 
@@ -589,7 +589,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
             {/* Collection header */}
             <button
               onClick={() => toggleCollection(coll.collectionId)}
-              className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/30 transition-colors"
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/30 transition-colors"
             >
               <div className="flex items-center gap-2 flex-wrap">
                 {workspaceId && filteredItemIds.length > 0 && (
@@ -598,53 +598,47 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                     checked={allInCollSelected}
                     onChange={e => { e.stopPropagation(); toggleSelectAllInCollection(filteredItemIds); }}
                     onClick={e => e.stopPropagation()}
-                    className="w-3.5 h-3.5 rounded border-zinc-600 text-teal-500 focus:ring-teal-500 bg-zinc-800 flex-shrink-0 cursor-pointer"
+                    className="w-3.5 h-3.5 rounded border-[var(--brand-border)] text-teal-500 focus:ring-teal-500 bg-[var(--surface-3)] flex-shrink-0 cursor-pointer"
                     title={allInCollSelected ? 'Deselect all in collection' : `Select all ${filteredItemIds.length} items`}
                   />
                 )}
-                {isExpanded ? <ChevronDown className="w-4 h-4 text-zinc-500" /> : <ChevronRight className="w-4 h-4 text-zinc-500" />}
-                <span className="text-sm font-medium text-zinc-200">{coll.collectionName}</span>
-                <span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">/{coll.collectionSlug}</span>
-                <span className="text-[11px] text-zinc-500">{coll.total} items</span>
+                <Icon as={isExpanded ? ChevronDown : ChevronRight} size="md" className="text-[var(--brand-text-muted)]" />
+                <span className="text-sm font-medium text-[var(--brand-text-bright)]">{coll.collectionName}</span>
+                <span className="t-caption-sm text-[var(--brand-text-muted)] bg-[var(--surface-3)] px-1.5 py-0.5 rounded">/{coll.collectionSlug}</span>
+                <span className="t-caption-sm text-[var(--brand-text-muted)]">{coll.total} items</span>
                 {extraSeoFields.length > 0 && (
-                  <span className="text-[11px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded">
+                  <span className="t-caption-sm text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded">
                     {extraSeoFields.map(f => f.displayName).join(', ')}
                   </span>
                 )}
                 {missingNames > 0 && (
-                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/8 border border-red-500/30 text-red-400/80">
+                  <span className="t-caption-sm px-1.5 py-0.5 rounded bg-red-500/8 border border-red-500/30 text-red-400/80">
                     {missingNames} missing names
                   </span>
                 )}
                 {missingTitles > 0 && (
-                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/8 border border-amber-500/30 text-amber-400/80">
+                  <span className="t-caption-sm px-1.5 py-0.5 rounded bg-amber-500/8 border border-amber-500/30 text-amber-400/80">
                     {missingTitles} missing SEO titles
                   </span>
                 )}
                 {missingDescs > 0 && (
-                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/8 border border-red-500/30 text-red-400/80">
+                  <span className="t-caption-sm px-1.5 py-0.5 rounded bg-red-500/8 border border-red-500/30 text-red-400/80">
                     {missingDescs} missing meta desc
                   </span>
                 )}
               </div>
               <div className="flex items-center gap-2">
                 {selectedInColl > 0 && (
-                  <span className="text-[11px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded">
+                  <span className="t-caption-sm text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded">
                     {selectedInColl} selected
                   </span>
                 )}
                 {collSavedIds.length > 0 && (
                   <span
                     onClick={e => { e.stopPropagation(); publishCollection(coll.collectionId); }}
-                    className="flex items-center gap-1 text-[11px] text-emerald-400 hover:text-emerald-300 cursor-pointer"
+                    className="flex items-center gap-1 t-caption-sm text-emerald-400 hover:text-emerald-300 cursor-pointer"
                   >
-                    {publishing.has(coll.collectionId) ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : published.has(coll.collectionId) ? (
-                      <Check className="w-3 h-3" />
-                    ) : (
-                      <Upload className="w-3 h-3" />
-                    )}
+                    <Icon as={publishing.has(coll.collectionId) ? Loader2 : published.has(coll.collectionId) ? Check : Upload} size="sm" className={publishing.has(coll.collectionId) ? 'animate-spin' : ''} />
                     {published.has(coll.collectionId) ? 'Published!' : `Publish ${collSavedIds.length}`}
                   </span>
                 )}
@@ -653,7 +647,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
 
             {/* Items */}
             {isExpanded && (
-              <div className="border-t border-zinc-800">
+              <div className="border-t border-[var(--brand-border)]">
                 {(search ? filteredItems : coll.items).map(item => {
                   const itemName = String(item.fieldData['name'] || '');
                   const itemSlug = String(item.fieldData['slug'] || '');
@@ -669,10 +663,10 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                   const hasIssues = !hasName || !hasSeoTitle || !hasSeoDesc;
 
                   return (
-                    <div key={item.id} className={`border-b border-zinc-800/50 last:border-b-0 ${trackingBorder || (hasIssues ? 'border-l-2 border-l-amber-500/40' : '')}`}>
+                    <div key={item.id} className={`border-b border-[var(--brand-border)]/50 last:border-b-0 ${trackingBorder || (hasIssues ? 'border-l-2 border-l-amber-500/40' : '')}`}>
                       <button
                         onClick={() => toggleItem(item.id)}
-                        className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-zinc-800/20 transition-colors"
+                        className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[var(--surface-3)]/20 transition-colors"
                       >
                         <div className="flex items-center gap-2 min-w-0">
                           {workspaceId && (
@@ -681,23 +675,23 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                               checked={approvalSelected.has(item.id)}
                               onChange={e => { e.stopPropagation(); toggleApprovalItem(item.id); }}
                               onClick={e => e.stopPropagation()}
-                              className="w-3.5 h-3.5 rounded border-zinc-600 text-teal-500 focus:ring-teal-500 bg-zinc-800 flex-shrink-0 cursor-pointer"
+                              className="w-3.5 h-3.5 rounded border-[var(--brand-border)] text-teal-500 focus:ring-teal-500 bg-[var(--surface-3)] flex-shrink-0 cursor-pointer"
                             />
                           )}
-                          {isItemExpanded ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />}
-                          <span className={`text-xs truncate ${hasName ? 'text-zinc-300' : 'text-red-400/80 italic'}`}>{itemName || '(untitled)'}</span>
-                          <span className="text-[11px] text-zinc-500 font-mono flex-shrink-0">/{coll.collectionSlug}/{itemSlug}</span>
+                          <Icon as={isItemExpanded ? ChevronDown : ChevronRight} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
+                          <span className={`text-xs truncate ${hasName ? 'text-[var(--brand-text-bright)]' : 'text-red-400/80 italic'}`}>{itemName || '(untitled)'}</span>
+                          <span className="t-caption-sm text-[var(--brand-text-muted)] font-mono flex-shrink-0">/{coll.collectionSlug}/{itemSlug}</span>
                         </div>
                         <div className="flex items-center gap-1.5 flex-shrink-0">
                           <StatusBadge status={getState(item.id)?.status} />
-                          {!hasSeoTitle && <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/8 border border-amber-500/30 text-amber-400/80">No title</span>}
-                          {!hasSeoDesc && <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/8 border border-red-500/30 text-red-400/80">No desc</span>}
-                          {isDirty && <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400">Unsaved</span>}
-                          {isSaved && !isDirty && <Check className="w-3 h-3 text-emerald-400" />}
-                          {error && <AlertCircle className="w-3 h-3 text-red-400/80" />}
+                          {!hasSeoTitle && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-amber-500/8 border border-amber-500/30 text-amber-400/80">No title</span>}
+                          {!hasSeoDesc && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-red-500/8 border border-red-500/30 text-red-400/80">No desc</span>}
+                          {isDirty && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400">Unsaved</span>}
+                          {isSaved && !isDirty && <Icon as={Check} size="sm" className="text-emerald-400" />}
+                          {error && <Icon as={AlertCircle} size="sm" className="text-red-400/80" />}
                           <button
                             onClick={(e) => { e.stopPropagation(); togglePreview(item.id); }}
-                            className="flex items-center gap-1 px-2 py-1 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
+                            className="flex items-center gap-1 px-2 py-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"
                             title="Toggle preview"
                           >
                             👁️
@@ -706,11 +700,11 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                       </button>
 
                       {isItemExpanded && (
-                        <div className="px-4 pb-4 space-y-3 bg-zinc-900/30">
+                        <div className="px-4 pb-4 space-y-3 bg-[var(--surface-2)]/30">
                           {/* Name field */}
                           <div>
                             <div className="flex items-center justify-between mb-1">
-                              <label className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Name (Title)</label>
+                              <label className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Name (Title)</label>
                               <div className="flex items-center gap-1">
                                 <CharacterCounter 
                               current={(edits[item.id]?.['name'] || '').length} 
@@ -723,7 +717,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                                   className="p-0.5 text-teal-400 hover:text-teal-300 disabled:opacity-50"
                                   title="AI rewrite"
                                 >
-                                  {aiLoading[`${item.id}-name`] ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+                                  <Icon as={aiLoading[`${item.id}-name`] ? Loader2 : Wand2} size="sm" className={aiLoading[`${item.id}-name`] ? 'animate-spin' : ''} />
                                 </button>
                               </div>
                             </div>
@@ -731,11 +725,11 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                               type="text"
                               value={edits[item.id]?.['name'] || ''}
                               onChange={e => updateField(item.id, 'name', e.target.value)}
-                              className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
+                              className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text-bright)] focus:outline-none focus:border-[var(--brand-border-hover)]"
                             />
                             {variations[item.id]?.fieldSlug === 'name' && variations[item.id].options.length > 1 && (
                               <div className="mt-1.5 space-y-1">
-                                <div className="text-[10px] text-zinc-500 font-medium">Pick a variation:</div>
+                                <div className="t-micro text-[var(--brand-text-muted)] font-medium">Pick a variation:</div>
                                 {variations[item.id].options.map((v, vi) => (
                                   <button
                                     key={vi}
@@ -743,10 +737,10 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                                     className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs border transition-colors ${
                                       (edits[item.id]?.['name'] || '') === v
                                         ? 'bg-teal-600/20 border-teal-500/40 text-teal-300'
-                                        : 'bg-zinc-800/60 border-zinc-700/50 text-zinc-300 hover:border-teal-500/30 hover:bg-teal-600/10'
+                                        : 'bg-[var(--surface-3)]/60 border-[var(--brand-border)]/50 text-[var(--brand-text-bright)] hover:border-teal-500/30 hover:bg-teal-600/10'
                                     }`}
                                   >
-                                    <span className="text-zinc-500 mr-1">{vi + 1}.</span>{v}
+                                    <span className="text-[var(--brand-text-muted)] mr-1">{vi + 1}.</span>{v}
                                     <CharacterCounter current={v.length} max={60} size="sm" className="ml-2" />
                                   </button>
                                 ))}
@@ -756,12 +750,12 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
 
                           {/* Slug field */}
                           <div>
-                            <label className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-1 block">Slug</label>
+                            <label className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider mb-1 block">Slug</label>
                             <input
                               type="text"
                               value={edits[item.id]?.['slug'] || ''}
                               onChange={e => updateField(item.id, 'slug', e.target.value)}
-                              className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 font-mono focus:outline-none focus:border-teal-500"
+                              className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text-bright)] font-mono focus:outline-none focus:border-[var(--brand-border-hover)]"
                             />
                           </div>
 
@@ -773,7 +767,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                             return (
                               <div key={field.slug}>
                                 <div className="flex items-center justify-between mb-1">
-                                  <label className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">{field.displayName}</label>
+                                  <label className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">{field.displayName}</label>
                                   <div className="flex items-center gap-1">
                                     <CharacterCounter 
                                     current={val.length} 
@@ -786,7 +780,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                                       className="p-0.5 text-teal-400 hover:text-teal-300 disabled:opacity-50"
                                       title="AI rewrite"
                                     >
-                                      {aiLoading[`${item.id}-${field.slug}`] ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+                                      <Icon as={aiLoading[`${item.id}-${field.slug}`] ? Loader2 : Wand2} size="sm" className={aiLoading[`${item.id}-${field.slug}`] ? 'animate-spin' : ''} />
                                     </button>
                                   </div>
                                 </div>
@@ -795,19 +789,19 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                                     type="text"
                                     value={val}
                                     onChange={e => updateField(item.id, field.slug, e.target.value)}
-                                    className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
+                                    className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text-bright)] focus:outline-none focus:border-[var(--brand-border-hover)]"
                                   />
                                 ) : (
                                   <textarea
                                     value={val}
                                     onChange={e => updateField(item.id, field.slug, e.target.value)}
                                     rows={3}
-                                    className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500 resize-none"
+                                    className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text-bright)] focus:outline-none focus:border-[var(--brand-border-hover)] resize-none"
                                   />
                                 )}
                                 {variations[item.id]?.fieldSlug === field.slug && variations[item.id].options.length > 1 && (
                                   <div className="mt-1.5 space-y-1">
-                                    <div className="text-[10px] text-zinc-500 font-medium">Pick a variation:</div>
+                                    <div className="t-micro text-[var(--brand-text-muted)] font-medium">Pick a variation:</div>
                                     {variations[item.id].options.map((v, vi) => {
                                       const maxLen = isTitle ? 60 : 160;
                                       return (
@@ -817,10 +811,10 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                                           className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs border transition-colors ${
                                             val === v
                                               ? 'bg-teal-600/20 border-teal-500/40 text-teal-300'
-                                              : 'bg-zinc-800/60 border-zinc-700/50 text-zinc-300 hover:border-teal-500/30 hover:bg-teal-600/10'
+                                              : 'bg-[var(--surface-3)]/60 border-[var(--brand-border)]/50 text-[var(--brand-text-bright)] hover:border-teal-500/30 hover:bg-teal-600/10'
                                           }`}
                                         >
-                                          <span className="text-zinc-500 mr-1">{vi + 1}.</span>{v}
+                                          <span className="text-[var(--brand-text-muted)] mr-1">{vi + 1}.</span>{v}
                                           <CharacterCounter current={v.length} max={maxLen} size="sm" className="ml-2" />
                                         </button>
                                       );
@@ -834,15 +828,15 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                           {/* Save button + error */}
                           <div className="flex items-center justify-between pt-1">
                             <div>
-                              {error && <span className="text-[11px] text-red-400/80">{error}</span>}
-                              {isSaved && !isDirty && <span className="text-[11px] text-emerald-400 flex items-center gap-1"><Check className="w-3 h-3" /> Saved as draft</span>}
+                              {error && <span className="t-caption-sm text-red-400/80">{error}</span>}
+                              {isSaved && !isDirty && <span className="t-caption-sm text-emerald-400 flex items-center gap-1"><Icon as={Check} size="sm" /> Saved as draft</span>}
                             </div>
                             <button
                               onClick={() => saveItem(coll.collectionId, item.id)}
                               disabled={!isDirty || isSaving}
                               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-xs font-medium transition-colors"
                             >
-                              {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                              <Icon as={isSaving ? Loader2 : Save} size="sm" className={isSaving ? 'animate-spin' : ''} />
                               Save
                             </button>
                           </div>
@@ -861,17 +855,17 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                             return (
                               <div className="mt-3 space-y-2">
                                 {/* Inline: latest approval context */}
-                                <div className="px-3 py-2 rounded-lg bg-zinc-800/40 border border-zinc-700/50">
+                                <div className="px-3 py-2 rounded-lg bg-[var(--surface-3)]/40 border border-[var(--brand-border)]/50">
                                   <div className="flex items-center gap-2 mb-1.5">
-                                    <Clock className="w-3 h-3 text-zinc-500" />
-                                    <span className="text-[11px] font-medium text-zinc-400">Latest: {latest.batchName}</span>
-                                    <span className={`text-[10px] px-1.5 py-0.5 rounded border ${statusColors[latest.status] || ''}`}>{latest.status}</span>
-                                    <span className="text-[10px] text-zinc-600 ml-auto">{new Date(latest.updatedAt).toLocaleDateString()}</span>
+                                    <Icon as={Clock} size="sm" className="text-[var(--brand-text-muted)]" />
+                                    <span className="t-caption-sm font-medium text-[var(--brand-text)]">Latest: {latest.batchName}</span>
+                                    <span className={`t-micro px-1.5 py-0.5 rounded border ${statusColors[latest.status] || ''}`}>{latest.status}</span>
+                                    <span className="t-micro text-[var(--brand-text-muted)]/60 ml-auto">{new Date(latest.updatedAt).toLocaleDateString()}</span>
                                   </div>
-                                  <div className="flex items-center gap-2 text-[11px]">
-                                    <span className="text-zinc-500 font-medium">{latest.field}</span>
-                                    <span className="text-zinc-500 truncate max-w-[160px]">{latest.currentValue || '(empty)'}</span>
-                                    <ArrowRight className="w-3 h-3 text-zinc-600 flex-shrink-0" />
+                                  <div className="flex items-center gap-2 t-caption-sm">
+                                    <span className="text-[var(--brand-text-muted)] font-medium">{latest.field}</span>
+                                    <span className="text-[var(--brand-text-muted)] truncate max-w-[160px]">{latest.currentValue || '(empty)'}</span>
+                                    <Icon as={ArrowRight} size="sm" className="text-[var(--brand-text-muted)]/60 flex-shrink-0" />
                                     <span className="text-teal-300 truncate max-w-[200px]">{latest.clientValue || latest.proposedValue}</span>
                                   </div>
                                 </div>
@@ -881,25 +875,25 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                                   <>
                                     <button
                                       onClick={() => toggleHistory(item.id)}
-                                      className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
+                                      className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"
                                     >
-                                      {historyExpanded.has(item.id) ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                                      <Icon as={historyExpanded.has(item.id) ? ChevronDown : ChevronRight} size="sm" />
                                       {itemApprovals.length} changes in history
                                     </button>
                                     {historyExpanded.has(item.id) && (
-                                      <div className="space-y-1.5 pl-3 border-l-2 border-zinc-800">
+                                      <div className="space-y-1.5 pl-3 border-l-2 border-[var(--brand-border)]">
                                         {itemApprovals.slice(1).map(a => (
-                                          <div key={a.id} className="px-2.5 py-1.5 rounded bg-zinc-800/30 text-[11px]">
+                                          <div key={a.id} className="px-2.5 py-1.5 rounded bg-[var(--surface-3)]/30 t-caption-sm">
                                             <div className="flex items-center gap-2 mb-0.5">
-                                              <span className="text-zinc-500">{a.batchName}</span>
-                                              <span className={`text-[10px] px-1 py-0.5 rounded border ${statusColors[a.status] || ''}`}>{a.status}</span>
-                                              <span className="text-[10px] text-zinc-600 ml-auto">{new Date(a.updatedAt).toLocaleDateString()}</span>
+                                              <span className="text-[var(--brand-text-muted)]">{a.batchName}</span>
+                                              <span className={`t-micro px-1 py-0.5 rounded border ${statusColors[a.status] || ''}`}>{a.status}</span>
+                                              <span className="t-micro text-[var(--brand-text-muted)]/60 ml-auto">{new Date(a.updatedAt).toLocaleDateString()}</span>
                                             </div>
                                             <div className="flex items-center gap-1.5">
-                                              <span className="text-zinc-500 font-medium">{a.field}:</span>
-                                              <span className="text-zinc-500 truncate max-w-[140px]">{a.currentValue || '(empty)'}</span>
-                                              <ArrowRight className="w-2.5 h-2.5 text-zinc-600 flex-shrink-0" />
-                                              <span className="text-zinc-300 truncate max-w-[180px]">{a.clientValue || a.proposedValue}</span>
+                                              <span className="text-[var(--brand-text-muted)] font-medium">{a.field}:</span>
+                                              <span className="text-[var(--brand-text-muted)] truncate max-w-[140px]">{a.currentValue || '(empty)'}</span>
+                                              <Icon as={ArrowRight} size="sm" className="text-[var(--brand-text-muted)]/60 flex-shrink-0" />
+                                              <span className="text-[var(--brand-text-bright)] truncate max-w-[180px]">{a.clientValue || a.proposedValue}</span>
                                             </div>
                                           </div>
                                         ))}
@@ -913,12 +907,12 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
 
                           {/* Preview Section */}
                           {previewExpanded.has(item.id) && (
-                            <div className="border-t border-zinc-800 pt-4 mt-4 space-y-4">
+                            <div className="border-t border-[var(--brand-border)] pt-4 mt-4 space-y-4">
                               <div className="flex items-center justify-between mb-2">
-                                <h4 className="text-sm font-medium text-zinc-300">Preview</h4>
+                                <h4 className="text-sm font-medium text-[var(--brand-text-bright)]">Preview</h4>
                                 <button
                                   onClick={() => togglePreview(item.id)}
-                                  className="text-zinc-500 hover:text-zinc-300 text-xs"
+                                  className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] text-xs"
                                 >
                                   Hide
                                 </button>
@@ -927,7 +921,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                                 {/* Google Search Preview */}
                                 <div>
-                                  <div className="text-xs font-medium text-zinc-400 mb-2">Google Search</div>
+                                  <div className="text-xs font-medium text-[var(--brand-text)] mb-2">Google Search</div>
                                   <SerpPreview
                                     title={edits[item.id]?.['name'] || itemName}
                                     description={titleField ? (edits[item.id]?.[titleField.slug] || '') : ''}
@@ -939,7 +933,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                                 
                                 {/* Social Media Preview */}
                                 <div>
-                                  <div className="text-xs font-medium text-zinc-400 mb-2">Facebook</div>
+                                  <div className="text-xs font-medium text-[var(--brand-text)] mb-2">Facebook</div>
                                   <SocialPreview
                                     title={edits[item.id]?.['name'] || itemName}
                                     description={titleField ? (edits[item.id]?.[titleField.slug] || '') : ''}
@@ -963,12 +957,12 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
       })}
 
       {/* Tip */}
-      <div className="bg-zinc-800/30 rounded-lg border border-zinc-800 px-4 py-3">
+      <div className="bg-[var(--surface-3)]/30 rounded-lg border border-[var(--brand-border)] px-4 py-3">
         <div className="flex items-start gap-2">
-          <Sparkles className="w-3.5 h-3.5 text-teal-400 mt-0.5 flex-shrink-0" />
-          <div className="text-[11px] text-zinc-500">
-            <strong className="text-zinc-400">How it works:</strong> Changes are saved as drafts first. Click <strong className="text-zinc-400">Publish</strong> on a collection to make changes live.
-            The <Wand2 className="w-3 h-3 inline text-teal-400" /> button generates AI-optimized rewrites.
+          <Icon as={Sparkles} size="md" className="text-teal-400 mt-0.5 flex-shrink-0" />
+          <div className="t-caption-sm text-[var(--brand-text-muted)]">
+            <strong className="text-[var(--brand-text)]">How it works:</strong> Changes are saved as drafts first. Click <strong className="text-[var(--brand-text)]">Publish</strong> on a collection to make changes live.
+            The <Icon as={Wand2} size="sm" className="inline text-teal-400" /> button generates AI-optimized rewrites.
             {collections.some(c => c.seoFields.filter(f => f.slug !== 'name' && f.slug !== 'slug').length === 0) && (
               <span className="block mt-1 text-amber-400/80">
                 Tip: Some collections don't have dedicated SEO fields. Consider adding "SEO Title" and "Meta Description" text fields in Webflow's collection schema for better control.

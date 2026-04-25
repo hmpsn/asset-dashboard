@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Sparkles, Check, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import type { SeoSuggestionClient } from '../../api/seo';
 import { seoSuggestions } from '../../api/seo';
+import { Icon } from '../ui';
 
 interface Props {
   workspaceId: string;
@@ -65,24 +66,24 @@ export function SeoSuggestionsPanel({ workspaceId, suggestions, counts, onRefres
   const readyToApply = suggestions.filter(s => s.selectedIndex !== null).length;
 
   return (
-    <div className="border border-teal-500/30 bg-teal-500/5 rounded-xl overflow-hidden">
+    <div className="border border-teal-500/30 bg-teal-500/5 rounded-[var(--radius-lg)] overflow-hidden">
       {/* Header */}
       <div
         className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-teal-500/10 transition-colors"
         onClick={() => setCollapsed(!collapsed)}
       >
         <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-teal-400" />
+          <Icon as={Sparkles} size="md" className="text-teal-400" />
           <span className="text-sm font-medium text-teal-300">
             AI Suggestions
           </span>
-          <span className="text-xs text-zinc-400">
+          <span className="text-xs text-[var(--brand-text)]">
             {counts.pending} pending
             {titleSuggestions.length > 0 && ` · ${titleSuggestions.length} title${titleSuggestions.length !== 1 ? 's' : ''}`}
             {descSuggestions.length > 0 && ` · ${descSuggestions.length} description${descSuggestions.length !== 1 ? 's' : ''}`}
           </span>
           {readyToApply > 0 && (
-            <span className="px-2 py-0.5 text-[10px] font-medium bg-teal-500/20 text-teal-300 rounded-full">
+            <span className="px-2 py-0.5 t-micro font-medium bg-teal-500/20 text-teal-300 rounded-full">
               {readyToApply} selected
             </span>
           )}
@@ -94,24 +95,24 @@ export function SeoSuggestionsPanel({ workspaceId, suggestions, counts, onRefres
               disabled={applying}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-teal-600 hover:bg-teal-500 text-white rounded-lg transition-colors disabled:opacity-50"
             >
-              {applying ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+              <Icon as={applying ? Loader2 : Check} size="sm" className={applying ? 'animate-spin' : ''} />
               Apply {readyToApply} to Webflow
             </button>
           )}
           <button
             onClick={(e) => { e.stopPropagation(); handleDismiss(); }}
             disabled={dismissing}
-            className="text-xs text-zinc-500 hover:text-red-400 transition-colors px-2 py-1"
+            className="text-xs text-[var(--brand-text-muted)] hover:text-red-400 transition-colors px-2 py-1"
           >
-            {dismissing ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Dismiss All'}
+            {dismissing ? <Icon as={Loader2} size="sm" className="animate-spin" /> : 'Dismiss All'}
           </button>
-          {collapsed ? <ChevronDown className="w-4 h-4 text-zinc-500" /> : <ChevronUp className="w-4 h-4 text-zinc-500" />}
+          <Icon as={collapsed ? ChevronDown : ChevronUp} size="md" className="text-[var(--brand-text-muted)]" />
         </div>
       </div>
 
       {/* Suggestion rows */}
       {!collapsed && (
-        <div className="divide-y divide-zinc-800/50 max-h-[60vh] overflow-y-auto">
+        <div className="divide-y divide-[var(--brand-border)]/50 max-h-[60vh] overflow-y-auto">
           {suggestions.map(s => (
             <SuggestionRow
               key={s.id}
@@ -139,23 +140,23 @@ function SuggestionRow({ suggestion: s, isSelecting, onSelect }: {
       {/* Page info */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-zinc-300 truncate max-w-[300px]">
+          <span className="text-xs font-medium text-[var(--brand-text-bright)] truncate max-w-[300px]">
             {s.pageTitle}
           </span>
-          <span className="text-[10px] text-zinc-600">/{s.pageSlug}</span>
-          <span className={`text-[10px] px-1.5 py-0.5 rounded ${s.field === 'title' ? 'bg-blue-500/10 text-blue-400' : 'bg-purple-500/10 text-purple-400'}`}>
+          <span className="t-micro text-[var(--brand-text-muted)]">/{s.pageSlug}</span>
+          <span className={`t-micro px-1.5 py-0.5 rounded ${s.field === 'title' ? 'bg-blue-500/10 text-blue-400' : 'bg-purple-500/10 text-purple-400'}`}>
             {fieldLabel}
           </span>
         </div>
         {s.selectedIndex !== null && (
-          <span className="text-[10px] text-teal-400 flex items-center gap-1">
-            <Check className="w-3 h-3" /> Option {s.selectedIndex + 1} selected
+          <span className="t-micro text-teal-400 flex items-center gap-1">
+            <Icon as={Check} size="sm" /> Option {s.selectedIndex + 1} selected
           </span>
         )}
       </div>
 
       {/* Current value */}
-      <div className="text-[11px] text-zinc-500 truncate">
+      <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">
         Current: {s.currentValue || '(empty)'}
       </div>
 
@@ -172,17 +173,17 @@ function SuggestionRow({ suggestion: s, isSelecting, onSelect }: {
               disabled={isSelecting}
               className={`flex items-start gap-2 px-3 py-2 rounded-lg text-left text-xs transition-all ${
                 isSelected
-                  ? 'bg-teal-500/15 border border-teal-500/40 text-zinc-200'
-                  : 'bg-zinc-900/50 border border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300'
+                  ? 'bg-teal-500/15 border border-teal-500/40 text-[var(--brand-text-bright)]'
+                  : 'bg-[var(--surface-2)]/50 border border-[var(--brand-border)] text-[var(--brand-text)] hover:border-[var(--brand-border-hover)] hover:text-[var(--brand-text-bright)]'
               }`}
             >
-              <span className={`shrink-0 mt-0.5 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                isSelected ? 'bg-teal-500 text-white' : 'bg-zinc-800 text-zinc-500'
+              <span className={`shrink-0 mt-0.5 w-5 h-5 rounded-full flex items-center justify-center t-micro font-bold ${
+                isSelected ? 'bg-teal-500 text-white' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)]'
               }`}>
-                {isSelected ? <Check className="w-3 h-3" /> : i + 1}
+                {isSelected ? <Icon as={Check} size="sm" /> : i + 1}
               </span>
               <span className="flex-1 leading-relaxed">{v}</span>
-              <span className={`shrink-0 text-[10px] mt-0.5 ${isOver ? 'text-red-400/80' : 'text-zinc-600'}`}>
+              <span className={`shrink-0 t-micro mt-0.5 ${isOver ? 'text-red-400/80' : 'text-[var(--brand-text-muted)]'}`}>
                 {charCount}
               </span>
             </button>

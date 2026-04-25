@@ -159,7 +159,7 @@ export function RequestList({
           const hasBrief = !!req.briefId;
           const inlineBrief = hasBrief && expandedRequest === req.id ? getBriefById(req.briefId!) : null;
           return (
-            <div key={req.id} className="rounded-xl bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden">
+            <div key={req.id} className="rounded-[var(--radius-lg)] bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden">
               <div className="px-3 py-2.5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">

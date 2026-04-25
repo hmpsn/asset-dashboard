@@ -4,7 +4,7 @@ import {
   Clipboard, RefreshCw, ChevronDown, ChevronRight,
   Sparkles, Flag, Eye, Send, ArrowRight,
 } from 'lucide-react';
-import { SectionCard } from './ui';
+import { SectionCard, Icon } from './ui';
 
 interface GuideSection {
   id: string;
@@ -130,11 +130,11 @@ export function ContentPipelineGuide() {
   return (
     <div className="space-y-8 max-w-3xl">
       <div className="space-y-1.5 mb-6">
-        <h2 className="text-lg font-bold text-zinc-100 flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-teal-400" />
+        <h2 className="text-lg font-bold text-[var(--brand-text-bright)] flex items-center gap-2">
+          <Icon as={Sparkles} size="md" className="text-teal-400" />
           Content Pipeline Guide
         </h2>
-        <p className="text-xs text-zinc-500 leading-relaxed max-w-xl">
+        <p className="text-xs text-[var(--brand-text-muted)] leading-relaxed max-w-xl">
           Quick walkthrough of every tool in the Content Pipeline. Click any section to expand.
         </p>
       </div>
@@ -150,10 +150,10 @@ export function ContentPipelineGuide() {
           { icon: Eye, label: 'Publish' },
         ].map((step, i) => (
           <div key={step.label} className="flex items-center gap-2 flex-shrink-0">
-            {i > 0 && <ArrowRight className="w-3 h-3 text-teal-500/40" />}
+            {i > 0 && <Icon as={ArrowRight} size="sm" className="text-teal-500/40" />}
             <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-teal-500/10">
-              <step.icon className="w-3 h-3 text-teal-400" />
-              <span className="text-[11px] font-medium text-teal-300">{step.label}</span>
+              <Icon as={step.icon} size="sm" className="text-teal-400" />
+              <span className="t-caption-sm font-medium text-teal-300">{step.label}</span>
             </div>
           </div>
         ))}
@@ -162,24 +162,21 @@ export function ContentPipelineGuide() {
       {/* Sections */}
       {SECTIONS.map(section => {
         const expanded = expandedSections.has(section.id);
-        const Icon = section.icon;
+        const SectionIcon = section.icon;
         return (
           <SectionCard key={section.id} noPadding>
             <button
               onClick={() => toggle(section.id)}
-              className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-zinc-800/30 transition-colors rounded-xl"
+              className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-[var(--surface-3)]/30 transition-colors rounded-[var(--radius-lg)]"
             >
               <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center flex-shrink-0">
-                <Icon className="w-4 h-4 text-teal-400" />
+                <Icon as={SectionIcon} size="md" className="text-teal-400" />
               </div>
               <div className="flex-1 min-w-0">
-                <span className="text-sm font-semibold text-zinc-200 block">{section.title}</span>
-                <span className="text-[11px] text-zinc-500">{section.subtitle}</span>
+                <span className="text-sm font-semibold text-[var(--brand-text-bright)] block">{section.title}</span>
+                <span className="t-caption-sm text-[var(--brand-text-muted)]">{section.subtitle}</span>
               </div>
-              {expanded
-                ? <ChevronDown className="w-4 h-4 text-zinc-500 flex-shrink-0" />
-                : <ChevronRight className="w-4 h-4 text-zinc-500 flex-shrink-0" />
-              }
+              <Icon as={expanded ? ChevronDown : ChevronRight} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
             </button>
 
             {expanded && (
@@ -190,15 +187,15 @@ export function ContentPipelineGuide() {
                     <div key={i} className="flex gap-3">
                       <div className="flex flex-col items-center flex-shrink-0">
                         <div className="w-5 h-5 rounded-full bg-teal-500/15 flex items-center justify-center">
-                          <span className="text-[10px] font-bold text-teal-400">{i + 1}</span>
+                          <span className="t-micro font-bold text-teal-400">{i + 1}</span>
                         </div>
                         {i < section.steps.length - 1 && (
-                          <div className="w-px flex-1 bg-zinc-800 mt-1" />
+                          <div className="w-px flex-1 bg-[var(--brand-border)] mt-1" />
                         )}
                       </div>
                       <div className="pb-3">
-                        <span className="text-xs font-semibold text-zinc-200 block mb-0.5">{step.label}</span>
-                        <span className="text-[11px] text-zinc-500 leading-relaxed">{step.detail}</span>
+                        <span className="text-xs font-semibold text-[var(--brand-text-bright)] block mb-0.5">{step.label}</span>
+                        <span className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">{step.detail}</span>
                       </div>
                     </div>
                   ))}
@@ -207,8 +204,8 @@ export function ContentPipelineGuide() {
                 {/* Tip */}
                 {section.tip && (
                   <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-amber-500/5 border border-amber-500/15">
-                    <Flag className="w-3 h-3 text-amber-400/80 flex-shrink-0 mt-0.5" />
-                    <span className="text-[11px] text-amber-300/80 leading-relaxed">{section.tip}</span>
+                    <Icon as={Flag} size="sm" className="text-amber-400/80 flex-shrink-0 mt-0.5" />
+                    <span className="t-caption-sm text-amber-300/80 leading-relaxed">{section.tip}</span>
                   </div>
                 )}
               </div>

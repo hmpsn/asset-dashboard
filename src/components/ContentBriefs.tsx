@@ -409,7 +409,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           {/* pr-check-disable-next-line -- modal dialog */}
-          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] p-6 max-w-sm w-full mx-4 shadow-2xl">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0">
                 <Icon as={AlertTriangle} size="lg" className="text-red-400" />
