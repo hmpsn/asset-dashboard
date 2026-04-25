@@ -12,6 +12,17 @@ import { BriefList } from './briefs/BriefList';
 import { useAdminBriefsList, useAdminRequestsList, useAdminPostsList } from '../hooks/admin';
 import { queryKeys } from '../lib/queryKeys';
 
+export interface PostSummary {
+  id: string;
+  briefId: string;
+  targetKeyword: string;
+  title: string;
+  totalWordCount: number;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface ContentBrief {
   id: string;
   workspaceId: string;
@@ -82,7 +93,6 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
   const briefsQ = useAdminBriefsList(workspaceId);
   const requestsQ = useAdminRequestsList(workspaceId);
   const postsQ = useAdminPostsList(workspaceId);
-  interface PostSummary { id: string; briefId: string; targetKeyword: string; title: string; totalWordCount: number; status: string; createdAt: string; updatedAt: string }
   const briefs = (briefsQ.data ?? []) as ContentBrief[];
   const clientRequests = (requestsQ.data ?? []) as ContentTopicRequest[];
   const posts = (postsQ.data ?? []) as PostSummary[];
@@ -309,14 +319,19 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
     setGeneratingBriefFor(null);
   };
 
-  const handleGeneratePost = async (briefId: string) => {
+  const handleGeneratePost = async (briefId: string): Promise<boolean> => {
     setGeneratingPostFor(briefId);
     try {
       const skeleton = await post<PostSummary>(`/api/content-posts/${workspaceId}/generate`, { briefId });
       queryClient.setQueryData(queryKeys.admin.posts(workspaceId), (old: unknown) => [skeleton, ...(Array.isArray(old) ? old : [])]);
       setActivePostId(skeleton.id);
-    } catch (err) { console.error('ContentBriefs operation failed:', err); }
-    setGeneratingPostFor(null);
+      return true;
+    } catch (err) {
+      console.error('ContentBriefs operation failed:', err);
+      return false;
+    } finally {
+      setGeneratingPostFor(null);
+    }
   };
 
   const handleUpdateRequestStatus = async (reqId: string, status: ContentTopicRequest['status'], extra?: { deliveryUrl?: string; deliveryNotes?: string }) => {

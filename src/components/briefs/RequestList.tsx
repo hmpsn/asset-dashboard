@@ -63,12 +63,10 @@ interface ContentTopicRequest {
   updatedAt: string;
 }
 
-export interface RequestPostSummary {
-  id: string;
-  briefId: string;
-  status: string;
-  totalWordCount?: number;
-}
+// Subset of PostSummary that RequestList needs. Pick keeps it in lock-step with the
+// canonical type — if PostSummary changes, TypeScript catches mismatches here.
+import type { PostSummary } from '../ContentBriefs';
+export type RequestPostSummary = Pick<PostSummary, 'id' | 'briefId' | 'status' | 'totalWordCount'>;
 
 export interface RequestListProps {
   clientRequests: ContentTopicRequest[];
@@ -94,7 +92,9 @@ export interface RequestListProps {
   // Post production (full_post requests after brief approval)
   posts?: RequestPostSummary[];
   generatingPostFor?: string | null;
-  onGeneratePost?: (briefId: string) => void;
+  /** Returns true on success, false on failure. Caller must check before advancing
+   *  request status, otherwise a generation failure leaves the request stuck. */
+  onGeneratePost?: (briefId: string) => Promise<boolean>;
   onOpenPost?: (postId: string) => void;
 }
 
@@ -208,19 +208,22 @@ export function RequestList({
                             </button>
                           );
                         }
-                        const isGenerating = generatingPostFor === req.briefId;
+                        const isGeneratingPost = generatingPostFor === req.briefId;
                         return (
                           <button
-                            onClick={() => {
+                            onClick={async () => {
                               if (!req.briefId || !onGeneratePost) return;
-                              onGeneratePost(req.briefId);
-                              onUpdateRequestStatus(req.id, 'in_progress');
+                              // Only advance status to in_progress if generation actually succeeded.
+                              // Otherwise a transient failure would leave the request stuck:
+                              // approved → in_progress with no post and no UI to recover.
+                              const ok = await onGeneratePost(req.briefId);
+                              if (ok) onUpdateRequestStatus(req.id, 'in_progress');
                             }}
-                            disabled={isGenerating || !onGeneratePost}
+                            disabled={isGeneratingPost || !onGeneratePost}
                             className="flex items-center gap-1 px-2 py-1 rounded bg-gradient-to-r from-teal-600/30 to-emerald-600/30 border border-teal-500/40 text-[11px] text-teal-200 font-medium hover:from-teal-600/50 hover:to-emerald-600/50 transition-all disabled:opacity-50"
                           >
-                            {isGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <PenLine className="w-3 h-3" />}
-                            {isGenerating ? 'Generating…' : 'Generate Post'}
+                            {isGeneratingPost ? <Loader2 className="w-3 h-3 animate-spin" /> : <PenLine className="w-3 h-3" />}
+                            {isGeneratingPost ? 'Generating…' : 'Generate Post'}
                           </button>
                         );
                       })()}
