@@ -415,6 +415,31 @@ Thin wrappers over `.t-*` utilities. Each forwards refs and merges `className`. 
 
 Codemod scaffold: `scripts/codemods/phase5-typography.ts` (dry-run) reports candidate sites. Phase 2 applies migrations.
 
+### 21. Icon (Phase 5)
+
+Strict-enum wrapper around any Lucide component. Inline-flex `<span>` so it is safe inside `<p>`, `<li>`, or flex rows without breaking layout.
+
+```tsx
+import { TrendingUp } from 'lucide-react';
+import { Icon } from '@/components/ui';
+
+<Icon as={TrendingUp} size="sm" className="text-teal-400" />
+```
+
+- **Strict size enum** (no freeform `size={N}`):
+  - `xs` → `w-2 h-2` (8px)
+  - `sm` → `w-3 h-3` (12px) — default in most usage
+  - `md` → `w-4 h-4` (16px)
+  - `lg` → `w-5 h-5` (20px)
+  - `xl` → `w-6 h-6` (24px)
+  - `2xl` → `w-8 h-8` (32px)
+- **Color via `className`**: `currentColor` inheritance (`className="text-teal-400"`). No color enum; composes with the Three Laws color tokens.
+- **A11y**:
+  - Inner SVG is `aria-hidden="true"` by default — decorative icons are ignored by screen readers.
+  - For a semantic icon that conveys meaning on its own, pass `aria-label` as a prop; it is forwarded to the `<span>` wrapper via the HTMLAttributes rest spread.
+- **Ref**: forwarded to the `<span>` (`HTMLSpanElement`).
+- **Exception list (do NOT wrap)**: Lucide icons passed as props to other primitives (e.g. `<EmptyState icon={Clock} />`, `<Button icon={Send}>`, `<IconButton icon={X} />`) — those primitives manage sizing themselves.
+
 ---
 
 ## Spacing
