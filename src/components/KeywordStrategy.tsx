@@ -323,7 +323,8 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       )}
 
       {/* Settings Panel */}
-      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-lg)]">
+      {/* pr-check-disable-next-line -- brand asymmetric signature on KeywordStrategy settings panel; intentional non-SectionCard chrome (collapsible, button-as-first-child) */}
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
         <button
           onClick={() => setSettingsOpen(!settingsOpen)}
           className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[var(--surface-3)]/20 transition-colors text-left"
