@@ -5,6 +5,7 @@ import {
   Loader2, Trash2, AlertTriangle, PenLine, Clipboard, Search, X, ArrowUpDown,
 } from 'lucide-react';
 import type { FixContext } from '../App';
+import type { PostSummary } from '../../shared/types/content';
 import { PostEditor } from './PostEditor';
 import { BriefGenerator } from './briefs/BriefGenerator';
 import { RequestList } from './briefs/RequestList';
@@ -82,11 +83,13 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
   const briefsQ = useAdminBriefsList(workspaceId);
   const requestsQ = useAdminRequestsList(workspaceId);
   const postsQ = useAdminPostsList(workspaceId);
-  interface PostSummary { id: string; briefId: string; targetKeyword: string; title: string; totalWordCount: number; status: string; createdAt: string; updatedAt: string }
   const briefs = (briefsQ.data ?? []) as ContentBrief[];
   const clientRequests = (requestsQ.data ?? []) as ContentTopicRequest[];
   const posts = (postsQ.data ?? []) as PostSummary[];
-  const loading = briefsQ.isLoading || requestsQ.isLoading;
+  // Include postsQ — RequestList uses posts to decide between "Generate Post" and
+  // "Open Post" buttons. If posts hasn't loaded yet we'd mistakenly show "Generate
+  // Post" for briefs that already have one, causing duplicate post creation on click.
+  const loading = briefsQ.isLoading || requestsQ.isLoading || postsQ.isLoading;
 
   // Notify parent of pending request count whenever requests data changes
   useEffect(() => {
@@ -309,14 +312,19 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
     setGeneratingBriefFor(null);
   };
 
-  const handleGeneratePost = async (briefId: string) => {
+  const handleGeneratePost = async (briefId: string): Promise<boolean> => {
     setGeneratingPostFor(briefId);
     try {
       const skeleton = await post<PostSummary>(`/api/content-posts/${workspaceId}/generate`, { briefId });
       queryClient.setQueryData(queryKeys.admin.posts(workspaceId), (old: unknown) => [skeleton, ...(Array.isArray(old) ? old : [])]);
       setActivePostId(skeleton.id);
-    } catch (err) { console.error('ContentBriefs operation failed:', err); }
-    setGeneratingPostFor(null);
+      return true;
+    } catch (err) {
+      console.error('ContentBriefs operation failed:', err);
+      return false;
+    } finally {
+      setGeneratingPostFor(null);
+    }
   };
 
   const handleUpdateRequestStatus = async (reqId: string, status: ContentTopicRequest['status'], extra?: { deliveryUrl?: string; deliveryNotes?: string }) => {
@@ -497,6 +505,10 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
         onSetExpandedRequest={setExpandedRequest}
         onCopyAsMarkdown={copyAsMarkdown}
         onExportClientHTML={exportClientHTML}
+        posts={posts}
+        generatingPostFor={generatingPostFor}
+        onGeneratePost={handleGeneratePost}
+        onOpenPost={setActivePostId}
       />
 
       {/* Content Briefs header — search/sort controls */}
