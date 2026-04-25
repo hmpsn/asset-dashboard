@@ -188,7 +188,7 @@ export default function ContentDecay({ workspaceId }: Props) {
                         <div className="flex items-center gap-4 flex-shrink-0 text-right">
                           <div>
                             <div className={`text-xs font-mono ${page.positionChange > 0 ? 'text-red-400' : page.positionChange < 0 ? 'text-emerald-400' : 'text-[var(--brand-text-muted)]'}`}>
-                              {page.positionChange > 0 ? <Icon as={ArrowDown} size="sm" className="inline" /> : page.positionChange < 0 ? <Icon as={ArrowUp} size="sm" className="inline" /> : null}
+                              {page.positionChange > 0 ? <Icon as={ArrowDown} size="sm" /> : page.positionChange < 0 ? <Icon as={ArrowUp} size="sm" /> : null}
                               {' '}{Math.abs(page.positionChange)} pos
                             </div>
                             <div className="text-[10px] text-[var(--brand-text-muted)]">now #{page.currentPosition}</div>
