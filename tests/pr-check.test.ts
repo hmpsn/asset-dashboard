@@ -31,6 +31,7 @@ import { fileURLToPath } from 'url';
 import {
   CHECKS,
   checkDirectory,
+  checkFile,
   buildWorkspaceScopedTables,
   extractDbPrepareArg,
   findUnrenderedSliceFields,
@@ -5079,5 +5080,64 @@ describe('Rule: styleguide-token-parity', () => {
     // Passing a path to a non-existent file should not throw
     const hits = runRule(RULE, ['/nonexistent/public/styleguide.css']);
     expect(hits).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Runner: pattern-based rules with `-`-prefix patterns
+// ════════════════════════════════════════════════════════════════════════════
+//
+// REGRESSION: PR #299 — silent-failure class.
+//
+// Before #299, `checkFile` and `checkDirectory` invoked grep as
+// `grep -n -E "$pattern" "$file"`. When `pattern` started with `-` (e.g.
+// `--radius-signature-lg`), grep parsed it as an unknown long option, errored
+// out, and the error was swallowed by `2>/dev/null || true` — so the rule
+// reported ✓ silently. The rule `radius-signature-lg used outside SectionCard`
+// was silently broken from the day it was added until #299; Phase 2 Batch 1
+// surfaced it because workers introduced 24+ violations and pr-check still
+// passed.
+//
+// Fix in #299: pass the pattern via `grep -e <pattern>` so leading `-` is
+// treated as a literal regex character.
+//
+// These tests fail loudly if a future refactor drops `-e` (or breaks the
+// equivalent fix). The probe pattern starts with two literal hyphens to
+// reproduce the exact failure mode and is intentionally weird so it can never
+// match real code.
+describe('Runner: pattern-rule with leading-`-` pattern (#299 regression)', () => {
+  const PROBE_PATTERN = '--probe-prefix-leading-dashes-x9k';
+  const PROBE_LINE = `// ${PROBE_PATTERN} — synthetic probe`;
+
+  function makeProbeCheck(): Check {
+    return {
+      name: 'probe-leading-dashes',
+      pattern: PROBE_PATTERN,
+      fileGlobs: ['*.tsx'],
+      message: 'probe',
+      severity: 'error',
+      rationale: 'regression test for leading-`-` pattern parsing',
+      claudeMdRef: '#',
+    };
+  }
+
+  it('checkFile: returns a match when the file contains the leading-`-` pattern', () => {
+    const probe = write(uniqPath('runner-prefix-dash', 'probe.tsx'), PROBE_LINE);
+    const hits = checkFile(probe, makeProbeCheck());
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0]).toContain('probe.tsx');
+    expect(hits[0]).toContain(PROBE_PATTERN);
+  });
+
+  it('checkDirectory: returns a match when a file in the dir contains the leading-`-` pattern', () => {
+    // Use a tmpdir-rooted absolute path so the run is isolated from the
+    // real tree's grep --exclude-dir filters.
+    const dir = path.join(TMPDIR, 'runner-prefix-dash-dir');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'probe.tsx'), PROBE_LINE);
+    const hits = checkDirectory(dir, makeProbeCheck());
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0]).toContain('probe.tsx');
+    expect(hits[0]).toContain(PROBE_PATTERN);
   });
 });
