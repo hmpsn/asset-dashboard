@@ -121,7 +121,7 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
               {/* Trend + SERP + Competitor badges */}
               <div className="flex items-center gap-2 flex-wrap mt-1">
                 {gap.trendDirection === 'rising' && (
-                  <span className="flex items-center gap-0.5 t-micro text-emerald-400 font-medium"><Icon as={TrendingUp} size="xs" className="text-emerald-400" />Rising</span>
+                  <span className="flex items-center gap-0.5 t-micro text-emerald-400 font-medium"><Icon as={TrendingUp} size="sm" className="text-emerald-400" />Rising</span>
                 )}
                 {gap.trendDirection === 'declining' && (
                   <span className="flex items-center gap-0.5 t-micro text-red-400 font-medium"><Icon as={TrendingDown} size="sm" className="text-red-400" />Declining</span>
