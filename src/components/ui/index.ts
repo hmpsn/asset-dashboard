@@ -77,7 +77,7 @@ export type {
   RowProps, GapSize, RowAlign, RowJustify,
   StackProps, StackDir, StackAlign,
   ColumnProps,
-  GridProps, GridCols,
+  GridProps, GridCols, GridColCount,
   DividerProps, DividerOrientation,
 } from './layout';
 
