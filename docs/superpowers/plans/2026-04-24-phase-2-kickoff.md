@@ -477,7 +477,7 @@ no-op. Preserve the contrast step:
 | Original | Migrated |
 |---|---|
 | `text-zinc-300 hover:text-zinc-100` | `text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]` |
-| `text-zinc-400 hover:text-zinc-200` | `text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]` |
+| `text-zinc-400 hover:text-zinc-200` | `text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]` |
 | `text-zinc-500 hover:text-zinc-300` | `text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]` |
 
 The general rule: the hover target should be **one tier brighter** than the
