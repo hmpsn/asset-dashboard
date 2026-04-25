@@ -205,7 +205,8 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
         const compOv = comp.overview;
 
         return (
-          <div key={comp.domain} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-lg)]">
+          // pr-check-disable-next-line -- brand asymmetric signature on collapsible per-competitor card; non-SectionCard chrome (button-as-first-child)
+          <div key={comp.domain} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
             <button
               onClick={() => toggleExpand(comp.domain)}
               className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[var(--surface-3)]/50 transition-colors"
@@ -261,7 +262,8 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
 
       {/* Keyword Gaps */}
       {effectiveGaps.length > 0 && (
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-lg)]">
+        // pr-check-disable-next-line -- brand asymmetric signature on Keyword Gaps collapsible section; non-SectionCard chrome
+        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
           <button
             onClick={() => toggleExpand('gaps')}
             className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[var(--surface-3)]/50 transition-colors"

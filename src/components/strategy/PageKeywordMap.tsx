@@ -90,7 +90,8 @@ export function PageKeywordMapPanel({
   onCopyText,
 }: PageKeywordMapProps) {
   return (
-    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-lg)]">
+    // pr-check-disable-next-line -- brand asymmetric signature on PageKeywordMap outer; non-SectionCard chrome (sticky table headers)
+    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
       <div className="px-4 py-3 border-b border-[var(--brand-border)]">
         <div className="flex items-center justify-between">
           <div>

@@ -58,7 +58,7 @@ export function CannibalizationAlert({ items }: CannibalizationAlertProps) {
             </div>
             <div className="mt-1.5 space-y-0.5">
               {item.pages.map((page, pi) => (
-                <div key={pi} className="flex items-center gap-2 t-micro">
+                <div key={pi} className="flex items-center gap-2 t-caption-sm">
                   <span className={`font-mono ${pi === 0 ? 'text-emerald-400' : 'text-[var(--brand-text)]'}`}>{page.path}</span>
                   {page.position && <span className="text-[var(--brand-text-muted)]">pos #{Math.round(page.position)}</span>}
                   {page.impressions != null && page.impressions > 0 && <span className="text-blue-400">{page.impressions} impr</span>}

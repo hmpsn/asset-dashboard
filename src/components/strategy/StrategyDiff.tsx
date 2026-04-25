@@ -31,7 +31,8 @@ export function StrategyDiff({ workspaceId }: StrategyDiffProps) {
     diff.newGaps.length + diff.resolvedGaps.length + diff.keywordChanges.length;
 
   return (
-    <div className="bg-[var(--surface-2)] border border-amber-500/20 overflow-hidden rounded-[var(--radius-lg)]">
+    // pr-check-disable-next-line -- brand asymmetric signature on StrategyDiff "What Changed" callout; amber-bordered non-SectionCard chrome
+    <div className="bg-[var(--surface-2)] border border-amber-500/20 overflow-hidden rounded-[var(--radius-signature-lg)]">
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors"
