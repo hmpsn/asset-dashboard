@@ -2,6 +2,7 @@ import { useAiSuggestedBriefs } from '../../hooks/admin/useAiSuggestedBriefs.js'
 import { SectionCard } from '../ui/SectionCard.js';
 import { EmptyState } from '../ui/EmptyState.js';
 import { Badge } from '../ui/Badge.js';
+import { Icon as IconPrimitive } from '../ui/Icon.js';
 import { Sparkles, FileText, RefreshCw } from 'lucide-react';
 
 interface Props {
@@ -22,11 +23,11 @@ export function AiSuggested({ workspaceId, onCreateBrief }: Props) {
     return (
       <SectionCard
         title="AI Suggested"
-        titleIcon={<Sparkles className="w-4 h-4 text-teal-400" />}
+        titleIcon={<IconPrimitive as={Sparkles} size="md" className="text-teal-400" />}
       >
         <div className="animate-pulse space-y-3">
           {[1, 2].map(i => (
-            <div key={i} className="h-12 bg-zinc-800/50 rounded-lg" />
+            <div key={i} className="h-12 bg-[var(--surface-3)]/50 rounded-lg" />
           ))}
         </div>
       </SectionCard>
@@ -37,7 +38,7 @@ export function AiSuggested({ workspaceId, onCreateBrief }: Props) {
     return (
       <SectionCard
         title="AI Suggested"
-        titleIcon={<Sparkles className="w-4 h-4 text-teal-400" />}
+        titleIcon={<IconPrimitive as={Sparkles} size="md" className="text-teal-400" />}
       >
         <EmptyState
           icon={Sparkles}
@@ -51,7 +52,7 @@ export function AiSuggested({ workspaceId, onCreateBrief }: Props) {
   return (
     <SectionCard
       title="AI Suggested"
-      titleIcon={<Sparkles className="w-4 h-4 text-teal-400" />}
+      titleIcon={<IconPrimitive as={Sparkles} size="md" className="text-teal-400" />}
       titleExtra={<Badge label={`${signals.length}`} color="teal" />}
     >
       <div className="space-y-2">
@@ -60,12 +61,12 @@ export function AiSuggested({ workspaceId, onCreateBrief }: Props) {
           return (
             <div
               key={signal.insightId}
-              className="flex items-start gap-3 p-3 rounded-lg bg-zinc-800/30 hover:bg-zinc-800/50 transition-colors"
+              className="flex items-start gap-3 p-3 rounded-lg bg-[var(--surface-3)]/30 hover:bg-[var(--surface-3)]/50 transition-colors"
             >
-              <Icon className="w-4 h-4 mt-0.5 text-teal-400 shrink-0" />
+              <IconPrimitive as={Icon} size="md" className="mt-0.5 text-teal-400 shrink-0" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-zinc-200 truncate">
+                  <span className="text-sm font-medium text-[var(--brand-text-bright)] truncate">
                     {signal.pageTitle ?? signal.keyword ?? 'Untitled'}
                   </span>
                   <Badge
@@ -73,7 +74,7 @@ export function AiSuggested({ workspaceId, onCreateBrief }: Props) {
                     color={signal.type === 'suggested_brief' ? 'blue' : 'amber'}
                   />
                 </div>
-                <p className="text-xs text-zinc-400 mt-0.5">{signal.detail}</p>
+                <p className="text-xs text-[var(--brand-text)] mt-0.5">{signal.detail}</p>
               </div>
               {onCreateBrief && signal.type === 'suggested_brief' && (
                 <button

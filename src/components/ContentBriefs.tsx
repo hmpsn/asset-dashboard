@@ -4,6 +4,7 @@ import { get, post, patch, del, getSafe, getText } from '../api/client';
 import {
   Loader2, Trash2, AlertTriangle, PenLine, Clipboard, Search, X, ArrowUpDown,
 } from 'lucide-react';
+import { Icon, cn } from './ui';
 import type { FixContext } from '../App';
 import type { PostSummary } from '../../shared/types/content';
 import { PostEditor } from './PostEditor';
@@ -397,7 +398,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-5 h-5 animate-spin text-teal-400" />
+        <Icon as={Loader2} size="lg" className="animate-spin text-teal-400" />
       </div>
     );
   }
@@ -408,23 +409,23 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           {/* pr-check-disable-next-line -- modal dialog */}
-          <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0">
-                <AlertTriangle className="w-5 h-5 text-red-400" />
+                <Icon as={AlertTriangle} size="lg" className="text-red-400" />
               </div>
               <div>
-                <div className="text-sm font-semibold text-zinc-200">Delete {deleteConfirm.type === 'brief' ? 'Brief' : 'Request'}?</div>
-                <div className="text-xs text-zinc-500 mt-0.5">This action cannot be undone</div>
+                <div className="text-sm font-semibold text-[var(--brand-text-bright)]">Delete {deleteConfirm.type === 'brief' ? 'Brief' : 'Request'}?</div>
+                <div className="text-xs text-[var(--brand-text-muted)] mt-0.5">This action cannot be undone</div>
               </div>
             </div>
-            <div className="text-xs text-zinc-400 mb-4 pl-[52px]">
-              <span className="text-zinc-300 font-medium">&ldquo;{deleteConfirm.label}&rdquo;</span> will be permanently removed.
+            <div className="text-xs text-[var(--brand-text)] mb-4 pl-[52px]">
+              <span className="text-[var(--brand-text-bright)] font-medium">&ldquo;{deleteConfirm.label}&rdquo;</span> will be permanently removed.
             </div>
             <div className="flex items-center justify-end gap-2">
-              <button onClick={() => setDeleteConfirm(null)} className="px-4 py-2 rounded-lg text-xs font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors">Cancel</button>
+              <button onClick={() => setDeleteConfirm(null)} className="px-4 py-2 rounded-lg text-xs font-medium bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--brand-border-hover)] transition-colors">Cancel</button>
               <button onClick={executeDelete} className="px-4 py-2 rounded-lg text-xs font-medium bg-red-600 text-white hover:bg-red-500 transition-colors flex items-center gap-1.5">
-                <Trash2 className="w-3.5 h-3.5" /> Delete
+                <Icon as={Trash2} size="md" /> Delete
               </button>
             </div>
           </div>
@@ -433,7 +434,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
 
       {/* Active Post Editor */}
       {activePostId && (
-        <div className="bg-zinc-900 border border-blue-500/20 p-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
+        <div className="bg-[var(--surface-2)] border border-blue-500/20 p-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <PostEditor
             workspaceId={workspaceId}
             postId={activePostId}
@@ -445,11 +446,11 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
 
       {/* Generated Posts list */}
       {posts.length > 0 && !activePostId && (
-        <div className="bg-zinc-900 border border-blue-500/20 p-4 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
+        <div className="bg-[var(--surface-2)] border border-blue-500/20 p-4 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <div className="flex items-center gap-2 mb-1">
-            <PenLine className="w-4 h-4 text-blue-400" />
-            <span className="text-xs font-medium text-zinc-300">Generated Posts</span>
-            <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">{posts.length}</span>
+            <Icon as={PenLine} size="md" className="text-blue-400" />
+            <span className="text-xs font-medium text-[var(--brand-text-bright)]">Generated Posts</span>
+            <span className="t-caption-sm px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">{posts.length}</span>
           </div>
           <div className="space-y-2">
             {posts.map(post => {
@@ -463,18 +464,18 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
                 <button
                   key={post.id}
                   onClick={() => setActivePostId(post.id)}
-                  className="w-full text-left rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2.5 hover:border-blue-500/30 transition-colors"
+                  className="w-full text-left rounded-lg bg-[var(--surface-1)] border border-[var(--brand-border)] px-3 py-2.5 hover:border-blue-500/30 transition-colors"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-medium text-zinc-200 truncate">{post.title}</div>
-                      <div className="text-[11px] text-zinc-500 mt-0.5">"{post.targetKeyword}" · {post.totalWordCount.toLocaleString()} words</div>
+                      <div className="text-xs font-medium text-[var(--brand-text-bright)] truncate">{post.title}</div>
+                      <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">"{post.targetKeyword}" · {post.totalWordCount.toLocaleString()} words</div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className={`text-[11px] px-1.5 py-0.5 rounded border font-medium ${statusColors[post.status] || statusColors.draft}`}>
+                      <span className={cn('t-caption-sm px-1.5 py-0.5 rounded border font-medium', statusColors[post.status] || statusColors.draft)}>
                         {post.status === 'generating' ? 'Generating...' : post.status.charAt(0).toUpperCase() + post.status.slice(1)}
                       </span>
-                      <span className="text-[11px] text-zinc-600">{new Date(post.createdAt).toLocaleDateString()}</span>
+                      <span className="t-caption-sm text-[var(--brand-text-muted)]">{new Date(post.createdAt).toLocaleDateString()}</span>
                     </div>
                   </div>
                 </button>
@@ -516,29 +517,29 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Clipboard className="w-5 h-5 text-teal-400" />
-            <h2 className="text-sm font-semibold text-zinc-200">Content Briefs</h2>
-            <span className="text-[11px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{briefs.length} total</span>
+            <Icon as={Clipboard} size="lg" className="text-teal-400" />
+            <h2 className="text-sm font-semibold text-[var(--brand-text-bright)]">Content Briefs</h2>
+            <span className="t-caption-sm px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{briefs.length} total</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="relative">
-              <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Icon as={Search} size="md" className="text-[var(--brand-text-muted)] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
                 value={briefSearch}
                 onChange={e => setBriefSearch(e.target.value)}
                 placeholder="Search briefs..."
-                className="w-48 pl-8 pr-7 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 focus:border-zinc-700 focus:outline-none"
+                className="w-48 pl-8 pr-7 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-[var(--brand-border-hover)] focus:outline-none"
               />
               {briefSearch && (
-                <button onClick={() => setBriefSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-400">
-                  <X className="w-3 h-3" />
+                <button onClick={() => setBriefSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]">
+                  <Icon as={X} size="sm" />
                 </button>
               )}
             </div>
-            <div className="flex items-center gap-1 text-[11px] text-zinc-500">
-              <ArrowUpDown className="w-3 h-3" />
-              <select value={briefSort} onChange={e => setBriefSort(e.target.value as 'date' | 'keyword' | 'difficulty')} className="bg-zinc-900 border border-zinc-800 rounded px-1.5 py-1 text-[11px] text-zinc-400 focus:outline-none cursor-pointer">
+            <div className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
+              <Icon as={ArrowUpDown} size="sm" />
+              <select value={briefSort} onChange={e => setBriefSort(e.target.value as 'date' | 'keyword' | 'difficulty')} className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded px-1.5 py-1 t-caption-sm text-[var(--brand-text)] focus:outline-none cursor-pointer">
                 <option value="date">Newest</option>
                 <option value="keyword">Keyword A-Z</option>
                 <option value="difficulty">Difficulty</option>

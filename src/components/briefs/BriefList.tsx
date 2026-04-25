@@ -2,7 +2,7 @@ import {
   ChevronDown, ChevronUp, FileText, Copy, Download, Trash2, Search,
 } from 'lucide-react';
 import { BriefDetail } from './BriefDetail';
-import { EmptyState } from '../ui';
+import { EmptyState, Icon } from '../ui';
 
 interface ContentBrief {
   id: string;
@@ -126,7 +126,7 @@ export function BriefList({
       ) : (
         <div className="space-y-2">
           {standaloneBriefs.map(brief => (
-            <div key={brief.id} className="bg-zinc-900 border border-zinc-800 overflow-hidden group/brief" style={{ borderRadius: '10px 24px 10px 24px' }}>
+            <div key={brief.id} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden group/brief" style={{ borderRadius: '10px 24px 10px 24px' }}>
               {/* Brief header row */}
               <div className="flex items-center gap-3 px-4 py-3">
                 <button
@@ -134,35 +134,35 @@ export function BriefList({
                   className="flex-1 min-w-0 text-left"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-zinc-200 truncate">{brief.targetKeyword}</span>
+                    <span className="text-xs font-medium text-[var(--brand-text-bright)] truncate">{brief.targetKeyword}</span>
                     {brief.difficultyScore != null && (
-                      <span className={`text-[11px] px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${brief.difficultyScore <= 30 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : brief.difficultyScore <= 60 ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>{brief.difficultyScore}/100</span>
+                      <span className={`t-caption-sm px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${brief.difficultyScore <= 30 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : brief.difficultyScore <= 60 ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>{brief.difficultyScore}/100</span>
                     )}
                   </div>
-                  <div className="text-[11px] text-zinc-500 mt-0.5 truncate">{brief.suggestedTitle}</div>
+                  <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 truncate">{brief.suggestedTitle}</div>
                 </button>
                 {/* At-a-glance metrics */}
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-medium">{brief.wordCountTarget.toLocaleString()} words</span>
-                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 capitalize">{brief.intent}</span>
-                  {brief.contentFormat && <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400/80 border border-amber-500/20 capitalize hidden sm:inline-block">{brief.contentFormat}</span>}
+                  <span className="t-caption-sm px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-medium">{brief.wordCountTarget.toLocaleString()} words</span>
+                  <span className="t-caption-sm px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--brand-text-muted)] capitalize">{brief.intent}</span>
+                  {brief.contentFormat && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400/80 border border-amber-500/20 capitalize hidden sm:inline-block">{brief.contentFormat}</span>}
                 </div>
                 {/* Quick actions */}
                 <div className="flex items-center gap-0.5 flex-shrink-0 opacity-40 group-hover/brief:opacity-100 transition-opacity">
-                  <button onClick={(e) => { e.stopPropagation(); onCopyAsMarkdown(brief); }} title="Copy for AI tool" className="p-1.5 rounded hover:bg-teal-500/10 text-zinc-500 hover:text-teal-400 transition-colors">
-                    <Copy className="w-3.5 h-3.5" />
+                  <button onClick={(e) => { e.stopPropagation(); onCopyAsMarkdown(brief); }} title="Copy for AI tool" className="p-1.5 rounded hover:bg-teal-500/10 text-[var(--brand-text-muted)] hover:text-teal-400 transition-colors">
+                    <Icon as={Copy} size="md" />
                   </button>
-                  <button onClick={(e) => { e.stopPropagation(); onExportClientHTML(brief); }} title="Export PDF" className="p-1.5 rounded hover:bg-teal-500/10 text-zinc-500 hover:text-teal-400 transition-colors">
-                    <Download className="w-3.5 h-3.5" />
+                  <button onClick={(e) => { e.stopPropagation(); onExportClientHTML(brief); }} title="Export PDF" className="p-1.5 rounded hover:bg-teal-500/10 text-[var(--brand-text-muted)] hover:text-teal-400 transition-colors">
+                    <Icon as={Download} size="md" />
                   </button>
-                  <button onClick={(e) => { e.stopPropagation(); onConfirmDeleteBrief(brief); }} title="Delete brief" className="p-1.5 rounded hover:bg-red-500/10 text-zinc-500 hover:text-red-400 transition-colors">
-                    <Trash2 className="w-3.5 h-3.5" />
+                  <button onClick={(e) => { e.stopPropagation(); onConfirmDeleteBrief(brief); }} title="Delete brief" className="p-1.5 rounded hover:bg-red-500/10 text-[var(--brand-text-muted)] hover:text-red-400 transition-colors">
+                    <Icon as={Trash2} size="md" />
                   </button>
                 </div>
                 {/* Date + expand */}
-                <span className="text-[11px] text-zinc-500 flex-shrink-0">{new Date(brief.createdAt).toLocaleDateString()}</span>
-                <button onClick={() => onSetExpanded(expanded === brief.id ? null : brief.id)} className="flex-shrink-0 p-1 rounded hover:bg-zinc-800 transition-colors">
-                  {expanded === brief.id ? <ChevronUp className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />}
+                <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">{new Date(brief.createdAt).toLocaleDateString()}</span>
+                <button onClick={() => onSetExpanded(expanded === brief.id ? null : brief.id)} className="flex-shrink-0 p-1 rounded hover:bg-[var(--surface-3)] transition-colors">
+                  <Icon as={expanded === brief.id ? ChevronUp : ChevronDown} size="md" className="text-[var(--brand-text-muted)]" />
                 </button>
               </div>
 
