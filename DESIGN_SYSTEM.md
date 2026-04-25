@@ -400,6 +400,21 @@ Centered modal overlay for confirming destructive or irreversible actions. Repla
 | **Ghost** | `text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 rounded-md px-2 py-1 text-xs font-medium` |
 | **Accent text** | `text-teal-400 hover:bg-zinc-800 rounded-md px-2 py-1 text-xs font-medium` |
 
+### 16. Typography primitives (Phase 5)
+
+Thin wrappers over `.t-*` utilities. Each forwards refs and merges `className`. Live in `src/components/ui/typography/`.
+
+| Primitive | API | Renders | Notes |
+|-----------|-----|---------|-------|
+| **Heading** | `level={1\|2\|3}`, `as?="h1\|h2\|h3\|div"` | `.t-h1` (level=1) / `.t-h2` (level=2) / `.t-page` (level=3) | Default tag tracks `level`; `as="div"` for semantic-heading nesting issues. |
+| **Stat** | `size?="hero"\|"default"\|"sm"` | `.t-stat-lg` / `.t-stat` / `.t-stat-sm` | DIN Pro numerals. Use for KPIs / dashboard numbers. |
+| **BodyText** | `tone?="default"\|"muted"\|"dim"` | `.t-body` + inline `style.color` from CSS var | Tone is the color API. Tailwind color utilities via `className` are overridden by the inline tone style — pass `tone="default"` and let parent context drive color if you need a custom hue. |
+| **Caption** | `size?="default"\|"sm"` | `.t-caption` / `.t-caption-sm` | Secondary metadata, timestamps. |
+| **Label** | (no props) | `.t-label` (uppercase DIN) | Form labels, uppercase section markers. |
+| **Mono** | `size?="default"\|"micro"` | `.t-mono` (12px) / `.t-micro` (10px) | Both monospace (Fira Code → JetBrains Mono → Menlo fallback). IDs, slugs, tokens, timestamps. |
+
+Codemod scaffold: `scripts/codemods/phase5-typography.ts` (dry-run) reports candidate sites. Phase 2 applies migrations.
+
 ---
 
 ## Spacing
