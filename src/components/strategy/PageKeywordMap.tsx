@@ -305,7 +305,7 @@ export function PageKeywordMapPanel({
                       </button>
                       <button
                         onClick={() => onSetEditingPage(null)}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded bg-[var(--surface-3)] hover:bg-zinc-700 text-[var(--brand-text-bright)] t-caption-sm font-medium"
+                        className="flex items-center gap-1 px-2.5 py-1 rounded bg-[var(--surface-3)] hover:bg-[var(--surface-1)] text-[var(--brand-text-bright)] t-caption-sm font-medium"
                       >
                         <Icon as={X} size="xs" /> Cancel
                       </button>

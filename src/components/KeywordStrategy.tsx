@@ -297,7 +297,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
               onClick={() => generateStrategy('incremental')}
               disabled={generating}
               title="Re-analyzes only pages not updated in the last 7 days. Faster and lower cost than a full regeneration."
-              className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption border border-[var(--brand-border-hover)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)] transition-colors disabled:opacity-50"
+              className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)] transition-colors disabled:opacity-50"
             >
               Update changed pages
             </button>
