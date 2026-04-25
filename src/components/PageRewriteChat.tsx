@@ -711,7 +711,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                 : 'text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)]'
             }`}
           >
-            <Icon as={Maximize2} size="sm" className={`transition-transform ${focusMode ? 'rotate-180' : ''}`} />
+            <Icon as={Maximize2} size="md" className={`transition-transform ${focusMode ? 'rotate-180' : ''}`} />
           </button>
         )}
       </div>

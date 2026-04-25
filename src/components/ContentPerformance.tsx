@@ -204,7 +204,7 @@ export function ContentPerformance({ workspaceId }: Props) {
             </div>
             <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] px-4 py-3 rounded-[var(--radius-signature)]">
               <div className="flex items-center gap-2 mb-1">
-                <Icon as={Eye} size="sm" className="text-cyan-400" />
+                <Icon as={Eye} size="md" className="text-cyan-400" />
                 <span className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider">Impressions</span>
               </div>
               <p className="text-xl font-semibold text-[var(--brand-text-bright)]">{totalImpressions.toLocaleString()}</p>
@@ -218,7 +218,7 @@ export function ContentPerformance({ workspaceId }: Props) {
             </div>
             <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] px-4 py-3 rounded-[var(--radius-signature)]">
               <div className="flex items-center gap-2 mb-1">
-                <Icon as={Target} size="sm" className="text-amber-400" />
+                <Icon as={Target} size="md" className="text-amber-400" />
                 <span className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider">Avg Position</span>
               </div>
               <p className="text-xl font-semibold text-[var(--brand-text-bright)]">{avgPosition > 0 ? avgPosition.toFixed(1) : '—'}</p>
@@ -273,7 +273,7 @@ export function ContentPerformance({ workspaceId }: Props) {
                         <Badge label={item.status} color={item.status === 'published' ? 'emerald' : 'blue'} />
                         {item.source === 'matrix' && (
                           <span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/20">
-                            <Icon as={Layers} size="xs" /> Content Plan
+                            <Icon as={Layers} size="sm" /> Content Plan
                           </span>
                         )}
                       </div>

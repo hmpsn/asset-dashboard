@@ -202,7 +202,7 @@ function PageWeight({ siteId }: Props) {
               <option value="cms">CMS Only</option>
               <option value="css">CSS Only</option>
             </select>
-            <Icon as={ChevronDown} size="sm" className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)] pointer-events-none" />
+            <Icon as={ChevronDown} size="md" className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)] pointer-events-none" />
           </div>
           <Button variant="secondary" size="sm" onClick={runAnalysis}>
             Re-scan
@@ -220,9 +220,9 @@ function PageWeight({ siteId }: Props) {
               className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors text-left"
             >
               {expanded.has(page.page) ? (
-                <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
+                <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
               ) : (
-                <Icon as={ChevronRight} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
+                <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
               )}
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium text-[var(--brand-text-bright)] truncate">{page.page}</div>
@@ -260,7 +260,7 @@ function PageWeight({ siteId }: Props) {
       {/* Cross-link tip: Asset Manager */}
       {heavyPages > 0 && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] bg-teal-500/5 border border-teal-500/20 text-xs text-teal-300">
-          <Icon as={Images} size="sm" className="flex-shrink-0" />
+          <Icon as={Images} size="md" className="flex-shrink-0" />
           <span className="flex-1"><strong>{heavyPages} heavy page{heavyPages !== 1 ? 's' : ''}</strong> found. Use the <strong>Asset Manager</strong> tab to compress images and reduce page weight.</span>
           <Icon as={ArrowRight} size="sm" className="flex-shrink-0 text-teal-400" />
         </div>

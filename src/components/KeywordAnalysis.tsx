@@ -267,9 +267,9 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                 {isAnalyzing ? (
                   <Loader2 className="w-3.5 h-3.5 text-teal-400 animate-spin shrink-0" />
                 ) : isExpanded ? (
-                  <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text-muted)] shrink-0" />
+                  <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] shrink-0" />
                 ) : (
-                  <Icon as={ChevronRight} size="sm" className="text-[var(--brand-text-muted)] shrink-0" />
+                  <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)] shrink-0" />
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
@@ -339,7 +339,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                       {/* Primary keyword */}
                       <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                         <div className="flex items-center gap-2 mb-2">
-                          <Icon as={Target} size="sm" className="text-teal-400" />
+                          <Icon as={Target} size="md" className="text-teal-400" />
                           <span className="text-xs font-medium text-[var(--brand-text-bright)]">Primary Keyword</span>
                         </div>
                         <div className="text-sm font-semibold text-[var(--brand-text-bright)] mb-2">{kw.primaryKeyword}</div>
@@ -367,7 +367,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                       <div className="grid grid-cols-2 gap-3">
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                           <div className="flex items-center gap-2 mb-2">
-                            <Icon as={Tag} size="sm" className="text-blue-400" />
+                            <Icon as={Tag} size="md" className="text-blue-400" />
                             <span className="text-xs font-medium text-[var(--brand-text-bright)]">Secondary Keywords</span>
                           </div>
                           <div className="flex flex-wrap gap-1">
@@ -380,7 +380,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                         </div>
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                           <div className="flex items-center gap-2 mb-2">
-                            <Icon as={TrendingUp} size="sm" className="text-emerald-400" />
+                            <Icon as={TrendingUp} size="md" className="text-emerald-400" />
                             <span className="text-xs font-medium text-[var(--brand-text-bright)]">Long-Tail Keywords</span>
                           </div>
                           <div className="flex flex-wrap gap-1">
@@ -397,7 +397,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                       {kw.competitorKeywords.length > 0 && (
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                           <div className="flex items-center gap-2 mb-2">
-                            <Icon as={Zap} size="sm" className="text-amber-400" />
+                            <Icon as={Zap} size="md" className="text-amber-400" />
                             <span className="text-xs font-medium text-[var(--brand-text-bright)]">Competitor Keywords</span>
                           </div>
                           <div className="flex flex-wrap gap-1">
@@ -445,7 +445,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                         {kw.recommendations.length > 0 && (
                           <div className="bg-[var(--surface-2)] rounded-[var(--radius-lg)] p-3 border border-emerald-500/20">
                             <div className="flex items-center gap-2 mb-2">
-                              <Icon as={Sparkles} size="sm" className="text-emerald-400" />
+                              <Icon as={Sparkles} size="md" className="text-emerald-400" />
                               <span className="text-xs font-medium text-[var(--brand-text-bright)]">Recommendations</span>
                             </div>
                             <ul className="space-y-1">
@@ -461,7 +461,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                       {cs && (
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                           <div className="flex items-center gap-2 mb-3">
-                            <Icon as={BarChart3} size="sm" className="text-cyan-400" />
+                            <Icon as={BarChart3} size="md" className="text-cyan-400" />
                             <span className="text-xs font-medium text-[var(--brand-text-bright)]">Content Metrics</span>
                           </div>
                           <div className="grid grid-cols-4 gap-3 mb-3">

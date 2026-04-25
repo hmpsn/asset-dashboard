@@ -599,7 +599,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
       {fixQueue.length > 0 && (
         <div className="bg-amber-500/5 border border-amber-500/20 rounded-[var(--radius-lg)] p-3">
           <div className="flex items-center gap-2 mb-2">
-            <Icon as={Zap} size="sm" className="text-amber-400" />
+            <Icon as={Zap} size="md" className="text-amber-400" />
             <span className="text-xs font-semibold text-amber-300">Fix These First</span>
             <span className="text-[10px] text-[var(--brand-text-muted)] ml-auto">ranked by traffic × optimization gap</span>
           </div>
@@ -681,9 +681,9 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                   {isAnalyzing ? (
                     <Loader2 className="w-3.5 h-3.5 text-teal-400 animate-spin flex-shrink-0" />
                   ) : isExpanded ? (
-                    <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
+                    <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
                   ) : (
-                    <Icon as={ChevronRight} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
+                    <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
                   )}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
@@ -908,7 +908,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                       {/* Primary keyword presence */}
                       <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                         <div className="flex items-center gap-2 mb-2">
-                          <Icon as={Target} size="sm" className="text-teal-400" />
+                          <Icon as={Target} size="md" className="text-teal-400" />
                           <span className="text-xs font-medium text-[var(--brand-text-bright)]">Primary Keyword: <span className="text-white">{kw.primaryKeyword}</span></span>
                           <button
                             onClick={() => trackKeyword(kw.primaryKeyword)}
@@ -936,7 +936,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                       <div className="grid grid-cols-2 gap-3">
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                           <div className="flex items-center gap-2 mb-2">
-                            <Icon as={Tag} size="sm" className="text-blue-400" />
+                            <Icon as={Tag} size="md" className="text-blue-400" />
                             <span className="text-xs font-medium text-[var(--brand-text-bright)]">Secondary Keywords</span>
                           </div>
                           <div className="flex flex-wrap gap-1">
@@ -947,7 +947,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                         </div>
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                           <div className="flex items-center gap-2 mb-2">
-                            <Icon as={TrendingUp} size="sm" className="text-emerald-400" />
+                            <Icon as={TrendingUp} size="md" className="text-emerald-400" />
                             <span className="text-xs font-medium text-[var(--brand-text-bright)]">Long-Tail Keywords</span>
                           </div>
                           <div className="flex flex-wrap gap-1">
@@ -962,7 +962,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                       {kw.competitorKeywords.length > 0 && (
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                           <div className="flex items-center gap-2 mb-2">
-                            <Icon as={Zap} size="sm" className="text-amber-400" />
+                            <Icon as={Zap} size="md" className="text-amber-400" />
                             <span className="text-xs font-medium text-[var(--brand-text-bright)]">Competitor Keywords</span>
                           </div>
                           <div className="flex flex-wrap gap-1">

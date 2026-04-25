@@ -126,16 +126,16 @@ function TreeNode({ node, defaultExpanded, coverageMap }: { node: SiteNode; defa
         style={{ paddingLeft: `${node.depth * 20 + 12}px` }}
       >
         {hasChildren ? (
-          expanded ? <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" /> : <Icon as={ChevronRight} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
+          expanded ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" /> : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
         ) : (
-          <Icon as={FileText} size="sm" className="text-[var(--brand-text-dim)] flex-shrink-0" />
+          <Icon as={FileText} size="md" className="text-[var(--brand-text-dim)] flex-shrink-0" />
         )}
 
         <span className="text-xs font-medium text-[var(--brand-text-bright)] truncate flex-1">{node.name}</span>
 
         {node.keyword && (
           <span className="text-[10px] text-[var(--brand-text-muted)] truncate max-w-[150px] hidden sm:block" title={node.keyword}>
-            <Icon as={Target} size="xs" className="mr-0.5 -mt-px" />{node.keyword}
+            <Icon as={Target} size="sm" className="mr-0.5 -mt-px" />{node.keyword}
           </span>
         )}
 
@@ -363,7 +363,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
                   <div className="text-xs font-medium text-[var(--brand-text-bright)] font-mono">{gap.suggestedPath}</div>
                   <div className="text-[11px] text-[var(--brand-text-muted)] mt-0.5">{gap.reason}</div>
                 </div>
-                <Icon as={ArrowUpRight} size="sm" className="text-[var(--brand-text-dim)] flex-shrink-0 mt-0.5" />
+                <Icon as={ArrowUpRight} size="md" className="text-[var(--brand-text-dim)] flex-shrink-0 mt-0.5" />
               </div>
             ))}
           </div>

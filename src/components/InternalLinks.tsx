@@ -181,7 +181,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
             onClick={() => setShowOrphans(!showOrphans)}
             className="w-full px-4 py-3 flex items-center gap-2 hover:bg-[var(--surface-3)]/30 transition-colors"
           >
-            {showOrphans ? <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronRight} size="sm" className="text-[var(--brand-text-muted)]" />}
+            {showOrphans ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)]" />}
             <Icon as={AlertTriangle} size="md" className="text-orange-400" />
             <span className="text-sm font-medium text-orange-300 flex-1 text-left">{data.orphanCount} Orphan Pages</span>
             <span className="text-[11px] text-[var(--brand-text-muted)]">No internal links point to these pages</span>
@@ -235,10 +235,10 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
         </div>
         <div className="flex items-center gap-0.5 bg-[var(--surface-3)] rounded-[var(--radius-lg)] p-0.5">
           <button onClick={() => setViewMode('list')} className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-[var(--surface-2)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)]'}`} title="List view">
-            <Icon as={List} size="sm" />
+            <Icon as={List} size="md" />
           </button>
           <button onClick={() => setViewMode('grouped')} className={`p-1.5 rounded ${viewMode === 'grouped' ? 'bg-[var(--surface-2)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)]'}`} title="Group by page">
-            <Icon as={LayoutList} size="sm" />
+            <Icon as={LayoutList} size="md" />
           </button>
         </div>
       </div>
@@ -263,7 +263,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
               <div key={fromPage} className="border-b border-[var(--brand-border)]/50 last:border-b-0">
                 <div className="px-4 py-2.5 bg-[var(--surface-3)]/30">
                   <div className="flex items-center gap-2">
-                    <Icon as={Link} size="sm" className="text-teal-400" />
+                    <Icon as={Link} size="md" className="text-teal-400" />
                     <span className="text-xs font-medium text-[var(--brand-text-bright)]">{suggestions[0].fromTitle}</span>
                     <span className="text-[11px] text-[var(--brand-text-muted)] font-mono">{fromPage}</span>
                     <span className="text-[11px] text-[var(--brand-text-muted)] ml-auto">{suggestions.length} links to add</span>
@@ -301,7 +301,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
                   onClick={() => toggleExpanded(idx)}
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)]/20 transition-colors text-left"
                 >
-                  {isExpanded ? <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" /> : <Icon as={ChevronRight} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />}
+                  {isExpanded ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" /> : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />}
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     <span className="text-xs text-[var(--brand-text-bright)] font-mono truncate max-w-[140px]">{s.fromPage}</span>
                     <Icon as={ArrowRight} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
@@ -359,7 +359,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
       {data.suggestions.length > 0 && (
         <div className="bg-[var(--surface-3)]/30 rounded-[var(--radius-lg)] border border-[var(--brand-border)] px-4 py-3">
           <div className="flex items-start gap-2">
-            <Icon as={AlertCircle} size="sm" className="text-teal-400 mt-0.5 flex-shrink-0" />
+            <Icon as={AlertCircle} size="md" className="text-teal-400 mt-0.5 flex-shrink-0" />
             <div className="text-[11px] text-[var(--brand-text-muted)] space-y-1">
               <p><strong className="text-[var(--brand-text)]">How to implement:</strong> Open each page in the Webflow Designer and add links using the suggested anchor text. Place links naturally within the page's body content where they make contextual sense.</p>
               <p><strong className="text-[var(--brand-text)]">SEO impact:</strong> Internal links help search engines discover and understand page relationships. They also distribute page authority (PageRank) across your site, which can improve rankings for linked pages.</p>
@@ -371,7 +371,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
 
       {data.suggestions.length === 0 && data.attemptedPageCount && data.pageCount < data.attemptedPageCount * 0.5 ? (
         <div className="bg-amber-500/5 border border-amber-500/20 rounded-[var(--radius-lg)] px-4 py-3 text-xs text-amber-400 flex items-center gap-2">
-          <Icon as={AlertTriangle} size="sm" className="flex-shrink-0" />
+          <Icon as={AlertTriangle} size="md" className="flex-shrink-0" />
           <div>
             <strong>Content fetch issue:</strong> Only {data.pageCount} of {data.attemptedPageCount} pages could be loaded.
             {data.pageCount === 0
@@ -381,12 +381,12 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
         </div>
       ) : data.suggestions.length === 0 && data.pageCount < 2 ? (
         <div className="bg-amber-500/5 border border-amber-500/20 rounded-[var(--radius-lg)] px-4 py-3 text-xs text-amber-400 flex items-center gap-2">
-          <Icon as={AlertTriangle} size="sm" className="flex-shrink-0" />
+          <Icon as={AlertTriangle} size="md" className="flex-shrink-0" />
           Not enough pages to analyze. At least 2 published pages with fetchable content are required.
         </div>
       ) : data.suggestions.length === 0 ? (
         <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-[var(--radius-lg)] px-4 py-3 text-xs text-emerald-400 flex items-center gap-2">
-          <Icon as={ExternalLink} size="sm" className="flex-shrink-0" />
+          <Icon as={ExternalLink} size="md" className="flex-shrink-0" />
           Your site has good internal linking coverage. No major gaps detected.
         </div>
       ) : null}

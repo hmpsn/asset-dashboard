@@ -220,7 +220,7 @@ export default function ContentDecay({ workspaceId }: Props) {
                           {page.refreshRecommendation && (
                             <div className="bg-purple-500/5 border border-purple-500/15 rounded-[var(--radius-lg)] p-3 mt-2">
                               <div className="flex items-center gap-1.5 text-[11px] font-medium text-purple-300 mb-2">
-                                <Icon as={Sparkles} size="sm" /> AI Refresh Recommendation
+                                <Icon as={Sparkles} size="md" /> AI Refresh Recommendation
                               </div>
                               <div className="text-[11px] text-[var(--brand-text-bright)] leading-relaxed whitespace-pre-wrap">{page.refreshRecommendation}</div>
                             </div>
