@@ -372,7 +372,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
       {sorted.length > 0 ? (
         // pr-check-disable-next-line -- brand asymmetric signature on RankTracker rank-table card; non-SectionCard chrome
         <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
-          <div className="grid grid-cols-[1fr,80px,80px,80px,80px,60px] gap-2 px-4 py-2 t-caption font-medium text-[var(--brand-text-muted)] uppercase tracking-wider border-b border-[var(--brand-border)]">
+          <div className="grid grid-cols-[1fr_80px_80px_80px_80px_60px] gap-2 px-4 py-2 t-caption font-medium text-[var(--brand-text-muted)] uppercase tracking-wider border-b border-[var(--brand-border)]">
             <span>Keyword</span>
             <span className="text-right">Position</span>
             <span className="text-right">Change</span>
@@ -385,7 +385,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
             return (
               <div key={rank.query}>
                 <div
-                  className="grid grid-cols-[1fr,80px,80px,80px,80px,60px] gap-2 px-4 py-2.5 items-center border-b border-[var(--brand-border)]/50 last:border-0 hover:bg-[var(--surface-3)]/20 cursor-pointer"
+                  className="grid grid-cols-[1fr_80px_80px_80px_80px_60px] gap-2 px-4 py-2.5 items-center border-b border-[var(--brand-border)]/50 last:border-0 hover:bg-[var(--surface-3)]/20 cursor-pointer"
                   onClick={() => toggleExpand(rank.query)}
                 >
                   <div className="flex items-center gap-2 min-w-0">
