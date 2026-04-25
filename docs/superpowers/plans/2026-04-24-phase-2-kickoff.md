@@ -358,6 +358,44 @@ import { TrendingUp } from 'lucide-react';
 <TrendingUp className={`w-${sizeMap[size]}`} />
 ```
 
+#### Icon SIZE_MAP — match the original Tailwind class exactly
+
+The Icon primitive's SIZE_MAP (`src/components/ui/Icon.tsx`) is **exact**:
+
+| `size=` | Tailwind class | Pixels |
+|---|---|---:|
+| `xs` | `w-2 h-2` | 8 |
+| `sm` | `w-3 h-3` | 12 |
+| `md` | `w-4 h-4` | 16 |
+| `lg` | `w-5 h-5` | 20 |
+| `xl` | `w-6 h-6` | 24 |
+| `2xl` | `w-8 h-8` | 32 |
+
+When migrating a raw Lucide icon, pick the size that matches the **exact pixel
+value** of the original `w-N h-N` class. Do not pick the next-smaller tier.
+
+```tsx
+// Original                           // Migrated
+<X className="w-3 h-3"  />        →   <Icon as={X} size="sm" />
+<X className="w-4 h-4"  />        →   <Icon as={X} size="md" />
+<X className="w-5 h-5"  />        →   <Icon as={X} size="lg" />
+<X className="w-6 h-6"  />        →   <Icon as={X} size="xl" />
+<X className="w-8 h-8"  />        →   <Icon as={X} size="2xl" />
+```
+
+**Half-step originals (`w-3.5 h-3.5`, `w-2.5 h-2.5`, etc.) — round UP, not
+down.** Phase 2 Batch 1 had a systemic bug where every worker (and the
+integrator) picked the next-smaller tier on a half-step miss, shrinking icons
+by 25–33% across hundreds of sites. The recovery rule: when the original
+doesn't match an exact tier, pick the nearest tier that is **at least as
+large** as the original. So `w-3.5 h-3.5` (14px) → `sm` (12px) is **wrong**;
+the right choice is `md` (16px), or stay hand-rolled if exact pixel parity
+matters.
+
+If a sizing decision is genuinely ambiguous (legitimate `w-2.5 h-2.5` for
+chart-tooltip arrows, etc.), keep the raw Lucide element with a
+`// pr-check-disable-next-line -- justification` and document the reason.
+
 ### 6.5 Button gradient — use the primitive, not hand-rolled
 
 ```tsx
@@ -426,6 +464,48 @@ If a site has no semantic equivalent (e.g. a one-off zinc-700 used for a legend
 swatch where a colored accent would be wrong), keep the original Tailwind
 utility class — it's defined as a CSS override in `src/index.css`. Do NOT
 escape into `text-[var(--zinc-700)]`; the variable does not exist.
+
+#### Hover-state preservation — never collapse default and hover to the same token
+
+When a site has both a default text color and a `hover:text-...` brightening
+on the same element, the original was almost always two adjacent zinc shades
+(e.g. `text-zinc-300 hover:text-zinc-100`). Both shades map to the same
+semantic bucket per the table above (`--brand-text-bright`) — but if you
+migrate both to `--brand-text-bright`, the hover transition is a visual
+no-op. Preserve the contrast step:
+
+| Original | Migrated |
+|---|---|
+| `text-zinc-300 hover:text-zinc-100` | `text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]` |
+| `text-zinc-400 hover:text-zinc-200` | `text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]` |
+| `text-zinc-500 hover:text-zinc-300` | `text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]` |
+
+The general rule: the hover target should be **one tier brighter** than the
+default. If a bulk-replace tool would collapse both to the same token, the
+default needs to drop one tier (or skip the migration on that line).
+
+### 6.9 Typography utilities — `t-micro` is for ALREADY-uppercase labels only
+
+`t-micro` (`src/index.css`) applies `text-transform: uppercase`,
+`letter-spacing: 0.1em`, and a monospace font family. It exists for
+timestamps, metric IDs, section header labels (`NEW KEYWORDS`,
+`REMOVED KEYWORDS`, etc.), and similar already-uppercase short labels.
+
+**Do NOT use `t-micro` for natural-language text.** Phase 2 Batch 1 had a
+worker apply `t-micro` to AI-generated paragraphs and recommendation
+sentences, which Tailwind dutifully rendered as
+`"HOW TO FIX A LEAKY FAUCET"` in tracked monospace. The right utility for
+small natural-language text is `t-caption-sm` (11px, normal case).
+
+| Site type | Use |
+|---|---|
+| Section header label (`NEW KEYWORDS`, `RESOLVED GAPS`) — already uppercase | `t-micro` |
+| Timestamp / ID / metric label (`12.5K IMPR`, `15:22 EST`) — short, often uppercase | `t-micro` |
+| Hint paragraph, recommendation sentence, question keyword, full-sentence body copy | `t-caption-sm` |
+| Tooltip / inline explanatory text | `t-caption-sm` |
+
+When migrating from `text-[10px]` or `text-[11px]`, choose by sentence type,
+not by pixel count. `t-micro` ≈ 10px-uppercase; `t-caption-sm` = 11px-normal.
 
 ---
 
