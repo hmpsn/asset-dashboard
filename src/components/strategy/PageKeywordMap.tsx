@@ -120,7 +120,7 @@ export function PageKeywordMapPanel({
                 }`}
               >
                 {s === 'opportunity' ? 'Priority' : s.charAt(0).toUpperCase() + s.slice(1)}
-                {sortBy === s && (sortDir === 'desc' ? <Icon as={ArrowDown} size="xs" /> : <Icon as={ArrowUp} size="xs" />)}
+                {sortBy === s && (sortDir === 'desc' ? <Icon as={ArrowDown} size="sm" /> : <Icon as={ArrowUp} size="sm" />)}
               </button>
             ))}
           </div>
@@ -138,7 +138,7 @@ export function PageKeywordMapPanel({
               className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[var(--surface-3)]/20 transition-colors text-left"
             >
               <div className="flex items-center gap-2 min-w-0 flex-1">
-                <Icon as={isExpanded ? ChevronDown : ChevronRight} size="xs" className="text-[var(--brand-text-muted)] flex-shrink-0" />
+                <Icon as={isExpanded ? ChevronDown : ChevronRight} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
                 <div className="min-w-0 flex-1">
                   <span className="t-caption text-[var(--brand-text-bright)] truncate block">{page.pageTitle}</span>
                   <span className="t-mono text-[var(--brand-text-muted)]">{page.pagePath}</span>
@@ -307,7 +307,7 @@ export function PageKeywordMapPanel({
                         onClick={() => onSetEditingPage(null)}
                         className="flex items-center gap-1 px-2.5 py-1 rounded bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)] t-caption-sm font-medium"
                       >
-                        <Icon as={X} size="xs" /> Cancel
+                        <Icon as={X} size="sm" /> Cancel
                       </button>
                     </div>
                   </div>

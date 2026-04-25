@@ -330,7 +330,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[var(--surface-3)]/20 transition-colors text-left"
         >
           <div className="flex items-center gap-2">
-            <Icon as={Briefcase} size="sm" className="text-teal-400" />
+            <Icon as={Briefcase} size="md" className="text-teal-400" />
             <span className="t-caption font-semibold text-[var(--brand-text-bright)]">Strategy Settings</span>
             {!settingsOpen && (
               <span className="t-caption-sm text-[var(--brand-text-muted)]">
@@ -341,7 +341,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
               </span>
             )}
           </div>
-          <Icon as={settingsOpen ? ChevronDown : ChevronRight} size="xs" className="text-[var(--brand-text-muted)]" />
+          <Icon as={settingsOpen ? ChevronDown : ChevronRight} size="md" className="text-[var(--brand-text-muted)]" />
         </button>
         {settingsOpen && (
           <div className="px-4 pb-4 space-y-6">
@@ -349,7 +349,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             {providerList.filter(p => p.configured).length > 1 && (
               <div>
                 <div className="flex items-center gap-1.5 mb-2">
-                  <Icon as={BarChart3} size="sm" className="text-teal-400" />
+                  <Icon as={BarChart3} size="md" className="text-teal-400" />
                   <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">SEO Data Provider</span>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -385,7 +385,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             {semrushAvailable && (
               <div>
                 <div className="flex items-center gap-1.5 mb-2">
-                  <Icon as={BarChart3} size="sm" className="text-orange-400" />
+                  <Icon as={BarChart3} size="md" className="text-orange-400" />
                   <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">SEMRush Data Mode</span>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
@@ -421,7 +421,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-1.5">
-                    <Icon as={Users} size="sm" className="text-orange-400" />
+                    <Icon as={Users} size="md" className="text-orange-400" />
                     <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">Competitor Domains</span>
                   </div>
                   <button
@@ -458,7 +458,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             {/* Page Limit */}
             <div>
               <div className="flex items-center gap-1.5 mb-2">
-                <Icon as={FileText} size="sm" className="text-teal-400" />
+                <Icon as={FileText} size="md" className="text-teal-400" />
                 <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">Page Limit</span>
               </div>
               <div className="grid grid-cols-4 gap-3">
@@ -495,9 +495,9 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                 onClick={() => setContextOpen(!contextOpen)}
                 className="flex items-center gap-1.5 mb-1"
               >
-                <Icon as={Briefcase} size="sm" className="text-teal-400" />
+                <Icon as={Briefcase} size="md" className="text-teal-400" />
                 <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">Business Context</span>
-                <Icon as={contextOpen ? ChevronDown : ChevronRight} size="xs" className="text-[var(--brand-text-muted)]" />
+                <Icon as={contextOpen ? ChevronDown : ChevronRight} size="sm" className="text-[var(--brand-text-muted)]" />
               </button>
               {contextOpen && (
                 <div className="space-y-1.5">
@@ -667,7 +667,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           {/* ── Site Keywords ── */}
           <SectionCard
             title="Site Target Keywords"
-            titleIcon={<Icon as={Target} size="sm" className="text-teal-400" />}
+            titleIcon={<Icon as={Target} size="md" className="text-teal-400" />}
           >
             <div className="flex flex-wrap gap-1.5">
               {strategy.siteKeywords.map((kw: string, i: number) => {

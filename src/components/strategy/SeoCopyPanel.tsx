@@ -49,7 +49,7 @@ export function SeoCopyPanel({
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 hover:bg-teal-600/30 disabled:opacity-50 text-teal-300 t-caption-sm font-medium transition-colors"
         >
           {generatingCopy === page.pagePath ? (
-            <><Icon as={Loader2} size="xs" className="animate-spin" /> Generating SEO Copy...</>
+            <><Icon as={Loader2} size="sm" className="animate-spin" /> Generating SEO Copy...</>
           ) : (
             <><Icon as={Wand2} size="sm" className="text-teal-300" /> Generate SEO Copy</>
           )}
@@ -65,7 +65,7 @@ export function SeoCopyPanel({
               disabled={generatingCopy === page.pagePath}
               className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-400 transition-colors"
             >
-              {generatingCopy === page.pagePath ? <Icon as={Loader2} size="xs" className="animate-spin" /> : <Icon as={RefreshCw} size="xs" />} Regenerate
+              {generatingCopy === page.pagePath ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={RefreshCw} size="sm" />} Regenerate
             </button>
           </div>
           {(() => {
@@ -77,7 +77,7 @@ export function SeoCopyPanel({
                   <div className="flex items-center justify-between mb-1">
                     <span className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">SEO Title</span>
                     <button onClick={(e) => { e.stopPropagation(); onCopyText(copy.seoTitle, 'seoTitle'); }} className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-400">
-                      {copiedField === 'seoTitle' ? <Icon as={Check} size="xs" className="text-emerald-400" /> : <Icon as={Copy} size="xs" />}
+                      {copiedField === 'seoTitle' ? <Icon as={Check} size="sm" className="text-emerald-400" /> : <Icon as={Copy} size="sm" />}
                       {copiedField === 'seoTitle' ? 'Copied!' : 'Copy'}
                     </button>
                   </div>
@@ -89,7 +89,7 @@ export function SeoCopyPanel({
                   <div className="flex items-center justify-between mb-1">
                     <span className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Meta Description</span>
                     <button onClick={(e) => { e.stopPropagation(); onCopyText(copy.metaDescription, 'metaDesc'); }} className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-400">
-                      {copiedField === 'metaDesc' ? <Icon as={Check} size="xs" className="text-emerald-400" /> : <Icon as={Copy} size="xs" />}
+                      {copiedField === 'metaDesc' ? <Icon as={Check} size="sm" className="text-emerald-400" /> : <Icon as={Copy} size="sm" />}
                       {copiedField === 'metaDesc' ? 'Copied!' : 'Copy'}
                     </button>
                   </div>
@@ -101,7 +101,7 @@ export function SeoCopyPanel({
                   <div className="flex items-center justify-between mb-1">
                     <span className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Suggested H1</span>
                     <button onClick={(e) => { e.stopPropagation(); onCopyText(copy.h1, 'h1'); }} className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-400">
-                      {copiedField === 'h1' ? <Icon as={Check} size="xs" className="text-emerald-400" /> : <Icon as={Copy} size="xs" />}
+                      {copiedField === 'h1' ? <Icon as={Check} size="sm" className="text-emerald-400" /> : <Icon as={Copy} size="sm" />}
                       {copiedField === 'h1' ? 'Copied!' : 'Copy'}
                     </button>
                   </div>
@@ -112,7 +112,7 @@ export function SeoCopyPanel({
                   <div className="flex items-center justify-between mb-1">
                     <span className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Intro Paragraph</span>
                     <button onClick={(e) => { e.stopPropagation(); onCopyText(copy.introParagraph, 'intro'); }} className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-400">
-                      {copiedField === 'intro' ? <Icon as={Check} size="xs" className="text-emerald-400" /> : <Icon as={Copy} size="xs" />}
+                      {copiedField === 'intro' ? <Icon as={Check} size="sm" className="text-emerald-400" /> : <Icon as={Copy} size="sm" />}
                       {copiedField === 'intro' ? 'Copied!' : 'Copy'}
                     </button>
                   </div>
@@ -122,7 +122,7 @@ export function SeoCopyPanel({
                 {copy.internalLinkSuggestions && copy.internalLinkSuggestions.length > 0 && (
                   <div className="bg-[var(--surface-3)]/60 rounded-[var(--radius-lg)] p-2.5">
                     <span className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider flex items-center gap-1 mb-1.5">
-                      <Icon as={Link} size="xs" /> Internal Link Suggestions
+                      <Icon as={Link} size="sm" /> Internal Link Suggestions
                     </span>
                     <div className="space-y-1">
                       {copy.internalLinkSuggestions.map((link, li) => (
@@ -139,7 +139,7 @@ export function SeoCopyPanel({
                 {copy.changes && copy.changes.length > 0 && (
                   <div className="bg-[var(--surface-3)]/40 rounded-[var(--radius-lg)] p-2.5">
                     <span className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider flex items-center gap-1 mb-1.5">
-                      <Icon as={MessageSquare} size="xs" /> Why These Changes
+                      <Icon as={MessageSquare} size="sm" /> Why These Changes
                     </span>
                     <ul className="space-y-0.5">
                       {copy.changes.map((c, ci) => (

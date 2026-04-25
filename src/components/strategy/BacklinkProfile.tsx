@@ -69,7 +69,7 @@ export function BacklinkProfile({ workspaceId }: Props) {
       return (
         <SectionCard noPadding>
           <div className="px-4 py-4 flex items-center gap-2 text-[var(--brand-text-muted)] t-caption">
-            <Icon as={AlertTriangle} size="sm" className="text-amber-400" />
+            <Icon as={AlertTriangle} size="md" className="text-amber-400" />
             <span>Backlink data requires an SEO provider. Set <code className="text-[var(--brand-text)]">SEMRUSH_API_KEY</code> or <code className="text-[var(--brand-text)]">DATAFORSEO_LOGIN</code> in environment to enable.</span>
           </div>
         </SectionCard>
@@ -78,7 +78,7 @@ export function BacklinkProfile({ workspaceId }: Props) {
     return (
       <SectionCard noPadding>
         <div className="px-4 py-4 flex items-center gap-2 text-red-400 t-caption">
-          <Icon as={AlertTriangle} size="sm" className="text-red-400" /> {error}
+          <Icon as={AlertTriangle} size="md" className="text-red-400" /> {error}
         </div>
       </SectionCard>
     );
@@ -139,7 +139,7 @@ export function BacklinkProfile({ workspaceId }: Props) {
                           className="text-teal-400 hover:text-teal-300 transition-colors flex items-center gap-1"
                         >
                           {rd.domain}
-                          <Icon as={ExternalLink} size="xs" className="opacity-50" />
+                          <Icon as={ExternalLink} size="sm" className="opacity-50" />
                         </a>
                       </td>
                       <td className="py-2 text-[var(--brand-text-bright)] text-right font-medium">{fmtNum(rd.backlinksCount)}</td>

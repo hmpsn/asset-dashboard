@@ -38,13 +38,13 @@ export function StrategyDiff({ workspaceId }: StrategyDiffProps) {
         className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors"
       >
         <div className="flex items-center gap-2">
-          <Icon as={RefreshCw} size="sm" className="text-amber-400" />
+          <Icon as={RefreshCw} size="md" className="text-amber-400" />
           <span className="t-ui font-semibold text-amber-300">What Changed</span>
           <span className="t-caption-sm text-[var(--brand-text-muted)]">
             {totalChanges} change{totalChanges !== 1 ? 's' : ''} since {new Date(diff.previousGeneratedAt).toLocaleDateString()}
           </span>
         </div>
-        <Icon as={ChevronDown} size="sm" className={`text-[var(--brand-text-muted)] transition-transform ${expanded ? '' : '-rotate-90'}`} />
+        <Icon as={ChevronDown} size="md" className={`text-[var(--brand-text-muted)] transition-transform ${expanded ? '' : '-rotate-90'}`} />
       </button>
 
       {expanded && (
@@ -56,7 +56,7 @@ export function StrategyDiff({ workspaceId }: StrategyDiffProps) {
               <div className="flex flex-wrap gap-1">
                 {diff.newKeywords.map(kw => (
                   <span key={kw} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 t-caption-sm text-emerald-400">
-                    <Icon as={Plus} size="xs" />{kw}
+                    <Icon as={Plus} size="sm" />{kw}
                   </span>
                 ))}
               </div>
@@ -70,7 +70,7 @@ export function StrategyDiff({ workspaceId }: StrategyDiffProps) {
               <div className="flex flex-wrap gap-1">
                 {diff.lostKeywords.map(kw => (
                   <span key={kw} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-red-500/10 border border-red-500/20 t-caption-sm text-red-400">
-                    <Icon as={Minus} size="xs" />{kw}
+                    <Icon as={Minus} size="sm" />{kw}
                   </span>
                 ))}
               </div>
@@ -84,7 +84,7 @@ export function StrategyDiff({ workspaceId }: StrategyDiffProps) {
               <div className="flex flex-wrap gap-1">
                 {diff.newGaps.map(kw => (
                   <span key={kw} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 t-caption-sm text-emerald-400">
-                    <Icon as={Plus} size="xs" />{kw}
+                    <Icon as={Plus} size="sm" />{kw}
                   </span>
                 ))}
               </div>

@@ -38,7 +38,7 @@ export function CannibalizationAlert({ items }: CannibalizationAlertProps) {
   return (
     <div className="bg-[var(--surface-2)] border border-red-500/20 p-5 rounded-[var(--radius-signature)]">
       <h4 className="t-caption-sm font-semibold text-red-300 mb-1 flex items-center gap-1.5">
-        <Icon as={Copy} size="sm" className="text-red-300" /> Keyword Cannibalization
+        <Icon as={Copy} size="md" className="text-red-300" /> Keyword Cannibalization
         {highCount > 0 && (
           <span className="ml-1 px-1.5 py-0.5 rounded-full bg-red-500/20 t-caption-sm text-red-400 font-medium">{highCount} critical</span>
         )}

@@ -95,7 +95,7 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
                     if (impact < 10) return null;
                     return (
                       <span className="t-caption-sm text-blue-400/70 flex items-center gap-0.5">
-                        <Icon as={TrendingUp} size="xs" className="text-blue-400/70" />
+                        <Icon as={TrendingUp} size="sm" className="text-blue-400/70" />
                         ~{fmtNum(impact)}/mo est. clicks at rank #3
                       </span>
                     );

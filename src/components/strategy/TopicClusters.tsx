@@ -31,7 +31,7 @@ export function TopicClusters({ clusters }: TopicClustersProps) {
   return (
     <div className="bg-[var(--surface-2)] border border-teal-500/20 p-5 rounded-[var(--radius-signature)]">
       <h4 className="t-caption-sm font-semibold text-teal-300 mb-1 flex items-center gap-1.5">
-        <Icon as={Layers} size="sm" className="text-teal-300" /> Topical Authority
+        <Icon as={Layers} size="md" className="text-teal-300" /> Topical Authority
       </h4>
       <p className="t-caption-sm text-[var(--brand-text-muted)] mb-3">Topic clusters ranked by coverage gap — lowest coverage = biggest opportunity.</p>
       <div className="space-y-2">

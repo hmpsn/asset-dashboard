@@ -19,7 +19,7 @@ export function QuickWins({ quickWins }: QuickWinsProps) {
   return (
     <div className="bg-[var(--surface-2)] border border-emerald-500/20 p-5 rounded-[var(--radius-signature)]">
       <h4 className="t-caption-sm font-semibold text-emerald-300 mb-1 flex items-center gap-1.5">
-        <Icon as={TrendingUp} size="sm" className="text-emerald-300" /> Quick Wins
+        <Icon as={TrendingUp} size="md" className="text-emerald-300" /> Quick Wins
       </h4>
       <p className="t-caption-sm text-[var(--brand-text-muted)] mb-3">High-impact changes that can be implemented immediately.</p>
       <div className="space-y-2">

@@ -41,7 +41,7 @@ export function IntelligenceSignals({ workspaceId }: Props) {
     return (
       <SectionCard
         title="Intelligence Signals"
-        titleIcon={<Icon as={TrendingUp} size="sm" className="text-teal-400" />}
+        titleIcon={<Icon as={TrendingUp} size="md" className="text-teal-400" />}
       >
         <div className="animate-pulse space-y-3">
           {[1, 2, 3].map(i => (
@@ -56,7 +56,7 @@ export function IntelligenceSignals({ workspaceId }: Props) {
     return (
       <SectionCard
         title="Intelligence Signals"
-        titleIcon={<Icon as={TrendingUp} size="sm" className="text-teal-400" />}
+        titleIcon={<Icon as={TrendingUp} size="md" className="text-teal-400" />}
       >
         <EmptyState
           icon={TrendingUp}
@@ -70,7 +70,7 @@ export function IntelligenceSignals({ workspaceId }: Props) {
   return (
     <SectionCard
       title="Intelligence Signals"
-      titleIcon={<Icon as={TrendingUp} size="sm" className="text-teal-400" />}
+      titleIcon={<Icon as={TrendingUp} size="md" className="text-teal-400" />}
       titleExtra={<Badge label={`${signals.length}`} color="teal" />}
     >
       <div className="space-y-2">

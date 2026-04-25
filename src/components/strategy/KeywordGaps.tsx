@@ -20,7 +20,7 @@ export function KeywordGaps({ keywordGaps, difficultyColor }: KeywordGapsProps) 
   return (
     <div className="bg-[var(--surface-2)] border border-orange-500/20 p-5 rounded-[var(--radius-signature)]">
       <h4 className="t-caption-sm font-semibold text-orange-300 mb-2 flex items-center gap-1.5">
-        <Icon as={Users} size="sm" className="text-orange-300" /> Competitor Keyword Gaps
+        <Icon as={Users} size="md" className="text-orange-300" /> Competitor Keyword Gaps
       </h4>
       <p className="t-caption-sm text-[var(--brand-text-muted)] mb-2">Keywords your competitors rank for that you don't — high-priority opportunities.</p>
       <div className="space-y-1">

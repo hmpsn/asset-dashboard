@@ -27,7 +27,7 @@ export function LowHangingFruit({ pages, positionColor }: LowHangingFruitProps) 
   return (
     <div className="bg-[var(--surface-2)] border border-amber-500/20 p-5 rounded-[var(--radius-signature)]">
       <h4 className="t-caption-sm font-semibold text-amber-300 mb-1 flex items-center gap-1.5">
-        <Icon as={Zap} size="sm" className="text-amber-300" /> Low-Hanging Fruit
+        <Icon as={Zap} size="md" className="text-amber-300" /> Low-Hanging Fruit
       </h4>
       <p className="t-caption-sm text-[var(--brand-text-muted)] mb-3">Pages ranking #4–20 with significant impressions — small improvements here drive major traffic gains.</p>
       <div className="space-y-1.5">
