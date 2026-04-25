@@ -1,4 +1,5 @@
 import { X } from 'lucide-react';
+import { Icon } from './ui';
 
 export interface ChartMetric {
   label: string;
@@ -23,11 +24,11 @@ export function ChartPointDetail({ date, metrics, onClose, xPct }: Props) {
       className="absolute z-30 top-0 mt-1 pointer-events-auto"
       style={{ left: alignRight ? undefined : `${xPct}%`, right: alignRight ? `${100 - xPct}%` : undefined }}
     >
-      <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl shadow-black/40 min-w-[160px] overflow-hidden">
-        <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800">
-          <span className="text-[11px] font-semibold text-zinc-200">{date}</span>
-          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 -mr-1" aria-label="Close">
-            <X className="w-3 h-3" />
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border-hover)] rounded-[var(--radius-sm)] shadow-xl shadow-black/40 min-w-[160px] overflow-hidden">
+        <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--brand-border)]">
+          <span className="t-caption-sm font-semibold text-[var(--brand-text-bright)]">{date}</span>
+          <button onClick={onClose} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] -mr-1" aria-label="Close">
+            <Icon as={X} size="sm" />
           </button>
         </div>
         <div className="px-3 py-2 space-y-1.5">
@@ -35,9 +36,9 @@ export function ChartPointDetail({ date, metrics, onClose, xPct }: Props) {
             <div key={i} className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-1.5">
                 {m.color && <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: m.color }} />}
-                <span className="text-[11px] text-zinc-500">{m.label}</span>
+                <span className="t-caption-sm text-[var(--brand-text-muted)]">{m.label}</span>
               </div>
-              <span className="text-[11px] font-medium text-zinc-200">{typeof m.value === 'number' ? m.value.toLocaleString() : m.value}</span>
+              <span className="t-caption-sm font-medium text-[var(--brand-text-bright)]">{typeof m.value === 'number' ? m.value.toLocaleString() : m.value}</span>
             </div>
           ))}
         </div>
