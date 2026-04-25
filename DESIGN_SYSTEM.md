@@ -614,7 +614,7 @@ Fixed size: `px-2.5 py-1 text-[11px]`. All use tinted border + bg pattern (`bord
 
 ### SegmentedControl
 
-WAI-ARIA `radiogroup` with roving tabIndex (selected button = `tabIndex={0}`, others = `tabIndex={-1}`). Arrow-key navigation moves both selection and DOM focus. Supports `disabled` options (skipped during keyboard nav).
+WAI-ARIA `radiogroup` with roving tabIndex (selected button = `tabIndex={0}`, others = `tabIndex={-1}`). Arrow-key navigation (Left/Right plus Home/End) moves both selection and DOM focus. Supports `disabled` options (skipped during keyboard nav). When the current `value` does not match any option, the first non-disabled option becomes the fallback tab stop so the widget remains keyboard-reachable.
 
 | State | Classes |
 |-------|---------|
@@ -623,6 +623,70 @@ WAI-ARIA `radiogroup` with roving tabIndex (selected button = `tabIndex={0}`, ot
 | Container | `bg-zinc-900 border border-zinc-800 rounded-md p-0.5` |
 
 Sizes: `sm` (`px-2 py-1 text-[11px]`) / `md` (`px-3 py-1.5 text-xs`, default).
+
+---
+
+## § 19 Layout Primitives (Phase 5 — 2026-04-24)
+
+Five structural layout primitives live in `src/components/ui/layout/`. Import from the barrel: `import { Row, Stack, Column, Grid, Divider } from '@/components/ui/layout'`. All are `React.forwardRef` components that accept an optional `className` prop for composition.
+
+### API Reference
+
+#### `<Row>`
+
+Horizontal flex container (`flex flex-row`).
+
+| Prop | Type | Default | Notes |
+|------|------|---------|-------|
+| `gap` | `GapSize` | — | `xs`=gap-1, `sm`=gap-2, `md`=gap-3, `lg`=gap-4, `xl`=gap-6 |
+| `align` | `'start' \| 'center' \| 'end' \| 'baseline'` | `'center'` | `items-*` |
+| `justify` | `'start' \| 'center' \| 'end' \| 'between' \| 'around'` | — | `justify-*` |
+| `wrap` | `boolean` | — | `true`→`flex-wrap`, `false`→`flex-nowrap`, omit→no class |
+| `className` | `string` | — | Merged at end |
+
+#### `<Stack>`
+
+Vertical flex container (`flex flex-col`) with optional horizontal mode.
+
+| Prop | Type | Default | Notes |
+|------|------|---------|-------|
+| `gap` | `GapSize` | — | Same scale as Row |
+| `align` | `'start' \| 'center' \| 'end' \| 'stretch'` | — | `items-*` |
+| `dir` | `'col' \| 'row'` | `'col'` | Override to `flex-row` when needed |
+| `className` | `string` | — | Merged at end |
+
+#### `<Column>`
+
+Strict vertical flex container. Never produces `flex-row`. Use when intent must be unambiguously vertical.
+
+| Prop | Type | Default | Notes |
+|------|------|---------|-------|
+| `gap` | `GapSize` | — | Same scale as Row |
+| `align` | `'start' \| 'center' \| 'end' \| 'stretch'` | — | `items-*` |
+| `className` | `string` | — | Merged at end |
+
+#### `<Grid>`
+
+Responsive CSS grid with static Tailwind class maps (Tailwind-scanner-safe).
+
+| Prop | Type | Default | Notes |
+|------|------|---------|-------|
+| `cols` | `{ sm?: number; md?: number; lg?: number; xl?: number }` | required | Values 1–12. First defined breakpoint also applied as unscoped base class. |
+| `gap` | `GapSize` | — | Same scale as Row |
+| `className` | `string` | — | Merged at end |
+
+**Important:** Grid uses `Record<number, string>` maps (not template literals) for each breakpoint so Tailwind's v4 static scanner can detect all `grid-cols-*` class strings. Adding a custom column count outside 1–12 requires adding it to each map in `Grid.tsx`.
+
+#### `<Divider>`
+
+Thin decorative rule using `var(--brand-border)`.
+
+| Prop | Type | Default | Notes |
+|------|------|---------|-------|
+| `orientation` | `'horizontal' \| 'vertical'` | `'horizontal'` | `horizontal`→`border-b w-full`, `vertical`→`border-r h-full` |
+| `className` | `string` | — | Merged at end |
+
+Renders a `<div role="separator" aria-orientation="...">`.
 
 ---
 
