@@ -902,6 +902,7 @@
         </div>
       </div>
       <div class="usage-strip" style="margin-top:20px;">
+      <div class="usage-strip" style="margin-top:16px;">
         <div style="display:flex; gap:16px;">
           <div style="flex:1;">
             <b>Don't</b>
@@ -915,6 +916,157 @@
       </div>
     </div>
     <!-- Phase5:Icon END -->
+
+    <!-- Phase5:Forms START -->
+    <div class="sub-section" id="sec-form-validation-states">
+      <div class="col-label">Form validation states</div>
+
+      <!-- Row: default + required + error + hint -->
+      <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px; margin-bottom:20px;">
+
+        <!-- 1. Default state -->
+        <div>
+          <div class="t-label" style="margin-bottom:6px; color:var(--brand-text-dim)">Default</div>
+          <div style="margin-bottom:4px;">
+            <label class="t-ui" style="display:block; margin-bottom:4px; color:var(--brand-text);">Email address</label>
+            <input type="text" placeholder="you@example.com" style="width:100%; padding:8px 12px; background:var(--surface-1,#18181b); border:1px solid #3f3f46; border-radius:6px; color:#e4e4e7; font-size:13px; outline:none;" />
+          </div>
+          <code class="t-mono" style="font-size:10px; color:var(--brand-text-dim);">&lt;FormField label="Email"&gt;&lt;FormInput /&gt;&lt;/FormField&gt;</code>
+        </div>
+
+        <!-- 2. Required -->
+        <div>
+          <div class="t-label" style="margin-bottom:6px; color:var(--brand-text-dim)">Required</div>
+          <div style="margin-bottom:4px;">
+            <label class="t-ui" style="display:block; margin-bottom:4px; color:var(--brand-text);">
+              Full name <span style="color:#f87171; margin-left:2px;" aria-hidden="true">*</span>
+            </label>
+            <input type="text" placeholder="Jane Smith" style="width:100%; padding:8px 12px; background:var(--surface-1,#18181b); border:1px solid #3f3f46; border-radius:6px; color:#e4e4e7; font-size:13px; outline:none;" />
+          </div>
+          <code class="t-mono" style="font-size:10px; color:var(--brand-text-dim);">&lt;FormField label="Full name" required&gt;…&lt;/FormField&gt;</code>
+        </div>
+
+        <!-- 3. Error state -->
+        <div>
+          <div class="t-label" style="margin-bottom:6px; color:var(--brand-text-dim)">Error</div>
+          <div style="margin-bottom:4px;">
+            <label class="t-ui" style="display:block; margin-bottom:4px; color:var(--brand-text);">Email address</label>
+            <input type="text" value="not-an-email" aria-invalid="true" style="width:100%; padding:8px 12px; background:var(--surface-1,#18181b); border:1px solid rgba(239,68,68,0.5); border-radius:6px; color:#e4e4e7; font-size:13px; outline:none;" />
+            <p role="alert" style="margin-top:6px; font-size:11px; color:#f87171;">Please enter a valid email address.</p>
+          </div>
+          <code class="t-mono" style="font-size:10px; color:var(--brand-text-dim);">&lt;FormField error="…"&gt;…&lt;/FormField&gt;</code>
+        </div>
+
+        <!-- 4. Hint -->
+        <div>
+          <div class="t-label" style="margin-bottom:6px; color:var(--brand-text-dim)">Hint</div>
+          <div style="margin-bottom:4px;">
+            <label class="t-ui" style="display:block; margin-bottom:4px; color:var(--brand-text);">Username</label>
+            <input type="text" placeholder="jane_smith" style="width:100%; padding:8px 12px; background:var(--surface-1,#18181b); border:1px solid #3f3f46; border-radius:6px; color:#e4e4e7; font-size:13px; outline:none;" />
+            <p style="margin-top:6px; font-size:11px; color:#71717a;">Letters, numbers, and underscores only.</p>
+          </div>
+          <code class="t-mono" style="font-size:10px; color:var(--brand-text-dim);">&lt;FormField hint="…"&gt;…&lt;/FormField&gt;</code>
+        </div>
+      </div>
+
+      <!-- Row: Textarea with counter + FormSelect -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
+
+        <!-- 5. Textarea with maxLength counter -->
+        <div>
+          <div class="t-label" style="margin-bottom:6px; color:var(--brand-text-dim)">FormTextarea — maxLength counter</div>
+          <label class="t-ui" style="display:block; margin-bottom:4px; color:var(--brand-text);">Bio</label>
+          <div style="position:relative;">
+            <textarea rows="4" maxlength="200" style="width:100%; padding:8px 12px; padding-bottom:24px; background:var(--surface-1,#18181b); border:1px solid #3f3f46; border-radius:6px; color:#e4e4e7; font-size:13px; outline:none; resize:none; box-sizing:border-box;">A short description about yourself.</textarea>
+            <span style="position:absolute; bottom:8px; right:12px; font-size:11px; color:#71717a;" aria-live="polite">36/200</span>
+          </div>
+          <code class="t-mono" style="font-size:10px; color:var(--brand-text-dim);">&lt;FormTextarea maxLength={200} /&gt;</code>
+        </div>
+
+        <!-- 6. FormSelect -->
+        <div>
+          <div class="t-label" style="margin-bottom:6px; color:var(--brand-text-dim)">FormSelect — 3 options</div>
+          <label class="t-ui" style="display:block; margin-bottom:4px; color:var(--brand-text);">Report period</label>
+          <select style="width:100%; padding:8px 12px; background:var(--surface-1,#18181b); border:1px solid #3f3f46; border-radius:6px; color:#e4e4e7; font-size:13px; outline:none;">
+            <option value="7">Last 7 days</option>
+            <option value="30" selected>Last 30 days</option>
+            <option value="90">Last 90 days</option>
+          </select>
+          <code class="t-mono" style="font-size:10px; color:var(--brand-text-dim);">&lt;FormSelect options={[…]} value="30" onChange={…} /&gt;</code>
+        </div>
+      </div>
+
+      <!-- Row: Checkbox + Toggle -->
+      <div style="margin-bottom:20px;">
+        <div class="t-label" style="margin-bottom:10px; color:var(--brand-text-dim)">Checkbox — checked + unchecked</div>
+        <div style="display:flex; gap:24px; flex-wrap:wrap;">
+          <!-- checked -->
+          <label style="display:inline-flex; align-items:center; gap:10px; cursor:pointer; user-select:none;">
+            <input type="checkbox" checked class="sr-only" />
+            <span style="width:16px; height:16px; border-radius:4px; background:var(--brand-mint,#2dd4bf); border:1px solid var(--brand-mint,#2dd4bf); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="#18181b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg>
+            </span>
+            <span class="t-ui" style="color:var(--brand-text);">Checked</span>
+          </label>
+          <!-- unchecked -->
+          <label style="display:inline-flex; align-items:center; gap:10px; cursor:pointer; user-select:none;">
+            <input type="checkbox" class="sr-only" />
+            <span style="width:16px; height:16px; border-radius:4px; background:#27272a; border:1px solid #3f3f46; display:flex; align-items:center; justify-content:center; flex-shrink:0;"></span>
+            <span class="t-ui" style="color:var(--brand-text);">Unchecked</span>
+          </label>
+        </div>
+        <code class="t-mono" style="font-size:10px; color:var(--brand-text-dim); display:block; margin-top:8px;">&lt;Checkbox checked onChange={…} label="Checked" /&gt;</code>
+      </div>
+
+      <div style="margin-bottom:24px;">
+        <div class="t-label" style="margin-bottom:10px; color:var(--brand-text-dim)">Toggle — on + off</div>
+        <div style="display:flex; gap:24px; flex-wrap:wrap;">
+          <!-- on -->
+          <label style="display:inline-flex; align-items:center; gap:12px; cursor:pointer; user-select:none;">
+            <input type="checkbox" role="switch" checked class="sr-only" />
+            <span style="position:relative; display:inline-flex; align-items:center; width:36px; height:20px; border-radius:9999px; background:var(--brand-mint,#2dd4bf); flex-shrink:0;">
+              <span style="position:absolute; top:2px; left:18px; width:16px; height:16px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.3);"></span>
+            </span>
+            <span class="t-ui" style="color:var(--brand-text);">On</span>
+          </label>
+          <!-- off -->
+          <label style="display:inline-flex; align-items:center; gap:12px; cursor:pointer; user-select:none;">
+            <input type="checkbox" role="switch" class="sr-only" />
+            <span style="position:relative; display:inline-flex; align-items:center; width:36px; height:20px; border-radius:9999px; background:#3f3f46; flex-shrink:0;">
+              <span style="position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.3);"></span>
+            </span>
+            <span class="t-ui" style="color:var(--brand-text);">Off</span>
+          </label>
+        </div>
+        <code class="t-mono" style="font-size:10px; color:var(--brand-text-dim); display:block; margin-top:8px;">&lt;Toggle checked onChange={…} label="On" /&gt;</code>
+      </div>
+
+      <!-- Do / Don't pairs -->
+      <div class="t-label" style="margin-bottom:10px; color:var(--brand-text-dim)">Do / Don't</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+
+        <!-- Pair 1: FormInput -->
+        <div>
+          <b style="color:#f87171;">Don't</b>
+          <div class="t-mono" style="margin-top:4px; padding:8px; background:rgba(239,68,68,0.08); border-radius:4px; color:var(--brand-text); font-size:11px;">&lt;input type="text" className="bg-zinc-900 border border-zinc-700 ..." /&gt;</div>
+        </div>
+        <div>
+          <b style="color:#34d399;">Do</b>
+          <div class="t-mono" style="margin-top:4px; padding:8px; background:rgba(52,211,153,0.08); border-radius:4px; color:var(--brand-text); font-size:11px;">&lt;FormInput value={val} onChange={setVal} /&gt;</div>
+        </div>
+
+        <!-- Pair 2: Checkbox -->
+        <div>
+          <b style="color:#f87171;">Don't</b>
+          <div class="t-mono" style="margin-top:4px; padding:8px; background:rgba(239,68,68,0.08); border-radius:4px; color:var(--brand-text); font-size:11px;">&lt;input type="checkbox" /&gt; &lt;label&gt;Accept&lt;/label&gt;</div>
+        </div>
+        <div>
+          <b style="color:#34d399;">Do</b>
+          <div class="t-mono" style="margin-top:4px; padding:8px; background:rgba(52,211,153,0.08); border-radius:4px; color:var(--brand-text); font-size:11px;">&lt;Checkbox checked={val} onChange={setVal} label="Accept" /&gt;</div>
+        </div>
+      </div>
+    </div>
+    <!-- Phase5:Forms END -->
     <!-- Phase5:Layout START -->
     <div class="col-label">Layout primitives · Phase 5 React wrappers</div>
     <p style="color:var(--fg-muted);font-size:13px;margin:0 0 20px;">
@@ -922,7 +1074,6 @@
       <strong>Row</strong>, <strong>Stack</strong>, <strong>Column</strong>, <strong>Grid</strong>, <strong>Divider</strong>.
       Gap values are strict enums (xs/sm/md/lg/xl) — no arbitrary Tailwind gap classes.
     </p>
-
     <!-- Row specimens -->
     <div style="margin-bottom:28px;">
       <div class="col-label" style="font-size:11px;margin-bottom:10px;">Row · gap · justify · wrap</div>
@@ -933,14 +1084,12 @@
           <div style="width:60px;height:40px;background:var(--teal-soft,rgba(45,212,191,.15));border-radius:6px;"></div>
           <div style="width:50px;height:40px;background:var(--teal-soft,rgba(45,212,191,.15));border-radius:6px;"></div>
           <span class="t-mono" style="margin-left:auto;font-size:11px;color:var(--fg-muted);">&lt;Row gap="sm"&gt; → gap-2</span>
-        </div>
         <!-- gap="md" justify="between" -->
         <div style="display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:12px;background:var(--surface-2);padding:12px 16px;border-radius:8px;">
           <div style="width:40px;height:40px;background:var(--blue);border-radius:6px;opacity:.7;"></div>
           <div style="width:40px;height:40px;background:var(--blue);border-radius:6px;opacity:.7;"></div>
           <div style="width:40px;height:40px;background:var(--blue);border-radius:6px;opacity:.7;"></div>
           <span class="t-mono" style="font-size:11px;color:var(--fg-muted);">&lt;Row gap="md" justify="between"&gt;</span>
-        </div>
         <!-- wrap=true -->
         <div style="display:flex;flex-direction:row;align-items:center;flex-wrap:wrap;gap:8px;background:var(--surface-2);padding:12px 16px;border-radius:8px;">
           <div style="width:60px;height:28px;background:rgba(45,212,191,.2);border-radius:4px;"></div>
@@ -949,10 +1098,6 @@
           <div style="width:90px;height:28px;background:rgba(45,212,191,.2);border-radius:4px;"></div>
           <div style="width:40px;height:28px;background:rgba(45,212,191,.2);border-radius:4px;"></div>
           <span class="t-mono" style="font-size:11px;color:var(--fg-muted);">&lt;Row gap="sm" wrap&gt;</span>
-        </div>
-      </div>
-    </div>
-
     <!-- Stack specimens -->
     <div style="margin-bottom:28px;">
       <div class="col-label" style="font-size:11px;margin-bottom:10px;">Stack · vertical (default) vs horizontal</div>
@@ -963,17 +1108,12 @@
           <div style="height:28px;background:rgba(96,165,250,.25);border-radius:4px;"></div>
           <div style="height:28px;background:rgba(96,165,250,.25);border-radius:4px;"></div>
           <span class="t-mono" style="font-size:11px;color:var(--fg-muted);margin-top:4px;">&lt;Stack gap="sm"&gt;</span>
-        </div>
         <!-- horizontal (dir="row") -->
         <div style="display:flex;flex-direction:row;align-items:center;gap:8px;background:var(--surface-2);padding:16px;border-radius:8px;">
           <div style="width:40px;height:40px;background:rgba(96,165,250,.25);border-radius:4px;"></div>
           <div style="width:40px;height:40px;background:rgba(96,165,250,.25);border-radius:4px;"></div>
           <div style="width:40px;height:40px;background:rgba(96,165,250,.25);border-radius:4px;"></div>
           <span class="t-mono" style="font-size:11px;color:var(--fg-muted);">&lt;Stack dir="row" gap="sm"&gt;</span>
-        </div>
-      </div>
-    </div>
-
     <!-- Grid specimens -->
     <div style="margin-bottom:28px;">
       <div class="col-label" style="font-size:11px;margin-bottom:10px;">Grid · responsive 3 columns</div>
@@ -984,10 +1124,7 @@
         <div style="height:48px;background:rgba(52,211,153,.12);border-radius:6px;"></div>
         <div style="height:48px;background:rgba(52,211,153,.12);border-radius:6px;"></div>
         <div style="height:48px;background:rgba(52,211,153,.12);border-radius:6px;"></div>
-      </div>
       <div class="t-mono" style="font-size:11px;color:var(--fg-muted);margin-top:8px;">&lt;Grid cols=&#123;&#123; sm: 1, md: 2, lg: 3 &#125;&#125; gap="md"&gt; → grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3</div>
-    </div>
-
     <!-- Divider specimens -->
     <div style="margin-bottom:28px;">
       <div class="col-label" style="font-size:11px;margin-bottom:10px;">Divider · horizontal + vertical</div>
@@ -998,30 +1135,20 @@
           <div style="border-bottom:1px solid var(--brand-border,rgba(255,255,255,.1));width:100%;"></div>
           <div style="font-size:12px;color:var(--fg-muted);margin-top:8px;">Below</div>
           <div class="t-mono" style="font-size:11px;color:var(--fg-muted);margin-top:8px;">&lt;Divider /&gt; → border-b border-[var(--brand-border)] w-full</div>
-        </div>
         <!-- vertical -->
         <div style="background:var(--surface-2);padding:16px;border-radius:8px;display:flex;flex-direction:row;align-items:stretch;gap:16px;">
           <div style="font-size:12px;color:var(--fg-muted);">Left panel</div>
           <div style="border-right:1px solid var(--brand-border,rgba(255,255,255,.1));height:40px;"></div>
           <div style="font-size:12px;color:var(--fg-muted);">Right panel</div>
           <div class="t-mono" style="font-size:11px;color:var(--fg-muted);margin-left:auto;">&lt;Divider orientation="vertical" /&gt;</div>
-        </div>
-      </div>
-    </div>
-
     <!-- Do / Don't -->
     <div class="usage-strip">
-      <div>
         Use <span class="t-mono">&lt;Row gap="md"&gt;</span> for horizontal content with standard spacing.
         Use <span class="t-mono">&lt;Stack gap="sm"&gt;</span> for vertical lists of cards or form fields.
         Use <span class="t-mono">&lt;Grid cols=&#123;&#123; sm:1, lg:3 &#125;&#125;&gt;</span> for responsive stat grids.
-      </div>
-      <div>
         Hand-roll <span class="t-mono">className="flex items-center gap-3"</span> — use <span class="t-mono">&lt;Row gap="md"&gt;</span>.
         Don't pass arbitrary <span class="t-mono">gap-*</span> values — the enum enforces the 4px grid scale.
         Don't use <span class="t-mono">&lt;hr&gt;</span> for section breaks — use <span class="t-mono">&lt;Divider /&gt;</span>.
-      </div>
-    </div>
     <!-- Phase5:Layout END -->
   </section>
 

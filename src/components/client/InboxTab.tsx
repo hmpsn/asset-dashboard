@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Inbox, ClipboardCheck, MessageSquare, FileText, Layers, Flag, ExternalLink } from 'lucide-react';
+import { Inbox, ClipboardCheck, MessageSquare, FileText, PenLine, Layers, Flag, ExternalLink } from 'lucide-react';
 import { EmptyState } from '../ui';
 import { ApprovalsTab } from './ApprovalsTab';
 import { RequestsTab } from './RequestsTab';
@@ -84,7 +84,7 @@ export function InboxTab({
     { id: 'all', label: 'All', icon: Inbox },
     { id: 'approvals', label: 'SEO Changes', icon: ClipboardCheck, count: pendingApprovals || undefined },
     { id: 'requests', label: 'Requests', icon: MessageSquare, count: pendingRequests || undefined },
-    ...(hasCopyEntries ? [{ id: 'copy' as InboxFilter, label: 'Copy Review', icon: FileText }] : []),
+    ...(hasCopyEntries ? [{ id: 'copy' as InboxFilter, label: 'Copy Review', icon: PenLine }] : []),
     ...(!betaMode ? [{ id: 'content' as InboxFilter, label: 'Content', icon: FileText, count: contentReviews || undefined }] : []),
     ...(planReviewCount > 0 ? [{ id: 'content-plan' as InboxFilter, label: 'Content Plan', icon: Layers, count: planReviewCount }] : []),
   ];
@@ -202,7 +202,7 @@ export function InboxTab({
         <div>
           {filter === 'all' && (
             <div className="flex items-center gap-2 mb-3 mt-2">
-              <FileText className="w-4 h-4 text-teal-400" />
+              <PenLine className="w-4 h-4 text-teal-400" />
               <span className="text-sm font-medium text-zinc-300">Copy Review</span>
             </div>
           )}
@@ -341,6 +341,9 @@ export function InboxTab({
       )}
       {filter === 'content-plan' && planReviewCount === 0 && (
         <EmptyState icon={Layers} title="No content plan items to review." description="When your team sends content for review, items will appear here." />
+      )}
+      {filter === 'copy' && !hasCopyEntries && (
+        <EmptyState icon={PenLine} title="No copy to review." description="Drafts and revisions will appear here as your team prepares them." />
       )}
       {filter === 'all' && !hasApprovals && !hasRequests && contentRequests.length === 0 && planReviewCount === 0 && !hasCopyEntries && !approvalsLoading && !requestsLoading && (
         <EmptyState

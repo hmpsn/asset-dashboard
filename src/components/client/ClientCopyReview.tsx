@@ -135,6 +135,7 @@ function ClientCopyReviewInner({ workspaceId }: ClientCopyReviewProps) {
     // ws-invalidation-ok — client keys (copyEntries, copySectionsAll) differ from admin keys in central hook
     [WS_EVENTS.COPY_SECTION_UPDATED]: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.client.copyEntries(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.client.copyEntriesCount(workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.client.copySectionsAll(workspaceId) });
     },
   }), [queryClient, workspaceId]);
@@ -348,6 +349,7 @@ function EntrySections({ workspaceId, entryId }: { workspaceId: string; entryId:
       setMutationError(null);
       queryClient.invalidateQueries({ queryKey: queryKeys.client.copySections(workspaceId, entryId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.client.copyEntries(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.client.copyEntriesCount(workspaceId) });
     },
     onError: () => {
       setMutationError('Could not approve this section. Please try again.');
@@ -365,6 +367,7 @@ function EntrySections({ workspaceId, entryId }: { workspaceId: string; entryId:
       setMutationError(null);
       queryClient.invalidateQueries({ queryKey: queryKeys.client.copySections(workspaceId, entryId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.client.copyEntries(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.client.copyEntriesCount(workspaceId) });
     },
     onError: () => {
       setMutationError('Could not submit your suggestion. Please try again.');
