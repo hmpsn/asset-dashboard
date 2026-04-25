@@ -89,12 +89,10 @@ function TrendsChart({ data, keywords }: { data: HistoryPoint[]; keywords: strin
     ...(data.length > 4 ? [{ idx: Math.floor(data.length / 2), date: data[Math.floor(data.length / 2)].date }] : []),
     { idx: data.length - 1, date: data[data.length - 1].date },
   ];
-
-  // pr-check-disable-next-line -- asymmetric signature radius for trend chart card; not a section card
   return (
-    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 rounded-[var(--radius-signature-lg)]">
+    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 rounded-[var(--radius-lg)]">
       <div className="flex items-center justify-between mb-3">
-        <h4 className="text-xs font-semibold text-[var(--zinc-300)]">Position History — Pinned Keywords</h4>
+        <h4 className="text-xs font-semibold text-[var(--brand-text-bright)]">Position History — Pinned Keywords</h4>
         <span className="t-caption-sm text-[var(--brand-text-dim)]">{data.length} snapshots · lower is better</span>
       </div>
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" className="overflow-visible">
@@ -296,7 +294,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Icon as={Target} size="md" className="text-teal-400" />
-          <h2 className="text-sm font-semibold text-[var(--zinc-200)]">Rank Tracker</h2>
+          <h2 className="text-sm font-semibold text-[var(--brand-text-bright)]">Rank Tracker</h2>
           <span className="t-caption px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{keywords.length} keywords</span>
         </div>
         <div className="flex items-center gap-2">
@@ -308,7 +306,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
                 'flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-sm)] t-caption font-medium border transition-colors',
                 showTrends
                   ? 'bg-blue-500/15 border-blue-500/30 text-blue-300'
-                  : 'bg-[var(--surface-3)]/50 border-[var(--brand-border-hover)]/50 text-[var(--brand-text)] hover:text-[var(--zinc-200)] hover:border-[var(--brand-border-hover)]',
+                  : 'bg-[var(--surface-3)]/50 border-[var(--brand-border-hover)]/50 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)]',
               )}
             >
               {trendsLoading ? <Icon as={Loader2} size="xs" className="animate-spin" /> : <Icon as={LineChart} size="xs" />}
@@ -344,7 +342,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
           value={newKeyword}
           onChange={e => setNewKeyword(e.target.value)}
           placeholder="Add keyword to track..."
-          className="flex-1 px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--zinc-300)] placeholder-[var(--brand-text-dim)]"
+          className="flex-1 px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-dim)]"
           onKeyDown={e => e.key === 'Enter' && !adding && addKeyword()}
         />
         <Button
@@ -370,9 +368,8 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
       )}
 
       {/* Rankings table */}
-      {/* pr-check-disable-next-line -- asymmetric signature radius for rank table card; not a section card */}
       {sorted.length > 0 ? (
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
+        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-lg)]">
           <div className="grid grid-cols-[1fr,80px,80px,80px,80px,60px] gap-2 px-4 py-2 t-caption font-medium text-[var(--brand-text-muted)] uppercase tracking-wider border-b border-[var(--brand-border)]">
             <span>Keyword</span>
             <span className="text-right">Position</span>
@@ -394,7 +391,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
                       <Icon as={Pin} size="xs" />
                     </button>
                     <Icon as={ChevronDown} size="xs" className={cn('text-[var(--brand-text-dim)] flex-shrink-0 transition-transform', isExpanded && 'rotate-180')} />
-                    <span className="text-xs text-[var(--zinc-200)] truncate">{rank.query}</span>
+                    <span className="text-xs text-[var(--brand-text-bright)] truncate">{rank.query}</span>
                   </div>
                   <div className="text-right">
                     <span className={cn('text-sm font-bold', rank.position <= 3 ? 'text-emerald-400' : rank.position <= 10 ? 'text-teal-400' : rank.position <= 20 ? 'text-amber-400' : 'text-[var(--brand-text)]')}>
@@ -447,6 +444,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
               icon={snapshotting ? undefined : RefreshCw}
               loading={snapshotting}
               disabled={!hasGsc || snapshotting}
+              title={!hasGsc ? 'Connect Google Search Console in Workspace Settings to enable snapshots' : undefined}
               onClick={takeSnapshot}
             >
               {snapshotting ? 'Capturing...' : 'Take First Snapshot'}

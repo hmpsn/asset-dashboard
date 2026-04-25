@@ -56,19 +56,18 @@ export function Annotations({ workspaceId }: { workspaceId: string }) {
     <div className="space-y-8">
       <div className="flex items-center gap-2">
         <Icon as={Flag} size="md" className="text-amber-400/80" />
-        <h2 className="text-sm font-semibold text-[var(--zinc-200)]">Timeline Annotations</h2>
+        <h2 className="text-sm font-semibold text-[var(--brand-text-bright)]">Timeline Annotations</h2>
         <span className="t-caption px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{annotations.length}</span>
       </div>
       <p className="t-caption text-[var(--brand-text-muted)]">Add markers to track key events. Annotations appear on timeline charts in both the admin and client dashboards.</p>
 
       {/* Add annotation form */}
-      {/* pr-check-disable-next-line -- asymmetric signature radius for annotation form; not a section card */}
-      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 space-y-3 rounded-[var(--radius-signature-lg)]">
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 space-y-3 rounded-[var(--radius-lg)]">
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="t-caption text-[var(--brand-text-muted)] block mb-1">Date *</label>
             <input type="date" value={newAnn.date} onChange={e => setNewAnn(p => ({ ...p, date: e.target.value }))}
-              className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--zinc-300)]" />
+              className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)]" />
           </div>
           <div>
             <label className="t-caption text-[var(--brand-text-muted)] block mb-1">Color</label>
@@ -87,12 +86,12 @@ export function Annotations({ workspaceId }: { workspaceId: string }) {
         <div>
           <label className="t-caption text-[var(--brand-text-muted)] block mb-1">Label *</label>
           <input type="text" value={newAnn.label} onChange={e => setNewAnn(p => ({ ...p, label: e.target.value }))} placeholder="e.g. Launched new landing pages"
-            className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--zinc-300)] placeholder-[var(--brand-text-dim)]" />
+            className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-dim)]" />
         </div>
         <div>
           <label className="t-caption text-[var(--brand-text-muted)] block mb-1">Description (optional)</label>
           <input type="text" value={newAnn.description} onChange={e => setNewAnn(p => ({ ...p, description: e.target.value }))} placeholder="Additional details..."
-            className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--zinc-300)] placeholder-[var(--brand-text-dim)]" />
+            className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-dim)]" />
         </div>
         <Button
           variant="primary"
@@ -113,7 +112,7 @@ export function Annotations({ workspaceId }: { workspaceId: string }) {
               <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: ann.color || '#2dd4bf' }} />
               <span className="text-xs text-[var(--brand-text-muted)] flex-shrink-0 font-mono">{ann.date}</span>
               <div className="flex-1 min-w-0">
-                <span className="text-xs text-[var(--zinc-200)] font-medium">{ann.label}</span>
+                <span className="text-xs text-[var(--brand-text-bright)] font-medium">{ann.label}</span>
                 {ann.description && <span className="t-caption text-[var(--brand-text-muted)] ml-2">{ann.description}</span>}
               </div>
               <button onClick={() => deleteAnnotation(ann.id)}

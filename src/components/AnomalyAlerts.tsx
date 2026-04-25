@@ -108,7 +108,7 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
             warnings.length > 0 ? 'text-amber-400/80' :
             'text-emerald-400/80'
           } />
-          <span className="t-caption text-[var(--zinc-300)]">
+          <span className="t-caption text-[var(--brand-text-bright)]">
             {totalAlerts > 0 && <span className="font-medium">{totalAlerts} alert{totalAlerts !== 1 ? 's' : ''}</span>}
             {totalAlerts > 0 && positive.length > 0 && ' · '}
             {positive.length > 0 && <span className="text-emerald-400/80">{positive.length} positive</span>}
@@ -122,7 +122,7 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
     <div className="space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <button onClick={() => setCollapsed(!collapsed)} className="flex items-center gap-2 text-xs font-medium text-[var(--zinc-300)] hover:text-[var(--zinc-100)] transition-colors">
+        <button onClick={() => setCollapsed(!collapsed)} className="flex items-center gap-2 text-xs font-medium text-[var(--brand-text-bright)] hover:text-[var(--brand-text-bright)] transition-colors">
           <Icon as={Activity} size="sm" className="text-[var(--brand-text)]" />
           Anomaly Alerts
           {critical.length > 0 && <span className="px-1.5 py-0.5 rounded t-caption-sm bg-red-500/20 text-red-400/80">{critical.length}</span>}
@@ -133,7 +133,7 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
         {isAdmin && (
           <Tooltip content="Re-scan now">
             <button onClick={handleScan} disabled={isLoading}
-              className="p-1 text-[var(--brand-text-muted)] hover:text-[var(--zinc-300)] transition-colors disabled:opacity-50">
+              className="p-1 text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors disabled:opacity-50">
               <Icon as={RefreshCw} size="xs" className={isLoading ? 'animate-spin' : ''} />
             </button>
           </Tooltip>
@@ -162,7 +162,7 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
                     <SeverityIcon severity={anomaly.severity} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="t-caption font-medium text-[var(--zinc-200)] truncate">{anomaly.title}</span>
+                        <span className="t-caption font-medium text-[var(--brand-text-bright)] truncate">{anomaly.title}</span>
                         {anomaly.acknowledgedAt && <Icon as={Check} size="xs" className="text-[var(--brand-text-muted)] flex-shrink-0" />}
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
@@ -186,11 +186,11 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
                       <div className="flex items-center gap-3 mt-3">
                         <div className="t-caption-sm">
                           <span className="text-[var(--brand-text-muted)]">Previous: </span>
-                          <span className="text-[var(--zinc-300)] font-medium">{anomaly.previousValue.toLocaleString()}</span>
+                          <span className="text-[var(--brand-text-bright)] font-medium">{anomaly.previousValue.toLocaleString()}</span>
                         </div>
                         <div className="t-caption-sm">
                           <span className="text-[var(--brand-text-muted)]">Current: </span>
-                          <span className="text-[var(--zinc-300)] font-medium">{anomaly.currentValue.toLocaleString()}</span>
+                          <span className="text-[var(--brand-text-bright)] font-medium">{anomaly.currentValue.toLocaleString()}</span>
                         </div>
                         <div className={`t-caption-sm font-medium ${anomaly.changePct > 0 ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
                           {anomaly.changePct > 0 ? '+' : ''}{anomaly.changePct}%
@@ -198,7 +198,7 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
                       </div>
                       {isAdmin && !anomaly.acknowledgedAt && (
                         <button onClick={() => handleAcknowledge(anomaly.id)}
-                          className="mt-2 t-caption-sm px-2 py-1 rounded-[var(--radius-sm)] bg-[var(--surface-3)] border border-[var(--brand-border-hover)] text-[var(--brand-text)] hover:text-[var(--zinc-200)] hover:border-[var(--brand-text-dim)] transition-colors">
+                          className="mt-2 t-caption-sm px-2 py-1 rounded-[var(--radius-sm)] bg-[var(--surface-3)] border border-[var(--brand-border-hover)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-text-dim)] transition-colors">
                           Mark as reviewed
                         </button>
                       )}

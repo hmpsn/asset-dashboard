@@ -249,9 +249,8 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
           {/* Step 5+6+7: Two-column layout — table left, sidebar right */}
           <div className="flex flex-col lg:flex-row lg:items-start gap-3">
             {/* Left: Data table — height matches sidebar via ref measurement */}
-            {/* pr-check-disable-next-line -- asymmetric signature radius for data table card; not a section card */}
             <div
-              className="bg-[var(--surface-2)] border border-[var(--brand-border)] flex flex-col min-w-0 lg:flex-[2] overflow-hidden rounded-[var(--radius-signature-lg)]"
+              className="bg-[var(--surface-2)] border border-[var(--brand-border)] flex flex-col min-w-0 lg:flex-[2] overflow-hidden rounded-[var(--radius-lg)]"
               style={{ maxHeight: sidebarHeight > 0 ? `${sidebarHeight}px` : undefined }}
             >
               {/* Inline toggle header */}
@@ -277,7 +276,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                       <th key={key} className="text-right py-3 px-3 text-[var(--brand-text-muted)] font-medium">
                         <button
                           onClick={() => handleSort(key)}
-                          className="flex items-center gap-1 ml-auto hover:text-[var(--zinc-300)] transition-colors"
+                          className="flex items-center gap-1 ml-auto hover:text-[var(--brand-text-bright)] transition-colors"
                         >
                           {key === 'ctr' ? 'CTR' : key.charAt(0).toUpperCase() + key.slice(1)}
                           {sortKey === key && <Icon as={ArrowUpDown} size="xs" />}
@@ -291,7 +290,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                     const badge = badgeMap.get(q.query);
                     return (
                       <tr key={i} className={`border-b border-[var(--brand-border)]/50 hover:bg-[var(--surface-3)]/30 ${rowTint(badge)}`}>
-                        <td className="py-2.5 px-4 text-[var(--zinc-300)] font-medium">
+                        <td className="py-2.5 px-4 text-[var(--brand-text-bright)] font-medium">
                           {q.query}
                           {badge && (
                             <span className={`t-caption-sm font-semibold px-1 py-0.5 rounded ${badge.color} ${badge.bgColor} ml-1 whitespace-nowrap`}>
@@ -316,7 +315,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                     const badge = badgeMap.get(p.page);
                     return (
                       <tr key={i} className={`border-b border-[var(--brand-border)]/50 hover:bg-[var(--surface-3)]/30 ${rowTint(badge)}`}>
-                        <td className="py-2.5 px-4 text-[var(--zinc-300)] font-medium max-w-xs truncate">
+                        <td className="py-2.5 px-4 text-[var(--brand-text-bright)] font-medium max-w-xs truncate">
                           <a href={p.page} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-blue-400 transition-colors">
                             {pagePath}
                             <Icon as={ExternalLink} size="xs" className="flex-shrink-0 text-[var(--brand-text-muted)]" />
@@ -360,7 +359,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                       return (
                         <div key={d.device}>
                           <div className="flex items-center justify-between t-caption-sm mb-1">
-                            <span className="text-[var(--zinc-300)] capitalize">{d.device.toLowerCase()}</span>
+                            <span className="text-[var(--brand-text-bright)] capitalize">{d.device.toLowerCase()}</span>
                             <span className="text-[var(--brand-text-muted)]">{pct}% · pos {d.position}</span>
                           </div>
                           <div className="h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden">
@@ -384,7 +383,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                       <div key={c.country} className="flex items-center justify-between t-caption-sm py-1 px-2 rounded bg-[var(--surface-3)]/30">
                         <div className="flex items-center gap-2">
                           <span className="text-[var(--brand-text-dim)] w-3 text-right">{i + 1}</span>
-                          <span className="text-[var(--zinc-300)]">{c.country}</span>
+                          <span className="text-[var(--brand-text-bright)]">{c.country}</span>
                         </div>
                         <div className="flex items-center gap-3 text-[var(--brand-text-muted)]">
                           <span>{c.clicks.toLocaleString()} clicks</span>
@@ -405,7 +404,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                       return (
                         <div key={st.searchType}>
                           <div className="flex items-center justify-between t-caption-sm mb-1">
-                            <span className="text-[var(--zinc-300)] capitalize">{st.searchType}</span>
+                            <span className="text-[var(--brand-text-bright)] capitalize">{st.searchType}</span>
                             <span className="text-[var(--brand-text-muted)]">{pct}%</span>
                           </div>
                           <div className="h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden">

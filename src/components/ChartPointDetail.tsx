@@ -26,8 +26,8 @@ export function ChartPointDetail({ date, metrics, onClose, xPct }: Props) {
     >
       <div className="bg-[var(--surface-2)] border border-[var(--brand-border-hover)] rounded-[var(--radius-sm)] shadow-xl shadow-black/40 min-w-[160px] overflow-hidden">
         <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--brand-border)]">
-          <span className="t-caption-sm font-semibold text-[var(--zinc-200)]">{date}</span>
-          <button onClick={onClose} className="text-[var(--brand-text-muted)] hover:text-[var(--zinc-300)] -mr-1" aria-label="Close">
+          <span className="t-caption-sm font-semibold text-[var(--brand-text-bright)]">{date}</span>
+          <button onClick={onClose} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] -mr-1" aria-label="Close">
             <Icon as={X} size="xs" />
           </button>
         </div>
@@ -38,7 +38,7 @@ export function ChartPointDetail({ date, metrics, onClose, xPct }: Props) {
                 {m.color && <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: m.color }} />}
                 <span className="t-caption-sm text-[var(--brand-text-muted)]">{m.label}</span>
               </div>
-              <span className="t-caption-sm font-medium text-[var(--zinc-200)]">{typeof m.value === 'number' ? m.value.toLocaleString() : m.value}</span>
+              <span className="t-caption-sm font-medium text-[var(--brand-text-bright)]">{typeof m.value === 'number' ? m.value.toLocaleString() : m.value}</span>
             </div>
           ))}
         </div>

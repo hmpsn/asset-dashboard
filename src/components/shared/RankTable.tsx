@@ -94,7 +94,7 @@ export function RankTable({ ranks, limit = 10, showClicks = true, showImpression
         <tbody>
           {visible.map((r, i) => (
             <tr key={i} className="border-t border-[var(--brand-border)]/50">
-              <td className="py-1.5 px-3 text-[var(--zinc-300)] truncate max-w-[200px]">{r.query}</td>
+              <td className="py-1.5 px-3 text-[var(--brand-text-bright)] truncate max-w-[200px]">{r.query}</td>
               <td className="py-1.5 px-3 text-right">
                 <span className={positionColor(r.position)}>#{Math.round(r.position)}</span>
               </td>

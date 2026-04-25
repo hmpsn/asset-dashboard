@@ -82,24 +82,23 @@ export function AnalyticsAnnotations({ workspaceId }: { workspaceId: string }) {
     <div className="space-y-8">
       <div className="flex items-center gap-2">
         <Icon as={Flag} size="md" className="text-amber-400/80" />
-        <h2 className="text-sm font-semibold text-[var(--zinc-200)]">Annotations</h2>
+        <h2 className="text-sm font-semibold text-[var(--brand-text-bright)]">Annotations</h2>
         <span className="t-caption px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{annotations.length}</span>
       </div>
       <p className="t-caption text-[var(--brand-text-muted)]">Track key events — algorithm updates, site launches, and campaigns — as markers on your timeline.</p>
 
       {/* Create form */}
-      {/* pr-check-disable-next-line -- asymmetric signature radius for annotation form; not a section card */}
-      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 space-y-3 rounded-[var(--radius-signature-lg)]">
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 space-y-3 rounded-[var(--radius-lg)]">
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="t-caption text-[var(--brand-text-muted)] block mb-1">Date *</label>
             <input type="date" value={newAnn.date} onChange={e => setNewAnn(p => ({ ...p, date: e.target.value }))}
-              className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--zinc-300)]" />
+              className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)]" />
           </div>
           <div>
             <label className="t-caption text-[var(--brand-text-muted)] block mb-1">Category</label>
             <select value={newAnn.category} onChange={e => setNewAnn(p => ({ ...p, category: e.target.value as Category }))}
-              className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--zinc-300)]">
+              className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)]">
               {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
             </select>
           </div>
@@ -107,7 +106,7 @@ export function AnalyticsAnnotations({ workspaceId }: { workspaceId: string }) {
         <div>
           <label className="t-caption text-[var(--brand-text-muted)] block mb-1">Label *</label>
           <input type="text" value={newAnn.label} onChange={e => setNewAnn(p => ({ ...p, label: e.target.value }))} placeholder="e.g. Launched new landing pages"
-            className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--zinc-300)] placeholder-[var(--brand-text-dim)]" />
+            className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-dim)]" />
         </div>
         <Button
           variant="primary"
@@ -125,7 +124,7 @@ export function AnalyticsAnnotations({ workspaceId }: { workspaceId: string }) {
         <button onClick={() => setFilter('all')}
           className={cn(
             't-caption px-2.5 py-1 rounded-full border transition-colors',
-            filter === 'all' ? 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--zinc-200)]' : 'border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:border-[var(--brand-border-hover)]',
+            filter === 'all' ? 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:border-[var(--brand-border-hover)]',
           )}>
           All
         </button>
@@ -133,7 +132,7 @@ export function AnalyticsAnnotations({ workspaceId }: { workspaceId: string }) {
           <button key={c.id} onClick={() => setFilter(c.id)}
             className={cn(
               't-caption px-2.5 py-1 rounded-full border transition-colors',
-              filter === c.id ? 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--zinc-200)]' : 'border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:border-[var(--brand-border-hover)]',
+              filter === c.id ? 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:border-[var(--brand-border-hover)]',
             )}>
             {c.label}
           </button>
@@ -148,17 +147,17 @@ export function AnalyticsAnnotations({ workspaceId }: { workspaceId: string }) {
               {editId === ann.id ? (
                 <>
                   <input type="date" value={editDraft.date} onChange={e => setEditDraft(p => ({ ...p, date: e.target.value }))}
-                    className="px-2 py-1 bg-[var(--surface-1)] border border-[var(--brand-border-hover)] rounded-[var(--radius-sm)] text-xs text-[var(--zinc-300)] flex-shrink-0" />
+                    className="px-2 py-1 bg-[var(--surface-1)] border border-[var(--brand-border-hover)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)] flex-shrink-0" />
                   <select value={editDraft.category} onChange={e => setEditDraft(p => ({ ...p, category: e.target.value as Category }))}
-                    className="px-2 py-1 bg-[var(--surface-1)] border border-[var(--brand-border-hover)] rounded-[var(--radius-sm)] text-xs text-[var(--zinc-300)] flex-shrink-0">
+                    className="px-2 py-1 bg-[var(--surface-1)] border border-[var(--brand-border-hover)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)] flex-shrink-0">
                     {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
                   </select>
                   <input type="text" value={editDraft.label} onChange={e => setEditDraft(p => ({ ...p, label: e.target.value }))}
-                    className="flex-1 min-w-0 px-2 py-1 bg-[var(--surface-1)] border border-[var(--brand-border-hover)] rounded-[var(--radius-sm)] text-xs text-[var(--zinc-300)]" />
+                    className="flex-1 min-w-0 px-2 py-1 bg-[var(--surface-1)] border border-[var(--brand-border-hover)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)]" />
                   <button onClick={saveEdit} disabled={updateMutation.isPending} className="text-teal-400 hover:text-teal-300 flex-shrink-0 p-1" aria-label="Save edit">
                     <Icon as={Check} size="sm" />
                   </button>
-                  <button onClick={() => setEditId(null)} className="text-[var(--brand-text-muted)] hover:text-[var(--zinc-300)] flex-shrink-0 p-1" aria-label="Cancel edit">
+                  <button onClick={() => setEditId(null)} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] flex-shrink-0 p-1" aria-label="Cancel edit">
                     <Icon as={X} size="sm" />
                   </button>
                 </>
@@ -166,9 +165,9 @@ export function AnalyticsAnnotations({ workspaceId }: { workspaceId: string }) {
                 <>
                   <span className="text-xs text-[var(--brand-text-muted)] flex-shrink-0 font-mono">{ann.date}</span>
                   <CategoryBadge category={ann.category} />
-                  <span className="text-xs text-[var(--zinc-200)] font-medium flex-1 min-w-0 truncate">{ann.label}</span>
+                  <span className="text-xs text-[var(--brand-text-bright)] font-medium flex-1 min-w-0 truncate">{ann.label}</span>
                   <button onClick={() => startEdit(ann)}
-                    className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-muted)] hover:text-[var(--zinc-300)] transition-all flex-shrink-0 p-1" aria-label="Edit annotation">
+                    className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-all flex-shrink-0 p-1" aria-label="Edit annotation">
                     <Icon as={Pencil} size="sm" />
                   </button>
                   <button onClick={() => remove(ann.id)}

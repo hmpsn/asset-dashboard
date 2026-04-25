@@ -237,13 +237,13 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
             {topPages.length > 0 && (
               <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-[var(--surface-3)]/30">
                 <span className="text-[var(--brand-text)]">Top page avg. engagement</span>
-                <span className="text-[var(--zinc-300)] font-medium">{formatDuration(topPages[0].avgEngagementTime)}</span>
+                <span className="text-[var(--brand-text-bright)] font-medium">{formatDuration(topPages[0].avgEngagementTime)}</span>
               </div>
             )}
             {organic && (
               <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-[var(--surface-3)]/30">
                 <span className="text-[var(--brand-text)]">Organic avg. engagement</span>
-                <span className="text-[var(--zinc-300)] font-medium">{formatDuration(organic.avgEngagementTime)}</span>
+                <span className="text-[var(--brand-text-bright)] font-medium">{formatDuration(organic.avgEngagementTime)}</span>
               </div>
             )}
           </div>
@@ -273,7 +273,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
                 </div>
                 <div className="text-[var(--brand-border-hover)]">vs</div>
                 <div className="text-center flex-1">
-                  <div className="text-sm font-bold text-[var(--zinc-300)]">{overview.bounceRate}%</div>
+                  <div className="text-sm font-bold text-[var(--brand-text-bright)]">{overview.bounceRate}%</div>
                   <div className="t-caption-sm text-[var(--brand-text-muted)]">All</div>
                 </div>
               </div>
@@ -287,7 +287,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
                 </div>
                 <div className="text-[var(--brand-border-hover)]">vs</div>
                 <div className="text-center flex-1">
-                  <div className="text-sm font-bold text-[var(--zinc-300)]">{(100 - overview.bounceRate).toFixed(1)}%</div>
+                  <div className="text-sm font-bold text-[var(--brand-text-bright)]">{(100 - overview.bounceRate).toFixed(1)}%</div>
                   <div className="t-caption-sm text-[var(--brand-text-muted)]">All Traffic</div>
                 </div>
               </div>
@@ -299,19 +299,18 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
       {/* ── 6. Two-column layout — table left, sidebar right ── */}
       <div className="flex flex-col lg:flex-row lg:items-start gap-3">
         {/* Left: Top Pages — height matches sidebar via ref measurement */}
-        {/* pr-check-disable-next-line -- asymmetric signature radius for top-pages card; not a section card */}
         <div
-          className="bg-[var(--surface-2)] border border-[var(--brand-border)] flex flex-col overflow-hidden min-w-0 lg:flex-[2] rounded-[var(--radius-signature-lg)]"
+          className="bg-[var(--surface-2)] border border-[var(--brand-border)] flex flex-col overflow-hidden min-w-0 lg:flex-[2] rounded-[var(--radius-lg)]"
           style={{ maxHeight: sidebarHeight > 0 ? `${sidebarHeight}px` : undefined }}
         >
           <div className="flex items-center px-4 py-3 border-b border-[var(--brand-border)] shrink-0">
-            <span className="text-sm font-semibold text-[var(--zinc-200)]">Top Pages</span>
+            <span className="text-sm font-semibold text-[var(--brand-text-bright)]">Top Pages</span>
           </div>
           <div className="space-y-1 overflow-y-auto flex-1 min-h-0 p-2">
             {topPages.map((p, i) => (
               <div key={i} className="flex items-center gap-2 py-1.5 px-2 rounded-[var(--radius-sm)] hover:bg-[var(--surface-3)]/50 min-w-0">
                 <span className="t-caption-sm text-[var(--brand-text-muted)] w-5 text-right shrink-0">{i + 1}</span>
-                <span className="text-xs text-[var(--zinc-300)] flex-1 truncate font-mono min-w-0">{p.path}</span>
+                <span className="text-xs text-[var(--brand-text-bright)] flex-1 truncate font-mono min-w-0">{p.path}</span>
                 <span className="text-xs text-blue-400 font-medium tabular-nums">{p.pageviews.toLocaleString()}</span>
                 <span className="t-caption-sm text-[var(--brand-text-muted)] w-14 text-right">{formatNumber(p.users)} u</span>
               </div>
@@ -331,7 +330,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
                   return (
                     <div key={i} className="relative">
                       <div className="flex items-center gap-2 py-1.5 px-2 rounded-[var(--radius-sm)] relative z-10">
-                        <span className="text-xs text-[var(--zinc-300)] flex-1 truncate">{s.source || '(direct)'}{s.medium !== '(none)' ? ` / ${s.medium}` : ''}</span>
+                        <span className="text-xs text-[var(--brand-text-bright)] flex-1 truncate">{s.source || '(direct)'}{s.medium !== '(none)' ? ` / ${s.medium}` : ''}</span>
                         <span className="text-xs text-blue-400 font-medium tabular-nums">{s.sessions.toLocaleString()}</span>
                         <span className="t-caption-sm text-[var(--brand-text-muted)] w-12 text-right">{pct.toFixed(1)}%</span>
                       </div>
@@ -351,7 +350,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
                   <DeviceIcon device={d.device} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between text-xs mb-0.5">
-                      <span className="text-[var(--zinc-300)] capitalize">{d.device}</span>
+                      <span className="text-[var(--brand-text-bright)] capitalize">{d.device}</span>
                       <span className="text-[var(--brand-text-muted)]">{d.percentage}%</span>
                     </div>
                     <div className="h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden">
@@ -384,7 +383,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-1.5">
                           <Icon as={SegIcon} size="sm" className={isNew ? 'text-cyan-400' : 'text-emerald-400'} />
-                          <span className="text-xs text-[var(--zinc-300)] capitalize">{seg.segment}</span>
+                          <span className="text-xs text-[var(--brand-text-bright)] capitalize">{seg.segment}</span>
                         </div>
                         <span className="text-xs text-[var(--brand-text-muted)]">{seg.percentage}%</span>
                       </div>
@@ -411,7 +410,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
       <SectionCard>
         <button
           onClick={() => setEventsExpanded(!eventsExpanded)}
-          className="w-full flex items-center justify-between text-sm font-semibold text-[var(--zinc-200)]"
+          className="w-full flex items-center justify-between text-sm font-semibold text-[var(--brand-text-bright)]"
         >
           <span>Events &amp; Conversions</span>
           <span className="text-xs text-[var(--brand-text-muted)]">
@@ -430,7 +429,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
                   {conversions.map((c, i) => (
                     <div key={i} className="bg-[var(--surface-3)]/30 border border-[var(--brand-border)] p-3 rounded-[var(--radius-signature)]">
                       <div className="t-caption-sm text-[var(--brand-text)] truncate mb-1">{c.eventName.replace(/_/g, ' ')}</div>
-                      <div className="text-xl font-bold text-[var(--zinc-200)]">{c.conversions.toLocaleString()}</div>
+                      <div className="text-xl font-bold text-[var(--brand-text-bright)]">{c.conversions.toLocaleString()}</div>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="t-caption-sm text-[var(--brand-text-muted)]">{c.users.toLocaleString()} users</span>
                         {c.rate > 0 && <span className="t-caption-sm font-medium text-emerald-400">{c.rate}%</span>}
@@ -452,8 +451,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
                 <div className="text-xs text-[var(--brand-text-muted)] font-medium mb-2 flex items-center gap-1.5">
                   <Icon as={ArrowRight} size="sm" className="text-teal-400" /> Top Landing Pages
                 </div>
-                {/* pr-check-disable-next-line -- asymmetric signature radius for landing pages table; not a section card */}
-                <div className="border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
+                <div className="border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-lg)]">
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-[var(--brand-border)] bg-[var(--surface-2)]/50">
@@ -467,7 +465,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
                     <tbody>
                       {landingPages.slice(0, 20).map((p, i) => (
                         <tr key={i} className="border-b border-[var(--brand-border)]/50 hover:bg-[var(--surface-3)]/30">
-                          <td className="py-2.5 px-4 text-[var(--zinc-300)] truncate max-w-[300px] font-mono">{p.landingPage}</td>
+                          <td className="py-2.5 px-4 text-[var(--brand-text-bright)] truncate max-w-[300px] font-mono">{p.landingPage}</td>
                           <td className="py-2.5 px-3 text-right text-blue-400">{p.sessions.toLocaleString()}</td>
                           <td className="py-2.5 px-3 text-right text-[var(--brand-text)]">{p.users.toLocaleString()}</td>
                           <td className="py-2.5 px-3 text-right">

@@ -169,7 +169,6 @@ function AnnotationDot({ x, annotation }: { x: number; annotation: Annotation })
       <circle cx={x} cy={12} r={5} fill={color} stroke={chartDotStroke()} strokeWidth={2} style={{ cursor: 'pointer' }} />
       {hovered && (
         <foreignObject x={x - 100} y={20} width={200} height={80}>
-          {/* pr-check-disable-next-line -- chart tooltip inside SVG foreignObject */}
           <div className="bg-[var(--surface-2)] border border-[var(--brand-border-hover)] rounded-[var(--radius-sm)] p-2 shadow-lg text-center">
             <span className="t-caption-sm font-mono text-[var(--brand-text-muted)] block">{annotation.date}</span>
             <span
@@ -178,7 +177,7 @@ function AnnotationDot({ x, annotation }: { x: number; annotation: Annotation })
             >
               {catLabel}
             </span>
-            <span className="t-caption-sm text-[var(--zinc-200)] block mt-1 truncate">{annotation.label}</span>
+            <span className="t-caption-sm text-[var(--brand-text-bright)] block mt-1 truncate">{annotation.label}</span>
           </div>
         </foreignObject>
       )}
@@ -226,7 +225,6 @@ function CreatePopover({
   };
 
   return (
-    // pr-check-disable-next-line -- absolute-positioned chart annotation tooltip; not a section card
     <div
       ref={popoverRef}
       className="absolute z-50 bg-[var(--surface-2)] border border-[var(--brand-border-hover)] rounded-[var(--radius-md)] shadow-xl p-3 w-64"
@@ -234,7 +232,7 @@ function CreatePopover({
     >
       <div className="flex items-center justify-between mb-2">
         <span className="t-caption-sm font-mono text-[var(--brand-text-muted)]">{state.date}</span>
-        <button onClick={onClose} className="text-[var(--brand-text-muted)] hover:text-[var(--zinc-300)] p-0.5" aria-label="Close"><Icon as={X} size="sm" /></button>
+        <button onClick={onClose} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] p-0.5" aria-label="Close"><Icon as={X} size="sm" /></button>
       </div>
       <input
         type="text"
@@ -243,12 +241,12 @@ function CreatePopover({
         onChange={e => setLabel(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') onClose(); }}
         autoFocus
-        className="w-full px-2 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--zinc-300)] placeholder-[var(--brand-text-dim)] mb-2"
+        className="w-full px-2 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-dim)] mb-2"
       />
       <select
         value={category}
         onChange={e => setCategory(e.target.value as Category)}
-        className="w-full px-2 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--zinc-300)] mb-2"
+        className="w-full px-2 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)] mb-2"
       >
         <option value="site_change">Site Change</option>
         <option value="algorithm_update">Algorithm</option>
