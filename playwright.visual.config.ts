@@ -16,6 +16,7 @@ import { defineConfig, devices } from '@playwright/test';
  * Usage (capture baselines against staging — one-time, before Phase 2 opens):
  *   BASE_URL=https://asset-dashboard-staging.onrender.com \
  *   PHASE2_ADMIN_TOKEN=<x-auth-token> \
+ *   PHASE2_ADMIN_WS_ID=<workspace-uuid> \
  *   PHASE2_CLIENT_WS_ID=<workspace-uuid> \
  *   PHASE2_CLIENT_PASSWORD=<client-portal-password> \
  *   npm run phase2:baseline:update
@@ -23,6 +24,7 @@ import { defineConfig, devices } from '@playwright/test';
  * Usage (diff against committed baseline — Phase 2 worker PRs run this):
  *   BASE_URL=https://<phase-2-branch-preview>.onrender.com \
  *   PHASE2_ADMIN_TOKEN=<x-auth-token> \
+ *   PHASE2_ADMIN_WS_ID=<workspace-uuid> \
  *   PHASE2_CLIENT_WS_ID=<workspace-uuid> \
  *   PHASE2_CLIENT_PASSWORD=<client-portal-password> \
  *   npm run phase2:baseline

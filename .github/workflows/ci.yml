@@ -58,15 +58,25 @@ jobs:
       #
       # See docs/superpowers/plans/2026-04-24-phase-2-kickoff.md §5 and
       # scripts/phase2-guard.ts.
+      # Branch refs are surfaced via `env:` rather than `${{ }}` interpolation
+      # in the run block — `${{ }}` is expanded by the Actions runner before
+      # bash sees it, so a head_ref like `feat/design-system-phase$(curl ...)`
+      # would shell-inject. Reading from $HEAD_REF / $BASE_REF keeps the value
+      # opaque to the shell parser. The `if:` filter is fine — startsWith()
+      # is a GitHub-expression-layer call, not passed to bash.
+      # See: https://securitylab.github.com/research/github-actions-untrusted-input/
       - name: Phase 2 frozen-paths guard
         if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'feat/design-system-phase')
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          if [[ "${{ github.head_ref }}" == *"integrator"* || "${{ github.head_ref }}" == *"phase2-integrator"* ]]; then
+          if [[ "$HEAD_REF" == *"integrator"* || "$HEAD_REF" == *"phase2-integrator"* ]]; then
             echo "[ci] integrator branch — running guard with --integrator"
-            npx tsx scripts/phase2-guard.ts --integrator --against=origin/${{ github.base_ref }}
-          elif [[ "${{ github.head_ref }}" == feat/design-system-phase5-2* ]]; then
+            npx tsx scripts/phase2-guard.ts --integrator --against="origin/$BASE_REF"
+          elif [[ "$HEAD_REF" == feat/design-system-phase5-2* ]]; then
             echo "[ci] Phase 2 worker branch — running strict guard"
-            npx tsx scripts/phase2-guard.ts --against=origin/${{ github.base_ref }}
+            npx tsx scripts/phase2-guard.ts --against="origin/$BASE_REF"
           else
             echo "[ci] Phase 5 branch but not a Phase 2 worker/integrator pattern — skipping guard"
           fi
