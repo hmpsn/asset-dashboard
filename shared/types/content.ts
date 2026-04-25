@@ -70,6 +70,22 @@ export interface ReviewChecklist {
   word_count_target: boolean;
 }
 
+/**
+ * Lightweight post summary used in admin list views (RequestList, ContentBriefs).
+ * Full shape lives in GeneratedPost; this is the summary projection returned by
+ * useAdminPostsList and threaded down to request-level UI.
+ */
+export interface PostSummary {
+  id: string;
+  briefId: string;
+  targetKeyword: string;
+  title: string;
+  totalWordCount: number;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface GeneratedPost {
   id: string;
   workspaceId: string;

@@ -5,23 +5,13 @@ import {
   Loader2, Trash2, AlertTriangle, PenLine, Clipboard, Search, X, ArrowUpDown,
 } from 'lucide-react';
 import type { FixContext } from '../App';
+import type { PostSummary } from '../../shared/types/content';
 import { PostEditor } from './PostEditor';
 import { BriefGenerator } from './briefs/BriefGenerator';
 import { RequestList } from './briefs/RequestList';
 import { BriefList } from './briefs/BriefList';
 import { useAdminBriefsList, useAdminRequestsList, useAdminPostsList } from '../hooks/admin';
 import { queryKeys } from '../lib/queryKeys';
-
-export interface PostSummary {
-  id: string;
-  briefId: string;
-  targetKeyword: string;
-  title: string;
-  totalWordCount: number;
-  status: string;
-  createdAt: string;
-  updatedAt: string;
-}
 
 interface ContentBrief {
   id: string;

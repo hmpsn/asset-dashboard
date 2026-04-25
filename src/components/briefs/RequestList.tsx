@@ -4,7 +4,7 @@ import {
   Copy, Download, Search, Target, MessageSquare, BarChart3,
   BookOpen, Users, TrendingUp, Check, ExternalLink, Link2, PenLine,
 } from 'lucide-react';
-import type { PostSummary } from '../ContentBriefs';
+import type { PostSummary } from '../../../shared/types/content';
 
 interface ContentBrief {
   id: string;
