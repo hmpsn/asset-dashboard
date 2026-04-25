@@ -32,11 +32,24 @@ describe('statusConfig', () => {
   it('uses distinct color families per status', () => {
     expect(statusConfig['issue-detected']!.text).toContain('amber');
     expect(statusConfig['fix-proposed']!.text).toContain('blue');
-    expect(statusConfig['in-review']!.text).toContain('purple');
+    // in-review uses teal to stay visually distinct from fix-proposed (blue).
+    // Overlap with live (also teal) is acceptable — they are non-adjacent states.
+    expect(statusConfig['in-review']!.text).toContain('teal');
     // approved uses emerald (refined from green) per visual polish spec
     expect(statusConfig.approved!.text).toContain('emerald');
     expect(statusConfig.rejected!.text).toContain('red');
     expect(statusConfig.live!.text).toContain('teal');
+  });
+
+  it('fix-proposed and in-review have distinct color families', () => {
+    // Guards against the regression fixed in PR #280 where both shared identical blue,
+    // collapsing the visual distinction in status summary bars.
+    const fixProposed = statusConfig['fix-proposed']!;
+    const inReview = statusConfig['in-review']!;
+    expect(fixProposed.text).not.toBe(inReview.text);
+    expect(fixProposed.border).not.toBe(inReview.border);
+    expect(fixProposed.bg).not.toBe(inReview.bg);
+    expect(fixProposed.dot).not.toBe(inReview.dot);
   });
 });
 

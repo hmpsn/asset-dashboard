@@ -4,6 +4,7 @@ import {
   Users, Shield, SlidersHorizontal, Brain,
 } from 'lucide-react';
 import { post } from '../../api/client';
+import { SectionCard } from '../ui';
 
 interface WorkspaceData {
   tier?: 'free' | 'growth' | 'premium';
@@ -35,7 +36,7 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
   return (
     <div className="space-y-8">
       {/* Workspace Tier */}
-      <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+      <SectionCard noPadding>
         <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
           <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
             <Sparkles className="w-4 h-4 text-amber-400" />
@@ -83,10 +84,10 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
             </div>
           )}
         </div>
-      </section>
+      </SectionCard>
 
       {/* Client Portal Toggles */}
-      <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+      <SectionCard noPadding>
         <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
           <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
             <SlidersHorizontal className="w-4 h-4 text-teal-400" />
@@ -223,10 +224,10 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
             </div>
           </label>
         </div>
-      </section>
+      </SectionCard>
 
       {/* Automated Reports */}
-      <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+      <SectionCard noPadding>
         <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
           <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
             <Mail className="w-4 h-4 text-blue-400" />
@@ -297,10 +298,10 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
             </div>
           )}
         </div>
-      </section>
+      </SectionCard>
 
       {/* Branding */}
-      <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+      <SectionCard noPadding>
         <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
           <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
             <ImageIcon className="w-4 h-4 text-teal-400" />
@@ -341,7 +342,7 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
             </div>
           </div>
         </div>
-      </section>
+      </SectionCard>
 
     </div>
   );

@@ -147,53 +147,53 @@ function SamplesSection({ workspaceId, samples, onChanged }: SamplesSectionProps
 
       {/* Add form */}
       {showAdd && (
-        <form onSubmit={handleAdd} className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4">
-          <h3 className="text-sm font-semibold text-zinc-200">Add Voice Sample</h3>
+        <SectionCard title="Add Voice Sample">
+          <form onSubmit={handleAdd} className="space-y-4">
+            <div className="space-y-1">
+              <label htmlFor="sample-context-tag" className="text-xs text-zinc-400">Context tag</label>
+              <select
+                id="sample-context-tag"
+                value={contextTag}
+                onChange={e => setContextTag(e.target.value as VoiceSampleContext)}
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+              >
+                {CONTEXT_TAG_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
 
-          <div className="space-y-1">
-            <label htmlFor="sample-context-tag" className="text-xs text-zinc-400">Context tag</label>
-            <select
-              id="sample-context-tag"
-              value={contextTag}
-              onChange={e => setContextTag(e.target.value as VoiceSampleContext)}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
-            >
-              {CONTEXT_TAG_OPTIONS.map(o => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
-          </div>
+            <div className="space-y-1">
+              <label htmlFor="sample-content" className="text-xs text-zinc-400">Content</label>
+              <textarea
+                id="sample-content"
+                value={content}
+                onChange={e => setContent(e.target.value)}
+                placeholder="Paste an example of on-brand copy..."
+                rows={4}
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 resize-none"
+              />
+            </div>
 
-          <div className="space-y-1">
-            <label htmlFor="sample-content" className="text-xs text-zinc-400">Content</label>
-            <textarea
-              id="sample-content"
-              value={content}
-              onChange={e => setContent(e.target.value)}
-              placeholder="Paste an example of on-brand copy..."
-              rows={4}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 resize-none"
-            />
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              type="submit"
-              disabled={!content.trim() || submitting}
-              className="flex items-center gap-2 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-            >
-              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-              Add
-            </button>
-            <button
-              type="button"
-              onClick={() => { setShowAdd(false); setContent(''); }}
-              className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
+            <div className="flex items-center gap-3">
+              <button
+                type="submit"
+                disabled={!content.trim() || submitting}
+                className="flex items-center gap-2 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                Add
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowAdd(false); setContent(''); }}
+                className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </SectionCard>
       )}
 
       {/* Sample list */}
@@ -216,6 +216,7 @@ function SamplesSection({ workspaceId, samples, onChanged }: SamplesSectionProps
       ) : (
         <div className="space-y-3">
           {samples.map(sample => (
+            // pr-check-disable-next-line -- list item row with delete control, not a section card
             <div
               key={sample.id}
               className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex items-start gap-3"
@@ -866,6 +867,7 @@ function CalibrationSection({ workspaceId, onSampleSaved }: CalibrationSectionPr
           {session.variations.map((variation, i) => {
             const rating = localRatings[i];
             return (
+              // pr-check-disable-next-line -- variation card uses dynamic border color for rating feedback; SectionCard does not support dynamic border overrides
               <div
                 key={i}
                 className={`bg-zinc-900 border rounded-xl p-4 space-y-3 transition-colors ${
@@ -972,40 +974,41 @@ function CalibrationSection({ workspaceId, onSampleSaved }: CalibrationSectionPr
 
           {/* Refine panel — show when at least one variation is rated */}
           {hasAnyRating && (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
-              <h4 className="text-sm font-semibold text-zinc-200">Refine</h4>
-              <div className="space-y-1">
-                <label htmlFor="calib-refine-direction" className="text-xs text-zinc-400">
-                  Steering direction (optional)
-                </label>
-                <input
-                  id="calib-refine-direction"
-                  type="text"
-                  value={refineDirection}
-                  onChange={e => setRefineDirection(e.target.value)}
-                  placeholder="e.g. Make it punchier and shorter"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
-                />
+            <SectionCard title="Refine">
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label htmlFor="calib-refine-direction" className="text-xs text-zinc-400">
+                    Steering direction (optional)
+                  </label>
+                  <input
+                    id="calib-refine-direction"
+                    type="text"
+                    value={refineDirection}
+                    onChange={e => setRefineDirection(e.target.value)}
+                    placeholder="e.g. Make it punchier and shorter"
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRefine}
+                  disabled={refining}
+                  className="flex items-center gap-2 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  {refining ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Refining…
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      Refine
+                    </>
+                  )}
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={handleRefine}
-                disabled={refining}
-                className="flex items-center gap-2 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-              >
-                {refining ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Refining…
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4" />
-                    Refine
-                  </>
-                )}
-              </button>
-            </div>
+            </SectionCard>
           )}
         </div>
       )}

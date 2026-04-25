@@ -24,19 +24,19 @@ const ACTION_TYPE_LABELS: Record<ActionType, string> = {
 };
 
 function TrendIcon({ trend }: { trend: LearningsTrend }) {
-  if (trend === 'improving') return <TrendingUp className="w-4 h-4 text-green-400" />;
+  if (trend === 'improving') return <TrendingUp className="w-4 h-4 text-emerald-400" />;
   if (trend === 'declining') return <TrendingDown className="w-4 h-4 text-red-400" />;
   return <Minus className="w-4 h-4 text-zinc-400" />;
 }
 
 function winRateColor(rate: number): string {
-  if (rate >= 0.6) return 'text-green-400';
+  if (rate >= 0.6) return 'text-emerald-400';
   if (rate >= 0.4) return 'text-amber-400';
   return 'text-red-400';
 }
 
 function winRateBg(rate: number): string {
-  if (rate >= 0.6) return 'bg-green-500/10 border-green-500/20';
+  if (rate >= 0.6) return 'bg-emerald-500/10 border-emerald-500/20';
   if (rate >= 0.4) return 'bg-amber-500/10 border-amber-500/20';
   return 'bg-red-500/10 border-red-500/20';
 }
@@ -66,7 +66,7 @@ function TopThreeWins({ scorecard }: { scorecard: OutcomeScorecard }) {
     <ul className="space-y-2">
       {topCategories.map(cat => (
         <li key={cat.actionType} className="flex items-start gap-2 text-sm text-zinc-300">
-          <CheckCircle2 className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
           <span>
             <span className="font-medium text-zinc-100">
               {ACTION_TYPE_LABELS[cat.actionType]}
@@ -162,7 +162,8 @@ function PremiumBreakdown({ scorecard }: { scorecard: OutcomeScorecard }) {
       <FullScorecard scorecard={scorecard} />
 
       {/* Detailed breakdown panel */}
-      <div className="border border-zinc-700/50 rounded-xl p-4 space-y-3 bg-zinc-900/50">
+      <SectionCard variant="subtle">
+        <div className="space-y-3">
         <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Detailed breakdown</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1">
@@ -171,7 +172,7 @@ function PremiumBreakdown({ scorecard }: { scorecard: OutcomeScorecard }) {
           </div>
           <div className="space-y-1">
             <p className="text-xs text-zinc-500">Confirmed wins</p>
-            <p className="text-xl font-semibold text-green-400">{totalWins}</p>
+            <p className="text-xl font-semibold text-emerald-400">{totalWins}</p>
           </div>
           <div className="space-y-1">
             <p className="text-xs text-zinc-500">Pending measurement</p>
@@ -184,7 +185,8 @@ function PremiumBreakdown({ scorecard }: { scorecard: OutcomeScorecard }) {
             </p>
           </div>
         </div>
-      </div>
+        </div>
+      </SectionCard>
     </div>
   );
 }

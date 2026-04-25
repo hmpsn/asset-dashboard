@@ -144,11 +144,11 @@ export function Roadmap() {
             {currentSprint && <span className="text-[11px] text-teal-400">Current: {currentSprint.name}</span>}
           </div>
           <div className="h-2.5 bg-zinc-800 rounded-full overflow-hidden flex">
-            {done > 0 && <div className="h-full bg-green-500 transition-all" style={{ width: `${(done / total) * 100}%` }} />}
+            {done > 0 && <div className="h-full bg-emerald-500 transition-all" style={{ width: `${(done / total) * 100}%` }} />}
             {inProgress > 0 && <div className="h-full bg-teal-400 transition-all" style={{ width: `${(inProgress / total) * 100}%` }} />}
           </div>
           <div className="flex items-center gap-4 mt-1.5 text-[11px] text-zinc-500">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" /> Done ({done})</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Done ({done})</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-teal-400" /> Active ({inProgress})</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-zinc-700" /> Pending ({pending})</span>
           </div>

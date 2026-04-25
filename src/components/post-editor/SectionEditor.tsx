@@ -5,6 +5,7 @@
 import {
   Loader2, RefreshCw, Check, ChevronDown, ChevronUp, Pencil, Clock, AlertTriangle,
 } from 'lucide-react';
+import { SectionCard } from '../ui';
 
 interface PostSection {
   index: number;
@@ -45,7 +46,7 @@ export function SectionEditor({
   onToggleExpand, onStartEdit, onSaveEdit, onCancelEdit, onRegenerate, onChangeBuffer,
 }: SectionEditorProps) {
   return (
-    <div className={`bg-zinc-900 rounded-xl border overflow-hidden ${section.status === 'error' ? 'border-red-500/30' : section.status === 'generating' ? 'border-amber-500/20' : 'border-zinc-800'}`}>
+    <SectionCard noPadding className={`overflow-hidden ${section.status === 'error' ? '!border-red-500/30' : section.status === 'generating' ? '!border-amber-500/20' : ''}`}>
       <button onClick={() => onToggleExpand(section.index)} className="w-full px-4 py-3 flex items-center justify-between hover:bg-zinc-800/30 transition-colors">
         <div className="flex items-center gap-2">
           {section.status === 'generating' ? <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400/80" /> :
@@ -101,6 +102,6 @@ export function SectionEditor({
           )}
         </div>
       )}
-    </div>
+    </SectionCard>
   );
 }

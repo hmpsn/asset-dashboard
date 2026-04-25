@@ -168,6 +168,7 @@ export function Explainer({ term }: { term: string }) {
         <HelpCircle className="w-3 h-3" />
       </button>
       {open && (
+        // pr-check-disable-next-line -- Glossary term tooltip/popover; absolutely positioned floating element, not a content card
         <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl p-3 text-left animate-in fade-in slide-in-from-bottom-1 duration-150">
           <div className="text-[11px] font-semibold text-teal-400 mb-1">{entry.term}</div>
           <p className="text-[11px] text-zinc-300 leading-relaxed mb-2">{entry.definition}</p>

@@ -28,7 +28,6 @@ import { Activity, Clipboard, Globe, Sparkles } from 'lucide-react';
 
 // ── Lazy-loaded route-level chunks ──
 const ClientDashboard = lazyWithRetry(() => import('./components/ClientDashboard').then(m => ({ default: m.ClientDashboard })));
-const Styleguide = lazyWithRetry(() => import('./components/Styleguide').then(m => ({ default: m.Styleguide })));
 const LandingPage = lazyWithRetry(() => import('./components/LandingPage').then(m => ({ default: m.LandingPage })));
 const PageRewriteChat = lazyWithRetry(() => import('./components/PageRewriteChat').then(m => ({ default: m.PageRewriteChat })));
 
@@ -69,6 +68,13 @@ const DiagnosticReportPage = lazyWithRetry(() => import('./components/admin/Diag
 
 function ChunkFallback() {
   return <div className="flex items-center justify-center py-24"><div className="w-6 h-6 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>;
+}
+
+// Not lazy-loaded — the redirect fires immediately so a lazy chunk would add
+// pointless network overhead before navigation.
+function StyleguideRedirect() {
+  useEffect(() => { window.location.replace('/styleguide.html'); }, []);
+  return null;
 }
 
 export interface FixContext {
@@ -116,7 +122,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/welcome" element={<Suspense fallback={<ChunkFallback />}><LandingPage /></Suspense>} />
-        <Route path="/styleguide" element={<Suspense fallback={<ChunkFallback />}><Styleguide /></Suspense>} />
+        <Route path="/styleguide" element={<StyleguideRedirect />} />
         <Route path="/client/beta/:workspaceId/*" element={<MobileGuard><Suspense fallback={<ChunkFallback />}><ClientRoutes betaMode /></Suspense></MobileGuard>} />
         <Route path="/client/:workspaceId/*" element={<MobileGuard><Suspense fallback={<ChunkFallback />}><ClientRoutes /></Suspense></MobileGuard>} />
         <Route path="/*" element={<ToastProvider><BackgroundTaskProvider><AdminApp /></BackgroundTaskProvider></ToastProvider>} />

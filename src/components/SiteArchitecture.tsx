@@ -50,12 +50,12 @@ interface SchemaCoverageData {
   priorityQueue: PriorityQueueItem[];
 }
 
-const PRIORITY_BADGE: Record<SchemaPriority, { label: string; color: 'red' | 'amber' | 'blue' | 'zinc' | 'green' }> = {
+const PRIORITY_BADGE: Record<SchemaPriority, { label: string; color: 'red' | 'amber' | 'blue' | 'zinc' | 'emerald' }> = {
   critical: { label: 'Critical', color: 'red' },
   high: { label: 'High', color: 'amber' },
   medium: { label: 'Medium', color: 'blue' },
   low: { label: 'Low', color: 'zinc' },
-  done: { label: 'Done', color: 'green' },
+  done: { label: 'Done', color: 'emerald' },
 };
 
 // ── Types (mirrors server/site-architecture.ts) ──
@@ -96,9 +96,9 @@ interface SiteArchitectureResult {
 
 // ── Source badge helpers ──
 
-const SOURCE_BADGE: Record<string, { label: string; color: 'green' | 'blue' | 'purple' | 'zinc' }> = {
-  existing: { label: 'Live', color: 'green' },
-  planned: { label: 'Planned', color: 'purple' },
+const SOURCE_BADGE: Record<string, { label: string; color: 'emerald' | 'blue' | 'zinc' }> = {
+  existing: { label: 'Live', color: 'emerald' },
+  planned: { label: 'Planned', color: 'blue' },
   strategy: { label: 'Strategy', color: 'blue' },
   gap: { label: 'Gap', color: 'zinc' },
 };

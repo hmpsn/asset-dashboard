@@ -312,7 +312,7 @@ describe('computeSummaryCounts', () => {
     const wins = summary.find(s => s.filterKey === INSIGHT_FILTER_KEYS.WINS);
     expect(wins).toBeDefined();
     expect(wins!.count).toBe(1);
-    expect(wins!.color).toBe('green');
+    expect(wins!.color).toBe('emerald');
   });
 
   it('counts serp_opportunity type as schema gaps (blue)', () => {

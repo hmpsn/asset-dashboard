@@ -49,6 +49,6 @@ export interface PipelineSignal {
 export interface SummaryCount {
   label: string;
   count: number;
-  color: string;            // tailwind color name: 'red', 'amber', 'green', 'blue', 'purple'
+  color: string;            // tailwind color name: 'red', 'amber', 'emerald', 'blue', 'purple'
   filterKey: string;        // used to filter feed when pill is clicked
 }

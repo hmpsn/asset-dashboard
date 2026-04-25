@@ -4,7 +4,7 @@ import {
   ArrowUpDown, Activity, ChevronDown, ChevronRight, Sparkles, Table2,
 } from 'lucide-react';
 import { RankTrackingSection } from '../shared/RankTable';
-import { CompactStatBar, EmptyState } from '../ui';
+import { CompactStatBar, EmptyState, SectionCard } from '../ui';
 import { DualTrendChart, InsightCard } from './helpers';
 import { Explainer } from './SeoGlossary';
 import type {
@@ -72,7 +72,7 @@ export function SearchTab({
 
   const insightCards = insights ? [
     insights.lowHanging.length > 0 ? { icon: Target, color: 'amber', title: 'Low-Hanging Fruit', count: insights.lowHanging.length, desc: 'Ranking 5-20 with impressions — push to page 1', items: insights.lowHanging.slice(0, 8).map(q => ({ label: q.query, value: `#${q.position}`, sub: `${q.impressions} imp` })) } : null,
-    insights.topPerformers.length > 0 ? { icon: Shield, color: 'green', title: 'Top Performers', count: insights.topPerformers.length, desc: 'Top 3 with real clicks — protect these', items: insights.topPerformers.slice(0, 8).map(q => ({ label: q.query, value: `#${q.position}`, sub: `${q.clicks} clicks` })) } : null,
+    insights.topPerformers.length > 0 ? { icon: Shield, color: 'emerald', title: 'Top Performers', count: insights.topPerformers.length, desc: 'Top 3 with real clicks — protect these', items: insights.topPerformers.slice(0, 8).map(q => ({ label: q.query, value: `#${q.position}`, sub: `${q.clicks} clicks` })) } : null,
     insights.ctrOpps.length > 0 ? { icon: TrendingDown, color: 'red', title: 'CTR Opportunities', count: insights.ctrOpps.length, desc: 'Page 1 but CTR under 3%', items: insights.ctrOpps.slice(0, 8).map(q => ({ label: q.query, value: `${q.ctr}% CTR`, sub: `#${q.position}` })) } : null,
     insights.highImpLowClick.length > 0 ? { icon: AlertTriangle, color: 'orange', title: 'Visibility Without Clicks', count: insights.highImpLowClick.length, desc: '100+ impressions, under 5 clicks', items: insights.highImpLowClick.slice(0, 8).map(q => ({ label: q.query, value: `${q.clicks} clicks`, sub: `${q.impressions} imp` })) } : null,
   ].filter(Boolean) as { icon: React.ComponentType<{ className?: string }>; color: string; title: string; count: number; desc: string; items: { label: string; value: string; sub: string }[] }[] : [];
@@ -85,6 +85,7 @@ export function SearchTab({
     </div>
 
     {/* AI-style takeaway */}
+    {/* pr-check-disable-next-line -- AI takeaway summary bar; compact bar with no section header */}
     <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl px-5 py-3.5 flex items-start gap-3">
       <Sparkles className="w-4 h-4 text-teal-400 mt-0.5 shrink-0" />
       <p className="text-xs text-zinc-300 leading-relaxed">{buildTakeaway(overview, searchComparison, insights)}</p>
@@ -102,31 +103,31 @@ export function SearchTab({
     {insights && (
       <div className="space-y-3">
         {/* Search Health Summary */}
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-          <div className="text-sm font-semibold text-zinc-200 mb-3">Search Health Summary</div>
+        <SectionCard title="Search Health Summary">
+
           <div className="grid grid-cols-4 gap-3">
             <div className="text-center">
-              <div className={`text-lg font-bold ${insights.page1 > 5 ? 'text-green-400' : 'text-amber-400'}`}>{insights.page1}</div>
+              <div className={`text-lg font-bold ${insights.page1 > 5 ? 'text-emerald-400' : 'text-amber-400'}`}>{insights.page1}</div>
               <div className="text-[11px] text-zinc-500">Page 1 Rankings</div>
-              <div className={`text-[10px] mt-0.5 ${insights.page1 >= 10 ? 'text-green-400/70' : insights.page1 >= 3 ? 'text-amber-400/70' : 'text-zinc-600'}`}>{insights.page1 >= 10 ? 'Strong visibility' : insights.page1 >= 3 ? 'Room to grow' : 'Building up'}</div>
+              <div className={`text-[10px] mt-0.5 ${insights.page1 >= 10 ? 'text-emerald-400/70' : insights.page1 >= 3 ? 'text-amber-400/70' : 'text-zinc-600'}`}>{insights.page1 >= 10 ? 'Strong visibility' : insights.page1 >= 3 ? 'Room to grow' : 'Building up'}</div>
             </div>
             <div className="text-center">
-              <div className={`text-lg font-bold ${insights.top3 > 2 ? 'text-green-400' : 'text-amber-400'}`}>{insights.top3}</div>
+              <div className={`text-lg font-bold ${insights.top3 > 2 ? 'text-emerald-400' : 'text-amber-400'}`}>{insights.top3}</div>
               <div className="text-[11px] text-zinc-500">Top 3 Rankings</div>
-              <div className={`text-[10px] mt-0.5 ${insights.top3 >= 5 ? 'text-green-400/70' : insights.top3 >= 1 ? 'text-amber-400/70' : 'text-zinc-600'}`}>{insights.top3 >= 5 ? 'Dominant positions' : insights.top3 >= 1 ? 'Competitive' : 'Opportunity ahead'}</div>
+              <div className={`text-[10px] mt-0.5 ${insights.top3 >= 5 ? 'text-emerald-400/70' : insights.top3 >= 1 ? 'text-amber-400/70' : 'text-zinc-600'}`}>{insights.top3 >= 5 ? 'Dominant positions' : insights.top3 >= 1 ? 'Competitive' : 'Opportunity ahead'}</div>
             </div>
             <div className="text-center">
-              <div className={`text-lg font-bold ${overview.avgCtr > 3 ? 'text-green-400' : overview.avgCtr > 1.5 ? 'text-amber-400' : 'text-red-400'}`}>{overview.avgCtr}%</div>
+              <div className={`text-lg font-bold ${overview.avgCtr > 3 ? 'text-emerald-400' : overview.avgCtr > 1.5 ? 'text-amber-400' : 'text-red-400'}`}>{overview.avgCtr}%</div>
               <div className="text-[11px] text-zinc-500 flex items-center justify-center gap-0.5">Avg CTR<Explainer term="ctr" /></div>
-              <div className={`text-[10px] mt-0.5 ${overview.avgCtr > 3 ? 'text-green-400/70' : overview.avgCtr > 1.5 ? 'text-amber-400/70' : 'text-red-400/70'}`}>{overview.avgCtr > 3 ? 'Above average' : overview.avgCtr > 1.5 ? 'Typical range' : 'Needs attention'}</div>
+              <div className={`text-[10px] mt-0.5 ${overview.avgCtr > 3 ? 'text-emerald-400/70' : overview.avgCtr > 1.5 ? 'text-amber-400/70' : 'text-red-400/70'}`}>{overview.avgCtr > 3 ? 'Above average' : overview.avgCtr > 1.5 ? 'Typical range' : 'Needs attention'}</div>
             </div>
             <div className="text-center">
-              <div className={`text-lg font-bold ${insights.lowHanging.length > 0 ? 'text-amber-400' : 'text-green-400'}`}>{insights.lowHanging.length}</div>
+              <div className={`text-lg font-bold ${insights.lowHanging.length > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>{insights.lowHanging.length}</div>
               <div className="text-[11px] text-zinc-500">Opportunities</div>
-              <div className={`text-[10px] mt-0.5 ${insights.lowHanging.length > 5 ? 'text-amber-400/70' : insights.lowHanging.length > 0 ? 'text-teal-400/70' : 'text-green-400/70'}`}>{insights.lowHanging.length > 5 ? 'Quick wins available' : insights.lowHanging.length > 0 ? 'A few to capture' : 'Fully optimized'}</div>
+              <div className={`text-[10px] mt-0.5 ${insights.lowHanging.length > 5 ? 'text-amber-400/70' : insights.lowHanging.length > 0 ? 'text-teal-400/70' : 'text-emerald-400/70'}`}>{insights.lowHanging.length > 5 ? 'Quick wins available' : insights.lowHanging.length > 0 ? 'A few to capture' : 'Fully optimized'}</div>
             </div>
           </div>
-        </div>
+        </SectionCard>
 
         {/* Insight cards — full-width for 1, 2-col for 2+ */}
         {insightCards.length === 1 ? (
@@ -141,13 +142,9 @@ export function SearchTab({
 
     {/* Trend chart */}
     {trend.length > 2 && (
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-medium text-zinc-400">Performance Trend</span>
-          <span className="text-[11px] text-zinc-500">{overview.dateRange.start} — {overview.dateRange.end}</span>
-        </div>
+      <SectionCard title="Performance Trend" action={<span className="text-[11px] text-zinc-500">{overview.dateRange.start} — {overview.dateRange.end}</span>}>
         <DualTrendChart data={trend} annotations={annotations} />
-      </div>
+      </SectionCard>
     )}
 
     {/* Rank Tracking */}
@@ -155,12 +152,7 @@ export function SearchTab({
 
     {/* Annotations (read-only, managed from admin) */}
     {annotations.length > 0 && (
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Activity className="w-4 h-4 text-zinc-400" />
-          <span className="text-xs font-semibold text-zinc-200">Timeline Annotations</span>
-          <span className="text-[11px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{annotations.length}</span>
-        </div>
+      <SectionCard title="Timeline Annotations" titleIcon={<Activity className="w-4 h-4 text-zinc-400" />} titleExtra={<span className="text-[11px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{annotations.length}</span>}>
         <div className="space-y-1.5">
           {annotations.map(ann => (
             <div key={ann.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-zinc-950/50">
@@ -171,10 +163,11 @@ export function SearchTab({
             </div>
           ))}
         </div>
-      </div>
+      </SectionCard>
     )}
 
     {/* Raw data tables — collapsible, secondary */}
+    {/* pr-check-disable-next-line -- Collapsible raw-data table wrapper with custom toggle button; not a static section card */}
     <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
       <button
         onClick={() => setShowRawData(!showRawData)}
@@ -214,7 +207,7 @@ export function SearchTab({
                   <td className="py-2.5 px-3 text-right text-blue-400 font-semibold">{q.clicks}</td>
                   <td className="py-2.5 px-3 text-right text-zinc-400">{q.impressions.toLocaleString()}</td>
                   <td className="py-2.5 px-3 text-right text-emerald-400">{q.ctr}%</td>
-                  <td className="py-2.5 px-3 text-right"><span className={q.position <= 10 ? 'text-green-400' : q.position <= 20 ? 'text-amber-400' : 'text-red-400'}>{q.position}</span></td>
+                  <td className="py-2.5 px-3 text-right"><span className={q.position <= 10 ? 'text-emerald-400' : q.position <= 20 ? 'text-amber-400' : 'text-red-400'}>{q.position}</span></td>
                 </tr>
               ))}
               {searchSubTab === 'pages' && sortedPages().map((p, i) => {
@@ -226,7 +219,7 @@ export function SearchTab({
                     <td className="py-2.5 px-3 text-right text-blue-400 font-semibold">{p.clicks}</td>
                     <td className="py-2.5 px-3 text-right text-zinc-400">{p.impressions.toLocaleString()}</td>
                     <td className="py-2.5 px-3 text-right text-emerald-400">{p.ctr}%</td>
-                    <td className="py-2.5 px-3 text-right"><span className={p.position <= 10 ? 'text-green-400' : p.position <= 20 ? 'text-amber-400' : 'text-red-400'}>{p.position}</span></td>
+                    <td className="py-2.5 px-3 text-right"><span className={p.position <= 10 ? 'text-emerald-400' : p.position <= 20 ? 'text-amber-400' : 'text-red-400'}>{p.position}</span></td>
                   </tr>
                 );
               })}

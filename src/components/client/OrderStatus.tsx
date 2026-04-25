@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { CheckCircle2, Loader2, Clock, FileText, Image, Code2, ArrowRightLeft, Package, Wrench } from 'lucide-react';
 import { getSafe } from '../../api/client';
+import { SectionCard } from '../ui';
 
 interface WorkOrder {
   id: string;
@@ -27,7 +28,7 @@ const STEP_LABELS: Record<string, string> = { pending: 'Pending', in_progress: '
 const STATUS_BADGE: Record<string, { label: string; icon: typeof CheckCircle2; color: string; bg: string; border: string }> = {
   pending:     { label: 'Pending',     icon: Clock,        color: 'text-amber-400',  bg: 'bg-amber-500/10',  border: 'border-amber-500/20' },
   in_progress: { label: 'In Progress', icon: Loader2,      color: 'text-blue-400',   bg: 'bg-blue-500/10',   border: 'border-blue-500/20' },
-  completed:   { label: 'Completed',   icon: CheckCircle2, color: 'text-green-400',  bg: 'bg-green-500/10',  border: 'border-green-500/20' },
+  completed:   { label: 'Completed',   icon: CheckCircle2, color: 'text-emerald-400',  bg: 'bg-emerald-500/10',  border: 'border-emerald-500/20' },
   cancelled:   { label: 'Cancelled',   icon: Clock,        color: 'text-zinc-400',   bg: 'bg-zinc-500/10',   border: 'border-zinc-500/20' },
 };
 
@@ -72,13 +73,7 @@ export function OrderStatus({ workspaceId }: OrderStatusProps) {
   if (orders.length === 0) return null;
 
   return (
-    <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-      <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2">
-        <Wrench className="w-4 h-4 text-teal-400" />
-        <span className="text-xs font-semibold text-zinc-200">Your Fix Orders</span>
-        <span className="text-[11px] text-zinc-500 ml-auto">{orders.length} order{orders.length !== 1 ? 's' : ''}</span>
-      </div>
-
+    <SectionCard title="Your Fix Orders" titleIcon={<Wrench className="w-4 h-4 text-teal-400" />} action={<span className="text-[11px] text-zinc-500">{orders.length} order{orders.length !== 1 ? 's' : ''}</span>} noPadding className="overflow-hidden">
       <div className="divide-y divide-zinc-800/50">
         {orders.map(order => {
           const product = PRODUCT_LABELS[order.productType] || { label: order.productType.replace(/_/g, ' '), icon: FileText };
@@ -120,6 +115,6 @@ export function OrderStatus({ workspaceId }: OrderStatusProps) {
           );
         })}
       </div>
-    </div>
+    </SectionCard>
   );
 }

@@ -3,6 +3,7 @@ import {
   Globe, Search, BarChart3, Loader2, Check, Unplug, LogIn, LogOut, ExternalLink,
 } from 'lucide-react';
 import SearchableSelect from '../SearchableSelect';
+import { SectionCard } from '../ui';
 
 interface GscSite { siteUrl: string; permissionLevel: string; }
 interface GA4Property { name: string; displayName: string; propertyId: string; }
@@ -44,7 +45,7 @@ export function ConnectionsTab({
   return (
     <div className="space-y-8">
       {/* Webflow */}
-      <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+      <SectionCard noPadding>
         <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
           <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
             <Globe className="w-4 h-4 text-teal-400" />
@@ -92,10 +93,10 @@ export function ConnectionsTab({
             )}
           </div>
         )}
-      </section>
+      </SectionCard>
 
       {/* Google Auth */}
-      <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+      <SectionCard noPadding>
         <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
           <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
             <Search className="w-4 h-4 text-blue-400" />
@@ -119,11 +120,11 @@ export function ConnectionsTab({
             <span className="text-[11px] text-amber-400 bg-amber-500/10 px-2 py-1 rounded-full">Not configured</span>
           )}
         </div>
-      </section>
+      </SectionCard>
 
       {/* GSC Property */}
       {googleStatus?.connected && gscSites.length > 0 && (
-        <section className="rounded-xl bg-zinc-900 border border-zinc-800">
+        <SectionCard noPadding>
           <div className="px-5 py-4 flex items-center gap-3">
             <Search className="w-4 h-4 text-blue-400" />
             <span className="text-sm font-medium flex-1 text-zinc-200">Search Console Property</span>
@@ -139,12 +140,12 @@ export function ConnectionsTab({
               />
             )}
           </div>
-        </section>
+        </SectionCard>
       )}
 
       {/* GA4 Property */}
       {googleStatus?.connected && ga4Properties.length > 0 && (
-        <section className="rounded-xl bg-zinc-900 border border-zinc-800">
+        <SectionCard noPadding>
           <div className="px-5 py-4 flex items-center gap-3">
             <BarChart3 className="w-4 h-4 text-teal-400" />
             <span className="text-sm font-medium flex-1 text-zinc-200">GA4 Property</span>
@@ -160,7 +161,7 @@ export function ConnectionsTab({
               />
             )}
           </div>
-        </section>
+        </SectionCard>
       )}
     </div>
   );

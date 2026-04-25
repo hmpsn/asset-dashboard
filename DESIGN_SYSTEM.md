@@ -47,21 +47,36 @@ Inter loaded from Google Fonts: 300–700.
 
 ---
 
+## Radius Scale
+
+| Token | Value | Tailwind Equivalent | Usage |
+|-------|-------|---------------------|-------|
+| `--radius-sm` | `6px` | `rounded` | Small controls, pills, badges |
+| `--radius-md` | `8px` | `rounded-md` | Buttons, inputs |
+| `--radius-lg` | `12px` | `rounded-xl` | Cards, panels — new code uses `rounded-[var(--radius-lg)]` |
+| `--radius-xl` | `16px` | `rounded-2xl` | Modals, large overlays |
+
+**Brand asymmetric radius:** `SectionCard` default variant uses `10px 24px 10px 24px` (the brand signature). This is intentional and correct. The `--radius-lg` token governs new generic cards; the asymmetric radius is a SectionCard-specific design decision, not a token.
+
+**Rule for new card elements:** use `rounded-[var(--radius-lg)]` not the hardcoded Tailwind class `rounded-xl`. This makes the radius system themeable.
+
+---
+
 ## Color System
 
 ### Dark Mode (default)
 
-| Token | Value | Tailwind | Usage |
-|-------|-------|----------|-------|
-| `--bg-base` | #0f1219 | — | Page background |
-| `--bg-card` | #18181b | bg-zinc-900 | Card backgrounds |
-| `--bg-elevated` | #27272a | bg-zinc-800 | Inputs, active tabs, hover states |
-| `--border-default` | #27272a | border-zinc-800 | Card borders |
-| `--border-hover` | #3f3f46 | border-zinc-700 | Hover border state |
-| `--text-primary` | #f4f4f5 | text-zinc-100/200 | Headings, key content |
-| `--text-secondary` | #b4b4bc | text-zinc-400 | Descriptions, supporting text |
-| `--text-muted` | #a1a1aa | text-zinc-500 | Captions, timestamps, labels |
-| `--text-subtle` | #71717a | text-zinc-600/700 | Disabled, dividers |
+| Canonical Token | Legacy Name | Value | Tailwind | Usage |
+|-----------------|-------------|-------|----------|-------|
+| `--surface-1` | `--brand-bg` | #0f1219 | — | Page background |
+| `--surface-2` | `--brand-bg-surface/elevated` | #18181b | bg-zinc-900 | Card backgrounds |
+| `--surface-3` | `--brand-bg-card` | #27272a | bg-zinc-800 | Inputs, active tabs, hover states |
+| — | `--brand-border` | #27272a | border-zinc-800 | Card borders |
+| — | `--brand-border-hover` | #3f3f46 | border-zinc-700 | Hover border state |
+| — | — | #f4f4f5 | text-zinc-100/200 | Headings, key content |
+| — | — | #b4b4bc | text-zinc-400 | Descriptions, supporting text |
+| — | — | #a1a1aa | text-zinc-500 | Captions, timestamps, labels |
+| — | — | #71717a | text-zinc-600/700 | Disabled, dividers |
 
 ### Light Mode (.dashboard-light)
 
@@ -385,6 +400,46 @@ Centered modal overlay for confirming destructive or irreversible actions. Repla
 | **Ghost** | `text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 rounded-md px-2 py-1 text-xs font-medium` |
 | **Accent text** | `text-teal-400 hover:bg-zinc-800 rounded-md px-2 py-1 text-xs font-medium` |
 
+### 16. Typography primitives (Phase 5)
+
+Thin wrappers over `.t-*` utilities. Each forwards refs and merges `className`. Live in `src/components/ui/typography/`.
+
+| Primitive | API | Renders | Notes |
+|-----------|-----|---------|-------|
+| **Heading** | `level={1\|2\|3}`, `as?="h1\|h2\|h3\|div"` | `.t-h1` (level=1) / `.t-h2` (level=2) / `.t-page` (level=3) | Default tag tracks `level`; `as="div"` for semantic-heading nesting issues. |
+| **Stat** | `size?="hero"\|"default"\|"sm"` | `.t-stat-lg` / `.t-stat` / `.t-stat-sm` | DIN Pro numerals. Use for KPIs / dashboard numbers. |
+| **BodyText** | `tone?="default"\|"muted"\|"dim"` | `.t-body` + inline `style.color` from CSS var | Tone is the color API. Tailwind color utilities via `className` are overridden by the inline tone style — pass `tone="default"` and let parent context drive color if you need a custom hue. |
+| **Caption** | `size?="default"\|"sm"` | `.t-caption` / `.t-caption-sm` | Secondary metadata, timestamps. |
+| **Label** | (no props) | `.t-label` (uppercase DIN) | Form labels, uppercase section markers. |
+| **Mono** | `size?="default"\|"micro"` | `.t-mono` (12px) / `.t-micro` (10px) | Both monospace (Fira Code → JetBrains Mono → Menlo fallback). IDs, slugs, tokens, timestamps. |
+
+Codemod scaffold: `scripts/codemods/phase5-typography.ts` (dry-run) reports candidate sites. Phase 2 applies migrations.
+
+### 21. Icon (Phase 5)
+
+Strict-enum wrapper around any Lucide component. Inline-flex `<span>` so it is safe inside `<p>`, `<li>`, or flex rows without breaking layout.
+
+```tsx
+import { TrendingUp } from 'lucide-react';
+import { Icon } from '@/components/ui';
+
+<Icon as={TrendingUp} size="sm" className="text-teal-400" />
+```
+
+- **Strict size enum** (no freeform `size={N}`):
+  - `xs` → `w-2 h-2` (8px)
+  - `sm` → `w-3 h-3` (12px) — default in most usage
+  - `md` → `w-4 h-4` (16px)
+  - `lg` → `w-5 h-5` (20px)
+  - `xl` → `w-6 h-6` (24px)
+  - `2xl` → `w-8 h-8` (32px)
+- **Color via `className`**: `currentColor` inheritance (`className="text-teal-400"`). No color enum; composes with the Three Laws color tokens.
+- **A11y**:
+  - Inner SVG is `aria-hidden="true"` by default — decorative icons are ignored by screen readers.
+  - For a semantic icon that conveys meaning on its own, pass `aria-label` as a prop; it is forwarded to the `<span>` wrapper via the HTMLAttributes rest spread.
+- **Ref**: forwarded to the `<span>` (`HTMLSpanElement`).
+- **Exception list (do NOT wrap)**: Lucide icons passed as props to other primitives (e.g. `<EmptyState icon={Clock} />`, `<Button icon={Send}>`, `<IconButton icon={X} />`) — those primitives manage sizing themselves.
+
 ---
 
 ## Spacing
@@ -421,6 +476,8 @@ src/components/ui/
 ├── MetricToggleCard.tsx    # Toggleable stat card for chart series visibility (active/inactive states)
 ├── PageHeader.tsx          # Consistent page header
 ├── SectionCard.tsx         # Standard card container
+├── ChartCard.tsx           # SectionCard variant for charts (inline title+TrendBadge)
+├── TrendBadge.tsx          # Canonical directional delta indicator (emerald/red/zinc)
 ├── DateRangeSelector.tsx   # Unified date/period picker
 ├── DataList.tsx            # Ranked list display
 ├── Badge.tsx               # Status/category pill

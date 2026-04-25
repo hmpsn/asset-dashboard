@@ -957,6 +957,23 @@ export const CHECKS: Check[] = [
     severity: 'warn',
   },
   {
+    // Hand-rolled trend badge: `<TrendingUp/>` + `<TrendingDown/>` in one ternary.
+    // This is the canonical signature of a delta indicator assembled inline rather
+    // than using `<TrendBadge>` from src/components/ui/TrendBadge.tsx. Ships as
+    // warn — promote to error once the long tail (currently ChatBlocks, SeoChangeImpact)
+    // is migrated.
+    name: 'Hand-rolled trend badge',
+    pattern: '<TrendingUp[^>]*/>[^<]*:[^<]*<TrendingDown|<TrendingDown[^>]*/>[^<]*:[^<]*<TrendingUp',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: ['src/components/ui/TrendBadge.tsx'],
+    excludeLines: ['// trend-badge-ok'],
+    message: 'Use <TrendBadge value={delta} /> from src/components/ui/ instead of hand-rolled TrendingUp/TrendingDown ternaries. Props: value, suffix, invert, showSign, label, size, hideOnZero.',
+    severity: 'warn',
+    rationale: 'Hand-rolled trend badges drift in color (text-green-400 vs text-emerald-400), sign handling, and zero-state across 7+ callsites. <TrendBadge> consolidates the canonical form.',
+    claudeMdRef: '#design-system--the-three-laws-of-color',
+  },
+  {
     name: 'z.array(z.unknown()) on server',
     pattern: 'z\\.array\\(z\\.unknown\\(\\)\\)',
     fileGlobs: ['*.ts'],
@@ -998,7 +1015,6 @@ export const CHECKS: Check[] = [
   },
   {
     name: 'SVG with hardcoded dark fill/stroke',
-    pattern: '(fill|stroke)=\\"(#0f1219|#18181b|#27272a|#303036|#52525b)\\"',
     fileGlobs: ['*.tsx'],
     pathFilter: 'src/components/',
     exclude: 'Styleguide.tsx',
@@ -1006,6 +1022,25 @@ export const CHECKS: Check[] = [
     excludeLines: ['chartDotStroke(', 'chartDotFill(', 'chartAxisColor(', 'chartGridColor('],
     message: 'Use chartDotStroke()/chartAxisColor() from ui/constants.ts for SVG colors. Dark hex breaks light mode.',
     severity: 'warn',
+    // Converted from pattern to customCheck — the original pattern contained `\"`
+    // inside outer shell double-quotes. The safePattern escaping would double-escape
+    // these to `\\"`, breaking the shell command silently (swallowed by || true).
+    customCheck: (files) => {
+      const SVG_ATTR = /(?:fill|stroke)="(#0f1219|#18181b|#27272a|#303036|#52525b)"/gi;
+      const hits: CustomCheckMatch[] = [];
+      files.forEach(filePath => {
+        try {
+          const fileLines = readFileSync(filePath, 'utf-8').split('\n');
+          fileLines.forEach((line, i) => {
+            if (SVG_ATTR.test(line)) {
+              hits.push({ file: filePath, line: i + 1, text: line.trim() });
+            }
+            SVG_ATTR.lastIndex = 0;
+          });
+        } catch { /* file not found in worktree */ }
+      });
+      return hits;
+    },
   },
   {
     name: 'Direct listPages() outside workspace-data',
@@ -3697,6 +3732,263 @@ export const CHECKS: Check[] = [
       return hits;
     },
   },
+  // ─── Design system enforcement rules (Phase 1) ─────────────────────────────
+  {
+    name: 'Legacy surface token in new code',
+    pattern: 'var\\(--brand-bg-',
+    fileGlobs: ['*.tsx', '*.css'],
+    exclude: ['src/index.css'],
+    message: 'Use var(--surface-1/2/3) instead of var(--brand-bg-*). The --brand-bg-* names are legacy aliases — see DESIGN_SYSTEM.md.',
+    severity: 'error',
+    rationale: 'Prevents new code from using deprecated token names that bypass the 3-tier surface system.',
+    claudeMdRef: '#design-system--the-three-laws-of-color',
+  },
+  {
+    name: 'Hand-rolled card div (use SectionCard)',
+    // customCheck (was pattern) — the original regex contained literal double
+    // quotes which broke the shell `grep -E "..."` invocation in checkDirectory;
+    // the error was swallowed by `2>/dev/null || true`, so the rule silently
+    // reported ✓ despite 26 violations. Converted to customCheck to avoid the
+    // shell-quoting hazard and to support pr-check-disable-next-line with a
+    // 5-line lookback (multi-attribute JSX puts className= 3-4 lines below the
+    // opening tag where the hatch comment sits).
+    fileGlobs: ['*.tsx'],
+    exclude: [
+      'src/components/ui/',
+    ],
+    message: 'Use <SectionCard> or <SectionCard variant="subtle"> instead of hand-rolling bg-zinc-9xx + rounded-xl. Add a // pr-check-disable-next-line comment with justification for modals and non-card elements.',
+    severity: 'error',
+    rationale: 'Prevents hand-rolled card divs that bypass the SectionCard primitive and the --surface-N token system.',
+    claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const cardRe = /className="[^"]*bg-zinc-9\d{2}[^"]*rounded-xl/;
+      // Look back up to 5 lines for the hatch comment. Multi-attribute JSX
+      // commonly places className= 3-4 lines below the opening tag where the
+      // disable comment sits, so the standard 1-line lookback in hasHatch() is
+      // insufficient here.
+      const localHasHatch = (lines: string[], i: number) => {
+        for (let j = Math.max(0, i - 5); j <= i; j++) {
+          if (lines[j].includes('pr-check-disable-next-line')) return true;
+        }
+        return false;
+      };
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!cardRe.test(lines[i])) continue;
+          if (localHasHatch(lines, i)) continue;
+          hits.push({ file, line: i + 1, text: lines[i] });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'SectionCard titleExtra with ml-auto (use action prop)',
+    // `titleExtra` renders inside the left-aligned title cluster. The cluster
+    // has no flex-grow, so `ml-auto` on a child has no effect — the content
+    // does NOT push to the right edge. Callers who want right-aligned content
+    // must use the `action` prop instead, which lives on the outer flex row
+    // that uses `justify-between`. This rule catches the recurring migration
+    // bug where `ml-auto` is carried over from a hand-rolled card into
+    // `titleExtra`, silently producing left-clustered content.
+    fileGlobs: ['*.tsx'],
+    exclude: ['src/components/ui/'],
+    message: 'titleExtra renders inside the left-aligned title cluster — ml-auto has no effect there. Use the `action` prop for right-aligned content (date pickers, counts, export links, tier badges). See src/components/ui/SectionCard.tsx JSDoc.',
+    severity: 'error',
+    rationale: 'Prevents the recurring "right-aligned metadata lands on the left" bug seen across 5 SectionCard migrations (OrderStatus, RankTable, DataSnapshots, SearchTab, FixRecommendations).',
+    claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const idx = line.indexOf('titleExtra=');
+          if (idx === -1) continue;
+          if (line.includes('pr-check-disable-next-line')) continue;
+          if (i > 0 && lines[i - 1].includes('pr-check-disable-next-line')) continue;
+          // Scan forward up to 10 lines to find the closing `}` of the prop.
+          // Use brace balancing starting from the `{` that follows `titleExtra=`.
+          const openIdx = line.indexOf('{', idx);
+          if (openIdx === -1) continue;
+          let depth = 0;
+          let sawMlAuto = false;
+          let endLine = i;
+          outer: for (let j = i; j < Math.min(lines.length, i + 15); j++) {
+            const scan = j === i ? lines[j].slice(openIdx) : lines[j];
+            if (scan.includes('ml-auto')) sawMlAuto = true;
+            for (const ch of scan) {
+              if (ch === '{') depth++;
+              else if (ch === '}') {
+                depth--;
+                if (depth === 0) { endLine = j; break outer; }
+              }
+            }
+          }
+          void endLine;
+          if (sawMlAuto) hits.push({ file, line: i + 1, text: line.trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'Page component missing PageHeader',
+    fileGlobs: [],
+    message: 'Top-level page components must use <PageHeader>. Add <PageHeader title="..." subtitle="..." /> or add this file to the exclude list in pr-check.ts with a justification comment.',
+    severity: 'warn',
+    rationale: 'Enforces consistent page-level header structure across all navigable views.',
+    claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
+    customCheck: (_files) => {
+      const PAGE_COMPONENTS = [
+        // Currently missing PageHeader (Phase 3 migration targets):
+        'src/components/ContentPipeline.tsx',
+        'src/components/ContentManager.tsx',
+        'src/components/SeoAudit.tsx',
+        'src/components/KeywordStrategy.tsx',
+        'src/components/Performance.tsx',
+        'src/components/PageSpeedPanel.tsx',
+        'src/components/RankTracker.tsx',
+        'src/components/ContentBriefs.tsx',
+        'src/components/RevenueDashboard.tsx',
+        'src/components/ClientDashboard.tsx',
+        'src/components/KeywordAnalysis.tsx',
+        // Already have PageHeader (guard against regression):
+        'src/components/WorkspaceHome.tsx',
+        'src/components/WorkspaceOverview.tsx',
+        'src/components/AnalyticsHub.tsx',
+        'src/components/BrandHub.tsx',
+        'src/components/InternalLinks.tsx',
+        'src/components/RedirectManager.tsx',
+        'src/components/SiteArchitecture.tsx',
+        'src/components/Roadmap.tsx',
+        'src/components/LlmsTxtGenerator.tsx',
+        'src/components/ContentPerformance.tsx',
+        'src/components/ContentPlanner.tsx',
+        'src/components/ContentSubscriptions.tsx',
+        'src/components/FeatureLibrary.tsx',
+      ];
+      return PAGE_COMPONENTS
+        .filter(p => {
+          try {
+            const content = readFileSync(path.join(ROOT, p), 'utf-8');
+            return !content.includes('<PageHeader');
+          } catch {
+            return false;
+          }
+        })
+        .map(p => ({ file: p, line: 1, text: 'Missing <PageHeader>' }));
+    },
+  },
+  {
+    name: 'Hardcoded card radius outside ui primitives',
+    pattern: 'className="[^"]*rounded-xl',
+    fileGlobs: ['*.tsx'],
+    exclude: [
+      'src/components/ui/',
+      'public/styleguide.html',
+    ],
+    message: 'Use rounded-[var(--radius-lg)] instead of rounded-xl so the radius is themeable. Add a // pr-check-disable-next-line comment with justification for modals or non-card elements.',
+    severity: 'warn',
+    rationale: 'Prevents hardcoded Tailwind radius classes that bypass the --radius-* token system.',
+    claudeMdRef: '#design-system--the-three-laws-of-color',
+  },
+  {
+    name: 'radius-signature-lg used outside SectionCard',
+    pattern: '--radius-signature-lg',
+    fileGlobs: ['*.tsx', '*.css'],
+    exclude: [
+      'src/components/ui/SectionCard.tsx',
+      'public/styleguide.html',
+      'public/styleguide.css',
+    ],
+    message: '--radius-signature-lg is the brand asymmetric radius (10px 24px 10px 24px) and is only permitted inside SectionCard.tsx. Use --radius-lg for other card elements.',
+    severity: 'error',
+    rationale: 'The asymmetric corner is a SectionCard-only brand signature. Other components adopting it would dilute the design intent.',
+    claudeMdRef: '#design-system--the-three-laws-of-color',
+  },
+  {
+    name: 'Non-standard transition duration',
+    // Implemented as customCheck — grep -E does not support negative lookahead,
+    // so the original pattern `transition-duration-\\[(?!120ms|180ms|400ms)` was
+    // silently ineffective (always matched zero lines).
+    fileGlobs: ['*.tsx', '*.css'],
+    exclude: [
+      'src/components/ui/',
+      'public/styleguide.html',
+      'public/styleguide.css',
+    ],
+    message: 'Use transition-duration-[120ms], transition-duration-[180ms], or transition-duration-[400ms]. Non-standard durations break motion consistency.',
+    severity: 'warn',
+    rationale: 'Enforces the three-speed motion system: 120ms (micro), 180ms (standard), 400ms (entrance).',
+    claudeMdRef: '#design-system--the-three-laws-of-color',
+    customCheck: (files) => {
+      const ALLOWED = new Set(['120ms', '180ms', '400ms']);
+      const violations: Array<{ file: string; line: number; text: string }> = [];
+      // files are absolute paths from resolveCheckFileList — use directly
+      files.forEach(filePath => {
+        try {
+          const lines = readFileSync(filePath, 'utf-8').split('\n');
+          lines.forEach((line, i) => {
+            for (const m of line.matchAll(/transition-duration-\[([^\]]+)\]/g)) {
+              if (!ALLOWED.has(m[1])) {
+                violations.push({ file: filePath, line: i + 1, text: line.trim() });
+              }
+            }
+          });
+        } catch { /* file not found in worktree */ }
+      });
+      return violations;
+    },
+  },
+
+  // ─── Phase 5 — Token authority ───────────────────────────────────────────────
+  {
+    name: 'styleguide-token-parity',
+    severity: 'warn', // promoted to error in Phase 3 after Phase 2 clears the backlog
+    fileGlobs: ['*.css'],
+    message:
+      'public/styleguide.css must only @import url(\'/tokens.css\'); redeclaring tokens creates drift. ' +
+      'Run `npx tsx scripts/verify-styleguide-parity.ts` for details.',
+    rationale:
+      'src/tokens.css is the single canonical token source. public/styleguide.css must import ' +
+      'from /tokens.css — not redeclare — so styleguide and app always use identical values.',
+    claudeMdRef: 'Design System — Token source of truth',
+    // customCheck because this requires cross-file parsing (tokens.css vs styleguide.css)
+    // rather than per-file pattern matching.
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+
+      // Only check files in the provided list that look like public/styleguide.css
+      const pathsToCheck = files.filter(f => f.endsWith('public/styleguide.css') || f.endsWith('public' + path.sep + 'styleguide.css'));
+
+      for (const styleguidePath of pathsToCheck) {
+        try {
+          const css = readFileSync(styleguidePath, 'utf-8');
+          const matches = [...css.matchAll(/^\s*(--[\w-]+)\s*:/gm)];
+          for (const m of matches) {
+            const lineNum = (css.slice(0, m.index ?? 0).match(/\n/g) ?? []).length + 1;
+            hits.push({
+              file: styleguidePath,
+              line: lineNum,
+              text: `re-declared token ${m[1]} in public/styleguide.css (must come via @import url('/tokens.css'))`,
+            });
+          }
+        } catch {
+          // File doesn't exist — skip (not an error in Phase 0 before styleguide is created)
+        }
+      }
+      return hits;
+    },
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
@@ -3714,9 +4006,11 @@ function applyExcludeLines(lines: string[], excludeLines?: string[]): string[] {
 
 function checkFile(file: string, check: Check): string[] {
   if (isExcluded(file, check.exclude)) return [];
+  if (!check.pattern) return [];
   try {
+    const safePattern = check.pattern.replace(/"/g, '\\"');
     const out = execSync(
-      `grep -n -E "${check.pattern}" "${file}" 2>/dev/null || true`,
+      `grep -n -E "${safePattern}" "${file}" 2>/dev/null || true`,
       { cwd: ROOT, encoding: 'utf-8' }
     );
     const lines = out.trim() ? out.trim().split('\n').filter(Boolean).map(l => `${file}:${l}`) : [];
@@ -3727,7 +4021,7 @@ function checkFile(file: string, check: Check): string[] {
 }
 
 // Directories that should never be scanned (vendor code, test fixtures, build output)
-const EXCLUDED_DIRS = ['node_modules', 'dist', '.git', '.claude', 'scripts', 'tests'];
+const EXCLUDED_DIRS = ['node_modules', 'dist', '.git', '.claude', '.worktrees', 'scripts', 'tests'];
 // Root-level files to skip (--exclude-dir doesn't work on files)
 const EXCLUDED_FILES = ['test-branding.ts'];
 
@@ -3735,6 +4029,7 @@ const EXCLUDED_FILES = ['test-branding.ts'];
 // collision' regression test. Not part of the public API; do not import from
 // anywhere except the test harness.
 export function checkDirectory(dir: string, check: Check): string[] {
+  if (!check.pattern) return [];
   const globs = check.fileGlobs.map(g => `--include="${g}"`).join(' ');
   // If the rule opts into a normally-excluded directory via pathFilter (e.g.
   // 'tests/'), that directory must NOT be in the grep --exclude-dir list.
@@ -3746,8 +4041,16 @@ export function checkDirectory(dir: string, check: Check): string[] {
   const excludeDirs = effectiveExcludeDirs.map(d => `--exclude-dir="${d}"`).join(' ');
   const excludeFiles = EXCLUDED_FILES.map(f => `--exclude="${f}"`).join(' ');
   try {
+    // Escape any literal double quotes in the pattern before interpolating into
+    // the shell command string. Without this, patterns like `className="[^"]*...`
+    // break the outer double-quote boundary, causing grep to misparse the
+    // command. The error is swallowed by `2>/dev/null || true`, so the rule
+    // silently reports ✓ — the exact silent-false-negative class this audit
+    // tries to prevent. Rule C ("Hardcoded card radius outside ui primitives")
+    // has this pattern; Rule B was already converted to customCheck.
+    const safePattern = check.pattern.replace(/"/g, '\\"');
     const out = execSync(
-      `grep -rn ${globs} ${excludeDirs} ${excludeFiles} -E "${check.pattern}" "${dir}" 2>/dev/null || true`,
+      `grep -rn ${globs} ${excludeDirs} ${excludeFiles} -E "${safePattern}" "${dir}" 2>/dev/null || true`,
       { cwd: ROOT, encoding: 'utf-8' }
     );
     let lines = out.trim() ? out.trim().split('\n').filter(Boolean) : [];

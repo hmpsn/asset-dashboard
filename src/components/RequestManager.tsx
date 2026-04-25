@@ -64,7 +64,7 @@ const STATUS_OPTIONS: { value: RequestStatus; label: string; color: string }[] =
   { value: 'in_review', label: 'In Review', color: 'bg-amber-500/10 border-amber-500/30 text-amber-400' },
   { value: 'in_progress', label: 'In Progress', color: 'bg-teal-500/10 border-teal-500/30 text-teal-400' },
   { value: 'on_hold', label: 'On Hold', color: 'bg-zinc-500/10 border-zinc-600 text-zinc-400' },
-  { value: 'completed', label: 'Completed', color: 'bg-green-500/10 border-green-500/30 text-green-400' },
+  { value: 'completed', label: 'Completed', color: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' },
   { value: 'closed', label: 'Closed', color: 'bg-zinc-500/10 border-zinc-600 text-zinc-500' },
 ];
 
@@ -304,6 +304,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
 
       {/* Bulk action bar */}
       {selected.size > 0 && (
+        // pr-check-disable-next-line -- floating bulk-action toolbar
         <div className="rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap bg-zinc-900 border-2 border-teal-400" style={{ boxShadow: '0 0 12px rgba(45,212,191,0.1)' }}>
           <div className="flex items-center gap-2">
             <CheckCheck className="w-4 h-4 text-teal-400" />

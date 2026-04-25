@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BrainCircuit, Save, Loader2, Sparkles } from 'lucide-react';
 import { put, post } from '../../api/client';
+import { SectionCard } from '../ui';
 
 interface IntelligenceProfile {
   industry?: string;
@@ -78,7 +79,7 @@ export function IntelligenceProfileTab({ workspaceId, intelligenceProfile, toast
   return (
     <div className="space-y-8">
       {/* Card */}
-      <div className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+      <SectionCard noPadding>
         <div className="px-5 py-4 flex items-center justify-between border-b border-zinc-800">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
@@ -155,13 +156,13 @@ export function IntelligenceProfileTab({ workspaceId, intelligenceProfile, toast
             </button>
           </div>
         </div>
-      </div>
+      </SectionCard>
 
       {/* Context note */}
-      <div className="rounded-xl bg-zinc-900/50 border border-zinc-800 px-4 py-3 text-[11px] text-zinc-500 space-y-1">
-        <p className="font-medium text-zinc-400">How this is used</p>
-        <p>The intelligence profile feeds into AI-generated insights, keyword strategy recommendations, and chat context. It helps the platform understand the business's strategic direction, not just its contact details.</p>
-      </div>
+      <SectionCard variant="subtle">
+        <p className="font-medium text-zinc-400 text-[11px]">How this is used</p>
+        <p className="text-[11px] text-zinc-500 mt-1">The intelligence profile feeds into AI-generated insights, keyword strategy recommendations, and chat context. It helps the platform understand the business's strategic direction, not just its contact details.</p>
+      </SectionCard>
     </div>
   );
 }

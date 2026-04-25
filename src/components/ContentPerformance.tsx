@@ -108,12 +108,12 @@ function formatEngagement(seconds: number): string {
 
 const PAGE_TYPE_COLORS: Record<string, string> = {
   blog: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  landing: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+  landing: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
   service: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
   location: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
   product: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   pillar: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
-  resource: 'bg-pink-500/10 text-pink-400 border-pink-500/20',
+  resource: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
 };
 
 export function ContentPerformance({ workspaceId }: Props) {

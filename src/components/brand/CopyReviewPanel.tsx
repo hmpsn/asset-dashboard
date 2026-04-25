@@ -388,11 +388,12 @@ function CopyReviewPanelInner({ workspaceId, blueprintId, entryId }: Props) {
 
   if (isError) {
     return (
-      <div className="bg-zinc-900 border border-red-900/40 rounded-xl p-6 text-center">
-        <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-3" />
-        <p className="text-sm font-medium text-zinc-200 mb-1">Failed to load copy sections</p>
-        <p className="text-xs text-zinc-500">Check your connection and try again.</p>
-      </div>
+      <SectionCard title="Failed to load copy sections" className="!border-red-900/40">
+        <div className="flex flex-col items-center text-center gap-3">
+          <AlertCircle className="w-8 h-8 text-red-400" />
+          <p className="text-xs text-zinc-500">Check your connection and try again.</p>
+        </div>
+      </SectionCard>
     );
   }
 

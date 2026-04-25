@@ -6,7 +6,7 @@ import {
   Loader2, Save, Sparkles, ChevronDown, ChevronRight,
   Check, AlertTriangle, CheckSquare, Square, Send, X, Search,
 } from 'lucide-react';
-import { StatusBadge, CharacterCounter, SerpPreview, SocialPreview } from '../ui';
+import { StatusBadge, CharacterCounter, SerpPreview, SocialPreview, SectionCard } from '../ui';
 import { statusBorderClass } from '../ui/statusConfig';
 
 interface PageMeta {
@@ -95,7 +95,11 @@ export function PageEditRow({
   const trackingBorder = statusBorderClass(pageState?.status as any);
 
   return (
-    <div id={`seo-editor-page-${page.id}`} className={`bg-zinc-900 rounded-xl border overflow-hidden ${trackingBorder || (hasRecFlag ? 'border-amber-500/30' : isSelected ? 'border-teal-500/40 bg-teal-500/5' : 'border-zinc-800')}`}>
+    <div id={`seo-editor-page-${page.id}`}>
+    <SectionCard
+      noPadding
+      className={`overflow-hidden ${trackingBorder || (hasRecFlag ? '!border-amber-500/30' : isSelected ? '!border-teal-500/40 !bg-teal-500/5' : '')}`}
+    >
       <div className="flex items-center">
         {showApprovalCheckbox && (
           <button
@@ -176,7 +180,7 @@ export function PageEditRow({
                 </div>
                 <div className="text-[11px] text-zinc-400 mt-1">{rec.insight}</div>
                 {rec.estimatedGain && (
-                  <div className="text-[10px] text-green-400/70 mt-1">
+                  <div className="text-[10px] text-emerald-400/70 mt-1">
                     Potential: {rec.estimatedGain}
                   </div>
                 )}
@@ -216,7 +220,7 @@ export function PageEditRow({
                 </button>
               )}
               {hasAnalysis && (
-                <span className="text-[10px] text-green-400/70 flex items-center gap-1">
+                <span className="text-[10px] text-emerald-400/70 flex items-center gap-1">
                   <Check className="w-2.5 h-2.5" /> Analysis on file
                 </span>
               )}
@@ -367,7 +371,7 @@ export function PageEditRow({
                 onClick={() => onSendToClient(page.id)}
                 disabled={!hasChanges || isSendingToClient}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  isSentToClient ? 'bg-green-600 text-white' : 'bg-cyan-600/20 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-600/30 disabled:opacity-50 disabled:cursor-not-allowed'
+                  isSentToClient ? 'bg-emerald-600 text-white' : 'bg-cyan-600/20 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-600/30 disabled:opacity-50 disabled:cursor-not-allowed'
                 }`}
               >
                 {isSendingToClient ? <Loader2 className="w-3 h-3 animate-spin" /> : isSentToClient ? <Check className="w-3 h-3" /> : <Send className="w-3 h-3" />}
@@ -391,7 +395,7 @@ export function PageEditRow({
               disabled={!edit.dirty || isSaving || !onSave}
               title={!onSave && isCmsPage ? 'CMS pages must be updated directly in Webflow' : undefined}
               className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                isSaved ? 'bg-green-600 text-white' : 'bg-white text-black hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed'
+                isSaved ? 'bg-emerald-600 text-white' : 'bg-white text-black hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed'
               }`}
             >
               {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : isSaved ? <Check className="w-3 h-3" /> : <Save className="w-3 h-3" />}
@@ -441,6 +445,7 @@ export function PageEditRow({
           </div>
         </div>
       )}
+    </SectionCard>
     </div>
   );
 }

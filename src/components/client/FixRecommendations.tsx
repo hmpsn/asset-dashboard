@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Sparkles, ShoppingCart, Image, FileText, Code2, ArrowRightLeft, Wrench, Crown, MessageSquare, TrendingUp, TrendingDown, Eye, MousePointerClick, ChevronDown, Lightbulb, CheckCircle2, Zap, Shield } from 'lucide-react';
+import { SectionCard } from '../ui';
 import { useCart } from './useCart';
 import type { AuditDetail } from './types';
 import { useBetaMode } from './BetaContext';
@@ -411,29 +412,22 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
   const totalHighTraffic = categories.reduce((s, c) => s + c.highTrafficPages, 0);
 
   return (
-    <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-      {/* Header */}
-      <div className="px-5 py-4 border-b border-zinc-800">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-teal-400" />
-          <span className="text-sm font-semibold text-zinc-200">Recommended Fixes</span>
-          {autoCategories.length > 0 && !isPremium && (
-            <span className="text-[11px] text-zinc-500 ml-auto">
-              Est. total: <span className="text-teal-400 font-medium">{fmt(estimatedTotal)}</span>
-            </span>
+    <SectionCard title="Recommended Fixes" titleIcon={<Sparkles className="w-4 h-4 text-teal-400" />} action={autoCategories.length > 0 && !isPremium ? <span className="text-[11px] text-zinc-500">Est. total: <span className="text-teal-400 font-medium">{fmt(estimatedTotal)}</span></span> : undefined} noPadding className="overflow-hidden">
+      {/* Sub-header description */}
+      {((hasTrafficData && totalHighTraffic > 0) || serverRecsError) && (
+        <div className="px-5 pt-3 pb-0">
+          {hasTrafficData && totalHighTraffic > 0 && (
+            <p className="text-[12px] text-zinc-400 leading-relaxed">
+              Based on your traffic data, we've identified <span className="text-teal-400 font-medium">{totalHighTraffic} high-traffic pages</span> with fixable SEO issues. Prioritizing these will have the biggest impact on your organic performance.
+            </p>
+          )}
+          {serverRecsError && (
+            <p className="text-[11px] text-red-400/80 mt-1.5">
+              Couldn't load personalized recommendations — showing general fixes based on your audit. Try refreshing the page.
+            </p>
           )}
         </div>
-        {hasTrafficData && totalHighTraffic > 0 && (
-          <p className="text-[12px] text-zinc-400 mt-1.5 leading-relaxed">
-            Based on your traffic data, we've identified <span className="text-teal-400 font-medium">{totalHighTraffic} high-traffic pages</span> with fixable SEO issues. Prioritizing these will have the biggest impact on your organic performance.
-          </p>
-        )}
-        {serverRecsError && (
-          <p className="text-[11px] text-red-400/80 mt-1.5">
-            Couldn't load personalized recommendations — showing general fixes based on your audit. Try refreshing the page.
-          </p>
-        )}
-      </div>
+      )}
 
       {/* Categories */}
       <div className="divide-y divide-zinc-800/50">
@@ -465,7 +459,7 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
                       </span>
                     )}
                     {allDone && (
-                      <span className="text-[11px] px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-green-400 flex items-center gap-1">
+                      <span className="text-[11px] px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center gap-1">
                         <CheckCircle2 className="w-3 h-3" /> Addressed
                       </span>
                     )}
@@ -608,6 +602,6 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
           </div>
         </div>
       )}
-    </div>
+    </SectionCard>
   );
 }

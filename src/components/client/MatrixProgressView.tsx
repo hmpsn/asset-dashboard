@@ -14,14 +14,14 @@ interface MatrixProgressViewProps {
   onDownload: (format: 'docx' | 'pdf') => void;
 }
 
-const STATUS_DISPLAY: Record<MatrixCell['status'], { label: string; icon: typeof CheckCircle2; color: string; badgeColor: 'zinc' | 'blue' | 'amber' | 'teal' | 'orange' | 'green' }> = {
+const STATUS_DISPLAY: Record<MatrixCell['status'], { label: string; icon: typeof CheckCircle2; color: string; badgeColor: 'zinc' | 'blue' | 'amber' | 'teal' | 'orange' | 'emerald' }> = {
   planned:           { label: 'Planned',       icon: Clock,        color: 'text-zinc-500',   badgeColor: 'zinc' },
   keyword_validated:  { label: 'In Progress',   icon: Clock,        color: 'text-blue-400',   badgeColor: 'blue' },
   brief_generated:   { label: 'Brief Ready',   icon: FileText,     color: 'text-amber-400',  badgeColor: 'amber' },
   review:            { label: 'Your Review',   icon: Eye,          color: 'text-blue-400',   badgeColor: 'blue' },
   approved:          { label: 'Approved',       icon: CheckCircle2, color: 'text-teal-400',   badgeColor: 'teal' },
   draft:             { label: 'In Production',  icon: PenTool,      color: 'text-orange-400', badgeColor: 'orange' },
-  published:         { label: 'Published',      icon: CheckCircle2, color: 'text-green-400',  badgeColor: 'green' },
+  published:         { label: 'Published',      icon: CheckCircle2, color: 'text-emerald-400',  badgeColor: 'emerald' },
 };
 
 function CellPreviewModal({ cell, onClose, onFlag }: { cell: MatrixCell; onClose: () => void; onFlag: (comment: string) => void }) {
@@ -177,7 +177,7 @@ export function MatrixProgressView({ matrix, onCellPreview, onFlagCell, onDownlo
           <span className="text-[11px] text-amber-400">{matrix.stats.briefGenerated} briefs</span>
           {reviewCount > 0 && <span className="text-[11px] text-blue-400">{reviewCount} awaiting review</span>}
           <span className="text-[11px] text-orange-400">{matrix.stats.drafted} drafts</span>
-          <span className="text-[11px] text-green-400">{publishedCount} published</span>
+          <span className="text-[11px] text-emerald-400">{publishedCount} published</span>
         </div>
       </div>
 

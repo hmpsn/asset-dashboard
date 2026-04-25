@@ -304,6 +304,184 @@
         </div>
       </div>
     </div>
+
+    <!-- Phase5:Typography START -->
+    <div class="sub-section" id="sec-type-primitives">
+      <div class="col-label">Typography primitives · Phase 5 React wrappers</div>
+      <p style="font-size:13px; color:var(--brand-text-muted); margin:0 0 16px; max-width:72ch;">
+        Each primitive is a thin <code>React.forwardRef</code> wrapper that applies exactly one <code>.t-*</code> class.
+        Consume these instead of hand-rolling class strings — the class is the contract.
+      </p>
+
+      <!-- Positive specimens -->
+      <div class="card" style="padding:8px 28px; margin-bottom:16px;">
+
+        <div class="type-specimen">
+          <div class="type-meta">
+            <b>&lt;Heading level={1}&gt;</b>
+            <span class="mono">→ .t-h1</span>
+            Default tag: <code>h1</code>. Override with <code>as="div"</code> when semantic nesting would be wrong.
+          </div>
+          <h1 class="t-h1" style="margin:0;">Search Console overview</h1>
+        </div>
+
+        <div class="type-specimen">
+          <div class="type-meta">
+            <b>&lt;Heading level={2}&gt;</b>
+            <span class="mono">→ .t-h2</span>
+            Default tag: <code>h2</code>. Section sub-head.
+          </div>
+          <h2 class="t-h2" style="margin:0;">Top performing queries this month</h2>
+        </div>
+
+        <div class="type-specimen">
+          <div class="type-meta">
+            <b>&lt;Heading level={3}&gt;</b>
+            <span class="mono">→ .t-page</span>
+            Default tag: <code>h3</code>. Renders <code>.t-page</code> (15.5px Inter), not a bold heading.
+          </div>
+          <h3 class="t-page" style="margin:0;">Scanned Mar 6, 2026 · 119 pages checked</h3>
+        </div>
+
+        <div class="type-specimen">
+          <div class="type-meta">
+            <b>&lt;Stat size="hero"&gt;</b>
+            <span class="mono">→ .t-stat-lg</span>
+            Dashboard hero metric. DIN Pro 700 · 34px · tabular-nums.
+          </div>
+          <div class="t-stat-lg">1,234,567</div>
+        </div>
+
+        <div class="type-specimen">
+          <div class="type-meta">
+            <b>&lt;Stat size="default"&gt;</b>
+            <span class="mono">→ .t-stat</span>
+            Section-level stat. DIN Pro 700 · 24px.
+          </div>
+          <div class="t-stat">45,678</div>
+        </div>
+
+        <div class="type-specimen">
+          <div class="type-meta">
+            <b>&lt;Stat size="sm"&gt;</b>
+            <span class="mono">→ .t-stat-sm</span>
+            Compact stat, table cells, mini-cards.
+          </div>
+          <div class="t-stat-sm">3,456</div>
+        </div>
+
+        <div class="type-specimen">
+          <div class="type-meta">
+            <b>&lt;BodyText&gt;</b>
+            <span class="mono">→ .t-body + color:var(--brand-text)</span>
+            Three tones: <code>default</code> / <code>muted</code> / <code>dim</code>.
+          </div>
+          <p class="t-body" style="margin:0; color:var(--brand-text);">Default body — descriptions, supporting copy, approval queues.</p>
+          <p class="t-body" style="margin:4px 0 0; color:var(--brand-text-muted);">Muted body — secondary context, metadata annotations.</p>
+          <p class="t-body" style="margin:4px 0 0; color:var(--brand-text-dim);">Dim body — tertiary hints, disabled state copy.</p>
+        </div>
+
+        <div class="type-specimen">
+          <div class="type-meta">
+            <b>&lt;Caption&gt; / &lt;Caption size="sm"&gt;</b>
+            <span class="mono">→ .t-caption / .t-caption-sm</span>
+            Timestamps, stat subs, list metadata.
+          </div>
+          <span class="t-caption">Last synced 2m ago · 3 queries flagged</span><br>
+          <span class="t-caption-sm" style="color:var(--brand-text-muted);">Updated Apr 24 · ID 3f2a-91b</span>
+        </div>
+
+        <div class="type-specimen">
+          <div class="type-meta">
+            <b>&lt;Label&gt;</b>
+            <span class="mono">→ .t-label</span>
+            DIN Pro 500 · 11.5px · uppercase · tracking 0.06em. Eyebrows, section dividers.
+          </div>
+          <span class="t-label">Site health · Last 28 days</span>
+        </div>
+
+        <div class="type-specimen">
+          <div class="type-meta">
+            <b>&lt;Mono&gt; / &lt;Mono size="micro"&gt;</b>
+            <span class="mono">→ .t-mono / .t-micro</span>
+            Fira Code. IDs, slugs, tokens, tick labels.
+          </div>
+          <span class="t-mono">/blog/seo-guide-2026 · ID 3f2a-91b</span><br>
+          <span class="t-micro" style="color:var(--brand-text-muted);">APR 12 — MON · 11:42 UTC</span>
+        </div>
+      </div>
+
+      <!-- Do / Don't grid -->
+      <div class="dd-grid">
+
+        <div class="dd-tile dd-do">
+          <div class="dd-head"><span class="dd-mark">✓</span> Do · use &lt;Stat&gt; for numeric values</div>
+          <div class="dd-stage" style="flex-direction:column; align-items:flex-start; gap:8px;">
+            <div class="t-stat-lg" style="color:var(--brand-text-bright);">12,340</div>
+            <span class="t-caption" style="color:var(--brand-text-muted);">Organic clicks · last 28 days</span>
+          </div>
+          <div class="dd-note">
+            <code>&lt;Stat size="hero"&gt;12,340&lt;/Stat&gt;</code> applies DIN Pro 700 with tabular-nums — the token intended for numeric dominance.
+          </div>
+        </div>
+
+        <div class="dd-tile dd-dont">
+          <div class="dd-head"><span class="dd-mark">✗</span> Don't · use &lt;Heading level={1}&gt; for stat values</div>
+          <div class="dd-stage" style="flex-direction:column; align-items:flex-start; gap:8px;">
+            <h1 class="t-h1" style="margin:0; color:var(--brand-text-bright);">12,340</h1>
+            <span class="t-caption" style="color:var(--brand-text-muted);">Organic clicks · last 28 days</span>
+          </div>
+          <div class="dd-note">
+            <code>&lt;Heading level={1}&gt;</code> is for page titles, not metrics. It carries semantic weight (<code>h1</code> tag) and the wrong letter-spacing for numbers.
+          </div>
+        </div>
+
+        <div class="dd-tile dd-do">
+          <div class="dd-head"><span class="dd-mark">✓</span> Do · use &lt;Label&gt; for eyebrow text</div>
+          <div class="dd-stage" style="flex-direction:column; align-items:flex-start; gap:6px;">
+            <span class="t-label" style="color:var(--brand-text-muted);">Keyword opportunities · last 30 days</span>
+            <div class="t-stat">47</div>
+          </div>
+          <div class="dd-note">
+            <code>&lt;Label&gt;</code> enforces the uppercase DIN chrome that visually separates section identity from content.
+          </div>
+        </div>
+
+        <div class="dd-tile dd-dont">
+          <div class="dd-head"><span class="dd-mark">✗</span> Don't · hand-roll label styles inline</div>
+          <div class="dd-stage" style="flex-direction:column; align-items:flex-start; gap:6px;">
+            <span style="font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:#71717a;">Keyword opportunities · last 30 days</span>
+            <div class="t-stat">47</div>
+          </div>
+          <div class="dd-note">
+            Inline <code>font-size:11px</code> + <code>text-transform:uppercase</code> bypasses the token pipeline. When the label spec changes, these won't update.
+          </div>
+        </div>
+
+        <div class="dd-tile dd-do">
+          <div class="dd-head"><span class="dd-mark">✓</span> Do · use &lt;BodyText tone="muted"&gt; for secondary copy</div>
+          <div class="dd-stage">
+            <p class="t-body" style="margin:0; color:var(--brand-text-muted);">No keyword data available for the selected date range.</p>
+          </div>
+          <div class="dd-note">
+            <code>tone="muted"</code> maps to <code>var(--brand-text-muted)</code> — one step down from body, two steps above dim. Type-safe: <code>tone="subtle"</code> is a compile error.
+          </div>
+        </div>
+
+        <div class="dd-tile dd-dont">
+          <div class="dd-head"><span class="dd-mark">✗</span> Don't · use arbitrary zinc class for secondary copy</div>
+          <div class="dd-stage">
+            <p style="font-size:14.5px; color:#71717a; margin:0; line-height:1.5;">No keyword data available for the selected date range.</p>
+          </div>
+          <div class="dd-note">
+            <code>color:#71717a</code> hard-codes the dark-mode zinc value and breaks in light mode. The <code>--brand-text-muted</code> token adapts automatically via the <code>[data-theme=light]</code> override.
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <!-- Phase5:Typography END -->
+
   </section>
 
   <!-- ══════ 03 · COLOR ══════ -->
@@ -702,6 +880,28 @@
           <span class="t-caption">2xl · 32px</span>
         </div>
       </div>
+      <div style="margin-top:28px;">
+        <div class="t-label" style="margin-bottom:12px;">Color via className · currentColor inheritance</div>
+        <div style="display:flex; gap:24px; align-items:center;">
+          <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+            <svg class="i" style="width:16px; height:16px; color:var(--teal);"><use href="#i-trend"/></svg>
+            <span class="t-mono" style="font-size:11px;">className="text-teal-400"</span>
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+            <svg class="i" style="width:16px; height:16px; color:var(--blue-data);"><use href="#i-trend"/></svg>
+            <span class="t-mono" style="font-size:11px;">className="text-blue-400"</span>
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+            <svg class="i" style="width:16px; height:16px; color:var(--emerald);"><use href="#i-trend"/></svg>
+            <span class="t-mono" style="font-size:11px;">className="text-emerald-400"</span>
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+            <svg class="i" style="width:16px; height:16px; color:var(--red);"><use href="#i-trend"/></svg>
+            <span class="t-mono" style="font-size:11px;">className="text-red-400"</span>
+          </div>
+        </div>
+      </div>
+      <div class="usage-strip" style="margin-top:20px;">
       <div class="usage-strip" style="margin-top:16px;">
         <div style="display:flex; gap:16px;">
           <div style="flex:1;">

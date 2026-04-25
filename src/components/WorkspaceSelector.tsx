@@ -107,6 +107,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
       </button>
 
       {open && (
+        // pr-check-disable-next-line -- dropdown
         <div className="absolute top-full left-0 mt-2 w-80 rounded-xl shadow-2xl z-50 overflow-hidden bg-zinc-900 border border-zinc-700">
           {workspaces.length > 0 && (
             <div className="p-1">

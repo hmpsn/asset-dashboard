@@ -49,54 +49,54 @@ function CreateForm({ workspaceId, templates, onCreated, onCancel }: CreateFormP
   };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4">
-      <h3 className="text-sm font-semibold text-zinc-200">New Brandscript</h3>
+    <SectionCard title="New Brandscript">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-1">
+          <label htmlFor="bs-name" className="text-xs text-zinc-400">Name</label>
+          <input
+            id="bs-name"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder="e.g. StoryBrand 2024"
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-teal-600"
+            autoFocus
+          />
+        </div>
 
-      <div className="space-y-1">
-        <label htmlFor="bs-name" className="text-xs text-zinc-400">Name</label>
-        <input
-          id="bs-name"
-          value={name}
-          onChange={e => setName(e.target.value)}
-          placeholder="e.g. StoryBrand 2024"
-          className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-teal-600"
-          autoFocus
-        />
-      </div>
+        <div className="space-y-1">
+          <label htmlFor="bs-framework" className="text-xs text-zinc-400">Framework (optional)</label>
+          <select
+            id="bs-framework"
+            value={frameworkType}
+            onChange={e => setFrameworkType(e.target.value)}
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-teal-600"
+          >
+            <option value="">Custom (blank)</option>
+            {templates.map(t => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+        </div>
 
-      <div className="space-y-1">
-        <label htmlFor="bs-framework" className="text-xs text-zinc-400">Framework (optional)</label>
-        <select
-          id="bs-framework"
-          value={frameworkType}
-          onChange={e => setFrameworkType(e.target.value)}
-          className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-teal-600"
-        >
-          <option value="">Custom (blank)</option>
-          {templates.map(t => (
-            <option key={t.id} value={t.id}>{t.name}</option>
-          ))}
-        </select>
-      </div>
-
-      <div className="flex items-center gap-3 pt-1">
-        <button
-          type="submit"
-          disabled={!name.trim() || submitting}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-        >
-          {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-          Create
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm transition-colors"
-        >
-          Cancel
-        </button>
-      </div>
-    </form>
+        <div className="flex items-center gap-3 pt-1">
+          <button
+            type="submit"
+            disabled={!name.trim() || submitting}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          >
+            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+            Create
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    </SectionCard>
   );
 }
 
@@ -133,53 +133,54 @@ function ImportForm({ workspaceId, onImported, onCancel }: ImportFormProps) {
   };
 
   return (
-    <form onSubmit={handleImport} className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4">
-      <h3 className="text-sm font-semibold text-zinc-200">Import Brandscript</h3>
-      <p className="text-xs text-zinc-400">
-        Paste existing brandscript copy — sections will be automatically detected.
-      </p>
+    <SectionCard title="Import Brandscript">
+      <form onSubmit={handleImport} className="space-y-4">
+        <p className="text-xs text-zinc-400">
+          Paste existing brandscript copy — sections will be automatically detected.
+        </p>
 
-      <div className="space-y-1">
-        <label htmlFor="import-name" className="text-xs text-zinc-400">Name (optional)</label>
-        <input
-          id="import-name"
-          value={name}
-          onChange={e => setName(e.target.value)}
-          placeholder="e.g. Imported v1"
-          className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-teal-600"
-        />
-      </div>
+        <div className="space-y-1">
+          <label htmlFor="import-name" className="text-xs text-zinc-400">Name (optional)</label>
+          <input
+            id="import-name"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder="e.g. Imported v1"
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-teal-600"
+          />
+        </div>
 
-      <div className="space-y-1">
-        <label htmlFor="import-raw-text" className="text-xs text-zinc-400">Raw text</label>
-        <textarea
-          id="import-raw-text"
-          value={rawText}
-          onChange={e => setRawText(e.target.value)}
-          placeholder="Paste your brandscript content here..."
-          rows={8}
-          className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-teal-600 resize-none font-mono"
-        />
-      </div>
+        <div className="space-y-1">
+          <label htmlFor="import-raw-text" className="text-xs text-zinc-400">Raw text</label>
+          <textarea
+            id="import-raw-text"
+            value={rawText}
+            onChange={e => setRawText(e.target.value)}
+            placeholder="Paste your brandscript content here..."
+            rows={8}
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-teal-600 resize-none font-mono"
+          />
+        </div>
 
-      <div className="flex items-center gap-3 pt-1">
-        <button
-          type="submit"
-          disabled={!rawText.trim() || submitting}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-        >
-          {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-          Import
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm transition-colors"
-        >
-          Cancel
-        </button>
-      </div>
-    </form>
+        <div className="flex items-center gap-3 pt-1">
+          <button
+            type="submit"
+            disabled={!rawText.trim() || submitting}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          >
+            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+            Import
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    </SectionCard>
   );
 }
 
@@ -237,6 +238,7 @@ function SectionEditorCard({ section, onSave }: SectionEditorCardProps) {
   };
 
   return (
+    // pr-check-disable-next-line -- expandable section editor: the entire header row IS the toggle button, SectionCard title would duplicate it
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
       <button
         type="button"
@@ -533,6 +535,7 @@ function ListView({ workspaceId, items, templates, onSelect, onDeleted, onCreate
       {/* List */}
       <div className="space-y-3">
         {items.map(bs => (
+          // pr-check-disable-next-line -- list item button row, not a section card
           <button
             key={bs.id}
             type="button"

@@ -31,7 +31,7 @@ export function SeoWorkStatus({ seoStatus, workspaceId, embedded }: SeoWorkStatu
       )}
       {seoStatus.inReview > 0 && (
         <button onClick={() => navigate(adminPath(workspaceId, 'seo-editor'))} className="flex flex-col items-center py-3 hover:bg-zinc-800/30 transition-colors bg-zinc-900">
-          <span className="text-lg font-bold text-purple-400">{seoStatus.inReview}</span>
+          <span className="text-lg font-bold text-blue-400">{seoStatus.inReview}</span>
           <span className="text-[10px] text-zinc-500">in review</span>
         </button>
       )}
