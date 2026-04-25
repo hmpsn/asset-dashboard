@@ -156,7 +156,9 @@ function lineMatchesTokens(line: string, required: string[]): boolean {
   let cm: RegExpExecArray | null;
   while ((cm = classRe.exec(line)) !== null) {
     const tokens = new Set(cm[1].split(/\s+/).filter(Boolean));
-    if (required.every((t) => tokens.has(t))) return true;
+    // `required` is a statically-defined token array from LAYOUT_PATTERNS,
+    // always non-empty by construction; a length guard would be dead code.
+    if (required.every((t) => tokens.has(t))) return true; // every-ok
   }
   return false;
 }
