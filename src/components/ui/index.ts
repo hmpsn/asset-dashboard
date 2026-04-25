@@ -73,6 +73,13 @@ export type { ToggleProps } from './forms/Toggle';
 
 // Layout
 export { Row, Stack, Column, Grid, Divider } from './layout';
+export type {
+  RowProps, GapSize, RowAlign, RowJustify,
+  StackProps, StackDir, StackAlign,
+  ColumnProps,
+  GridProps, GridCols, GridColCount,
+  DividerProps, DividerOrientation,
+} from './layout';
 
 // Overlays
 export { Modal, Popover, Tooltip } from './overlay';
