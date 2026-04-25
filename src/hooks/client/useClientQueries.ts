@@ -225,3 +225,20 @@ export function useClientRawInsights(wsId: string, enabled: boolean) {
     select: (d) => (Array.isArray(d) ? d : []),
   });
 }
+
+// ── Copy Review ───────────────────────────────────────────────────
+/**
+ * Lightweight count-only probe used by InboxTab to decide whether to render
+ * the Copy Review filter tab. Uses `copyEntriesCount` (a distinct key from
+ * `copyEntries`) so its `getSafe` fallback does NOT dedupe with the full
+ * ClientCopyReview query, which uses `get()` and needs its error UI path
+ * to actually receive thrown errors.
+ */
+export function useClientCopyEntries(wsId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.client.copyEntriesCount(wsId),
+    queryFn: () => getSafe<{ entries: unknown[] }>(`/api/public/copy/${wsId}/entries`, { entries: [] }),
+    enabled,
+    select: (d) => (Array.isArray(d?.entries) ? d.entries.length : 0),
+  });
+}

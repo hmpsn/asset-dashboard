@@ -17,6 +17,8 @@ import {
   regenerateOutline,
 } from '../content-brief.js';
 import { createContentRequest, updateContentRequest } from '../content-requests.js';
+import { broadcastToWorkspace } from '../broadcast.js';
+import { WS_EVENTS } from '../ws-events.js';
 import { notifyClientBriefReady } from '../email.js';
 import { getSearchOverview } from '../search-console.js';
 import { getConfiguredProvider, getProviderDisplayName } from '../seo-data-provider.js';
@@ -273,6 +275,8 @@ router.post('/api/content-briefs/:workspaceId/:briefId/send-to-client', requireW
     briefId: brief.id,
     status: 'client_review',
   });
+
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_CREATED, { id: request.id });
 
   // Send email notification
   if (ws?.clientEmail) {
