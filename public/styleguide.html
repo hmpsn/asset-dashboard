@@ -1227,6 +1227,89 @@
       </div>
     </div>
 
+    <!-- Phase5:Buttons START -->
+    <div class="sub-section">
+      <div class="col-label">Phase 5 primitives · Button family</div>
+      <div class="card" style="display:grid; gap:20px;">
+        <div>
+          <div class="t-label" style="margin-bottom:8px;">&lt;Button&gt; · 5 variants × 3 sizes</div>
+          <div class="row" style="gap:8px; flex-wrap:wrap;">
+            <button class="btn btn-primary" style="padding:4px 10px; font-size:11px;">primary sm</button>
+            <button class="btn btn-primary">primary md</button>
+            <button class="btn btn-primary" style="padding:10px 20px; font-size:14px;">primary lg</button>
+            <button class="btn btn-secondary">secondary md</button>
+            <button class="btn btn-ghost">ghost md</button>
+            <button class="btn" style="background:#dc2626; color:#fff;">danger md</button>
+            <button class="btn btn-link">link md</button>
+          </div>
+          <div class="t-mono" style="margin-top:8px; color:var(--brand-text-muted); font-size:11px;">&lt;Button variant="primary|secondary|ghost|danger|link" size="sm|md|lg" icon? iconPosition? loading? disabled?&gt;</div>
+        </div>
+
+        <div>
+          <div class="t-label" style="margin-bottom:8px;">&lt;Button&gt; · with icon + states</div>
+          <div class="row" style="gap:8px; flex-wrap:wrap;">
+            <button class="btn btn-primary"><svg class="i i-sm"><use href="#i-send"/></svg> Send</button>
+            <button class="btn btn-primary">Approve <svg class="i i-sm"><use href="#i-check"/></svg></button>
+            <button class="btn btn-primary" disabled style="opacity:.5;">Disabled</button>
+            <button class="btn btn-primary"><svg class="i i-sm" style="animation:spin 1s linear infinite;"><use href="#i-zap"/></svg> Loading…</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="t-label" style="margin-bottom:8px;">&lt;IconButton&gt; · 3 sizes × 2 variants · a11y label REQUIRED</div>
+          <div class="row" style="gap:8px;">
+            <button class="btn btn-ghost" style="width:24px; height:24px; padding:0;" aria-label="Close (sm ghost)"><svg class="i i-xs"><use href="#i-x"/></svg></button>
+            <button class="btn btn-ghost" style="width:32px; height:32px; padding:0;" aria-label="Close (md ghost)"><svg class="i i-sm"><use href="#i-x"/></svg></button>
+            <button class="btn btn-ghost" style="width:40px; height:40px; padding:0;" aria-label="Close (lg ghost)"><svg class="i i-md"><use href="#i-x"/></svg></button>
+            <button class="btn btn-secondary" style="width:24px; height:24px; padding:0;" aria-label="Edit (sm solid)"><svg class="i i-xs"><use href="#i-search"/></svg></button>
+            <button class="btn btn-secondary" style="width:32px; height:32px; padding:0;" aria-label="Edit (md solid)"><svg class="i i-sm"><use href="#i-search"/></svg></button>
+            <button class="btn btn-secondary" style="width:40px; height:40px; padding:0;" aria-label="Edit (lg solid)"><svg class="i i-md"><use href="#i-search"/></svg></button>
+          </div>
+          <div class="t-mono" style="margin-top:8px; color:var(--brand-text-muted); font-size:11px;">&lt;IconButton icon={X} label="Close" size?="sm|md|lg" variant?="ghost|solid" /&gt; <strong style="color:#fbbf24;">label is required</strong></div>
+        </div>
+
+        <div>
+          <div class="t-label" style="margin-bottom:8px;">&lt;ActionPill&gt; · workflow inline actions · 5 variants</div>
+          <div class="row" style="gap:8px; flex-wrap:wrap;">
+            <button class="action-pill ap-start">Start</button>
+            <button class="action-pill ap-approve">Approve</button>
+            <button class="action-pill ap-decline">Decline</button>
+            <button class="action-pill ap-send">Send</button>
+            <button class="action-pill ap-changes">Request Changes</button>
+          </div>
+          <div class="t-mono" style="margin-top:8px; color:var(--brand-text-muted); font-size:11px;">&lt;ActionPill variant="start|approve|decline|send|request-changes" icon?&gt;…&lt;/ActionPill&gt;</div>
+        </div>
+
+        <div>
+          <div class="t-label" style="margin-bottom:8px;">&lt;SegmentedControl&gt; · radiogroup · arrow-key navigation</div>
+          <div class="row">
+            <div style="display:inline-flex; background:#18181b; border:1px solid #27272a; border-radius:6px; padding:2px;">
+              <button style="padding:6px 12px; font-size:12px; background:#3f3f46; color:#fff; border-radius:4px; border:0;">Day</button>
+              <button style="padding:6px 12px; font-size:12px; background:transparent; color:#a1a1aa; border:0;">Week</button>
+              <button style="padding:6px 12px; font-size:12px; background:transparent; color:#a1a1aa; border:0;">Month</button>
+            </div>
+          </div>
+          <div class="t-mono" style="margin-top:8px; color:var(--brand-text-muted); font-size:11px;">&lt;SegmentedControl options={[{id, label}]} value onChange size?="sm|md" /&gt;</div>
+        </div>
+
+        <div>
+          <div class="t-label" style="margin-bottom:8px;">Do · use the primitive · enforces variants + a11y</div>
+          <div class="t-mono" style="background:#0a0e14; padding:10px; border-radius:6px; color:#34d399; font-size:11px; border:1px solid rgba(52,211,153,0.2);">&lt;Button variant="primary" icon={Send} loading={isSending}&gt;Send to client&lt;/Button&gt;</div>
+        </div>
+
+        <div>
+          <div class="t-label" style="margin-bottom:8px;">Don't · hand-roll the gradient · drifts from Law 01</div>
+          <div class="t-mono" style="background:#0a0e14; padding:10px; border-radius:6px; color:#f87171; font-size:11px; border:1px solid rgba(248,113,113,0.2);">&lt;button className="px-4 py-2 bg-gradient-to-r from-teal-600 to-emerald-600 text-white"&gt;…&lt;/button&gt;</div>
+        </div>
+
+        <div>
+          <div class="t-label" style="margin-bottom:8px;">Don't · icon-only button without label · a11y break</div>
+          <div class="t-mono" style="background:#0a0e14; padding:10px; border-radius:6px; color:#f87171; font-size:11px; border:1px solid rgba(248,113,113,0.2);">&lt;button onClick={close}&gt;&lt;X className="w-4 h-4" /&gt;&lt;/button&gt; <span style="color:var(--brand-text-muted);">// no aria-label, screenreader silent</span></div>
+        </div>
+      </div>
+    </div>
+    <!-- Phase5:Buttons END -->
+
     <!-- Badges -->
     <div class="sub-section">
       <div class="col-label">Badge · colored status labels</div>
