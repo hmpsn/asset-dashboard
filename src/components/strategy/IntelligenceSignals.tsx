@@ -1,7 +1,7 @@
 import { useIntelligenceSignals } from '../../hooks/admin/useIntelligenceSignals.js';
 import { SectionCard } from '../ui/SectionCard.js';
 import { EmptyState } from '../ui/EmptyState.js';
-import { Badge } from '../ui/Badge.js';
+import { Badge, Icon } from '../ui';
 import { TrendingUp, AlertTriangle, Target } from 'lucide-react';
 import type { StrategySignal } from '../../../shared/types/insights.js';
 
@@ -41,11 +41,11 @@ export function IntelligenceSignals({ workspaceId }: Props) {
     return (
       <SectionCard
         title="Intelligence Signals"
-        titleIcon={<TrendingUp className="w-4 h-4 text-teal-400" />}
+        titleIcon={<Icon as={TrendingUp} size="sm" className="text-teal-400" />}
       >
         <div className="animate-pulse space-y-3">
           {[1, 2, 3].map(i => (
-            <div key={i} className="h-12 bg-zinc-800/50 rounded-lg" />
+            <div key={i} className="h-12 bg-[var(--surface-3)]/50 rounded-[var(--radius-lg)]" />
           ))}
         </div>
       </SectionCard>
@@ -56,7 +56,7 @@ export function IntelligenceSignals({ workspaceId }: Props) {
     return (
       <SectionCard
         title="Intelligence Signals"
-        titleIcon={<TrendingUp className="w-4 h-4 text-teal-400" />}
+        titleIcon={<Icon as={TrendingUp} size="sm" className="text-teal-400" />}
       >
         <EmptyState
           icon={TrendingUp}
@@ -70,22 +70,22 @@ export function IntelligenceSignals({ workspaceId }: Props) {
   return (
     <SectionCard
       title="Intelligence Signals"
-      titleIcon={<TrendingUp className="w-4 h-4 text-teal-400" />}
+      titleIcon={<Icon as={TrendingUp} size="sm" className="text-teal-400" />}
       titleExtra={<Badge label={`${signals.length}`} color="teal" />}
     >
       <div className="space-y-2">
         {signals.slice(0, 10).map(signal => {
-          const Icon = iconMap[signal.type];
+          const SignalIcon = iconMap[signal.type];
           const color = colorMap[signal.type];
           return (
             <div
               key={signal.insightId}
-              className="flex items-start gap-3 p-3 rounded-lg bg-zinc-800/30 hover:bg-zinc-800/50 transition-colors"
+              className="flex items-start gap-3 p-3 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/30 hover:bg-[var(--surface-3)]/50 transition-colors"
             >
-              <Icon className={`w-4 h-4 mt-0.5 ${color} shrink-0`} />
+              <Icon as={SignalIcon} size="sm" className={`mt-0.5 ${color} shrink-0`} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-zinc-200 truncate">
+                  <span className="t-ui font-medium text-[var(--brand-text-bright)] truncate">
                     {signal.keyword}
                   </span>
                   <Badge
@@ -93,7 +93,7 @@ export function IntelligenceSignals({ workspaceId }: Props) {
                     color={badgeColorMap[signal.type]}
                   />
                 </div>
-                <p className="text-xs text-zinc-400 mt-0.5">{signal.detail}</p>
+                <p className="t-caption text-[var(--brand-text)] mt-0.5">{signal.detail}</p>
               </div>
             </div>
           );

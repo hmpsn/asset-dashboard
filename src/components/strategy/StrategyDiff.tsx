@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { SectionCard, Icon } from '../ui';
 import { RefreshCw, Plus, Minus, ArrowRight, ChevronDown } from 'lucide-react';
 import { keywords } from '../../api/seo';
 import type { StrategyDiff as StrategyDiffType } from '../../api/seo';
@@ -30,31 +31,31 @@ export function StrategyDiff({ workspaceId }: StrategyDiffProps) {
     diff.newGaps.length + diff.resolvedGaps.length + diff.keywordChanges.length;
 
   return (
-    <div className="bg-zinc-900 border border-amber-500/20 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
+    <SectionCard noPadding>
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors"
       >
         <div className="flex items-center gap-2">
-          <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
-          <span className="text-xs font-semibold text-amber-300">What Changed</span>
-          <span className="text-[10px] text-zinc-500">
+          <Icon as={RefreshCw} size="sm" className="text-amber-400" />
+          <span className="t-ui font-semibold text-amber-300">What Changed</span>
+          <span className="t-micro text-[var(--brand-text-muted)]">
             {totalChanges} change{totalChanges !== 1 ? 's' : ''} since {new Date(diff.previousGeneratedAt).toLocaleDateString()}
           </span>
         </div>
-        <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${expanded ? '' : '-rotate-90'}`} />
+        <Icon as={ChevronDown} size="sm" className={`text-[var(--brand-text-muted)] transition-transform ${expanded ? '' : '-rotate-90'}`} />
       </button>
 
       {expanded && (
-        <div className="px-4 pb-4 border-t border-zinc-800/50 space-y-3 mt-3">
+        <div className="px-4 pb-4 border-t border-[var(--brand-border)]/50 space-y-3 mt-3">
           {/* New site keywords */}
           {diff.newKeywords.length > 0 && (
             <div>
-              <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium mb-1.5">New Keywords</div>
+              <div className="t-micro text-[var(--brand-text-muted)] uppercase tracking-wider font-medium mb-1.5">New Keywords</div>
               <div className="flex flex-wrap gap-1">
                 {diff.newKeywords.map(kw => (
-                  <span key={kw} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-400">
-                    <Plus className="w-2.5 h-2.5" />{kw}
+                  <span key={kw} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 t-caption-sm text-emerald-400">
+                    <Icon as={Plus} size="xs" />{kw}
                   </span>
                 ))}
               </div>
@@ -64,11 +65,11 @@ export function StrategyDiff({ workspaceId }: StrategyDiffProps) {
           {/* Lost site keywords */}
           {diff.lostKeywords.length > 0 && (
             <div>
-              <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium mb-1.5">Removed Keywords</div>
+              <div className="t-micro text-[var(--brand-text-muted)] uppercase tracking-wider font-medium mb-1.5">Removed Keywords</div>
               <div className="flex flex-wrap gap-1">
                 {diff.lostKeywords.map(kw => (
-                  <span key={kw} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-[11px] text-red-400">
-                    <Minus className="w-2.5 h-2.5" />{kw}
+                  <span key={kw} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-red-500/10 border border-red-500/20 t-caption-sm text-red-400">
+                    <Icon as={Minus} size="xs" />{kw}
                   </span>
                 ))}
               </div>
@@ -78,11 +79,11 @@ export function StrategyDiff({ workspaceId }: StrategyDiffProps) {
           {/* New content gaps */}
           {diff.newGaps.length > 0 && (
             <div>
-              <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium mb-1.5">New Content Gaps</div>
+              <div className="t-micro text-[var(--brand-text-muted)] uppercase tracking-wider font-medium mb-1.5">New Content Gaps</div>
               <div className="flex flex-wrap gap-1">
                 {diff.newGaps.map(kw => (
-                  <span key={kw} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-400">
-                    <Plus className="w-2.5 h-2.5" />{kw}
+                  <span key={kw} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 t-caption-sm text-emerald-400">
+                    <Icon as={Plus} size="xs" />{kw}
                   </span>
                 ))}
               </div>
@@ -92,10 +93,10 @@ export function StrategyDiff({ workspaceId }: StrategyDiffProps) {
           {/* Resolved content gaps */}
           {diff.resolvedGaps.length > 0 && (
             <div>
-              <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium mb-1.5">Resolved Gaps</div>
+              <div className="t-micro text-[var(--brand-text-muted)] uppercase tracking-wider font-medium mb-1.5">Resolved Gaps</div>
               <div className="flex flex-wrap gap-1">
                 {diff.resolvedGaps.map(kw => (
-                  <span key={kw} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-zinc-700/30 border border-zinc-600/20 text-[11px] text-zinc-400 line-through">
+                  <span key={kw} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-[var(--zinc-700)]/30 border border-[var(--zinc-600)]/20 t-caption-sm text-[var(--brand-text)] line-through">
                     {kw}
                   </span>
                 ))}
@@ -106,13 +107,13 @@ export function StrategyDiff({ workspaceId }: StrategyDiffProps) {
           {/* Keyword reassignments */}
           {diff.keywordChanges.length > 0 && (
             <div>
-              <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium mb-1.5">Keyword Reassignments</div>
+              <div className="t-micro text-[var(--brand-text-muted)] uppercase tracking-wider font-medium mb-1.5">Keyword Reassignments</div>
               <div className="space-y-1">
                 {diff.keywordChanges.map((ch, i) => (
-                  <div key={i} className="flex items-center gap-2 text-[11px] px-2 py-1 bg-zinc-800/40 rounded border border-zinc-800">
-                    <span className="text-zinc-500 font-mono truncate max-w-[200px]">{ch.pagePath}</span>
+                  <div key={i} className="flex items-center gap-2 t-caption-sm px-2 py-1 bg-[var(--surface-3)]/40 rounded border border-[var(--brand-border)]">
+                    <span className="t-mono text-[var(--brand-text-muted)] truncate max-w-[200px]">{ch.pagePath}</span>
                     <span className="text-amber-400">{ch.oldKeyword}</span>
-                    <ArrowRight className="w-3 h-3 text-zinc-600 flex-shrink-0" />
+                    <Icon as={ArrowRight} size="xs" className="text-[var(--brand-text-dim)] flex-shrink-0" />
                     <span className="text-teal-400">{ch.newKeyword}</span>
                   </div>
                 ))}
@@ -121,6 +122,6 @@ export function StrategyDiff({ workspaceId }: StrategyDiffProps) {
           )}
         </div>
       )}
-    </div>
+    </SectionCard>
   );
 }

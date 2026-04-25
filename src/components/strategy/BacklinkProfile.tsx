@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Icon } from '../ui';
 import { Link2, Globe, ExternalLink, Loader2, Shield, AlertTriangle } from 'lucide-react';
 import { SectionCard, StatCard, EmptyState } from '../ui';
 import { backlinks } from '../../api';
@@ -56,8 +57,8 @@ export function BacklinkProfile({ workspaceId }: Props) {
   if (loading) {
     return (
       <SectionCard noPadding>
-        <div className="px-4 py-6 flex items-center justify-center gap-2 text-zinc-500 text-sm">
-          <Loader2 className="w-4 h-4 animate-spin" /> Loading backlink profile…
+        <div className="px-4 py-6 flex items-center justify-center gap-2 text-[var(--brand-text-muted)] t-ui">
+          <Icon as={Loader2} size="sm" className="animate-spin" /> Loading backlink profile…
         </div>
       </SectionCard>
     );
@@ -67,17 +68,17 @@ export function BacklinkProfile({ workspaceId }: Props) {
     if (error.includes('No SEO data provider configured')) {
       return (
         <SectionCard noPadding>
-          <div className="px-4 py-4 flex items-center gap-2 text-zinc-500 text-xs">
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-            <span>Backlink data requires an SEO provider. Set <code className="text-zinc-400">SEMRUSH_API_KEY</code> or <code className="text-zinc-400">DATAFORSEO_LOGIN</code> in environment to enable.</span>
+          <div className="px-4 py-4 flex items-center gap-2 text-[var(--brand-text-muted)] t-caption">
+            <Icon as={AlertTriangle} size="xs" className="text-amber-400" />
+            <span>Backlink data requires an SEO provider. Set <code className="text-[var(--brand-text)]">SEMRUSH_API_KEY</code> or <code className="text-[var(--brand-text)]">DATAFORSEO_LOGIN</code> in environment to enable.</span>
           </div>
         </SectionCard>
       );
     }
     return (
       <SectionCard noPadding>
-        <div className="px-4 py-4 flex items-center gap-2 text-red-400 text-xs">
-          <AlertTriangle className="w-3.5 h-3.5" /> {error}
+        <div className="px-4 py-4 flex items-center gap-2 text-red-400 t-caption">
+          <Icon as={AlertTriangle} size="xs" className="text-red-400" /> {error}
         </div>
       </SectionCard>
     );
@@ -97,9 +98,9 @@ export function BacklinkProfile({ workspaceId }: Props) {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2 mb-1">
-        <Link2 className="w-4 h-4 text-teal-400" />
-        <h3 className="text-sm font-semibold text-zinc-200">Backlink Profile</h3>
-        <span className="text-[11px] text-zinc-600 ml-1">{domain}</span>
+        <Icon as={Link2} size="sm" className="text-teal-400" />
+        <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Backlink Profile</h3>
+        <span className="t-caption-sm text-[var(--brand-text-dim)] ml-1">{domain}</span>
       </div>
 
       {/* Stat cards */}
@@ -116,18 +117,18 @@ export function BacklinkProfile({ workspaceId }: Props) {
       {referringDomains.length > 0 && (
         <SectionCard noPadding>
           <div className="px-4 py-3">
-            <div className="text-xs font-medium text-zinc-200 mb-3">Top Referring Domains</div>
+            <div className="t-ui font-medium text-[var(--brand-text-bright)] mb-3">Top Referring Domains</div>
             <div className="overflow-x-auto">
-              <table className="w-full text-xs">
+              <table className="w-full t-caption">
                 <thead>
-                  <tr className="text-zinc-500 text-left">
+                  <tr className="text-[var(--brand-text-muted)] text-left">
                     <th className="pb-2 font-medium">Domain</th>
                     <th className="pb-2 font-medium text-right">Backlinks</th>
                     <th className="pb-2 font-medium text-right">First Seen</th>
                     <th className="pb-2 font-medium text-right">Last Seen</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800">
+                <tbody className="divide-y divide-[var(--brand-border)]">
                   {referringDomains.map(rd => (
                     <tr key={rd.domain}>
                       <td className="py-2">
@@ -138,12 +139,12 @@ export function BacklinkProfile({ workspaceId }: Props) {
                           className="text-teal-400 hover:text-teal-300 transition-colors flex items-center gap-1"
                         >
                           {rd.domain}
-                          <ExternalLink className="w-2.5 h-2.5 opacity-50" />
+                          <Icon as={ExternalLink} size="xs" className="opacity-50" />
                         </a>
                       </td>
-                      <td className="py-2 text-zinc-300 text-right font-medium">{fmtNum(rd.backlinksCount)}</td>
-                      <td className="py-2 text-zinc-500 text-right">{rd.firstSeen ? new Date(rd.firstSeen).toLocaleDateString() : '—'}</td>
-                      <td className="py-2 text-zinc-500 text-right">{rd.lastSeen ? new Date(rd.lastSeen).toLocaleDateString() : '—'}</td>
+                      <td className="py-2 text-[var(--zinc-300)] text-right font-medium">{fmtNum(rd.backlinksCount)}</td>
+                      <td className="py-2 text-[var(--brand-text-muted)] text-right">{rd.firstSeen ? new Date(rd.firstSeen).toLocaleDateString() : '—'}</td>
+                      <td className="py-2 text-[var(--brand-text-muted)] text-right">{rd.lastSeen ? new Date(rd.lastSeen).toLocaleDateString() : '—'}</td>
                     </tr>
                   ))}
                 </tbody>

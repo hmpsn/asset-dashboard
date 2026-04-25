@@ -2,6 +2,7 @@
  * KeywordStrategyGuide — In-app guide for the keyword strategy tool.
  * Rendered as a sub-tab inside the Keyword Strategy tab.
  */
+import { Icon, SectionCard } from '../ui';
 import {
   ArrowRight, CheckCircle, Settings2, Briefcase, Sparkles,
   BarChart3, Zap, ArrowUpRight, FileText,
@@ -116,8 +117,8 @@ export function KeywordStrategyGuide() {
     <div className="space-y-8 max-w-3xl">
       {/* Header */}
       <div className="space-y-2">
-        <h2 className="text-lg font-semibold text-zinc-200">Keyword Strategy Guide</h2>
-        <p className="text-sm text-zinc-400">
+        <h2 className="t-h2 text-[var(--brand-text-bright)]">Keyword Strategy Guide</h2>
+        <p className="t-body text-[var(--brand-text)]">
           How to configure, generate, and act on an AI-powered keyword strategy — from setup through content execution.
         </p>
       </div>
@@ -125,30 +126,30 @@ export function KeywordStrategyGuide() {
       {/* Steps */}
       <div className="space-y-3">
         {STEPS.map(step => {
-          const Icon = step.icon;
+          const StepIcon = step.icon;
           return (
-            <div key={step.number} className={`border p-5 ${step.bg}`} style={{ borderRadius: '6px 12px 6px 12px' }}>
+            <div key={step.number} className={`border p-5 ${step.bg} rounded-[var(--radius-signature)]`}>
               <div className="flex items-start gap-3">
-                <div className={`flex items-center justify-center w-8 h-8 rounded-lg bg-zinc-900/60 flex-shrink-0 ${step.color}`}>
-                  <Icon className="w-4 h-4" />
+                <div className={`flex items-center justify-center w-8 h-8 rounded-[var(--radius-lg)] bg-[var(--surface-2)]/60 flex-shrink-0 ${step.color}`}>
+                  <Icon as={StepIcon} size="sm" className={step.color} />
                 </div>
                 <div className="flex-1 min-w-0 space-y-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Step {step.number}</span>
-                    <h3 className="text-sm font-medium text-zinc-200">{step.title}</h3>
+                    <span className="t-micro font-bold text-[var(--brand-text-muted)] uppercase tracking-wider">Step {step.number}</span>
+                    <h3 className="t-ui font-medium text-[var(--brand-text-bright)]">{step.title}</h3>
                   </div>
-                  <p className="text-xs text-zinc-400 leading-relaxed">{step.description}</p>
+                  <p className="t-caption text-[var(--brand-text)] leading-relaxed">{step.description}</p>
                   <ul className="space-y-1">
                     {step.actions.map((a, i) => (
-                      <li key={i} className="flex items-start gap-2 text-xs text-zinc-300">
-                        <ArrowRight className="w-3 h-3 text-zinc-600 mt-0.5 flex-shrink-0" />
+                      <li key={i} className="flex items-start gap-2 t-caption text-[var(--zinc-300)]">
+                        <Icon as={ArrowRight} size="xs" className="text-[var(--brand-text-dim)] mt-0.5 flex-shrink-0" />
                         <span>{a}</span>
                       </li>
                     ))}
                   </ul>
-                  <div className="flex items-start gap-1.5 mt-1 pt-1.5 border-t border-zinc-800/30">
-                    <CheckCircle className="w-3 h-3 text-zinc-600 mt-0.5 flex-shrink-0" />
-                    <span className="text-[11px] text-zinc-500 italic">{step.tip}</span>
+                  <div className="flex items-start gap-1.5 mt-1 pt-1.5 border-t border-[var(--brand-border)]/30">
+                    <Icon as={CheckCircle} size="xs" className="text-[var(--brand-text-dim)] mt-0.5 flex-shrink-0" />
+                    <span className="t-caption-sm text-[var(--brand-text-muted)] italic">{step.tip}</span>
                   </div>
                 </div>
               </div>
@@ -158,49 +159,47 @@ export function KeywordStrategyGuide() {
       </div>
 
       {/* Metric Glossary */}
-      <div className="bg-zinc-900 border border-zinc-800 p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
-        <div className="flex items-center gap-2">
-          <BarChart3 className="w-4 h-4 text-sky-400" />
-          <h3 className="text-sm font-medium text-zinc-200">Metric Glossary</h3>
-        </div>
+      <SectionCard
+        title="Metric Glossary"
+        titleIcon={<Icon as={BarChart3} size="sm" className="text-sky-400" />}
+      >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {METRIC_GLOSSARY.map(m => (
-            <div key={m.term} className="flex items-start gap-2 px-3 py-2 bg-zinc-800/40 rounded-lg">
-              <span className="text-[11px] font-bold text-sky-400 flex-shrink-0 w-14">{m.term}</span>
-              <span className="text-[11px] text-zinc-400 leading-relaxed">{m.def}</span>
+            <div key={m.term} className="flex items-start gap-2 px-3 py-2 bg-[var(--surface-3)]/40 rounded-[var(--radius-lg)]">
+              <span className="t-caption-sm font-bold text-sky-400 flex-shrink-0 w-14">{m.term}</span>
+              <span className="t-caption-sm text-[var(--brand-text)] leading-relaxed">{m.def}</span>
             </div>
           ))}
         </div>
-      </div>
+      </SectionCard>
 
       {/* Content Pipeline integration */}
-      <div className="bg-zinc-900 border border-zinc-800 p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
-        <div className="flex items-center gap-2">
-          <FileText className="w-4 h-4 text-amber-400" />
-          <h3 className="text-sm font-medium text-zinc-200">Strategy → Content Pipeline</h3>
-        </div>
-        <div className="space-y-2 text-xs text-zinc-400">
+      <SectionCard
+        title="Strategy → Content Pipeline"
+        titleIcon={<Icon as={FileText} size="sm" className="text-amber-400" />}
+      >
+        <div className="space-y-2 t-caption text-[var(--brand-text)]">
           <p>The keyword strategy is the upstream source for all content work. Here's how it connects:</p>
           <ul className="space-y-1.5">
             <li className="flex items-start gap-2">
               <span className="text-amber-400 font-bold">1.</span>
-              <span><strong className="text-zinc-300">Content Gaps → new page briefs</strong> — gaps represent keywords you don't rank for. Each gap can become a new page in the content pipeline.</span>
+              <span><strong className="text-[var(--zinc-300)]">Content Gaps → new page briefs</strong> — gaps represent keywords you don't rank for. Each gap can become a new page in the content pipeline.</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-amber-400 font-bold">2.</span>
-              <span><strong className="text-zinc-300">Quick Wins → improve existing pages</strong> — Quick Win pages already exist; the brief optimizes titles, H1s, and meta descriptions around the target keyword.</span>
+              <span><strong className="text-[var(--zinc-300)]">Quick Wins → improve existing pages</strong> — Quick Win pages already exist; the brief optimizes titles, H1s, and meta descriptions around the target keyword.</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-amber-400 font-bold">3.</span>
-              <span><strong className="text-zinc-300">Site keywords auto-populate briefs</strong> — when you create a brief for a page, the mapped primary keyword pre-fills the brief's keyword field.</span>
+              <span><strong className="text-[var(--zinc-300)]">Site keywords auto-populate briefs</strong> — when you create a brief for a page, the mapped primary keyword pre-fills the brief's keyword field.</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-amber-400 font-bold">4.</span>
-              <span><strong className="text-zinc-300">Re-run after publishing</strong> — once new content goes live, re-run the strategy to see if rankings moved and update the keyword map.</span>
+              <span><strong className="text-[var(--zinc-300)]">Re-run after publishing</strong> — once new content goes live, re-run the strategy to see if rankings moved and update the keyword map.</span>
             </li>
           </ul>
         </div>
-      </div>
+      </SectionCard>
     </div>
   );
 }
