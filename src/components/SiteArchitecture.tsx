@@ -135,7 +135,7 @@ function TreeNode({ node, defaultExpanded, coverageMap }: { node: SiteNode; defa
 
         {node.keyword && (
           <span className="text-[10px] text-[var(--brand-text-muted)] truncate max-w-[150px] hidden sm:block" title={node.keyword}>
-            <Icon as={Target} size="xs" className="inline mr-0.5 -mt-px" />{node.keyword}
+            <Icon as={Target} size="xs" className="mr-0.5 -mt-px" />{node.keyword}
           </span>
         )}
 
