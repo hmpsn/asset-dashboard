@@ -78,7 +78,7 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
                   {gap.volume != null && <span className="t-caption-sm text-[var(--brand-text)] flex items-center gap-0.5"><Icon as={BarChart3} size="sm" />{fmtNum(gap.volume)}/mo</span>}
                   {gap.difficulty != null && gap.difficulty > 0 && (
                     <span
-                      className={`t-micro font-medium ${kdColor(gap.difficulty)} cursor-help`}
+                      className={`t-caption-sm font-medium ${kdColor(gap.difficulty)} cursor-help`}
                       title={kdTooltip(gap.difficulty)}
                     >
                       KD {gap.difficulty}
@@ -121,13 +121,13 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
               {/* Trend + SERP + Competitor badges */}
               <div className="flex items-center gap-2 flex-wrap mt-1">
                 {gap.trendDirection === 'rising' && (
-                  <span className="flex items-center gap-0.5 t-micro text-emerald-400 font-medium"><Icon as={TrendingUp} size="sm" className="text-emerald-400" />Rising</span>
+                  <span className="flex items-center gap-0.5 t-caption-sm text-emerald-400 font-medium"><Icon as={TrendingUp} size="sm" className="text-emerald-400" />Rising</span>
                 )}
                 {gap.trendDirection === 'declining' && (
-                  <span className="flex items-center gap-0.5 t-micro text-red-400 font-medium"><Icon as={TrendingDown} size="sm" className="text-red-400" />Declining</span>
+                  <span className="flex items-center gap-0.5 t-caption-sm text-red-400 font-medium"><Icon as={TrendingDown} size="sm" className="text-red-400" />Declining</span>
                 )}
                 {gap.trendDirection === 'stable' && gap.volume && gap.volume > 0 && (
-                  <span className="flex items-center gap-0.5 t-micro text-[var(--brand-text)] font-medium"><Icon as={Minus} size="sm" />Stable</span>
+                  <span className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text)] font-medium"><Icon as={Minus} size="sm" />Stable</span>
                 )}
                 {Array.isArray(gap.serpFeatures) && gap.serpFeatures.length > 0 && (
                   <div className="flex flex-wrap gap-1">

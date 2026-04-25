@@ -40,7 +40,7 @@ export function CannibalizationAlert({ items }: CannibalizationAlertProps) {
       <h4 className="t-caption-sm font-semibold text-red-300 mb-1 flex items-center gap-1.5">
         <Icon as={Copy} size="sm" className="text-red-300" /> Keyword Cannibalization
         {highCount > 0 && (
-          <span className="ml-1 px-1.5 py-0.5 rounded-full bg-red-500/20 t-micro text-red-400 font-medium">{highCount} critical</span>
+          <span className="ml-1 px-1.5 py-0.5 rounded-full bg-red-500/20 t-caption-sm text-red-400 font-medium">{highCount} critical</span>
         )}
       </h4>
       <p className="t-caption-sm text-[var(--brand-text-muted)] mb-3">Multiple pages competing for the same keyword dilute your ranking power. Consolidate to one canonical page.</p>
@@ -53,7 +53,7 @@ export function CannibalizationAlert({ items }: CannibalizationAlertProps) {
                 <span className={`t-caption-sm font-medium px-1.5 py-0.5 rounded border ${sevColor(item.severity)}`}>
                   {item.severity}
                 </span>
-                <span className="t-micro text-[var(--brand-text-muted)]">{item.pages.length} pages</span>
+                <span className="t-caption-sm text-[var(--brand-text-muted)]">{item.pages.length} pages</span>
               </div>
             </div>
             <div className="mt-1.5 space-y-0.5">
@@ -74,7 +74,7 @@ export function CannibalizationAlert({ items }: CannibalizationAlertProps) {
               if (!a) return null;
               const ActionIcon = a.icon;
               return (
-                <div className={`flex items-center gap-1 mt-1.5 px-1.5 py-0.5 rounded t-micro font-medium ${a.color} w-fit`}>
+                <div className={`flex items-center gap-1 mt-1.5 px-1.5 py-0.5 rounded t-caption-sm font-medium ${a.color} w-fit`}>
                   <Icon as={ActionIcon} size="xs" />
                   {a.label}
                   {item.canonicalPath && <span className="font-mono ml-1 opacity-70">→ {item.canonicalPath}</span>}

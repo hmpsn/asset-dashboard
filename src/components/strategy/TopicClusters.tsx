@@ -53,12 +53,12 @@ export function TopicClusters({ clusters }: TopicClustersProps) {
             <div className="flex items-center justify-between mt-1.5">
               <div className="flex items-center gap-2 flex-wrap">
                 {cluster.avgPosition && (
-                  <span className="t-micro text-[var(--brand-text)] flex items-center gap-0.5">
+                  <span className="t-caption-sm text-[var(--brand-text)] flex items-center gap-0.5">
                     <Icon as={TrendingUp} size="sm" />Avg pos #{cluster.avgPosition}
                   </span>
                 )}
                 {cluster.topCompetitor && cluster.topCompetitorCoverage && (
-                  <span className="t-micro text-orange-400 flex items-center gap-0.5">
+                  <span className="t-caption-sm text-orange-400 flex items-center gap-0.5">
                     <Icon as={AlertTriangle} size="sm" className="text-orange-400" />{cluster.topCompetitor}: {cluster.topCompetitorCoverage}%
                   </span>
                 )}
@@ -67,12 +67,12 @@ export function TopicClusters({ clusters }: TopicClustersProps) {
             {cluster.gap.length > 0 && (
               <div className="mt-1.5 flex flex-wrap gap-1">
                 {cluster.gap.slice(0, 5).map((kw, ki) => (
-                  <span key={ki} className="t-micro px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20">
+                  <span key={ki} className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20">
                     {kw}
                   </span>
                 ))}
                 {cluster.gap.length > 5 && (
-                  <span className="t-micro text-[var(--brand-text-muted)]">+{cluster.gap.length - 5} more</span>
+                  <span className="t-caption-sm text-[var(--brand-text-muted)]">+{cluster.gap.length - 5} more</span>
                 )}
               </div>
             )}
