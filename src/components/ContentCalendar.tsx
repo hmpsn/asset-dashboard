@@ -173,7 +173,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Icon as={CalendarIcon} size="md" className="text-amber-400" />
+          <Icon as={CalendarIcon} size="lg" className="text-amber-400" />
           <h2 className="text-lg font-semibold text-[var(--brand-text-bright)]">Content Calendar</h2>
         </div>
         <div className="flex items-center gap-2">

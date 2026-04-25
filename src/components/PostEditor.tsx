@@ -241,7 +241,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
 
   if (loading) return (
     <div className="flex items-center justify-center py-16">
-      <Icon as={Loader2} size="md" className="animate-spin text-teal-400" />
+      <Icon as={Loader2} size="lg" className="animate-spin text-teal-400" />
     </div>
   );
 
@@ -263,7 +263,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
           <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] p-6 max-w-sm w-full mx-4 shadow-2xl">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0">
-                <Icon as={AlertTriangle} size="md" className="text-red-400" />
+                <Icon as={AlertTriangle} size="lg" className="text-red-400" />
               </div>
               <div>
                 <div className="text-sm font-semibold text-[var(--brand-text-bright)]">Delete Post?</div>

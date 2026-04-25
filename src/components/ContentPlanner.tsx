@@ -156,7 +156,7 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24 gap-3">
-        <Icon as={Loader2} size="md" className="animate-spin text-teal-400" />
+        <Icon as={Loader2} size="lg" className="animate-spin text-teal-400" />
         <span className="text-sm text-[var(--brand-text)]">Loading content planner…</span>
       </div>
     );
@@ -181,7 +181,7 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
         <PageHeader
           title="Content Planner"
           subtitle="Create templates and build content matrices at scale"
-          icon={<Icon as={Layers} size="md" className="text-teal-400" />}
+          icon={<Icon as={Layers} size="lg" className="text-teal-400" />}
         />
         <EmptyState
           icon={Layers}
@@ -209,7 +209,7 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
       <PageHeader
         title="Content Planner"
         subtitle={`${templates.length} template${templates.length !== 1 ? 's' : ''} · ${matrices.length} matri${matrices.length !== 1 ? 'ces' : 'x'} · ${totalCells} pages planned`}
-        icon={<Icon as={Layers} size="md" className="text-teal-400" />}
+        icon={<Icon as={Layers} size="lg" className="text-teal-400" />}
         actions={
           <div className="flex items-center gap-2">
             <button

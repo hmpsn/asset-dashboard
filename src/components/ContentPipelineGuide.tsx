@@ -131,7 +131,7 @@ export function ContentPipelineGuide() {
     <div className="space-y-8 max-w-3xl">
       <div className="space-y-1.5 mb-6">
         <h2 className="text-lg font-bold text-[var(--brand-text-bright)] flex items-center gap-2">
-          <Icon as={Sparkles} size="md" className="text-teal-400" />
+          <Icon as={Sparkles} size="lg" className="text-teal-400" />
           Content Pipeline Guide
         </h2>
         <p className="text-xs text-[var(--brand-text-muted)] leading-relaxed max-w-xl">

@@ -149,7 +149,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Icon as={Loader2} size="md" className="animate-spin text-[var(--brand-text-muted)]" />
+        <Icon as={Loader2} size="lg" className="animate-spin text-[var(--brand-text-muted)]" />
       </div>
     );
   }
