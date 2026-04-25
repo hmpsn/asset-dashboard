@@ -32,12 +32,14 @@ interface ContentTabProps {
   pricingConfirming: boolean;
   workspaceId: string;
   setToast: (t: { message: string; type: 'success' | 'error' } | null) => void;
+  /** When true (external billing), hide price chips on upgrade button. */
+  hidePrices?: boolean;
 }
 
 export function ContentTab({
   contentRequests, setContentRequests, effectiveTier,
   briefPrice, fullPostPrice, fmtPrice, setPricingModal, pricingConfirming,
-  workspaceId, setToast,
+  workspaceId, setToast, hidePrices = false,
 }: ContentTabProps) {
   const navigate = useNavigate();
   const betaMode = useBetaMode();
@@ -208,7 +210,15 @@ export function ContentTab({
           : [isPending ? 'Awaiting Payment' : 'Requested', 'Brief Ready', 'Your Review', 'Approved', 'In Production', 'Delivered', 'Published'];
         // Map pending_payment and changes_requested back for timeline display
         const displayStatus = req.status === 'pending_payment' ? 'requested' : req.status === 'changes_requested' ? 'client_review' : req.status;
-        const currentIdx = (steps as readonly string[]).indexOf(displayStatus);
+        const rawIdx = (steps as readonly string[]).indexOf(displayStatus);
+        // Fallback: brief_only records that reached in_progress (before the admin UI guard
+        // was added) aren't in the brief_only steps array. Pin to approved so the bar
+        // stays filled rather than going dark. Scoped narrowly to avoid masking future gaps.
+        const currentIdx = rawIdx >= 0
+          ? rawIdx
+          : (isBriefOnly && req.status === 'in_progress')
+            ? (steps as readonly string[]).indexOf('approved')
+            : 0;
         const isExpanded = expandedContentReq === req.id;
         const brief = req.briefId ? briefPreviews[req.briefId] : null;
         const canUpgrade = isBriefOnly && ['approved', 'delivered', 'published'].includes(req.status);
@@ -591,7 +601,7 @@ export function ContentTab({
                     >
                       <Sparkles className="w-3.5 h-3.5" />
                       Upgrade to Full Post
-                      {briefPrice != null && fullPostPrice != null && <span className="text-[11px] opacity-70 ml-0.5">+{fmtPrice(Math.max(0, fullPostPrice - briefPrice))}</span>}
+                      {!hidePrices && briefPrice != null && fullPostPrice != null && <span className="text-[11px] opacity-70 ml-0.5">+{fmtPrice(Math.max(0, fullPostPrice - briefPrice))}</span>}
                     </button>
                   </div>
                 )}
