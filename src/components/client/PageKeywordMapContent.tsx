@@ -213,7 +213,7 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                                   </span>
                                 )}
                               </div>
-                              <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{page.pagePath}</div>
+                              <div className="t-caption-sm text-[var(--brand-text-muted)] font-mono truncate">{page.pagePath}</div>
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0 ml-3">
                               {page.impressions != null && page.impressions > 0 && (

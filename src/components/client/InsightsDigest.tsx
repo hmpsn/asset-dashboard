@@ -525,8 +525,8 @@ export function InsightsDigest(props: InsightsDigestProps) {
             >
               {/* Header */}
               <div className="flex items-center gap-1.5 mb-2">
-                <InsightIcon className={`w-4 h-4 ${c.text}`} />
-                <span className={`t-caption font-medium px-1.5 py-0.5 rounded ${c.badge}`}>
+                <Icon as={InsightIcon} size="md" className={c.text} />
+                <span className={`t-caption-sm font-medium px-1.5 py-0.5 rounded ${c.badge}`}>
                   {SENTIMENT_LABELS[insight.sentiment]}
                 </span>
               </div>
