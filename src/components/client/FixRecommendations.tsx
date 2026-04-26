@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Sparkles, ShoppingCart, Image, FileText, Code2, ArrowRightLeft, Wrench, Crown, MessageSquare, TrendingUp, TrendingDown, Eye, MousePointerClick, ChevronDown, Lightbulb, CheckCircle2, Zap, Shield } from 'lucide-react';
 import { SectionCard } from '../ui';
+import { Icon } from '../ui/Icon';
 import { useCart } from './useCart';
 import type { AuditDetail } from './types';
 import { useBetaMode } from './BetaContext';
@@ -412,17 +413,17 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
   const totalHighTraffic = categories.reduce((s, c) => s + c.highTrafficPages, 0);
 
   return (
-    <SectionCard title="Recommended Fixes" titleIcon={<Sparkles className="w-4 h-4 text-teal-400" />} action={autoCategories.length > 0 && !isPremium ? <span className="text-[11px] text-zinc-500">Est. total: <span className="text-teal-400 font-medium">{fmt(estimatedTotal)}</span></span> : undefined} noPadding className="overflow-hidden">
+    <SectionCard title="Recommended Fixes" titleIcon={<Icon as={Sparkles} size="md" className="text-teal-400" />} action={autoCategories.length > 0 && !isPremium ? <span className="t-caption-sm text-[var(--brand-text-muted)]">Est. total: <span className="text-teal-400 font-medium">{fmt(estimatedTotal)}</span></span> : undefined} noPadding className="overflow-hidden">
       {/* Sub-header description */}
       {((hasTrafficData && totalHighTraffic > 0) || serverRecsError) && (
         <div className="px-5 pt-3 pb-0">
           {hasTrafficData && totalHighTraffic > 0 && (
-            <p className="text-[12px] text-zinc-400 leading-relaxed">
+            <p className="t-caption text-[var(--brand-text)] leading-relaxed">
               Based on your traffic data, we've identified <span className="text-teal-400 font-medium">{totalHighTraffic} high-traffic pages</span> with fixable SEO issues. Prioritizing these will have the biggest impact on your organic performance.
             </p>
           )}
           {serverRecsError && (
-            <p className="text-[11px] text-red-400/80 mt-1.5">
+            <p className="t-caption-sm text-red-400/80 mt-1.5">
               Couldn't load personalized recommendations — showing general fixes based on your audit. Try refreshing the page.
             </p>
           )}
@@ -430,9 +431,9 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
       )}
 
       {/* Categories */}
-      <div className="divide-y divide-zinc-800/50">
+      <div className="divide-y divide-[var(--brand-border)]/50">
         {categories.map(cat => {
-          const Icon = cat.icon;
+          const CatIcon = cat.icon;
           const inCart = cart?.items.some(i => cat.options.some(o => o.productType === i.productType));
           const isExpanded = expandedCategories.has(cat.id);
           const topPages = cat.pages.slice(0, 5);
@@ -445,26 +446,26 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
             <div key={cat.id} className={`px-5 py-4 ${allDone ? 'opacity-50' : ''}`}>
               {/* Category header */}
               <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-lg bg-zinc-800 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Icon className="w-4 h-4 text-zinc-400" />
+                <div className="w-9 h-9 rounded-[var(--radius-md)] bg-[var(--surface-3)] flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Icon as={CatIcon} size="md" className="text-[var(--brand-text)]" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-zinc-200">{cat.label}</span>
-                    <span className="text-[11px] text-zinc-500">{cat.totalPages} {cat.id === 'redirect' ? 'issue' : 'page'}{cat.totalPages !== 1 ? 's' : ''}</span>
+                    <span className="text-sm font-medium text-[var(--brand-text-bright)]">{cat.label}</span>
+                    <span className="t-caption-sm text-[var(--brand-text-muted)]">{cat.totalPages} {cat.id === 'redirect' ? 'issue' : 'page'}{cat.totalPages !== 1 ? 's' : ''}</span>
                     {cat.highTrafficPages > 0 && (
-                      <span className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400 flex items-center gap-1">
-                        <TrendingUp className="w-3 h-3" />
+                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 border border-teal-500/20 text-teal-400 flex items-center gap-1">
+                        <Icon as={TrendingUp} size="sm" />
                         {cat.highTrafficPages} with traffic
                       </span>
                     )}
                     {allDone && (
-                      <span className="text-[11px] px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3" /> Addressed
+                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center gap-1">
+                        <Icon as={CheckCircle2} size="sm" /> Addressed
                       </span>
                     )}
                     {completedCount > 0 && pendingCount > 0 && (
-                      <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400">
+                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 border border-blue-500/20 text-blue-400">
                         {completedCount} done · {pendingCount} remaining
                       </span>
                     )}
@@ -472,42 +473,42 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
 
                   {/* Insight text */}
                   <div className="mt-1.5 flex items-start gap-1.5">
-                    <Lightbulb className="w-3 h-3 text-amber-400 flex-shrink-0 mt-0.5" />
-                    <p className="text-[12px] text-zinc-400 leading-relaxed">{cat.insight}</p>
+                    <Icon as={Lightbulb} size="sm" className="text-amber-400 flex-shrink-0 mt-0.5" />
+                    <p className="t-caption text-[var(--brand-text)] leading-relaxed">{cat.insight}</p>
                   </div>
 
                   {/* Top affected pages (traffic-sorted) */}
                   {hasPages && !cat.isManual && (
                     <div className="mt-3">
-                      <button onClick={() => toggleCategory(cat.id)} className="flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors mb-1.5">
-                        <ChevronDown className={`w-3 h-3 transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
+                      <button onClick={() => toggleCategory(cat.id)} className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors mb-1.5">
+                        <Icon as={ChevronDown} size="sm" className={`transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
                         Top pages that would benefit most
                       </button>
                       {isExpanded && (
-                        <div className="rounded-lg bg-zinc-800/40 border border-zinc-800 overflow-hidden">
-                          <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 px-3 py-1.5 text-[10px] text-zinc-500 uppercase tracking-wider border-b border-zinc-800">
+                        <div className="rounded-[var(--radius-md)] bg-[var(--surface-3)]/40 border border-[var(--brand-border)] overflow-hidden">
+                          <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 px-3 py-1.5 t-micro text-[var(--brand-text-muted)] border-b border-[var(--brand-border)]">
                             <span>Page</span>
                             <span className="text-right">Clicks</span>
                             <span className="text-right">Impressions</span>
                           </div>
                           {topPages.filter(p => p.clicks > 0 || p.impressions > 0).slice(0, 5).map((p, i) => (
-                            <div key={i} className="grid grid-cols-[1fr_auto_auto] gap-x-4 px-3 py-2 text-[11px] border-b border-zinc-800/50 last:border-b-0">
+                            <div key={i} className="grid grid-cols-[1fr_auto_auto] gap-x-4 px-3 py-2 t-caption-sm border-b border-[var(--brand-border)]/50 last:border-b-0">
                               <div className="truncate">
-                                <span className="text-zinc-300">{p.name}</span>
-                                <span className="text-zinc-600 ml-1.5">{p.slug}</span>
+                                <span className="text-[var(--brand-text-bright)]">{p.name}</span>
+                                <span className="text-[var(--brand-text-dim)] ml-1.5">{p.slug}</span>
                               </div>
-                              <span className="text-right tabular-nums flex items-center gap-1 text-zinc-400">
-                                <MousePointerClick className="w-3 h-3 text-teal-400" />
+                              <span className="text-right tabular-nums flex items-center gap-1 text-[var(--brand-text)]">
+                                <Icon as={MousePointerClick} size="sm" className="text-teal-400" />
                                 {num(p.clicks)}
                               </span>
-                              <span className="text-right tabular-nums flex items-center gap-1 text-zinc-500">
-                                <Eye className="w-3 h-3" />
+                              <span className="text-right tabular-nums flex items-center gap-1 text-[var(--brand-text-muted)]">
+                                <Icon as={Eye} size="sm" />
                                 {num(p.impressions)}
                               </span>
                             </div>
                           ))}
                           {topPages.filter(p => p.clicks > 0 || p.impressions > 0).length > 5 && (
-                            <div className="px-3 py-1.5 text-[10px] text-zinc-500 text-center">
+                            <div className="px-3 py-1.5 t-caption-sm text-[var(--brand-text-muted)] text-center">
                               + {topPages.filter(p => p.clicks > 0 || p.impressions > 0).length - 5} more pages with traffic
                             </div>
                           )}
@@ -520,17 +521,17 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
                   {!betaMode && <div className="mt-3">
                     {isPremium ? (
                       <div className="flex items-center gap-1.5">
-                        <Crown className="w-3 h-3 text-amber-400" />
-                        <span className="text-[11px] text-amber-400">Included in your Premium plan</span>
+                        <Icon as={Crown} size="sm" className="text-amber-400" />
+                        <span className="t-caption-sm text-amber-400">Included in your Premium plan</span>
                       </div>
                     ) : cat.isManual ? (
-                      <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors">
-                        <MessageSquare className="w-3 h-3" />
+                      <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)] transition-colors">
+                        <Icon as={MessageSquare} size="sm" />
                         Request a Quote
                       </button>
                     ) : inCart ? (
-                      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-teal-500/10 text-teal-400 border border-teal-500/20">
-                        <ShoppingCart className="w-3 h-3" />
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium bg-teal-500/10 text-teal-400 border border-teal-500/20">
+                        <Icon as={ShoppingCart} size="sm" />
                         In cart
                       </div>
                     ) : (
@@ -545,13 +546,13 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
                               quantity: opt.quantity || 1,
                               isFlat: opt.isFlat,
                             })}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium transition-colors ${
                               opt.isSuggested
                                 ? 'bg-teal-600 hover:bg-teal-500 text-white'
-                                : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
+                                : 'bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)]'
                             }`}
                           >
-                            <ShoppingCart className="w-3 h-3" />
+                            <Icon as={ShoppingCart} size="sm" />
                             {opt.buttonLabel}
                           </button>
                         ))}
@@ -567,14 +568,14 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
 
       {/* Fix everything CTA */}
       {!betaMode && !isPremium && autoCategories.length > 1 && (
-        <div className="px-5 py-3.5 border-t border-zinc-800 bg-zinc-800/30">
+        <div className="px-5 py-3.5 border-t border-[var(--brand-border)] bg-[var(--surface-3)]/30">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-[11px] font-medium text-zinc-300">
+              <div className="t-caption-sm font-medium text-[var(--brand-text-bright)]">
                 Fix everything above for <span className="text-teal-400">{fmt(estimatedTotal)}</span>
               </div>
               {estimatedTotal >= 500 && (
-                <div className="text-[10px] text-zinc-500 mt-0.5">
+                <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
                   Premium includes all this for $999/mo
                 </div>
               )}
@@ -594,9 +595,9 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
                   }
                 });
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors"
             >
-              <ShoppingCart className="w-3 h-3" />
+              <Icon as={ShoppingCart} size="sm" />
               Add All to Cart
             </button>
           </div>
