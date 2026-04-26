@@ -76,7 +76,7 @@ export function ClientHeader({
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-semibold">{ws.name}</h1>
               {!betaMode && ws.isTrial && (
-                <span className="px-2 py-0.5 t-micro rounded-full bg-amber-500/15 text-amber-400/80 border border-amber-500/20">
+                <span className="px-2 py-0.5 t-caption-sm uppercase tracking-wider font-semibold rounded-full bg-amber-500/15 text-amber-400/80 border border-amber-500/20">
                   Growth Trial{ws.trialDaysRemaining ? ` · ${ws.trialDaysRemaining}d` : ''}
                 </span>
               )}
@@ -138,7 +138,7 @@ export function ClientHeader({
                   <p className="text-xs font-medium text-[var(--brand-text-muted)] mb-3">Custom date range</p>
                   <div className="space-y-2">
                     <label className="block">
-                      <span className="t-micro text-[var(--brand-text-muted)]">Start date</span>
+                      <span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)]">Start date</span>
                       <input type="date" ref={customStartRef}
                         defaultValue={customDateRange?.startDate || MODULE_DEFAULT_START}
                         max={MODULE_TODAY}
@@ -146,7 +146,7 @@ export function ClientHeader({
                       />
                     </label>
                     <label className="block">
-                      <span className="t-micro text-[var(--brand-text-muted)]">End date</span>
+                      <span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)]">End date</span>
                       <input type="date" ref={customEndRef}
                         defaultValue={customDateRange?.endDate || MODULE_TODAY}
                         max={MODULE_TODAY}

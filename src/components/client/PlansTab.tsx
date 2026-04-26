@@ -153,7 +153,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
           return (
             <div key={plan.id} className={`relative rounded-[var(--radius-xl)] border p-5 transition-all ${isCurrent ? `${plan.bgColor} ${plan.borderColor} ring-1 ring-offset-0 ${plan.id !== 'free' ? 'ring-teal-500/20' : 'ring-zinc-700'}` : `bg-zinc-900/50 border-[var(--brand-border)] hover:border-[var(--brand-border-strong)]`}`}>
               {isCurrent && (
-                <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full t-micro border ${plan.id !== 'free' ? 'bg-teal-500/20 border-teal-500/30 text-teal-300' : 'bg-[var(--surface-3)] border-[var(--brand-border-strong)] text-[var(--brand-text-muted)]'}`}>
+                <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full t-caption-sm uppercase tracking-wider font-semibold border ${plan.id !== 'free' ? 'bg-teal-500/20 border-teal-500/30 text-teal-300' : 'bg-[var(--surface-3)] border-[var(--brand-border-strong)] text-[var(--brand-text-muted)]'}`}>
                   {isTrial ? 'Current Trial' : 'Current Plan'}
                 </div>
               )}
@@ -167,7 +167,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                 <div className="space-y-3">
                   {plan.featureGroups.map((group, gi) => (
                     <div key={gi}>
-                      <div className="t-micro text-[var(--brand-text-muted)] font-medium mb-1.5">{group.category}</div>
+                      <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1.5">{group.category}</div>
                       {group.features.map((f, fi) => (
                         <div key={fi} className="flex items-center gap-2 py-0.5">
                           {f.included ? (

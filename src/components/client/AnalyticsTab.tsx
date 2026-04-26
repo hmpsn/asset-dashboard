@@ -482,10 +482,10 @@ export function AnalyticsTab({
               <table className="w-full text-left">
                 <thead>
                   <tr className="border-b border-[var(--brand-border)]">
-                    <th className="t-micro text-[var(--brand-text-muted)] font-medium py-2 pr-3">Event</th>
-                    <th className="t-micro text-[var(--brand-text-muted)] font-medium py-2 pr-3">Page</th>
-                    <th className="t-micro text-[var(--brand-text-muted)] font-medium py-2 pr-3 text-right">Count</th>
-                    <th className="t-micro text-[var(--brand-text-muted)] font-medium py-2 text-right">Users</th>
+                    <th className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium py-2 pr-3">Event</th>
+                    <th className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium py-2 pr-3">Page</th>
+                    <th className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium py-2 pr-3 text-right">Count</th>
+                    <th className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium py-2 text-right">Users</th>
                   </tr>
                 </thead>
                 <tbody>
