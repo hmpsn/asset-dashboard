@@ -621,7 +621,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
 
       {/* Generated timestamp */}
       <div className="px-5 py-2 border-t border-[var(--brand-border)]/50 text-center">
-        <span className="t-micro text-[var(--brand-text-dim)]">
+        <span className="t-caption-sm text-[var(--brand-text-muted)]">
           Generated {new Date(data.generatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
           {' · '}{data.recommendations.length} recommendations from audit + strategy analysis
         </span>
