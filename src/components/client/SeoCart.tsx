@@ -61,15 +61,15 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60]" onClick={closeCart} />
 
       {/* Drawer */}
-      <div className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-zinc-900 border-l border-zinc-800 z-[61] flex flex-col animate-[slideInRight_0.2s_ease-out]">
+      <div className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-[var(--surface-2)] border-l border-[var(--brand-border)] z-[61] flex flex-col animate-[slideInRight_0.2s_ease-out]">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--brand-border)]">
           <div className="flex items-center gap-2">
             <ShoppingCart className="w-4 h-4 text-teal-400" />
-            <span className="text-sm font-semibold text-zinc-100">SEO Fix Cart</span>
-            <span className="text-[11px] text-zinc-500">({items.length} item{items.length !== 1 ? 's' : ''})</span>
+            <span className="text-sm font-semibold text-[var(--brand-text-bright)]">SEO Fix Cart</span>
+            <span className="t-caption-sm text-[var(--brand-text-muted)]">({items.length} item{items.length !== 1 ? 's' : ''})</span>
           </div>
-          <button onClick={closeCart} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors">
+          <button onClick={closeCart} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -78,17 +78,17 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
           {items.length === 0 ? (
             <div className="text-center py-12">
-              <ShoppingCart className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
-              <p className="text-sm text-zinc-500">Your cart is empty</p>
-              <p className="text-[11px] text-zinc-600 mt-1">Add fixes from the Site Health tab</p>
+              <ShoppingCart className="w-8 h-8 text-[var(--brand-border)] mx-auto mb-3" />
+              <p className="text-sm text-[var(--brand-text-muted)]">Your cart is empty</p>
+              <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">Add fixes from the Site Health tab</p>
             </div>
           ) : (
             items.map(item => (
-              <div key={item.productType} className="bg-zinc-800/50 border border-zinc-700/50 rounded-xl p-4">
+              <div key={item.productType} className="bg-[var(--surface-3)]/50 border border-[var(--brand-border)]/50 rounded-xl p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-zinc-200">{item.displayName}</div>
-                    <div className="text-[11px] text-zinc-500 mt-0.5">
+                    <div className="text-sm font-medium text-[var(--brand-text-bright)]">{item.displayName}</div>
+                    <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
                       {item.isFlat ? 'Full site' : `${fmt(item.priceUsd)}/page`}
                     </div>
                   </div>
@@ -99,28 +99,28 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
 
                 <div className="flex items-center justify-between mt-3">
                   {item.isFlat ? (
-                    <span className="text-[11px] text-zinc-500">Flat rate</span>
+                    <span className="t-caption-sm text-[var(--brand-text-muted)]">Flat rate</span>
                   ) : (
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => updateQuantity(item.productType, item.quantity - 1)}
-                        className="w-6 h-6 rounded flex items-center justify-center bg-zinc-700 hover:bg-zinc-600 text-zinc-300 transition-colors"
+                        className="w-6 h-6 rounded flex items-center justify-center bg-[var(--surface-3)] hover:bg-[var(--surface-3)]/80 text-[var(--brand-text)] transition-colors"
                       >
                         <Minus className="w-3 h-3" />
                       </button>
-                      <span className="w-8 text-center text-xs font-medium text-zinc-300">{item.quantity}</span>
+                      <span className="w-8 text-center text-xs font-medium text-[var(--brand-text)]">{item.quantity}</span>
                       <button
                         onClick={() => updateQuantity(item.productType, item.quantity + 1)}
-                        className="w-6 h-6 rounded flex items-center justify-center bg-zinc-700 hover:bg-zinc-600 text-zinc-300 transition-colors"
+                        className="w-6 h-6 rounded flex items-center justify-center bg-[var(--surface-3)] hover:bg-[var(--surface-3)]/80 text-[var(--brand-text)] transition-colors"
                       >
                         <Plus className="w-3 h-3" />
                       </button>
-                      <span className="text-[11px] text-zinc-500 ml-1">pages</span>
+                      <span className="t-caption-sm text-[var(--brand-text-muted)] ml-1">pages</span>
                     </div>
                   )}
                   <button
                     onClick={() => removeItem(item.productType)}
-                    className="w-6 h-6 rounded flex items-center justify-center hover:bg-red-500/10 text-zinc-500 hover:text-red-400 transition-colors"
+                    className="w-6 h-6 rounded flex items-center justify-center hover:bg-red-500/10 text-[var(--brand-text-muted)] hover:text-red-400 transition-colors"
                   >
                     <Trash2 className="w-3 h-3" />
                   </button>
@@ -148,15 +148,15 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
 
         {/* Footer */}
         {items.length > 0 && (
-          <div className="border-t border-zinc-800 px-5 py-4 space-y-3">
+          <div className="border-t border-[var(--brand-border)] px-5 py-4 space-y-3">
             {/* Premium upgrade nudge */}
             {showPremiumNudge && (
               <div className="px-3 py-2.5 rounded-xl bg-gradient-to-r from-amber-500/5 to-orange-500/5 border border-amber-500/20">
                 <div className="flex items-start gap-2">
                   <Crown className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
                   <div>
-                    <div className="text-[11px] font-medium text-amber-300">Premium includes all this</div>
-                    <div className="text-[11px] text-zinc-500 mt-0.5">
+                    <div className="t-caption-sm font-medium text-amber-300">Premium includes all this</div>
+                    <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
                       For $999/mo, all technical SEO fixes are included with 3 implementation hours.
                     </div>
                   </div>
@@ -166,8 +166,8 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
 
             {/* Total */}
             <div className="flex items-center justify-between">
-              <span className="text-sm text-zinc-400">Total</span>
-              <span className="text-lg font-bold text-zinc-100">{fmt(totalPrice)}</span>
+              <span className="text-sm text-[var(--brand-text)]">Total</span>
+              <span className="text-lg font-bold text-[var(--brand-text-bright)]">{fmt(totalPrice)}</span>
             </div>
 
             {/* Error */}
@@ -198,7 +198,7 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
 
             <button
               onClick={clearCart}
-              className="w-full text-[11px] text-zinc-500 hover:text-zinc-300 py-1 transition-colors"
+              className="w-full t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] py-1 transition-colors"
             >
               Clear cart
             </button>
