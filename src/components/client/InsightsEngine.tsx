@@ -13,6 +13,7 @@ import type { RecPriority, RecType, RecStatus, Recommendation, RecommendationSet
 import { STUDIO_NAME } from '../../constants';
 import { get, post, patch, del } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
+import { Icon } from '../ui/Icon';
 
 // ─── Props ────────────────────────────────────────────────────────
 
@@ -180,19 +181,21 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
 
   if (isLoading) {
     return (
-      <div className="bg-zinc-900 border border-zinc-800 p-8 text-center" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      // pr-check-disable-next-line -- InsightsEngine loading state is a top-level client container intentionally using brand signature shape
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-8 text-center" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
         <Loader2 className="w-6 h-6 text-teal-400 animate-spin mx-auto mb-2" />
-        <p className="text-xs text-zinc-500">Analyzing your site for recommendations...</p>
+        <p className="t-caption text-[var(--brand-text-muted)]">Analyzing your site for recommendations...</p>
       </div>
     );
   }
 
   if (isError && !data) {
     return (
-      <div className="bg-zinc-900 border border-zinc-800 p-6 text-center" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      // pr-check-disable-next-line -- InsightsEngine error state is a top-level client container intentionally using brand signature shape
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-6 text-center" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
         <XCircle className="w-6 h-6 text-red-400 mx-auto mb-2" />
-        <p className="text-xs text-zinc-400">Failed to load recommendations</p>
-        <button onClick={handleRegenerate} className="mt-2 text-xs text-teal-400 hover:text-teal-300">
+        <p className="t-caption text-[var(--brand-text)]">Failed to load recommendations</p>
+        <button onClick={handleRegenerate} className="mt-2 t-caption text-teal-400 hover:text-teal-300">
           Try again
         </button>
       </div>
@@ -201,10 +204,11 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
 
   if (!data || data.recommendations.length === 0) {
     return (
-      <div className="bg-zinc-900 border border-zinc-800 p-8 text-center" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      // pr-check-disable-next-line -- InsightsEngine empty state is a top-level client container intentionally using brand signature shape
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-8 text-center" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
         <Shield className="w-8 h-8 text-teal-400 mx-auto mb-3" />
-        <p className="text-sm font-medium text-zinc-300">No recommendations yet</p>
-        <p className="text-xs text-zinc-500 mt-1">Run a site audit to generate prioritized recommendations.</p>
+        <p className="text-sm font-medium text-[var(--brand-text-bright)]">No recommendations yet</p>
+        <p className="t-caption text-[var(--brand-text-muted)] mt-1">Run a site audit to generate prioritized recommendations.</p>
       </div>
     );
   }
@@ -216,15 +220,16 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
     const topRecs = [...fixNowRecs, ...fixSoonRecs].slice(0, 4);
 
     return (
-      <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
-        <div className="px-5 py-4 border-b border-zinc-800">
+      // pr-check-disable-next-line -- InsightsEngine compact view is a top-level client container intentionally using brand signature shape
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+        <div className="px-5 py-4 border-b border-[var(--brand-border)]">
           <div className="flex items-center gap-2">
             <Lightbulb className="w-4 h-4 text-amber-400" />
-            <span className="text-sm font-semibold text-zinc-200">Action Plan</span>
-            <span className="text-[11px] text-zinc-500 ml-auto">{activeCount} active · {completedCount} completed</span>
+            <span className="text-sm font-semibold text-[var(--brand-text-bright)]">Action Plan</span>
+            <span className="t-caption text-[var(--brand-text-muted)] ml-auto">{activeCount} active · {completedCount} completed</span>
           </div>
           {data.summary.trafficAtRisk > 0 && (
-            <p className="text-[12px] text-zinc-400 mt-1">
+            <p className="t-caption text-[var(--brand-text)] mt-1">
               <span className="text-amber-400 font-medium">{num(data.summary.trafficAtRisk)} organic clicks/mo</span> are at risk from unresolved issues
               {data.summary.estimatedRecoverableClicks > 0 && (
                 <span className="ml-1 text-teal-400">· ~{num(data.summary.estimatedRecoverableClicks)} recoverable</span>
@@ -234,15 +239,15 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
         </div>
 
         {/* Priority summary pills */}
-        <div className="px-5 py-3 flex gap-2 border-b border-zinc-800/50">
+        <div className="px-5 py-3 flex gap-2 border-b border-[var(--brand-border)]/50">
           {(['fix_now', 'fix_soon', 'fix_later', 'ongoing'] as RecPriority[]).map(p => {
             const config = PRIORITY_CONFIG[p];
             const count = (grouped.get(p) || []).filter(r => r.status === 'pending').length;
             if (count === 0) return null;
-            const Icon = config.icon;
+            const PriorityIcon = config.icon;
             return (
-              <div key={p} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium ${config.bg} border ${config.border} ${config.color}`}>
-                <Icon className="w-3 h-3" />
+              <div key={p} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-[var(--radius-md)] t-caption font-medium ${config.bg} border ${config.border} ${config.color}`}>
+                <PriorityIcon className="w-3 h-3" />
                 {count} {config.label}
               </div>
             );
@@ -250,43 +255,43 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
         </div>
 
         {/* Top recommendations */}
-        <div className="divide-y divide-zinc-800/50">
+        <div className="divide-y divide-[var(--brand-border)]/50">
           {topRecs.map(rec => {
             const pConfig = PRIORITY_CONFIG[rec.priority];
             const TypeIcon = TYPE_ICONS[rec.type] || Wrench;
             return (
               <div key={rec.id} className="px-5 py-3 flex items-start gap-3">
-                <div className={`w-7 h-7 rounded-lg ${pConfig.bg} border ${pConfig.border} flex items-center justify-center flex-shrink-0 mt-0.5`}>
+                <div className={`w-7 h-7 rounded-[var(--radius-md)] ${pConfig.bg} border ${pConfig.border} flex items-center justify-center flex-shrink-0 mt-0.5`}>
                   <TypeIcon className={`w-3.5 h-3.5 ${pConfig.color}`} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-[12px] font-medium text-zinc-300 truncate">{rec.title}</div>
-                  <div className="text-[11px] text-zinc-500 mt-0.5 line-clamp-1">{rec.insight}</div>
+                  <div className="t-caption font-medium text-[var(--brand-text-bright)] truncate">{rec.title}</div>
+                  <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 line-clamp-1">{rec.insight}</div>
                   {rec.affectedPages.length > 0 && (
                     <div className="flex flex-wrap items-center gap-1 mt-1.5">
                       {rec.affectedPages.slice(0, 3).map((slug, i) => (
-                        <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700/50 truncate max-w-[180px]">
+                        <span key={i} className="t-caption-sm px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--brand-text)] border border-[var(--brand-border)] truncate max-w-[180px]">
                           /{slug}
                         </span>
                       ))}
                       {rec.affectedPages.length > 3 && (
-                        <span className="text-[10px] text-zinc-600">+{rec.affectedPages.length - 3} more</span>
+                        <span className="t-caption-sm text-[var(--brand-text-dim)]">+{rec.affectedPages.length - 3} more</span>
                       )}
                     </div>
                   )}
                 </div>
                 {rec.trafficAtRisk > 0 && (
-                  <span className="text-[10px] text-teal-400 flex-shrink-0 flex items-center gap-0.5">
-                    <MousePointerClick className="w-3 h-3" />
+                  <span className="t-caption-sm text-teal-400 flex-shrink-0 flex items-center gap-0.5">
+                    <Icon as={MousePointerClick} size="sm" />
                     {num(rec.trafficAtRisk)}
                   </span>
                 )}
                 {onNavigate && (
                   <button
                     onClick={() => onNavigate(REC_TYPE_TAB[rec.type] || 'seo-audit', { pageSlug: rec.affectedPages[0], recType: rec.type })}
-                    className="flex items-center gap-0.5 text-[10px] text-teal-400 hover:text-teal-300 transition-colors flex-shrink-0"
+                    className="flex items-center gap-0.5 t-caption-sm text-teal-400 hover:text-teal-300 transition-colors flex-shrink-0"
                   >
-                    Fix <ArrowUpRight className="w-3 h-3" />
+                    Fix <Icon as={ArrowUpRight} size="sm" />
                   </button>
                 )}
               </div>
@@ -295,8 +300,8 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
         </div>
 
         {activeCount > topRecs.length && (
-          <div className="px-5 py-2.5 border-t border-zinc-800 text-center">
-            <span className="text-[11px] text-zinc-500">
+          <div className="px-5 py-2.5 border-t border-[var(--brand-border)] text-center">
+            <span className="t-caption text-[var(--brand-text-muted)]">
               + {activeCount - topRecs.length} more recommendations — view in Site Health
             </span>
           </div>
@@ -308,18 +313,19 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
   // ── Full Mode ──────────────────────────────────────────────────
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
+    // pr-check-disable-next-line -- InsightsEngine full view is a top-level client container intentionally using brand signature shape
+    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
       {/* Header */}
-      <div className="px-5 py-4 border-b border-zinc-800">
+      <div className="px-5 py-4 border-b border-[var(--brand-border)]">
         <div className="flex items-center gap-2">
           <Lightbulb className="w-4 h-4 text-amber-400" />
-          <span className="text-sm font-semibold text-zinc-200">Prioritized Action Plan</span>
+          <span className="text-sm font-semibold text-[var(--brand-text-bright)]">Prioritized Action Plan</span>
           <div className="ml-auto flex items-center gap-2">
-            <span className="text-[11px] text-zinc-500">{activeCount} active · {completedCount} done</span>
+            <span className="t-caption text-[var(--brand-text-muted)]">{activeCount} active · {completedCount} done</span>
             <button
               onClick={handleRegenerate}
               disabled={regenerating}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] text-zinc-400 hover:text-zinc-200 bg-zinc-800 hover:bg-zinc-700 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--surface-3)]/80 transition-colors disabled:opacity-50"
             >
               <RefreshCw className={`w-3 h-3 ${regenerating ? 'animate-spin' : ''}`} />
               Refresh
@@ -327,12 +333,12 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
           </div>
         </div>
         {isPremium ? (
-          <p className="text-[12px] text-zinc-400 mt-1.5 leading-relaxed">
+          <p className="t-caption text-[var(--brand-text)] mt-1.5 leading-relaxed">
             <Crown className="w-3 h-3 text-amber-400 inline mr-1" />
             {STUDIO_NAME} is actively working through these recommendations. Items are prioritized by traffic impact.
           </p>
         ) : (
-          <p className="text-[12px] text-zinc-400 mt-1.5 leading-relaxed">
+          <p className="t-caption text-[var(--brand-text)] mt-1.5 leading-relaxed">
             We've analyzed your audit, traffic, and SEO strategy to create a prioritized action plan.
             {data.summary.trafficAtRisk > 0 && (
               <> <span className="text-amber-400 font-medium">{num(data.summary.trafficAtRisk)} organic clicks/mo</span> are at risk from unresolved issues{data.summary.estimatedRecoverableClicks > 0 ? ` — addressing fix-now and fix-soon items could recover ~${num(data.summary.estimatedRecoverableClicks)} clicks/mo.` : '.'}</>
@@ -342,14 +348,14 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
       </div>
 
       {/* Priority sections */}
-      <div className="divide-y divide-zinc-800/50">
+      <div className="divide-y divide-[var(--brand-border)]/50">
         {(['fix_now', 'fix_soon', 'fix_later', 'ongoing'] as RecPriority[]).map(priority => {
           const config = PRIORITY_CONFIG[priority];
           const recs = grouped.get(priority) || [];
           if (recs.length === 0) return null;
 
           const isExpanded = expandedPriorities.has(priority);
-          const Icon = config.icon;
+          const PriorityIcon = config.icon;
           const pendingCount = recs.filter(r => r.status === 'pending').length;
           const inProgressCount = recs.filter(r => r.status === 'in_progress').length;
           const completedInGroup = recs.filter(r => r.status === 'completed').length;
@@ -359,31 +365,31 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
               {/* Priority header */}
               <button
                 onClick={() => togglePriority(priority)}
-                className="w-full px-5 py-3.5 flex items-center gap-3 hover:bg-zinc-800/30 transition-colors text-left"
+                className="w-full px-5 py-3.5 flex items-center gap-3 hover:bg-[var(--surface-3)]/30 transition-colors text-left"
               >
-                <div className={`w-8 h-8 rounded-lg ${config.bg} border ${config.border} flex items-center justify-center flex-shrink-0`}>
-                  <Icon className={`w-4 h-4 ${config.color}`} />
+                <div className={`w-8 h-8 rounded-[var(--radius-md)] ${config.bg} border ${config.border} flex items-center justify-center flex-shrink-0`}>
+                  <PriorityIcon className={`w-4 h-4 ${config.color}`} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className={`text-sm font-semibold ${config.color}`}>{config.label}</span>
-                    <span className="text-[11px] text-zinc-500">
+                    <span className="t-caption text-[var(--brand-text-muted)]">
                       {pendingCount > 0 && `${pendingCount} pending`}
                       {inProgressCount > 0 && `${pendingCount > 0 ? ' · ' : ''}${inProgressCount} in progress`}
                       {completedInGroup > 0 && `${pendingCount + inProgressCount > 0 ? ' · ' : ''}${completedInGroup} done`}
                     </span>
                   </div>
-                  <p className="text-[11px] text-zinc-500 mt-0.5">{config.description}</p>
+                  <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{config.description}</p>
                 </div>
                 {isExpanded
-                  ? <ChevronDown className="w-4 h-4 text-zinc-500 flex-shrink-0" />
-                  : <ChevronRight className="w-4 h-4 text-zinc-500 flex-shrink-0" />
+                  ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
+                  : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
                 }
               </button>
 
               {/* Recommendations in this priority */}
               {isExpanded && (
-                <div className="border-t border-zinc-800/30">
+                <div className="border-t border-[var(--brand-border)]/30">
                   {recs.map(rec => {
                     const TypeIcon = TYPE_ICONS[rec.type] || Wrench;
                     const impactBadge = IMPACT_BADGE[rec.impact];
@@ -393,41 +399,41 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                     const inCart = rec.productType && cart?.items.some(i => i.productType === rec.productType);
 
                     return (
-                      <div key={rec.id} className={`border-b border-zinc-800/20 last:border-b-0 ${isCompleted ? 'opacity-50' : ''}`}>
+                      <div key={rec.id} className={`border-b border-[var(--brand-border)]/20 last:border-b-0 ${isCompleted ? 'opacity-50' : ''}`}>
                         {/* Recommendation row */}
                         <div className="px-5 py-3 flex items-start gap-3">
                           <button
                             onClick={() => toggleRec(rec.id)}
-                            className="w-6 h-6 rounded-md bg-zinc-800 flex items-center justify-center flex-shrink-0 mt-0.5 hover:bg-zinc-700 transition-colors"
+                            className="w-6 h-6 rounded-[var(--radius-sm)] bg-[var(--surface-3)] flex items-center justify-center flex-shrink-0 mt-0.5 hover:bg-[var(--surface-3)]/80 transition-colors"
                           >
                             {isRecExpanded
-                              ? <ChevronDown className="w-3 h-3 text-zinc-400" />
-                              : <ChevronRight className="w-3 h-3 text-zinc-400" />
+                              ? <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text)]" />
+                              : <Icon as={ChevronRight} size="sm" className="text-[var(--brand-text)]" />
                             }
                           </button>
 
-                          <div className="w-7 h-7 rounded-lg bg-zinc-800 flex items-center justify-center flex-shrink-0 mt-0.5">
-                            <TypeIcon className="w-3.5 h-3.5 text-zinc-400" />
+                          <div className="w-7 h-7 rounded-[var(--radius-md)] bg-[var(--surface-3)] flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <TypeIcon className="w-3.5 h-3.5 text-[var(--brand-text)]" />
                           </div>
 
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className={`text-[12px] font-medium ${isCompleted ? 'text-zinc-500 line-through' : 'text-zinc-200'}`}>
+                              <span className={`t-caption font-medium ${isCompleted ? 'text-[var(--brand-text-muted)] line-through' : 'text-[var(--brand-text-bright)]'}`}>
                                 {rec.title}
                               </span>
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded ${impactBadge.bg} ${impactBadge.color}`}>
+                              <span className={`t-caption-sm px-1.5 py-0.5 rounded ${impactBadge.bg} ${impactBadge.color}`}>
                                 {impactBadge.label}
                               </span>
-                              <span className={`text-[10px] ${effortBadge.color}`}>
+                              <span className={`t-caption-sm ${effortBadge.color}`}>
                                 {effortBadge.label}
                               </span>
                               {rec.status === 'in_progress' && (
-                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400">
+                                <span className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400">
                                   In Progress
                                 </span>
                               )}
                               {isCompleted && (
-                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center gap-0.5">
+                                <span className="t-caption-sm px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center gap-0.5">
                                   <CheckCircle2 className="w-3 h-3" /> Done
                                 </span>
                               )}
@@ -435,14 +441,14 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
 
                             {/* Insight preview (always visible) */}
                             {!isRecExpanded && (
-                              <p className="text-[11px] text-zinc-500 mt-0.5 line-clamp-1">{rec.insight}</p>
+                              <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 line-clamp-1">{rec.insight}</p>
                             )}
                           </div>
 
                           {/* Traffic badge */}
                           {rec.trafficAtRisk > 0 && (
-                            <div className="flex items-center gap-1 text-[10px] text-teal-400 flex-shrink-0">
-                              <MousePointerClick className="w-3 h-3" />
+                            <div className="flex items-center gap-1 t-caption-sm text-teal-400 flex-shrink-0">
+                              <Icon as={MousePointerClick} size="sm" />
                               {num(rec.trafficAtRisk)} clicks
                             </div>
                           )}
@@ -454,21 +460,21 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                             {/* Insight */}
                             <div className="flex items-start gap-1.5 mb-3">
                               <Lightbulb className="w-3 h-3 text-amber-400 flex-shrink-0 mt-0.5" />
-                              <p className="text-[12px] text-zinc-400 leading-relaxed">{rec.insight}</p>
+                              <p className="t-caption text-[var(--brand-text)] leading-relaxed">{rec.insight}</p>
                             </div>
 
                             {/* Affected pages */}
                             {rec.affectedPages.length > 0 && (
                               <div className="mb-3">
-                                <div className="text-[10px] text-zinc-500 tracking-wider mb-1.5">Affected Pages</div>
+                                <div className="t-caption-sm text-[var(--brand-text-muted)] tracking-wider mb-1.5">Affected Pages</div>
                                 <div className="flex flex-wrap gap-1.5">
                                   {rec.affectedPages.slice(0, 8).map((slug, i) => (
-                                    <span key={i} className="text-[11px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
+                                    <span key={i} className="t-caption px-2 py-0.5 rounded bg-[var(--surface-3)] text-[var(--brand-text)] border border-[var(--brand-border)]">
                                       /{slug}
                                     </span>
                                   ))}
                                   {rec.affectedPages.length > 8 && (
-                                    <span className="text-[11px] text-zinc-500">
+                                    <span className="t-caption text-[var(--brand-text-muted)]">
                                       + {rec.affectedPages.length - 8} more
                                     </span>
                                   )}
@@ -480,15 +486,15 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                             {(rec.trafficAtRisk > 0 || rec.impressionsAtRisk > 0) && (
                               <div className="flex gap-4 mb-3">
                                 {rec.trafficAtRisk > 0 && (
-                                  <div className="flex items-center gap-1.5 text-[11px]">
-                                    <MousePointerClick className="w-3 h-3 text-teal-400" />
-                                    <span className="text-zinc-400">{num(rec.trafficAtRisk)} clicks/mo at risk</span>
+                                  <div className="flex items-center gap-1.5 t-caption">
+                                    <Icon as={MousePointerClick} size="sm" className="text-teal-400" />
+                                    <span className="text-[var(--brand-text)]">{num(rec.trafficAtRisk)} clicks/mo at risk</span>
                                   </div>
                                 )}
                                 {rec.impressionsAtRisk > 0 && (
-                                  <div className="flex items-center gap-1.5 text-[11px]">
-                                    <Eye className="w-3 h-3 text-zinc-500" />
-                                    <span className="text-zinc-500">{num(rec.impressionsAtRisk)} impressions</span>
+                                  <div className="flex items-center gap-1.5 t-caption">
+                                    <Eye className="w-3 h-3 text-[var(--brand-text-muted)]" />
+                                    <span className="text-[var(--brand-text-muted)]">{num(rec.impressionsAtRisk)} impressions</span>
                                   </div>
                                 )}
                               </div>
@@ -497,7 +503,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                             {/* Estimated gain */}
                             <div className="flex items-center gap-1.5 mb-3">
                               <TrendingUp className="w-3 h-3 text-emerald-400" />
-                              <span className="text-[11px] text-emerald-400">{rec.estimatedGain}</span>
+                              <span className="t-caption text-emerald-400">{rec.estimatedGain}</span>
                             </div>
 
                             {/* Action buttons */}
@@ -508,16 +514,16 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                                   {rec.status === 'pending' && (
                                     <button
                                       onClick={() => handleStatusUpdate(rec.id, 'in_progress')}
-                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors"
+                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors"
                                     >
-                                      <ArrowUpRight className="w-3 h-3" />
+                                      <Icon as={ArrowUpRight} size="sm" />
                                       Start Working On This
                                     </button>
                                   )}
                                   {rec.status === 'in_progress' && (
                                     <button
                                       onClick={() => handleStatusUpdate(rec.id, 'completed')}
-                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
                                     >
                                       <CheckCircle2 className="w-3 h-3" />
                                       Mark Complete
@@ -535,28 +541,28 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                                         priceUsd: rec.productPrice!,
                                         quantity: 1,
                                       })}
-                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors"
+                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors"
                                     >
                                       <ShoppingCart className="w-3 h-3" />
                                       Let Us Fix This — {fmt(rec.productPrice)}
                                     </button>
                                   ) : inCart ? (
-                                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-teal-500/10 text-teal-400 border border-teal-500/20">
+                                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-teal-500/10 text-teal-400 border border-teal-500/20">
                                       <ShoppingCart className="w-3 h-3" />
                                       In Cart
                                     </span>
                                   ) : rec.status === 'pending' ? (
                                     <button
                                       onClick={() => handleStatusUpdate(rec.id, 'in_progress')}
-                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-zinc-700 hover:bg-zinc-600 text-zinc-200 transition-colors"
+                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)] transition-colors"
                                     >
-                                      <ArrowUpRight className="w-3 h-3" />
+                                      <Icon as={ArrowUpRight} size="sm" />
                                       I'll Handle This
                                     </button>
                                   ) : rec.status === 'in_progress' ? (
                                     <button
                                       onClick={() => handleStatusUpdate(rec.id, 'completed')}
-                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
                                     >
                                       <CheckCircle2 className="w-3 h-3" />
                                       Mark Done
@@ -565,7 +571,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
 
                                   {/* Premium upsell for high-value items */}
                                   {rec.impact === 'high' && !isPremium && (
-                                    <span className="flex items-center gap-1 text-[10px] text-amber-400/70">
+                                    <span className="flex items-center gap-1 t-caption-sm text-amber-400/70">
                                       <Crown className="w-3 h-3" />
                                       Premium handles this for you
                                     </span>
@@ -577,7 +583,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                               {rec.status !== 'completed' && (
                                 <button
                                   onClick={() => handleDismiss(rec.id)}
-                                  className="text-[11px] text-zinc-600 hover:text-zinc-400 transition-colors ml-auto"
+                                  className="t-caption text-[var(--brand-text-dim)] hover:text-[var(--brand-text)] transition-colors ml-auto"
                                 >
                                   Dismiss
                                 </button>
@@ -597,25 +603,25 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
 
       {/* Footer with Premium upsell */}
       {!isPremium && data.summary.fixNow + data.summary.fixSoon > 3 && (
-        <div className="px-5 py-3.5 border-t border-zinc-800 bg-gradient-to-r from-amber-500/5 to-teal-500/5">
+        <div className="px-5 py-3.5 border-t border-[var(--brand-border)] bg-gradient-to-r from-amber-500/5 to-teal-500/5">
           <div className="flex items-center gap-3">
             <Crown className="w-5 h-5 text-amber-400 flex-shrink-0" />
             <div className="flex-1">
-              <div className="text-[12px] font-medium text-zinc-300">
+              <div className="t-caption font-medium text-[var(--brand-text-bright)]">
                 Want {STUDIO_NAME} to handle all {data.summary.fixNow + data.summary.fixSoon} urgent items?
               </div>
-              <div className="text-[11px] text-zinc-500 mt-0.5">
+              <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
                 Premium clients get hands-free SEO — we implement every recommendation for you.
               </div>
             </div>
-            <span className="text-[11px] text-amber-400 font-medium flex-shrink-0">$999/mo</span>
+            <span className="t-caption text-amber-400 font-medium flex-shrink-0">$999/mo</span>
           </div>
         </div>
       )}
 
       {/* Generated timestamp */}
-      <div className="px-5 py-2 border-t border-zinc-800/50 text-center">
-        <span className="text-[10px] text-zinc-600">
+      <div className="px-5 py-2 border-t border-[var(--brand-border)]/50 text-center">
+        <span className="t-micro text-[var(--brand-text-dim)]">
           Generated {new Date(data.generatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
           {' · '}{data.recommendations.length} recommendations from audit + strategy analysis
         </span>

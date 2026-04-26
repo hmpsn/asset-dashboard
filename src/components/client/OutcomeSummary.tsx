@@ -3,6 +3,7 @@
 
 import { TrendingUp, TrendingDown, Minus, BarChart3, CheckCircle2, Clock, Trophy } from 'lucide-react';
 import { SectionCard, EmptyState, Skeleton, StatCard } from '../ui';
+import { Icon } from '../ui/Icon';
 import { FeatureFlag } from '../ui/FeatureFlag';
 import { TierGate } from '../ui/TierGate';
 import { useClientOutcomeSummary } from '../../hooks/client/useClientOutcomes';
@@ -24,9 +25,9 @@ const ACTION_TYPE_LABELS: Record<ActionType, string> = {
 };
 
 function TrendIcon({ trend }: { trend: LearningsTrend }) {
-  if (trend === 'improving') return <TrendingUp className="w-4 h-4 text-emerald-400" />;
-  if (trend === 'declining') return <TrendingDown className="w-4 h-4 text-red-400" />;
-  return <Minus className="w-4 h-4 text-zinc-400" />;
+  if (trend === 'improving') return <Icon as={TrendingUp} size="md" className="text-emerald-400" />;
+  if (trend === 'declining') return <Icon as={TrendingDown} size="md" className="text-red-400" />;
+  return <Icon as={Minus} size="md" className="text-[var(--brand-text)]" />;
 }
 
 function winRateColor(rate: number): string {
@@ -56,7 +57,7 @@ function TopThreeWins({ scorecard }: { scorecard: OutcomeScorecard }) {
 
   if (topCategories.length === 0) {
     return (
-      <p className="text-sm text-zinc-500 italic">
+      <p className="text-sm text-[var(--brand-text-muted)] italic">
         Not enough scored results yet — check back after your first recommendations are measured.
       </p>
     );
@@ -65,10 +66,10 @@ function TopThreeWins({ scorecard }: { scorecard: OutcomeScorecard }) {
   return (
     <ul className="space-y-2">
       {topCategories.map(cat => (
-        <li key={cat.actionType} className="flex items-start gap-2 text-sm text-zinc-300">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+        <li key={cat.actionType} className="flex items-start gap-2 text-sm text-[var(--brand-text-bright)]">
+          <Icon as={CheckCircle2} size="md" className="text-emerald-400 flex-shrink-0 mt-0.5" />
           <span>
-            <span className="font-medium text-zinc-100">
+            <span className="font-medium text-[var(--brand-text-bright)]">
               {ACTION_TYPE_LABELS[cat.actionType]}
             </span>
             {' '}worked {Math.round(cat.winRate * 100)}% of the time
@@ -107,12 +108,12 @@ function FullScorecard({ scorecard }: { scorecard: OutcomeScorecard }) {
         <StatCard
           label="Pending results"
           value={scorecard.pendingMeasurement.toString()}
-          valueColor="text-zinc-400"
+          valueColor="text-[var(--brand-text)]"
         />
       </div>
 
       {/* Trend indicator */}
-      <div className="flex items-center gap-2 text-sm text-zinc-400">
+      <div className="flex items-center gap-2 text-sm text-[var(--brand-text)]">
         <TrendIcon trend={scorecard.trend} />
         <span>
           {scorecard.trend === 'improving' && 'Your results are trending in the right direction.'}
@@ -124,7 +125,7 @@ function FullScorecard({ scorecard }: { scorecard: OutcomeScorecard }) {
       {/* Category breakdown */}
       {scorecard.byCategory.length > 0 && (
         <div className="space-y-2">
-          <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">By recommendation type</p>
+          <p className="t-micro text-[var(--brand-text-muted)]">By recommendation type</p>
           <div className="space-y-1.5">
             {scorecard.byCategory
               .filter(c => c.scored > 0)
@@ -134,12 +135,12 @@ function FullScorecard({ scorecard }: { scorecard: OutcomeScorecard }) {
                 return (
                   <div
                     key={cat.actionType}
-                    className={`flex items-center justify-between px-3 py-2 rounded-lg border text-sm ${winRateBg(cat.winRate)}`}
+                    className={`flex items-center justify-between px-3 py-2 rounded-[var(--radius-md)] border text-sm ${winRateBg(cat.winRate)}`}
                   >
-                    <span className="text-zinc-300">{ACTION_TYPE_LABELS[cat.actionType]}</span>
+                    <span className="text-[var(--brand-text-bright)]">{ACTION_TYPE_LABELS[cat.actionType]}</span>
                     <div className="flex items-center gap-3 text-right">
                       <span className={`font-semibold ${winRateColor(cat.winRate)}`}>{pct}%</span>
-                      <span className="text-xs text-zinc-500">{cat.scored} scored</span>
+                      <span className="t-caption text-[var(--brand-text-muted)]">{cat.scored} scored</span>
                     </div>
                   </div>
                 );
@@ -164,22 +165,22 @@ function PremiumBreakdown({ scorecard }: { scorecard: OutcomeScorecard }) {
       {/* Detailed breakdown panel */}
       <SectionCard variant="subtle">
         <div className="space-y-3">
-        <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Detailed breakdown</p>
+        <p className="t-micro text-[var(--brand-text-muted)]">Detailed breakdown</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1">
-            <p className="text-xs text-zinc-500">Total scored actions</p>
-            <p className="text-xl font-semibold text-zinc-100">{totalScored}</p>
+            <p className="t-caption text-[var(--brand-text-muted)]">Total scored actions</p>
+            <p className="text-xl font-semibold text-[var(--brand-text-bright)]">{totalScored}</p>
           </div>
           <div className="space-y-1">
-            <p className="text-xs text-zinc-500">Confirmed wins</p>
+            <p className="t-caption text-[var(--brand-text-muted)]">Confirmed wins</p>
             <p className="text-xl font-semibold text-emerald-400">{totalWins}</p>
           </div>
           <div className="space-y-1">
-            <p className="text-xs text-zinc-500">Pending measurement</p>
-            <p className="text-xl font-semibold text-zinc-300">{scorecard.pendingMeasurement}</p>
+            <p className="t-caption text-[var(--brand-text-muted)]">Pending measurement</p>
+            <p className="text-xl font-semibold text-[var(--brand-text-bright)]">{scorecard.pendingMeasurement}</p>
           </div>
           <div className="space-y-1">
-            <p className="text-xs text-zinc-500">Strong wins (top score)</p>
+            <p className="t-caption text-[var(--brand-text-muted)]">Strong wins (top score)</p>
             <p className={`text-xl font-semibold ${winRateColor(scorecard.strongWinRate)}`}>
               {Math.round(scorecard.strongWinRate * 100)}%
             </p>
@@ -200,10 +201,10 @@ export default function OutcomeSummary({ workspaceId, tier }: OutcomeSummaryProp
     <FeatureFlag flag="outcome-client-reporting">
       <SectionCard>
         <div className="flex items-center gap-2 mb-4">
-          <Trophy className="w-4 h-4 text-teal-400" />
-          <h3 className="text-sm font-semibold text-zinc-100">Your results</h3>
-          <span className="text-xs text-zinc-500 ml-auto flex items-center gap-1">
-            <Clock className="w-3 h-3" /> Measured over 90 days
+          <Icon as={Trophy} size="md" className="text-teal-400" />
+          <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Your results</h3>
+          <span className="t-caption text-[var(--brand-text-muted)] ml-auto flex items-center gap-1">
+            <Icon as={Clock} size="sm" /> Measured over 90 days
           </span>
         </div>
 
@@ -228,7 +229,7 @@ export default function OutcomeSummary({ workspaceId, tier }: OutcomeSummaryProp
             {/* Free: top 3 wins text only */}
             {tier === 'free' && (
               <div className="space-y-3">
-                <p className="text-sm text-zinc-400">
+                <p className="text-sm text-[var(--brand-text)]">
                   Here's what's been working for your site so far:
                 </p>
                 <TopThreeWins scorecard={scorecard} />

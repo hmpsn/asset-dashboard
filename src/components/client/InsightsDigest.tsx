@@ -16,6 +16,7 @@ import type {
   SearchComparison, GA4Comparison, ClientKeywordStrategy, ClientTab,
 } from './types';
 import { fmtNum } from '../../utils/formatNumbers';
+import { Icon } from '../ui/Icon';
 
 // ─── Types ───
 
@@ -504,34 +505,35 @@ export function InsightsDigest(props: InsightsDigestProps) {
     <div className="space-y-6">
       <div className="flex items-center gap-2">
         <div className="w-5 h-5 rounded-md bg-teal-500/15 flex items-center justify-center">
-          <Sparkles className="w-3 h-3 text-teal-400" />
+          <Icon as={Sparkles} size="sm" className="text-teal-400" />
         </div>
-        <span className="text-sm font-semibold text-zinc-200">Insights</span>
-        <span className="text-xs text-zinc-500">{all.length} things to know</span>
+        <span className="text-sm font-semibold text-[var(--brand-text-bright)]">Insights</span>
+        <span className="t-caption text-[var(--brand-text-muted)]">{all.length} things to know</span>
       </div>
 
       <div className="space-y-3">
         {visible.map(insight => {
           const c = COLORS[insight.color] || COLORS.teal;
-          const Icon = insight.icon;
+          const InsightIcon = insight.icon;
           return (
+            // pr-check-disable-next-line -- InsightsDigest insight card is a top-level client card intentionally using brand signature shape
             <button
               key={insight.id}
               onClick={() => insight.action && navigate(clientPath(props.workspaceId, insight.action.tab, betaMode))}
-              className="w-full bg-zinc-900 border border-zinc-800 p-5 text-left hover:border-zinc-700 transition-colors cursor-pointer group"
-              style={{ borderRadius: '10px 24px 10px 24px' }}
+              className="w-full bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 text-left hover:border-[var(--brand-border-hover)] transition-colors cursor-pointer group"
+              style={{ borderRadius: 'var(--radius-signature-lg)' }}
             >
               {/* Header */}
               <div className="flex items-center gap-1.5 mb-2">
-                <Icon className={`w-4 h-4 ${c.text}`} />
-                <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded ${c.badge}`}>
+                <InsightIcon className={`w-4 h-4 ${c.text}`} />
+                <span className={`t-caption font-medium px-1.5 py-0.5 rounded ${c.badge}`}>
                   {SENTIMENT_LABELS[insight.sentiment]}
                 </span>
               </div>
-              <h3 className="text-sm font-medium text-zinc-200 leading-snug mb-1.5">{insight.headline}</h3>
+              <h3 className="text-sm font-medium text-[var(--brand-text-bright)] leading-snug mb-1.5">{insight.headline}</h3>
 
               {/* Body */}
-              <p className="text-[11px] text-zinc-500 leading-relaxed mb-2">
+              <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed mb-2">
                 {insight.body}
               </p>
 
@@ -539,7 +541,7 @@ export function InsightsDigest(props: InsightsDigestProps) {
               {insight.detail && insight.detail.length > 0 && (
                 <div className="space-y-1 mb-2">
                   {insight.detail.map((item, i) => (
-                    <div key={i} className="text-[11px] py-1 px-2 rounded bg-zinc-800/30 text-zinc-400 truncate">
+                    <div key={i} className="t-caption-sm py-1 px-2 rounded bg-[var(--surface-3)] text-[var(--brand-text)] truncate">
                       {item}
                     </div>
                   ))}
@@ -548,8 +550,8 @@ export function InsightsDigest(props: InsightsDigestProps) {
 
               {/* Destination hint */}
               {insight.action && (
-                <span className="text-[11px] text-teal-400 group-hover:text-teal-300 flex items-center gap-1 transition-colors">
-                  {insight.action.label} <ArrowRight className="w-3 h-3" />
+                <span className="t-caption-sm text-teal-400 group-hover:text-teal-300 flex items-center gap-1 transition-colors">
+                  {insight.action.label} <Icon as={ArrowRight} size="sm" />
                 </span>
               )}
             </button>
@@ -560,9 +562,9 @@ export function InsightsDigest(props: InsightsDigestProps) {
       {hasMore && !expanded && (
         <button
           onClick={() => setExpanded(true)}
-          className="flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
+          className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
         >
-          <ChevronDown className="w-3 h-3" />
+          <Icon as={ChevronDown} size="sm" />
           Show {all.length - INITIAL_COUNT} more insight{all.length - INITIAL_COUNT > 1 ? 's' : ''}
         </button>
       )}
@@ -647,13 +649,13 @@ export function PerformancePulse({ overview, searchComparison, ga4Overview, ga4C
   return (
     <div className="flex items-center gap-2 flex-wrap">
       {metrics.map((m, i) => (
-        <div key={i} className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2">
+        <div key={i} className="flex items-center gap-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2">
           <div>
-            <div className="text-[10px] text-zinc-500 uppercase tracking-wider">{m.label}</div>
+            <div className="t-micro text-[var(--brand-text-muted)]">{m.label}</div>
             <span className={`text-sm font-bold ${m.color}`}>{m.value}</span>
           </div>
           {m.change != null && m.change !== 0 && (
-            <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded ${
+            <span className={`t-caption font-medium px-1.5 py-0.5 rounded ${
               m.change > 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
             }`}>
               {m.changeLabel || pct(m.change)}

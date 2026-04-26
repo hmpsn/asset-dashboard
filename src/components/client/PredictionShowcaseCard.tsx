@@ -1,6 +1,7 @@
 import { Trophy, TrendingUp, Calendar } from 'lucide-react';
 import { SectionCard } from '../ui/SectionCard';
 import { EmptyState } from '../ui/EmptyState';
+import { Icon } from '../ui/Icon';
 import type { WeCalledItEntry } from '../../../shared/types/intelligence';
 
 interface PredictionShowcaseCardProps {
@@ -38,19 +39,19 @@ export function PredictionShowcaseCard({ predictions }: PredictionShowcaseCardPr
   return (
     <SectionCard
       title="Predictions That Came True"
-      titleIcon={<Trophy className="w-4 h-4 text-teal-400" />}
+      titleIcon={<Icon as={Trophy} size="md" className="text-teal-400" />}
     >
       <div className="space-y-3">
         {items.map((p) => (
           <div
             key={p.actionId}
-            className="bg-teal-500/5 border border-teal-500/10 rounded-xl p-4 space-y-2"
+            className="bg-teal-500/5 border border-teal-500/10 rounded-[var(--radius-xl)] p-4 space-y-2"
           >
             {/* What we predicted */}
             <div className="flex items-start gap-2">
-              <TrendingUp className="w-4 h-4 text-teal-400 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-zinc-200 leading-snug">
-                We predicted <span className="font-medium text-zinc-100">{p.prediction}</span>
+              <Icon as={TrendingUp} size="md" className="text-teal-400 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-[var(--brand-text-bright)] leading-snug">
+                We predicted <span className="font-medium text-[var(--brand-text-bright)]">{p.prediction}</span>
               </p>
             </div>
 
@@ -60,8 +61,8 @@ export function PredictionShowcaseCard({ predictions }: PredictionShowcaseCardPr
             </p>
 
             {/* Date measured */}
-            <div className="flex items-center gap-1.5 pl-6 text-xs text-zinc-500">
-              <Calendar className="w-3 h-3" />
+            <div className="flex items-center gap-1.5 pl-6 t-caption text-[var(--brand-text-muted)]">
+              <Icon as={Calendar} size="sm" />
               <span>Confirmed {formatDate(p.measuredAt)}</span>
             </div>
           </div>
