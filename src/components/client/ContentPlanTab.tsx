@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Loader2, Layers, Grid3X3, AlertTriangle } from 'lucide-react';
-import { SectionCard, Badge, EmptyState } from '../ui';
+import { SectionCard, Badge, EmptyState, Icon} from '../ui';
 import { MatrixProgressView } from './MatrixProgressView';
 import { contentPlanReview } from '../../api/content';
 import type { ContentMatrix, MatrixCell } from '../matrix/types';
@@ -58,8 +58,8 @@ export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24 gap-3">
-        <Loader2 className="w-5 h-5 animate-spin text-teal-400" />
-        <span className="text-sm text-zinc-400">Loading content plans…</span>
+        <Icon as={Loader2} size="lg" className="animate-spin text-teal-400" />
+        <span className="text-sm text-[var(--brand-text-muted)]">Loading content plans…</span>
       </div>
     );
   }
@@ -94,7 +94,7 @@ export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
         {plans.length > 1 && (
           <button
             onClick={() => setSelectedMatrixId(null)}
-            className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+            className="flex items-center gap-1 text-xs text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
           >
             ← All Content Plans
           </button>
@@ -115,7 +115,7 @@ export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
     <div className="space-y-4">
       <SectionCard
         title="Your Content Plans"
-        titleIcon={<Layers className="w-4 h-4 text-teal-400" />}
+        titleIcon={<Icon as={Layers} size="md" className="text-teal-400" />}
       >
         <div className="space-y-2">
           {plans.map(plan => {
@@ -128,15 +128,15 @@ export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
               <button
                 key={plan.id}
                 onClick={() => setSelectedMatrixId(plan.id)}
-                className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-zinc-800/50 hover:bg-zinc-800 transition-colors text-left group"
+                className="w-full flex items-center justify-between px-4 py-3 rounded-[var(--radius-xl)] bg-zinc-800/50 hover:bg-[var(--surface-3)] transition-colors text-left group"
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <Grid3X3 className="w-4 h-4 text-zinc-500 flex-shrink-0" />
+                  <Icon as={Grid3X3} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
                   <div className="min-w-0">
-                    <span className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors truncate block">
+                    <span className="text-sm font-medium text-[var(--brand-text)] group-hover:text-white transition-colors truncate block">
                       {plan.name}
                     </span>
-                    <span className="text-xs text-zinc-500">
+                    <span className="text-xs text-[var(--brand-text-muted)]">
                       {total} pages · {progress}% complete
                     </span>
                   </div>

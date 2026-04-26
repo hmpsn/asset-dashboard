@@ -4,7 +4,7 @@ import {
   ArrowUpDown, Activity, ChevronDown, ChevronRight, Sparkles, Table2,
 } from 'lucide-react';
 import { RankTrackingSection } from '../shared/RankTable';
-import { CompactStatBar, EmptyState, SectionCard } from '../ui';
+import { CompactStatBar, EmptyState, SectionCard, Icon} from '../ui';
 import { DualTrendChart, InsightCard } from './helpers';
 import { Explainer } from './SeoGlossary';
 import type {
@@ -80,15 +80,15 @@ export function SearchTab({
   return (<>
     {/* Header with takeaway */}
     <div className="mb-2">
-      <h2 className="text-xl font-semibold text-zinc-100">Search Performance</h2>
-      <p className="text-sm text-zinc-500 mt-1">{overview.dateRange.start} — {overview.dateRange.end}</p>
+      <h2 className="text-xl font-semibold text-[var(--brand-text)]">Search Performance</h2>
+      <p className="text-sm text-[var(--brand-text-muted)] mt-1">{overview.dateRange.start} — {overview.dateRange.end}</p>
     </div>
 
     {/* AI-style takeaway */}
     {/* pr-check-disable-next-line -- AI takeaway summary bar; compact bar with no section header */}
-    <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl px-5 py-3.5 flex items-start gap-3">
-      <Sparkles className="w-4 h-4 text-teal-400 mt-0.5 shrink-0" />
-      <p className="text-xs text-zinc-300 leading-relaxed">{buildTakeaway(overview, searchComparison, insights)}</p>
+    <div className="bg-zinc-900/60 border border-[var(--brand-border)] rounded-[var(--radius-xl)] px-5 py-3.5 flex items-start gap-3">
+      <Icon as={Sparkles} size="md" className="text-teal-400 mt-0.5 shrink-0" />
+      <p className="text-xs text-[var(--brand-text)] leading-relaxed">{buildTakeaway(overview, searchComparison, insights)}</p>
     </div>
 
     {/* Compact metrics bar */}
@@ -108,23 +108,23 @@ export function SearchTab({
           <div className="grid grid-cols-4 gap-3">
             <div className="text-center">
               <div className={`text-lg font-bold ${insights.page1 > 5 ? 'text-emerald-400' : 'text-amber-400'}`}>{insights.page1}</div>
-              <div className="text-[11px] text-zinc-500">Page 1 Rankings</div>
-              <div className={`text-[10px] mt-0.5 ${insights.page1 >= 10 ? 'text-emerald-400/70' : insights.page1 >= 3 ? 'text-amber-400/70' : 'text-zinc-600'}`}>{insights.page1 >= 10 ? 'Strong visibility' : insights.page1 >= 3 ? 'Room to grow' : 'Building up'}</div>
+              <div className="t-caption-sm text-[var(--brand-text-muted)]">Page 1 Rankings</div>
+              <div className={`t-caption-sm mt-0.5 ${insights.page1 >= 10 ? 'text-emerald-400/70' : insights.page1 >= 3 ? 'text-amber-400/70' : 'text-[var(--brand-text-faint)]'}`}>{insights.page1 >= 10 ? 'Strong visibility' : insights.page1 >= 3 ? 'Room to grow' : 'Building up'}</div>
             </div>
             <div className="text-center">
               <div className={`text-lg font-bold ${insights.top3 > 2 ? 'text-emerald-400' : 'text-amber-400'}`}>{insights.top3}</div>
-              <div className="text-[11px] text-zinc-500">Top 3 Rankings</div>
-              <div className={`text-[10px] mt-0.5 ${insights.top3 >= 5 ? 'text-emerald-400/70' : insights.top3 >= 1 ? 'text-amber-400/70' : 'text-zinc-600'}`}>{insights.top3 >= 5 ? 'Dominant positions' : insights.top3 >= 1 ? 'Competitive' : 'Opportunity ahead'}</div>
+              <div className="t-caption-sm text-[var(--brand-text-muted)]">Top 3 Rankings</div>
+              <div className={`t-caption-sm mt-0.5 ${insights.top3 >= 5 ? 'text-emerald-400/70' : insights.top3 >= 1 ? 'text-amber-400/70' : 'text-[var(--brand-text-faint)]'}`}>{insights.top3 >= 5 ? 'Dominant positions' : insights.top3 >= 1 ? 'Competitive' : 'Opportunity ahead'}</div>
             </div>
             <div className="text-center">
               <div className={`text-lg font-bold ${overview.avgCtr > 3 ? 'text-emerald-400' : overview.avgCtr > 1.5 ? 'text-amber-400' : 'text-red-400'}`}>{overview.avgCtr}%</div>
-              <div className="text-[11px] text-zinc-500 flex items-center justify-center gap-0.5">Avg CTR<Explainer term="ctr" /></div>
-              <div className={`text-[10px] mt-0.5 ${overview.avgCtr > 3 ? 'text-emerald-400/70' : overview.avgCtr > 1.5 ? 'text-amber-400/70' : 'text-red-400/70'}`}>{overview.avgCtr > 3 ? 'Above average' : overview.avgCtr > 1.5 ? 'Typical range' : 'Needs attention'}</div>
+              <div className="t-caption-sm text-[var(--brand-text-muted)] flex items-center justify-center gap-0.5">Avg CTR<Explainer term="ctr" /></div>
+              <div className={`t-caption-sm mt-0.5 ${overview.avgCtr > 3 ? 'text-emerald-400/70' : overview.avgCtr > 1.5 ? 'text-amber-400/70' : 'text-red-400/70'}`}>{overview.avgCtr > 3 ? 'Above average' : overview.avgCtr > 1.5 ? 'Typical range' : 'Needs attention'}</div>
             </div>
             <div className="text-center">
               <div className={`text-lg font-bold ${insights.lowHanging.length > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>{insights.lowHanging.length}</div>
-              <div className="text-[11px] text-zinc-500">Opportunities</div>
-              <div className={`text-[10px] mt-0.5 ${insights.lowHanging.length > 5 ? 'text-amber-400/70' : insights.lowHanging.length > 0 ? 'text-teal-400/70' : 'text-emerald-400/70'}`}>{insights.lowHanging.length > 5 ? 'Quick wins available' : insights.lowHanging.length > 0 ? 'A few to capture' : 'Fully optimized'}</div>
+              <div className="t-caption-sm text-[var(--brand-text-muted)]">Opportunities</div>
+              <div className={`t-caption-sm mt-0.5 ${insights.lowHanging.length > 5 ? 'text-amber-400/70' : insights.lowHanging.length > 0 ? 'text-teal-400/70' : 'text-emerald-400/70'}`}>{insights.lowHanging.length > 5 ? 'Quick wins available' : insights.lowHanging.length > 0 ? 'A few to capture' : 'Fully optimized'}</div>
             </div>
           </div>
         </SectionCard>
@@ -142,7 +142,7 @@ export function SearchTab({
 
     {/* Trend chart */}
     {trend.length > 2 && (
-      <SectionCard title="Performance Trend" action={<span className="text-[11px] text-zinc-500">{overview.dateRange.start} — {overview.dateRange.end}</span>}>
+      <SectionCard title="Performance Trend" action={<span className="t-caption-sm text-[var(--brand-text-muted)]">{overview.dateRange.start} — {overview.dateRange.end}</span>}>
         <DualTrendChart data={trend} annotations={annotations} />
       </SectionCard>
     )}
@@ -152,14 +152,14 @@ export function SearchTab({
 
     {/* Annotations (read-only, managed from admin) */}
     {annotations.length > 0 && (
-      <SectionCard title="Timeline Annotations" titleIcon={<Activity className="w-4 h-4 text-zinc-400" />} titleExtra={<span className="text-[11px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{annotations.length}</span>}>
+      <SectionCard title="Timeline Annotations" titleIcon={<Icon as={Activity} size="md" className="text-[var(--brand-text-muted)]" />} titleExtra={<span className="t-caption-sm px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{annotations.length}</span>}>
         <div className="space-y-1.5">
           {annotations.map(ann => (
             <div key={ann.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-zinc-950/50">
               <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: ann.color || '#2dd4bf' }} />
-              <span className="text-[11px] text-zinc-500 flex-shrink-0">{ann.date}</span>
-              <span className="text-xs text-zinc-300 flex-1 truncate">{ann.label}</span>
-              {ann.description && <span className="text-[11px] text-zinc-500 truncate max-w-[120px]">{ann.description}</span>}
+              <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">{ann.date}</span>
+              <span className="text-xs text-[var(--brand-text)] flex-1 truncate">{ann.label}</span>
+              {ann.description && <span className="t-caption-sm text-[var(--brand-text-muted)] truncate max-w-[120px]">{ann.description}</span>}
             </div>
           ))}
         </div>
@@ -168,34 +168,34 @@ export function SearchTab({
 
     {/* Raw data tables — collapsible, secondary */}
     {/* pr-check-disable-next-line -- Collapsible raw-data table wrapper with custom toggle button; not a static section card */}
-    <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+    <div className="bg-[var(--surface-2)] rounded-[var(--radius-xl)] border border-[var(--brand-border)] overflow-hidden">
       <button
         onClick={() => setShowRawData(!showRawData)}
         className="w-full px-5 py-3.5 flex items-center gap-2 hover:bg-zinc-800/30 transition-colors text-left"
       >
-        {showRawData ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-500" />}
-        <Table2 className="w-4 h-4 text-zinc-400" />
-        <span className="text-sm font-medium text-zinc-300">Raw Data</span>
-        <span className="text-[11px] text-zinc-500 ml-1">{overview.topQueries.length} queries, {overview.topPages.length} pages</span>
+        {showRawData ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)]" />}
+        <Icon as={Table2} size="md" className="text-[var(--brand-text-muted)]" />
+        <span className="text-sm font-medium text-[var(--brand-text)]">Raw Data</span>
+        <span className="t-caption-sm text-[var(--brand-text-muted)] ml-1">{overview.topQueries.length} queries, {overview.topPages.length} pages</span>
       </button>
       {showRawData && (
         <>
-          <div className="flex items-center gap-1 px-4 pb-1 border-t border-zinc-800">
+          <div className="flex items-center gap-1 px-4 pb-1 border-t border-[var(--brand-border)]">
             {(['queries', 'pages'] as const).map(st => (
               <button key={st} onClick={() => setSearchSubTab(st)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${searchSubTab === st ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'}`}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${searchSubTab === st ? 'bg-zinc-700 text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}
               >{st === 'queries' ? 'Queries' : 'Pages'}</button>
             ))}
           </div>
           <table className="w-full text-xs">
-            <thead><tr className="border-b border-zinc-800">
-              <th className="text-left py-3 px-4 text-zinc-500 font-medium">{searchSubTab === 'queries' ? 'Query' : 'Page'}</th>
+            <thead><tr className="border-b border-[var(--brand-border)]">
+              <th className="text-left py-3 px-4 text-[var(--brand-text-muted)] font-medium">{searchSubTab === 'queries' ? 'Query' : 'Page'}</th>
               {(['clicks', 'impressions', 'ctr', 'position'] as SortKey[]).map(key => (
-                <th key={key} className="text-right py-3 px-3 text-zinc-500 font-medium">
-                  <button onClick={() => handleSort(key)} className="flex items-center gap-1 ml-auto hover:text-zinc-300">
+                <th key={key} className="text-right py-3 px-3 text-[var(--brand-text-muted)] font-medium">
+                  <button onClick={() => handleSort(key)} className="flex items-center gap-1 ml-auto hover:text-[var(--brand-text)]">
                     {key === 'ctr' ? 'CTR' : key.charAt(0).toUpperCase() + key.slice(1)}
                     <Explainer term={key === 'ctr' ? 'ctr' : key} />
-                    {sortKey === key && <ArrowUpDown className="w-3 h-3" />}
+                    {sortKey === key && <Icon as={ArrowUpDown} size="sm" />}
                   </button>
                 </th>
               ))}
@@ -203,9 +203,9 @@ export function SearchTab({
             <tbody>
               {searchSubTab === 'queries' && sortedQueries().map((q, i) => (
                 <tr key={i} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                  <td className="py-2.5 px-4 text-zinc-300 font-medium">{q.query}</td>
+                  <td className="py-2.5 px-4 text-[var(--brand-text)] font-medium">{q.query}</td>
                   <td className="py-2.5 px-3 text-right text-blue-400 font-semibold">{q.clicks}</td>
-                  <td className="py-2.5 px-3 text-right text-zinc-400">{q.impressions.toLocaleString()}</td>
+                  <td className="py-2.5 px-3 text-right text-[var(--brand-text-muted)]">{q.impressions.toLocaleString()}</td>
                   <td className="py-2.5 px-3 text-right text-emerald-400">{q.ctr}%</td>
                   <td className="py-2.5 px-3 text-right"><span className={q.position <= 10 ? 'text-emerald-400' : q.position <= 20 ? 'text-amber-400' : 'text-red-400'}>{q.position}</span></td>
                 </tr>
@@ -215,9 +215,9 @@ export function SearchTab({
                 try { pagePath = new URL(p.page).pathname; } catch { pagePath = p.page; }
                 return (
                   <tr key={i} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                    <td className="py-2.5 px-4 text-zinc-300 font-medium max-w-xs truncate">{pagePath}</td>
+                    <td className="py-2.5 px-4 text-[var(--brand-text)] font-medium max-w-xs truncate">{pagePath}</td>
                     <td className="py-2.5 px-3 text-right text-blue-400 font-semibold">{p.clicks}</td>
-                    <td className="py-2.5 px-3 text-right text-zinc-400">{p.impressions.toLocaleString()}</td>
+                    <td className="py-2.5 px-3 text-right text-[var(--brand-text-muted)]">{p.impressions.toLocaleString()}</td>
                     <td className="py-2.5 px-3 text-right text-emerald-400">{p.ctr}%</td>
                     <td className="py-2.5 px-3 text-right"><span className={p.position <= 10 ? 'text-emerald-400' : p.position <= 20 ? 'text-amber-400' : 'text-red-400'}>{p.position}</span></td>
                   </tr>
