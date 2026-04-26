@@ -325,7 +325,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
             <button
               onClick={handleRegenerate}
               disabled={regenerating}
-              className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--surface-3)]/80 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] transition-colors disabled:opacity-50"
             >
               <Icon as={RefreshCw} size="sm" className={regenerating ? 'animate-spin' : ''} />
               Refresh
@@ -404,7 +404,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                         <div className="px-5 py-3 flex items-start gap-3">
                           <button
                             onClick={() => toggleRec(rec.id)}
-                            className="w-6 h-6 rounded-[var(--radius-sm)] bg-[var(--surface-3)] flex items-center justify-center flex-shrink-0 mt-0.5 hover:bg-[var(--surface-3)]/80 transition-colors"
+                            className="w-6 h-6 rounded-[var(--radius-sm)] bg-[var(--surface-3)] flex items-center justify-center flex-shrink-0 mt-0.5 hover:bg-[var(--brand-border-hover)] transition-colors"
                           >
                             {isRecExpanded
                               ? <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text)]" />
