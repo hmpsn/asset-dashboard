@@ -232,7 +232,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
         <div className="w-16 h-16 rounded-2xl bg-[var(--surface-2)] flex items-center justify-center">
-          <Icon as={AlertTriangle} size="xl" className="text-[var(--brand-text-muted)]" />
+          <Icon as={AlertTriangle} size="2xl" className="text-[var(--brand-text-muted)]" />
         </div>
         <p className="text-[var(--brand-text)] t-body">Scan your Webflow site for asset issues</p>
         <p className="t-caption text-[var(--brand-text-muted)]">Checks for missing alt text, oversized files, unused assets, and more</p>

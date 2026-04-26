@@ -97,7 +97,7 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
         </div>
         <button
           onClick={() => setAdding(!adding)}
-          className="flex items-center gap-1 px-2 py-1 rounded-md t-caption font-medium hover:bg-[var(--surface-2)] transition-colors text-teal-400"
+          className="flex items-center gap-1 px-2 py-1 rounded-md t-caption font-medium hover:bg-[var(--surface-3)] transition-colors text-teal-400"
         >
           <Icon as={Plus} size="sm" /> Add
         </button>

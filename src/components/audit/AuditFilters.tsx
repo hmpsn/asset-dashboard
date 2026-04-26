@@ -37,7 +37,7 @@ export function AuditToolbar({
     count + page.issues.filter(i => i.suggestedFix && !appliedFixes.has(`${page.pageId}-${i.check}`)).length, 0);
 
   return (
-    <div className="sticky top-0 z-10 bg-zinc-950/95 backdrop-blur-sm py-2 space-y-3">
+    <div className="sticky top-0 z-10 bg-[var(--surface-1)]/95 backdrop-blur-sm py-2 space-y-3">
       <div className="flex items-center gap-3">
         <div className="relative flex-1">
           <Icon as={SearchIcon} size="md" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />

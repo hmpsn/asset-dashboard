@@ -98,7 +98,7 @@ export function LinkChecker({ siteId }: Props) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
         <div className="w-16 h-16 rounded-2xl bg-[var(--surface-2)] flex items-center justify-center">
-          <Icon as={Link2Off} size="xl" className="text-[var(--brand-text-muted)]" />
+          <Icon as={Link2Off} size="2xl" className="text-[var(--brand-text-muted)]" />
         </div>
         <p className="text-[var(--brand-text)] t-body">Find broken links and redirect chains across your site</p>
         <p className="t-caption text-[var(--brand-text-muted)] max-w-md text-center">

@@ -518,7 +518,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         {auditTabBar}
         <div className="flex flex-col items-center justify-center py-16 gap-4">
           <div className="w-16 h-16 rounded-2xl bg-[var(--surface-2)] flex items-center justify-center">
-            <Icon as={Globe} size="xl" className="text-[var(--brand-text-muted)]" />
+            <Icon as={Globe} size="2xl" className="text-[var(--brand-text-muted)]" />
           </div>
           <p className="text-[var(--brand-text)] t-body">Comprehensive SEO audit for your Webflow site</p>
           <p className="t-caption text-[var(--brand-text-muted)] max-w-md text-center">

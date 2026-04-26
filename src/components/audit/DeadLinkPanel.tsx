@@ -118,7 +118,7 @@ export function DeadLinkPanel({ deadLinkDetails, siteId, workspaceId }: DeadLink
                       className="flex items-center gap-0.5 t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 transition-colors"
                       title="Open source page in SEO Editor"
                     >
-                      <Icon as={Wrench} size="xs" /> Fix
+                      <Icon as={Wrench} size="sm" /> Fix
                     </button>
                   )}
                   <button
@@ -134,7 +134,7 @@ export function DeadLinkPanel({ deadLinkDetails, siteId, workspaceId }: DeadLink
                     className={cn('flex items-center gap-0.5 t-caption-sm px-1.5 py-0.5 rounded border transition-colors', hasRedirect ? 'bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border-blue-500/20' : 'bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--brand-text)] border-[var(--brand-border)]')}
                     title="Create a redirect for this URL"
                   >
-                    <Icon as={Plus} size="xs" /> {hasRedirect ? 'Edit Redirect' : 'Add Redirect'}
+                    <Icon as={Plus} size="sm" /> {hasRedirect ? 'Edit Redirect' : 'Add Redirect'}
                   </button>
                 </div>
               </div>

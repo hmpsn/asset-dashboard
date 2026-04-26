@@ -90,11 +90,11 @@ export function AuditHistory({ siteId, history, onRefresh }: { siteId: string; h
             onClick={() => {
               navigator.clipboard.writeText(`${window.location.origin}/report/audit/${siteId}`);
             }}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-md t-caption font-medium bg-[var(--surface-2)] hover:bg-[var(--surface-3)] transition-colors"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-md t-caption font-medium bg-[var(--surface-3)] hover:bg-[var(--surface-3)]/80 transition-colors"
           >
             <Icon as={Copy} size="sm" /> Copy
           </button>
-          <a href={`/report/audit/${siteId}`} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md hover:bg-[var(--surface-2)] text-teal-400">
+          <a href={`/report/audit/${siteId}`} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md hover:bg-[var(--surface-3)] text-teal-400">
             <Icon as={ExternalLink} size="md" />
           </a>
         </div>
