@@ -95,7 +95,7 @@ export default function OutcomeScorecard({ workspaceId }: Props) {
         <SectionCard noPadding className="flex flex-col items-center justify-center gap-3 py-6 px-4">
           <MetricRing score={winRateScore} size={144} />
           <div className="flex flex-col items-center gap-1">
-            <span className="t-micro font-medium">Overall Win Rate</span>
+            <span className="t-caption text-[var(--brand-text-muted)] uppercase tracking-wider font-medium">Overall Win Rate</span>
             <div className="flex items-center gap-1.5">
               <TrendIcon trend={scorecard.trend} />
               <TrendLabel trend={scorecard.trend} />

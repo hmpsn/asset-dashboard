@@ -257,7 +257,7 @@ export function SalesReport() {
               const domain = r.url.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
               window.location.hash = `#new-workspace?url=${encodeURIComponent(r.url)}&name=${encodeURIComponent(domain)}`;
             }}
-            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors bg-[var(--surface-3)] hover:bg-[var(--surface-3)] text-[var(--brand-text-bright)] border border-[var(--brand-border-hover)]"
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors bg-[var(--surface-3)] hover:bg-[var(--surface-3)]/80 text-[var(--brand-text-bright)] border border-[var(--brand-border-hover)]"
           >
             <Zap className="w-3.5 h-3.5" />
             Onboard as Client

@@ -221,7 +221,7 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
                     'w-full text-left px-3 py-2 rounded-lg border transition-colors',
                     s.id === sessionId
                       ? 'bg-purple-500/10 border-purple-500/30 text-purple-300'
-                      : 'bg-[var(--surface-3)] border-[var(--brand-border)] text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)]'
+                      : 'bg-[var(--surface-3)]/50 border-[var(--brand-border)] text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)]'
                   )}>
                   <div className="t-caption font-medium truncate">{s.title}</div>
                   <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{s.messageCount} messages · {new Date(s.updatedAt).toLocaleDateString()}</div>
