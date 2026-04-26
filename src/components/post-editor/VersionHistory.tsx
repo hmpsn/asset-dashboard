@@ -64,7 +64,7 @@ export function VersionHistory({
                     </div>
                     <div className="min-w-0">
                       <div className="t-caption-sm text-[var(--brand-text-bright)] truncate">{label}{detail}</div>
-                      <div className="t-micro text-[var(--brand-text-muted)]">{new Date(v.createdAt).toLocaleString()} · {v.totalWordCount.toLocaleString()}w</div>
+                      <div className="t-caption-sm text-[var(--brand-text-muted)]">{new Date(v.createdAt).toLocaleString()} · {v.totalWordCount.toLocaleString()}w</div>
                     </div>
                   </div>
                   <button

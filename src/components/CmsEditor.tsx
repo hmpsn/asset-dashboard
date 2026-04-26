@@ -859,7 +859,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                                   <div className="flex items-center gap-2 mb-1.5">
                                     <Icon as={Clock} size="sm" className="text-[var(--brand-text-muted)]" />
                                     <span className="t-caption-sm font-medium text-[var(--brand-text)]">Latest: {latest.batchName}</span>
-                                    <span className={`t-micro px-1.5 py-0.5 rounded border ${statusColors[latest.status] || ''}`}>{latest.status}</span>
+                                    <span className={`t-caption-sm px-1.5 py-0.5 rounded border ${statusColors[latest.status] || ''}`}>{latest.status}</span>
                                     <span className="t-micro text-[var(--brand-text-muted)]/60 ml-auto">{new Date(latest.updatedAt).toLocaleDateString()}</span>
                                   </div>
                                   <div className="flex items-center gap-2 t-caption-sm">
@@ -886,7 +886,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                                           <div key={a.id} className="px-2.5 py-1.5 rounded bg-[var(--surface-3)]/30 t-caption-sm">
                                             <div className="flex items-center gap-2 mb-0.5">
                                               <span className="text-[var(--brand-text-muted)]">{a.batchName}</span>
-                                              <span className={`t-micro px-1 py-0.5 rounded border ${statusColors[a.status] || ''}`}>{a.status}</span>
+                                              <span className={`t-caption-sm px-1 py-0.5 rounded border ${statusColors[a.status] || ''}`}>{a.status}</span>
                                               <span className="t-micro text-[var(--brand-text-muted)]/60 ml-auto">{new Date(a.updatedAt).toLocaleDateString()}</span>
                                             </div>
                                             <div className="flex items-center gap-1.5">
