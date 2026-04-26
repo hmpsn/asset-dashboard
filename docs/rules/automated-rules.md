@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **82** — 44 error, 38 warn.
+Total rules: **83** — 45 error, 38 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -59,7 +59,8 @@ advisory but tracked.
 | 41 | Legacy surface token in new code | error | pattern | `*.tsx, *.css` | — | Prevents new code from using deprecated token names that bypass the 3-tier surface system. |
 | 42 | Hand-rolled card div (use SectionCard) | error | custom | `*.tsx` | — | Prevents hand-rolled card divs that bypass the SectionCard primitive and the --surface-N token system. |
 | 43 | SectionCard titleExtra with ml-auto (use action prop) | error | custom | `*.tsx` | — | Prevents the recurring "right-aligned metadata lands on the left" bug seen across 5 SectionCard migrations (OrderStatus, RankTable, DataSnapshots, SearchTab, FixRecommendations). |
-| 44 | radius-signature-lg used outside SectionCard | error | custom | `*.tsx, *.css` | — | The asymmetric corner is the brand visual signature. SectionCard.tsx owns the canonical implementation; consumer files MAY use --radius-signature-lg directly when the asymmetric look is intentional, but they must justify the choice with a hatch comment per site so design-system stewards can audit drift. |
+| 44 | SectionCard className double-wrap trap (space-y-* always wrong; p[xy]?-* needs noPadding) | error | custom | `*.tsx` | — | Devin Phase 2.3a flagged 6 instances of this trap in PR #307 (SeoAudit, SeoAuditGuide×3, RedirectManager×2). Memorialized in feedback_sectioncard_classname_double_wrap.md. |
+| 45 | radius-signature-lg used outside SectionCard | error | custom | `*.tsx, *.css` | — | The asymmetric corner is the brand visual signature. SectionCard.tsx owns the canonical implementation; consumer files MAY use --radius-signature-lg directly when the asymmetric look is intentional, but they must justify the choice with a hatch comment per site so design-system stewards can audit drift. |
 
 ---
 

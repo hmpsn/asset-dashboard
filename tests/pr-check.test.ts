@@ -4415,6 +4415,11 @@ describe('Meta: customCheck rule name registry', () => {
     // rule; relaxing with per-site justification preserves the brand
     // signature where intentional)
     'radius-signature-lg used outside SectionCard',
+    // Phase 2 Batch 2 Devin review pattern (2026-04-25, PR #307) — SectionCard
+    // wraps children in `<div className={noPadding ? '' : 'p-4'}>`, so
+    // space-y-* on outer never reaches children, and p[xy]?-* doubles unless
+    // noPadding is set. Memorialized in feedback_sectioncard_classname_double_wrap.md.
+    'SectionCard className double-wrap trap (space-y-* always wrong; p[xy]?-* needs noPadding)',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -5288,6 +5293,121 @@ describe('Rule: Comma in arbitrary grid-cols/grid-rows (Tailwind v4)', () => {
       '<div className="grid grid-cols-[repeat(3,1fr)]"></div>\n'
     );
     const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBe(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// 'SectionCard className double-wrap trap' rule
+// ════════════════════════════════════════════════════════════════════════════
+//
+// SectionCard wraps children in `<div className={noPadding ? '' : 'p-4'}>`,
+// so:
+// - `space-[xy]-N` on outer ALWAYS has no effect (only one direct child)
+// - `p[xy]?-N` on outer doubles with inner p-4 unless `noPadding`
+//
+// Devin Phase 2.3a flagged 6 instances in PR #307. Memory:
+// feedback_sectioncard_classname_double_wrap.md.
+describe('Rule: SectionCard className double-wrap trap (space-y-* always wrong; p[xy]?-* needs noPadding)', () => {
+  const RULE = 'SectionCard className double-wrap trap (space-y-* always wrong; p[xy]?-* needs noPadding)';
+
+  it('flags space-y-* on SectionCard className', () => {
+    const probe = write(
+      uniqPath('sc-spacey', 'probe.tsx'),
+      '<SectionCard className="space-y-2">\n  <div>child</div>\n</SectionCard>\n'
+    );
+    const hits = runRule(RULE, [probe]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0].text).toContain('space-[xy]-* (always ineffective');
+  });
+
+  it('flags space-x-* on SectionCard className', () => {
+    const probe = write(
+      uniqPath('sc-spacex', 'probe.tsx'),
+      '<SectionCard className="space-x-3">\n  <div>child</div>\n</SectionCard>\n'
+    );
+    const hits = runRule(RULE, [probe]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('flags px-* on SectionCard without noPadding', () => {
+    const probe = write(
+      uniqPath('sc-padx', 'probe.tsx'),
+      '<SectionCard className="px-6 py-12 text-center">\n  <div>child</div>\n</SectionCard>\n'
+    );
+    const hits = runRule(RULE, [probe]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0].text).toContain('without noPadding');
+  });
+
+  it('does NOT flag px-* on SectionCard WITH noPadding', () => {
+    const probe = write(
+      uniqPath('sc-pad-ok', 'probe.tsx'),
+      '<SectionCard noPadding className="px-6 py-12 text-center">\n  <div>child</div>\n</SectionCard>\n'
+    );
+    const hits = runRule(RULE, [probe]);
+    expect(hits.length).toBe(0);
+  });
+
+  it('does NOT flag SectionCard with no padding/space utilities in className', () => {
+    const probe = write(
+      uniqPath('sc-clean', 'probe.tsx'),
+      '<SectionCard className="text-center">\n  <div>child</div>\n</SectionCard>\n'
+    );
+    const hits = runRule(RULE, [probe]);
+    expect(hits.length).toBe(0);
+  });
+
+  it('does NOT flag SectionCard with no className', () => {
+    const probe = write(
+      uniqPath('sc-noprops', 'probe.tsx'),
+      '<SectionCard>\n  <div>child</div>\n</SectionCard>\n'
+    );
+    const hits = runRule(RULE, [probe]);
+    expect(hits.length).toBe(0);
+  });
+
+  it('honors `// sectioncard-className-ok` inline hatch', () => {
+    const probe = write(
+      uniqPath('sc-hatch-inline', 'probe.tsx'),
+      '<SectionCard className="space-y-2"> {/* sectioncard-className-ok */}\n  <div>child</div>\n</SectionCard>\n'
+    );
+    const hits = runRule(RULE, [probe]);
+    expect(hits.length).toBe(0);
+  });
+
+  it('honors `// sectioncard-className-ok` above-line hatch', () => {
+    const probe = write(
+      uniqPath('sc-hatch-above', 'probe.tsx'),
+      '{/* sectioncard-className-ok */}\n<SectionCard className="space-y-2">\n  <div>child</div>\n</SectionCard>\n'
+    );
+    const hits = runRule(RULE, [probe]);
+    expect(hits.length).toBe(0);
+  });
+
+  it('flags multi-line SectionCard with className on a later line', () => {
+    const probe = write(
+      uniqPath('sc-multiline', 'probe.tsx'),
+      [
+        '<SectionCard',
+        '  title="Foo"',
+        '  className="space-y-3"',
+        '>',
+        '  <div>child</div>',
+        '</SectionCard>',
+        '',
+      ].join('\n')
+    );
+    const hits = runRule(RULE, [probe]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('does NOT flag identifier-prefixed SectionCard (e.g. SectionCardProps type)', () => {
+    const probe = write(
+      uniqPath('sc-typeref', 'probe.tsx'),
+      'type X = SectionCardProps; const y: SectionCardProps = { className: "space-y-2" };\n'
+    );
+    const hits = runRule(RULE, [probe]);
     expect(hits.length).toBe(0);
   });
 });

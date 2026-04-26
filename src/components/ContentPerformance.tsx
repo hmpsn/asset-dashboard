@@ -250,7 +250,7 @@ export function ContentPerformance({ workspaceId }: Props) {
               const ptColor = item.pageType ? PAGE_TYPE_COLORS[item.pageType] : undefined;
 
               return (
-                <SectionCard key={item.requestId} className="!p-0 overflow-hidden">
+                <SectionCard key={item.requestId} noPadding className="overflow-hidden">
                   {/* Row header */}
                   <button
                     onClick={() => toggleExpand(item.requestId)}
