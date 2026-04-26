@@ -168,7 +168,7 @@ export function SteeringChat({ content, onRefine, versions, onSelectVersion }: S
                           : 'bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)] hover:text-[var(--brand-text-bright)]'
                       )}
                     >
-                      <span className={cn('shrink-0 t-micro font-semibold mt-0.5', isActive ? 'text-teal-400' : 'text-[var(--brand-text-muted)]')}>
+                      <span className={cn('shrink-0 t-mono text-xs font-semibold mt-0.5', isActive ? 'text-teal-400' : 'text-[var(--brand-text-muted)]')}>
                         v{idx + 1}
                       </span>
                       <div className="min-w-0 flex-1">

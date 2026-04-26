@@ -348,7 +348,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
                       <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">{info.description}</p>
                       <div className="flex flex-wrap gap-1 mt-1">
                         {info.examples.map(ex => (
-                          <code key={ex} className="t-micro text-[var(--brand-text-muted)] bg-[var(--surface-3)]/60 px-1 py-0.5 rounded font-mono">{ex}</code>
+                          <code key={ex} className="t-mono text-xs text-[var(--brand-text-muted)] bg-[var(--surface-3)]/60 px-1 py-0.5 rounded">{ex}</code>
                         ))}
                       </div>
                     </div>
@@ -372,9 +372,9 @@ export function SchemaPlanPanel({ siteId }: Props) {
                 <div className="mt-2 space-y-1.5">
                   {plan.canonicalEntities.map((entity, i) => (
                     <div key={i} className="flex items-center gap-3 px-3 py-2 bg-[var(--surface-3)]/50 rounded-[var(--radius-md)] border border-[var(--brand-border)]">
-                      <span className="px-1.5 py-0.5 bg-teal-500/15 text-teal-300 rounded t-micro font-mono">{entity.type}</span>
+                      <span className="px-1.5 py-0.5 bg-teal-500/15 text-teal-300 rounded t-mono text-xs">{entity.type}</span>
                       <span className="t-caption text-[var(--brand-text)] font-medium">{entity.name}</span>
-                      <span className="t-micro text-[var(--brand-text-muted)] font-mono truncate">{entity.id}</span>
+                      <span className="t-mono text-xs text-[var(--brand-text-muted)] truncate">{entity.id}</span>
                     </div>
                   ))}
                 </div>

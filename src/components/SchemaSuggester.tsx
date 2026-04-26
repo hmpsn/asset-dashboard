@@ -690,7 +690,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
                       <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">{info.description}</p>
                       <div className="flex flex-wrap gap-1 mt-0.5">
                         {info.examples.map((ex: string) => (
-                          <code key={ex} className="t-micro text-[var(--brand-text-muted)] bg-[var(--surface-3)]/60 px-1 py-0.5 rounded font-mono">{ex}</code>
+                          <code key={ex} className="t-mono text-xs text-[var(--brand-text-muted)] bg-[var(--surface-3)]/60 px-1 py-0.5 rounded">{ex}</code>
                         ))}
                       </div>
                     </div>

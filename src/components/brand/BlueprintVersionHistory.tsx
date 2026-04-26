@@ -58,7 +58,7 @@ export function BlueprintVersionHistory({ workspaceId, blueprintId }: Props) {
                   className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-[var(--surface-3)]/50 transition-colors rounded-md"
                 >
                   <Icon as={Clock} size="md" className="shrink-0 text-[var(--brand-text-muted)]" />
-                  <span className="t-micro text-teal-400 shrink-0">
+                  <span className="t-mono text-xs text-teal-400 shrink-0">
                     v{v.version}
                   </span>
                   <span className="t-caption text-[var(--brand-text)] shrink-0">{timeStr}</span>
