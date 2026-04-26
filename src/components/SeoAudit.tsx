@@ -695,8 +695,8 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
             const cfg = SEVERITY_CONFIG[issue.severity];
             const SeverityIcon = cfg.icon;
             return (
-              <div key={idx} className="flex items-start gap-3 px-3 py-2 rounded-lg bg-zinc-950/50">
-                <SeverityIcon className={cn('w-4 h-4 mt-0.5 flex-shrink-0', cfg.color)} />
+              <div key={idx} className="flex items-start gap-3 px-3 py-2 rounded-lg bg-[var(--surface-1)]/50">
+                <Icon as={SeverityIcon} size="md" className={cn('mt-0.5 flex-shrink-0', cfg.color)} />
                 <div className="flex-1 min-w-0">
                   <div className="t-body text-[var(--brand-text-bright)]">{issue.message}</div>
                   <div className="t-caption text-[var(--brand-text-muted)] mt-0.5">{issue.recommendation}</div>

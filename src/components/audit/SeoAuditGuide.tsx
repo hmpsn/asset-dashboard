@@ -100,7 +100,7 @@ export function SeoAuditGuide() {
           return (
             <div key={idx} className={cn('border p-5', section.bg)} style={{ borderRadius: '6px 12px 6px 12px' }}>
               <div className="flex items-start gap-3">
-                <div className={cn('flex items-center justify-center w-8 h-8 rounded-lg bg-zinc-900/60 flex-shrink-0', section.color)}>
+                <div className={cn('flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--surface-2)]/60 flex-shrink-0', section.color)}>
                   <Icon as={SectionIcon} size="md" />
                 </div>
                 <div className="flex-1 min-w-0 space-y-2">
@@ -109,13 +109,13 @@ export function SeoAuditGuide() {
                   <ul className="space-y-1">
                     {section.actions.map((a, i) => (
                       <li key={i} className="flex items-start gap-2 t-caption text-[var(--brand-text-bright)]">
-                        <Icon as={ArrowRight} size="sm" className="text-[var(--brand-border)] mt-0.5 flex-shrink-0" />
+                        <Icon as={ArrowRight} size="sm" className="text-[var(--brand-text-muted)] mt-0.5 flex-shrink-0" />
                         <span>{a}</span>
                       </li>
                     ))}
                   </ul>
-                  <div className="flex items-start gap-1.5 mt-1 pt-1.5 border-t border-zinc-800/30">
-                    <Icon as={CheckCircle} size="sm" className="text-[var(--brand-border)] mt-0.5 flex-shrink-0" />
+                  <div className="flex items-start gap-1.5 mt-1 pt-1.5 border-t border-[var(--brand-border)]/30">
+                    <Icon as={CheckCircle} size="sm" className="text-[var(--brand-text-muted)] mt-0.5 flex-shrink-0" />
                     <span className="t-caption-sm text-[var(--brand-text-muted)] italic">{section.tip}</span>
                   </div>
                 </div>

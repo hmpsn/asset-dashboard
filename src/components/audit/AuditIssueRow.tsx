@@ -75,7 +75,7 @@ export function AuditIssueRow({
 
   return (
     <div key={idx} className="flex items-start gap-3 px-4 py-2 rounded-lg hover:bg-[var(--surface-2)]/30 transition-colors group/issue">
-      <SeverityIcon className={cn('w-3.5 h-3.5 mt-0.5 flex-shrink-0', cfg.color)} />
+      <Icon as={SeverityIcon} size="md" className={cn('mt-0.5 flex-shrink-0', cfg.color)} />
       <div className="flex-1 min-w-0">
         {/* Issue title + inline badges */}
         <div className="flex items-center gap-1.5 flex-wrap">

@@ -267,7 +267,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
       <div className="grid grid-cols-4 gap-3">
         <button
           onClick={() => setActiveFilter(null)}
-          className={cn('bg-[var(--surface-2)] p-5 border text-left transition-colors', activeFilter === null ? 'border-zinc-600' : 'border-[var(--brand-border)] hover:border-zinc-700')}
+          className={cn('bg-[var(--surface-2)] p-5 border text-left transition-colors', activeFilter === null ? 'border-[var(--brand-border-hover)]' : 'border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]')}
           style={{ borderRadius: '6px 12px 6px 12px' }}
         >
           <div className={cn('text-3xl font-bold', scoreColor)}>{score}</div>
@@ -277,7 +277,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
 
         <button
           onClick={() => setActiveFilter(activeFilter === 'missing-alt' ? null : 'missing-alt')}
-          className={cn('bg-[var(--surface-2)] p-5 border text-left transition-colors', activeFilter === 'missing-alt' ? 'border-amber-500/50' : 'border-[var(--brand-border)] hover:border-zinc-700')}
+          className={cn('bg-[var(--surface-2)] p-5 border text-left transition-colors', activeFilter === 'missing-alt' ? 'border-amber-500/50' : 'border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]')}
           style={{ borderRadius: '6px 12px 6px 12px' }}
         >
           <div className="text-3xl font-bold text-amber-400">{audit.missingAlt}</div>
@@ -289,7 +289,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
 
         <button
           onClick={() => setActiveFilter(activeFilter === 'oversized' ? null : 'oversized')}
-          className={cn('bg-[var(--surface-2)] p-5 border text-left transition-colors', activeFilter === 'oversized' ? 'border-orange-500/50' : 'border-[var(--brand-border)] hover:border-zinc-700')}
+          className={cn('bg-[var(--surface-2)] p-5 border text-left transition-colors', activeFilter === 'oversized' ? 'border-orange-500/50' : 'border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]')}
           style={{ borderRadius: '6px 12px 6px 12px' }}
         >
           <div className="text-3xl font-bold text-orange-400">{audit.oversized}</div>
@@ -301,7 +301,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
 
         <button
           onClick={() => setActiveFilter(activeFilter === 'unused' ? null : 'unused')}
-          className={cn('bg-[var(--surface-2)] p-5 border text-left transition-colors', activeFilter === 'unused' ? 'border-zinc-500/50' : 'border-[var(--brand-border)] hover:border-zinc-700')}
+          className={cn('bg-[var(--surface-2)] p-5 border text-left transition-colors', activeFilter === 'unused' ? 'border-zinc-500/50' : 'border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]')}
           style={{ borderRadius: '6px 12px 6px 12px' }}
         >
           <div className="text-3xl font-bold text-[var(--brand-text)]">{audit.unused}</div>
@@ -323,7 +323,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
           <button
             key={key}
             onClick={() => setActiveFilter(activeFilter === key ? null : key)}
-            className={cn('t-caption-sm px-2.5 py-1 rounded-full border transition-colors', activeFilter === key ? `${colors} bg-[var(--surface-2)]` : 'text-[var(--brand-text-muted)] border-[var(--brand-border)] hover:border-zinc-600')}
+            className={cn('t-caption-sm px-2.5 py-1 rounded-full border transition-colors', activeFilter === key ? `${colors} bg-[var(--surface-2)]` : 'text-[var(--brand-text-muted)] border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]')}
           >
             {label}
           </button>
@@ -368,7 +368,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
       )}
 
       {/* Sticky toolbar */}
-      <div className="sticky top-0 z-10 bg-zinc-950/95 backdrop-blur-sm py-2 space-y-3">
+      <div className="sticky top-0 z-10 bg-[var(--surface-1)]/95 backdrop-blur-sm py-2 space-y-3">
         {/* Search + sort */}
         <div className="flex items-center gap-3">
           <div className="relative flex-1">
@@ -378,7 +378,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search issues by name or page..."
-              className="w-full pl-10 pr-4 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg t-body focus:outline-none focus:border-zinc-600"
+              className="w-full pl-10 pr-4 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg t-body focus:outline-none focus:border-[var(--brand-border-hover)]"
             />
           </div>
           <div className="relative">
@@ -520,7 +520,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
                     const IssueIcon = info.icon;
                     return (
                       <span key={issueType} className={cn('inline-flex items-center gap-1 t-caption-sm px-1.5 py-0.5 rounded border', info.bg, info.color)}>
-                        <IssueIcon className="w-2.5 h-2.5" /> {info.label}
+                        <Icon as={IssueIcon} size="sm" /> {info.label}
                       </span>
                     );
                   })}
@@ -599,7 +599,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
               <Icon as={X} size="lg" />
             </button>
             <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
-              <div className="flex items-center justify-center bg-zinc-950 p-6 min-h-[300px] max-h-[60vh]">
+              <div className="flex items-center justify-center bg-[var(--surface-1)] p-6 min-h-[300px] max-h-[60vh]">
                 <img
                   src={lightboxIssue.url}
                   alt={lightboxIssue.fileName}
@@ -620,7 +620,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
                     const IssueIcon = info.icon;
                     return (
                       <span key={issueType} className={cn('inline-flex items-center gap-1 t-caption-sm px-1.5 py-0.5 rounded border', info.bg, info.color)}>
-                        <IssueIcon className="w-2.5 h-2.5" /> {info.label}
+                        <Icon as={IssueIcon} size="sm" /> {info.label}
                       </span>
                     );
                   })}

@@ -57,13 +57,13 @@ export function AuditBatchActions({
             <span className="t-caption-sm text-[var(--brand-text-muted)]">Sort:</span>
             <button
               onClick={() => onSetSortMode('issues')}
-              className={cn('px-2 py-0.5 rounded t-caption-sm font-medium transition-colors border', sortMode === 'issues' ? 'border-[var(--brand-border)] bg-[var(--surface-2)] text-[var(--brand-text-bright)]' : 'border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:border-zinc-700')}
+              className={cn('px-2 py-0.5 rounded t-caption-sm font-medium transition-colors border', sortMode === 'issues' ? 'border-[var(--brand-border)] bg-[var(--surface-2)] text-[var(--brand-text-bright)]' : 'border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:border-[var(--brand-border-hover)]')}
             >
               Issues
             </button>
             <button
               onClick={() => onSetSortMode('traffic')}
-              className={cn('px-2 py-0.5 rounded t-caption-sm font-medium transition-colors border', sortMode === 'traffic' ? 'border-teal-500/50 bg-teal-500/10 text-teal-400' : 'border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:border-zinc-700')}
+              className={cn('px-2 py-0.5 rounded t-caption-sm font-medium transition-colors border', sortMode === 'traffic' ? 'border-teal-500/50 bg-teal-500/10 text-teal-400' : 'border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:border-[var(--brand-border-hover)]')}
             >
               Traffic Impact
             </button>
@@ -101,7 +101,7 @@ export function AuditBatchActions({
               )}
               <button
                 onClick={() => onBatchCreateTasks('all')}
-                className="flex items-center gap-1 px-2 py-1 rounded t-caption-sm font-medium bg-[var(--surface-2)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-zinc-600 transition-colors"
+                className="flex items-center gap-1 px-2 py-1 rounded t-caption-sm font-medium bg-[var(--surface-2)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)] transition-colors"
                 title="Add ALL findings to tasks"
               >
                 <Icon as={ClipboardList} size="sm" /> Add All to Tasks ({effectiveData.errors + effectiveData.warnings + effectiveData.infos})

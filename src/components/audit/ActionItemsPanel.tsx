@@ -120,7 +120,7 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
             value={newTitle}
             onChange={e => setNewTitle(e.target.value)}
             placeholder="What needs to be done?"
-            className="w-full px-3 py-2 rounded-lg bg-[var(--surface-2)] border border-[var(--brand-border)] t-body text-[var(--brand-text-bright)] placeholder-zinc-500 focus:outline-none focus:border-zinc-600"
+            className="w-full px-3 py-2 rounded-lg bg-[var(--surface-2)] border border-[var(--brand-border)] t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
             onKeyDown={e => e.key === 'Enter' && addItem()}
             autoFocus
           />
@@ -128,7 +128,7 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
             value={newDesc}
             onChange={e => setNewDesc(e.target.value)}
             placeholder="Description (optional)"
-            className="w-full px-3 py-2 rounded-lg bg-[var(--surface-2)] border border-[var(--brand-border)] t-body text-[var(--brand-text-bright)] placeholder-zinc-500 focus:outline-none focus:border-zinc-600"
+            className="w-full px-3 py-2 rounded-lg bg-[var(--surface-2)] border border-[var(--brand-border)] t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
           />
           <div className="flex items-center justify-between">
             <div className="flex gap-1">
@@ -159,7 +159,7 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
       )}
 
       {/* Items list */}
-      <div className="divide-y divide-zinc-800/50">
+      <div className="divide-y divide-[var(--brand-border)]/50">
         {sorted.map(item => {
           const cfg = STATUS_CONFIG[item.status];
           const StatusIcon = cfg.icon;

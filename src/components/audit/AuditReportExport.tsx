@@ -182,7 +182,7 @@ export function ReportModal({ onExportHtml, onExportCsv, onClose }: ReportModalP
           </button>
           <button
             onClick={onExportCsv}
-            className="w-full flex items-center gap-3 px-4 py-3 bg-[var(--surface-3)] hover:bg-zinc-700 rounded-lg transition-colors text-left"
+            className="w-full flex items-center gap-3 px-4 py-3 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] rounded-lg transition-colors text-left"
           >
             <Icon as={Download} size="lg" />
             <div>
@@ -251,7 +251,7 @@ export function ReportViewer({ reportView, data, onClose }: ReportViewerProps) {
           <textarea
             readOnly
             value={getCSV(data)}
-            className="w-full h-full p-4 bg-zinc-950 text-[var(--brand-text)] t-mono resize-none focus:outline-none"
+            className="w-full h-full p-4 bg-[var(--surface-1)] text-[var(--brand-text)] t-mono resize-none focus:outline-none"
           />
         )}
       </div>

@@ -301,7 +301,7 @@ export function RedirectManager({ siteId }: Props) {
                     <div className="mt-2 flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)]">
                       <span>Final destination:</span>
                       <a href={chain.finalUrl} target="_blank" rel="noopener noreferrer" className="text-teal-400 hover:underline flex items-center gap-0.5 truncate">
-                        {chain.finalUrl} <ExternalLink className="w-2.5 h-2.5 flex-shrink-0" />
+                        {chain.finalUrl} <Icon as={ExternalLink} size="sm" className="flex-shrink-0" />
                       </a>
                     </div>
                   </div>
@@ -458,7 +458,7 @@ export function RedirectManager({ siteId }: Props) {
                       {page.redirectsTo ? (
                         <a href={page.redirectsTo} target="_blank" rel="noopener noreferrer" className="t-caption-sm text-amber-400 hover:underline truncate block flex items-center gap-0.5">
                           {(() => { try { return new URL(page.redirectsTo).pathname; } catch { return page.redirectsTo; } })()}
-                          <ExternalLink className="w-2.5 h-2.5 flex-shrink-0" />
+                          <Icon as={ExternalLink} size="sm" className="flex-shrink-0" />
                         </a>
                       ) : (
                         <span className="t-caption-sm text-[var(--brand-text-muted)]/30">—</span>
@@ -484,7 +484,7 @@ export function RedirectManager({ siteId }: Props) {
 
       {/* Tips */}
       {(summary.chainsDetected > 0 || summary.notFound > 0) && (
-        <SectionCard noPadding className="px-4 py-3">
+        <SectionCard noPadding variant="subtle" className="px-4 py-3">
           <div className="flex items-start gap-2">
             <Icon as={AlertCircle} size="md" className="text-amber-400 mt-0.5 flex-shrink-0" />
             <div className="t-caption-sm text-[var(--brand-text-muted)] space-y-1">
