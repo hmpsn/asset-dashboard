@@ -729,7 +729,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                             />
                             {variations[item.id]?.fieldSlug === 'name' && variations[item.id].options.length > 1 && (
                               <div className="mt-1.5 space-y-1">
-                                <div className="t-micro text-[var(--brand-text-muted)] font-medium">Pick a variation:</div>
+                                <div className="t-caption-sm text-[var(--brand-text-muted)] font-medium">Pick a variation:</div>
                                 {variations[item.id].options.map((v, vi) => (
                                   <button
                                     key={vi}
@@ -801,7 +801,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                                 )}
                                 {variations[item.id]?.fieldSlug === field.slug && variations[item.id].options.length > 1 && (
                                   <div className="mt-1.5 space-y-1">
-                                    <div className="t-micro text-[var(--brand-text-muted)] font-medium">Pick a variation:</div>
+                                    <div className="t-caption-sm text-[var(--brand-text-muted)] font-medium">Pick a variation:</div>
                                     {variations[item.id].options.map((v, vi) => {
                                       const maxLen = isTitle ? 60 : 160;
                                       return (

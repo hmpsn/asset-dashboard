@@ -60,7 +60,7 @@ export function VersionHistory({
                 <div key={v.id} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-[var(--surface-3)]/50 hover:bg-[var(--surface-3)] transition-colors group">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="flex-shrink-0 w-6 h-6 rounded-full bg-teal-500/10 border border-teal-500/20 flex items-center justify-center">
-                      <span className="t-micro font-semibold text-teal-400">v{v.versionNumber}</span>
+                      <span className="t-caption-sm font-semibold text-teal-400">v{v.versionNumber}</span>
                     </div>
                     <div className="min-w-0">
                       <div className="t-caption-sm text-[var(--brand-text-bright)] truncate">{label}{detail}</div>
@@ -70,7 +70,7 @@ export function VersionHistory({
                   <button
                     onClick={() => onRevert(v.id)}
                     disabled={reverting === v.id}
-                    className="flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded t-micro font-medium text-[var(--brand-text-muted)] hover:text-teal-300 hover:bg-teal-500/10 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
+                    className="flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded t-caption-sm font-medium text-[var(--brand-text-muted)] hover:text-teal-300 hover:bg-teal-500/10 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
                   >
                     <Icon as={reverting === v.id ? Loader2 : RotateCcw} size="sm" className={reverting === v.id ? 'animate-spin' : ''} />
                     Revert

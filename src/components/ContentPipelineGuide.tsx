@@ -187,7 +187,7 @@ export function ContentPipelineGuide() {
                     <div key={i} className="flex gap-3">
                       <div className="flex flex-col items-center flex-shrink-0">
                         <div className="w-5 h-5 rounded-full bg-teal-500/15 flex items-center justify-center">
-                          <span className="t-micro font-bold text-teal-400">{i + 1}</span>
+                          <span className="t-caption-sm font-bold text-teal-400">{i + 1}</span>
                         </div>
                         {i < section.steps.length - 1 && (
                           <div className="w-px flex-1 bg-[var(--brand-border)] mt-1" />

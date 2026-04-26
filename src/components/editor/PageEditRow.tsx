@@ -137,7 +137,7 @@ export function PageEditRow({
           {pageState?.status && onClearTracking && (
             <button
               onClick={(e) => { e.stopPropagation(); onClearTracking(page.id); }}
-              className="flex items-center gap-0.5 t-micro px-1.5 py-0.5 rounded text-[var(--brand-text-muted)] hover:text-red-400 hover:bg-red-500/10 transition-colors"
+              className="flex items-center gap-0.5 t-caption-sm px-1.5 py-0.5 rounded text-[var(--brand-text-muted)] hover:text-red-400 hover:bg-red-500/10 transition-colors"
               title="Clear page tracking status"
             >
               <Icon as={X} size="sm" /> clear
@@ -173,19 +173,19 @@ export function PageEditRow({
                 <div className="flex items-center gap-2">
                   <div className="text-xs font-medium text-amber-300">{rec.title}</div>
                   {rec.trafficAtRisk > 0 && (
-                    <span className="t-micro text-amber-400/70">
+                    <span className="t-caption-sm text-amber-400/70">
                       {rec.trafficAtRisk.toLocaleString()} clicks at risk
                     </span>
                   )}
                 </div>
                 <div className="t-caption-sm text-[var(--brand-text)] mt-1">{rec.insight}</div>
                 {rec.estimatedGain && (
-                  <div className="t-micro text-emerald-400/70 mt-1">
+                  <div className="t-caption-sm text-emerald-400/70 mt-1">
                     Potential: {rec.estimatedGain}
                   </div>
                 )}
               </div>
-              <span className={`flex-shrink-0 t-micro px-1.5 py-0.5 rounded font-medium ${
+              <span className={`flex-shrink-0 t-caption-sm px-1.5 py-0.5 rounded font-medium ${
                 rec.priority === 'fix_now' ? 'bg-red-500/15 text-red-400' :
                 rec.priority === 'fix_soon' ? 'bg-amber-500/15 text-amber-400' :
                 'bg-zinc-500/15 text-zinc-400'
@@ -220,7 +220,7 @@ export function PageEditRow({
                 </button>
               )}
               {hasAnalysis && (
-                <span className="t-micro text-emerald-400/70 flex items-center gap-1">
+                <span className="t-caption-sm text-emerald-400/70 flex items-center gap-1">
                   <Icon as={Check} size="sm" /> Analysis on file
                 </span>
               )}
@@ -259,12 +259,12 @@ export function PageEditRow({
                   >
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-[var(--brand-text-muted)] font-bold">{i + 1}.</span>
-                      <span className="t-micro px-1 py-0.5 rounded bg-blue-500/10 text-blue-400">Title</span>
+                      <span className="t-caption-sm px-1 py-0.5 rounded bg-blue-500/10 text-blue-400">Title</span>
                       <span className="flex-1">{titleV}</span>
                       <CharacterCounter current={titleV.length} max={60} size="sm" />
                     </div>
                     <div className="flex items-center gap-2 ml-4">
-                      <span className="t-micro px-1 py-0.5 rounded bg-purple-500/10 text-purple-400">Desc</span>
+                      <span className="t-caption-sm px-1 py-0.5 rounded bg-purple-500/10 text-purple-400">Desc</span>
                       <span className="flex-1 text-[var(--brand-text)]">{descV}</span>
                       <CharacterCounter current={descV.length} max={160} size="sm" />
                     </div>

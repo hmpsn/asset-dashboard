@@ -265,7 +265,7 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
                       <span className="text-xs font-medium text-[var(--brand-text-bright)] group-hover:text-white transition-colors truncate block">
                         {t.name}
                       </span>
-                      <span className="t-micro text-[var(--brand-text-muted)]">
+                      <span className="t-caption-sm text-[var(--brand-text-muted)]">
                         {t.pageType} · {t.sections?.length || 0} sections · {t.variables?.length || 0} variables
                       </span>
                     </div>
@@ -289,7 +289,7 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
           title="Content Matrices"
           titleIcon={<Icon as={Grid3X3} size="md" className="text-teal-400" />}
           titleExtra={
-            <span className="t-micro text-[var(--brand-text-muted)]">
+            <span className="t-caption-sm text-[var(--brand-text-muted)]">
               {publishedCells}/{totalCells} published
             </span>
           }
@@ -312,7 +312,7 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
                       <span className="text-xs font-medium text-[var(--brand-text-bright)] group-hover:text-white transition-colors truncate block">
                         {m.name}
                       </span>
-                      <span className="t-micro text-[var(--brand-text-muted)]">
+                      <span className="t-caption-sm text-[var(--brand-text-muted)]">
                         {template?.name || 'Unknown template'} · {m.cells.length} pages · {progress}% published
                       </span>
                     </div>

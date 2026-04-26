@@ -902,7 +902,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
                 await post(`/api/workspaces/${workspaceId}/page-states/clear`, { status: 'all' });
                 refreshStates();
               }}
-              className="ml-auto t-micro text-[var(--brand-text-muted)] hover:text-red-400 underline underline-offset-2 transition-colors"
+              className="ml-auto t-caption-sm text-[var(--brand-text-muted)] hover:text-red-400 underline underline-offset-2 transition-colors"
             >
               reset all
             </button>
@@ -917,7 +917,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
             await post(`/api/workspaces/${workspaceId}/page-states/clear`, { status: 'all' });
             refreshStates();
           }}
-          className="t-micro text-[var(--brand-text-muted)] hover:text-red-400 underline underline-offset-2 transition-colors"
+          className="t-caption-sm text-[var(--brand-text-muted)] hover:text-red-400 underline underline-offset-2 transition-colors"
         >
           Reset page tracking
         </button>

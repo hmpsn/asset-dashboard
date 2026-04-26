@@ -541,12 +541,12 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
         <div className="bg-[var(--surface-2)]/50 rounded-[var(--radius-xl)] border border-[var(--brand-border)]/50 px-4 py-3 space-y-3">
           {post.seoTitle && (
             <div>
-              <div className="t-micro text-[var(--brand-text-muted)] uppercase tracking-wider font-medium mb-1">SEO Title Tag <span className="normal-case text-[var(--brand-text-muted)]">({post.seoTitle.length} chars)</span></div>
+              <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1">SEO Title Tag <span className="normal-case text-[var(--brand-text-muted)]">({post.seoTitle.length} chars)</span></div>
               <div className="text-xs text-[var(--brand-text-bright)] font-medium">{post.seoTitle}</div>
             </div>
           )}
           <div>
-            <div className="t-micro text-[var(--brand-text-muted)] uppercase tracking-wider font-medium mb-1">Meta Description {post.seoMetaDescription && <span className="normal-case text-[var(--brand-text-muted)]">({post.seoMetaDescription.length} chars)</span>}</div>
+            <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1">Meta Description {post.seoMetaDescription && <span className="normal-case text-[var(--brand-text-muted)]">({post.seoMetaDescription.length} chars)</span>}</div>
             <div className="text-xs text-[var(--brand-text)]">{post.seoMetaDescription || post.metaDescription}</div>
           </div>
         </div>

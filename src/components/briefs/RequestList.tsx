@@ -259,7 +259,7 @@ export function RequestList({
                 {/* Delivery form */}
                 {(req.status === 'in_progress' || (req.status === 'approved' && (req.serviceType || 'brief_only') === 'brief_only' && !req.upgradedAt)) && deliveringReqId === req.id && (
                   <div className="mt-2 bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-3 space-y-2">
-                    <div className="flex items-center gap-1.5 mb-1"><Icon as={Link2} size="md" className="text-emerald-400" /><span className="t-micro text-emerald-400 font-medium">Attach Deliverable</span></div>
+                    <div className="flex items-center gap-1.5 mb-1"><Icon as={Link2} size="md" className="text-emerald-400" /><span className="t-caption-sm uppercase tracking-wider text-emerald-400 font-medium">Attach Deliverable</span></div>
                     <input type="url" value={deliveryUrl} onChange={e => onSetDeliveryUrl(e.target.value)} placeholder="Google Doc link, Dropbox URL, or any content URL..." className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-emerald-500/50 focus:outline-none" />
                     <textarea value={deliveryNotes} onChange={e => onSetDeliveryNotes(e.target.value)} placeholder="Delivery notes (optional) — e.g. revision notes, word count, etc." className="w-full px-3 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-emerald-500/50 focus:outline-none resize-y" rows={2} />
                     <div className="flex items-center gap-2">
@@ -328,7 +328,7 @@ export function RequestList({
                   {/* Executive Summary */}
                   {inlineBrief.executiveSummary && (
                     <div className="bg-teal-500/5 border border-teal-500/20 rounded-lg px-4 py-3">
-                      <div className="flex items-center gap-1.5 mb-1.5"><Icon as={BookOpen} size="md" className="text-teal-400" /><span className="t-micro text-teal-400 font-medium">Executive Summary</span></div>
+                      <div className="flex items-center gap-1.5 mb-1.5"><Icon as={BookOpen} size="md" className="text-teal-400" /><span className="t-caption-sm uppercase tracking-wider text-teal-400 font-medium">Executive Summary</span></div>
                       <div className="text-xs text-[var(--brand-text-bright)] leading-relaxed">{inlineBrief.executiveSummary}</div>
                     </div>
                   )}
@@ -336,11 +336,11 @@ export function RequestList({
                   {/* Title & Meta */}
                   <div className="space-y-2">
                     <div>
-                      <div className="t-micro text-[var(--brand-text-muted)] font-medium mb-1">Suggested Title</div>
+                      <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1">Suggested Title</div>
                       <div className="text-xs text-teal-400 bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)]">{inlineBrief.suggestedTitle}</div>
                     </div>
                     <div>
-                      <div className="t-micro text-[var(--brand-text-muted)] font-medium mb-1">Meta Description</div>
+                      <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1">Meta Description</div>
                       <div className="text-xs text-[var(--brand-text-bright)] bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)]">{inlineBrief.suggestedMetaDesc}</div>
                     </div>
                   </div>
@@ -348,22 +348,22 @@ export function RequestList({
                   {/* Key Metrics Row */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div className="bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)]">
-                      <div className="t-micro text-[var(--brand-text-muted)] font-medium mb-0.5">Word Count</div>
+                      <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-0.5">Word Count</div>
                       <div className="text-sm font-bold text-blue-400">{inlineBrief.wordCountTarget?.toLocaleString()}</div>
                     </div>
                     <div className="bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)]">
-                      <div className="t-micro text-[var(--brand-text-muted)] font-medium mb-0.5">Intent</div>
+                      <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-0.5">Intent</div>
                       <div className="text-xs text-[var(--brand-text-bright)] capitalize font-medium">{inlineBrief.intent}</div>
                     </div>
                     {inlineBrief.contentFormat && (
                       <div className="bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)]">
-                        <div className="t-micro text-[var(--brand-text-muted)] font-medium mb-0.5">Format</div>
+                        <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-0.5">Format</div>
                         <div className="text-xs text-amber-400 capitalize font-medium">{inlineBrief.contentFormat}</div>
                       </div>
                     )}
                     {inlineBrief.difficultyScore != null && (
                       <div className="bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)]">
-                        <div className="t-micro text-[var(--brand-text-muted)] font-medium mb-0.5">Difficulty</div>
+                        <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-0.5">Difficulty</div>
                         <div className={`text-sm font-bold ${inlineBrief.difficultyScore <= 30 ? 'text-emerald-400' : inlineBrief.difficultyScore <= 60 ? 'text-amber-400' : 'text-red-400'}`}>{inlineBrief.difficultyScore}/100</div>
                       </div>
                     )}
@@ -373,19 +373,19 @@ export function RequestList({
                   {inlineBrief.trafficPotential && (
                     <div className="flex items-start gap-2 bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)]">
                       <Icon as={TrendingUp} size="md" className="text-emerald-400 mt-0.5 flex-shrink-0" />
-                      <div><div className="t-micro text-[var(--brand-text-muted)] font-medium mb-0.5">Traffic Potential</div><div className="text-xs text-[var(--brand-text-bright)]">{inlineBrief.trafficPotential}</div></div>
+                      <div><div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-0.5">Traffic Potential</div><div className="text-xs text-[var(--brand-text-bright)]">{inlineBrief.trafficPotential}</div></div>
                     </div>
                   )}
 
                   {/* Audience & Tone */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <div className="flex items-center gap-1.5 mb-1"><Icon as={Users} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-micro text-[var(--brand-text-muted)] font-medium">Audience</span></div>
+                      <div className="flex items-center gap-1.5 mb-1"><Icon as={Users} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Audience</span></div>
                       <div className="text-xs text-[var(--brand-text)] bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)]">{inlineBrief.audience}</div>
                     </div>
                     {inlineBrief.toneAndStyle && (
                       <div>
-                        <div className="flex items-center gap-1.5 mb-1"><Icon as={MessageSquare} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-micro text-[var(--brand-text-muted)] font-medium">Tone & Style</span></div>
+                        <div className="flex items-center gap-1.5 mb-1"><Icon as={MessageSquare} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Tone & Style</span></div>
                         <div className="text-xs text-[var(--brand-text)] bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)]">{inlineBrief.toneAndStyle}</div>
                       </div>
                     )}
@@ -394,7 +394,7 @@ export function RequestList({
                   {/* Secondary Keywords */}
                   {inlineBrief.secondaryKeywords?.length > 0 && (
                     <div>
-                      <div className="flex items-center gap-1.5 mb-1.5"><Icon as={Search} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-micro text-[var(--brand-text-muted)] font-medium">Secondary Keywords</span></div>
+                      <div className="flex items-center gap-1.5 mb-1.5"><Icon as={Search} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Secondary Keywords</span></div>
                       <div className="flex flex-wrap gap-1.5">
                         {inlineBrief.secondaryKeywords.map((kw, i) => (
                           <span key={i} className="t-caption-sm px-2 py-0.5 rounded-full bg-[var(--surface-3)] text-[var(--brand-text)]">{kw}</span>
@@ -406,7 +406,7 @@ export function RequestList({
                   {/* Topical Entities */}
                   {inlineBrief.topicalEntities && inlineBrief.topicalEntities.length > 0 && (
                     <div>
-                      <div className="flex items-center gap-1.5 mb-1.5"><Icon as={Target} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-micro text-[var(--brand-text-muted)] font-medium">Topical Entities to Cover</span></div>
+                      <div className="flex items-center gap-1.5 mb-1.5"><Icon as={Target} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Topical Entities to Cover</span></div>
                       <div className="flex flex-wrap gap-1.5">
                         {inlineBrief.topicalEntities.map((entity, i) => (
                           <span key={i} className="t-caption-sm px-2 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-300">{entity}</span>
@@ -418,7 +418,7 @@ export function RequestList({
                   {/* People Also Ask */}
                   {inlineBrief.peopleAlsoAsk && inlineBrief.peopleAlsoAsk.length > 0 && (
                     <div>
-                      <div className="flex items-center gap-1.5 mb-1.5"><Icon as={MessageSquare} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-micro text-[var(--brand-text-muted)] font-medium">Questions to Answer</span></div>
+                      <div className="flex items-center gap-1.5 mb-1.5"><Icon as={MessageSquare} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Questions to Answer</span></div>
                       <div className="space-y-1">
                         {inlineBrief.peopleAlsoAsk.map((q, i) => (
                           <div key={i} className="flex items-start gap-2 text-xs text-[var(--brand-text-bright)] bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)]">
@@ -432,7 +432,7 @@ export function RequestList({
                   {/* SERP Analysis */}
                   {inlineBrief.serpAnalysis && (
                     <div>
-                      <div className="flex items-center gap-1.5 mb-1.5"><Icon as={BarChart3} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-micro text-[var(--brand-text-muted)] font-medium">SERP Analysis</span></div>
+                      <div className="flex items-center gap-1.5 mb-1.5"><Icon as={BarChart3} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">SERP Analysis</span></div>
                       <div className="bg-[var(--surface-1)] rounded-lg px-3 py-3 border border-[var(--brand-border)] space-y-2">
                         <div className="grid grid-cols-2 gap-3">
                           <div><span className="t-caption-sm text-[var(--brand-text-muted)]">Content Type:</span><span className="text-xs text-[var(--brand-text-bright)] ml-1">{inlineBrief.serpAnalysis.contentType}</span></div>
@@ -451,7 +451,7 @@ export function RequestList({
                   {/* Content Outline */}
                   {inlineBrief.outline?.length > 0 && (
                     <div>
-                      <div className="t-micro text-[var(--brand-text-muted)] font-medium mb-2">Content Outline</div>
+                      <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-2">Content Outline</div>
                       <div className="space-y-2">
                         {inlineBrief.outline.map((section, i) => (
                           <div key={i} className="bg-[var(--surface-1)] rounded-lg px-3 py-2.5 border border-[var(--brand-border)]">
@@ -472,7 +472,7 @@ export function RequestList({
                   {/* CTA Recommendations */}
                   {inlineBrief.ctaRecommendations && inlineBrief.ctaRecommendations.length > 0 && (
                     <div>
-                      <div className="t-micro text-[var(--brand-text-muted)] font-medium mb-1.5">CTA Recommendations</div>
+                      <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1.5">CTA Recommendations</div>
                       <div className="space-y-1">{inlineBrief.ctaRecommendations.map((cta, i) => (
                         <div key={i} className="text-xs text-[var(--brand-text-bright)] bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)] flex items-start gap-2">
                           <span className={`t-caption-sm px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${i === 0 ? 'bg-teal-500/20 text-teal-400' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)]'}`}>{i === 0 ? 'Primary' : 'Secondary'}</span>{cta}
@@ -484,7 +484,7 @@ export function RequestList({
                   {/* Competitor Insights */}
                   {inlineBrief.competitorInsights && (
                     <div>
-                      <div className="t-micro text-[var(--brand-text-muted)] font-medium mb-1">Competitor Insights</div>
+                      <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1">Competitor Insights</div>
                       <div className="text-xs text-[var(--brand-text)] bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)] leading-relaxed">{inlineBrief.competitorInsights}</div>
                     </div>
                   )}
@@ -492,7 +492,7 @@ export function RequestList({
                   {/* Internal Links */}
                   {inlineBrief.internalLinkSuggestions?.length > 0 && (
                     <div>
-                      <div className="t-micro text-[var(--brand-text-muted)] font-medium mb-1">Internal Link Suggestions</div>
+                      <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1">Internal Link Suggestions</div>
                       <div className="flex flex-wrap gap-1.5">
                         {inlineBrief.internalLinkSuggestions.map((link, i) => (
                           <span key={i} className="t-caption-sm px-2 py-0.5 rounded bg-[var(--surface-3)] text-blue-400">/{link}</span>
@@ -504,7 +504,7 @@ export function RequestList({
                   {/* E-E-A-T Guidance */}
                   {inlineBrief.eeatGuidance && (
                     <div>
-                      <div className="t-micro text-[var(--brand-text-muted)] font-medium mb-2">E-E-A-T Signals</div>
+                      <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-2">E-E-A-T Signals</div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {[
                           { label: 'Experience', value: inlineBrief.eeatGuidance.experience, color: 'text-blue-400' },
@@ -513,7 +513,7 @@ export function RequestList({
                           { label: 'Trust', value: inlineBrief.eeatGuidance.trust, color: 'text-amber-400' },
                         ].filter(e => e.value).map((e, i) => (
                           <div key={i} className="bg-[var(--surface-1)] rounded-lg px-3 py-2.5 border border-[var(--brand-border)]">
-                            <div className={`t-micro ${e.color} font-medium mb-1`}>{e.label}</div>
+                            <div className={`t-caption-sm uppercase tracking-wider ${e.color} font-medium mb-1`}>{e.label}</div>
                             <div className="t-caption-sm text-[var(--brand-text)] leading-relaxed">{e.value}</div>
                           </div>
                         ))}
@@ -524,7 +524,7 @@ export function RequestList({
                   {/* Content Checklist */}
                   {inlineBrief.contentChecklist && inlineBrief.contentChecklist.length > 0 && (
                     <div>
-                      <div className="t-micro text-[var(--brand-text-muted)] font-medium mb-2">Content Checklist</div>
+                      <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-2">Content Checklist</div>
                       <div className="bg-[var(--surface-1)] rounded-lg border border-[var(--brand-border)] divide-y divide-[var(--brand-border)]/50">
                         {inlineBrief.contentChecklist.map((item, i) => (
                           <div key={i} className="flex items-start gap-2.5 px-4 py-2.5">
@@ -539,7 +539,7 @@ export function RequestList({
                   {/* Schema Recommendations */}
                   {inlineBrief.schemaRecommendations && inlineBrief.schemaRecommendations.length > 0 && (
                     <div>
-                      <div className="t-micro text-[var(--brand-text-muted)] font-medium mb-2">Schema Markup</div>
+                      <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-2">Schema Markup</div>
                       <div className="space-y-2">
                         {inlineBrief.schemaRecommendations.map((schema, i) => (
                           <div key={i} className="bg-[var(--surface-1)] rounded-lg px-4 py-3 border border-[var(--brand-border)]">

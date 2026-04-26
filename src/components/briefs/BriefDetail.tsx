@@ -128,7 +128,7 @@ export function BriefDetail({
       {/* Executive Summary */}
       {brief.executiveSummary && (
         <div className="bg-teal-500/5 border border-teal-500/20 rounded-lg px-4 py-3">
-          <div className="flex items-center gap-1.5 mb-1.5"><Icon as={BookOpen} size="md" className="text-teal-400" /><span className="t-micro text-teal-400 font-medium">Executive Summary</span></div>
+          <div className="flex items-center gap-1.5 mb-1.5"><Icon as={BookOpen} size="md" className="text-teal-400" /><span className="t-caption-sm uppercase tracking-wider text-teal-400 font-medium">Executive Summary</span></div>
           {editingBrief === brief.id ? (
             <textarea defaultValue={brief.executiveSummary} onBlur={e => { if (e.target.value !== brief.executiveSummary) onSaveBriefField(brief.id, { executiveSummary: e.target.value }); }} className="w-full text-xs text-[var(--brand-text-bright)] leading-relaxed bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg px-3 py-2 focus:border-teal-500/50 focus:outline-none resize-y min-h-[60px]" rows={3} />
           ) : (
@@ -140,7 +140,7 @@ export function BriefDetail({
       {/* Title & Meta — with A/B variant picker */}
       <div className="space-y-2">
         <div>
-          <div className="t-micro text-[var(--brand-text-muted)] font-medium mb-1">Suggested Title</div>
+          <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1">Suggested Title</div>
           {editingBrief === brief.id ? (
             <input type="text" defaultValue={brief.suggestedTitle} onBlur={e => { if (e.target.value !== brief.suggestedTitle) onSaveBriefField(brief.id, { suggestedTitle: e.target.value }); }} className="w-full text-xs text-teal-400 bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)] focus:border-teal-500/50 focus:outline-none" />
           ) : (
@@ -148,7 +148,7 @@ export function BriefDetail({
           )}
           {brief.titleVariants && brief.titleVariants.length > 0 && (
             <div className="mt-1.5 space-y-1">
-              <div className="t-micro text-[var(--brand-text-muted)] font-medium">Alternatives</div>
+              <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Alternatives</div>
               {brief.titleVariants.map((variant, i) => (
                 <button
                   key={i}
@@ -166,7 +166,7 @@ export function BriefDetail({
           )}
         </div>
         <div>
-          <div className="t-micro text-[var(--brand-text-muted)] font-medium mb-1">Meta Description</div>
+          <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1">Meta Description</div>
           {editingBrief === brief.id ? (
             <textarea defaultValue={brief.suggestedMetaDesc} onBlur={e => { if (e.target.value !== brief.suggestedMetaDesc) onSaveBriefField(brief.id, { suggestedMetaDesc: e.target.value }); }} className="w-full text-xs text-[var(--brand-text-bright)] bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)] focus:border-teal-500/50 focus:outline-none resize-y" rows={2} />
           ) : (
@@ -174,7 +174,7 @@ export function BriefDetail({
           )}
           {brief.metaDescVariants && brief.metaDescVariants.length > 0 && (
             <div className="mt-1.5 space-y-1">
-              <div className="t-micro text-[var(--brand-text-muted)] font-medium">Alternatives</div>
+              <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Alternatives</div>
               {brief.metaDescVariants.map((variant, i) => (
                 <button
                   key={i}
@@ -196,7 +196,7 @@ export function BriefDetail({
       {/* Key Metrics Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)]">
-          <div className="t-micro text-[var(--brand-text-muted)] font-medium mb-0.5">Word Count</div>
+          <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-0.5">Word Count</div>
           {editingBrief === brief.id ? (
             <input type="number" defaultValue={brief.wordCountTarget} onBlur={e => { const v = parseInt(e.target.value, 10); if (!isNaN(v) && v !== brief.wordCountTarget) onSaveBriefField(brief.id, { wordCountTarget: v }); }} className="w-full text-sm font-bold text-blue-400 bg-transparent border-b border-[var(--brand-border)] focus:border-blue-400 focus:outline-none py-0.5" />
           ) : (
@@ -204,7 +204,7 @@ export function BriefDetail({
           )}
         </div>
         <div className="bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)]">
-          <div className="t-micro text-[var(--brand-text-muted)] font-medium mb-0.5">Intent</div>
+          <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-0.5">Intent</div>
           {editingBrief === brief.id ? (
             <input type="text" defaultValue={brief.intent} onBlur={e => { if (e.target.value !== brief.intent) onSaveBriefField(brief.id, { intent: e.target.value }); }} className="w-full text-xs text-[var(--brand-text-bright)] capitalize font-medium bg-transparent border-b border-[var(--brand-border)] focus:border-teal-500/50 focus:outline-none py-0.5" />
           ) : (
@@ -213,7 +213,7 @@ export function BriefDetail({
         </div>
         {brief.contentFormat && (
           <div className="bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)]">
-            <div className="t-micro text-[var(--brand-text-muted)] font-medium mb-0.5">Format</div>
+            <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-0.5">Format</div>
             {editingBrief === brief.id ? (
               <select defaultValue={brief.contentFormat} onChange={e => onSaveBriefField(brief.id, { contentFormat: e.target.value })} className="w-full text-xs text-amber-400 capitalize font-medium bg-transparent border-b border-[var(--brand-border)] focus:border-teal-500/50 focus:outline-none py-0.5 cursor-pointer">
                 {['guide', 'listicle', 'how-to', 'comparison', 'FAQ', 'case-study', 'pillar-page', 'landing-page', 'blog-post'].map(f => <option key={f} value={f}>{f}</option>)}
@@ -225,7 +225,7 @@ export function BriefDetail({
         )}
         {brief.difficultyScore != null && (
           <div className="bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)]">
-            <div className="t-micro text-[var(--brand-text-muted)] font-medium mb-0.5">Difficulty</div>
+            <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-0.5">Difficulty</div>
             <div className={`text-sm font-bold ${brief.difficultyScore <= 30 ? 'text-emerald-400' : brief.difficultyScore <= 60 ? 'text-amber-400' : 'text-red-400'}`}>{brief.difficultyScore}/100</div>
           </div>
         )}
@@ -235,14 +235,14 @@ export function BriefDetail({
       {brief.trafficPotential && (
         <div className="flex items-start gap-2 bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)]">
           <Icon as={TrendingUp} size="md" className="text-emerald-400 mt-0.5 flex-shrink-0" />
-          <div><div className="t-micro text-[var(--brand-text-muted)] font-medium mb-0.5">Traffic Potential</div><div className="text-xs text-[var(--brand-text-bright)]">{brief.trafficPotential}</div></div>
+          <div><div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-0.5">Traffic Potential</div><div className="text-xs text-[var(--brand-text-bright)]">{brief.trafficPotential}</div></div>
         </div>
       )}
 
       {/* Audience & Tone */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <div className="flex items-center gap-1.5 mb-1"><Icon as={Users} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-micro text-[var(--brand-text-muted)] font-medium">Audience</span></div>
+          <div className="flex items-center gap-1.5 mb-1"><Icon as={Users} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Audience</span></div>
           {editingBrief === brief.id ? (
             <textarea defaultValue={brief.audience} onBlur={e => { if (e.target.value !== brief.audience) onSaveBriefField(brief.id, { audience: e.target.value }); }} className="w-full text-xs text-[var(--brand-text)] bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)] focus:border-teal-500/50 focus:outline-none resize-y" rows={2} />
           ) : (
@@ -251,7 +251,7 @@ export function BriefDetail({
         </div>
         {brief.toneAndStyle && (
           <div>
-            <div className="flex items-center gap-1.5 mb-1"><Icon as={MessageSquare} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-micro text-[var(--brand-text-muted)] font-medium">Tone & Style</span></div>
+            <div className="flex items-center gap-1.5 mb-1"><Icon as={MessageSquare} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Tone & Style</span></div>
             {editingBrief === brief.id ? (
               <textarea defaultValue={brief.toneAndStyle} onBlur={e => { if (e.target.value !== brief.toneAndStyle) onSaveBriefField(brief.id, { toneAndStyle: e.target.value }); }} className="w-full text-xs text-[var(--brand-text)] bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)] focus:border-teal-500/50 focus:outline-none resize-y" rows={2} />
             ) : (
@@ -264,7 +264,7 @@ export function BriefDetail({
       {/* Secondary Keywords */}
       {brief.secondaryKeywords.length > 0 && (
         <div>
-          <div className="flex items-center gap-1.5 mb-1.5"><Icon as={Search} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-micro text-[var(--brand-text-muted)] font-medium">Secondary Keywords</span></div>
+          <div className="flex items-center gap-1.5 mb-1.5"><Icon as={Search} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Secondary Keywords</span></div>
           <div className="flex flex-wrap gap-1.5">
             {brief.secondaryKeywords.map((kw, i) => (
               <span key={i} className="t-caption-sm px-2 py-0.5 rounded-full bg-[var(--surface-3)] text-[var(--brand-text)]">{kw}</span>
@@ -276,7 +276,7 @@ export function BriefDetail({
       {/* Topical Entities */}
       {brief.topicalEntities && brief.topicalEntities.length > 0 && (
         <div>
-          <div className="flex items-center gap-1.5 mb-1.5"><Icon as={Target} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-micro text-[var(--brand-text-muted)] font-medium">Topical Entities to Cover</span></div>
+          <div className="flex items-center gap-1.5 mb-1.5"><Icon as={Target} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Topical Entities to Cover</span></div>
           <div className="flex flex-wrap gap-1.5">
             {brief.topicalEntities.map((entity, i) => (
               <span key={i} className="t-caption-sm px-2 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-300">{entity}</span>
@@ -288,7 +288,7 @@ export function BriefDetail({
       {/* People Also Ask */}
       {brief.peopleAlsoAsk && brief.peopleAlsoAsk.length > 0 && (
         <div>
-          <div className="flex items-center gap-1.5 mb-1.5"><Icon as={MessageSquare} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-micro text-[var(--brand-text-muted)] font-medium">Questions to Answer</span></div>
+          <div className="flex items-center gap-1.5 mb-1.5"><Icon as={MessageSquare} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Questions to Answer</span></div>
           <div className="space-y-1">
             {brief.peopleAlsoAsk.map((q, i) => (
               <div key={i} className="flex items-start gap-2 text-xs text-[var(--brand-text-bright)] bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)]">
@@ -302,7 +302,7 @@ export function BriefDetail({
       {/* SERP Analysis */}
       {brief.serpAnalysis && (
         <div>
-          <div className="flex items-center gap-1.5 mb-1.5"><Icon as={BarChart3} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-micro text-[var(--brand-text-muted)] font-medium">SERP Analysis</span></div>
+          <div className="flex items-center gap-1.5 mb-1.5"><Icon as={BarChart3} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">SERP Analysis</span></div>
           <div className="bg-[var(--surface-1)] rounded-lg px-3 py-3 border border-[var(--brand-border)] space-y-2">
             <div className="grid grid-cols-2 gap-3">
               <div><span className="t-caption-sm text-[var(--brand-text-muted)]">Content Type:</span><span className="text-xs text-[var(--brand-text-bright)] ml-1">{brief.serpAnalysis.contentType}</span></div>
@@ -322,7 +322,7 @@ export function BriefDetail({
       {brief.outline.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-2">
-            <div className="t-micro text-[var(--brand-text-muted)] font-medium">Content Outline</div>
+            <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Content Outline</div>
             {onRegenerateOutline && (
               <button
                 onClick={() => setShowOutlineRegen(!showOutlineRegen)}
@@ -393,7 +393,7 @@ export function BriefDetail({
       {/* CTA Recommendations */}
       {brief.ctaRecommendations && brief.ctaRecommendations.length > 0 && (
         <div>
-          <div className="t-micro text-[var(--brand-text-muted)] font-medium mb-1.5">CTA Recommendations</div>
+          <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1.5">CTA Recommendations</div>
           <div className="space-y-1">{brief.ctaRecommendations.map((cta, i) => (
             <div key={i} className="text-xs text-[var(--brand-text-bright)] bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)] flex items-start gap-2">
               <span className={`t-caption-sm px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${i === 0 ? 'bg-teal-500/20 text-teal-400' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)]'}`}>{i === 0 ? 'Primary' : 'Secondary'}</span>
@@ -408,7 +408,7 @@ export function BriefDetail({
       {/* Competitor Insights */}
       {brief.competitorInsights && (
         <div>
-          <div className="t-micro text-[var(--brand-text-muted)] font-medium mb-1">Competitor Insights</div>
+          <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1">Competitor Insights</div>
           {editingBrief === brief.id ? (
             <textarea defaultValue={brief.competitorInsights} onBlur={e => { if (e.target.value !== brief.competitorInsights) onSaveBriefField(brief.id, { competitorInsights: e.target.value }); }} className="w-full text-xs text-[var(--brand-text)] bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)] focus:border-teal-500/50 focus:outline-none resize-y leading-relaxed" rows={3} />
           ) : (
@@ -420,7 +420,7 @@ export function BriefDetail({
       {/* Internal Links */}
       {brief.internalLinkSuggestions.length > 0 && (
         <div>
-          <div className="t-micro text-[var(--brand-text-muted)] font-medium mb-1">Internal Link Suggestions</div>
+          <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1">Internal Link Suggestions</div>
           <div className="flex flex-wrap gap-1.5">
             {brief.internalLinkSuggestions.map((link, i) => (
               <span key={i} className="t-caption-sm px-2 py-0.5 rounded bg-[var(--surface-3)] text-blue-400">/{link}</span>
@@ -432,7 +432,7 @@ export function BriefDetail({
       {/* E-E-A-T Guidance */}
       {brief.eeatGuidance && (
         <div>
-          <div className="t-micro text-[var(--brand-text-muted)] font-medium mb-2">E-E-A-T Signals</div>
+          <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-2">E-E-A-T Signals</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {[
               { label: 'Experience', value: brief.eeatGuidance.experience, color: 'text-blue-400' },
@@ -441,7 +441,7 @@ export function BriefDetail({
               { label: 'Trust', value: brief.eeatGuidance.trust, color: 'text-amber-400' },
             ].filter(e => e.value).map((e, i) => (
               <div key={i} className="bg-[var(--surface-1)] rounded-lg px-3 py-2.5 border border-[var(--brand-border)]">
-                <div className={`t-micro ${e.color} font-medium mb-1`}>{e.label}</div>
+                <div className={`t-caption-sm uppercase tracking-wider ${e.color} font-medium mb-1`}>{e.label}</div>
                 <div className="t-caption-sm text-[var(--brand-text)] leading-relaxed">{e.value}</div>
               </div>
             ))}
@@ -452,7 +452,7 @@ export function BriefDetail({
       {/* Content Checklist */}
       {brief.contentChecklist && brief.contentChecklist.length > 0 && (
         <div>
-          <div className="t-micro text-[var(--brand-text-muted)] font-medium mb-2">Content Checklist</div>
+          <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-2">Content Checklist</div>
           <div className="bg-[var(--surface-1)] rounded-lg border border-[var(--brand-border)] divide-y divide-[var(--brand-border)]/50">
             {brief.contentChecklist.map((item, i) => (
               <div key={i} className="flex items-start gap-2.5 px-4 py-2.5">
@@ -467,7 +467,7 @@ export function BriefDetail({
       {/* Schema Recommendations */}
       {brief.schemaRecommendations && brief.schemaRecommendations.length > 0 && (
         <div>
-          <div className="t-micro text-[var(--brand-text-muted)] font-medium mb-2">Schema Markup</div>
+          <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-2">Schema Markup</div>
           <div className="space-y-2">
             {brief.schemaRecommendations.map((schema, i) => (
               <div key={i} className="bg-[var(--surface-1)] rounded-lg px-4 py-3 border border-[var(--brand-border)]">
