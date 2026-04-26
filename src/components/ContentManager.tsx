@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { EmptyState, MetricRing } from './ui';
+import { EmptyState, MetricRing, Icon } from './ui';
 import {
   Loader2, FileText, PenLine, Clock, CheckCircle2, Eye, Send,
   Trash2, Download, Search, ArrowUpDown, Filter,
@@ -130,11 +130,11 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
       <div className="space-y-8">
         <button
           onClick={() => { setActivePostId(null); invalidatePosts(); }}
-          className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
+          className="flex items-center gap-1.5 text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
         >
           ← Back to Content
         </button>
-        <div className="bg-zinc-900 border border-zinc-800 p-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
+        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <PostEditor
             workspaceId={workspaceId}
             postId={activePostId}
@@ -149,7 +149,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Loader2 className="w-5 h-5 animate-spin text-zinc-500" />
+        <Icon as={Loader2} size="lg" className="animate-spin text-[var(--brand-text-muted)]" />
       </div>
     );
   }
@@ -160,21 +160,21 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {(['draft', 'review', 'approved', 'generating'] as const).map(status => {
           const cfg = STATUS_CONFIG[status];
-          const Icon = cfg.icon;
+          const StatusIcon = cfg.icon;
           return (
             <button
               key={status}
               onClick={() => setStatusFilter(statusFilter === status ? 'all' : status)}
               style={{ borderRadius: '6px 12px 6px 12px' }}
               className={`border px-4 py-3 text-left transition-colors ${
-                statusFilter === status ? `${cfg.bg} border-opacity-100` : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'
+                statusFilter === status ? `${cfg.bg} border-opacity-100` : 'bg-[var(--surface-2)] border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]'
               }`}
             >
               <div className="flex items-center gap-2 mb-1">
-                <Icon className={`w-3.5 h-3.5 ${cfg.color}`} />
-                <span className="text-[11px] text-zinc-500 font-medium">{cfg.label}</span>
+                <Icon as={StatusIcon} size="md" className={cfg.color} />
+                <span className="t-caption-sm text-[var(--brand-text-muted)] font-medium">{cfg.label}</span>
               </div>
-              <span className="text-lg font-semibold text-zinc-200">{statusCounts[status]}</span>
+              <span className="text-lg font-semibold text-[var(--brand-text-bright)]">{statusCounts[status]}</span>
             </button>
           );
         })}
@@ -183,16 +183,16 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
       {/* Search & sort bar */}
       <div className="flex items-center gap-3">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+          <Icon as={Search} size="md" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search by title or keyword..."
-            className="w-full pl-9 pr-3 py-2 text-xs bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-700"
+            className="w-full pl-9 pr-3 py-2 text-xs bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
           />
           {search && (
             <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2">
-              <X className="w-3 h-3 text-zinc-500 hover:text-zinc-300" />
+              <Icon as={X} size="sm" className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]" />
             </button>
           )}
         </div>
@@ -201,12 +201,12 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
             <button
               key={f}
               onClick={() => { if (sortField === f) setSortAsc(!sortAsc); else { setSortField(f); setSortAsc(false); } }}
-              className={`px-2 py-1.5 text-[11px] rounded-md transition-colors ${
-                sortField === f ? 'bg-zinc-800 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'
+              className={`px-2 py-1.5 t-caption-sm rounded-md transition-colors ${
+                sortField === f ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
               }`}
             >
               {f.charAt(0).toUpperCase() + f.slice(1)}
-              {sortField === f && <ArrowUpDown className="w-2.5 h-2.5 inline ml-0.5" />}
+              {sortField === f && <Icon as={ArrowUpDown} size="sm" className="inline ml-0.5" />}
             </button>
           ))}
         </div>
@@ -220,7 +220,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
       {/* Filtered empty state */}
       {posts.length > 0 && filtered.length === 0 && (
         <EmptyState icon={Filter} title="No content matches your filters" className="py-8" action={
-          <button onClick={() => { setSearch(''); setStatusFilter('all'); }} className="text-[11px] text-teal-400 hover:text-teal-300">Clear filters</button>
+          <button onClick={() => { setSearch(''); setStatusFilter('all'); }} className="t-caption-sm text-teal-400 hover:text-teal-300">Clear filters</button>
         } />
       )}
 
@@ -228,7 +228,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
       <div className="space-y-3">
         {filtered.map(post => {
           const cfg = STATUS_CONFIG[post.status] || STATUS_CONFIG.draft;
-          const Icon = cfg.icon;
+          const PostStatusIcon = cfg.icon;
           const isGenerating = post.status === 'generating';
           const sectionsComplete = post.sections?.filter(s => s.status === 'done').length || 0;
           const totalSections = post.sections?.length || 0;
@@ -236,7 +236,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
           return (
             <div
               key={post.id}
-              className="bg-zinc-900 border border-zinc-800 hover:border-zinc-700 transition-colors"
+              className="bg-[var(--surface-2)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] transition-colors"
               style={{ borderRadius: '10px 24px 10px 24px' }}
             >
               <div className="px-4 py-3">
@@ -246,40 +246,40 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                     onClick={() => setActivePostId(post.id)}
                     className="flex-1 min-w-0 text-left group"
                   >
-                    <div className="text-sm font-medium text-zinc-200 group-hover:text-teal-300 transition-colors truncate">
+                    <div className="text-sm font-medium text-[var(--brand-text-bright)] group-hover:text-teal-300 transition-colors truncate">
                       {post.title}
                     </div>
                     <div className="flex items-center gap-3 mt-1.5">
-                      <span className="text-[11px] text-zinc-500">
-                        <span className="text-zinc-400">"{post.targetKeyword}"</span>
+                      <span className="t-caption-sm text-[var(--brand-text-muted)]">
+                        <span className="text-[var(--brand-text)]">"{post.targetKeyword}"</span>
                       </span>
-                      <span className="text-[11px] text-zinc-600">·</span>
-                      <span className="text-[11px] text-zinc-500">
+                      <span className="t-caption-sm text-[var(--brand-text-muted)]">·</span>
+                      <span className="t-caption-sm text-[var(--brand-text-muted)]">
                         {post.totalWordCount.toLocaleString()} words
                       </span>
                       {isGenerating && totalSections > 0 && (
                         <>
-                          <span className="text-[11px] text-zinc-600">·</span>
-                          <span className="text-[11px] text-amber-400">
+                          <span className="t-caption-sm text-[var(--brand-text-muted)]">·</span>
+                          <span className="t-caption-sm text-amber-400">
                             {sectionsComplete}/{totalSections} sections
                           </span>
                         </>
                       )}
-                      <span className="text-[11px] text-zinc-600">·</span>
-                      <span className="text-[11px] text-zinc-600">
+                      <span className="t-caption-sm text-[var(--brand-text-muted)]">·</span>
+                      <span className="t-caption-sm text-[var(--brand-text-muted)]">
                         {new Date(post.createdAt).toLocaleDateString()}
                       </span>
                       {/* Voice score inline */}
                       {post.voiceScore != null && (
                         <>
-                          <span className="text-[11px] text-zinc-600">·</span>
+                          <span className="t-caption-sm text-[var(--brand-text-muted)]">·</span>
                           <button
                             onClick={(e) => { e.stopPropagation(); setExpandedVoice(expandedVoice === post.id ? null : post.id); }}
                             className="flex items-center gap-1 hover:opacity-80 transition-opacity"
                             title={`Voice match: ${post.voiceScore}/100 — click for details`}
                           >
                             <MetricRing score={post.voiceScore} size={20} strokeWidth={3} />
-                            <span className="text-[11px] text-blue-400 font-medium">Voice {post.voiceScore}</span>
+                            <span className="t-caption-sm text-blue-400 font-medium">Voice {post.voiceScore}</span>
                           </button>
                         </>
                       )}
@@ -288,8 +288,8 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
 
                   {/* Right: status + actions */}
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className={`flex items-center gap-1 text-[11px] px-2 py-1 rounded-md border font-medium ${cfg.bg} ${cfg.color}`}>
-                      <Icon className={`w-3 h-3 ${isGenerating ? 'animate-spin' : ''}`} />
+                    <span className={`flex items-center gap-1 t-caption-sm px-2 py-1 rounded-md border font-medium ${cfg.bg} ${cfg.color}`}>
+                      <Icon as={PostStatusIcon} size="sm" className={isGenerating ? 'animate-spin' : ''} />
                       {cfg.label}
                     </span>
 
@@ -300,10 +300,10 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                           <button
                             onClick={() => updateStatus(post.id, 'review')}
                             disabled={updatingStatus === post.id}
-                            className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 hover:bg-cyan-500/20 transition-colors disabled:opacity-50"
+                            className="flex items-center gap-1 t-caption-sm px-2 py-1 rounded-md bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 hover:bg-cyan-500/20 transition-colors disabled:opacity-50"
                             title="Send for review"
                           >
-                            <Send className="w-3 h-3" />
+                            <Icon as={Send} size="sm" />
                             Review
                           </button>
                         )}
@@ -311,10 +311,10 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                           <button
                             onClick={() => updateStatus(post.id, 'approved')}
                             disabled={updatingStatus === post.id}
-                            className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+                            className="flex items-center gap-1 t-caption-sm px-2 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
                             title="Approve content"
                           >
-                            <CheckCircle2 className="w-3 h-3" />
+                            <Icon as={CheckCircle2} size="sm" />
                             Approve
                           </button>
                         )}
@@ -322,7 +322,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                           <button
                             onClick={() => updateStatus(post.id, 'draft')}
                             disabled={updatingStatus === post.id}
-                            className="text-[11px] px-2 py-1 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                            className="t-caption-sm px-2 py-1 rounded-md text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)] transition-colors disabled:opacity-50"
                             title="Move back to draft"
                           >
                             ↩ Draft
@@ -334,17 +334,17 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                     {/* Publish to Webflow */}
                     {hasPublishTarget && !isGenerating && (post.status === 'approved' || post.status === 'review') && (
                       post.publishedAt ? (
-                        <span className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-medium">
-                          <Check className="w-3 h-3" /> Published
+                        <span className="flex items-center gap-1 t-caption-sm px-2 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-medium">
+                          <Icon as={Check} size="sm" /> Published
                         </span>
                       ) : (
                         <button
                           onClick={() => publishPost(post.id)}
                           disabled={publishingPost === post.id}
-                          className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-teal-500/10 border border-teal-500/20 text-teal-400 hover:bg-teal-500/20 transition-colors disabled:opacity-50 font-medium"
+                          className="flex items-center gap-1 t-caption-sm px-2 py-1 rounded-md bg-teal-500/10 border border-teal-500/20 text-teal-400 hover:bg-teal-500/20 transition-colors disabled:opacity-50 font-medium"
                           title="Publish to Webflow CMS"
                         >
-                          {publishingPost === post.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Globe className="w-3 h-3" />}
+                          <Icon as={publishingPost === post.id ? Loader2 : Globe} size="sm" className={publishingPost === post.id ? 'animate-spin' : ''} />
                           Publish
                         </button>
                       )
@@ -355,10 +355,10 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                       <button
                         onClick={() => scoreVoice(post.id)}
                         disabled={scoringVoice === post.id}
-                        className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 transition-colors disabled:opacity-50"
+                        className="flex items-center gap-1 t-caption-sm px-2 py-1 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 transition-colors disabled:opacity-50"
                         title="Score brand voice match"
                       >
-                        {scoringVoice === post.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                        <Icon as={scoringVoice === post.id ? Loader2 : Sparkles} size="sm" className={scoringVoice === post.id ? 'animate-spin' : ''} />
                         Score Voice
                       </button>
                     )}
@@ -369,26 +369,26 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                         href={`/api/content-posts/${workspaceId}/${post.id}/export/html`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-zinc-600 hover:text-zinc-400 transition-colors p-1"
+                        className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors p-1"
                         title="Export HTML"
                       >
-                        <Download className="w-3.5 h-3.5" />
+                        <Icon as={Download} size="md" />
                       </a>
                     )}
 
                     {/* Delete */}
                     {deleteConfirm === post.id ? (
                       <div className="flex items-center gap-1">
-                        <button onClick={() => deletePost(post.id)} className="text-[11px] px-2 py-1 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30">Delete</button>
-                        <button onClick={() => setDeleteConfirm(null)} className="text-[11px] px-2 py-1 rounded text-zinc-500 hover:text-zinc-300">Cancel</button>
+                        <button onClick={() => deletePost(post.id)} className="t-caption-sm px-2 py-1 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30">Delete</button>
+                        <button onClick={() => setDeleteConfirm(null)} className="t-caption-sm px-2 py-1 rounded text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]">Cancel</button>
                       </div>
                     ) : (
                       <button
                         onClick={() => setDeleteConfirm(post.id)}
-                        className="text-zinc-700 hover:text-red-400 transition-colors p-1"
+                        className="text-[var(--brand-text-muted)] hover:text-red-400 transition-colors p-1"
                         title="Delete"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Icon as={Trash2} size="md" />
                       </button>
                     )}
                   </div>
@@ -397,23 +397,23 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
 
               {/* Expandable voice feedback */}
               {expandedVoice === post.id && post.voiceFeedback && (
-                <div className="px-4 pb-3 border-t border-zinc-800/50">
+                <div className="px-4 pb-3 border-t border-[var(--brand-border)]/50">
                   <div className="flex items-center gap-2 mt-2 mb-1.5">
                     <MetricRing score={post.voiceScore!} size={36} strokeWidth={4} />
                     <div>
-                      <div className="text-[11px] text-zinc-500 font-medium">Brand Voice Match</div>
-                      <div className="text-xs text-zinc-300 font-semibold">{post.voiceScore}/100</div>
+                      <div className="t-caption-sm text-[var(--brand-text-muted)] font-medium">Brand Voice Match</div>
+                      <div className="text-xs text-[var(--brand-text-bright)] font-semibold">{post.voiceScore}/100</div>
                     </div>
                     <button
                       onClick={() => scoreVoice(post.id)}
                       disabled={scoringVoice === post.id}
-                      className="ml-auto text-[11px] px-2 py-1 rounded-md text-zinc-500 hover:text-blue-400 hover:bg-blue-500/10 transition-colors disabled:opacity-50"
+                      className="ml-auto t-caption-sm px-2 py-1 rounded-md text-[var(--brand-text-muted)] hover:text-blue-400 hover:bg-blue-500/10 transition-colors disabled:opacity-50"
                     >
-                      {scoringVoice === post.id ? <Loader2 className="w-3 h-3 animate-spin inline mr-1" /> : null}
+                      {scoringVoice === post.id ? <Icon as={Loader2} size="sm" className="animate-spin inline mr-1" /> : null}
                       Re-score
                     </button>
                   </div>
-                  <div className="text-[11px] text-zinc-400 leading-relaxed whitespace-pre-wrap bg-zinc-950/50 rounded-lg px-3 py-2 border border-zinc-800/50">
+                  <div className="t-caption-sm text-[var(--brand-text)] leading-relaxed whitespace-pre-wrap bg-[var(--surface-1)]/50 rounded-lg px-3 py-2 border border-[var(--brand-border)]/50">
                     {post.voiceFeedback}
                   </div>
                 </div>

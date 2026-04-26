@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Loader2, Plus, Layers, FileText, Grid3X3, AlertTriangle } from 'lucide-react';
-import { SectionCard, Badge, EmptyState, PageHeader } from './ui';
+import { SectionCard, Badge, EmptyState, PageHeader, Icon } from './ui';
 import { TemplateEditor, MatrixBuilder, MatrixGrid } from './matrix';
 import { contentTemplates, contentMatrices } from '../api/content';
 import type { ContentTemplate, ContentMatrix, MatrixCell } from './matrix';
@@ -137,7 +137,7 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
     }
     return (
       <div className="space-y-2">
-        <button onClick={() => setView({ mode: 'list' })} className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
+        <button onClick={() => setView({ mode: 'list' })} className="flex items-center gap-1 text-xs text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
           ← Back to Planner
         </button>
         <MatrixGrid
@@ -156,8 +156,8 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24 gap-3">
-        <Loader2 className="w-5 h-5 animate-spin text-teal-400" />
-        <span className="text-sm text-zinc-400">Loading content planner…</span>
+        <Icon as={Loader2} size="lg" className="animate-spin text-teal-400" />
+        <span className="text-sm text-[var(--brand-text)]">Loading content planner…</span>
       </div>
     );
   }
@@ -181,7 +181,7 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
         <PageHeader
           title="Content Planner"
           subtitle="Create templates and build content matrices at scale"
-          icon={<Layers className="w-5 h-5 text-teal-400" />}
+          icon={<Icon as={Layers} size="lg" className="text-teal-400" />}
         />
         <EmptyState
           icon={Layers}
@@ -192,7 +192,7 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
               onClick={() => setView({ mode: 'template-editor' })}
               className="flex items-center gap-1.5 text-xs px-4 py-2 rounded-lg bg-teal-500/10 text-teal-400 hover:bg-teal-500/15 transition-colors font-medium"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Icon as={Plus} size="md" />
               Create First Template
             </button>
           }
@@ -209,14 +209,14 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
       <PageHeader
         title="Content Planner"
         subtitle={`${templates.length} template${templates.length !== 1 ? 's' : ''} · ${matrices.length} matri${matrices.length !== 1 ? 'ces' : 'x'} · ${totalCells} pages planned`}
-        icon={<Layers className="w-5 h-5 text-teal-400" />}
+        icon={<Icon as={Layers} size="lg" className="text-teal-400" />}
         actions={
           <div className="flex items-center gap-2">
             <button
               onClick={() => setView({ mode: 'template-editor' })}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors"
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)]/80 transition-colors"
             >
-              <FileText className="w-3 h-3" />
+              <Icon as={FileText} size="sm" />
               New Template
             </button>
             {templates.length > 0 && (
@@ -224,7 +224,7 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
                 onClick={() => setView({ mode: 'matrix-builder' })}
                 className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-teal-500/10 text-teal-400 hover:bg-teal-500/15 transition-colors"
               >
-                <Grid3X3 className="w-3 h-3" />
+                <Icon as={Grid3X3} size="sm" />
                 Build Matrix
               </button>
             )}
@@ -234,7 +234,7 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
 
       {error && (
         <div className="flex items-start gap-2 px-4 py-3 bg-red-500/5 border border-red-500/15" style={{ borderRadius: '10px 24px 10px 24px' }}>
-          <AlertTriangle className="w-3.5 h-3.5 text-red-400 flex-shrink-0 mt-0.5" />
+          <Icon as={AlertTriangle} size="md" className="text-red-400 flex-shrink-0 mt-0.5" />
           <span className="text-xs text-red-400">{error}</span>
         </div>
       )}
@@ -243,9 +243,9 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
       {templates.length > 0 && (
         <SectionCard
           title="Templates"
-          titleIcon={<FileText className="w-4 h-4 text-teal-400" />}
+          titleIcon={<Icon as={FileText} size="md" className="text-teal-400" />}
           action={
-            <button onClick={() => setView({ mode: 'template-editor' })} className="text-[11px] text-teal-400 hover:text-teal-300 transition-colors">
+            <button onClick={() => setView({ mode: 'template-editor' })} className="t-caption-sm text-teal-400 hover:text-teal-300 transition-colors">
               + New
             </button>
           }
@@ -257,15 +257,15 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
                 <button
                   key={t.id}
                   onClick={() => setView({ mode: 'template-editor', templateId: t.id })}
-                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 transition-colors text-left group"
+                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-[var(--surface-3)]/50 hover:bg-[var(--surface-3)] transition-colors text-left group"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <FileText className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
+                    <Icon as={FileText} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
                     <div className="min-w-0">
-                      <span className="text-xs font-medium text-zinc-200 group-hover:text-white transition-colors truncate block">
+                      <span className="text-xs font-medium text-[var(--brand-text-bright)] group-hover:text-white transition-colors truncate block">
                         {t.name}
                       </span>
-                      <span className="text-[10px] text-zinc-500">
+                      <span className="t-caption-sm text-[var(--brand-text-muted)]">
                         {t.pageType} · {t.sections?.length || 0} sections · {t.variables?.length || 0} variables
                       </span>
                     </div>
@@ -287,9 +287,9 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
       {matrices.length > 0 && (
         <SectionCard
           title="Content Matrices"
-          titleIcon={<Grid3X3 className="w-4 h-4 text-teal-400" />}
+          titleIcon={<Icon as={Grid3X3} size="md" className="text-teal-400" />}
           titleExtra={
-            <span className="text-[10px] text-zinc-500">
+            <span className="t-caption-sm text-[var(--brand-text-muted)]">
               {publishedCells}/{totalCells} published
             </span>
           }
@@ -304,21 +304,21 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
                 <button
                   key={m.id}
                   onClick={() => setView({ mode: 'matrix-grid', matrixId: m.id })}
-                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 transition-colors text-left group"
+                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-[var(--surface-3)]/50 hover:bg-[var(--surface-3)] transition-colors text-left group"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <Grid3X3 className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
+                    <Icon as={Grid3X3} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
                     <div className="min-w-0">
-                      <span className="text-xs font-medium text-zinc-200 group-hover:text-white transition-colors truncate block">
+                      <span className="text-xs font-medium text-[var(--brand-text-bright)] group-hover:text-white transition-colors truncate block">
                         {m.name}
                       </span>
-                      <span className="text-[10px] text-zinc-500">
+                      <span className="t-caption-sm text-[var(--brand-text-muted)]">
                         {template?.name || 'Unknown template'} · {m.cells.length} pages · {progress}% published
                       </span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <div className="w-16 h-1.5 bg-zinc-700 rounded-full overflow-hidden">
+                    <div className="w-16 h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden">
                       <div className="h-full bg-teal-500/50 rounded-full transition-all" style={{ width: `${progress}%` }} />
                     </div>
                     <Badge color={progress === 100 ? 'emerald' : progress > 0 ? 'amber' : 'zinc'} label={`${m.cells.length} pages`} />
