@@ -172,7 +172,7 @@ export function FeatureFlagSettings() {
 
       {isLoading ? (
         <div className="px-5 py-8 flex items-center justify-center gap-2 t-caption text-[var(--brand-text-muted)]">
-          <Icon as={Loader2} size="sm" className="animate-spin" /> Loading flags...
+          <Icon as={Loader2} size="md" className="animate-spin" /> Loading flags...
         </div>
       ) : isError ? (
         <div className="px-5 py-6 t-caption text-red-400 space-y-1">
@@ -264,12 +264,12 @@ function FlagRow({ flag, disabled, onToggle, onReset }: FlagRowProps) {
       {/* Label */}
       <div className="flex-1 min-w-0">
         <span className="t-caption text-[var(--brand-text)] truncate">{label}</span>
-        <span className="ml-2 t-micro text-[var(--brand-border-hover)]">{flag.key}</span>
+        <span className="ml-2 t-caption-sm font-mono text-[var(--brand-text-muted)]">{flag.key}</span>
       </div>
 
       {/* Source badge */}
       <span
-        className={`t-micro px-1.5 py-0.5 rounded font-medium shrink-0 ${
+        className={`t-caption-sm px-1.5 py-0.5 rounded font-medium shrink-0 ${
           flag.source === 'db'
             ? 'bg-teal-500/10 text-teal-400'
             : flag.source === 'env'

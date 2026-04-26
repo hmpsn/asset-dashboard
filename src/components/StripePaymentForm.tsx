@@ -92,7 +92,7 @@ function PaymentFormInner({ amount, productName, onSuccess, onCancel }: PaymentF
       {/* Error message — preserve red error emphasis for payment safety */}
       {error && (
         <div className="flex items-start gap-2 px-3 py-2.5 rounded-[var(--radius-lg)] bg-red-500/8 border border-red-500/20">
-          <Icon as={AlertTriangle} size="sm" className="text-red-400/80 mt-0.5 flex-shrink-0" />
+          <Icon as={AlertTriangle} size="md" className="text-red-400/80 mt-0.5 flex-shrink-0" />
           <span className="t-caption-sm text-red-300 leading-relaxed">{error}</span>
         </div>
       )}
@@ -116,7 +116,7 @@ function PaymentFormInner({ amount, productName, onSuccess, onCancel }: PaymentF
         disabled={processing}
         className="w-full px-4 py-2 rounded-[var(--radius-xl)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]/50 transition-all flex items-center justify-center gap-1.5"
       >
-        <Icon as={ArrowLeft} size="sm" />
+        <Icon as={ArrowLeft} size="md" />
         Back
       </button>
 
@@ -341,7 +341,7 @@ export function StripePaymentModal({
             <span className="text-lg font-bold tracking-tight text-teal-300">
               {fmt(amount)}
             </span>
-            <span className="t-micro text-[var(--brand-text-muted)]">one-time</span>
+            <span className="t-caption-sm text-[var(--brand-text-muted)]">one-time</span>
           </div>
         </div>
 

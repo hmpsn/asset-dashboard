@@ -100,10 +100,10 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
         <div className="truncate flex-1 text-left">
           <span className={selected ? 'text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)]'}>{selected?.name || 'Select workspace'}</span>
           {selected?.webflowSiteName && (
-            <div className="t-micro text-[var(--brand-text-muted)] truncate leading-tight">{selected.webflowSiteName}</div>
+            <div className="t-caption-sm text-[var(--brand-text-muted)] truncate leading-tight">{selected.webflowSiteName}</div>
           )}
         </div>
-        <Icon as={ChevronDown} size="sm" className={cn('shrink-0 transition-transform', open ? 'rotate-180 text-teal-400' : 'text-[var(--brand-text-muted)]')} />
+        <Icon as={ChevronDown} size="md" className={cn('shrink-0 transition-transform', open ? 'rotate-180 text-teal-400' : 'text-[var(--brand-text-muted)]')} />
       </button>
 
       {open && (

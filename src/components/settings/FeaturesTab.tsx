@@ -76,7 +76,7 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
               </button>
             ))}
           </div>
-          <p className="t-micro text-[var(--brand-border-hover)]">
+          <p className="t-caption-sm text-[var(--brand-text-muted)]">
             Free: limited features &amp; chat • Growth: all features, full chat • Premium: priority support, advanced analytics
           </p>
           {ws?.trialEndsAt && (
@@ -229,7 +229,7 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
                   await patchWorkspace({ onboardingCompleted: false });
                   toast('Onboarding reset — client will see the questionnaire again');
                 }}
-                  className="t-micro text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] px-2 py-1 rounded bg-[var(--surface-3)] border border-[var(--brand-border)] transition-colors">
+                  className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] px-2 py-1 rounded bg-[var(--surface-3)] border border-[var(--brand-border)] transition-colors">
                   Reset
                 </button>
               )}

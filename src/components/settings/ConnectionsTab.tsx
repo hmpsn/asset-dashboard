@@ -114,7 +114,7 @@ export function ConnectionsTab({
             </div>
           ) : googleStatus?.configured ? (
             <button onClick={connectGoogle} className="flex items-center gap-1.5 px-3 py-2 rounded-[var(--radius-lg)] bg-blue-600 hover:bg-blue-500 text-white t-caption font-medium transition-colors">
-              <Icon as={LogIn} size="sm" /> Connect
+              <Icon as={LogIn} size="md" /> Connect
             </button>
           ) : (
             <span className="t-caption-sm text-amber-400 bg-amber-500/10 px-2 py-1 rounded-full">Not configured</span>
@@ -128,7 +128,7 @@ export function ConnectionsTab({
           <div className="px-5 py-4 flex items-center gap-3">
             <Icon as={Search} size="md" className="text-blue-400" />
             <span className="text-sm font-medium flex-1 text-[var(--brand-text-bright)]">Search Console Property</span>
-            {loadingGoogle ? <Icon as={Loader2} size="sm" className="animate-spin text-[var(--brand-text-muted)]" /> : (
+            {loadingGoogle ? <Icon as={Loader2} size="md" className="animate-spin text-[var(--brand-text-muted)]" /> : (
               <SearchableSelect
                 options={gscSites.map(s => ({ value: s.siteUrl, label: s.siteUrl }))}
                 value={ws?.gscPropertyUrl || ''}
@@ -149,7 +149,7 @@ export function ConnectionsTab({
           <div className="px-5 py-4 flex items-center gap-3">
             <Icon as={BarChart3} size="md" className="text-teal-400" />
             <span className="text-sm font-medium flex-1 text-[var(--brand-text-bright)]">GA4 Property</span>
-            {loadingGoogle ? <Icon as={Loader2} size="sm" className="animate-spin text-[var(--brand-text-muted)]" /> : (
+            {loadingGoogle ? <Icon as={Loader2} size="md" className="animate-spin text-[var(--brand-text-muted)]" /> : (
               <SearchableSelect
                 options={ga4Properties.map(p => ({ value: p.propertyId, label: p.displayName }))}
                 value={ws?.ga4PropertyId || ''}

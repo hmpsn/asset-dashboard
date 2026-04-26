@@ -315,7 +315,7 @@ export function StripeSettings() {
                   return (
                     <div key={product.productType}>
                       {showGroupHeader && (
-                        <div className={`t-micro mt-3 mb-1.5 flex items-center gap-2 ${
+                        <div className={`t-caption-sm uppercase tracking-wider font-medium mt-3 mb-1.5 flex items-center gap-2 ${
                           product.recurring ? 'text-teal-400' : 'text-[var(--brand-text-muted)]'
                         }`}>
                           {product.group}
@@ -343,7 +343,7 @@ export function StripeSettings() {
                             disabled={!product.enabled}
                             className="w-full px-1 py-0.5 rounded t-caption-sm text-right bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500/50 disabled:opacity-30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
-                          {product.recurring && <span className="t-micro text-[var(--brand-border-hover)] ml-0.5">/mo</span>}
+                          {product.recurring && <span className="t-caption-sm text-[var(--brand-text-muted)] ml-0.5">/mo</span>}
                         </div>
                         <input
                           type="text"

@@ -28,14 +28,14 @@ function RevenueChart({ months }: { months: RevenueSummary['months'] }) {
     <div className="flex items-end gap-1.5 h-32">
       {months.map((m, i) => (
         <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative">
-          <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded px-2 py-1 t-micro whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+          <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded px-2 py-1 t-caption-sm whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
             {m.month}: {fmtCents(m.revenue)} ({m.count})
           </div>
           <div
             className="w-full rounded-t bg-teal-500/60 hover:bg-teal-400/70 transition-colors min-h-[2px]"
             style={{ height: `${Math.max((m.revenue / maxRevenue) * 100, 2)}%` }}
           />
-          <span className="t-micro text-[var(--brand-border-hover)] truncate w-full text-center">{m.month.split(' ')[0]}</span>
+          <span className="t-caption-sm text-[var(--brand-text-muted)] truncate w-full text-center">{m.month.split(' ')[0]}</span>
         </div>
       ))}
     </div>

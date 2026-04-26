@@ -44,7 +44,7 @@ export function PredictionShowcaseCard({ predictions }: PredictionShowcaseCardPr
         {items.map((p) => (
           <div
             key={p.actionId}
-            className="bg-teal-500/5 border border-teal-500/10 rounded-xl p-4 space-y-2"
+            className="bg-teal-500/5 border border-teal-500/10 rounded-[var(--radius-xl)] p-4 space-y-2"
           >
             {/* What we predicted */}
             <div className="flex items-start gap-2">

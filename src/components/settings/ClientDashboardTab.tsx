@@ -262,12 +262,12 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
               style={copiedLink ? { backgroundColor: 'rgba(52,211,153,0.1)', color: '#34d399', border: '1px solid rgba(52,211,153,0.2)' }
                 : { backgroundColor: themeColor('#18181b', '#ffffff'), color: themeColor('#a1a1aa', '#64748b'), border: `1px solid ${themeColor('#27272a', '#e2e8f0')}` }}>
               {copiedLink
-                ? <><Icon as={CheckCircle} size="sm" /> Copied!</>
-                : <><Icon as={Copy} size="sm" /> Copy</>}
+                ? <><Icon as={CheckCircle} size="md" /> Copied!</>
+                : <><Icon as={Copy} size="md" /> Copy</>}
             </button>
             <a href={`/client/${workspaceId}`} target="_blank" rel="noopener noreferrer"
               className="flex items-center gap-1.5 px-3 py-2 rounded-[var(--radius-lg)] t-caption font-medium transition-colors bg-teal-500/10 text-teal-400 border border-teal-500/20">
-              <Icon as={ExternalLink} size="sm" /> Open <Icon as={ChevronRight} size="xs" />
+              <Icon as={ExternalLink} size="md" /> Open <Icon as={ChevronRight} size="xs" />
             </a>
           </div>
           {/* Password */}
@@ -301,7 +301,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
               </button>
               <button onClick={() => { setEditingPassword(false); setNewPassword(''); }}
                 className="p-2 rounded-[var(--radius-lg)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)] transition-colors">
-                <Icon as={X} size="sm" />
+                <Icon as={X} size="md" />
               </button>
             </div>
           )}
@@ -419,10 +419,10 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                         <input value={editUserEmail} onChange={e => setEditUserEmail(e.target.value)} placeholder="Email"
                           className={`flex-1 ${inputClass} py-1.5`} />
                         <button onClick={() => saveEditUser(user.id)} className="text-emerald-400 hover:text-emerald-300">
-                          <Icon as={Check} size="sm" />
+                          <Icon as={Check} size="md" />
                         </button>
                         <button onClick={() => setEditingUserId(null)} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]">
-                          <Icon as={X} size="sm" />
+                          <Icon as={X} size="md" />
                         </button>
                       </div>
                     ) : (
@@ -651,7 +651,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                 {/* Groups */}
                 <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)]/50 p-3">
                   <div className="flex items-center gap-2 mb-2">
-                    <Icon as={Palette} size="sm" className="text-teal-400" />
+                    <Icon as={Palette} size="md" className="text-teal-400" />
                     <span className="t-caption font-medium text-[var(--brand-text-bright)]">Event Groups</span>
                     <span className="t-caption-sm text-[var(--brand-text-muted)] ml-auto">{localGroups.length} groups</span>
                   </div>
@@ -758,8 +758,8 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                       <div key={ev.eventName} className={`flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] transition-colors ${pinned ? 'bg-teal-500/10 border border-teal-500/20' : 'hover:bg-white/5'}`}>
                         <button onClick={() => togglePin(ev.eventName)} className="shrink-0" title={pinned ? 'Unpin' : 'Pin'}>
                           {pinned
-                            ? <Icon as={Pin} size="sm" className="text-teal-400" />
-                            : <Icon as={PinOff} size="sm" className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]" />}
+                            ? <Icon as={Pin} size="md" className="text-teal-400" />
+                            : <Icon as={PinOff} size="md" className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]" />}
                         </button>
                         <div className="flex-1 min-w-0">
                           {isEditing ? (
@@ -767,8 +767,8 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                               <input autoFocus value={editingDisplayName} onChange={e => setEditingDisplayName(e.target.value)}
                                 onKeyDown={e => { if (e.key === 'Enter') updateDisplayName(ev.eventName, editingDisplayName); if (e.key === 'Escape') setEditingEventName(null); }}
                                 className={`flex-1 ${inputClass} py-1`} />
-                              <button onClick={() => updateDisplayName(ev.eventName, editingDisplayName)} className="text-emerald-400 hover:text-emerald-300"><Icon as={Check} size="sm" /></button>
-                              <button onClick={() => setEditingEventName(null)} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"><Icon as={X} size="sm" /></button>
+                              <button onClick={() => updateDisplayName(ev.eventName, editingDisplayName)} className="text-emerald-400 hover:text-emerald-300"><Icon as={Check} size="md" /></button>
+                              <button onClick={() => setEditingEventName(null)} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"><Icon as={X} size="md" /></button>
                             </div>
                           ) : (
                             <div className="flex items-center gap-1.5">
