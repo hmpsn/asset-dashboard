@@ -113,7 +113,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
         onClick={() => setOpen(true)}
         className={cn('fixed bottom-6 left-6 flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border)]/50 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] text-xs font-medium shadow-lg transition-all z-40 backdrop-blur-sm', chatExpanded ? 'sm:flex hidden' : '')}
       >
-        <Icon as={MessageSquarePlus} size="sm" />
+        <Icon as={MessageSquarePlus} size="md" />
         Feedback
         {unreadCount > 0 && (
           <span className="w-4 h-4 rounded-full bg-teal-500 text-[9px] font-bold text-white flex items-center justify-center">{unreadCount}</span>
@@ -256,7 +256,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
                   </button>
 
                   {isExpanded && (
-                    <div className="px-3 pb-3 border-t border-zinc-800">
+                    <div className="px-3 pb-3 border-t border-[var(--brand-border)]">
                       <p className="t-caption-sm text-[var(--brand-text)] mt-2 leading-relaxed">{item.description}</p>
 
                       {/* Replies */}

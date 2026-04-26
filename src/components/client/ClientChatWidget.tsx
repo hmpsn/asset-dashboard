@@ -113,7 +113,7 @@ export function ClientChatWidget({
                   title="New conversation"
                   className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] p-1"
                 >
-                  <Icon as={Plus} size="sm" />
+                  <Icon as={Plus} size="md" />
                 </button>
               )}
               <button
@@ -131,7 +131,7 @@ export function ClientChatWidget({
                 title="Chat history"
                 className={cn('p-1', showChatHistory ? 'text-teal-400' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]')}
               >
-                <Icon as={MessageSquare} size="sm" />
+                <Icon as={MessageSquare} size="md" />
               </button>
               <button
                 onClick={() => setChatExpanded(!chatExpanded)}
