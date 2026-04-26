@@ -431,7 +431,7 @@ export function OverviewTab({
             request_resolved: { color: '#34d399', label: 'Done' },
             approval_applied: { color: '#2dd4bf', label: 'Applied' },
             seo_updated: { color: '#fbbf24', label: 'SEO' },
-            images_optimized: { color: '#2dd4bf', label: 'Media' },
+            images_optimized: { color: '#38bdf8', label: 'Media' },
             links_fixed: { color: '#fb923c', label: 'Links' },
             content_updated: { color: '#2dd4bf', label: 'Content' },
           };

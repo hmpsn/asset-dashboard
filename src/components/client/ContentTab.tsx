@@ -181,7 +181,7 @@ export function ContentTab({
     {/* Empty state when no requests yet */}
     {contentRequests.length === 0 && (
       <div className="text-center py-16">
-        <Icon as={FileText} size="md" className="text-[var(--brand-text-faint)] mx-auto mb-3" />
+        <Icon as={FileText} size="2xl" className="text-[var(--brand-text-faint)] mx-auto mb-3" />
         <p className="text-sm font-medium text-[var(--brand-text-muted)]">Your content pipeline is empty</p>
         <p className="text-xs text-[var(--brand-text-muted)] mt-1.5 max-w-sm mx-auto leading-relaxed">
           {effectiveTier === 'free' ? (
@@ -672,7 +672,7 @@ export function ContentTab({
     {/* Declined items (collapsed) */}
     {contentRequests.filter(r => r.status === 'declined').length > 0 && (
       <details className="mt-4">
-        <summary className="text-xs text-[var(--brand-text-muted)] cursor-pointer hover:text-[var(--brand-text-muted)] transition-colors">
+        <summary className="text-xs text-[var(--brand-text-muted)] cursor-pointer hover:text-[var(--brand-text)] transition-colors">
           {contentRequests.filter(r => r.status === 'declined').length} declined topic{contentRequests.filter(r => r.status === 'declined').length > 1 ? 's' : ''}
         </summary>
         <div className="mt-2 space-y-2">

@@ -500,7 +500,7 @@ export function AnalyticsTab({
                         </td>
                         <td className="py-2 pr-3">
                           <button onClick={() => { setExplorerPage(row.pagePath); runExplorer(explorerEvent || undefined, row.pagePath); }}
-                            className="text-xs text-[var(--brand-text)] hover:text-[var(--brand-text)] font-mono truncate max-w-[250px] block">{row.pagePath}</button>
+                            className="text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] font-mono truncate max-w-[250px] block">{row.pagePath}</button>
                         </td>
                         <td className="py-2 pr-3 text-right">
                           <div className="flex items-center justify-end gap-2">
