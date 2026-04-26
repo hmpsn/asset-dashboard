@@ -5,6 +5,7 @@ import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { ErrorBoundary } from './ErrorBoundary';
 import { RedirectManager } from './RedirectManager';
 import { InternalLinks } from './InternalLinks';
+import { Icon, cn } from './ui';
 
 const LinkChecker = lazyWithRetry(() => import('./LinkChecker').then(m => ({ default: m.LinkChecker })));
 
@@ -41,21 +42,16 @@ export function LinksPanel({ siteId, workspaceId }: Props) {
   return (
     <div className="space-y-8">
       {/* Sub-tab bar */}
-      <div className="flex items-center gap-1 border-b border-zinc-800 pb-0">
+      <div className="flex items-center gap-1 border-b border-[var(--brand-border)] pb-0">
         {TABS.map(t => {
-          const Icon = t.icon;
           const active = activeTab === t.id;
           return (
             <button
               key={t.id}
               onClick={() => handleTabChange(t.id)}
-              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px ${
-                active
-                  ? 'border-teal-400 text-teal-300'
-                  : 'border-transparent text-zinc-500 hover:text-zinc-300'
-              }`}
+              className={cn('flex items-center gap-1.5 px-3 py-2 t-caption font-medium border-b-2 transition-colors -mb-px', active ? 'border-teal-400 text-teal-300' : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}
             >
-              <Icon className="w-3.5 h-3.5" />
+              <Icon as={t.icon} size="md" />
               {t.label}
             </button>
           );
@@ -71,7 +67,7 @@ export function LinksPanel({ siteId, workspaceId }: Props) {
       )}
       {activeTab === 'dead-links' && (
         <ErrorBoundary>
-          <Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>}>
+          <Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-full animate-spin border-[var(--brand-border)] border-t-teal-400" /></div>}>
             <LinkChecker siteId={siteId} />
           </Suspense>
         </ErrorBoundary>
