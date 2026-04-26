@@ -1,9 +1,9 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Sparkles, Check, Download, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { Sparkles, Check, Download, ChevronDown, ChevronUp } from 'lucide-react';
 import { identity } from '../../api/brand-engine';
 import type { BrandDeliverable, DeliverableType, DeliverableTier } from '../../../shared/types/brand-engine';
-import { SectionCard, EmptyState, Skeleton } from '../ui';
+import { SectionCard, EmptyState, Skeleton, Icon, Button, cn } from '../ui';
 import { useToast } from '../Toast';
 import { queryKeys } from '../../lib/queryKeys';
 
@@ -120,11 +120,12 @@ function DeliverableCard({ workspaceId, deliverableType, deliverable, onChanged 
       action={
         deliverable ? (
           <span
-            className={`flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+            className={cn(
+              'flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded t-caption font-medium',
               isApproved
                 ? 'bg-teal-500/10 text-teal-400'
                 : 'bg-amber-500/10 text-amber-400'
-            }`}
+            )}
           >
             {isApproved ? 'Approved' : 'Draft'}
           </span>
@@ -135,17 +136,17 @@ function DeliverableCard({ workspaceId, deliverableType, deliverable, onChanged 
         {/* Content preview */}
         {hasContent && (
           <div className="space-y-1">
-            <p className="text-sm text-zinc-300 whitespace-pre-wrap leading-relaxed">{displayContent}{!expanded && showToggle ? '…' : ''}</p>
+            <p className="text-sm text-[var(--brand-text)] whitespace-pre-wrap leading-relaxed">{displayContent}{!expanded && showToggle ? '…' : ''}</p>
             {showToggle && (
               <button
                 type="button"
                 onClick={() => setExpanded(prev => !prev)}
-                className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+                className="flex items-center gap-1 t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
               >
                 {expanded ? (
-                  <><ChevronUp className="w-3.5 h-3.5" /> Show less</>
+                  <><Icon as={ChevronUp} size="md" /> Show less</>
                 ) : (
-                  <><ChevronDown className="w-3.5 h-3.5" /> Show more</>
+                  <><Icon as={ChevronDown} size="md" /> Show more</>
                 )}
               </button>
             )}
@@ -165,59 +166,60 @@ function DeliverableCard({ workspaceId, deliverableType, deliverable, onChanged 
               onChange={e => setRefineInput(e.target.value)}
               disabled={isLoading}
               placeholder="Refinement direction..."
-              className="flex-1 min-w-0 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 disabled:opacity-50"
+              className="flex-1 min-w-0 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-1.5 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40 disabled:opacity-50"
             />
-            <button
+            <Button
               type="submit"
               disabled={!refineInput.trim() || isLoading}
-              className="flex items-center gap-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+              variant="primary"
+              size="sm"
+              icon={Sparkles}
+              loading={refining}
             >
-              {refining ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
               Refine
-            </button>
+            </Button>
           </form>
         )}
 
         {/* Action buttons */}
         <div className="flex items-center gap-2 flex-wrap">
           {!hasContent ? (
-            <button
+            <Button
               type="button"
               onClick={handleGenerate}
               disabled={isLoading}
-              className="flex items-center gap-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+              variant="primary"
+              size="sm"
+              icon={Sparkles}
+              loading={generating}
             >
-              {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
               Generate
-            </button>
+            </Button>
           ) : (
             <>
-              <button
+              <Button
                 type="button"
                 onClick={handleGenerate}
                 disabled={isLoading}
-                className="flex items-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                variant="secondary"
+                size="sm"
+                icon={Sparkles}
+                loading={generating}
               >
-                {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                 Regenerate
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={handleToggleApprove}
                 disabled={isLoading}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${
-                  isApproved
-                    ? 'bg-teal-500/10 text-teal-400 hover:bg-teal-500/20'
-                    : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
-                }`}
+                variant={isApproved ? 'ghost' : 'secondary'}
+                size="sm"
+                icon={Check}
+                loading={approving}
+                className={isApproved ? 'text-teal-400' : ''}
               >
-                {approving ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Check className="w-3.5 h-3.5" />
-                )}
                 {isApproved ? 'Approved' : 'Approve'}
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -240,7 +242,7 @@ function TierSection({ tier, workspaceId, deliverableMap, onChanged }: TierSecti
 
   return (
     <div className="space-y-3">
-      <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+      <h2 className="t-caption font-semibold uppercase tracking-wider text-[var(--brand-text-muted)]">
         {TIER_LABELS[tier]}
       </h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -330,7 +332,7 @@ export function IdentityTab({ workspaceId }: { workspaceId: string }) {
             <Skeleton className="h-4 w-24" />
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
               {TIER_TYPES[tier].map(type => (
-                <Skeleton key={type} className="h-40 rounded-xl" />
+                <Skeleton key={type} className="h-40 rounded-[var(--radius-xl)]" />
               ))}
             </div>
           </div>
@@ -341,7 +343,7 @@ export function IdentityTab({ workspaceId }: { workspaceId: string }) {
 
   if (isError) {
     return (
-      <div className="text-sm text-zinc-500 py-8 text-center">
+      <div className="text-sm text-[var(--brand-text-muted)] py-8 text-center">
         Failed to load brand deliverables.{' '}
         <button
           type="button"
@@ -361,15 +363,17 @@ export function IdentityTab({ workspaceId }: { workspaceId: string }) {
         title="No brand deliverables yet"
         description="Generate your first brand deliverable to start building your identity."
         action={
-          <button
+          <Button
             type="button"
             onClick={handleGenerateMission}
             disabled={generatingMission}
-            className="flex items-center gap-2 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+            variant="primary"
+            size="md"
+            icon={Sparkles}
+            loading={generatingMission}
           >
-            {generatingMission ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
             Generate Mission
-          </button>
+          </Button>
         }
       />
     );
@@ -379,22 +383,20 @@ export function IdentityTab({ workspaceId }: { workspaceId: string }) {
     <div className="space-y-8">
       {/* Top bar */}
       <div className="flex items-center justify-end">
-        <button
+        <Button
           type="button"
           onClick={handleExportAll}
           disabled={approvedCount === 0 || exporting}
-          className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+          variant="secondary"
+          size="sm"
+          icon={Download}
+          loading={exporting}
         >
-          {exporting ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Download className="w-4 h-4" />
-          )}
           Export All
           {approvedCount > 0 && (
-            <span className="ml-1 text-xs text-zinc-500">({approvedCount} approved)</span>
+            <span className="ml-1 t-caption text-[var(--brand-text-muted)]">({approvedCount} approved)</span>
           )}
-        </button>
+        </Button>
       </div>
 
       {/* Tier sections */}

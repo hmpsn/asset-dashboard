@@ -11,7 +11,7 @@ import {
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { usePageEditStates } from '../hooks/usePageEditStates';
-import { StatusBadge } from './ui/StatusBadge';
+import { StatusBadge, Icon, cn } from './ui';
 import { WorkflowStepper, ErrorState, ProgressIndicator, NextStepsCard, TrendBadge } from './ui';
 import { CmsTemplatePanel } from './schema/CmsTemplatePanel';
 import { SchemaPageCard } from './schema/SchemaPageCard';
@@ -565,7 +565,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
   );
 
   const schemaTabBar = (
-    <div className="flex items-center gap-1 border-b border-zinc-800 pb-0 mb-4">
+    <div className="flex items-center gap-1 border-b border-[var(--brand-border)] pb-0 mb-4">
       {([
         { id: 'generator' as SchemaSubTab, label: 'Generator', icon: Sparkles },
         { id: 'guide' as SchemaSubTab, label: 'Workflow Guide', icon: BookOpen },
@@ -573,13 +573,14 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
         <button
           key={t.id}
           onClick={() => setSchemaSubTab(t.id)}
-          className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px ${
+          className={cn(
+            'flex items-center gap-1.5 px-3 py-2 t-caption font-medium border-b-2 transition-colors -mb-px',
             schemaSubTab === t.id
               ? 'border-teal-500 text-teal-300'
-              : 'border-transparent text-zinc-500 hover:text-zinc-300'
-          }`}
+              : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'
+          )}
         >
-          <t.icon className="w-3.5 h-3.5" />
+          <Icon as={t.icon} size="sm" />
           {t.label}
         </button>
       ))}
@@ -608,25 +609,25 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
         )}
         <div className="flex flex-col items-center justify-center py-8 gap-4">
           <div className="w-14 h-14 rounded-2xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center">
-            <Sparkles className="w-7 h-7 text-teal-400" />
+            <Icon as={Sparkles} size="xl" className="text-teal-400" />
           </div>
           <div className="text-center space-y-1.5">
-            <p className="text-sm font-medium text-zinc-200">Schema Generator</p>
-            <p className="text-xs text-zinc-500 max-w-sm">Generate optimized JSON-LD structured data. Optionally set page types below for more accurate schemas, then generate.</p>
+            <p className="text-sm font-medium text-[var(--brand-text-bright)]">Schema Generator</p>
+            <p className="t-caption text-[var(--brand-text-muted)] max-w-sm">Generate optimized JSON-LD structured data. Optionally set page types below for more accurate schemas, then generate.</p>
           </div>
           <div className="flex items-center gap-3 mt-2">
             <button
               onClick={runScan}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-[var(--radius-md)] text-sm font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors"
             >
-              <Sparkles className="w-4 h-4" /> Generate All Pages
+              <Icon as={Sparkles} size="md" /> Generate All Pages
             </button>
             <button
               onClick={fetchCmsTemplatePages}
               disabled={loadingCmsPages}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-zinc-800 hover:bg-zinc-700 text-amber-300 border border-amber-500/30 transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-[var(--radius-md)] text-sm font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-amber-300 border border-amber-500/30 transition-colors disabled:opacity-50"
             >
-              {loadingCmsPages ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />} CMS Templates
+              {loadingCmsPages ? <Icon as={Loader2} size="md" className="animate-spin" /> : <Icon as={Database} size="md" />} CMS Templates
             </button>
           </div>
         </div>
@@ -646,27 +647,27 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
           onPublishCmsTemplate={publishCmsTemplate}
         />
         {generatingSingle && (
-          <div className="flex items-center gap-2 px-4 py-2 bg-teal-500/10 border border-teal-500/20 rounded-xl">
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400" />
-            <span className="text-xs text-teal-300">Generating schema for page...</span>
+          <div className="flex items-center gap-2 px-4 py-2 bg-teal-500/10 border border-teal-500/20 rounded-[var(--radius-xl)]">
+            <Icon as={Loader2} size="sm" className="animate-spin text-teal-400" />
+            <span className="t-caption text-teal-300">Generating schema for page...</span>
           </div>
         )}
         {/* Page list with type selectors */}
         {loadingPages ? (
-          <div className="flex items-center justify-center py-6 gap-2 text-zinc-500 text-xs">
-            <Loader2 className="w-4 h-4 animate-spin" /> Loading pages...
+          <div className="flex items-center justify-center py-6 gap-2 text-[var(--brand-text-muted)] t-caption">
+            <Icon as={Loader2} size="md" className="animate-spin" /> Loading pages...
           </div>
         ) : availablePages.length > 0 && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-              <span className="text-xs text-zinc-500">{availablePages.length} pages — set page types for better AI prompts</span>
+              <span className="t-caption text-[var(--brand-text-muted)]">{availablePages.length} pages — set page types for better AI prompts</span>
               <button
                 onClick={() => setShowTypeGuide(v => !v)}
-                className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors"
+                className="flex items-center gap-1 t-micro text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
                 title="Page Type Guide"
               >
-                <HelpCircle className="w-3 h-3" />
+                <Icon as={HelpCircle} size="sm" />
                 Guide
               </button>
             </div>
@@ -675,21 +676,21 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
                 value={pageSearch}
                 onChange={e => setPageSearch(e.target.value)}
                 placeholder="Filter pages..."
-                className="px-3 py-1 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-300 w-48 focus:outline-none focus:border-zinc-600"
+                className="px-3 py-1 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-md)] t-caption text-[var(--brand-text)] w-48 focus:outline-none focus:border-[var(--brand-border-hover)]"
               />
             </div>
             {showTypeGuide && (
-              <div className="bg-zinc-950/50 rounded-lg border border-zinc-800 overflow-hidden max-h-[280px] overflow-y-auto">
+              <div className="bg-[var(--surface-1)]/50 rounded-[var(--radius-md)] border border-[var(--brand-border)] overflow-hidden max-h-[280px] overflow-y-auto">
                 {PAGE_TYPE_OPTIONS.filter(o => o.value !== 'auto').map(opt => {
                   const info = SCHEMA_ROLE_INDEX[opt.value as keyof typeof SCHEMA_ROLE_INDEX];
                   if (!info) return null;
                   return (
-                    <div key={opt.value} className="px-3 py-2 border-b border-zinc-800/50 last:border-b-0">
-                      <span className="text-[11px] font-medium text-zinc-300">{opt.label}</span>
-                      <p className="text-[11px] text-zinc-500 leading-relaxed">{info.description}</p>
+                    <div key={opt.value} className="px-3 py-2 border-b border-[var(--brand-border)]/50 last:border-b-0">
+                      <span className="t-caption-sm font-medium text-[var(--brand-text)]">{opt.label}</span>
+                      <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">{info.description}</p>
                       <div className="flex flex-wrap gap-1 mt-0.5">
                         {info.examples.map((ex: string) => (
-                          <code key={ex} className="text-[9px] text-zinc-600 bg-zinc-800/60 px-1 py-0.5 rounded font-mono">{ex}</code>
+                          <code key={ex} className="t-micro text-[var(--brand-text-muted)] bg-[var(--surface-3)]/60 px-1 py-0.5 rounded font-mono">{ex}</code>
                         ))}
                       </div>
                     </div>
@@ -697,17 +698,17 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
                 })}
               </div>
             )}
-            <div className="bg-zinc-900 border border-zinc-800 overflow-hidden max-h-[400px] overflow-y-auto" style={{ borderRadius: '10px 24px 10px 24px' }}>
+            <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden max-h-[400px] overflow-y-auto" style={{ borderRadius: '10px 24px 10px 24px' }}>
               {filteredInitialPages.map(p => (
-                <div key={p.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-zinc-800/50 last:border-b-0 hover:bg-zinc-800/30 transition-colors">
+                <div key={p.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-[var(--brand-border)]/50 last:border-b-0 hover:bg-[var(--surface-3)]/30 transition-colors">
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs text-zinc-300 truncate">{p.title}</div>
-                    <div className="text-[11px] text-zinc-500 truncate">/{p.slug}</div>
+                    <div className="t-caption text-[var(--brand-text)] truncate">{p.title}</div>
+                    <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">/{p.slug}</div>
                   </div>
                   <select
                     value={pageTypes[p.id] || 'auto'}
                     onChange={e => setPageTypes(prev => ({ ...prev, [p.id]: e.target.value }))}
-                    className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[11px] text-zinc-300 focus:outline-none focus:border-teal-500 cursor-pointer"
+                    className="px-2 py-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption-sm text-[var(--brand-text)] focus:outline-none focus:border-teal-500 cursor-pointer"
                   >
                     {PAGE_TYPE_OPTIONS.map(opt => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -716,9 +717,9 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
                   <button
                     onClick={() => generateSinglePage(p.id)}
                     disabled={generatingSingle === p.id}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] text-teal-300 bg-teal-600/10 border border-teal-500/20 hover:bg-teal-600/20 transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-md)] t-caption-sm text-teal-300 bg-teal-600/10 border border-teal-500/20 hover:bg-teal-600/20 transition-colors disabled:opacity-50"
                   >
-                    {generatingSingle === p.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                    {generatingSingle === p.id ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Sparkles} size="sm" />}
                     Generate
                   </button>
                 </div>
@@ -762,10 +763,10 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3">
         {schemaTabBar}
-        <CheckCircle className="w-8 h-8 text-emerald-400/80" />
-        <p className="text-zinc-400 text-sm">No schema suggestions needed</p>
-        <button onClick={runScan} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors mt-2">
-          <RefreshCw className="w-3 h-3" /> Re-scan
+        <Icon as={CheckCircle} size="2xl" className="text-emerald-400/80" />
+        <p className="text-[var(--brand-text-muted)] text-sm">No schema suggestions needed</p>
+        <button onClick={runScan} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] transition-colors mt-2">
+          <Icon as={RefreshCw} size="sm" /> Re-scan
         </button>
       </div>
     );
@@ -827,9 +828,9 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-zinc-500">
+          <span className="t-caption text-[var(--brand-text-muted)]">
             {data.length} pages · {totalTypes} schema types generated{loading ? ' (so far)' : ''}
-            {snapshotDate && !loading && <span className="text-zinc-500"> · saved {new Date(snapshotDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
+            {snapshotDate && !loading && <span className="text-[var(--brand-text-muted)]"> · saved {new Date(snapshotDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -850,9 +851,9 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
             <button
               onClick={fetchPages}
               disabled={loading || loadingPages}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-[var(--radius-md)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loadingPages ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />} Add Page
+              {loadingPages ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Plus} size="sm" />} Add Page
             </button>
             {showPagePicker && (
               <PagePicker
@@ -866,15 +867,15 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
               />
             )}
           </div>
-          <button onClick={runScan} disabled={loading} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-            <RefreshCw className="w-3 h-3" /> Re-generate All
+          <button onClick={runScan} disabled={loading} className="flex items-center gap-1.5 px-2.5 py-1 rounded-[var(--radius-md)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            <Icon as={RefreshCw} size="sm" /> Re-generate All
           </button>
         </div>
       </div>
       {generatingSingle && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-teal-500/10 border border-teal-500/20 rounded-xl">
-          <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400" />
-          <span className="text-xs text-teal-300">Generating schema for page...</span>
+        <div className="flex items-center gap-2 px-4 py-2 bg-teal-500/10 border border-teal-500/20 rounded-[var(--radius-xl)]">
+          <Icon as={Loader2} size="sm" className="animate-spin text-teal-400" />
+          <span className="t-caption text-teal-300">Generating schema for page...</span>
         </div>
       )}
 
@@ -891,102 +892,102 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
       {/* Summary cards */}
       <div id="schema-suggestions-list" />
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-zinc-900 p-4 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
-          <div className="text-xs text-zinc-500 mb-1">Pages</div>
-          <div className="text-2xl font-bold text-zinc-200">{data.length}</div>
-          <div className="text-xs text-zinc-500">{totalTypes} @graph types total</div>
+        <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)]" style={{ borderRadius: '6px 12px 6px 12px' }}>
+          <div className="t-caption text-[var(--brand-text-muted)] mb-1">Pages</div>
+          <div className="text-2xl font-bold text-[var(--brand-text-bright)]">{data.length}</div>
+          <div className="t-caption text-[var(--brand-text-muted)]">{totalTypes} @graph types total</div>
         </div>
-        <div className="bg-zinc-900 p-4 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
-          <div className="text-xs text-zinc-500 mb-1">Validated</div>
-          <div className={`text-2xl font-bold ${pagesWithErrors > 0 ? 'text-amber-400/80' : 'text-emerald-400/80'}`}>{data.length - pagesWithErrors}/{data.length}</div>
-          <div className="text-xs text-zinc-500">{pagesWithErrors > 0 ? `${pagesWithErrors} with warnings` : 'all passing'}</div>
+        <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)]" style={{ borderRadius: '6px 12px 6px 12px' }}>
+          <div className="t-caption text-[var(--brand-text-muted)] mb-1">Validated</div>
+          <div className={cn('text-2xl font-bold', pagesWithErrors > 0 ? 'text-amber-400/80' : 'text-emerald-400/80')}>{data.length - pagesWithErrors}/{data.length}</div>
+          <div className="t-caption text-[var(--brand-text-muted)]">{pagesWithErrors > 0 ? `${pagesWithErrors} with warnings` : 'all passing'}</div>
         </div>
-        <div className="bg-zinc-900 p-4 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
-          <div className="text-xs text-zinc-500 mb-1">Existing Schemas</div>
+        <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)]" style={{ borderRadius: '6px 12px 6px 12px' }}>
+          <div className="t-caption text-[var(--brand-text-muted)] mb-1">Existing Schemas</div>
           <div className="text-2xl font-bold text-emerald-400/80">{pagesWithExisting}</div>
-          <div className="text-xs text-zinc-500">pages already have JSON-LD</div>
+          <div className="t-caption text-[var(--brand-text-muted)]">pages already have JSON-LD</div>
         </div>
       </div>
 
       {/* Schema Impact Panel (C6) */}
       {impactData && impactData.totalDeployments > 0 && (
-        <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
+        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <button
             onClick={() => setShowImpactDetail(v => !v)}
-            className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/30 transition-colors"
+            className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/30 transition-colors"
           >
             <div className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-teal-400" />
-              <span className="text-xs font-medium text-zinc-200">Schema Impact</span>
-              <span className="text-[10px] text-zinc-500">{impactData.totalDeployments} deployments tracked</span>
+              <Icon as={BarChart3} size="md" className="text-teal-400" />
+              <span className="t-caption font-medium text-[var(--brand-text-bright)]">Schema Impact</span>
+              <span className="t-micro text-[var(--brand-text-muted)]">{impactData.totalDeployments} deployments tracked</span>
             </div>
             <div className="flex items-center gap-3">
               {impactData.avgClicksDelta !== null && (
-                <span className={`text-xs font-medium ${impactData.avgClicksDelta >= 0 ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
+                <span className={cn('t-caption font-medium', impactData.avgClicksDelta >= 0 ? 'text-emerald-400/80' : 'text-red-400/80')}>
                   {impactData.avgClicksDelta >= 0 ? '+' : ''}{impactData.avgClicksDelta} clicks
                 </span>
               )}
               {impactData.avgPositionDelta !== null && (
-                <span className={`text-xs font-medium ${impactData.avgPositionDelta <= 0 ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
+                <span className={cn('t-caption font-medium', impactData.avgPositionDelta <= 0 ? 'text-emerald-400/80' : 'text-red-400/80')}>
                   {impactData.avgPositionDelta <= 0 ? '' : '+'}{impactData.avgPositionDelta} pos
                 </span>
               )}
               {impactData.tooRecent > 0 && (
-                <span className="flex items-center gap-1 text-[10px] text-zinc-500">
-                  <Clock className="w-3 h-3" /> {impactData.tooRecent} pending
+                <span className="flex items-center gap-1 t-micro text-[var(--brand-text-muted)]">
+                  <Icon as={Clock} size="sm" /> {impactData.tooRecent} pending
                 </span>
               )}
             </div>
           </button>
           {showImpactDetail && (
-            <div className="border-t border-zinc-800">
+            <div className="border-t border-[var(--brand-border)]">
               {/* Aggregate stat cards */}
-              <div className="grid grid-cols-4 gap-px bg-zinc-800">
+              <div className="grid grid-cols-4 gap-px bg-[var(--brand-border)]">
                 {[
                   { label: 'Avg Clicks', value: impactData.avgClicksDelta, suffix: '', positive: (v: number) => v >= 0 },
                   { label: 'Avg Impressions', value: impactData.avgImpressionsDelta, suffix: '', positive: (v: number) => v >= 0 },
                   { label: 'Avg CTR', value: impactData.avgCtrDelta, suffix: '%', positive: (v: number) => v >= 0 },
                   { label: 'Avg Position', value: impactData.avgPositionDelta, suffix: '', positive: (v: number) => v <= 0 },
                 ].map(stat => (
-                  <div key={stat.label} className="bg-zinc-900 px-3 py-2.5">
-                    <div className="text-[10px] text-zinc-500">{stat.label}</div>
+                  <div key={stat.label} className="bg-[var(--surface-2)] px-3 py-2.5">
+                    <div className="t-micro text-[var(--brand-text-muted)]">{stat.label}</div>
                     {stat.value !== null ? (
-                      <div className={`text-sm font-bold ${stat.positive(stat.value) ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
+                      <div className={cn('text-sm font-bold', stat.positive(stat.value) ? 'text-emerald-400/80' : 'text-red-400/80')}>
                         {stat.value >= 0 && stat.label !== 'Avg Position' ? '+' : ''}{stat.value}{stat.suffix}
                       </div>
                     ) : (
-                      <div className="text-sm text-zinc-600">—</div>
+                      <div className="text-sm text-[var(--brand-text-muted)]">—</div>
                     )}
                   </div>
                 ))}
               </div>
               {/* Per-deployment list */}
-              <div className="max-h-[240px] overflow-y-auto divide-y divide-zinc-800/50">
+              <div className="max-h-[240px] overflow-y-auto divide-y divide-[var(--brand-border)]/50">
                 {impactData.deployments.map((d: SchemaDeploymentImpact) => (
                   <div key={d.change.id} className="flex items-center gap-3 px-4 py-2">
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs text-zinc-300 truncate">{d.change.pageTitle || d.change.pageSlug || 'Unknown page'}</div>
-                      <div className="text-[10px] text-zinc-600">
+                      <div className="t-caption text-[var(--brand-text)] truncate">{d.change.pageTitle || d.change.pageSlug || 'Unknown page'}</div>
+                      <div className="t-micro text-[var(--brand-text-muted)]">
                         {new Date(d.change.changedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         {' · '}{d.daysSinceChange}d ago
                       </div>
                     </div>
                     {d.tooRecent ? (
-                      <span className="flex items-center gap-1 text-[10px] text-zinc-500"><Clock className="w-3 h-3" /> Too recent</span>
+                      <span className="flex items-center gap-1 t-micro text-[var(--brand-text-muted)]"><Icon as={Clock} size="sm" /> Too recent</span>
                     ) : d.before && d.after ? (
-                      <div className="flex items-center gap-3 text-[11px]">
+                      <div className="flex items-center gap-3 t-caption-sm">
                         <TrendBadge value={d.after.clicks - d.before.clicks} suffix="" showSign label="clicks" hideOnZero={false} />
                         <span className={d.after.position <= d.before.position ? 'text-emerald-400/80' : 'text-red-400/80'}>
                           pos {d.after.position.toFixed(1)}
                         </span>
                       </div>
                     ) : (
-                      <span className="text-[10px] text-zinc-600">No GSC data</span>
+                      <span className="t-micro text-[var(--brand-text-muted)]">No GSC data</span>
                     )}
                   </div>
                 ))}
               </div>
-              <div className="px-4 py-2 border-t border-zinc-800 text-[11px] text-zinc-500">
+              <div className="px-4 py-2 border-t border-[var(--brand-border)] t-caption-sm text-[var(--brand-text-muted)]">
                 Compares 28-day GSC metrics before vs after each schema deployment. Changes &lt; 7 days old are marked pending.
               </div>
             </div>
@@ -996,8 +997,8 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
 
       {/* Edit status summary bar */}
       {summary.total > 0 && (
-        <div className="flex items-center gap-3 text-[11px] text-zinc-500 mb-2">
-          <span className="text-zinc-400 font-medium">{summary.total} tracked</span>
+        <div className="flex items-center gap-3 t-caption-sm text-[var(--brand-text-muted)] mb-2">
+          <span className="text-[var(--brand-text)] font-medium">{summary.total} tracked</span>
           {summary.live > 0 && <><StatusBadge status="live" /><span className="text-teal-400">{summary.live}</span></>}
           {summary.inReview > 0 && <><StatusBadge status="in-review" /><span className="text-blue-400">{summary.inReview}</span></>}
           {summary.approved > 0 && <><StatusBadge status="approved" /><span className="text-emerald-400/80">{summary.approved}</span></>}
@@ -1090,10 +1091,10 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
         })}
       </div>
 
-      <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-blue-500/5 border border-blue-500/10">
-        <Info className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
-        <div className="text-xs text-zinc-400">
-          <strong className="text-zinc-300">How to use:</strong> Each page gets one unified <code className="text-blue-300">@graph</code> schema with cross-referenced types. Click <strong>Publish to Webflow</strong> to inject it directly into the page's <code className="text-blue-300">&lt;head&gt;</code> via the Custom Code API, or <strong>Copy</strong> to paste it manually. Existing custom code on your pages is never touched — only schema scripts are managed.
+      <div className="flex items-start gap-2 px-3 py-2 rounded-[var(--radius-md)] bg-blue-500/5 border border-blue-500/10">
+        <Icon as={Info} size="md" className="text-blue-400 flex-shrink-0 mt-0.5" />
+        <div className="t-caption text-[var(--brand-text-muted)]">
+          <strong className="text-[var(--brand-text-bright)]">How to use:</strong> Each page gets one unified <code className="text-blue-300">@graph</code> schema with cross-referenced types. Click <strong>Publish to Webflow</strong> to inject it directly into the page's <code className="text-blue-300">&lt;head&gt;</code> via the Custom Code API, or <strong>Copy</strong> to paste it manually. Existing custom code on your pages is never touched — only schema scripts are managed.
         </div>
       </div>
     </div>

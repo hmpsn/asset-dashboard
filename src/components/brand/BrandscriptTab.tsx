@@ -7,7 +7,7 @@ import {
 import { brandscripts } from '../../api/brand-engine';
 import { ApiError } from '../../api/client';
 import type { Brandscript, BrandscriptSection, BrandscriptTemplate } from '../../../shared/types/brand-engine';
-import { SectionCard, EmptyState, Skeleton } from '../ui';
+import { SectionCard, EmptyState, Skeleton, Icon, Button, cn } from '../ui';
 import { useToast } from '../Toast';
 import { queryKeys } from '../../lib/queryKeys';
 
@@ -52,24 +52,24 @@ function CreateForm({ workspaceId, templates, onCreated, onCancel }: CreateFormP
     <SectionCard title="New Brandscript">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1">
-          <label htmlFor="bs-name" className="text-xs text-zinc-400">Name</label>
+          <label htmlFor="bs-name" className="t-caption text-[var(--brand-text-muted)]">Name</label>
           <input
             id="bs-name"
             value={name}
             onChange={e => setName(e.target.value)}
             placeholder="e.g. StoryBrand 2024"
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-teal-600"
+            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-600"
             autoFocus
           />
         </div>
 
         <div className="space-y-1">
-          <label htmlFor="bs-framework" className="text-xs text-zinc-400">Framework (optional)</label>
+          <label htmlFor="bs-framework" className="t-caption text-[var(--brand-text-muted)]">Framework (optional)</label>
           <select
             id="bs-framework"
             value={frameworkType}
             onChange={e => setFrameworkType(e.target.value)}
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-teal-600"
+            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-600"
           >
             <option value="">Custom (blank)</option>
             {templates.map(t => (
@@ -79,21 +79,24 @@ function CreateForm({ workspaceId, templates, onCreated, onCancel }: CreateFormP
         </div>
 
         <div className="flex items-center gap-3 pt-1">
-          <button
+          <Button
             type="submit"
             disabled={!name.trim() || submitting}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            variant="primary"
+            size="sm"
+            icon={submitting ? Loader2 : Plus}
+            loading={submitting}
           >
-            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
             Create
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm transition-colors"
+            variant="ghost"
+            size="sm"
           >
             Cancel
-          </button>
+          </Button>
         </div>
       </form>
     </SectionCard>
@@ -135,49 +138,52 @@ function ImportForm({ workspaceId, onImported, onCancel }: ImportFormProps) {
   return (
     <SectionCard title="Import Brandscript">
       <form onSubmit={handleImport} className="space-y-4">
-        <p className="text-xs text-zinc-400">
+        <p className="t-caption text-[var(--brand-text-muted)]">
           Paste existing brandscript copy — sections will be automatically detected.
         </p>
 
         <div className="space-y-1">
-          <label htmlFor="import-name" className="text-xs text-zinc-400">Name (optional)</label>
+          <label htmlFor="import-name" className="t-caption text-[var(--brand-text-muted)]">Name (optional)</label>
           <input
             id="import-name"
             value={name}
             onChange={e => setName(e.target.value)}
             placeholder="e.g. Imported v1"
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-teal-600"
+            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-600"
           />
         </div>
 
         <div className="space-y-1">
-          <label htmlFor="import-raw-text" className="text-xs text-zinc-400">Raw text</label>
+          <label htmlFor="import-raw-text" className="t-caption text-[var(--brand-text-muted)]">Raw text</label>
           <textarea
             id="import-raw-text"
             value={rawText}
             onChange={e => setRawText(e.target.value)}
             placeholder="Paste your brandscript content here..."
             rows={8}
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-teal-600 resize-none font-mono"
+            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-600 resize-none font-mono"
           />
         </div>
 
         <div className="flex items-center gap-3 pt-1">
-          <button
+          <Button
             type="submit"
             disabled={!rawText.trim() || submitting}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            variant="primary"
+            size="sm"
+            icon={submitting ? Loader2 : FileText}
+            loading={submitting}
           >
-            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
             Import
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm transition-colors"
+            variant="ghost"
+            size="sm"
           >
             Cancel
-          </button>
+          </Button>
         </div>
       </form>
     </SectionCard>
@@ -239,50 +245,52 @@ function SectionEditorCard({ section, onSave }: SectionEditorCardProps) {
 
   return (
     // pr-check-disable-next-line -- expandable section editor: the entire header row IS the toggle button, SectionCard title would duplicate it
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] overflow-hidden">
       <button
         type="button"
         onClick={() => setExpanded(v => !v)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors text-left"
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors text-left"
       >
         <div className="flex-1 min-w-0">
-          <span className="text-sm font-semibold text-zinc-200">{section.title}</span>
+          <span className="text-sm font-semibold text-[var(--brand-text-bright)]">{section.title}</span>
           {!expanded && section.content && (
-            <p className="text-xs text-zinc-500 truncate mt-0.5">{section.content}</p>
+            <p className="t-caption text-[var(--brand-text-muted)] truncate mt-0.5">{section.content}</p>
           )}
           {!expanded && !section.content && (
-            <p className="text-xs text-zinc-600 mt-0.5">Empty — click to edit</p>
+            <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">Empty — click to edit</p>
           )}
         </div>
         {expanded ? (
-          <ChevronUp className="w-4 h-4 text-zinc-500 shrink-0 ml-2" />
+          <Icon as={ChevronUp} size="md" className="text-[var(--brand-text-muted)] shrink-0 ml-2" />
         ) : (
-          <ChevronDown className="w-4 h-4 text-zinc-500 shrink-0 ml-2" />
+          <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] shrink-0 ml-2" />
         )}
       </button>
 
       {expanded && (
-        <div className="px-4 pb-4 space-y-3 border-t border-zinc-800">
+        <div className="px-4 pb-4 space-y-3 border-t border-[var(--brand-border)]">
           {section.purpose && (
-            <p className="text-xs text-zinc-400 pt-3 italic">{section.purpose}</p>
+            <p className="t-caption text-[var(--brand-text-muted)] pt-3 italic">{section.purpose}</p>
           )}
           <textarea
             value={content}
             onChange={e => setContent(e.target.value)}
             rows={5}
             placeholder="Enter section content..."
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-teal-600 resize-y"
+            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-600 resize-y"
           />
           <div className="flex justify-end">
-            <button
+            <Button
               type="button"
               onClick={handleSave}
               disabled={saving || !isDirty}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              variant="primary"
+              size="sm"
+              icon={saving ? Loader2 : Save}
+              loading={saving}
             >
-              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
               Save
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -361,14 +369,14 @@ function BrandscriptDetail({ workspaceId, brandscript, onBack, onUpdated }: Bran
           type="button"
           onClick={onBack}
           aria-label="Back to all brandscripts"
-          className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
+          className="t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"
         >
           ← All brandscripts
         </button>
-        <span className="text-zinc-700">/</span>
-        <span className="text-sm font-semibold text-zinc-200 truncate">{brandscript.name}</span>
+        <span className="text-[var(--brand-text-muted)]">/</span>
+        <span className="text-sm font-semibold text-[var(--brand-text-bright)] truncate">{brandscript.name}</span>
         {brandscript.frameworkType && (
-          <span className="text-xs text-zinc-500 bg-zinc-800 rounded px-2 py-0.5">
+          <span className="t-caption text-[var(--brand-text-muted)] bg-[var(--surface-3)] rounded px-2 py-0.5">
             {brandscript.frameworkType}
           </span>
         )}
@@ -376,45 +384,45 @@ function BrandscriptDetail({ workspaceId, brandscript, onBack, onUpdated }: Bran
 
       {/* Mode toggle + AI complete */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-1">
+        <div className={cn('flex items-center gap-1 bg-[var(--surface-3)] rounded-[var(--radius-md)] p-1')}>
           <button
             type="button"
             onClick={() => setMode('edit')}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+            className={cn(
+              'px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors',
               mode === 'edit'
-                ? 'bg-zinc-700 text-zinc-100'
-                : 'text-zinc-400 hover:text-zinc-200'
-            }`}
+                ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)]'
+                : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'
+            )}
           >
             Edit sections
           </button>
           <button
             type="button"
             onClick={() => setMode('import')}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+            className={cn(
+              'px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors',
               mode === 'import'
-                ? 'bg-zinc-700 text-zinc-100'
-                : 'text-zinc-400 hover:text-zinc-200'
-            }`}
+                ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)]'
+                : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'
+            )}
           >
             Import text
           </button>
         </div>
 
         {mode === 'edit' && emptySectionCount > 0 && (
-          <button
+          <Button
             type="button"
             onClick={handleComplete}
             disabled={completing}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            variant="primary"
+            size="sm"
+            icon={completing ? Loader2 : Sparkles}
+            loading={completing}
           >
-            {completing ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Sparkles className="w-4 h-4" />
-            )}
             {completing ? 'Completing…' : `Complete ${emptySectionCount} empty section${emptySectionCount !== 1 ? 's' : ''}`}
-          </button>
+          </Button>
         )}
       </div>
 
@@ -428,7 +436,7 @@ function BrandscriptDetail({ workspaceId, brandscript, onBack, onUpdated }: Bran
       ) : (
         <div className="space-y-3">
           {sections.length === 0 ? (
-            <div className="text-sm text-zinc-500 text-center py-8">
+            <div className="text-sm text-[var(--brand-text-muted)] text-center py-8">
               No sections yet.
             </div>
           ) : (
@@ -493,14 +501,15 @@ function ListView({ workspaceId, items, templates, onSelect, onDeleted, onCreate
           title="No brandscripts yet"
           description="Create a StoryBrand script, a custom brand narrative, or import existing copy."
           action={
-            <button
+            <Button
               type="button"
               onClick={() => setShowCreate(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-sm font-medium transition-all"
+              variant="primary"
+              size="sm"
+              icon={Plus}
             >
-              <Plus className="w-4 h-4" />
               Create Brandscript
-            </button>
+            </Button>
           }
         />
       </div>
@@ -512,14 +521,15 @@ function ListView({ workspaceId, items, templates, onSelect, onDeleted, onCreate
       {/* Toolbar */}
       {!showCreate && (
         <div className="flex justify-end">
-          <button
+          <Button
             type="button"
             onClick={() => setShowCreate(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-sm font-medium transition-all"
+            variant="primary"
+            size="sm"
+            icon={Plus}
           >
-            <Plus className="w-4 h-4" />
             New Brandscript
-          </button>
+          </Button>
         </div>
       )}
 
@@ -540,16 +550,16 @@ function ListView({ workspaceId, items, templates, onSelect, onDeleted, onCreate
             key={bs.id}
             type="button"
             onClick={() => onSelect(bs)}
-            className="w-full text-left bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 hover:border-zinc-700 transition-colors group"
+            className="w-full text-left bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] px-4 py-3 hover:border-[var(--brand-border-hover)] transition-colors group"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center shrink-0">
-                  <BookOpen className="w-4 h-4 text-teal-400" />
+                <div className="w-8 h-8 rounded-[var(--radius-md)] bg-teal-500/10 flex items-center justify-center shrink-0">
+                  <Icon as={BookOpen} size="md" className="text-teal-400" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-zinc-200 truncate">{bs.name}</p>
-                  <p className="text-xs text-zinc-500 mt-0.5">
+                  <p className="text-sm font-semibold text-[var(--brand-text-bright)] truncate">{bs.name}</p>
+                  <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">
                     {bs.frameworkType || 'Custom'} · {bs.sections.length} section{bs.sections.length !== 1 ? 's' : ''}
                   </p>
                 </div>
@@ -559,13 +569,13 @@ function ListView({ workspaceId, items, templates, onSelect, onDeleted, onCreate
                 type="button"
                 onClick={e => handleDelete(e, bs.id)}
                 disabled={deletingId === bs.id}
-                className="shrink-0 text-zinc-600 hover:text-red-400 transition-colors p-1 rounded disabled:opacity-50"
+                className="shrink-0 text-[var(--brand-text-muted)] hover:text-red-400 transition-colors p-1 rounded disabled:opacity-50"
                 aria-label="Delete brandscript"
               >
                 {deletingId === bs.id ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Icon as={Loader2} size="md" className="animate-spin" />
                 ) : (
-                  <Trash2 className="w-4 h-4" />
+                  <Icon as={Trash2} size="md" />
                 )}
               </button>
             </div>
@@ -624,7 +634,7 @@ export function BrandscriptTab({ workspaceId }: Props) {
     return (
       <SectionCard
         title="Brandscript Builder"
-        titleIcon={<BookOpen className="w-4 h-4 text-teal-400" />}
+        titleIcon={<Icon as={BookOpen} size="md" className="text-teal-400" />}
       >
         <div className="space-y-3">
           <Skeleton className="h-14 w-full" />
@@ -638,7 +648,7 @@ export function BrandscriptTab({ workspaceId }: Props) {
   return (
     <SectionCard
       title="Brandscript Builder"
-      titleIcon={<BookOpen className="w-4 h-4 text-teal-400" />}
+      titleIcon={<Icon as={BookOpen} size="md" className="text-teal-400" />}
     >
       {selectedBrandscript ? (
         <BrandscriptDetail

@@ -10,7 +10,7 @@ import type {
   DiscoverySource, DiscoveryExtraction,
   SourceType, ExtractionStatus,
 } from '../../../shared/types/brand-engine';
-import { SectionCard, EmptyState, Skeleton } from '../ui';
+import { SectionCard, EmptyState, Skeleton, Icon, Button, cn } from '../ui';
 import { useToast } from '../Toast';
 
 interface Props {
@@ -49,10 +49,10 @@ function ConfidenceBadge({ confidence }: { confidence: DiscoveryExtraction['conf
   const styles = {
     high: 'bg-teal-500/10 text-teal-400',
     medium: 'bg-amber-500/10 text-amber-400',
-    low: 'bg-zinc-700 text-zinc-400',
+    low: 'bg-[var(--surface-3)] text-[var(--brand-text-muted)]',
   };
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${styles[confidence]}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded t-caption font-medium ${styles[confidence]}`}>
       {confidence}
     </span>
   );
@@ -62,7 +62,7 @@ function ConfidenceBadge({ confidence }: { confidence: DiscoveryExtraction['conf
 
 function SourceTypeBadge({ sourceType }: { sourceType: SourceType }) {
   return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-zinc-700 text-zinc-300">
+    <span className="inline-flex items-center px-2 py-0.5 rounded t-caption font-medium bg-[var(--surface-3)] text-[var(--brand-text)]">
       {SOURCE_TYPE_LABELS[sourceType] ?? sourceType}
     </span>
   );
@@ -104,11 +104,11 @@ function ExtractionCard({ extraction, onUpdate }: ExtractionCardProps) {
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap">
             <ConfidenceBadge confidence={extraction.confidence} />
-            <span className="text-xs text-zinc-500 bg-zinc-800 rounded px-2 py-0.5">
+            <span className="t-caption text-[var(--brand-text-muted)] bg-[var(--surface-3)] rounded px-2 py-0.5">
               {extraction.category.replace(/_/g, ' ')}
             </span>
             {extraction.routedTo && (
-              <span className="text-xs text-teal-400 bg-teal-500/10 rounded px-2 py-0.5">
+              <span className="t-caption text-teal-400 bg-teal-500/10 rounded px-2 py-0.5">
                 → {ROUTED_TO_LABELS[extraction.routedTo] ?? extraction.routedTo}
               </span>
             )}
@@ -117,58 +117,54 @@ function ExtractionCard({ extraction, onUpdate }: ExtractionCardProps) {
           {/* Accept / Dismiss — only show on pending */}
           {extraction.status === 'pending' && (
             <div className="flex items-center gap-2 shrink-0">
-              <button
+              <Button
                 type="button"
                 onClick={handleAccept}
                 disabled={acting !== null}
+                variant="primary"
+                size="sm"
+                icon={CheckCircle}
+                loading={acting === 'accept'}
                 aria-label="Accept extraction"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
-                {acting === 'accept' ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <CheckCircle className="w-3.5 h-3.5" />
-                )}
                 Accept
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={handleDismiss}
                 disabled={acting !== null}
+                variant="secondary"
+                size="sm"
+                icon={XCircle}
+                loading={acting === 'dismiss'}
                 aria-label="Dismiss extraction"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {acting === 'dismiss' ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <XCircle className="w-3.5 h-3.5" />
-                )}
                 Dismiss
-              </button>
+              </Button>
             </div>
           )}
 
           {/* Status indicator for accepted / dismissed */}
           {extraction.status === 'accepted' && (
-            <span className="text-xs text-teal-400 flex items-center gap-1">
-              <CheckCircle className="w-3.5 h-3.5" />
+            <span className="t-caption text-teal-400 flex items-center gap-1">
+              <Icon as={CheckCircle} size="md" />
               Accepted
             </span>
           )}
           {extraction.status === 'dismissed' && (
-            <span className="text-xs text-zinc-500 flex items-center gap-1">
-              <XCircle className="w-3.5 h-3.5" />
+            <span className="t-caption text-[var(--brand-text-muted)] flex items-center gap-1">
+              <Icon as={XCircle} size="md" />
               Dismissed
             </span>
           )}
         </div>
 
         {/* Content */}
-        <p className="text-sm text-zinc-200 leading-relaxed">{extraction.content}</p>
+        <p className="text-sm text-[var(--brand-text)] leading-relaxed">{extraction.content}</p>
 
         {/* Source quote */}
         {extraction.sourceQuote && (
-          <p className="text-xs italic text-zinc-500 border-l-2 border-zinc-700 pl-3">
+          <p className="t-caption italic text-[var(--brand-text-muted)] border-l-2 border-[var(--brand-border)] pl-3">
             "{extraction.sourceQuote}"
           </p>
         )}
@@ -232,15 +228,15 @@ function ExtractionsPanel({ workspaceId, source, onBack }: ExtractionsPanelProps
           type="button"
           onClick={onBack}
           aria-label="Back to sources"
-          className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
+          className="t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
         >
           ← All sources
         </button>
-        <span className="text-zinc-700">/</span>
-        <span className="text-sm font-semibold text-zinc-200 truncate">{source.filename}</span>
+        <span className="text-[var(--brand-border-hover)]">/</span>
+        <span className="text-sm font-semibold text-[var(--brand-text)] truncate">{source.filename}</span>
         <SourceTypeBadge sourceType={source.sourceType} />
         {pendingCount > 0 && (
-          <span className="text-xs text-amber-400 bg-amber-500/10 rounded px-2 py-0.5">
+          <span className="t-caption text-amber-400 bg-amber-500/10 rounded px-2 py-0.5">
             {pendingCount} pending
           </span>
         )}
@@ -248,18 +244,19 @@ function ExtractionsPanel({ workspaceId, source, onBack }: ExtractionsPanelProps
 
       {/* Status filter tabs */}
       <div className="flex items-center gap-2">
-        <Filter className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-        <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-1">
+        <Icon as={Filter} size="md" className="text-[var(--brand-text-muted)] shrink-0" />
+        <div className="flex items-center gap-1 bg-[var(--surface-3)] rounded-[var(--radius-md)] p-1">
           {filters.map(f => (
             <button
               key={f.value}
               type="button"
               onClick={() => setStatusFilter(f.value)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              className={cn(
+                'px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors',
                 statusFilter === f.value
-                  ? 'bg-zinc-700 text-zinc-100'
-                  : 'text-zinc-400 hover:text-zinc-200'
-              }`}
+                  ? 'bg-[var(--surface-2)] text-[var(--brand-text-bright)]'
+                  : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'
+              )}
             >
               {f.label}
             </button>
@@ -338,23 +335,23 @@ function TextPasteForm({ workspaceId, onUploaded, onCancel }: TextPasteFormProps
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1">
-            <label htmlFor="paste-filename" className="text-xs text-zinc-400">Name (optional)</label>
+            <label htmlFor="paste-filename" className="t-caption text-[var(--brand-text-muted)]">Name (optional)</label>
             <input
               id="paste-filename"
               value={filename}
               onChange={e => setFilename(e.target.value)}
               placeholder="e.g. Sales call transcript"
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-teal-600"
+              className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-600"
             />
           </div>
 
           <div className="space-y-1">
-            <label htmlFor="paste-source-type" className="text-xs text-zinc-400">Source type</label>
+            <label htmlFor="paste-source-type" className="t-caption text-[var(--brand-text-muted)]">Source type</label>
             <select
               id="paste-source-type"
               value={sourceType}
               onChange={e => setSourceType(e.target.value as SourceType)}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-teal-600"
+              className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] focus:outline-none focus:border-teal-600"
             >
               {SOURCE_TYPE_OPTIONS.map(o => (
                 <option key={o.value} value={o.value}>{o.label}</option>
@@ -364,33 +361,36 @@ function TextPasteForm({ workspaceId, onUploaded, onCancel }: TextPasteFormProps
         </div>
 
         <div className="space-y-1">
-          <label htmlFor="paste-content" className="text-xs text-zinc-400">Content</label>
+          <label htmlFor="paste-content" className="t-caption text-[var(--brand-text-muted)]">Content</label>
           <textarea
             id="paste-content"
             value={rawContent}
             onChange={e => setRawContent(e.target.value)}
             placeholder="Paste transcript, brand document, competitor copy, or any text to analyze..."
             rows={8}
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-teal-600 resize-none"
+            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-600 resize-none"
           />
         </div>
 
         <div className="flex items-center gap-3 pt-1">
-          <button
+          <Button
             type="submit"
             disabled={!rawContent.trim() || submitting}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            variant="primary"
+            size="md"
+            icon={FileText}
+            loading={submitting}
           >
-            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
             Add Source
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm transition-colors"
+            variant="secondary"
+            size="md"
           >
             Cancel
-          </button>
+          </Button>
         </div>
       </form>
     </SectionCard>
@@ -455,16 +455,16 @@ function UploadZone({ workspaceId, onUploaded, onCancel }: UploadZoneProps) {
   return (
     <SectionCard title="Upload Files">
       <div className="space-y-4">
-        <p className="text-xs text-zinc-400">.txt and .md files only — transcripts, brand documents, etc.</p>
+        <p className="t-caption text-[var(--brand-text-muted)]">.txt and .md files only — transcripts, brand documents, etc.</p>
 
         {/* Source type selector */}
         <div className="space-y-1">
-          <label htmlFor="upload-source-type" className="text-xs text-zinc-400">Source type</label>
+          <label htmlFor="upload-source-type" className="t-caption text-[var(--brand-text-muted)]">Source type</label>
           <select
             id="upload-source-type"
             value={sourceType}
             onChange={e => setSourceType(e.target.value as SourceType)}
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-teal-600"
+            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] focus:outline-none focus:border-teal-600"
           >
             {SOURCE_TYPE_OPTIONS.map(o => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -477,11 +477,12 @@ function UploadZone({ workspaceId, onUploaded, onCancel }: UploadZoneProps) {
           onDragOver={e => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
-          className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center gap-3 transition-colors cursor-pointer ${
+          className={cn(
+            'border-2 border-dashed rounded-[var(--radius-xl)] p-8 flex flex-col items-center justify-center gap-3 transition-colors cursor-pointer',
             dragOver
               ? 'border-teal-500 bg-teal-500/5'
-              : 'border-zinc-700 hover:border-zinc-600'
-          }`}
+              : 'border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]'
+          )}
           onClick={() => fileInputRef.current?.click()}
           role="button"
           aria-label="Drop files here or click to browse"
@@ -491,14 +492,14 @@ function UploadZone({ workspaceId, onUploaded, onCancel }: UploadZoneProps) {
           {uploading ? (
             <Loader2 className="w-8 h-8 text-teal-400 animate-spin" />
           ) : (
-            <Upload className={`w-8 h-8 transition-colors ${dragOver ? 'text-teal-400' : 'text-zinc-600'}`} />
+            <Icon as={Upload} size="2xl" className={cn('transition-colors', dragOver ? 'text-teal-400' : 'text-[var(--brand-text-muted)]')} />
           )}
           <div className="text-center">
-            <p className="text-sm text-zinc-400">
+            <p className="text-sm text-[var(--brand-text-muted)]">
               {uploading ? 'Uploading…' : 'Drop files here'}
             </p>
             {!uploading && (
-              <p className="text-xs text-zinc-600 mt-1">or click to browse</p>
+              <p className="t-caption text-[var(--brand-text-muted)] mt-1">or click to browse</p>
             )}
           </div>
           <input
@@ -513,13 +514,14 @@ function UploadZone({ workspaceId, onUploaded, onCancel }: UploadZoneProps) {
         </div>
 
         <div className="flex justify-end">
-          <button
+          <Button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm transition-colors"
+            variant="secondary"
+            size="md"
           >
             Cancel
-          </button>
+          </Button>
         </div>
       </div>
     </SectionCard>
@@ -548,53 +550,52 @@ function SourceRow({ source, onProcess, onDelete, onViewExtractions, processing,
 
   return (
     // pr-check-disable-next-line -- list item row with inline controls, not a section card
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
       <div className="flex items-center gap-3 min-w-0">
-        <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center shrink-0">
-          <FileText className="w-4 h-4 text-zinc-400" />
+        <div className="w-8 h-8 rounded-[var(--radius-md)] bg-[var(--surface-3)] flex items-center justify-center shrink-0">
+          <Icon as={FileText} size="md" className="text-[var(--brand-text-muted)]" />
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-sm font-medium text-zinc-200 truncate">{source.filename}</p>
+            <p className="text-sm font-medium text-[var(--brand-text)] truncate">{source.filename}</p>
             <SourceTypeBadge sourceType={source.sourceType} />
             {isProcessed && (
-              <span className="text-xs text-teal-400 bg-teal-500/10 rounded px-2 py-0.5">
+              <span className="t-caption text-teal-400 bg-teal-500/10 rounded px-2 py-0.5">
                 Processed
               </span>
             )}
           </div>
-          <p className="text-xs text-zinc-500 mt-0.5">{uploadDate}</p>
+          <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">{uploadDate}</p>
         </div>
       </div>
 
       <div className="flex items-center gap-2 shrink-0">
         {/* View extractions button (if processed) */}
         {isProcessed && (
-          <button
+          <Button
             type="button"
             onClick={() => onViewExtractions(source)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium transition-colors"
+            variant="secondary"
+            size="sm"
+            icon={ChevronDown}
           >
-            <ChevronDown className="w-3.5 h-3.5" />
             Extractions
-          </button>
+          </Button>
         )}
 
         {/* Process button (if not yet processed) */}
         {!isProcessed && (
-          <button
+          <Button
             type="button"
             onClick={() => onProcess(source)}
             disabled={anyProcessing}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            variant="primary"
+            size="sm"
+            icon={Cpu}
+            loading={processing}
           >
-            {processing ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Cpu className="w-3.5 h-3.5" />
-            )}
             {processing ? 'Processing…' : 'Process'}
-          </button>
+          </Button>
         )}
 
         {/* Delete button */}
@@ -603,12 +604,12 @@ function SourceRow({ source, onProcess, onDelete, onViewExtractions, processing,
           onClick={() => onDelete(source)}
           disabled={isDeleting}
           aria-label="Delete source"
-          className="text-zinc-600 hover:text-red-400 transition-colors p-1.5 rounded disabled:opacity-50"
+          className="text-[var(--brand-text-muted)] hover:text-red-400 transition-colors p-1.5 rounded disabled:opacity-50"
         >
           {isDeleting ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <Icon as={Loader2} size="md" className="animate-spin" />
           ) : (
-            <Trash2 className="w-4 h-4" />
+            <Icon as={Trash2} size="md" />
           )}
         </button>
       </div>
@@ -632,22 +633,24 @@ function UploadPanel({ workspaceId, onUploaded, onCancel }: UploadPanelProps) {
   return (
     <div className="space-y-4">
       {/* Mode toggle */}
-      <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-1 w-fit">
+      <div className="flex items-center gap-1 bg-[var(--surface-3)] rounded-[var(--radius-md)] p-1 w-fit">
         <button
           type="button"
           onClick={() => setMode('file')}
-          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-            mode === 'file' ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-400 hover:text-zinc-200'
-          }`}
+          className={cn(
+            'px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors',
+            mode === 'file' ? 'bg-[var(--surface-2)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'
+          )}
         >
           Upload file
         </button>
         <button
           type="button"
           onClick={() => setMode('text')}
-          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-            mode === 'text' ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-400 hover:text-zinc-200'
-          }`}
+          className={cn(
+            'px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors',
+            mode === 'text' ? 'bg-[var(--surface-2)] text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'
+          )}
         >
           Paste text
         </button>
@@ -726,14 +729,15 @@ function SourcesList({ workspaceId, sources, onViewExtractions }: SourcesListPro
           title="No sources yet"
           description="Upload transcripts, brand documents, or competitor copy to extract brand insights."
           action={
-            <button
+            <Button
               type="button"
               onClick={() => setShowUpload(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-sm font-medium transition-all"
+              variant="primary"
+              size="md"
+              icon={Upload}
             >
-              <Upload className="w-4 h-4" />
               Add Source
-            </button>
+            </Button>
           }
         />
       </div>
@@ -745,14 +749,15 @@ function SourcesList({ workspaceId, sources, onViewExtractions }: SourcesListPro
       {/* Toolbar */}
       {!showUpload && (
         <div className="flex justify-end">
-          <button
+          <Button
             type="button"
             onClick={() => setShowUpload(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-sm font-medium transition-all"
+            variant="primary"
+            size="md"
+            icon={Upload}
           >
-            <Upload className="w-4 h-4" />
             Add Source
-          </button>
+          </Button>
         </div>
       )}
 
@@ -804,7 +809,7 @@ export function DiscoveryTab({ workspaceId }: Props) {
     return (
       <SectionCard
         title="Discovery Ingestion"
-        titleIcon={<Cpu className="w-4 h-4 text-teal-400" />}
+        titleIcon={<Icon as={Cpu} size="md" className="text-teal-400" />}
       >
         <div className="space-y-3">
           <Skeleton className="h-14 w-full" />
@@ -818,7 +823,7 @@ export function DiscoveryTab({ workspaceId }: Props) {
   return (
     <SectionCard
       title="Discovery Ingestion"
-      titleIcon={<Cpu className="w-4 h-4 text-teal-400" />}
+      titleIcon={<Icon as={Cpu} size="md" className="text-teal-400" />}
     >
       {syncedSource ? (
         <ExtractionsPanel

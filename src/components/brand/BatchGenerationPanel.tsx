@@ -12,10 +12,7 @@ import {
   useBatchJob,
   useCopyStatus,
 } from '../../hooks/admin/useCopyPipeline';
-import { SectionCard } from '../ui/SectionCard';
-import { Badge } from '../ui/Badge';
-import { SectionCardSkeleton } from '../ui/Skeleton';
-import { EmptyState } from '../ui/EmptyState';
+import { SectionCard, Badge, SectionCardSkeleton, EmptyState, Icon, Button, cn } from '../ui';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { PAGE_TYPE_LABELS } from '../../lib/pageTypeLabels';
 import type { BatchMode, BatchJob } from '../../../shared/types/copy-pipeline';
@@ -51,18 +48,21 @@ function EntryRow({ entry, workspaceId, selected, onToggle }: EntryRowProps) {
   return (
     <button
       onClick={onToggle}
-      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors text-left ${
+      className={cn(
+        'w-full flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-md)] border transition-colors text-left',
         selected
           ? 'bg-teal-900/20 border-teal-700/40 hover:bg-teal-900/30'
-          : 'bg-zinc-800/50 border-zinc-800 hover:bg-zinc-800'
-      }`}
+          : 'bg-[var(--surface-3)]/50 border-[var(--brand-border)] hover:bg-[var(--surface-3)]'
+      )}
       aria-pressed={selected}
       aria-label={`${selected ? 'Deselect' : 'Select'} entry: ${entry.name}`}
     >
-      <CheckIcon
-        className={`w-4 h-4 shrink-0 ${selected ? 'text-teal-400' : 'text-zinc-600'}`}
+      <Icon
+        as={CheckIcon}
+        size="md"
+        className={cn('shrink-0', selected ? 'text-teal-400' : 'text-[var(--brand-text-muted)]')}
       />
-      <span className="flex-1 text-sm text-zinc-200 truncate">{entry.name}</span>
+      <span className="flex-1 text-sm text-[var(--brand-text)] truncate">{entry.name}</span>
       <div className="flex items-center gap-1.5 shrink-0">
         <Badge label={pageTypeLabel} color="zinc" />
         <Badge label={statusConfig.label} color={statusConfig.color} />
@@ -90,7 +90,7 @@ function BatchProgressBar({ job }: BatchProgressProps) {
   };
 
   const statusColor: Record<BatchJob['status'], string> = {
-    pending:  'text-zinc-400',
+    pending:  'text-[var(--brand-text-muted)]',
     running:  'text-blue-400',
     paused:   'text-amber-400',
     complete: 'text-emerald-400',
@@ -99,21 +99,21 @@ function BatchProgressBar({ job }: BatchProgressProps) {
 
   return (
     <div className="space-y-2 pt-1">
-      <div className="flex items-center justify-between text-xs">
+      <div className="flex items-center justify-between t-caption">
         <span className={`font-medium ${statusColor[job.status]}`}>
           {statusLabel[job.status]}
           {job.status === 'running' && (
             <Loader2 className="inline-block ml-1 w-3 h-3 animate-spin" />
           )}
         </span>
-        <span className="text-zinc-400">
+        <span className="text-[var(--brand-text-muted)]">
           {generated}/{total} generated
-          {reviewed > 0 && <span className="ml-2 text-zinc-500">&middot; {reviewed} reviewed</span>}
+          {reviewed > 0 && <span className="ml-2 text-[var(--brand-text-muted)]">&middot; {reviewed} reviewed</span>}
           {approved > 0 && <span className="ml-2 text-emerald-400">&middot; {approved} approved</span>}
         </span>
       </div>
       <div
-        className="h-2 bg-zinc-800 rounded-full overflow-hidden"
+        className="h-2 bg-[var(--surface-3)] rounded-full overflow-hidden"
         role="progressbar"
         aria-valuenow={Math.round(percentage)}
         aria-valuemin={0}
@@ -230,16 +230,16 @@ function BatchGenerationPanelInner({ workspaceId, blueprintId, entries }: Props)
       {/* Entry selection */}
       <SectionCard
         title="Select Pages"
-        titleIcon={<Layers className="w-4 h-4 text-zinc-500" />}
+        titleIcon={<Icon as={Layers} size="md" className="text-[var(--brand-text-muted)]" />}
         titleExtra={
-          <span className="text-xs text-zinc-500">
+          <span className="t-caption text-[var(--brand-text-muted)]">
             {selectedIds.size}/{entries.length} selected
           </span>
         }
         action={
           <button
             onClick={toggleAll}
-            className="text-xs text-teal-400 hover:text-teal-300 transition-colors"
+            className="t-caption text-teal-400 hover:text-teal-300 transition-colors"
             aria-label={allSelected ? 'Deselect all entries' : 'Select all entries'}
           >
             {allSelected ? 'Deselect all' : 'Select all'}
@@ -262,7 +262,7 @@ function BatchGenerationPanelInner({ workspaceId, blueprintId, entries }: Props)
       {/* Mode selector + batch size */}
       <SectionCard
         title="Generation Mode"
-        titleIcon={<InboxIcon className="w-4 h-4 text-zinc-500" />}
+        titleIcon={<Icon as={InboxIcon} size="md" className="text-[var(--brand-text-muted)]" />}
       >
         <div className="space-y-4">
 
@@ -276,32 +276,34 @@ function BatchGenerationPanelInner({ workspaceId, blueprintId, entries }: Props)
               onClick={() => setMode('review_inbox')}
               role="radio"
               aria-checked={mode === 'review_inbox'}
-              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+              className={cn(
+                'flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-[var(--radius-md)] border text-sm font-medium transition-colors',
                 mode === 'review_inbox'
                   ? 'bg-teal-900/20 border-teal-700/40 text-teal-300'
-                  : 'bg-zinc-800/50 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
-              }`}
+                  : 'bg-[var(--surface-3)]/50 border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]'
+              )}
             >
-              <InboxIcon className="w-4 h-4" />
+              <Icon as={InboxIcon} size="md" />
               Review Inbox
             </button>
             <button
               onClick={() => setMode('iterative')}
               role="radio"
               aria-checked={mode === 'iterative'}
-              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+              className={cn(
+                'flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-[var(--radius-md)] border text-sm font-medium transition-colors',
                 mode === 'iterative'
                   ? 'bg-teal-900/20 border-teal-700/40 text-teal-300'
-                  : 'bg-zinc-800/50 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
-              }`}
+                  : 'bg-[var(--surface-3)]/50 border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]'
+              )}
             >
-              <Layers className="w-4 h-4" />
+              <Icon as={Layers} size="md" />
               Iterative Batch
             </button>
           </div>
 
           {/* Mode description */}
-          <p className="text-xs text-zinc-500">
+          <p className="t-caption text-[var(--brand-text-muted)]">
             {mode === 'review_inbox'
               ? 'Generate copy for all selected pages at once and queue them for review in the inbox.'
               : 'Generate pages in small batches, pausing for review and steering between each batch.'}
@@ -310,7 +312,7 @@ function BatchGenerationPanelInner({ workspaceId, blueprintId, entries }: Props)
           {/* Batch size (iterative only) */}
           {mode === 'iterative' && (
             <div className="flex items-center gap-3">
-              <label htmlFor="batch-size-input" className="text-sm text-zinc-300 shrink-0">
+              <label htmlFor="batch-size-input" className="text-sm text-[var(--brand-text)] shrink-0">
                 Batch size
               </label>
               <input
@@ -320,10 +322,10 @@ function BatchGenerationPanelInner({ workspaceId, blueprintId, entries }: Props)
                 max={20}
                 value={batchSize}
                 onChange={e => setBatchSize(Math.max(1, Math.min(20, Number(e.target.value))))}
-                className="w-20 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-100 text-center focus:outline-none focus:border-teal-500"
+                className="w-20 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-1.5 text-sm text-[var(--brand-text-bright)] text-center focus:outline-none focus:border-teal-500"
                 aria-label="Pages per batch"
               />
-              <span className="text-xs text-zinc-500">pages per batch</span>
+              <span className="t-caption text-[var(--brand-text-muted)]">pages per batch</span>
             </div>
           )}
 
@@ -334,14 +336,14 @@ function BatchGenerationPanelInner({ workspaceId, blueprintId, entries }: Props)
       {activeBatchId && (
         <SectionCard
           title="Batch Progress"
-          titleIcon={<Play className="w-4 h-4 text-zinc-500" />}
+          titleIcon={<Icon as={Play} size="md" className="text-[var(--brand-text-muted)]" />}
         >
           {isBatchLoading ? (
             <SectionCardSkeleton lines={2} />
           ) : batchJob ? (
             <BatchProgressBar job={batchJob} />
           ) : (
-            <p className="text-xs text-zinc-500">Waiting for batch status...</p>
+            <p className="t-caption text-[var(--brand-text-muted)]">Waiting for batch status...</p>
           )}
         </SectionCard>
       )}
@@ -349,29 +351,25 @@ function BatchGenerationPanelInner({ workspaceId, blueprintId, entries }: Props)
       {/* Generate button */}
       <div className="flex items-center justify-between pt-1">
         {noneSelected && (
-          <p className="text-xs text-zinc-500" role="alert">
+          <p className="t-caption text-[var(--brand-text-muted)]" role="alert">
             Select at least one page to generate copy.
           </p>
         )}
         <div className="ml-auto">
-          <button
+          <Button
             onClick={handleGenerate}
             disabled={noneSelected || startBatch.isPending}
-            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white text-sm rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+            variant="primary"
+            size="md"
+            icon={Play}
+            loading={startBatch.isPending}
             aria-label={`Generate copy for ${selectedIds.size} selected page${selectedIds.size !== 1 ? 's' : ''}`}
           >
-            {startBatch.isPending ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Starting batch...
-              </>
-            ) : (
-              <>
-                <Play className="w-4 h-4" />
-                Generate{selectedIds.size > 0 ? ` ${selectedIds.size} Page${selectedIds.size !== 1 ? 's' : ''}` : ''}
-              </>
-            )}
-          </button>
+            {startBatch.isPending
+              ? 'Starting batch...'
+              : `Generate${selectedIds.size > 0 ? ` ${selectedIds.size} Page${selectedIds.size !== 1 ? 's' : ''}` : ''}`
+            }
+          </Button>
         </div>
       </div>
 

@@ -6,6 +6,7 @@ import {
   Sparkles, CheckCircle, BarChart3, Globe, Users, Layers,
   ArrowRight, Target, Eye, Zap, TrendingUp, FileText,
 } from 'lucide-react';
+import { Icon } from '../ui';
 
 const STEPS = [
   {
@@ -125,8 +126,8 @@ export function SchemaWorkflowGuide() {
     <div className="space-y-8 max-w-3xl">
       {/* Header */}
       <div className="space-y-2">
-        <h2 className="text-lg font-semibold text-zinc-200">Schema Workflow Guide</h2>
-        <p className="text-sm text-zinc-400">
+        <h2 className="text-lg font-semibold text-[var(--brand-text-bright)]">Schema Workflow Guide</h2>
+        <p className="text-sm text-[var(--brand-text-muted)]">
           Step-by-step process for deploying structured data across a client site — from plan through measurement.
         </p>
       </div>
@@ -134,30 +135,30 @@ export function SchemaWorkflowGuide() {
       {/* Steps */}
       <div className="space-y-3">
         {STEPS.map(step => {
-          const Icon = step.icon;
+          const StepIcon = step.icon;
           return (
             <div key={step.number} className={`border p-5 ${step.bg}`} style={{ borderRadius: '6px 12px 6px 12px' }}>
               <div className="flex items-start gap-3">
-                <div className={`flex items-center justify-center w-8 h-8 rounded-lg bg-zinc-900/60 flex-shrink-0 ${step.color}`}>
-                  <Icon className="w-4 h-4" />
+                <div className={`flex items-center justify-center w-8 h-8 rounded-[var(--radius-md)] bg-[var(--surface-2)]/60 flex-shrink-0 ${step.color}`}>
+                  <Icon as={StepIcon} size="md" />
                 </div>
                 <div className="flex-1 min-w-0 space-y-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Step {step.number}</span>
-                    <h3 className="text-sm font-medium text-zinc-200">{step.title}</h3>
+                    <span className="t-micro font-bold text-[var(--brand-text-muted)] uppercase tracking-wider">Step {step.number}</span>
+                    <h3 className="text-sm font-medium text-[var(--brand-text-bright)]">{step.title}</h3>
                   </div>
-                  <p className="text-xs text-zinc-400 leading-relaxed">{step.description}</p>
+                  <p className="t-caption text-[var(--brand-text-muted)] leading-relaxed">{step.description}</p>
                   <ul className="space-y-1">
                     {step.actions.map((a, i) => (
-                      <li key={i} className="flex items-start gap-2 text-xs text-zinc-300">
-                        <ArrowRight className="w-3 h-3 text-zinc-600 mt-0.5 flex-shrink-0" />
+                      <li key={i} className="flex items-start gap-2 t-caption text-[var(--brand-text)]">
+                        <Icon as={ArrowRight} size="sm" className="text-[var(--brand-text-muted)] mt-0.5 flex-shrink-0" />
                         <span>{a}</span>
                       </li>
                     ))}
                   </ul>
-                  <div className="flex items-start gap-1.5 mt-1 pt-1.5 border-t border-zinc-800/30">
-                    <CheckCircle className="w-3 h-3 text-zinc-600 mt-0.5 flex-shrink-0" />
-                    <span className="text-[11px] text-zinc-500 italic">{step.tip}</span>
+                  <div className="flex items-start gap-1.5 mt-1 pt-1.5 border-t border-[var(--brand-border)]/30">
+                    <Icon as={CheckCircle} size="sm" className="text-[var(--brand-text-muted)] mt-0.5 flex-shrink-0" />
+                    <span className="t-caption-sm text-[var(--brand-text-muted)] italic">{step.tip}</span>
                   </div>
                 </div>
               </div>
@@ -167,21 +168,21 @@ export function SchemaWorkflowGuide() {
       </div>
 
       {/* What happens automatically */}
-      <div className="bg-zinc-900 border border-zinc-800 p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="flex items-center gap-2">
-          <Layers className="w-4 h-4 text-teal-400" />
-          <h3 className="text-sm font-medium text-zinc-200">What Happens Automatically</h3>
+          <Icon as={Layers} size="md" className="text-teal-400" />
+          <h3 className="text-sm font-medium text-[var(--brand-text-bright)]">What Happens Automatically</h3>
         </div>
-        <p className="text-xs text-zinc-400">
+        <p className="t-caption text-[var(--brand-text-muted)]">
           Every time schema is generated, the post-processing pipeline runs 8 steps automatically:
         </p>
         <div className="grid grid-cols-2 gap-2">
           {AUTO_FEATURES.map(f => (
-            <div key={f.label} className="flex items-start gap-2 px-3 py-2 bg-zinc-800/40 rounded-lg">
-              <CheckCircle className="w-3 h-3 text-teal-500 mt-0.5 flex-shrink-0" />
+            <div key={f.label} className="flex items-start gap-2 px-3 py-2 bg-[var(--surface-3)]/40 rounded-[var(--radius-md)]">
+              <Icon as={CheckCircle} size="sm" className="text-teal-500 mt-0.5 flex-shrink-0" />
               <div>
-                <div className="text-[11px] font-medium text-zinc-300">{f.label}</div>
-                <div className="text-[10px] text-zinc-500">{f.desc}</div>
+                <div className="t-caption-sm font-medium text-[var(--brand-text)]">{f.label}</div>
+                <div className="t-micro text-[var(--brand-text-muted)]">{f.desc}</div>
               </div>
             </div>
           ))}
@@ -189,39 +190,39 @@ export function SchemaWorkflowGuide() {
       </div>
 
       {/* Content Pipeline integration */}
-      <div className="bg-zinc-900 border border-zinc-800 p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="flex items-center gap-2">
-          <FileText className="w-4 h-4 text-amber-400" />
-          <h3 className="text-sm font-medium text-zinc-200">Content Pipeline Integration</h3>
+          <Icon as={FileText} size="md" className="text-amber-400" />
+          <h3 className="text-sm font-medium text-[var(--brand-text-bright)]">Content Pipeline Integration</h3>
         </div>
-        <div className="space-y-2 text-xs text-zinc-400">
+        <div className="space-y-2 t-caption text-[var(--brand-text-muted)]">
           <p>If you're using Content Matrices, schema integrates automatically:</p>
           <ul className="space-y-1.5">
             <li className="flex items-start gap-2">
               <span className="text-amber-400 font-bold">1.</span>
-              <span><strong className="text-zinc-300">Templates carry schema types</strong> — A "service" template auto-inherits Service + Offer + BreadcrumbList.</span>
+              <span><strong className="text-[var(--brand-text)]">Templates carry schema types</strong> — A "service" template auto-inherits Service + Offer + BreadcrumbList.</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-amber-400 font-bold">2.</span>
-              <span><strong className="text-zinc-300">Matrix cells inherit</strong> — Each cell shows expected schema type badges from the template.</span>
+              <span><strong className="text-[var(--brand-text)]">Matrix cells inherit</strong> — Each cell shows expected schema type badges from the template.</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-amber-400 font-bold">3.</span>
-              <span><strong className="text-zinc-300">Auto pre-generation</strong> — When a cell reaches "brief generated" or "approved", a schema skeleton is queued automatically.</span>
+              <span><strong className="text-[var(--brand-text)]">Auto pre-generation</strong> — When a cell reaches "brief generated" or "approved", a schema skeleton is queued automatically.</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-amber-400 font-bold">4.</span>
-              <span><strong className="text-zinc-300">Ready on publish</strong> — Pre-generated schema is ready to apply when the page goes live in Webflow.</span>
+              <span><strong className="text-[var(--brand-text)]">Ready on publish</strong> — Pre-generated schema is ready to apply when the page goes live in Webflow.</span>
             </li>
           </ul>
         </div>
       </div>
 
       {/* Typical engagement */}
-      <div className="bg-zinc-900 border border-zinc-800 p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="flex items-center gap-2">
-          <BarChart3 className="w-4 h-4 text-purple-400" />
-          <h3 className="text-sm font-medium text-zinc-200">Typical Client Engagement</h3>
+          <Icon as={BarChart3} size="md" className="text-purple-400" />
+          <h3 className="text-sm font-medium text-[var(--brand-text-bright)]">Typical Client Engagement</h3>
         </div>
         <div className="flex flex-wrap gap-1.5">
           {[
@@ -234,7 +235,7 @@ export function SchemaWorkflowGuide() {
             'Report → Share GSC deltas with client',
             'Maintain → Re-run coverage periodically',
           ].map((step, i) => (
-            <div key={i} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-zinc-800/50 rounded-lg text-[11px] text-zinc-400">
+            <div key={i} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--surface-3)]/50 rounded-[var(--radius-md)] t-caption-sm text-[var(--brand-text-muted)]">
               <span className="text-purple-400 font-bold">{i + 1}.</span>
               {step}
             </div>

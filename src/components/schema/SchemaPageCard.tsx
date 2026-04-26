@@ -9,7 +9,7 @@ import {
   ArrowRight, GitCompareArrows, Pencil, AlertTriangle,
   Loader2, Save, Trash2, Star, History, Clock, ShieldCheck, XCircle,
 } from 'lucide-react';
-import { StatusBadge } from '../ui/StatusBadge';
+import { StatusBadge, Icon, cn } from '../ui';
 import { statusBorderClass, type PageEditStatus } from '../ui/statusConfig';
 import { SchemaEditor } from './SchemaEditor';
 import { SchemaVersionHistory } from './SchemaVersionHistory';
@@ -119,55 +119,55 @@ export function SchemaPageCard({
   const isStale = staleDays !== null && staleDays > 90;
 
   return (
-    <div className={`bg-zinc-900 border overflow-hidden ${statusBorderClass(editState?.status) || (hasErrors ? 'border-amber-500/30' : 'border-zinc-800')}`} style={{ borderRadius: '10px 24px 10px 24px' }}>
+    <div className={cn('bg-[var(--surface-2)] border overflow-hidden', statusBorderClass(editState?.status) || (hasErrors ? 'border-amber-500/30' : 'border-[var(--brand-border)]'))} style={{ borderRadius: '10px 24px 10px 24px' }}>
       <div className="flex items-center gap-3 px-4 py-3">
         <button
           onClick={() => onToggleExpand(page.pageId)}
           className="flex items-center gap-3 flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
         >
-          {isOpen ? <ChevronDown className="w-4 h-4 text-zinc-500 flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-zinc-500 flex-shrink-0" />}
+          {isOpen ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" /> : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />}
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium text-zinc-200 truncate">{page.pageTitle}</div>
-            <div className="text-xs text-zinc-500 truncate">/{page.slug}</div>
+            <div className="text-sm font-medium text-[var(--brand-text-bright)] truncate">{page.pageTitle}</div>
+            <div className="t-caption text-[var(--brand-text-muted)] truncate">/{page.slug}</div>
           </div>
         </button>
         <div className="flex items-center gap-2 flex-shrink-0">
           <StatusBadge status={editState?.status} />
           {page.existingSchemas.length > 0 && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20">
-              <CheckCircle className="w-3 h-3" /> {page.existingSchemas.length} existing
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full t-caption bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20">
+              <Icon as={CheckCircle} size="sm" /> {page.existingSchemas.length} existing
             </span>
           )}
           {graphTypes.length > 0 && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-teal-500/10 text-teal-400 border border-teal-500/20">
-              <Sparkles className="w-3 h-3" /> {graphTypes.length} types
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full t-caption bg-teal-500/10 text-teal-400 border border-teal-500/20">
+              <Icon as={Sparkles} size="sm" /> {graphTypes.length} types
             </span>
           )}
           {eligibleCount > 0 && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20" title={`${eligibleCount} rich result type${eligibleCount > 1 ? 's' : ''} eligible`}>
-              <Star className="w-3 h-3" /> {eligibleCount} rich
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full t-caption bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20" title={`${eligibleCount} rich result type${eligibleCount > 1 ? 's' : ''} eligible`}>
+              <Icon as={Star} size="sm" /> {eligibleCount} rich
             </span>
           )}
           {isStale && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-amber-500/8 text-amber-400/80 border border-amber-500/20" title={`Published ${staleDays} days ago — consider refreshing`}>
-              <Clock className="w-3 h-3" /> {staleDays}d old
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full t-caption bg-amber-500/8 text-amber-400/80 border border-amber-500/20" title={`Published ${staleDays} days ago — consider refreshing`}>
+              <Icon as={Clock} size="sm" /> {staleDays}d old
             </span>
           )}
           {hasErrors && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-amber-500/8 text-amber-400/80 border border-amber-500/20">
-              <AlertCircle className="w-3 h-3" /> {page.validationErrors!.length}
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full t-caption bg-amber-500/8 text-amber-400/80 border border-amber-500/20">
+              <Icon as={AlertCircle} size="sm" /> {page.validationErrors!.length}
             </span>
           )}
           {schemaRecs.length > 0 && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-amber-500/8 text-amber-400/80 border border-amber-500/20">
-              <AlertTriangle className="w-3 h-3" /> {schemaRecs.length} rec{schemaRecs.length > 1 ? 's' : ''}
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full t-caption bg-amber-500/8 text-amber-400/80 border border-amber-500/20">
+              <Icon as={AlertTriangle} size="sm" /> {schemaRecs.length} rec{schemaRecs.length > 1 ? 's' : ''}
             </span>
           )}
           <select
             value={pageType}
             onChange={e => { e.stopPropagation(); onPageTypeChange(page.pageId, e.target.value); }}
             onClick={e => e.stopPropagation()}
-            className="px-1.5 py-1 bg-zinc-800 border border-zinc-700 rounded text-[11px] text-zinc-400 focus:outline-none focus:border-teal-500 cursor-pointer"
+            className="px-1.5 py-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption-sm text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 cursor-pointer"
             title="Page type hint for schema generation"
           >
             <option value="auto">Auto-detect</option>
@@ -199,23 +199,23 @@ export function SchemaPageCard({
           <button
             onClick={(e) => { e.stopPropagation(); onRegenerate(page.pageId); }}
             disabled={isRegenLoading}
-            className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors disabled:opacity-50 text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700"
+            className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption font-medium transition-colors disabled:opacity-50 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)]"
             title="Regenerate schema for this page"
           >
-            {isRegenLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+            {isRegenLoading ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={RefreshCw} size="sm" />}
           </button>
         </div>
       </div>
 
       {isOpen && schema && (
-        <div className="border-t border-zinc-800">
+        <div className="border-t border-[var(--brand-border)]">
           {/* Existing schemas */}
           {page.existingSchemas.length > 0 && (
-            <div className="px-4 py-3 border-b border-zinc-800/50">
-              <div className="text-xs font-medium text-zinc-400 mb-2">Already on page</div>
+            <div className="px-4 py-3 border-b border-[var(--brand-border)]/50">
+              <div className="t-caption font-medium text-[var(--brand-text-muted)] mb-2">Already on page</div>
               <div className="flex flex-wrap gap-1.5">
                 {page.existingSchemas.map((s, i) => (
-                  <span key={i} className="px-2 py-1 rounded-md text-xs font-mono bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20">
+                  <span key={i} className="px-2 py-1 rounded-[var(--radius-md)] t-caption font-mono bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20">
                     {s}
                   </span>
                 ))}
@@ -226,9 +226,9 @@ export function SchemaPageCard({
           {/* Validation errors */}
           {hasErrors && (
             <div className="px-4 py-2 bg-amber-500/5 border-b border-amber-500/20">
-              <div className="text-xs font-medium text-amber-400/80 mb-1">Validation warnings</div>
+              <div className="t-caption font-medium text-amber-400/80 mb-1">Validation warnings</div>
               {page.validationErrors!.map((err, i) => (
-                <div key={i} className="text-[11px] text-amber-300/80">• {err}</div>
+                <div key={i} className="t-caption-sm text-amber-300/80">• {err}</div>
               ))}
             </div>
           )}
@@ -238,21 +238,22 @@ export function SchemaPageCard({
             <div className="px-4 py-2 border-b border-amber-500/20 bg-amber-500/5 space-y-1.5">
               {schemaRecs.map(rec => (
                 <div key={rec.id} className="flex items-start gap-2">
-                  <AlertTriangle className="w-3 h-3 text-amber-400/80 flex-shrink-0 mt-0.5" />
+                  <Icon as={AlertTriangle} size="sm" className="text-amber-400/80 flex-shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
-                    <div className="text-[11px] font-medium text-amber-300">{rec.title}</div>
-                    <div className="text-[11px] text-zinc-400">{rec.insight}</div>
+                    <div className="t-caption-sm font-medium text-amber-300">{rec.title}</div>
+                    <div className="t-caption-sm text-[var(--brand-text-muted)]">{rec.insight}</div>
                     {rec.trafficAtRisk > 0 && (
-                      <div className="text-[10px] text-amber-400/70 mt-0.5">
+                      <div className="t-micro text-amber-400/70 mt-0.5">
                         {rec.trafficAtRisk.toLocaleString()} clicks at risk · {rec.estimatedGain}
                       </div>
                     )}
                   </div>
-                  <span className={`flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                  <span className={cn(
+                    'flex-shrink-0 t-micro px-1.5 py-0.5 rounded font-medium',
                     rec.priority === 'fix_now' ? 'bg-red-500/15 text-red-400/80' :
                     rec.priority === 'fix_soon' ? 'bg-amber-500/15 text-amber-400/80' :
-                    'bg-zinc-500/15 text-zinc-400'
-                  }`}>
+                    'bg-[var(--surface-3)]/15 text-[var(--brand-text-muted)]'
+                  )}>
                     {rec.priority.replace('_', ' ')}
                   </span>
                 </div>
@@ -261,35 +262,35 @@ export function SchemaPageCard({
           )}
 
           {/* Graph types */}
-          <div className="px-4 py-2 border-b border-zinc-800/50">
-            <div className="text-xs font-medium text-zinc-400 mb-1.5">@graph types</div>
+          <div className="px-4 py-2 border-b border-[var(--brand-border)]/50">
+            <div className="t-caption font-medium text-[var(--brand-text-muted)] mb-1.5">@graph types</div>
             <div className="flex flex-wrap gap-1.5">
               {graphTypes.map((t, i) => (
-                <span key={i} className="px-2 py-1 rounded-md text-xs font-mono bg-teal-500/10 text-teal-300 border border-teal-500/20">
+                <span key={i} className="px-2 py-1 rounded-[var(--radius-md)] t-caption font-mono bg-teal-500/10 text-teal-300 border border-teal-500/20">
                   {t}
                 </span>
               ))}
             </div>
-            <p className="text-[11px] text-zinc-500 mt-1.5">{schema.reason}</p>
+            <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1.5">{schema.reason}</p>
           </div>
 
           {/* Rich Results Eligibility */}
           {page.richResultsEligibility && page.richResultsEligibility.length > 0 && (
-            <div className="px-4 py-2 border-b border-zinc-800/50">
+            <div className="px-4 py-2 border-b border-[var(--brand-border)]/50">
               <div className="flex items-center gap-1.5 mb-1.5">
-                <Star className="w-3 h-3 text-amber-400/80" />
-                <div className="text-xs font-medium text-zinc-400">Rich Results</div>
+                <Icon as={Star} size="sm" className="text-amber-400/80" />
+                <div className="t-caption font-medium text-[var(--brand-text-muted)]">Rich Results</div>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {page.richResultsEligibility.map((r, i) => (
                   r.eligible ? (
-                    <span key={i} className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20" title={`Eligible for: ${r.feature}`}>
-                      <CheckCircle className="w-3 h-3 flex-shrink-0" />
+                    <span key={i} className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption-sm bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20" title={`Eligible for: ${r.feature}`}>
+                      <Icon as={CheckCircle} size="sm" className="flex-shrink-0" />
                       {r.type}: {r.feature}
                     </span>
                   ) : (
-                    <span key={i} className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] bg-amber-500/8 text-amber-400/80 border border-amber-500/20" title={`Missing for ${r.feature}: ${r.missingFields?.join(', ')}`}>
-                      <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                    <span key={i} className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption-sm bg-amber-500/8 text-amber-400/80 border border-amber-500/20" title={`Missing for ${r.feature}: ${r.missingFields?.join(', ')}`}>
+                      <Icon as={AlertCircle} size="sm" className="flex-shrink-0" />
                       {r.type}: missing {r.missingFields?.join(', ')}
                     </span>
                   )
@@ -305,13 +306,14 @@ export function SchemaPageCard({
                 {page.existingSchemaJson && page.existingSchemaJson.length > 0 && (
                   <button
                     onClick={() => onToggleDiff(page.pageId)}
-                    className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+                    className={cn(
+                      'flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-md)] t-caption font-medium transition-colors',
                       showDiff
                         ? 'bg-purple-500/15 text-purple-400 border border-purple-500/30'
-                        : 'bg-zinc-800 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-700'
-                    }`}
+                        : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)]'
+                    )}
                   >
-                    <GitCompareArrows className="w-3 h-3" />
+                    <Icon as={GitCompareArrows} size="sm" />
                     {showDiff ? 'Hide Diff' : 'Show Diff'}
                   </button>
                 )}
@@ -319,23 +321,24 @@ export function SchemaPageCard({
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => onToggleSchemaEdit(page.pageId, schema.template)}
-                  className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+                  className={cn(
+                    'flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption font-medium transition-colors',
                     editingSchema
                       ? 'bg-teal-500/15 text-teal-400 border border-teal-500/30'
-                      : 'bg-zinc-800 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-700'
-                  }`}
+                      : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)]'
+                  )}
                 >
-                  <Pencil className="w-3 h-3" />
+                  <Icon as={Pencil} size="sm" />
                   {editingSchema ? 'Done Editing' : 'Edit'}
                 </button>
                 <button
                   onClick={() => onCopyTemplate(schema, page.pageId)}
-                  className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors"
+                  className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
                 >
                   {copiedId === `${page.pageId}-${schema.type}` ? (
-                    <><CheckCircle className="w-3 h-3 text-emerald-400/80" /> Copied</>
+                    <><Icon as={CheckCircle} size="sm" className="text-emerald-400/80" /> Copied</>
                   ) : (
-                    <><Copy className="w-3 h-3" /> Copy</>
+                    <><Icon as={Copy} size="sm" /> Copy</>
                   )}
                 </button>
               </div>
@@ -344,18 +347,18 @@ export function SchemaPageCard({
             {showDiff && page.existingSchemaJson ? (
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <div className="text-[11px] font-medium text-red-400/80 mb-1 flex items-center gap-1">
+                  <div className="t-caption-sm font-medium text-red-400/80 mb-1 flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-red-400/60" /> Current (on page)
                   </div>
-                  <pre className="text-xs font-mono bg-zinc-950 rounded-lg p-3 overflow-x-auto text-zinc-500 border border-red-500/20 max-h-64 overflow-y-auto whitespace-pre-wrap">
+                  <pre className="t-caption font-mono bg-[var(--surface-1)] rounded-[var(--radius-md)] p-3 overflow-x-auto text-[var(--brand-text-muted)] border border-red-500/20 max-h-64 overflow-y-auto whitespace-pre-wrap">
                     {JSON.stringify(page.existingSchemaJson.length === 1 ? page.existingSchemaJson[0] : page.existingSchemaJson, null, 2)}
                   </pre>
                 </div>
                 <div>
-                  <div className="text-[11px] font-medium text-emerald-400/80 mb-1 flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400/60" /> Suggested <ArrowRight className="w-3 h-3" />
+                  <div className="t-caption-sm font-medium text-emerald-400/80 mb-1 flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400/60" /> Suggested <Icon as={ArrowRight} size="sm" />
                   </div>
-                  <pre className="text-xs font-mono bg-zinc-950 rounded-lg p-3 overflow-x-auto text-zinc-400 border border-emerald-500/20 max-h-64 overflow-y-auto whitespace-pre-wrap">
+                  <pre className="t-caption font-mono bg-[var(--surface-1)] rounded-[var(--radius-md)] p-3 overflow-x-auto text-[var(--brand-text-muted)] border border-emerald-500/20 max-h-64 overflow-y-auto whitespace-pre-wrap">
                     {JSON.stringify(schema.template, null, 2)}
                   </pre>
                 </div>
@@ -369,7 +372,7 @@ export function SchemaPageCard({
                 onChange={onSchemaJsonChange}
               />
             ) : (
-              <pre className="text-xs font-mono bg-zinc-950 rounded-lg p-3 overflow-x-auto text-zinc-400 border border-zinc-800 max-h-64 overflow-y-auto">
+              <pre className="t-caption font-mono bg-[var(--surface-1)] rounded-[var(--radius-md)] p-3 overflow-x-auto text-[var(--brand-text-muted)] border border-[var(--brand-border)] max-h-64 overflow-y-auto">
                 {JSON.stringify(getEffectiveSchema(page.pageId, schema.template), null, 2)}
               </pre>
             )}
@@ -378,39 +381,39 @@ export function SchemaPageCard({
             <div className="mt-3 flex items-center gap-2 flex-wrap">
               {/* Validation status badge */}
               {validationStatus === 'valid' && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20">
-                  <ShieldCheck className="w-3 h-3" /> Schema valid
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full t-caption bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20">
+                  <Icon as={ShieldCheck} size="sm" /> Schema valid
                 </span>
               )}
               {validationStatus === 'warnings' && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-amber-500/8 text-amber-400/80 border border-amber-500/20">
-                  <AlertTriangle className="w-3 h-3" /> Warnings
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full t-caption bg-amber-500/8 text-amber-400/80 border border-amber-500/20">
+                  <Icon as={AlertTriangle} size="sm" /> Warnings
                 </span>
               )}
               {validationStatus === 'errors' && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-red-500/8 text-red-400/80 border border-red-500/20" title="Fix errors before publishing">
-                  <XCircle className="w-3 h-3" /> Fix errors to publish
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full t-caption bg-red-500/8 text-red-400/80 border border-red-500/20" title="Fix errors before publishing">
+                  <Icon as={XCircle} size="sm" /> Fix errors to publish
                 </span>
               )}
               {!page.pageId.startsWith('cms-') && (
                 published ? (
-                  <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20">
-                    <CheckCircle className="w-3.5 h-3.5" /> Published to Webflow
+                  <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20">
+                    <Icon as={CheckCircle} size="md" /> Published to Webflow
                   </span>
                 ) : confirmPublish ? (
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-amber-400/80">Publish {editedSchemaJson ? 'edited ' : ''}schema to this page&apos;s &lt;head&gt;?</span>
+                    <span className="t-caption text-amber-400/80">Publish {editedSchemaJson ? 'edited ' : ''}schema to this page&apos;s &lt;head&gt;?</span>
                     <button
                       onClick={() => onPublish(page.pageId, getEffectiveSchema(page.pageId, schema.template))}
                       disabled={publishing || !!schemaParseError || validationStatus === 'errors'}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 bg-emerald-600 hover:bg-emerald-500 text-white"
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors disabled:opacity-50 bg-emerald-600 hover:bg-emerald-500 text-white"
                     >
-                      {publishing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+                      {publishing ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Upload} size="sm" />}
                       Yes, publish
                     </button>
                     <button
                       onClick={() => onConfirmPublish(null)}
-                      className="px-2 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors"
+                      className="px-2 py-1.5 rounded-[var(--radius-md)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] transition-colors"
                     >
                       Cancel
                     </button>
@@ -419,32 +422,32 @@ export function SchemaPageCard({
                   <button
                     onClick={() => onConfirmPublish(page.pageId)}
                     disabled={publishing}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors disabled:opacity-50 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white"
                   >
                     {publishing ? (
-                      <><Loader2 className="w-3 h-3 animate-spin" /> Publishing...</>
+                      <><Icon as={Loader2} size="sm" className="animate-spin" /> Publishing...</>
                     ) : (
-                      <><Upload className="w-3.5 h-3.5" /> Publish to Webflow</>
+                      <><Icon as={Upload} size="md" /> Publish to Webflow</>
                     )}
                   </button>
                 )
               )}
               {isHomepage && (
                 templateSaved ? (
-                  <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20">
-                    <CheckCircle className="w-3.5 h-3.5" /> Template Saved
+                  <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20">
+                    <Icon as={CheckCircle} size="md" /> Template Saved
                   </span>
                 ) : (
                   <button
                     onClick={() => onSaveAsTemplate(page.pageId)}
                     disabled={savingTemplate}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors disabled:opacity-50 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30"
                     title="Save Organization + WebSite nodes as the site-wide template for subpages"
                   >
                     {savingTemplate ? (
-                      <><Loader2 className="w-3 h-3 animate-spin" /> Saving...</>
+                      <><Icon as={Loader2} size="sm" className="animate-spin" /> Saving...</>
                     ) : (
-                      <><Save className="w-3.5 h-3.5" /> Save as Site Template</>
+                      <><Icon as={Save} size="md" /> Save as Site Template</>
                     )}
                   </button>
                 )
@@ -453,35 +456,35 @@ export function SchemaPageCard({
                 <button
                   onClick={() => onRetract(page.pageId)}
                   disabled={retracting}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 bg-red-500/8 hover:bg-red-500/15 text-red-400/80 border border-red-500/30"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors disabled:opacity-50 bg-red-500/8 hover:bg-red-500/15 text-red-400/80 border border-red-500/30"
                 >
-                  {retracting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                  {retracting ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Trash2} size="md" />}
                   Retract
                 </button>
               )}
               {retracted && (
-                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-500/10 text-zinc-400 border border-zinc-500/20">
-                  <Trash2 className="w-3.5 h-3.5" /> Retracted
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-[var(--surface-3)]/10 text-[var(--brand-text-muted)] border border-[var(--brand-border)]/20">
+                  <Icon as={Trash2} size="md" /> Retracted
                 </span>
               )}
               {publishError && (
-                <span className="text-xs text-red-400/80">{publishError}</span>
+                <span className="t-caption text-red-400/80">{publishError}</span>
               )}
               {workspaceId && (
                 sentPage ? (
-                  <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-teal-500/10 text-teal-400 border border-teal-500/20">
-                    <CheckCircle className="w-3.5 h-3.5" /> Sent for Approval
+                  <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-teal-500/10 text-teal-400 border border-teal-500/20">
+                    <Icon as={CheckCircle} size="md" /> Sent for Approval
                   </span>
                 ) : (
                   <button
                     onClick={() => onSendToClient(page)}
                     disabled={sendingPage}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/30"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors disabled:opacity-50 bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/30"
                   >
                     {sendingPage ? (
-                      <><Loader2 className="w-3 h-3 animate-spin" /> Sending...</>
+                      <><Icon as={Loader2} size="sm" className="animate-spin" /> Sending...</>
                     ) : (
-                      <><Send className="w-3.5 h-3.5" /> Send to Client</>
+                      <><Icon as={Send} size="md" /> Send to Client</>
                     )}
                   </button>
                 )
@@ -489,23 +492,24 @@ export function SchemaPageCard({
               {/* Version History toggle */}
               <button
                 onClick={() => setShowHistory(h => !h)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors',
                   showHistory
                     ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
-                    : 'bg-zinc-800 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-700'
-                }`}
+                    : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)]'
+                )}
                 title="View publish version history"
               >
-                <History className="w-3.5 h-3.5" />
+                <Icon as={History} size="md" />
                 History
               </button>
             </div>
 
             {/* Stale schema warning */}
             {isStale && (
-              <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/5 border border-amber-500/20">
-                <Clock className="w-3.5 h-3.5 text-amber-400/80 flex-shrink-0" />
-                <span className="text-[11px] text-amber-300">
+              <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-[var(--radius-md)] bg-amber-500/5 border border-amber-500/20">
+                <Icon as={Clock} size="md" className="text-amber-400/80 flex-shrink-0" />
+                <span className="t-caption-sm text-amber-300">
                   Schema published {staleDays} days ago — consider regenerating to reflect any content changes.
                 </span>
               </div>
@@ -513,9 +517,9 @@ export function SchemaPageCard({
 
             {/* Version history panel */}
             {showHistory && (
-              <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-950 p-3">
-                <div className="text-xs font-medium text-zinc-400 mb-2 flex items-center gap-1.5">
-                  <History className="w-3 h-3" /> Publish History
+              <div className="mt-3 rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-3">
+                <div className="t-caption font-medium text-[var(--brand-text-muted)] mb-2 flex items-center gap-1.5">
+                  <Icon as={History} size="sm" /> Publish History
                 </div>
                 <SchemaVersionHistory
                   siteId={siteId}
