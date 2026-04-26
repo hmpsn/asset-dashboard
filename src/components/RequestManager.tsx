@@ -240,7 +240,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
             ].map(s => (
               <div key={s.label} className="text-center">
                 <div className={cn('text-xl font-bold', s.cls)}>{s.value}</div>
-                <div className="t-micro text-[var(--brand-text-muted)]">{s.label}</div>
+                <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)]">{s.label}</div>
               </div>
             ))}
           </div>
@@ -249,7 +249,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
               <div className="text-lg font-bold text-emerald-400">
                 {Math.round((counts.completed / counts.total) * 100)}%
               </div>
-              <div className="t-micro text-[var(--brand-text-muted)]">Complete</div>
+              <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)]">Complete</div>
             </div>
           )}
         </div>
@@ -313,7 +313,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
           </div>
           <div className="h-4 w-px bg-[var(--brand-border)]" />
           <div className="flex items-center gap-1">
-            <span className="t-micro mr-1 text-[var(--brand-text-muted)]">Set status:</span>
+            <span className="t-caption-sm uppercase tracking-wider mr-1 text-[var(--brand-text-muted)]">Set status:</span>
             {STATUS_OPTIONS.map(s => (
               <button key={s.value} onClick={() => bulkUpdateStatus(s.value)} disabled={bulkUpdating}
                 className={cn('px-2 py-1 rounded t-caption font-medium border transition-colors hover:opacity-90 disabled:opacity-50', s.color)}>
@@ -424,21 +424,21 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                     {/* Controls row */}
                     <div className="px-5 py-3 flex items-center gap-3 flex-wrap border-b border-[var(--brand-border)]">
                       <div>
-                        <label className="t-micro block mb-1 text-[var(--brand-text-muted)]">Status</label>
+                        <label className="t-caption-sm uppercase tracking-wider block mb-1 text-[var(--brand-text-muted)]">Status</label>
                         <select value={req.status} onChange={e => updateRequest(req.id, { status: e.target.value })}
                           className="px-2 py-1 rounded t-caption border border-[var(--brand-border)] text-[var(--brand-text-bright)] bg-[var(--surface-1)]">
                           {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                         </select>
                       </div>
                       <div>
-                        <label className="t-micro block mb-1 text-[var(--brand-text-muted)]">Priority</label>
+                        <label className="t-caption-sm uppercase tracking-wider block mb-1 text-[var(--brand-text-muted)]">Priority</label>
                         <select value={req.priority} onChange={e => updateRequest(req.id, { priority: e.target.value })}
                           className="px-2 py-1 rounded t-caption border border-[var(--brand-border)] text-[var(--brand-text-bright)] bg-[var(--surface-1)]">
                           {PRIORITY_OPTIONS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                         </select>
                       </div>
                       <div>
-                        <label className="t-micro block mb-1 text-[var(--brand-text-muted)]">Category</label>
+                        <label className="t-caption-sm uppercase tracking-wider block mb-1 text-[var(--brand-text-muted)]">Category</label>
                         <select value={req.category} onChange={e => updateRequest(req.id, { category: e.target.value })}
                           className="px-2 py-1 rounded t-caption border border-[var(--brand-border)] text-[var(--brand-text-bright)] bg-[var(--surface-1)]">
                           {Object.entries(CAT_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}

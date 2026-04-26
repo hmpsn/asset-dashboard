@@ -57,7 +57,7 @@ function ContentSection({ data }: ContentSectionProps) {
         {/* Win rate by format */}
         {formatWins.length > 0 ? (
           <div>
-            <p className="t-micro mb-2">Win Rate by Format</p>
+            <p className="t-caption-sm uppercase tracking-wider mb-2">Win Rate by Format</p>
             <div className="space-y-1.5">
               {formatWins.map(({ label, value }) => (
                 <div key={label} className="flex items-center justify-between">
@@ -74,18 +74,18 @@ function ContentSection({ data }: ContentSectionProps) {
         {/* Key metrics */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <p className="t-micro mb-0.5">Avg Days to Page 1</p>
+            <p className="t-caption-sm uppercase tracking-wider mb-0.5">Avg Days to Page 1</p>
             <p className="text-sm font-bold text-[var(--brand-text-bright)]">
               {data.avgDaysToPage1 !== null ? `${data.avgDaysToPage1}d` : '—'}
             </p>
           </div>
           <div>
-            <p className="t-micro mb-0.5">Refresh Recovery Rate</p>
+            <p className="t-caption-sm uppercase tracking-wider mb-0.5">Refresh Recovery Rate</p>
             <p className="text-sm font-bold text-[var(--brand-text-bright)]">{pct(data.refreshRecoveryRate)}</p>
           </div>
           {data.optimalWordCount && (
             <div>
-              <p className="t-micro mb-0.5">Optimal Word Count</p>
+              <p className="t-caption-sm uppercase tracking-wider mb-0.5">Optimal Word Count</p>
               <p className="text-sm font-bold text-[var(--brand-text-bright)]">
                 {data.optimalWordCount.min}–{data.optimalWordCount.max}
               </p>
@@ -93,7 +93,7 @@ function ContentSection({ data }: ContentSectionProps) {
           )}
           {data.voiceScoreCorrelation !== null && (
             <div>
-              <p className="t-micro mb-0.5">Voice Score Correlation</p>
+              <p className="t-caption-sm uppercase tracking-wider mb-0.5">Voice Score Correlation</p>
               <p className="text-sm font-bold text-[var(--brand-text-bright)]">{data.voiceScoreCorrelation > 0 ? '+' : ''}{data.voiceScoreCorrelation.toFixed(1)} pts</p>
             </div>
           )}
@@ -102,7 +102,7 @@ function ContentSection({ data }: ContentSectionProps) {
         {/* Best topics */}
         {data.bestPerformingTopics.length > 0 && (
           <div>
-            <p className="t-micro mb-2">Best Performing Topics</p>
+            <p className="t-caption-sm uppercase tracking-wider mb-2">Best Performing Topics</p>
             <div className="flex flex-wrap gap-1.5">
               {data.bestPerformingTopics.slice(0, 6).map((topic) => (
                 <Badge key={topic} label={topic} color="blue" />
@@ -135,7 +135,7 @@ function StrategySection({ data }: StrategySectionProps) {
         {/* Win rate by difficulty */}
         {difficultyWins.length > 0 ? (
           <div>
-            <p className="t-micro mb-2">Win Rate by Difficulty</p>
+            <p className="t-caption-sm uppercase tracking-wider mb-2">Win Rate by Difficulty</p>
             <div className="space-y-1.5">
               {difficultyWins.map(({ label, value }) => (
                 <div key={label} className="flex items-center justify-between">
@@ -152,7 +152,7 @@ function StrategySection({ data }: StrategySectionProps) {
         {/* Win rate by checkpoint */}
         {checkpointWinRates.length > 0 && (
           <div>
-            <p className="t-micro mb-2">Win Rate by Checkpoint</p>
+            <p className="t-caption-sm uppercase tracking-wider mb-2">Win Rate by Checkpoint</p>
             <div className="space-y-1.5">
               {checkpointWinRates.map(([checkpoint, rate]) => (
                 <div key={checkpoint} className="flex items-center justify-between">
@@ -168,7 +168,7 @@ function StrategySection({ data }: StrategySectionProps) {
         <div className="grid grid-cols-2 gap-3">
           {data.keywordVolumeSweetSpot && (
             <div>
-              <p className="t-micro mb-0.5">Volume Sweet Spot</p>
+              <p className="t-caption-sm uppercase tracking-wider mb-0.5">Volume Sweet Spot</p>
               <p className="text-sm font-bold text-[var(--brand-text-bright)]">
                 {data.keywordVolumeSweetSpot.min.toLocaleString()}–{data.keywordVolumeSweetSpot.max.toLocaleString()}
               </p>
@@ -179,7 +179,7 @@ function StrategySection({ data }: StrategySectionProps) {
         {/* Best intent types */}
         {data.bestIntentTypes.length > 0 && (
           <div>
-            <p className="t-micro mb-2">Best Intent Types</p>
+            <p className="t-caption-sm uppercase tracking-wider mb-2">Best Intent Types</p>
             <div className="flex flex-wrap gap-1.5">
               {data.bestIntentTypes.slice(0, 5).map((intent) => (
                 <Badge key={intent} label={intent} color="blue" />
@@ -209,7 +209,7 @@ function TechnicalSection({ data }: TechnicalSectionProps) {
         {/* Win rate by fix type */}
         {fixTypeWins.length > 0 ? (
           <div>
-            <p className="t-micro mb-2">Win Rate by Fix Type</p>
+            <p className="t-caption-sm uppercase tracking-wider mb-2">Win Rate by Fix Type</p>
             <div className="space-y-1.5">
               {fixTypeWins.map(({ label, value }) => (
                 <div key={label} className="flex items-center justify-between">
@@ -226,11 +226,11 @@ function TechnicalSection({ data }: TechnicalSectionProps) {
         {/* Key metrics */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <p className="t-micro mb-0.5">Avg Health Score Gain</p>
+            <p className="t-caption-sm uppercase tracking-wider mb-0.5">Avg Health Score Gain</p>
             <p className="text-sm font-bold text-[var(--brand-text-bright)]">+{data.avgHealthScoreImprovement.toFixed(1)}</p>
           </div>
           <div>
-            <p className="t-micro mb-0.5">Internal Link Effectiveness</p>
+            <p className="t-caption-sm uppercase tracking-wider mb-0.5">Internal Link Effectiveness</p>
             <p className="text-sm font-bold text-[var(--brand-text-bright)]">{pct(data.internalLinkEffectiveness)}</p>
           </div>
         </div>
@@ -238,7 +238,7 @@ function TechnicalSection({ data }: TechnicalSectionProps) {
         {/* Schema types with rich results */}
         {data.schemaTypesWithRichResults.length > 0 && (
           <div>
-            <p className="t-micro mb-2">Schema Types Driving Rich Results</p>
+            <p className="t-caption-sm uppercase tracking-wider mb-2">Schema Types Driving Rich Results</p>
             <div className="flex flex-wrap gap-1.5">
               {data.schemaTypesWithRichResults.map((type) => (
                 <Badge key={type} label={type} color="blue" />
@@ -327,19 +327,19 @@ export default function OutcomeLearningsPanel({ workspaceId }: Props) {
       >
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div>
-            <p className="t-micro mb-0.5">Win Rate</p>
+            <p className="t-caption-sm uppercase tracking-wider mb-0.5">Win Rate</p>
             <p className="text-xl font-bold text-emerald-400">{pct(overall.totalWinRate)}</p>
           </div>
           <div>
-            <p className="t-micro mb-0.5">Strong Win Rate</p>
+            <p className="t-caption-sm uppercase tracking-wider mb-0.5">Strong Win Rate</p>
             <p className="text-xl font-bold text-[var(--brand-text-bright)]">{pct(overall.strongWinRate)}</p>
           </div>
           <div>
-            <p className="t-micro mb-0.5">Scored Actions</p>
+            <p className="t-caption-sm uppercase tracking-wider mb-0.5">Scored Actions</p>
             <p className="text-xl font-bold text-blue-400">{learnings.totalScoredActions}</p>
           </div>
           <div>
-            <p className="t-micro mb-0.5">Top Action</p>
+            <p className="t-caption-sm uppercase tracking-wider mb-0.5">Top Action</p>
             <p className="text-sm font-bold text-[var(--brand-text-bright)] leading-tight">
               {overall.topActionTypes[0]
                 ? overall.topActionTypes[0].type.replace(/_/g, ' ')

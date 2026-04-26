@@ -118,15 +118,15 @@ function ActionRow({ action }: ActionRowProps) {
           {/* Detail grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <div>
-              <p className="t-micro mb-0.5">Attribution</p>
+              <p className="t-caption-sm uppercase tracking-wider mb-0.5">Attribution</p>
               <p className="text-xs text-[var(--brand-text-bright)]">{action.attribution.replace(/_/g, ' ')}</p>
             </div>
             <div>
-              <p className="t-micro mb-0.5">Window</p>
+              <p className="t-caption-sm uppercase tracking-wider mb-0.5">Window</p>
               <p className="text-xs text-[var(--brand-text-bright)]">{action.measurementWindow}d</p>
             </div>
             <div>
-              <p className="t-micro mb-0.5">Status</p>
+              <p className="t-caption-sm uppercase tracking-wider mb-0.5">Status</p>
               <p className="text-xs text-[var(--brand-text-bright)]">{action.measurementComplete ? 'Complete' : 'In progress'}</p>
             </div>
           </div>
@@ -134,7 +134,7 @@ function ActionRow({ action }: ActionRowProps) {
           {/* Baseline snapshot */}
           {(baseline.position !== undefined || baseline.clicks !== undefined) && (
             <div>
-              <p className="t-micro mb-1.5">Baseline Snapshot</p>
+              <p className="t-caption-sm uppercase tracking-wider mb-1.5">Baseline Snapshot</p>
               <div className="flex flex-wrap gap-3">
                 {baseline.position !== undefined && (
                   <span className="text-xs text-[var(--brand-text)]">Pos: <span className="text-blue-400 font-medium">{baseline.position.toFixed(1)}</span></span>
