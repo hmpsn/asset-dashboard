@@ -188,7 +188,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
                   <div key={i} className="px-3 py-3 bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-left" style={{ borderRadius: 'var(--radius-signature)' }}>
                     <item.icon className="w-4 h-4 text-teal-400 mb-1.5" />
                     <div className="t-caption-sm font-semibold text-[var(--brand-text-bright)]">{item.label}</div>
-                    <div className="t-micro text-[var(--brand-text-muted)]">{item.desc}</div>
+                    <div className="t-caption-sm text-[var(--brand-text-muted)]">{item.desc}</div>
                   </div>
                 ))}
               </div>
@@ -291,7 +291,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
                     <button key={opt.value} onClick={() => setAudience({ ...audience, buyingStage: opt.value })}
                       className={cn('text-left px-3 py-2.5 rounded-xl border transition-all', audience.buyingStage === opt.value ? 'bg-teal-500/10 border-teal-500/30 ring-1 ring-teal-500/20' : 'bg-[var(--surface-3)]/40 border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]')}>
                       <div className={cn('t-caption-sm font-semibold', audience.buyingStage === opt.value ? 'text-teal-300' : 'text-[var(--brand-text)]')}>{opt.label}</div>
-                      <div className="t-micro text-[var(--brand-text-muted)]">{opt.desc}</div>
+                      <div className="t-caption-sm text-[var(--brand-text-muted)]">{opt.desc}</div>
                     </button>
                   ))}
                 </div>
@@ -422,7 +422,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
                 </SummaryCard>
 
                 <SummaryCard icon={Palette} title="Brand Voice" filled={brand.personality.length > 0 || !!brand.tone} onClick={() => setStep('brand')}>
-                  {brand.personality.length > 0 && <div className="flex flex-wrap gap-1">{brand.personality.map(p => <span key={p} className="t-micro px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400">{p}</span>)}</div>}
+                  {brand.personality.length > 0 && <div className="flex flex-wrap gap-1">{brand.personality.map(p => <span key={p} className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400">{p}</span>)}</div>}
                   {brand.tone && <div className="t-caption-sm text-[var(--brand-text)] mt-1 line-clamp-1">{brand.tone}</div>}
                   {!brand.personality.length && !brand.tone && <div className="t-caption-sm text-[var(--brand-text-muted)] italic">Not filled in yet</div>}
                 </SummaryCard>
@@ -492,7 +492,7 @@ function SummaryCard({ icon: Icon, title, filled, onClick, children }: {
           <span className="text-xs font-medium text-[var(--brand-text-bright)]">{title}</span>
           {filled && <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />}
         </div>
-        <span className="t-micro text-[var(--brand-text-muted)] group-hover:text-[var(--brand-text)] transition-colors">Edit →</span>
+        <span className="t-caption-sm text-[var(--brand-text-muted)] group-hover:text-[var(--brand-text)] transition-colors">Edit →</span>
       </div>
       {children}
     </button>

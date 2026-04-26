@@ -94,7 +94,7 @@ export function ClientChatWidget({
               <Icon as={Sparkles} size="md" className="text-teal-400" />
               <span className="text-sm font-medium text-[var(--brand-text-bright)]">Insights Engine</span>
               {!betaMode && chatUsage && chatUsage.tier === 'free' ? (
-                <span className={cn('t-micro px-1.5 py-0.5 rounded font-medium', chatUsage.remaining > 0 ? 'text-[var(--brand-text)] bg-[var(--surface-3)]' : 'text-amber-400/80 bg-amber-500/8 border border-amber-500/20')}>
+                <span className={cn('t-caption-sm px-1.5 py-0.5 rounded font-medium', chatUsage.remaining > 0 ? 'text-[var(--brand-text)] bg-[var(--surface-3)]' : 'text-amber-400/80 bg-amber-500/8 border border-amber-500/20')}>
                   {chatUsage.remaining}/{chatUsage.limit} left
                 </span>
               ) : (
@@ -183,7 +183,7 @@ export function ClientChatWidget({
                     className={cn('w-full text-left px-3 py-2 rounded-lg border transition-colors', s.id === chatSessionId ? 'bg-teal-500/10 border-teal-500/30 text-teal-300' : 'bg-[var(--surface-3)]/50 border-[var(--brand-border)] text-[var(--brand-text)] hover:bg-[var(--surface-3)]')}
                   >
                     <div className="t-caption-sm font-medium truncate">{s.title}</div>
-                    <div className="t-micro text-[var(--brand-text-muted)] mt-0.5">
+                    <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
                       {s.messageCount} messages · {new Date(s.updatedAt).toLocaleDateString()}
                     </div>
                   </button>
@@ -206,7 +206,7 @@ export function ClientChatWidget({
                       ))}
                     </div>
                     <div className="pt-3 border-t border-[var(--brand-border)]/50">
-                      <p className="t-micro text-[var(--brand-text-muted)] mb-2">New to SEO? Ask the AI</p>
+                      <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-2">New to SEO? Ask the AI</p>
                       {LEARN_SEO_QUESTIONS.slice(0, 3).map((q, i) => (
                         <button
                           key={`learn-${i}`}
@@ -262,7 +262,7 @@ export function ClientChatWidget({
                     {/* Show quick questions as follow-ups after proactive greeting */}
                     {chatMessages.length === 1 && chatMessages[0].role === 'assistant' && !chatLoading && (
                       <div className="space-y-1.5 pt-1">
-                        <p className="t-micro text-[var(--brand-text-muted)]">Ask a follow-up</p>
+                        <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)]">Ask a follow-up</p>
                         {QUICK_QUESTIONS.slice(0, 3).map((q, i) => (
                           <button
                             key={i}
@@ -272,7 +272,7 @@ export function ClientChatWidget({
                             {q}
                           </button>
                         ))}
-                        <p className="t-micro text-[var(--brand-text-muted)] mt-3">New to SEO?</p>
+                        <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mt-3">New to SEO?</p>
                         {LEARN_SEO_QUESTIONS.slice(0, 2).map((q, i) => (
                           <button
                             key={`learn-${i}`}
