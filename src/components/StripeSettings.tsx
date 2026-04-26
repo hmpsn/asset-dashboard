@@ -266,7 +266,7 @@ export function StripeSettings() {
                   />
                 </div>
               </div>
-              <p className="t-caption-sm text-[var(--brand-border-hover)] mt-1">Required for inline payment form (Stripe Elements). Found in Stripe Dashboard → API keys.</p>
+              <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">Required for inline payment form (Stripe Elements). Found in Stripe Dashboard → API keys.</p>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -296,7 +296,7 @@ export function StripeSettings() {
             className="flex items-center gap-2 w-full text-left group"
           >
             <div className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Product Price IDs</div>
-            <span className="t-caption-sm text-[var(--brand-border-hover)]">({configuredCount} configured)</span>
+            <span className="t-caption-sm text-[var(--brand-text-muted)]">({configuredCount} configured)</span>
             {productsExpanded
               ? <Icon as={ChevronUp} size="sm" className="text-[var(--brand-text-muted)] ml-auto" />
               : <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text-muted)] ml-auto" />}
@@ -385,7 +385,7 @@ export function StripeSettings() {
         )}
 
         {config?.updatedAt && (
-          <div className="t-caption-sm text-[var(--brand-border-hover)] pt-1">
+          <div className="t-caption-sm text-[var(--brand-text-muted)] pt-1">
             Last updated: {new Date(config.updatedAt).toLocaleString()}
           </div>
         )}

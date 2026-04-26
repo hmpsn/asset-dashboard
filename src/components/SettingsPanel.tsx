@@ -134,7 +134,8 @@ export function SettingsPanel() {
       </div>
 
       {/* Google Account Connection */}
-      <section className="bg-[var(--surface-2)] overflow-hidden border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature)' }}>
+      {/* pr-check-disable-next-line -- hand-rolled section card with inner subsections; mirrors SectionCard brand signature intentionally */}
+      <section className="bg-[var(--surface-2)] overflow-hidden border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
         <div className="px-5 py-4 flex items-center gap-3 border-b border-[var(--brand-border)]">
           <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-blue-500/10 flex items-center justify-center">
             <Icon as={Search} size="md" className="text-blue-400" />
@@ -179,7 +180,8 @@ export function SettingsPanel() {
       </section>
 
       {/* Webflow Connections Overview */}
-      <section className="bg-[var(--surface-2)] overflow-hidden border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature)' }}>
+      {/* pr-check-disable-next-line -- hand-rolled section card with inner subsections; mirrors SectionCard brand signature intentionally */}
+      <section className="bg-[var(--surface-2)] overflow-hidden border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
         <div className="px-5 py-4 border-b border-[var(--brand-border)]">
           <div className="flex items-center gap-2">
             <Icon as={Globe} size="md" className="text-teal-400" />
@@ -216,7 +218,8 @@ export function SettingsPanel() {
       </section>
 
       {/* API Keys */}
-      <section className="bg-[var(--surface-2)] overflow-hidden border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature)' }}>
+      {/* pr-check-disable-next-line -- hand-rolled section card with inner subsections; mirrors SectionCard brand signature intentionally */}
+      <section className="bg-[var(--surface-2)] overflow-hidden border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
         <div className="px-5 py-4 border-b border-[var(--brand-border)]">
           <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">API Keys</h3>
         </div>
@@ -230,7 +233,8 @@ export function SettingsPanel() {
       </section>
 
       {/* Platform Health */}
-      <section className="bg-[var(--surface-2)] overflow-hidden border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature)' }}>
+      {/* pr-check-disable-next-line -- hand-rolled section card with inner subsections; mirrors SectionCard brand signature intentionally */}
+      <section className="bg-[var(--surface-2)] overflow-hidden border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
         <div className="px-5 py-4 border-b border-[var(--brand-border)]">
           <div className="flex items-center gap-2">
             <Icon as={Shield} size="md" className="text-teal-400" />
@@ -279,7 +283,8 @@ export function SettingsPanel() {
       </section>
 
       {/* Storage Monitor */}
-      <section className="bg-[var(--surface-2)] overflow-hidden border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature)' }}>
+      {/* pr-check-disable-next-line -- hand-rolled section card with inner subsections; mirrors SectionCard brand signature intentionally */}
+      <section className="bg-[var(--surface-2)] overflow-hidden border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
         <div className="px-5 py-4 border-b border-[var(--brand-border)] flex items-center gap-3">
           <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-amber-500/8 flex items-center justify-center">
             <Icon as={HardDrive} size="md" className="text-amber-400/80" />
@@ -322,7 +327,7 @@ export function SettingsPanel() {
                     <span className="t-caption text-[var(--brand-text-muted)] flex-1 truncate">{d.label}</span>
                     <span className="t-caption-sm text-[var(--brand-text-muted)] tabular-nums">{d.fileCount} files</span>
                     <span className="t-caption font-medium text-[var(--brand-text)] tabular-nums w-16 text-right">{formatBytes(d.bytes)}</span>
-                    <span className="t-caption-sm text-[var(--brand-border-hover)] tabular-nums w-10 text-right">{pct.toFixed(0)}%</span>
+                    <span className="t-caption-sm text-[var(--brand-text-muted)] tabular-nums w-10 text-right">{pct.toFixed(0)}%</span>
                   </div>
                 );
               })}
@@ -411,7 +416,8 @@ export function SettingsPanel() {
       </section>
 
       {/* Studio Config — Booking URL */}
-      <section className="bg-[var(--surface-2)] overflow-hidden border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature)' }}>
+      {/* pr-check-disable-next-line -- hand-rolled section card with inner subsections; mirrors SectionCard brand signature intentionally */}
+      <section className="bg-[var(--surface-2)] overflow-hidden border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
         <div className="px-5 py-4 flex items-center gap-3 border-b border-[var(--brand-border)]">
           <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-teal-500/10 flex items-center justify-center">
             <Icon as={CalendarDays} size="md" className="text-teal-400" />

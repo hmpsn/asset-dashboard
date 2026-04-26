@@ -168,7 +168,7 @@ export function RevenueDashboard() {
                 <div key={ws.workspaceId} className="flex items-center justify-between">
                   <div>
                     <div className="t-caption text-[var(--brand-text)]">{ws.name}</div>
-                    <div className="t-caption-sm text-[var(--brand-border-hover)]">{ws.count} transactions</div>
+                    <div className="t-caption-sm text-[var(--brand-text-muted)]">{ws.count} transactions</div>
                   </div>
                   <div className="t-caption font-semibold text-teal-400">{fmtCents(ws.revenue)}</div>
                 </div>
@@ -186,7 +186,7 @@ export function RevenueDashboard() {
                 <div key={prod.productType} className="flex items-center justify-between">
                   <div>
                     <div className="t-caption text-[var(--brand-text)]">{fmtProductType(prod.productType)}</div>
-                    <div className="t-caption-sm text-[var(--brand-border-hover)]">{prod.count} sold</div>
+                    <div className="t-caption-sm text-[var(--brand-text-muted)]">{prod.count} sold</div>
                   </div>
                   <div className="t-caption font-semibold text-teal-400">{fmtCents(prod.revenue)}</div>
                 </div>

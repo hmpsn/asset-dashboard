@@ -396,10 +396,10 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
           ) : clientUsers.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 gap-2">
               <div className="w-10 h-10 rounded-[var(--radius-xl)] bg-[var(--surface-3)] flex items-center justify-center">
-                <Icon as={Users} size="lg" className="text-[var(--brand-border-hover)]" />
+                <Icon as={Users} size="lg" className="text-[var(--brand-text-muted)]" />
               </div>
               <p className="t-caption text-[var(--brand-text-muted)]">No client users yet</p>
-              <p className="t-caption-sm text-[var(--brand-border-hover)] max-w-xs text-center">Add individual accounts so clients can log in with their own credentials. Activity will be attributed to each user.</p>
+              <p className="t-caption-sm text-[var(--brand-text-muted)] max-w-xs text-center">Add individual accounts so clients can log in with their own credentials. Activity will be attributed to each user.</p>
             </div>
           ) : (
             <div className="space-y-1">
@@ -436,7 +436,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className="t-caption-sm text-[var(--brand-text-muted)] truncate">{user.email}</span>
                           {user.lastLoginAt && (
-                            <span className="t-caption-sm text-[var(--brand-border-hover)]">Last login {new Date(user.lastLoginAt).toLocaleDateString()}</span>
+                            <span className="t-caption-sm text-[var(--brand-text-muted)]">Last login {new Date(user.lastLoginAt).toLocaleDateString()}</span>
                           )}
                         </div>
                       </div>
@@ -485,7 +485,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
           )}
 
           {clientUsers.length > 0 && (
-            <div className="t-caption-sm text-[var(--brand-border-hover)] pt-1">
+            <div className="t-caption-sm text-[var(--brand-text-muted)] pt-1">
               {clientUsers.length} user{clientUsers.length !== 1 ? 's' : ''} with individual access to this dashboard
             </div>
           )}

@@ -158,7 +158,8 @@ export function FeatureFlagSettings() {
   const flagMap = new Map<string, FlagMeta>(flags?.map(f => [f.key, f]) ?? []);
 
   return (
-    <section className="bg-[var(--surface-2)] overflow-hidden border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature)' }}>
+    // pr-check-disable-next-line -- hand-rolled section card with inner subsections; mirrors SectionCard brand signature intentionally
+    <section className="bg-[var(--surface-2)] overflow-hidden border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
       <div className="px-5 py-4 border-b border-[var(--brand-border)] flex items-center gap-3">
         <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-teal-500/10 flex items-center justify-center">
           <Icon as={Flag} size="md" className="text-teal-400" />
