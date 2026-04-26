@@ -95,7 +95,7 @@ export function SchemaVersionHistory({ siteId, pageId, workspaceId, onRestore }:
                   {date.toLocaleDateString()} {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
                 {isLatest && (
-                  <span className="t-micro px-1.5 py-0.5 rounded bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20">
+                  <span className="t-caption-sm px-1.5 py-0.5 rounded bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20">
                     current
                   </span>
                 )}

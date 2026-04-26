@@ -106,7 +106,7 @@ export function CmsTemplatePanel({
             <div className="mt-3 flex items-center gap-2">
               {cmsPublished ? (
                 <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20">
-                  <Icon as={CheckCircle} size="sm" /> Published to Webflow
+                  <Icon as={CheckCircle} size="md" /> Published to Webflow
                 </span>
               ) : (
                 <Button

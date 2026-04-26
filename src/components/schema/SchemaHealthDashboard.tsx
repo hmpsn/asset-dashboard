@@ -93,7 +93,7 @@ function ValidationRow({ record, onRevalidate }: { record: ValidationRecord; onR
             className="p-1 text-[var(--brand-text-muted)] hover:text-teal-400 transition-colors"
             title="Re-validate"
           >
-            <Icon as={RefreshCw} size="sm" />
+            <Icon as={RefreshCw} size="md" />
           </button>
         </div>
       </div>
@@ -155,15 +155,15 @@ export function SchemaHealthDashboard({ validations, loading, onRevalidate }: Sc
   const statsBar = validations.length > 0 ? (
     <div className="flex items-center gap-4 t-caption">
       <span className="flex items-center gap-1 text-emerald-400">
-        <Icon as={ShieldCheck} size="sm" />
+        <Icon as={ShieldCheck} size="md" />
         {validCount} valid
       </span>
       <span className="flex items-center gap-1 text-amber-400">
-        <Icon as={AlertTriangle} size="sm" />
+        <Icon as={AlertTriangle} size="md" />
         {warningCount} warnings
       </span>
       <span className="flex items-center gap-1 text-red-400">
-        <Icon as={XCircle} size="sm" />
+        <Icon as={XCircle} size="md" />
         {errorCount} errors
       </span>
     </div>

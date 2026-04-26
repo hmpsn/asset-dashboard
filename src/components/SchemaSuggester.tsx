@@ -580,7 +580,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
               : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'
           )}
         >
-          <Icon as={t.icon} size="sm" />
+          <Icon as={t.icon} size="md" />
           {t.label}
         </button>
       ))}
@@ -648,7 +648,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
         />
         {generatingSingle && (
           <div className="flex items-center gap-2 px-4 py-2 bg-teal-500/10 border border-teal-500/20 rounded-[var(--radius-xl)]">
-            <Icon as={Loader2} size="sm" className="animate-spin text-teal-400" />
+            <Icon as={Loader2} size="md" className="animate-spin text-teal-400" />
             <span className="t-caption text-teal-300">Generating schema for page...</span>
           </div>
         )}
@@ -664,7 +664,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
               <span className="t-caption text-[var(--brand-text-muted)]">{availablePages.length} pages — set page types for better AI prompts</span>
               <button
                 onClick={() => setShowTypeGuide(v => !v)}
-                className="flex items-center gap-1 t-micro text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+                className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
                 title="Page Type Guide"
               >
                 <Icon as={HelpCircle} size="sm" />
@@ -919,7 +919,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
             <div className="flex items-center gap-2">
               <Icon as={BarChart3} size="md" className="text-teal-400" />
               <span className="t-caption font-medium text-[var(--brand-text-bright)]">Schema Impact</span>
-              <span className="t-micro text-[var(--brand-text-muted)]">{impactData.totalDeployments} deployments tracked</span>
+              <span className="t-caption-sm text-[var(--brand-text-muted)]">{impactData.totalDeployments} deployments tracked</span>
             </div>
             <div className="flex items-center gap-3">
               {impactData.avgClicksDelta !== null && (
@@ -933,7 +933,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
                 </span>
               )}
               {impactData.tooRecent > 0 && (
-                <span className="flex items-center gap-1 t-micro text-[var(--brand-text-muted)]">
+                <span className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
                   <Icon as={Clock} size="sm" /> {impactData.tooRecent} pending
                 </span>
               )}
@@ -950,7 +950,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
                   { label: 'Avg Position', value: impactData.avgPositionDelta, suffix: '', positive: (v: number) => v <= 0 },
                 ].map(stat => (
                   <div key={stat.label} className="bg-[var(--surface-2)] px-3 py-2.5">
-                    <div className="t-micro text-[var(--brand-text-muted)]">{stat.label}</div>
+                    <div className="t-caption-sm text-[var(--brand-text-muted)]">{stat.label}</div>
                     {stat.value !== null ? (
                       <div className={cn('text-sm font-bold', stat.positive(stat.value) ? 'text-emerald-400/80' : 'text-red-400/80')}>
                         {stat.value >= 0 && stat.label !== 'Avg Position' ? '+' : ''}{stat.value}{stat.suffix}
@@ -967,13 +967,13 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
                   <div key={d.change.id} className="flex items-center gap-3 px-4 py-2">
                     <div className="flex-1 min-w-0">
                       <div className="t-caption text-[var(--brand-text)] truncate">{d.change.pageTitle || d.change.pageSlug || 'Unknown page'}</div>
-                      <div className="t-micro text-[var(--brand-text-muted)]">
+                      <div className="t-caption-sm text-[var(--brand-text-muted)]">
                         {new Date(d.change.changedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         {' · '}{d.daysSinceChange}d ago
                       </div>
                     </div>
                     {d.tooRecent ? (
-                      <span className="flex items-center gap-1 t-micro text-[var(--brand-text-muted)]"><Icon as={Clock} size="sm" /> Too recent</span>
+                      <span className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]"><Icon as={Clock} size="sm" /> Too recent</span>
                     ) : d.before && d.after ? (
                       <div className="flex items-center gap-3 t-caption-sm">
                         <TrendBadge value={d.after.clicks - d.before.clicks} suffix="" showSign label="clicks" hideOnZero={false} />
@@ -982,7 +982,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
                         </span>
                       </div>
                     ) : (
-                      <span className="t-micro text-[var(--brand-text-muted)]">No GSC data</span>
+                      <span className="t-caption-sm text-[var(--brand-text-muted)]">No GSC data</span>
                     )}
                   </div>
                 ))}

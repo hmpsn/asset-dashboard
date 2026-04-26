@@ -144,7 +144,7 @@ export function SchemaWorkflowGuide() {
                 </div>
                 <div className="flex-1 min-w-0 space-y-2">
                   <div className="flex items-center gap-2">
-                    <span className="t-micro font-bold text-[var(--brand-text-muted)] uppercase tracking-wider">Step {step.number}</span>
+                    <span className="t-caption-sm font-bold text-[var(--brand-text-muted)] uppercase tracking-wider">Step {step.number}</span>
                     <h3 className="text-sm font-medium text-[var(--brand-text-bright)]">{step.title}</h3>
                   </div>
                   <p className="t-caption text-[var(--brand-text-muted)] leading-relaxed">{step.description}</p>
@@ -182,7 +182,7 @@ export function SchemaWorkflowGuide() {
               <Icon as={CheckCircle} size="sm" className="text-teal-500 mt-0.5 flex-shrink-0" />
               <div>
                 <div className="t-caption-sm font-medium text-[var(--brand-text)]">{f.label}</div>
-                <div className="t-micro text-[var(--brand-text-muted)]">{f.desc}</div>
+                <div className="t-caption-sm text-[var(--brand-text-muted)]">{f.desc}</div>
               </div>
             </div>
           ))}

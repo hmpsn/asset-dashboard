@@ -243,13 +243,13 @@ export function SchemaPageCard({
                     <div className="t-caption-sm font-medium text-amber-300">{rec.title}</div>
                     <div className="t-caption-sm text-[var(--brand-text-muted)]">{rec.insight}</div>
                     {rec.trafficAtRisk > 0 && (
-                      <div className="t-micro text-amber-400/70 mt-0.5">
+                      <div className="t-caption-sm text-amber-400/70 mt-0.5">
                         {rec.trafficAtRisk.toLocaleString()} clicks at risk · {rec.estimatedGain}
                       </div>
                     )}
                   </div>
                   <span className={cn(
-                    'flex-shrink-0 t-micro px-1.5 py-0.5 rounded font-medium',
+                    'flex-shrink-0 t-caption-sm px-1.5 py-0.5 rounded font-medium',
                     rec.priority === 'fix_now' ? 'bg-red-500/15 text-red-400/80' :
                     rec.priority === 'fix_soon' ? 'bg-amber-500/15 text-amber-400/80' :
                     'bg-[var(--surface-3)]/15 text-[var(--brand-text-muted)]'
@@ -408,7 +408,7 @@ export function SchemaPageCard({
                       disabled={publishing || !!schemaParseError || validationStatus === 'errors'}
                       className="flex items-center gap-1 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors disabled:opacity-50 bg-emerald-600 hover:bg-emerald-500 text-white"
                     >
-                      {publishing ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Upload} size="sm" />}
+                      {publishing ? <Icon as={Loader2} size="md" className="animate-spin" /> : <Icon as={Upload} size="md" />}
                       Yes, publish
                     </button>
                     <button
@@ -425,7 +425,7 @@ export function SchemaPageCard({
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors disabled:opacity-50 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white"
                   >
                     {publishing ? (
-                      <><Icon as={Loader2} size="sm" className="animate-spin" /> Publishing...</>
+                      <><Icon as={Loader2} size="md" className="animate-spin" /> Publishing...</>
                     ) : (
                       <><Icon as={Upload} size="md" /> Publish to Webflow</>
                     )}
@@ -445,7 +445,7 @@ export function SchemaPageCard({
                     title="Save Organization + WebSite nodes as the site-wide template for subpages"
                   >
                     {savingTemplate ? (
-                      <><Icon as={Loader2} size="sm" className="animate-spin" /> Saving...</>
+                      <><Icon as={Loader2} size="md" className="animate-spin" /> Saving...</>
                     ) : (
                       <><Icon as={Save} size="md" /> Save as Site Template</>
                     )}
@@ -458,7 +458,7 @@ export function SchemaPageCard({
                   disabled={retracting}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors disabled:opacity-50 bg-red-500/8 hover:bg-red-500/15 text-red-400/80 border border-red-500/30"
                 >
-                  {retracting ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Trash2} size="md" />}
+                  {retracting ? <Icon as={Loader2} size="md" className="animate-spin" /> : <Icon as={Trash2} size="md" />}
                   Retract
                 </button>
               )}
@@ -482,7 +482,7 @@ export function SchemaPageCard({
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors disabled:opacity-50 bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/30"
                   >
                     {sendingPage ? (
-                      <><Icon as={Loader2} size="sm" className="animate-spin" /> Sending...</>
+                      <><Icon as={Loader2} size="md" className="animate-spin" /> Sending...</>
                     ) : (
                       <><Icon as={Send} size="md" /> Send to Client</>
                     )}

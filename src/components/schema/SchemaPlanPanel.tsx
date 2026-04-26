@@ -150,13 +150,13 @@ export function SchemaPlanPanel({ siteId }: Props) {
       active: { label: 'Active', cls: 'bg-teal-500/15 text-teal-300 border-teal-500/30' },
     };
     const s = map[status] || map.draft;
-    return <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full t-micro font-medium border', s.cls)}>{s.label}</span>;
+    return <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full t-caption-sm font-medium border', s.cls)}>{s.label}</span>;
   };
 
   if (loading) {
     return (
       <div className="flex items-center gap-2 py-3 t-caption text-[var(--brand-text-muted)]">
-        <Icon as={Loader2} size="sm" className="animate-spin" /> Loading schema plan...
+        <Icon as={Loader2} size="md" className="animate-spin" /> Loading schema plan...
       </div>
     );
   }
@@ -182,7 +182,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
           disabled={generating}
           className="flex items-center gap-2 px-4 py-2 rounded-[var(--radius-md)] t-caption font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors disabled:opacity-50"
         >
-          {generating ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Sparkles} size="sm" />}
+          {generating ? <Icon as={Loader2} size="md" className="animate-spin" /> : <Icon as={Sparkles} size="md" />}
           {generating ? 'Analyzing site...' : 'Generate Site Plan'}
         </button>
       </div>
@@ -206,12 +206,12 @@ export function SchemaPlanPanel({ siteId }: Props) {
           <Icon as={Globe} size="md" className="text-teal-400" />
           <span className="text-sm font-medium text-[var(--brand-text-bright)]">Schema Site Plan</span>
           {statusBadge(plan.status)}
-          <span className="t-micro text-[var(--brand-text-muted)]">
+          <span className="t-caption-sm text-[var(--brand-text-muted)]">
             {plan.pageRoles.length} pages · {plan.canonicalEntities.length} entities
           </span>
         </div>
         <div className="flex items-center gap-2">
-          {dirty && <span className="t-micro text-amber-400/80">Unsaved changes</span>}
+          {dirty && <span className="t-caption-sm text-amber-400/80">Unsaved changes</span>}
           {expanded ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)]" />}
         </div>
       </button>
@@ -237,7 +237,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
               disabled={generating}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text)] border border-[var(--brand-border)] transition-colors disabled:opacity-50"
             >
-              {generating ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Sparkles} size="sm" />}
+              {generating ? <Icon as={Loader2} size="md" className="animate-spin" /> : <Icon as={Sparkles} size="md" />}
               {generating ? 'Regenerating...' : 'Regenerate'}
             </button>
             {dirty && (
@@ -317,7 +317,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
             {Object.entries(roleCounts).sort((a, b) => b[1] - a[1]).map(([role, count]) => (
               <span
                 key={role}
-                className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full t-micro font-medium border', ROLE_COLORS[role as SchemaPageRole] ?? DEFAULT_ROLE_COLOR)}
+                className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full t-caption-sm font-medium border', ROLE_COLORS[role as SchemaPageRole] ?? DEFAULT_ROLE_COLOR)}
               >
                 {SCHEMA_ROLE_LABELS[role as SchemaPageRole] || role} ({count})
               </span>
@@ -341,7 +341,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
                   return (
                     <div key={role} className="px-3 py-2 border-b border-[var(--brand-border)]/50 last:border-b-0">
                       <div className="flex items-center gap-2 mb-0.5">
-                        <span className={cn('inline-flex items-center px-1.5 py-0.5 rounded t-micro font-medium border', ROLE_COLORS[role] ?? DEFAULT_ROLE_COLOR)}>
+                        <span className={cn('inline-flex items-center px-1.5 py-0.5 rounded t-caption-sm font-medium border', ROLE_COLORS[role] ?? DEFAULT_ROLE_COLOR)}>
                           {SCHEMA_ROLE_LABELS[role]}
                         </span>
                       </div>
@@ -393,9 +393,9 @@ export function SchemaPlanPanel({ siteId }: Props) {
                 >
                   <div className="flex-1 min-w-0">
                     <div className="t-caption text-[var(--brand-text)] truncate">{pr.pageTitle}</div>
-                    <div className="t-micro text-[var(--brand-text-muted)] truncate">{pr.pagePath}</div>
+                    <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{pr.pagePath}</div>
                   </div>
-                  <span className="t-micro text-[var(--brand-text-muted)] font-mono shrink-0">{pr.primaryType}</span>
+                  <span className="t-caption-sm text-[var(--brand-text-muted)] font-mono shrink-0">{pr.primaryType}</span>
                   <select
                     value={pr.role}
                     onChange={e => handleRoleChange(pr.pagePath, e.target.value as SchemaPageRole)}
@@ -408,7 +408,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
                     ))}
                   </select>
                   {pr.entityRefs.length > 0 && (
-                    <span className="t-micro text-[var(--brand-text-muted)]" title={pr.entityRefs.join(', ')}>
+                    <span className="t-caption-sm text-[var(--brand-text-muted)]" title={pr.entityRefs.join(', ')}>
                       {pr.entityRefs.length} ref{pr.entityRefs.length > 1 ? 's' : ''}
                     </span>
                   )}
@@ -418,7 +418,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
           </div>
 
           {/* Metadata */}
-          <div className="t-micro text-[var(--brand-text-muted)] flex items-center gap-3">
+          <div className="t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-3">
             <span>Generated {new Date(plan.generatedAt).toLocaleDateString()}</span>
             {plan.updatedAt !== plan.generatedAt && (
               <span>Updated {new Date(plan.updatedAt).toLocaleDateString()}</span>
