@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { AlertTriangle, Info, CheckCircle2, ChevronDown, Shield, FileEdit, Share2, Link2, ExternalLink, FileText, BarChart3, Check, Globe, TrendingUp, Minus, LayoutList, Layers } from 'lucide-react';
-import { MetricRing } from '../ui';
+import { MetricRing, Icon} from '../ui';
 import { scoreColorClass, themeColor } from '../ui/constants';
 import { ScoreHistoryChart } from './helpers';
 import { toLiveUrl } from './utils';
@@ -167,44 +167,44 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
       {/* ── HEADER ── */}
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-zinc-100">Site Health</h2>
-          <p className="text-sm text-zinc-500 mt-1">{auditDetail.audit.totalPages} pages · Last scanned {new Date(auditDetail.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+          <h2 className="text-xl font-semibold text-[var(--brand-text)]">Site Health</h2>
+          <p className="text-sm text-[var(--brand-text-muted)] mt-1">{auditDetail.audit.totalPages} pages · Last scanned {new Date(auditDetail.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
         </div>
         <div className="relative" ref={shareRef}>
           <button onClick={() => setShareOpen(!shareOpen)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 border border-zinc-700 text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 transition-colors">
-            <Share2 className="w-3.5 h-3.5" />
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] hover:bg-zinc-700 hover:text-[var(--brand-text)] transition-colors">
+            <Icon as={Share2} size="md" />
             Share Report
           </button>
           {shareOpen && (
             // pr-check-disable-next-line -- Shareable Reports popover dropdown; positioned absolute, not a content card
-            <div className="absolute right-0 top-full mt-2 w-80 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl z-50 overflow-hidden">
-              <div className="px-4 py-3 border-b border-zinc-800">
-                <div className="text-xs font-medium text-zinc-200">Shareable Reports</div>
-                <div className="text-[11px] text-zinc-500 mt-0.5">Copy a link to share with your team</div>
+            <div className="absolute right-0 top-full mt-2 w-80 bg-[var(--surface-2)] border border-[var(--brand-border-strong)] rounded-[var(--radius-xl)] shadow-xl z-50 overflow-hidden">
+              <div className="px-4 py-3 border-b border-[var(--brand-border)]">
+                <div className="text-xs font-medium text-[var(--brand-text)]">Shareable Reports</div>
+                <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">Copy a link to share with your team</div>
               </div>
               <div className="max-h-64 overflow-y-auto divide-y divide-zinc-800/50">
                 {reports.length === 0 && (
-                  <div className="px-4 py-6 text-center text-xs text-zinc-500">Loading reports...</div>
+                  <div className="px-4 py-6 text-center text-xs text-[var(--brand-text-muted)]">Loading reports...</div>
                 )}
                 {reports.map(r => (
                   <div key={r.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-zinc-800/50 transition-colors">
                     <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${r.type === 'audit' ? 'bg-emerald-500/10' : 'bg-blue-500/10'}`}>
-                      {r.type === 'audit' ? <BarChart3 className="w-3.5 h-3.5 text-emerald-400" /> : <FileText className="w-3.5 h-3.5 text-blue-400" />}
+                      {r.type === 'audit' ? <Icon as={BarChart3} size="md" className="text-emerald-400" /> : <Icon as={FileText} size="md" className="text-blue-400" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-[11px] font-medium text-zinc-300 truncate">{r.title}</div>
-                      <div className="text-[10px] text-zinc-500">{new Date(r.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                      <div className="t-caption-sm font-medium text-[var(--brand-text)] truncate">{r.title}</div>
+                      <div className="t-caption-sm text-[var(--brand-text-muted)]">{new Date(r.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
                       <button onClick={() => copyReportLink(r.permalink, r.id)}
-                        className={`p-1.5 rounded-md transition-colors ${copiedId === r.id ? 'bg-emerald-500/10 text-emerald-400' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'}`}
+                        className={`p-1.5 rounded-md transition-colors ${copiedId === r.id ? 'bg-emerald-500/10 text-emerald-400' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]'}`}
                         title="Copy link">
-                        {copiedId === r.id ? <Check className="w-3.5 h-3.5" /> : <Link2 className="w-3.5 h-3.5" />}
+                        {copiedId === r.id ? <Icon as={Check} size="md" /> : <Icon as={Link2} size="md" />}
                       </button>
                       <a href={r.permalink} target="_blank" rel="noopener noreferrer"
-                        className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors" title="Open report">
-                        <ExternalLink className="w-3.5 h-3.5" />
+                        className="p-1.5 rounded-md text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)] transition-colors" title="Open report">
+                        <Icon as={ExternalLink} size="md" />
                       </a>
                     </div>
                   </div>
@@ -226,21 +226,21 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
           ? 'Several issues are holding back your search performance — prioritize the fixes below.'
           : 'Critical issues need immediate attention to establish search visibility.';
         return (
-          <div className="bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
+          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
             <div className="flex items-center gap-4">
               <div className={`text-4xl font-bold ${scoreColorClass(score)}`}>{score}</div>
               <div className="flex-1">
-                <div className="text-sm font-medium text-zinc-200">Your site's health</div>
-                <div className="text-xs text-zinc-500 mt-0.5">{summary}</div>
+                <div className="text-sm font-medium text-[var(--brand-text)]">Your site's health</div>
+                <div className="text-xs text-[var(--brand-text-muted)] mt-0.5">{summary}</div>
               </div>
               {auditDetail.previousScore != null && (
-                <div className={`text-xs ${auditDetail.audit.siteScore > auditDetail.previousScore ? 'text-emerald-400' : auditDetail.audit.siteScore < auditDetail.previousScore ? 'text-red-400' : 'text-zinc-500'}`}>
+                <div className={`text-xs ${auditDetail.audit.siteScore > auditDetail.previousScore ? 'text-emerald-400' : auditDetail.audit.siteScore < auditDetail.previousScore ? 'text-red-400' : 'text-[var(--brand-text-muted)]'}`}>
                   {auditDetail.audit.siteScore > auditDetail.previousScore ? '↑' : '↓'} {Math.abs(auditDetail.audit.siteScore - auditDetail.previousScore)} from previous
                 </div>
               )}
             </div>
             <div className="flex items-center gap-4 mt-3 pt-3 border-t border-zinc-800/50 text-xs">
-              <span className="text-zinc-500">{auditDetail.audit.totalPages} pages scanned</span>
+              <span className="text-[var(--brand-text-muted)]">{auditDetail.audit.totalPages} pages scanned</span>
               <button
                 onClick={() => { setSeverityFilter(severityFilter === 'error' ? 'all' : 'error'); setTimeout(() => allPagesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }}
                 className={`transition-colors ${severityFilter === 'error' ? 'text-red-300 font-medium' : 'text-red-400 hover:text-red-300'}`}
@@ -260,17 +260,17 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
       ) && (() => {
         const { resolved, newIssues } = auditDetail.auditDiff!;
         const scoreDelta = auditDetail.audit.siteScore - auditDetail.previousScore!;
-        const deltaColor = scoreDelta > 0 ? 'text-emerald-400' : scoreDelta < 0 ? 'text-red-400' : 'text-zinc-500';
+        const deltaColor = scoreDelta > 0 ? 'text-emerald-400' : scoreDelta < 0 ? 'text-red-400' : 'text-[var(--brand-text-muted)]';
         const DeltaIcon = scoreDelta > 0 ? TrendingUp : scoreDelta < 0 ? AlertTriangle : Minus;
         return (
           // pr-check-disable-next-line -- Compact audit-delta status bar; inline row element, not a content card
-          <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-[12px]">
+          <div className="flex items-center gap-3 px-4 py-2.5 rounded-[var(--radius-xl)] bg-[var(--surface-2)] border border-[var(--brand-border)] t-caption">
             <DeltaIcon className={`w-4 h-4 flex-shrink-0 ${deltaColor}`} />
-            <span className="text-zinc-400">Since last audit:</span>
+            <span className="text-[var(--brand-text-muted)]">Since last audit:</span>
             {resolved > 0 && <span className="text-emerald-400 font-medium">{resolved} resolved</span>}
-            {resolved > 0 && newIssues > 0 && <span className="text-zinc-600">·</span>}
+            {resolved > 0 && newIssues > 0 && <span className="text-[var(--brand-text-faint)]">·</span>}
             {newIssues > 0 && <span className="text-red-400 font-medium">{newIssues} new</span>}
-            <span className="text-zinc-600">·</span>
+            <span className="text-[var(--brand-text-faint)]">·</span>
             <span className={`font-medium ${deltaColor}`}>
               score {auditDetail.previousScore} → {auditDetail.audit.siteScore}
               {scoreDelta !== 0 && <span className="ml-1">({scoreDelta > 0 ? '+' : ''}{scoreDelta})</span>}
@@ -282,21 +282,21 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
       {/* ── 2. PAGE SPEED (Always Expanded) ── */}
       {auditDetail.audit.cwvSummary && (auditDetail.audit.cwvSummary.mobile || auditDetail.audit.cwvSummary.desktop) && (() => {
         const ratingColor = (r: CwvStrategyResult['metrics']['LCP']['rating']) =>
-          r === 'good' ? 'text-emerald-400' : r === 'needs-improvement' ? 'text-amber-400' : r === 'poor' ? 'text-red-400' : 'text-zinc-500';
+          r === 'good' ? 'text-emerald-400' : r === 'needs-improvement' ? 'text-amber-400' : r === 'poor' ? 'text-red-400' : 'text-[var(--brand-text-muted)]';
         const ratingBg = (r: CwvStrategyResult['metrics']['LCP']['rating']) =>
           r === 'good' ? 'bg-emerald-500/10 border-emerald-500/20' : r === 'needs-improvement' ? 'bg-amber-500/10 border-amber-500/20' : r === 'poor' ? 'bg-red-500/10 border-red-500/20' : 'bg-zinc-800/50 border-zinc-700/30';
         const assessBadge = (a: CwvStrategyResult['assessment']) =>
           a === 'good' ? { text: 'Passed', cls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' }
           : a === 'needs-improvement' ? { text: 'Needs Work', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/30' }
           : a === 'poor' ? { text: 'Failed', cls: 'bg-red-500/15 text-red-400 border-red-500/30' }
-          : { text: 'No Data', cls: 'bg-zinc-800/50 text-zinc-500 border-zinc-700/30' };
+          : { text: 'No Data', cls: 'bg-zinc-800/50 text-[var(--brand-text-muted)] border-zinc-700/30' };
         const renderStrategy = (label: string, s: CwvStrategyResult) => {
           const badge = assessBadge(s.assessment);
           return (
             <div key={label} className="flex-1 min-w-[200px]">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-zinc-400 tracking-wider">{label}</span>
-                <span className={`text-[11px] px-2 py-0.5 rounded border font-medium ${badge.cls}`}>{badge.text}</span>
+                <span className="text-xs font-medium text-[var(--brand-text-muted)] tracking-wider">{label}</span>
+                <span className={`t-caption-sm px-2 py-0.5 rounded border font-medium ${badge.cls}`}>{badge.text}</span>
               </div>
               <div className="space-y-1.5">
                 {[
@@ -308,8 +308,8 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                   return (
                     <div key={m.key} className={`flex items-center justify-between px-3 py-2 rounded-lg border ${ratingBg(metric.rating)}`}>
                       <div>
-                        <span className="text-xs font-medium text-zinc-300">{m.label}</span>
-                        <span className="text-[10px] text-zinc-500 ml-1.5">{m.desc}</span>
+                        <span className="text-xs font-medium text-[var(--brand-text)]">{m.label}</span>
+                        <span className="t-caption-sm text-[var(--brand-text-muted)] ml-1.5">{m.desc}</span>
                       </div>
                       <span className={`text-sm font-mono font-medium ${ratingColor(metric.rating)}`}>
                         {metric.value !== null ? m.fmt(metric.value) : '—'}
@@ -320,19 +320,19 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
               </div>
               {!s.fieldDataAvailable && (
                 <div className="mt-2 flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
-                  <p className="text-[11px] text-amber-300">These are simulated scores, not real user data. Real metrics appear once Chrome has enough traffic data for your site.</p>
+                  <Icon as={AlertTriangle} size="md" className="text-amber-400 flex-shrink-0 mt-0.5" />
+                  <p className="t-caption-sm text-amber-300">These are simulated scores, not real user data. Real metrics appear once Chrome has enough traffic data for your site.</p>
                 </div>
               )}
             </div>
           );
         };
         return (
-          <div className="bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
+          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
             <div className="flex items-center gap-2 mb-3">
-              <Globe className="w-4 h-4 text-teal-400" />
-              <span className="text-sm font-medium text-zinc-200">Page Speed &amp; Core Web Vitals</span>
-              <span className="text-[11px] text-zinc-500 ml-2">Google uses these to rank your site</span>
+              <Icon as={Globe} size="md" className="text-teal-400" />
+              <span className="text-sm font-medium text-[var(--brand-text)]">Page Speed &amp; Core Web Vitals</span>
+              <span className="t-caption-sm text-[var(--brand-text-muted)] ml-2">Google uses these to rank your site</span>
             </div>
             <div className="flex gap-4 flex-wrap">
               {auditDetail.audit.cwvSummary!.mobile && renderStrategy('Mobile', auditDetail.audit.cwvSummary!.mobile)}
@@ -383,16 +383,16 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
               {/* Fix These First */}
-              <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
-                <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-red-400" />
-                  <span className="text-sm font-medium text-zinc-200">Fix these first</span>
+              <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
+                <div className="px-4 py-3 border-b border-[var(--brand-border)] flex items-center gap-2">
+                  <Icon as={AlertTriangle} size="md" className="text-red-400" />
+                  <span className="text-sm font-medium text-[var(--brand-text)]">Fix these first</span>
                 </div>
                 <div className="divide-y divide-zinc-800/50">
                   {prioritized.length === 0 ? (
                     <div className="px-4 py-6 text-center">
-                      <CheckCircle2 className="w-8 h-8 text-emerald-500/50 mx-auto mb-2" />
-                      <p className="text-xs text-zinc-500">No critical issues found!</p>
+                      <Icon as={CheckCircle2} size="2xl" className="text-emerald-500/50 mx-auto mb-2" />
+                      <p className="text-xs text-[var(--brand-text-muted)]">No critical issues found!</p>
                     </div>
                   ) : (
                     prioritized.map((item, i) => {
@@ -400,22 +400,22 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                       return (
                         <div key={`${item.pageId}-${i}`} className="px-4 py-3">
                           <div className="flex items-start gap-3">
-                            <span className="w-5 h-5 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center flex-shrink-0 text-[11px] text-zinc-400 font-medium">{i + 1}</span>
+                            <span className="w-5 h-5 rounded-full bg-[var(--surface-3)] border border-[var(--brand-border-strong)] flex items-center justify-center flex-shrink-0 t-caption-sm text-[var(--brand-text-muted)] font-medium">{i + 1}</span>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
-                                <span className={`text-[11px] font-medium uppercase ${sc.text}`}>{item.issue.severity}</span>
-                                <span className="text-[11px] text-zinc-500 truncate">{item.page}</span>
+                                <span className={`t-caption-sm font-medium uppercase ${sc.text}`}>{item.issue.severity}</span>
+                                <span className="t-caption-sm text-[var(--brand-text-muted)] truncate">{item.page}</span>
                               </div>
-                              <div className="text-[11px] text-zinc-300 mt-0.5">{item.issue.message}</div>
+                              <div className="t-caption-sm text-[var(--brand-text)] mt-0.5">{item.issue.message}</div>
                               {checkImpact(item.issue.check) && (
-                                <div className="text-[11px] text-zinc-500 mt-0.5 leading-relaxed">{checkImpact(item.issue.check)}</div>
+                                <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 leading-relaxed">{checkImpact(item.issue.check)}</div>
                               )}
                             </div>
                             {hasContentIssues([item.issue]) && workspaceId && !requestedPages.has(item.pageId) && (
                               <button
                                 onClick={() => requestContentImprovement({ pageId: item.pageId, page: item.page, slug: item.slug, issues: [item.issue] })}
                                 disabled={requestingPage === item.pageId}
-                                className="flex-shrink-0 px-2 py-1 rounded bg-teal-600 hover:bg-teal-500 text-white text-[10px] font-medium transition-colors"
+                                className="flex-shrink-0 px-2 py-1 rounded bg-teal-600 hover:bg-teal-500 text-white t-caption-sm font-medium transition-colors"
                               >
                                 {requestingPage === item.pageId ? '...' : 'Fix'}
                               </button>
@@ -429,13 +429,13 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
               </div>
 
               {/* Page Cards */}
-              <div className="bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
+              <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-zinc-400" />
-                    <span className="text-sm font-medium text-zinc-200">Pages needing attention</span>
+                    <Icon as={FileText} size="md" className="text-[var(--brand-text-muted)]" />
+                    <span className="text-sm font-medium text-[var(--brand-text)]">Pages needing attention</span>
                   </div>
-                  <span className="text-[11px] text-zinc-500">Top {sortedPages.length}</span>
+                  <span className="t-caption-sm text-[var(--brand-text-muted)]">Top {sortedPages.length}</span>
                 </div>
                 <div className="grid grid-cols-1 gap-3">
                   {sortedPages.map(page => {
@@ -443,20 +443,20 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                     const warns = page.issues.filter(i => i.severity === 'warning').length;
                     const isExpanded = expandedPages.has(page.pageId);
                     return (
-                      <div key={page.pageId} className={`rounded-lg border transition-all ${isExpanded ? 'bg-zinc-950/50 border-zinc-700' : 'bg-zinc-950/50 border-zinc-800/50 hover:border-zinc-700'}`}>
+                      <div key={page.pageId} className={`rounded-lg border transition-all ${isExpanded ? 'bg-zinc-950/50 border-[var(--brand-border-strong)]' : 'bg-zinc-950/50 border-zinc-800/50 hover:border-[var(--brand-border-strong)]'}`}>
                         <button
                           onClick={() => togglePage(page.pageId)}
                           className="w-full flex items-center gap-3 p-3 text-left"
                         >
                           <div className="flex-1 min-w-0">
-                            <div className="text-xs font-medium text-zinc-300 truncate">{page.page}</div>
-                            <div className="text-[11px] text-zinc-500 truncate">{toLiveUrl(page.url, liveDomain)}</div>
+                            <div className="text-xs font-medium text-[var(--brand-text)] truncate">{page.page}</div>
+                            <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{toLiveUrl(page.url, liveDomain)}</div>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
-                            {errs > 0 && <span className="text-[11px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">{errs}E</span>}
-                            {warns > 0 && <span className="text-[11px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">{warns}W</span>}
+                            {errs > 0 && <span className="t-caption-sm text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">{errs}E</span>}
+                            {warns > 0 && <span className="t-caption-sm text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">{warns}W</span>}
                             <div className={`text-xs font-bold ${scoreColorClass(page.score)}`}>{page.score}</div>
-                            <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
+                            <ChevronDown className={`w-3.5 h-3.5 text-[var(--brand-text-muted)] transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
                           </div>
                         </button>
                         
@@ -472,11 +472,11 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                                       {issue.severity === 'error' && <AlertTriangle className={`w-3.5 h-3.5 ${sc.text} flex-shrink-0 mt-0.5`} />}
                                       {issue.severity === 'warning' && <Info className={`w-3.5 h-3.5 ${sc.text} flex-shrink-0 mt-0.5`} />}
                                       <div className="flex-1">
-                                        <div className="text-[11px] text-zinc-300">{issue.message}</div>
+                                        <div className="t-caption-sm text-[var(--brand-text)]">{issue.message}</div>
                                         {checkImpact(issue.check) && (
-                                          <div className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">{checkImpact(issue.check)}</div>
+                                          <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 leading-relaxed">{checkImpact(issue.check)}</div>
                                         )}
-                                        {issue.recommendation && <div className="text-[11px] text-zinc-500 mt-0.5">{issue.recommendation}</div>}
+                                        {issue.recommendation && <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{issue.recommendation}</div>}
                                       </div>
                                     </div>
                                   </div>
@@ -488,17 +488,17 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                                 <button
                                   onClick={() => { setRequestError(null); requestContentImprovement(page); }}
                                   disabled={requestedPages.has(page.pageId) || requestingPage === page.pageId}
-                                  className={`mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${
+                                  className={`mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg t-caption-sm font-medium transition-colors ${
                                     requestedPages.has(page.pageId)
                                       ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 cursor-default'
                                       : 'bg-teal-600 hover:bg-teal-500 text-white'
                                   }`}
                                 >
-                                  <FileEdit className="w-3 h-3" />
+                                  <Icon as={FileEdit} size="sm" />
                                   {requestedPages.has(page.pageId) ? 'Request created' : requestingPage === page.pageId ? 'Creating...' : 'Request Content Fix'}
                                 </button>
                                 {requestError === page.pageId && (
-                                  <p className="text-[11px] text-red-400 mt-1">Failed to create request. Please try again.</p>
+                                  <p className="t-caption-sm text-red-400 mt-1">Failed to create request. Please try again.</p>
                                 )}
                               </>
                             )}
@@ -512,7 +512,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                   onClick={() => {
                     setTimeout(() => allPagesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
                   }}
-                  className="w-full mt-3 text-center py-2 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors border border-dashed border-zinc-800 rounded-lg hover:border-zinc-700"
+                  className="w-full mt-3 text-center py-2 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors border border-dashed border-[var(--brand-border)] rounded-lg hover:border-[var(--brand-border-strong)]"
                 >
                   View all {auditDetail.audit.totalPages} pages
                 </button>
@@ -527,15 +527,15 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
 
       {/* ── 5. SITE-WIDE ISSUES ── */}
       {auditDetail.audit.siteWideIssues.length > 0 && (
-        <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
-          <div className="px-4 py-3 border-b border-zinc-800 bg-zinc-900">
+        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
+          <div className="px-4 py-3 border-b border-[var(--brand-border)] bg-[var(--surface-2)]">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center">
-                <Info className="w-4 h-4 text-amber-400" />
+              <div className="w-8 h-8 rounded-lg bg-[var(--surface-3)] flex items-center justify-center">
+                <Icon as={Info} size="md" className="text-amber-400" />
               </div>
               <div>
-                <div className="text-sm font-medium text-zinc-200">Site-Wide Issues</div>
-                <div className="text-[11px] text-zinc-500">{auditDetail.audit.siteWideIssues.length} issues affecting your entire site</div>
+                <div className="text-sm font-medium text-[var(--brand-text)]">Site-Wide Issues</div>
+                <div className="t-caption-sm text-[var(--brand-text-muted)]">{auditDetail.audit.siteWideIssues.length} issues affecting your entire site</div>
               </div>
             </div>
           </div>
@@ -545,7 +545,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
               {auditDetail.audit.siteWideIssues.slice(0, 3).map((issue, i) => {
                 const sc = SEV[issue.severity];
                 return (
-                  <div key={i} className={`px-2.5 py-1.5 rounded-lg ${sc.bg} border ${sc.border} text-[11px]`}>
+                  <div key={i} className={`px-2.5 py-1.5 rounded-lg ${sc.bg} border ${sc.border} t-caption-sm`}>
                     <span className={sc.text}>{issue.message}</span>
                   </div>
                 );
@@ -553,7 +553,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
               {auditDetail.audit.siteWideIssues.length > 3 && (
                 <button 
                   onClick={() => toggleSection('site-wide-all')}
-                  className="px-2.5 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-[11px] text-zinc-400 hover:text-zinc-300"
+                  className="px-2.5 py-1.5 rounded-lg bg-[var(--surface-3)] border border-[var(--brand-border-strong)] t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
                 >
                   +{auditDetail.audit.siteWideIssues.length - 3} more
                 </button>
@@ -566,8 +566,8 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                   const sc = SEV[issue.severity];
                   return (
                     <div key={i} className={`px-3 py-2 rounded-lg ${sc.bg} border ${sc.border}`}>
-                      <div className={`text-[11px] font-medium ${sc.text}`}>{issue.message}</div>
-                      {issue.recommendation && <div className="text-[11px] text-zinc-500 mt-0.5">{issue.recommendation}</div>}
+                      <div className={`t-caption-sm font-medium ${sc.text}`}>{issue.message}</div>
+                      {issue.recommendation && <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{issue.recommendation}</div>}
                     </div>
                   );
                 })}
@@ -579,44 +579,44 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
 
       {/* ── 6. ALL PAGES LIST ── */}
       <div ref={allPagesRef}>
-        <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
-          <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2 flex-wrap bg-zinc-950/50">
+        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
+          <div className="px-4 py-3 border-b border-[var(--brand-border)] flex items-center gap-2 flex-wrap bg-zinc-950/50">
             {/* View mode toggle */}
-            <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-0.5">
+            <div className="flex items-center gap-1 bg-[var(--surface-3)] rounded-lg p-0.5">
               <button onClick={() => setViewMode('by-page')}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-medium transition-colors ${viewMode === 'by-page' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'}`}>
-                <LayoutList className="w-3 h-3" /> By Page
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md t-caption-sm font-medium transition-colors ${viewMode === 'by-page' ? 'bg-zinc-700 text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}>
+                <Icon as={LayoutList} size="sm" /> By Page
               </button>
               <button onClick={() => setViewMode('by-fix-type')}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-medium transition-colors ${viewMode === 'by-fix-type' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'}`}>
-                <Layers className="w-3 h-3" /> By Fix Type
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md t-caption-sm font-medium transition-colors ${viewMode === 'by-fix-type' ? 'bg-zinc-700 text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}>
+                <Icon as={Layers} size="sm" /> By Fix Type
               </button>
             </div>
             {/* Severity filter */}
-            <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-0.5">
+            <div className="flex items-center gap-1 bg-[var(--surface-3)] rounded-lg p-0.5">
               {(['all', 'error', 'warning'] as const).map(s => (
                 <button key={s} onClick={() => setSeverityFilter(s)}
-                  className={`px-3 py-2 min-h-[44px] rounded-md text-[11px] font-medium transition-colors ${
-                    severityFilter === s ? (s === 'all' ? 'bg-zinc-700 text-zinc-200' : `${SEV[s].bg} ${SEV[s].text}`) : 'text-zinc-500 hover:text-zinc-300'
+                  className={`px-3 py-2 min-h-[44px] rounded-md t-caption-sm font-medium transition-colors ${
+                    severityFilter === s ? (s === 'all' ? 'bg-zinc-700 text-[var(--brand-text)]' : `${SEV[s].bg} ${SEV[s].text}`) : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'
                   }`}>{s === 'all' ? 'Issues' : s.charAt(0).toUpperCase() + s.slice(1)}</button>
               ))}
             </div>
             {infoIssueCount > 0 && (
               <button
                 onClick={() => setShowInfoItems(!showInfoItems)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] transition-colors border ${
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg t-caption-sm transition-colors border ${
                   showInfoItems
-                    ? 'bg-zinc-700 text-zinc-300 border-zinc-600'
-                    : 'bg-transparent text-zinc-500 border-zinc-700 hover:text-zinc-300'
+                    ? 'bg-zinc-700 text-[var(--brand-text)] border-zinc-600'
+                    : 'bg-transparent text-[var(--brand-text-muted)] border-[var(--brand-border-strong)] hover:text-[var(--brand-text)]'
                 }`}
               >
-                <Info className="w-3 h-3" />
+                <Icon as={Info} size="sm" />
                 {showInfoItems ? 'Hide' : 'Show'} {infoIssueCount} informational
               </button>
             )}
             {viewMode === 'by-page' && (
               <input type="text" value={auditSearch} onChange={e => setAuditSearch(e.target.value)} placeholder="Search pages..."
-                className="bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-[11px] text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-600 w-40" />
+                className="bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-lg px-2.5 py-1.5 t-caption-sm text-[var(--brand-text)] placeholder-zinc-600 focus:outline-none focus:border-zinc-600 w-40" />
             )}
           </div>
 
@@ -634,14 +634,14 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                     className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/30 transition-colors text-left"
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-medium text-zinc-300 truncate">{page.page}</div>
-                      <div className="text-[11px] text-zinc-500 truncate">{toLiveUrl(page.url, liveDomain)}</div>
+                      <div className="text-xs font-medium text-[var(--brand-text)] truncate">{page.page}</div>
+                      <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{toLiveUrl(page.url, liveDomain)}</div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      {errs > 0 && <span className="text-[11px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">{errs} err</span>}
-                      {warns > 0 && <span className="text-[11px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">{warns} warn</span>}
+                      {errs > 0 && <span className="t-caption-sm text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">{errs} err</span>}
+                      {warns > 0 && <span className="t-caption-sm text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">{warns} warn</span>}
                       <div className={`text-xs font-bold ${scoreColorClass(page.score)}`}>{page.score}</div>
-                      <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
+                      <ChevronDown className={`w-3.5 h-3.5 text-[var(--brand-text-muted)] transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
                     </div>
                   </button>
 
@@ -656,8 +656,8 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                                 {issue.severity === 'error' && <AlertTriangle className={`w-3.5 h-3.5 ${sc.text} flex-shrink-0 mt-0.5`} />}
                                 {issue.severity === 'warning' && <Info className={`w-3.5 h-3.5 ${sc.text} flex-shrink-0 mt-0.5`} />}
                                 <div className="flex-1">
-                                  <div className="text-[11px] text-zinc-300">{issue.message}</div>
-                                  {issue.recommendation && <div className="text-[11px] text-zinc-500 mt-0.5">{issue.recommendation}</div>}
+                                  <div className="t-caption-sm text-[var(--brand-text)]">{issue.message}</div>
+                                  {issue.recommendation && <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{issue.recommendation}</div>}
                                 </div>
                               </div>
                             </div>
@@ -669,17 +669,17 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                           <button
                             onClick={() => { setRequestError(null); requestContentImprovement(page); }}
                             disabled={requestedPages.has(page.pageId) || requestingPage === page.pageId}
-                            className={`mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${
+                            className={`mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg t-caption-sm font-medium transition-colors ${
                               requestedPages.has(page.pageId)
                                 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 cursor-default'
                                 : 'bg-teal-600 hover:bg-teal-500 text-white'
                             }`}
                           >
-                            <FileEdit className="w-3 h-3" />
+                            <Icon as={FileEdit} size="sm" />
                             {requestedPages.has(page.pageId) ? 'Request created' : requestingPage === page.pageId ? 'Creating...' : 'Request Content Fix'}
                           </button>
                           {requestError === page.pageId && (
-                            <p className="text-[11px] text-red-400 mt-1">Failed to create request. Please try again.</p>
+                            <p className="t-caption-sm text-red-400 mt-1">Failed to create request. Please try again.</p>
                           )}
                         </>
                       )}
@@ -688,7 +688,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                 </div>
               );
             })}
-            {filteredPages.length === 0 && <div className="px-4 py-8 text-center text-xs text-zinc-500">No pages match your filters</div>}
+            {filteredPages.length === 0 && <div className="px-4 py-8 text-center text-xs text-[var(--brand-text-muted)]">No pages match your filters</div>}
           </div>
           )}
 
@@ -737,7 +737,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
 
             return (
               <div className="divide-y divide-zinc-800/50 max-h-[500px] overflow-y-auto">
-                {sorted.length === 0 && <div className="px-4 py-8 text-center text-xs text-zinc-500">No issues match your filters</div>}
+                {sorted.length === 0 && <div className="px-4 py-8 text-center text-xs text-[var(--brand-text-muted)]">No issues match your filters</div>}
                 {sorted.map(group => {
                   const sc = SEV[group.severity];
                   const isExpanded = expandedPages.has(`fix-type-${group.check}`);
@@ -748,27 +748,27 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                         className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/30 transition-colors text-left"
                       >
                         <div className="flex-1 min-w-0">
-                          <div className="text-xs font-medium text-zinc-300">{group.label}</div>
-                          <div className="text-[11px] text-zinc-500">{group.pages.length} {group.pages.length === 1 ? 'page' : 'pages'} affected</div>
+                          <div className="text-xs font-medium text-[var(--brand-text)]">{group.label}</div>
+                          <div className="t-caption-sm text-[var(--brand-text-muted)]">{group.pages.length} {group.pages.length === 1 ? 'page' : 'pages'} affected</div>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className={`text-[11px] font-medium uppercase ${sc.text}`}>{group.severity}</span>
-                          <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${sc.bg} border ${sc.border} ${sc.text}`}>{group.pages.length}</span>
-                          <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
+                          <span className={`t-caption-sm font-medium uppercase ${sc.text}`}>{group.severity}</span>
+                          <span className={`t-caption-sm font-bold px-1.5 py-0.5 rounded ${sc.bg} border ${sc.border} ${sc.text}`}>{group.pages.length}</span>
+                          <ChevronDown className={`w-3.5 h-3.5 text-[var(--brand-text-muted)] transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
                         </div>
                       </button>
 
                       {isExpanded && (
                         <div className="px-4 pb-3">
                           {checkImpact(group.check) && (
-                            <div className="text-[11px] text-zinc-400 mb-2 leading-relaxed px-1">{checkImpact(group.check)}</div>
+                            <div className="t-caption-sm text-[var(--brand-text-muted)] mb-2 leading-relaxed px-1">{checkImpact(group.check)}</div>
                           )}
                           <div className="space-y-1.5">
                             {group.pages.map((p, i) => (
                               <div key={`${p.pageId}-${i}`} className={`px-3 py-2 rounded-lg ${sc.bg} border ${sc.border}`}>
-                                <div className="text-[11px] font-medium text-zinc-300 truncate">{p.page}</div>
-                                <div className="text-[10px] text-zinc-500 truncate">{toLiveUrl(p.url, liveDomain)}</div>
-                                {p.recommendation && <div className="text-[10px] text-zinc-500 mt-0.5">{p.recommendation}</div>}
+                                <div className="t-caption-sm font-medium text-[var(--brand-text)] truncate">{p.page}</div>
+                                <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{toLiveUrl(p.url, liveDomain)}</div>
+                                {p.recommendation && <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{p.recommendation}</div>}
                               </div>
                             ))}
                           </div>
@@ -784,34 +784,34 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
       </div>
 
       {/* ── 7. HISTORY (Collapsed by default - at the bottom) ── */}
-      <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <button onClick={() => toggleSection('history')} className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors">
           <div className="flex items-center gap-2">
-            <BarChart3 className="w-4 h-4 text-zinc-400" />
-            <span className="text-sm font-medium text-zinc-300">History &amp; Details</span>
+            <Icon as={BarChart3} size="md" className="text-[var(--brand-text-muted)]" />
+            <span className="text-sm font-medium text-[var(--brand-text)]">History &amp; Details</span>
           </div>
-          <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${expandedSections.has('history') ? '' : '-rotate-90'}`} />
+          <ChevronDown className={`w-4 h-4 text-[var(--brand-text-muted)] transition-transform ${expandedSections.has('history') ? '' : '-rotate-90'}`} />
         </button>
         {expandedSections.has('history') && (
-          <div className="px-4 pb-4 border-t border-zinc-800 space-y-4">
+          <div className="px-4 pb-4 border-t border-[var(--brand-border)] space-y-4">
             {/* Score History */}
             {auditDetail.scoreHistory.length >= 2 && (
               <div className="pt-4">
-                <div className="text-xs font-medium text-zinc-400 mb-2">Score History</div>
+                <div className="text-xs font-medium text-[var(--brand-text-muted)] mb-2">Score History</div>
                 <ScoreHistoryChart history={auditDetail.scoreHistory} />
               </div>
             )}
             {/* Category Breakdown */}
             <div>
-              <div className="text-xs font-medium text-zinc-400 mb-2">Issues by Category</div>
+              <div className="text-xs font-medium text-[var(--brand-text-muted)] mb-2">Issues by Category</div>
               <div className="space-y-2">
                 {Object.entries(categoryStats).map(([cat, counts]) => {
                   const info = CAT_LABELS[cat] || { label: cat, color: themeColor('#71717a', '#94a3b8') };
                   return (
                     <div key={cat} className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: info.color }} />
-                      <span className="text-[11px] text-zinc-400 flex-1">{info.label}</span>
-                      <div className="flex items-center gap-1.5 text-[11px]">
+                      <span className="t-caption-sm text-[var(--brand-text-muted)] flex-1">{info.label}</span>
+                      <div className="flex items-center gap-1.5 t-caption-sm">
                         {counts.errors > 0 && <span className="text-red-400">{counts.errors}E</span>}
                         {counts.warnings > 0 && <span className="text-amber-400">{counts.warnings}W</span>}
                         {counts.infos > 0 && <span className="text-blue-400">{counts.infos}I</span>}
@@ -828,12 +828,12 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
   );
 
   if (audit) return (
-    <div className="bg-zinc-900 border border-zinc-800 p-6" style={{ borderRadius: '10px 24px 10px 24px' }}>
+    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-6" style={{ borderRadius: '10px 24px 10px 24px' }}>
       <div className="flex items-center gap-4">
         <ScoreRing score={audit.siteScore} size={100} />
         <div>
-          <div className="text-sm font-medium text-zinc-200">Site Health Score</div>
-          <div className="text-xs text-zinc-500">{audit.totalPages} pages • {new Date(audit.createdAt).toLocaleDateString()}</div>
+          <div className="text-sm font-medium text-[var(--brand-text)]">Site Health Score</div>
+          <div className="text-xs text-[var(--brand-text-muted)]">{audit.totalPages} pages • {new Date(audit.createdAt).toLocaleDateString()}</div>
           <div className="flex gap-3 mt-2"><span className="text-xs text-red-400">{audit.errors} errors</span><span className="text-xs text-amber-400">{audit.warnings} warnings</span></div>
         </div>
       </div>
@@ -842,11 +842,11 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
 
   return (
     <div className="text-center py-16">
-      <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4">
-        <Shield className="w-8 h-8 text-zinc-700" />
+      <div className="w-16 h-16 rounded-2xl bg-[var(--surface-2)] border border-[var(--brand-border)] flex items-center justify-center mx-auto mb-4">
+        <Icon as={Shield} size="2xl" className="text-[var(--brand-text-faint)]" />
       </div>
-      <p className="text-sm font-medium text-zinc-400">Site Health Check Coming Soon</p>
-      <p className="text-xs text-zinc-500 mt-1 max-w-sm mx-auto">Once {STUDIO_NAME} runs a site audit, you'll see a detailed health score, page-by-page issues, and recommendations to improve your site.</p>
+      <p className="text-sm font-medium text-[var(--brand-text-muted)]">Site Health Check Coming Soon</p>
+      <p className="text-xs text-[var(--brand-text-muted)] mt-1 max-w-sm mx-auto">Once {STUDIO_NAME} runs a site audit, you'll see a detailed health score, page-by-page issues, and recommendations to improve your site.</p>
     </div>
   );
 }
