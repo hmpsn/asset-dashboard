@@ -66,11 +66,12 @@ export function PricingConfirmationModal({
         const fmt = fmtPrice;
         return (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[70] flex items-center justify-center p-4" onClick={() => !pricingConfirming && setPricingModal(null)}>
-            <div className="relative bg-zinc-900 border border-zinc-700/50 shadow-2xl shadow-black/50 w-full max-w-md overflow-hidden animate-[scaleIn_0.2s_ease-out]" style={{ borderRadius: '10px 24px 10px 24px' }} onClick={e => e.stopPropagation()}>
+            {/* pr-check-disable-next-line -- pricing modal surface uses brand signature radius intentionally */}
+            <div className="relative bg-[var(--surface-2)] border border-[var(--brand-border)]/50 shadow-2xl shadow-black/50 w-full max-w-md overflow-hidden animate-[scaleIn_0.2s_ease-out]" style={{ borderRadius: 'var(--radius-signature-lg)' }} onClick={e => e.stopPropagation()}>
               {/* Close button */}
               <button
                 onClick={() => !pricingConfirming && setPricingModal(null)}
-                className="absolute top-3 right-3 w-7 h-7 rounded-lg flex items-center justify-center bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors z-10"
+                className="absolute top-3 right-3 w-7 h-7 rounded-lg flex items-center justify-center bg-[var(--surface-3)]/80 hover:bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors z-10"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -86,10 +87,10 @@ export function PricingConfirmationModal({
                       {isFull ? <Sparkles className="w-5 h-5 text-teal-400" /> : <FileText className="w-5 h-5 text-teal-400" />}
                     </div>
                     <div>
-                      <div className="text-sm font-semibold text-zinc-100">
+                      <div className="text-sm font-semibold text-[var(--brand-text-bright)]">
                         {isUpgrade ? 'Upgrade to Full Blog Post' : isFull ? (pricing?.fullPostLabel || 'Full Blog Post') : (pricing?.briefLabel || 'Content Brief')}
                       </div>
-                      <div className="text-[11px] text-zinc-500 mt-0.5">
+                      <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
                         {isUpgrade ? 'Continue from your approved brief' : 'Confirm your content request'}
                       </div>
                     </div>
@@ -97,13 +98,13 @@ export function PricingConfirmationModal({
                 </div>
 
                 {/* Topic card */}
-                <div className="px-3.5 py-3 border bg-teal-950/30 border-teal-500/10" style={{ borderRadius: '6px 12px 6px 12px' }}>
+                <div className="px-3.5 py-3 border bg-teal-950/30 border-teal-500/10" style={{ borderRadius: 'var(--radius-signature)' }}>
                   <div className="flex items-center gap-2 mb-1">
                     <Target className="w-3 h-3 text-teal-400/70" />
-                    <span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Topic</span>
+                    <span className="t-micro text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Topic</span>
                   </div>
-                  <div className="text-xs text-zinc-200 font-medium leading-relaxed">{pricingModal.topic}</div>
-                  <div className="text-[11px] mt-1 text-teal-400/80">Keyword: &ldquo;{pricingModal.targetKeyword}&rdquo;</div>
+                  <div className="text-xs text-[var(--brand-text-bright)] font-medium leading-relaxed">{pricingModal.topic}</div>
+                  <div className="t-caption-sm mt-1 text-teal-400/80">Keyword: &ldquo;{pricingModal.targetKeyword}&rdquo;</div>
                 </div>
               </div>
 
@@ -112,7 +113,7 @@ export function PricingConfirmationModal({
                 <div className="mx-6 flex items-center justify-between px-4 py-3 border bg-teal-500/5 border-teal-500/15" style={{ borderRadius: '6px 12px 6px 12px' }}>
                   <div>
                     <div className="text-2xl font-bold tracking-tight text-teal-300">{fmt(displayPrice)}</div>
-                    <div className="text-[10px] text-zinc-500 mt-0.5">{isUpgrade ? 'Upgrade difference' : 'One-time payment'}</div>
+                    <div className="t-micro text-[var(--brand-text-muted)] mt-0.5">{isUpgrade ? 'Upgrade difference' : 'One-time payment'}</div>
                   </div>
                   <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-teal-500/10">
                     <Shield className="w-4 h-4 text-teal-400/60" />
@@ -120,7 +121,7 @@ export function PricingConfirmationModal({
                 </div>
               )}
               {displayPrice == null && (
-                <div className="mx-6 mt-0 mb-0 text-[11px] text-zinc-500 bg-zinc-800/40 px-4 py-3 border border-zinc-700/30" style={{ borderRadius: '6px 12px 6px 12px' }}>
+                <div className="mx-6 mt-0 mb-0 t-caption-sm text-[var(--brand-text-muted)] bg-[var(--surface-3)]/40 px-4 py-3 border border-[var(--brand-border)]/30" style={{ borderRadius: 'var(--radius-signature)' }}>
                   <Lock className="w-3 h-3 inline mr-1.5 -mt-0.5" />
                   {isExternal
                     ? `Billing for this request is handled separately by ${STUDIO_NAME}.`
@@ -155,7 +156,7 @@ export function PricingConfirmationModal({
                 <button
                   disabled={pricingConfirming}
                   onClick={() => setPricingModal(null)}
-                  className="w-full px-4 py-2 rounded-xl text-xs text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 transition-all"
+                  className="w-full px-4 py-2 rounded-xl text-xs text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]/50 transition-all"
                 >
                   Cancel
                 </button>
@@ -164,13 +165,13 @@ export function PricingConfirmationModal({
                 {!isExternal && (
                   <div className="flex items-center justify-center gap-4 pt-1">
                     <div className="flex items-center gap-1.5">
-                      <Shield className="w-3 h-3 text-zinc-600" />
-                      <span className="text-[10px] text-zinc-600">SSL Encrypted</span>
+                      <Shield className="w-3 h-3 text-[var(--brand-border)]" />
+                      <span className="t-micro text-[var(--brand-text-muted)]">SSL Encrypted</span>
                     </div>
-                    <div className="w-px h-3 bg-zinc-800" />
+                    <div className="w-px h-3 bg-[var(--surface-3)]" />
                     <div className="flex items-center gap-1.5">
-                      <svg className="w-3 h-3 text-zinc-600" viewBox="0 0 24 24" fill="currentColor"><path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z"/></svg>
-                      <span className="text-[10px] text-zinc-600">Powered by Stripe</span>
+                      <svg className="w-3 h-3 text-[var(--brand-border)]" viewBox="0 0 24 24" fill="currentColor"><path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z"/></svg>
+                      <span className="t-micro text-[var(--brand-text-muted)]">Powered by Stripe</span>
                     </div>
                   </div>
                 )}

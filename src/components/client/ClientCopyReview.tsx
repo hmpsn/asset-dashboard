@@ -7,8 +7,9 @@ import { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   FileText, Check, MessageSquare, ChevronDown, ChevronUp,
-  AlertCircle, Loader2, PenLine, FileCheck,
+  AlertCircle, PenLine, FileCheck,
 } from 'lucide-react';
+import { Button } from '../ui';
 import { SectionCard } from '../ui/SectionCard';
 import { Badge } from '../ui/Badge';
 import { EmptyState } from '../ui/EmptyState';
@@ -175,16 +176,13 @@ function ClientCopyReviewInner({ workspaceId }: ClientCopyReviewProps) {
   if (entriesError) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-6">
-        <SectionCard title="Copy Review" titleIcon={<FileText className="w-4 h-4 text-zinc-400" />}>
+        <SectionCard title="Copy Review" titleIcon={<FileText className="w-4 h-4 text-[var(--brand-text)]" />}>
           <div className="flex flex-col items-center py-8 gap-3">
             <AlertCircle className="w-8 h-8 text-red-400" />
-            <p className="text-sm text-zinc-300">Something went wrong loading your copy review.</p>
-            <button
-              onClick={() => refetchEntries()}
-              className="text-xs px-3 py-1.5 rounded bg-teal-600 hover:bg-teal-500 text-white transition-colors"
-            >
+            <p className="text-sm text-[var(--brand-text)]">Something went wrong loading your copy review.</p>
+            <Button variant="primary" onClick={() => refetchEntries()} className="text-xs px-3 py-1.5">
               Try Again
-            </button>
+            </Button>
           </div>
         </SectionCard>
       </div>
@@ -217,14 +215,14 @@ function ClientCopyReviewInner({ workspaceId }: ClientCopyReviewProps) {
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-lg font-semibold text-zinc-100">Copy Review</h2>
-        <p className="text-sm text-zinc-400 mt-1">
+        <h2 className="text-lg font-semibold text-[var(--brand-text-bright)]">Copy Review</h2>
+        <p className="text-sm text-[var(--brand-text)] mt-1">
           Review your website copy and approve sections or suggest changes.
         </p>
       </div>
 
       {/* Summary stats */}
-      <div className="flex gap-4 text-xs text-zinc-400">
+      <div className="flex gap-4 text-xs text-[var(--brand-text)]">
         <span className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-teal-500" />
           {entries.reduce((n, e) => n + e.copyStatus.clientReviewSections, 0)} awaiting your review
@@ -238,7 +236,7 @@ function ClientCopyReviewInner({ workspaceId }: ClientCopyReviewProps) {
       {/* Entry list grouped by blueprint */}
       {Object.entries(grouped).map(([bpId, { blueprintName, items }]) => (
         <div key={bpId} className="space-y-3">
-          <h3 className="text-xs font-medium text-zinc-500 uppercase tracking-wide">{blueprintName}</h3>
+          <h3 className="text-xs font-medium text-[var(--brand-text-muted)] uppercase tracking-wide">{blueprintName}</h3>
           {items.map((entry, idx) => (
             <EntryCard
               key={entry.id}
@@ -278,24 +276,24 @@ function EntryCard({ entry, workspaceId, isExpanded, onToggle, staggerIndex }: E
         className="w-full flex items-center justify-between gap-3 text-left"
       >
         <div className="flex items-center gap-3 min-w-0">
-          <FileText className="w-4 h-4 text-zinc-400 shrink-0" />
+          <FileText className="w-4 h-4 text-[var(--brand-text)] shrink-0" />
           <div className="min-w-0">
-            <span className="text-sm font-medium text-zinc-200 block truncate">{entry.name}</span>
-            <span className="text-xs text-zinc-500">{pageLabel}</span>
+            <span className="text-sm font-medium text-[var(--brand-text-bright)] block truncate">{entry.name}</span>
+            <span className="text-xs text-[var(--brand-text-muted)]">{pageLabel}</span>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Badge label={badgeConfig.label} color={badgeConfig.color} />
           {/* Progress indicator — both fraction and bar use totalSections as denominator */}
           {copyStatus.totalSections > 0 && (
-            <span className="text-xs text-zinc-500">
+            <span className="text-xs text-[var(--brand-text-muted)]">
               {copyStatus.approvedSections}/{copyStatus.totalSections}
             </span>
           )}
           {isExpanded ? (
-            <ChevronUp className="w-4 h-4 text-zinc-500" />
+            <ChevronUp className="w-4 h-4 text-[var(--brand-text-muted)]" />
           ) : (
-            <ChevronDown className="w-4 h-4 text-zinc-500" />
+            <ChevronDown className="w-4 h-4 text-[var(--brand-text-muted)]" />
           )}
         </div>
       </button>
@@ -303,7 +301,7 @@ function EntryCard({ entry, workspaceId, isExpanded, onToggle, staggerIndex }: E
       {/* Approval progress bar */}
       {copyStatus.totalSections > 0 && (
         <div className="mt-3">
-          <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
+          <div className="w-full h-1 bg-[var(--surface-3)] rounded-full overflow-hidden">
             <div
               className="h-full bg-emerald-500 rounded-full transition-all duration-500"
               style={{ width: `${copyStatus.approvalPercentage}%` }}
@@ -314,7 +312,7 @@ function EntryCard({ entry, workspaceId, isExpanded, onToggle, staggerIndex }: E
 
       {/* Expanded sections */}
       {isExpanded && (
-        <div className="mt-4 border-t border-zinc-800 pt-4">
+        <div className="mt-4 border-t border-[var(--brand-border)] pt-4">
           <EntrySections workspaceId={workspaceId} entryId={entry.id} />
         </div>
       )}
@@ -391,7 +389,7 @@ function EntrySections({ workspaceId, entryId }: { workspaceId: string; entryId:
     return (
       <div className="flex flex-col items-center py-6 gap-2">
         <AlertCircle className="w-5 h-5 text-red-400" />
-        <p className="text-xs text-zinc-400">Could not load sections.</p>
+        <p className="text-xs text-[var(--brand-text)]">Could not load sections.</p>
         <button
           onClick={() => refetch()}
           className="text-xs text-teal-400 hover:text-teal-300 transition-colors"
@@ -404,7 +402,7 @@ function EntrySections({ workspaceId, entryId }: { workspaceId: string; entryId:
 
   if (sections.length === 0) {
     return (
-      <p className="text-xs text-zinc-500 py-4 text-center">
+      <p className="text-xs text-[var(--brand-text-muted)] py-4 text-center">
         No sections are ready for review yet.
       </p>
     );
@@ -464,26 +462,26 @@ function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSugge
   }, [suggestedText, section.generatedCopy, onSuggest]);
 
   return (
-    <div className="border border-zinc-800 rounded-lg p-4 space-y-3 bg-zinc-900/50">
+    <div className="border border-[var(--brand-border)] rounded-lg p-4 space-y-3 bg-[var(--surface-2)]/50">
       {/* Section header */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <PenLine className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-          <span className="text-xs font-medium text-zinc-300">{sectionLabel}</span>
+          <PenLine className="w-3.5 h-3.5 text-[var(--brand-text)] shrink-0" />
+          <span className="text-xs font-medium text-[var(--brand-text)]">{sectionLabel}</span>
         </div>
         <Badge label={badgeConfig.label} color={badgeConfig.color} />
       </div>
 
       {/* Copy text */}
       {section.generatedCopy && (
-        <div className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap bg-zinc-800/30 rounded p-3">
+        <div className="text-sm text-[var(--brand-text)] leading-relaxed whitespace-pre-wrap bg-[var(--surface-3)]/30 rounded p-3">
           {section.generatedCopy}
         </div>
       )}
 
       {/* AI annotation (context for client — why this section was written this way) */}
       {section.aiAnnotation && (
-        <div className="text-xs text-zinc-500 italic border-l-2 border-zinc-700 pl-2">
+        <div className="text-xs text-[var(--brand-text-muted)] italic border-l-2 border-[var(--brand-border)] pl-2">
           {section.aiAnnotation}
         </div>
       )}
@@ -491,22 +489,22 @@ function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSugge
       {/* Previous suggestions */}
       {section.clientSuggestions && section.clientSuggestions.length > 0 && (
         <div className="space-y-2">
-          <span className="text-xs font-medium text-zinc-500">Your previous suggestions</span>
+          <span className="text-xs font-medium text-[var(--brand-text-muted)]">Your previous suggestions</span>
           {section.clientSuggestions.map((s, i) => (
-            <div key={i} className="text-xs bg-zinc-800/50 rounded p-2 space-y-1">
+            <div key={i} className="text-xs bg-[var(--surface-3)]/50 rounded p-2 space-y-1">
               <div className="flex items-center gap-1.5">
-                <MessageSquare className="w-3 h-3 text-zinc-500" />
-                <span className="text-zinc-400">
+                <MessageSquare className="w-3 h-3 text-[var(--brand-text-muted)]" />
+                <span className="text-[var(--brand-text)]">
                   {s.status === 'pending' ? 'Pending review' :
                    s.status === 'accepted' ? 'Accepted' :
                    s.status === 'rejected' ? 'Not applied' :
                    'Modified'}
                 </span>
               </div>
-              <p className="text-zinc-400 line-through">{s.originalText.slice(0, 100)}{s.originalText.length > 100 ? '...' : ''}</p>
-              <p className="text-zinc-300">{s.suggestedText.slice(0, 100)}{s.suggestedText.length > 100 ? '...' : ''}</p>
+              <p className="text-[var(--brand-text)] line-through">{s.originalText.slice(0, 100)}{s.originalText.length > 100 ? '...' : ''}</p>
+              <p className="text-[var(--brand-text-bright)]">{s.suggestedText.slice(0, 100)}{s.suggestedText.length > 100 ? '...' : ''}</p>
               {s.reviewNote && (
-                <p className="text-zinc-500 italic">{s.reviewNote}</p>
+                <p className="text-[var(--brand-text-muted)] italic">{s.reviewNote}</p>
               )}
             </div>
           ))}
@@ -516,21 +514,19 @@ function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSugge
       {/* Action buttons (only for sections in client_review) */}
       {isReviewable && (
         <div className="flex flex-wrap items-center gap-2 pt-1">
-          <button
+          <Button
+            variant="primary"
             onClick={onApprove}
             disabled={isApproving}
-            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            loading={isApproving}
+            className="flex items-center gap-1.5 text-xs px-3 py-1.5"
           >
-            {isApproving ? (
-              <Loader2 className="w-3 h-3 animate-spin" />
-            ) : (
-              <Check className="w-3 h-3" />
-            )}
+            {!isApproving && <Check className="w-3 h-3" />}
             Approve
-          </button>
+          </Button>
           <button
             onClick={() => setShowSuggestForm(!showSuggestForm)}
-            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-zinc-700 text-zinc-300 hover:border-zinc-600 hover:text-zinc-200 transition-colors"
+            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-[var(--brand-border)] text-[var(--brand-text)] hover:border-[var(--brand-border-hover)] hover:text-[var(--brand-text-bright)] transition-colors"
           >
             <MessageSquare className="w-3 h-3" />
             Suggest Changes
@@ -548,8 +544,8 @@ function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSugge
 
       {/* Suggestion form */}
       {showSuggestForm && isReviewable && (
-        <div className="border-t border-zinc-800 pt-3 space-y-2">
-          <label className="text-xs text-zinc-400 block">
+        <div className="border-t border-[var(--brand-border)] pt-3 space-y-2">
+          <label className="text-xs text-[var(--brand-text)] block">
             How would you like this section to read?
           </label>
           <textarea
@@ -557,24 +553,22 @@ function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSugge
             onChange={e => setSuggestedText(e.target.value)}
             placeholder="Type your suggested version here..."
             rows={4}
-            className="w-full text-sm bg-zinc-800 border border-zinc-700 rounded p-2 text-zinc-200 placeholder-zinc-600 focus:border-teal-600 focus:outline-none resize-y"
+            className="w-full text-sm bg-[var(--surface-3)] border border-[var(--brand-border)] rounded p-2 text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-teal-600 focus:outline-none resize-y"
           />
           <div className="flex items-center gap-2">
-            <button
+            <Button
+              variant="primary"
               onClick={handleSubmitSuggestion}
               disabled={!suggestedText.trim() || isSuggesting}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              loading={isSuggesting}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5"
             >
-              {isSuggesting ? (
-                <Loader2 className="w-3 h-3 animate-spin" />
-              ) : (
-                <MessageSquare className="w-3 h-3" />
-              )}
+              {!isSuggesting && <MessageSquare className="w-3 h-3" />}
               Submit Suggestion
-            </button>
+            </Button>
             <button
               onClick={() => { setShowSuggestForm(false); setSuggestedText(''); }}
-              className="text-xs text-zinc-500 hover:text-zinc-400 transition-colors"
+              className="text-xs text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
             >
               Cancel
             </button>

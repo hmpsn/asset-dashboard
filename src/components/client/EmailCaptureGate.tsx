@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
-import { Loader2, Mail } from 'lucide-react';
+import { Mail } from 'lucide-react';
 import { post } from '../../api/client';
+import { Icon, Button } from '../ui';
 import type { WorkspaceInfo } from './types';
 
 export interface EmailCaptureGateProps {
@@ -50,15 +51,16 @@ export function EmailCaptureGate({
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+    <div className="min-h-screen bg-[var(--surface-1)] flex items-center justify-center">
       <div className="w-full max-w-sm">
-        <div className="bg-zinc-900 border border-zinc-800 p-8 shadow-2xl shadow-black/40" style={{ borderRadius: '10px 24px 10px 24px' }}>
+        {/* pr-check-disable-next-line -- full-screen email gate card uses brand signature radius intentionally */}
+        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-8 shadow-2xl shadow-black/40" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
           <div className="flex flex-col items-center mb-6">
             <div className="w-12 h-12 rounded-2xl bg-teal-500/10 flex items-center justify-center mb-4">
-              <Mail className="w-6 h-6 text-teal-400" />
+              <Icon as={Mail} size="xl" className="text-teal-400" />
             </div>
-            <h2 className="text-lg font-semibold text-zinc-200">Welcome to {ws?.name}</h2>
-            <p className="text-xs text-zinc-500 mt-1 text-center">
+            <h2 className="text-lg font-semibold text-[var(--brand-text-bright)]">Welcome to {ws?.name}</h2>
+            <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1 text-center">
               Enter your email to receive performance reports and important updates about your site.
             </p>
           </div>
@@ -68,7 +70,7 @@ export function EmailCaptureGate({
               value={captureName}
               onChange={(e) => setCaptureName(e.target.value)}
               placeholder="Your name (optional)"
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors"
+              className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] px-4 py-3 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors"
             />
             <input
               type="email"
@@ -76,20 +78,22 @@ export function EmailCaptureGate({
               onChange={(e) => setCaptureEmail(e.target.value)}
               placeholder="Your email address"
               required
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors"
+              className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] px-4 py-3 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors"
               autoFocus
             />
-            <button
+            <Button
               type="submit"
+              variant="primary"
               disabled={captureSubmitting || !captureEmail.trim()}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white text-sm font-medium transition-all flex items-center justify-center gap-2"
+              loading={captureSubmitting}
+              className="w-full"
             >
-              {captureSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Continue to Dashboard'}
-            </button>
+              {captureSubmitting ? '' : 'Continue to Dashboard'}
+            </Button>
             <button
               type="button"
               onClick={handleSkip}
-              className="w-full text-center text-[11px] text-zinc-600 hover:text-zinc-400 transition-colors"
+              className="w-full text-center t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
             >
               Skip for now
             </button>
