@@ -69,9 +69,9 @@ function ActionRow({ action }: ActionRowProps) {
   const hasDelta = delta !== null && !Number.isNaN(delta);
 
   return (
-    <div className="border border-zinc-800 rounded-xl overflow-hidden">
+    <div className="border border-[var(--brand-border)] rounded-xl overflow-hidden">
       <button
-        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-zinc-800/50 transition-colors"
+        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-[var(--surface-3)] transition-colors"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
       >
@@ -84,21 +84,21 @@ function ActionRow({ action }: ActionRowProps) {
         {/* Page + keyword */}
         <div className="flex-1 min-w-0">
           {action.pageUrl && (
-            <p className="text-xs text-zinc-300 font-medium truncate">
+            <p className="text-xs text-[var(--brand-text-bright)] font-medium truncate">
               {truncateUrl(action.pageUrl)}
             </p>
           )}
           {action.targetKeyword && (
-            <p className="text-[11px] text-zinc-500 truncate">{action.targetKeyword}</p>
+            <p className="t-caption text-[var(--brand-text-muted)] truncate">{action.targetKeyword}</p>
           )}
         </div>
 
         {/* Date */}
-        <span className="text-[11px] text-zinc-500 shrink-0">{formatOutcomeDate(action.createdAt)}</span>
+        <span className="t-caption text-[var(--brand-text-muted)] shrink-0">{formatOutcomeDate(action.createdAt)}</span>
 
         {/* Delta */}
         {hasDelta && (
-          <span className={`text-xs font-medium shrink-0 ${delta > 0 ? 'text-emerald-400' : delta < 0 ? 'text-red-400' : 'text-zinc-400'}`}>
+          <span className={`text-xs font-medium shrink-0 ${delta > 0 ? 'text-emerald-400' : delta < 0 ? 'text-red-400' : 'text-[var(--brand-text)]'}`}>
             {delta > 0 ? '+' : ''}{delta.toFixed(1)}
           </span>
         )}
@@ -106,47 +106,47 @@ function ActionRow({ action }: ActionRowProps) {
         {/* Score badge */}
         <div className="shrink-0">
           {expanded ? (
-            <ChevronUp className="w-3.5 h-3.5 text-zinc-500" />
+            <ChevronUp className="w-3.5 h-3.5 text-[var(--brand-text-muted)]" />
           ) : (
-            <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />
+            <ChevronDown className="w-3.5 h-3.5 text-[var(--brand-text-muted)]" />
           )}
         </div>
       </button>
 
       {expanded && (
-        <div className="border-t border-zinc-800 px-4 py-3 space-y-3 bg-zinc-900/50">
+        <div className="border-t border-[var(--brand-border)] px-4 py-3 space-y-3 bg-[var(--surface-2)]">
           {/* Detail grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <div>
-              <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-0.5">Attribution</p>
-              <p className="text-xs text-zinc-300">{action.attribution.replace(/_/g, ' ')}</p>
+              <p className="t-micro mb-0.5">Attribution</p>
+              <p className="text-xs text-[var(--brand-text-bright)]">{action.attribution.replace(/_/g, ' ')}</p>
             </div>
             <div>
-              <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-0.5">Window</p>
-              <p className="text-xs text-zinc-300">{action.measurementWindow}d</p>
+              <p className="t-micro mb-0.5">Window</p>
+              <p className="text-xs text-[var(--brand-text-bright)]">{action.measurementWindow}d</p>
             </div>
             <div>
-              <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-0.5">Status</p>
-              <p className="text-xs text-zinc-300">{action.measurementComplete ? 'Complete' : 'In progress'}</p>
+              <p className="t-micro mb-0.5">Status</p>
+              <p className="text-xs text-[var(--brand-text-bright)]">{action.measurementComplete ? 'Complete' : 'In progress'}</p>
             </div>
           </div>
 
           {/* Baseline snapshot */}
           {(baseline.position !== undefined || baseline.clicks !== undefined) && (
             <div>
-              <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1.5">Baseline Snapshot</p>
+              <p className="t-micro mb-1.5">Baseline Snapshot</p>
               <div className="flex flex-wrap gap-3">
                 {baseline.position !== undefined && (
-                  <span className="text-xs text-zinc-400">Pos: <span className="text-blue-400 font-medium">{baseline.position.toFixed(1)}</span></span>
+                  <span className="text-xs text-[var(--brand-text)]">Pos: <span className="text-blue-400 font-medium">{baseline.position.toFixed(1)}</span></span>
                 )}
                 {baseline.clicks !== undefined && (
-                  <span className="text-xs text-zinc-400">Clicks: <span className="text-blue-400 font-medium">{baseline.clicks}</span></span>
+                  <span className="text-xs text-[var(--brand-text)]">Clicks: <span className="text-blue-400 font-medium">{baseline.clicks}</span></span>
                 )}
                 {baseline.impressions !== undefined && (
-                  <span className="text-xs text-zinc-400">Impressions: <span className="text-blue-400 font-medium">{baseline.impressions}</span></span>
+                  <span className="text-xs text-[var(--brand-text)]">Impressions: <span className="text-blue-400 font-medium">{baseline.impressions}</span></span>
                 )}
                 {baseline.ctr !== undefined && (
-                  <span className="text-xs text-zinc-400">CTR: <span className="text-blue-400 font-medium">{baseline.ctr}%</span></span>
+                  <span className="text-xs text-[var(--brand-text)]">CTR: <span className="text-blue-400 font-medium">{baseline.ctr}%</span></span>
                 )}
               </div>
             </div>
@@ -184,11 +184,11 @@ export default function OutcomeActionFeed({ workspaceId }: Props) {
     <div className="space-y-4">
       {/* Filter bar */}
       <div className="flex items-center gap-3 flex-wrap">
-        <Filter className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+        <Filter className="w-3.5 h-3.5 text-[var(--brand-text-muted)] shrink-0" />
         <select
           value={typeFilter}
           onChange={(e) => setTypeFilter(e.target.value)}
-          className="bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-zinc-600 transition-colors"
+          className="bg-[var(--surface-2)] border border-[var(--brand-border)] text-xs text-[var(--brand-text-bright)] rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[var(--brand-border-hover)] transition-colors"
           aria-label="Filter by action type"
         >
           {ACTION_TYPE_OPTIONS.map((opt) => (
@@ -198,7 +198,7 @@ export default function OutcomeActionFeed({ workspaceId }: Props) {
         <select
           value={scoreFilter}
           onChange={(e) => setScoreFilter(e.target.value)}
-          className="bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-zinc-600 transition-colors"
+          className="bg-[var(--surface-2)] border border-[var(--brand-border)] text-xs text-[var(--brand-text-bright)] rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[var(--brand-border-hover)] transition-colors"
           aria-label="Filter by score"
         >
           {SCORE_OPTIONS.map((opt) => (
@@ -208,7 +208,7 @@ export default function OutcomeActionFeed({ workspaceId }: Props) {
         {(typeFilter || scoreFilter) && (
           <button
             onClick={() => { setTypeFilter(''); setScoreFilter(''); }}
-            className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+            className="text-xs text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"
           >
             Clear filters
           </button>

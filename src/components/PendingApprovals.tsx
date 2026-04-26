@@ -5,6 +5,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Send, Trash2, ChevronDown, Bell, Check } from 'lucide-react';
+import { Icon, cn } from './ui';
 import { approvals } from '../api/misc';
 import { queryKeys } from '../lib/queryKeys';
 import type { ApprovalBatch } from '../../shared/types/approvals';
@@ -72,25 +73,26 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
   };
 
   const statusBadge = (status: string) => {
-    if (status === 'applied') return <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 font-medium">Applied</span>;
-    if (status === 'approved') return <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 font-medium">Approved</span>;
-    if (status === 'partial') return <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20 font-medium">Partially Reviewed</span>;
-    if (status === 'rejected') return <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 border border-red-500/20 font-medium">Rejected</span>;
-    return <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/15 text-teal-400 border border-teal-500/20 font-medium">Awaiting Review</span>;
+    if (status === 'applied') return <span className="t-caption-sm px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 font-medium">Applied</span>;
+    if (status === 'approved') return <span className="t-caption-sm px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 font-medium">Approved</span>;
+    if (status === 'partial') return <span className="t-caption-sm px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20 font-medium">Partially Reviewed</span>;
+    if (status === 'rejected') return <span className="t-caption-sm px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 border border-red-500/20 font-medium">Rejected</span>;
+    return <span className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/15 text-teal-400 border border-teal-500/20 font-medium">Awaiting Review</span>;
   };
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
-      <div className="px-3 py-2 border-b border-zinc-800 flex items-center gap-2">
-        <Send className="w-3.5 h-3.5 text-teal-400" />
-        <span className="text-xs font-medium text-zinc-300">Sent to Client{!loading && ` (${batches.length})`}</span>
+    // pr-check-disable-next-line -- approval card uses brand signature radius intentionally
+    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+      <div className="px-3 py-2 border-b border-[var(--brand-border)] flex items-center gap-2">
+        <Icon as={Send} size="sm" className="text-teal-400" />
+        <span className="text-xs font-medium text-[var(--brand-text-bright)]">Sent to Client{!loading && ` (${batches.length})`}</span>
       </div>
       {loading ? (
-        <div className="px-3 py-3 text-[11px] text-zinc-500">Loading...</div>
+        <div className="px-3 py-3 t-caption text-[var(--brand-text-muted)]">Loading...</div>
       ) : batches.length === 0 ? (
-        <div className="px-3 py-3 text-[11px] text-zinc-500">No pending approval batches</div>
+        <div className="px-3 py-3 t-caption text-[var(--brand-text-muted)]">No pending approval batches</div>
       ) : (
-      <div className="divide-y divide-zinc-800/50">
+      <div className="divide-y divide-[var(--brand-border)]">
         {batches.map(batch => {
           const isExpanded = !compact && expanded.has(batch.id);
           const isConfirming = confirmId === batch.id;
@@ -101,36 +103,36 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
             <div key={batch.id}>
               <div className="flex items-center gap-2 px-3 py-2">
                 {!compact && (
-                  <button onClick={() => toggleExpand(batch.id)} className="p-0.5 hover:bg-zinc-800 rounded transition-colors">
-                    <ChevronDown className={`w-3 h-3 text-zinc-500 transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
+                  <button onClick={() => toggleExpand(batch.id)} className="p-0.5 hover:bg-[var(--surface-3)] rounded transition-colors">
+                    <ChevronDown className={cn('w-3 h-3 text-[var(--brand-text-muted)] transition-transform', !isExpanded && '-rotate-90')} />
                   </button>
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-medium text-zinc-300 truncate">{batch.name}</span>
+                    <span className="t-caption font-medium text-[var(--brand-text-bright)] truncate">{batch.name}</span>
                     {statusBadge(batch.status)}
                   </div>
-                  <div className="text-[10px] text-zinc-500 mt-0.5">
+                  <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
                     {new Date(batch.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     {' · '}{batch.items.length} item{batch.items.length !== 1 ? 's' : ''}
                     {approvedCount > 0 && <span className="text-emerald-400"> · {approvedCount} approved</span>}
                     {rejectedCount > 0 && <span className="text-red-400"> · {rejectedCount} rejected</span>}
-                    {pendingCount > 0 && pendingCount < batch.items.length && <span className="text-zinc-400"> · {pendingCount} pending</span>}
+                    {pendingCount > 0 && pendingCount < batch.items.length && <span className="text-[var(--brand-text)]"> · {pendingCount} pending</span>}
                   </div>
                 </div>
                 {isConfirming ? (
                   <div className="flex items-center gap-1 flex-shrink-0">
-                    <span className="text-[10px] text-red-400">Remove from client view?</span>
+                    <span className="t-caption-sm text-red-400">Remove from client view?</span>
                     <button
                       onClick={() => retract(batch.id)}
                       disabled={retractMutation.isPending && retractMutation.variables === batch.id}
-                      className="px-2 py-1 rounded text-[10px] font-medium bg-red-600 hover:bg-red-500 text-white transition-colors disabled:opacity-50"
+                      className="px-2 py-1 rounded t-caption-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-colors disabled:opacity-50"
                     >
                       {retractMutation.isPending && retractMutation.variables === batch.id ? '...' : 'Yes'}
                     </button>
                     <button
                       onClick={() => setConfirmId(null)}
-                      className="px-2 py-1 rounded text-[10px] font-medium text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+                      className="px-2 py-1 rounded t-caption-sm font-medium text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)] transition-colors"
                     >
                       No
                     </button>
@@ -139,26 +141,26 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
                   <div className="flex items-center gap-1 flex-shrink-0">
                     {pendingCount > 0 && (
                       reminderSent.has(batch.id) ? (
-                        <span className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-emerald-400">
-                          <Check className="w-3 h-3" /> Sent
+                        <span className="flex items-center gap-1 px-2 py-1 t-caption-sm font-medium text-emerald-400">
+                          <Icon as={Check} size="sm" /> Sent
                         </span>
                       ) : (
                         <button
                           onClick={() => sendReminder(batch.id)}
                           disabled={reminding === batch.id}
-                          className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-amber-400 hover:bg-amber-500/10 transition-colors disabled:opacity-50"
+                          className="flex items-center gap-1 px-2 py-1 rounded t-caption-sm font-medium text-amber-400 hover:bg-amber-500/10 transition-colors disabled:opacity-50"
                           title="Send reminder email to client"
                         >
-                          <Bell className="w-3 h-3" /> {reminding === batch.id ? 'Sending...' : 'Remind'}
+                          <Icon as={Bell} size="sm" /> {reminding === batch.id ? 'Sending...' : 'Remind'}
                         </button>
                       )
                     )}
                     <button
                       onClick={() => setConfirmId(batch.id)}
-                      className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-red-400 hover:bg-red-500/10 transition-colors"
+                      className="flex items-center gap-1 px-2 py-1 rounded t-caption-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors"
                       title="Retract — remove this from the client's view"
                     >
-                      <Trash2 className="w-3 h-3" /> Retract
+                      <Icon as={Trash2} size="sm" /> Retract
                     </button>
                   </div>
                 )}
@@ -166,11 +168,11 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
               {isExpanded && (
                 <div className="px-3 pb-2 pl-8 space-y-1">
                   {batch.items.map(item => {
-                    const itemStatus = item.status === 'approved' ? 'text-emerald-400' : item.status === 'rejected' ? 'text-red-400' : 'text-zinc-400';
+                    const itemStatus = item.status === 'approved' ? 'text-emerald-400' : item.status === 'rejected' ? 'text-red-400' : 'text-[var(--brand-text)]';
                     return (
-                      <div key={item.id} className="flex items-center gap-2 text-[10px]">
-                        <span className={`uppercase font-medium ${itemStatus}`}>{item.status}</span>
-                        <span className="text-zinc-500 truncate">{item.pageTitle} — {item.field}</span>
+                      <div key={item.id} className="flex items-center gap-2 t-caption-sm">
+                        <span className={cn('uppercase font-medium', itemStatus)}>{item.status}</span>
+                        <span className="text-[var(--brand-text-muted)] truncate">{item.pageTitle} — {item.field}</span>
                       </div>
                     );
                   })}

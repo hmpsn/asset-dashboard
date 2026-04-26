@@ -4,6 +4,7 @@ import { useActionQueue } from '../../hooks/admin/useActionQueue.js';
 import { SectionCard } from '../ui/SectionCard.js';
 import { EmptyState } from '../ui/EmptyState.js';
 import { Skeleton } from '../ui/Skeleton.js';
+import { Icon } from '../ui/index.js';
 import { put } from '../../api/client.js';
 import { queryKeys } from '../../lib/queryKeys.js';
 import { AlertTriangle, Clock, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react';
@@ -39,7 +40,7 @@ export function ActionQueue({ workspaceId }: Props) {
 
   if (isLoading) {
     return (
-      <SectionCard title="Action Queue" titleIcon={<AlertTriangle className="w-4 h-4 text-zinc-400" />}>
+      <SectionCard title="Action Queue" titleIcon={<Icon as={AlertTriangle} size="md" className="text-[var(--brand-text-muted)]" />}>
         <div className="space-y-3">
           {[1, 2, 3].map(i => <Skeleton key={i} className="h-16" />)}
         </div>
@@ -49,7 +50,7 @@ export function ActionQueue({ workspaceId }: Props) {
 
   if (!items.length) {
     return (
-      <SectionCard title="Action Queue" titleIcon={<AlertTriangle className="w-4 h-4 text-zinc-400" />}>
+      <SectionCard title="Action Queue" titleIcon={<Icon as={AlertTriangle} size="md" className="text-[var(--brand-text-muted)]" />}>
         <EmptyState
           icon={CheckCircle}
           title="All caught up"
@@ -60,7 +61,7 @@ export function ActionQueue({ workspaceId }: Props) {
   }
 
   return (
-    <SectionCard title={`Action Queue (${items.length})`} titleIcon={<AlertTriangle className="w-4 h-4 text-zinc-400" />}>
+    <SectionCard title={`Action Queue (${items.length})`} titleIcon={<Icon as={AlertTriangle} size="md" className="text-[var(--brand-text-muted)]" />}>
       <div className="space-y-2">
         {items.map(item => {
           const isExpanded = expandedId === item.id;
@@ -69,16 +70,16 @@ export function ActionQueue({ workspaceId }: Props) {
           const note = noteInputs[item.id] ?? '';
 
           return (
-            <div key={item.id} className="rounded-lg border border-zinc-800 bg-zinc-900/40">
+            <div key={item.id} className="rounded-lg border border-[var(--brand-border)] bg-[var(--surface-2)]">
               {/* Header row */}
               <button
-                className="w-full flex items-center gap-3 p-3 text-left hover:bg-zinc-800/30 rounded-lg transition-colors"
+                className="w-full flex items-center gap-3 p-3 text-left hover:bg-[var(--surface-3)] rounded-lg transition-colors"
                 onClick={() => setExpandedId(isExpanded ? null : item.id)}
               >
-                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase border ${badgeClass} shrink-0`}>
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full t-caption-sm font-semibold uppercase border ${badgeClass} shrink-0`}>
                   {item.severity}
                 </span>
-                <span className="text-sm text-zinc-200 flex-1 text-left truncate">
+                <span className="text-sm text-[var(--brand-text-bright)] flex-1 text-left truncate">
                   {item.pageTitle ?? item.pageId ?? 'Unknown page'}
                 </span>
                 {/* Impact score — blue for data */}
@@ -86,18 +87,18 @@ export function ActionQueue({ workspaceId }: Props) {
                   {item.impactScore ?? 0}
                 </span>
                 {isExpanded ? (
-                  <ChevronUp className="w-4 h-4 text-zinc-500 shrink-0" />
+                  <ChevronUp className="w-4 h-4 text-[var(--brand-text-muted)] shrink-0" />
                 ) : (
-                  <ChevronDown className="w-4 h-4 text-zinc-500 shrink-0" />
+                  <ChevronDown className="w-4 h-4 text-[var(--brand-text-muted)] shrink-0" />
                 )}
               </button>
 
               {/* Expanded resolution panel */}
               {isExpanded && (
-                <div className="px-3 pb-3 space-y-3 border-t border-zinc-800/60 pt-3">
-                  <p className="text-xs text-zinc-400">
-                    Type: <span className="text-zinc-300">{item.insightType}</span>
-                    {' · '}Domain: <span className="text-zinc-300">{item.domain ?? '—'}</span>
+                <div className="px-3 pb-3 space-y-3 border-t border-[var(--brand-border)] pt-3">
+                  <p className="text-xs text-[var(--brand-text)]">
+                    Type: <span className="text-[var(--brand-text-bright)]">{item.insightType}</span>
+                    {' · '}Domain: <span className="text-[var(--brand-text-bright)]">{item.domain ?? '—'}</span>
                   </p>
 
                   {/* Note input */}
@@ -106,7 +107,7 @@ export function ActionQueue({ workspaceId }: Props) {
                     placeholder="Add a resolution note (optional)..."
                     value={note}
                     onChange={e => setNoteInputs(prev => ({ ...prev, [item.id]: e.target.value }))}
-                    className="w-full text-xs bg-zinc-800/60 border border-zinc-700/50 rounded px-2.5 py-1.5 text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-teal-500/50"
+                    className="w-full text-xs bg-[var(--surface-1)] border border-[var(--brand-border-hover)] rounded px-2.5 py-1.5 text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500/50"
                   />
 
                   {/* Resolution buttons — teal for actions */}
@@ -114,7 +115,7 @@ export function ActionQueue({ workspaceId }: Props) {
                     <button
                       onClick={() => resolveMutation.mutate({ insightId: item.id, status: 'in_progress', note: note || undefined })}
                       disabled={resolveMutation.isPending}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-700/50 text-zinc-300 hover:bg-zinc-700 border border-zinc-600/50 transition-colors disabled:opacity-50"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)] border border-[var(--brand-border-hover)] transition-colors disabled:opacity-50"
                     >
                       <Clock className="w-3 h-3" />
                       In Progress

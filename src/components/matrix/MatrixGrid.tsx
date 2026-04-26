@@ -16,13 +16,13 @@ interface MatrixGridProps {
 }
 
 const STATUS_CONFIG: Record<MatrixCell['status'], { label: string; bg: string; text: string; border: string; icon: string }> = {
-  planned:            { label: 'Planned',           bg: 'bg-zinc-800',       text: 'text-zinc-500',   border: '',                    icon: '\u25CB' },
-  keyword_validated:   { label: 'Keyword Optimized', bg: 'bg-blue-500/10',    text: 'text-blue-400',   border: 'border-blue-500/20',  icon: '\u25D0' },
-  brief_generated:    { label: 'Brief Generated',   bg: 'bg-amber-500/10',   text: 'text-amber-400',  border: 'border-amber-500/20', icon: '\u25D1' },
-  review:             { label: 'Client Review',     bg: 'bg-blue-500/10',    text: 'text-blue-400',   border: 'border-blue-500/20', icon: '\u25D1' },
-  approved:           { label: 'Approved',           bg: 'bg-teal-500/10',   text: 'text-teal-400',   border: 'border-teal-500/20',  icon: '\u2713' },
-  draft:              { label: 'Draft',              bg: 'bg-orange-500/10',  text: 'text-orange-400', border: 'border-orange-500/20',icon: '\u25D0' },
-  published:          { label: 'Published',          bg: 'bg-emerald-500/10',   text: 'text-emerald-400',  border: 'border-emerald-500/20', icon: '\u25CF' },
+  planned:            { label: 'Planned',           bg: 'bg-[var(--surface-3)]',   text: 'text-[var(--brand-text-muted)]', border: '',                    icon: '○' },
+  keyword_validated:   { label: 'Keyword Optimized', bg: 'bg-blue-500/10',    text: 'text-blue-400',   border: 'border-blue-500/20',  icon: '◐' },
+  brief_generated:    { label: 'Brief Generated',   bg: 'bg-amber-500/10',   text: 'text-amber-400',  border: 'border-amber-500/20', icon: '◑' },
+  review:             { label: 'Client Review',     bg: 'bg-blue-500/10',    text: 'text-blue-400',   border: 'border-blue-500/20', icon: '◑' },
+  approved:           { label: 'Approved',           bg: 'bg-teal-500/10',   text: 'text-teal-400',   border: 'border-teal-500/20',  icon: '✓' },
+  draft:              { label: 'Draft',              bg: 'bg-orange-500/10',  text: 'text-orange-400', border: 'border-orange-500/20', icon: '◐' },
+  published:          { label: 'Published',          bg: 'bg-emerald-500/10',   text: 'text-emerald-400',  border: 'border-emerald-500/20', icon: '●' },
 };
 
 const ALL_STATUSES: MatrixCell['status'][] = ['planned', 'keyword_validated', 'brief_generated', 'review', 'approved', 'draft', 'published'];
@@ -121,27 +121,27 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
   };
 
   const renderCell = (cell: MatrixCell | undefined, flatIndex: number) => {
-    if (!cell) return <td key={`empty-${flatIndex}`} className="p-2 border border-zinc-800"><div className="h-14" /></td>;
+    if (!cell) return <td key={`empty-${flatIndex}`} className="p-2 border border-[var(--brand-border)]"><div className="h-14" /></td>;
     const cfg = STATUS_CONFIG[cell.status];
     const isSelected = selectedIds.has(cell.id);
     return (
       <td
         key={cell.id}
-        className={`p-0 border border-zinc-800 cursor-pointer transition-all ${isSelected ? 'ring-2 ring-teal-400 ring-inset' : ''}`}
+        className={`p-0 border border-[var(--brand-border)] cursor-pointer transition-all ${isSelected ? 'ring-2 ring-teal-400 ring-inset' : ''}`}
         onClick={e => handleCellSelect(cell.id, e, flatIndex)}
         onDoubleClick={() => handleCellOpen(cell)}
       >
         <div className={`px-2.5 py-2 h-full ${cfg.bg}`}>
           <div className="flex items-center gap-1 mb-1">
-            <span className={`text-[11px] ${cfg.text}`}>{cfg.icon}</span>
-            <span className="text-[11px] text-zinc-300 truncate flex-1">
+            <span className={`t-caption ${cfg.text}`}>{cfg.icon}</span>
+            <span className="t-caption text-[var(--brand-text-bright)] truncate flex-1">
               {cell.customKeyword ?? cell.targetKeyword}
             </span>
           </div>
           {cell.keywordValidation && (
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-zinc-400 tabular-nums">{cell.keywordValidation.volume}/mo</span>
-              <span className={`text-[10px] tabular-nums ${cell.keywordValidation.difficulty > 60 ? 'text-red-400' : cell.keywordValidation.difficulty > 35 ? 'text-amber-400' : 'text-emerald-400'}`}>
+              <span className="t-caption-sm text-[var(--brand-text)] tabular-nums">{cell.keywordValidation.volume}/mo</span>
+              <span className={`t-caption-sm tabular-nums ${cell.keywordValidation.difficulty > 60 ? 'text-red-400' : cell.keywordValidation.difficulty > 35 ? 'text-amber-400' : 'text-emerald-400'}`}>
                 KD {cell.keywordValidation.difficulty}
               </span>
             </div>
@@ -168,10 +168,10 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
       {/* Progress bar */}
       <div>
         <div className="flex items-center justify-between mb-1">
-          <span className="text-xs text-zinc-400">{progressPercent}% complete</span>
-          <span className="text-[11px] text-zinc-500">{completedCount}/{matrix.cells.length} pages</span>
+          <span className="text-xs text-[var(--brand-text)]">{progressPercent}% complete</span>
+          <span className="t-caption text-[var(--brand-text-muted)]">{completedCount}/{matrix.cells.length} pages</span>
         </div>
-        <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
+        <div className="w-full h-2 bg-[var(--surface-1)] rounded-full overflow-hidden">
           <div
             className="h-full bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full transition-all"
             style={{ width: `${progressPercent}%` }}
@@ -186,16 +186,16 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
           <div className="relative">
             <button
               onClick={() => { setShowFilter(!showFilter); setShowSort(false); }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-800 text-xs text-zinc-400 hover:text-zinc-200 hover:border-zinc-700 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--brand-border)] text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)] transition-colors"
             >
               <Filter className="w-3 h-3" /> Filter
               {filterStatus !== 'all' && <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />}
             </button>
             {showFilter && (
-              <div className="absolute top-full left-0 mt-1 w-48 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl z-20 py-1">
+              <div className="absolute top-full left-0 mt-1 w-48 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg shadow-xl z-20 py-1">
                 <button
                   onClick={() => { setFilterStatus('all'); setShowFilter(false); }}
-                  className={`w-full text-left px-3 py-1.5 text-xs hover:bg-zinc-800 transition-colors ${filterStatus === 'all' ? 'text-teal-400' : 'text-zinc-400'}`}
+                  className={`w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--surface-3)] transition-colors ${filterStatus === 'all' ? 'text-teal-400' : 'text-[var(--brand-text)]'}`}
                 >
                   All statuses
                 </button>
@@ -203,7 +203,7 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
                   <button
                     key={s}
                     onClick={() => { setFilterStatus(s); setShowFilter(false); }}
-                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-zinc-800 transition-colors ${filterStatus === s ? 'text-teal-400' : 'text-zinc-400'}`}
+                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--surface-3)] transition-colors ${filterStatus === s ? 'text-teal-400' : 'text-[var(--brand-text)]'}`}
                   >
                     {STATUS_CONFIG[s].icon} {STATUS_CONFIG[s].label}
                   </button>
@@ -216,17 +216,17 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
           <div className="relative">
             <button
               onClick={() => { setShowSort(!showSort); setShowFilter(false); }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-800 text-xs text-zinc-400 hover:text-zinc-200 hover:border-zinc-700 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--brand-border)] text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)] transition-colors"
             >
               <ArrowUpDown className="w-3 h-3" /> Sort
             </button>
             {showSort && (
-              <div className="absolute top-full left-0 mt-1 w-40 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl z-20 py-1">
+              <div className="absolute top-full left-0 mt-1 w-40 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg shadow-xl z-20 py-1">
                 {([['status', 'Status'], ['volume', 'Volume'], ['difficulty', 'Difficulty'], ['alphabetical', 'Alphabetical']] as const).map(([key, label]) => (
                   <button
                     key={key}
                     onClick={() => { setSortKey(key); setShowSort(false); }}
-                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-zinc-800 transition-colors ${sortKey === key ? 'text-teal-400' : 'text-zinc-400'}`}
+                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--surface-3)] transition-colors ${sortKey === key ? 'text-teal-400' : 'text-[var(--brand-text)]'}`}
                   >
                     {label}
                   </button>
@@ -239,7 +239,7 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
         <div className="flex items-center gap-2">
           {selectedIds.size > 0 && (
             <>
-              <span className="text-xs text-zinc-400">
+              <span className="text-xs text-[var(--brand-text)]">
                 <CheckSquare className="w-3 h-3 inline mr-1" />
                 {selectedIds.size} selected
               </span>
@@ -251,7 +251,7 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
                   Actions
                 </button>
                 {showBulkMenu && (
-                  <div className="absolute top-full right-0 mt-1 w-52 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl z-20 py-1">
+                  <div className="absolute top-full right-0 mt-1 w-52 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg shadow-xl z-20 py-1">
                     {[
                       { key: 'optimize' as const, label: 'Optimize Keywords', icon: Sparkles },
                       { key: 'generate_briefs' as const, label: 'Generate Briefs', icon: FileText },
@@ -262,9 +262,9 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
                       <button
                         key={action.key}
                         onClick={() => { onBulkAction(action.key, [...selectedIds]); setShowBulkMenu(false); }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800 transition-colors"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)] transition-colors"
                       >
-                        <action.icon className="w-3.5 h-3.5 text-zinc-500" />
+                        <action.icon className="w-3.5 h-3.5 text-[var(--brand-text-muted)]" />
                         {action.label}
                       </button>
                     ))}
@@ -283,11 +283,11 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
             <table className="w-full border-collapse text-left">
               <thead>
                 <tr>
-                  <th className="px-3 py-2 text-[11px] font-semibold text-zinc-500 uppercase tracking-wider border-b border-zinc-800 bg-zinc-950 sticky left-0 z-10">
+                  <th className="px-3 py-2 t-caption font-semibold text-[var(--brand-text-muted)] uppercase tracking-wider border-b border-[var(--brand-border)] bg-[var(--surface-1)] sticky left-0 z-10">
                     {dim0.label ?? dim0.variableName} / {dim1.label ?? dim1.variableName}
                   </th>
                   {dim1.values.map(col => (
-                    <th key={col} className="px-3 py-2 text-[11px] font-semibold text-zinc-300 border-b border-zinc-800 bg-zinc-950 text-center min-w-[120px]">
+                    <th key={col} className="px-3 py-2 t-caption font-semibold text-[var(--brand-text-bright)] border-b border-[var(--brand-border)] bg-[var(--surface-1)] text-center min-w-[120px]">
                       {col}
                     </th>
                   ))}
@@ -296,7 +296,7 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
               <tbody>
                 {dim0.values.map(row => (
                   <tr key={row}>
-                    <td className="px-3 py-2 text-xs font-medium text-zinc-300 border-b border-zinc-800 bg-zinc-950 sticky left-0 z-10 whitespace-nowrap">
+                    <td className="px-3 py-2 text-xs font-medium text-[var(--brand-text-bright)] border-b border-[var(--brand-border)] bg-[var(--surface-1)] sticky left-0 z-10 whitespace-nowrap">
                       {row}
                     </td>
                     {dim1.values.map(col => {
@@ -312,29 +312,29 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
         </SectionCard>
       ) : (
         <SectionCard noPadding>
-          <div className="divide-y divide-zinc-800">
+          <div className="divide-y divide-[var(--brand-border)]">
             {sortedCells.map((cell, i) => {
               const cfg = STATUS_CONFIG[cell.status];
               const isSelected = selectedIds.has(cell.id);
               return (
                 <div
                   key={cell.id}
-                  className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-zinc-800/40 transition-colors ${isSelected ? 'ring-2 ring-teal-400 ring-inset' : ''}`}
+                  className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[var(--surface-3)] transition-colors ${isSelected ? 'ring-2 ring-teal-400 ring-inset' : ''}`}
                   onClick={e => handleCellSelect(cell.id, e, i)}
                   onDoubleClick={() => handleCellOpen(cell)}
                 >
                   <button
                     onClick={e => { e.stopPropagation(); handleCellSelect(cell.id, { ...e, ctrlKey: true } as React.MouseEvent, i); }}
-                    className="text-zinc-500 hover:text-zinc-300"
+                    className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
                   >
                     {isSelected ? <CheckSquare className="w-3.5 h-3.5 text-teal-400" /> : <Square className="w-3.5 h-3.5" />}
                   </button>
-                  <Badge label={`${cfg.icon} ${cfg.label}`} color={cfg.text.includes('zinc') ? 'zinc' : cfg.text.includes('blue') ? 'blue' : cfg.text.includes('amber') ? 'amber' : cfg.text.includes('teal') ? 'teal' : cfg.text.includes('orange') ? 'orange' : cfg.text.includes('emerald') ? 'emerald' : cfg.text.includes('red') ? 'red' : 'zinc'} />
-                  <span className="text-xs text-zinc-300 flex-1 truncate">{cell.customKeyword ?? cell.targetKeyword}</span>
+                  <Badge label={`${cfg.icon} ${cfg.label}`} color={cfg.text.includes('zinc') || cfg.text.includes('brand') ? 'zinc' : cfg.text.includes('blue') ? 'blue' : cfg.text.includes('amber') ? 'amber' : cfg.text.includes('teal') ? 'teal' : cfg.text.includes('orange') ? 'orange' : cfg.text.includes('emerald') ? 'emerald' : cfg.text.includes('red') ? 'red' : 'zinc'} />
+                  <span className="text-xs text-[var(--brand-text-bright)] flex-1 truncate">{cell.customKeyword ?? cell.targetKeyword}</span>
                   {cell.keywordValidation && (
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-[10px] text-zinc-400 tabular-nums">{cell.keywordValidation.volume}/mo</span>
-                      <span className={`text-[10px] tabular-nums ${cell.keywordValidation.difficulty > 60 ? 'text-red-400' : cell.keywordValidation.difficulty > 35 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                      <span className="t-caption-sm text-[var(--brand-text)] tabular-nums">{cell.keywordValidation.volume}/mo</span>
+                      <span className={`t-caption-sm tabular-nums ${cell.keywordValidation.difficulty > 60 ? 'text-red-400' : cell.keywordValidation.difficulty > 35 ? 'text-amber-400' : 'text-emerald-400'}`}>
                         KD {cell.keywordValidation.difficulty}
                       </span>
                     </div>
@@ -352,12 +352,12 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
         {ALL_STATUSES.map(s => {
           const cfg = STATUS_CONFIG[s];
           return (
-            <span key={s} className="flex items-center gap-1 text-[10px] text-zinc-500">
+            <span key={s} className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
               <span className={cfg.text}>{cfg.icon}</span> {cfg.label}
             </span>
           );
         })}
-        <span className="flex items-center gap-1 text-[10px] text-zinc-500">
+        <span className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
           <Flag className="w-2.5 h-2.5 text-amber-400" /> Flagged
         </span>
       </div>
