@@ -60,9 +60,9 @@ function VariablePill({ variable, index, onRemove }: { variable: TemplateVariabl
   return (
     <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${color.bg} ${color.border}`}>
       <span className={`text-xs font-mono font-semibold ${color.text}`}>{`{${variable.name}}`}</span>
-      <span className="text-[11px] text-zinc-400">Label: {variable.label}</span>
-      {variable.description && <span className="text-[11px] text-zinc-500">&mdash; {variable.description}</span>}
-      <button onClick={onRemove} className="ml-auto p-0.5 rounded hover:bg-zinc-700 text-zinc-500 hover:text-zinc-300 transition-colors">
+      <span className="t-caption text-[var(--brand-text)]">Label: {variable.label}</span>
+      {variable.description && <span className="t-caption text-[var(--brand-text-muted)]">&mdash; {variable.description}</span>}
+      <button onClick={onRemove} className="ml-auto p-0.5 rounded hover:bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">
         <X className="w-3 h-3" />
       </button>
     </div>
@@ -96,64 +96,64 @@ function SectionItem({
       onDragStart={onDragStart}
       onDragOver={onDragOver}
       onDrop={onDrop}
-      className="bg-zinc-950 border border-zinc-800 rounded-lg overflow-hidden transition-colors hover:border-zinc-700"
+      className="bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg overflow-hidden transition-colors hover:border-[var(--brand-border-hover)]"
     >
       <button
         onClick={onToggle}
         className="w-full flex items-center gap-2 px-3 py-2.5 text-left"
       >
-        <GripVertical className="w-3.5 h-3.5 text-zinc-600 cursor-grab flex-shrink-0" />
-        <span className="text-xs font-semibold text-zinc-200 flex-1 truncate capitalize">
+        <GripVertical className="w-3.5 h-3.5 text-[var(--brand-text-muted)] cursor-grab flex-shrink-0" />
+        <span className="text-xs font-semibold text-[var(--brand-text-bright)] flex-1 truncate capitalize">
           {section.name.replace(/_/g, ' ')}
         </span>
-        <span className="text-[11px] text-zinc-500 flex-shrink-0">{section.wordCountTarget} words</span>
-        {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />}
+        <span className="t-caption text-[var(--brand-text-muted)] flex-shrink-0">{section.wordCountTarget} words</span>
+        {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-[var(--brand-text-muted)]" /> : <ChevronDown className="w-3.5 h-3.5 text-[var(--brand-text-muted)]" />}
       </button>
 
       {isExpanded && (
-        <div className="px-3 pb-3 space-y-2 border-t border-zinc-800">
+        <div className="px-3 pb-3 space-y-2 border-t border-[var(--brand-border)]">
           <div className="pt-2">
-            <label className="text-[11px] text-zinc-500 font-medium">Heading Template</label>
+            <label className="t-caption text-[var(--brand-text-muted)] font-medium">Heading Template</label>
             <input
               type="text"
               value={section.headingTemplate}
               onChange={e => onUpdate({ headingTemplate: e.target.value })}
               placeholder="e.g. {service} in {city}"
-              className="w-full mt-1 px-2.5 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 focus:border-teal-500/40 focus:outline-none transition-colors"
+              className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
             />
-            <p className="text-[10px] text-zinc-600 mt-0.5">
+            <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
               Preview: {replaceVariables(section.headingTemplate, variables)}
             </p>
           </div>
           <div>
-            <label className="text-[11px] text-zinc-500 font-medium">Guidance</label>
+            <label className="t-caption text-[var(--brand-text-muted)] font-medium">Guidance</label>
             <textarea
               value={section.guidance}
               onChange={e => onUpdate({ guidance: e.target.value })}
               placeholder="AI guidance for this section..."
               rows={2}
-              className="w-full mt-1 px-2.5 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 resize-none focus:border-teal-500/40 focus:outline-none transition-colors"
+              className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] resize-none focus:border-teal-500/40 focus:outline-none transition-colors"
             />
           </div>
           <div className="flex items-center gap-3">
             <div className="flex-1">
-              <label className="text-[11px] text-zinc-500 font-medium">Word Count Target</label>
+              <label className="t-caption text-[var(--brand-text-muted)] font-medium">Word Count Target</label>
               <input
                 type="number"
                 value={section.wordCountTarget}
                 onChange={e => onUpdate({ wordCountTarget: parseInt(e.target.value) || 0 })}
                 min={0}
-                className="w-full mt-1 px-2.5 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-300 focus:border-teal-500/40 focus:outline-none transition-colors"
+                className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text)] focus:border-teal-500/40 focus:outline-none transition-colors"
               />
             </div>
             <div className="flex-1">
-              <label className="text-[11px] text-zinc-500 font-medium">CMS Field Slug</label>
+              <label className="t-caption text-[var(--brand-text-muted)] font-medium">CMS Field Slug</label>
               <input
                 type="text"
                 value={section.cmsFieldSlug ?? ''}
                 onChange={e => onUpdate({ cmsFieldSlug: e.target.value || undefined })}
                 placeholder="hero_content"
-                className="w-full mt-1 px-2.5 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 focus:border-teal-500/40 focus:outline-none transition-colors"
+                className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
               />
             </div>
           </div>
@@ -302,7 +302,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
     <div className="max-w-6xl mx-auto px-6 py-6 space-y-8">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <button onClick={onCancel} className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200 transition-colors">
+        <button onClick={onCancel} className="flex items-center gap-1 text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
           <ArrowLeft className="w-3.5 h-3.5" /> Back to Templates
         </button>
       </div>
@@ -311,31 +311,31 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
       <SectionCard title={templateId ? 'Edit Template' : 'New Template'} titleIcon={<FileText className="w-4 h-4 text-teal-400" />}>
         <div className="space-y-3">
           <div>
-            <label className="text-[11px] text-zinc-500 font-medium">Template Name</label>
+            <label className="t-caption text-[var(--brand-text-muted)] font-medium">Template Name</label>
             <input
               type="text"
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="e.g. Service \u00d7 Location Page"
-              className="w-full mt-1 px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 focus:border-teal-500/40 focus:outline-none transition-colors"
+              className="w-full mt-1 px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
             />
           </div>
           <div>
-            <label className="text-[11px] text-zinc-500 font-medium">Description</label>
+            <label className="t-caption text-[var(--brand-text-muted)] font-medium">Description</label>
             <input
               type="text"
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder="What is this template for?"
-              className="w-full mt-1 px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 focus:border-teal-500/40 focus:outline-none transition-colors"
+              className="w-full mt-1 px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
             />
           </div>
           <div>
-            <label className="text-[11px] text-zinc-500 font-medium">Page Type</label>
+            <label className="t-caption text-[var(--brand-text-muted)] font-medium">Page Type</label>
             <select
               value={pageType}
               onChange={e => setPageType(e.target.value as ContentTemplate['pageType'])}
-              className="w-full mt-1 px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 focus:border-teal-500/40 focus:outline-none transition-colors"
+              className="w-full mt-1 px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text)] focus:border-teal-500/40 focus:outline-none transition-colors"
             >
               {PAGE_TYPES.map(pt => (
                 <option key={pt} value={pt}>{pt.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}</option>
@@ -355,7 +355,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
             ))}
 
             {showAddVar ? (
-              <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 space-y-2">
+              <div className="bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg p-3 space-y-2">
                 <div className="flex items-center gap-2">
                   <div className="flex-1">
                     <input
@@ -363,7 +363,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
                       value={newVarName}
                       onChange={e => setNewVarName(e.target.value)}
                       placeholder="Variable name (e.g. city)"
-                      className="w-full px-2.5 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 focus:border-teal-500/40 focus:outline-none transition-colors"
+                      className="w-full px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
                     />
                   </div>
                   <div className="flex-1">
@@ -372,7 +372,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
                       value={newVarLabel}
                       onChange={e => setNewVarLabel(e.target.value)}
                       placeholder="Display label (e.g. City)"
-                      className="w-full px-2.5 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 focus:border-teal-500/40 focus:outline-none transition-colors"
+                      className="w-full px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
                     />
                   </div>
                 </div>
@@ -381,13 +381,13 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
                   value={newVarDesc}
                   onChange={e => setNewVarDesc(e.target.value)}
                   placeholder="Description (optional)"
-                  className="w-full px-2.5 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 focus:border-teal-500/40 focus:outline-none transition-colors"
+                  className="w-full px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
                 />
                 <div className="flex items-center gap-2">
-                  <button onClick={handleAddVariable} className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 text-[11px] text-white font-medium hover:from-teal-500 hover:to-emerald-500 transition-colors">
+                  <button onClick={handleAddVariable} className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 t-caption text-white font-medium hover:from-teal-500 hover:to-emerald-500 transition-colors">
                     Add
                   </button>
-                  <button onClick={() => setShowAddVar(false)} className="px-3 py-1.5 rounded-lg text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors">
+                  <button onClick={() => setShowAddVar(false)} className="px-3 py-1.5 rounded-lg t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">
                     Cancel
                   </button>
                 </div>
@@ -401,9 +401,9 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
               </button>
             )}
 
-            <div className="pt-3 space-y-2 border-t border-zinc-800">
+            <div className="pt-3 space-y-2 border-t border-[var(--brand-border)]">
               <div>
-                <label className="text-[11px] text-zinc-500 font-medium flex items-center gap-1">
+                <label className="t-caption text-[var(--brand-text-muted)] font-medium flex items-center gap-1">
                   <Link2 className="w-3 h-3" /> URL Pattern
                 </label>
                 <input
@@ -411,14 +411,14 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
                   value={urlPattern}
                   onChange={e => setUrlPattern(e.target.value)}
                   placeholder="/services/{city}/{service}"
-                  className="w-full mt-1 px-2.5 py-1.5 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 font-mono placeholder-zinc-600 focus:border-teal-500/40 focus:outline-none transition-colors"
+                  className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text)] font-mono placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
                 />
                 {urlPattern && (
-                  <p className="text-[10px] text-zinc-600 mt-0.5 font-mono">{replaceVariables(urlPattern, variables)}</p>
+                  <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 font-mono">{replaceVariables(urlPattern, variables)}</p>
                 )}
               </div>
               <div>
-                <label className="text-[11px] text-zinc-500 font-medium flex items-center gap-1">
+                <label className="t-caption text-[var(--brand-text-muted)] font-medium flex items-center gap-1">
                   <Search className="w-3 h-3" /> Keyword Pattern
                 </label>
                 <input
@@ -426,14 +426,14 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
                   value={keywordPattern}
                   onChange={e => setKeywordPattern(e.target.value)}
                   placeholder="{service} in {city}"
-                  className="w-full mt-1 px-2.5 py-1.5 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 font-mono placeholder-zinc-600 focus:border-teal-500/40 focus:outline-none transition-colors"
+                  className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text)] font-mono placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
                 />
                 {keywordPattern && (
-                  <p className="text-[10px] text-zinc-600 mt-0.5 font-mono">{replaceVariables(keywordPattern, variables)}</p>
+                  <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 font-mono">{replaceVariables(keywordPattern, variables)}</p>
                 )}
               </div>
               <div>
-                <label className="text-[11px] text-zinc-500 font-medium flex items-center gap-1">
+                <label className="t-caption text-[var(--brand-text-muted)] font-medium flex items-center gap-1">
                   <Type className="w-3 h-3" /> Tone & Style
                 </label>
                 <textarea
@@ -441,7 +441,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
                   onChange={e => setToneAndStyle(e.target.value)}
                   placeholder="Optional brand voice override..."
                   rows={2}
-                  className="w-full mt-1 px-2.5 py-1.5 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 resize-none focus:border-teal-500/40 focus:outline-none transition-colors"
+                  className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] resize-none focus:border-teal-500/40 focus:outline-none transition-colors"
                 />
               </div>
             </div>
@@ -453,10 +453,10 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
           <div className="space-y-3">
             {keywordPattern && (
               <div>
-                <p className="text-lg font-semibold text-zinc-100">
+                <p className="text-lg font-semibold text-[var(--brand-text-bright)]">
                   {replaceVariables(keywordPattern, variables)}
                 </p>
-                <p className="text-[11px] text-zinc-500 font-mono mt-0.5">
+                <p className="t-caption text-[var(--brand-text-muted)] font-mono mt-0.5">
                   {urlPattern ? replaceVariables(urlPattern, variables) : 'No URL pattern set'}
                 </p>
               </div>
@@ -465,24 +465,24 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
             {sections.length > 0 ? (
               <div className="space-y-2">
                 {sections.map(s => (
-                  <div key={s.id} className="flex items-start gap-2 py-1.5 border-b border-zinc-800/50 last:border-0">
-                    <span className="text-[11px] text-zinc-600 mt-0.5">&sect;</span>
+                  <div key={s.id} className="flex items-start gap-2 py-1.5 border-b border-[var(--brand-border)] last:border-0">
+                    <span className="t-caption text-[var(--brand-text-muted)] mt-0.5">&sect;</span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-zinc-300">
+                      <p className="text-xs font-medium text-[var(--brand-text)]">
                         {replaceVariables(s.headingTemplate, variables) || s.name.replace(/_/g, ' ')}
                       </p>
-                      <p className="text-[10px] text-zinc-500">{s.wordCountTarget} words</p>
+                      <p className="t-caption-sm text-[var(--brand-text-muted)]">{s.wordCountTarget} words</p>
                     </div>
                   </div>
                 ))}
-                <div className="pt-2 border-t border-zinc-800">
-                  <p className="text-xs text-zinc-400">
+                <div className="pt-2 border-t border-[var(--brand-border)]">
+                  <p className="text-xs text-[var(--brand-text)]">
                     Total: ~{totalWords.toLocaleString()} words ({sections.length} section{sections.length !== 1 ? 's' : ''})
                   </p>
                 </div>
               </div>
             ) : (
-              <p className="text-xs text-zinc-500 py-4 text-center">Add sections below to see a preview</p>
+              <p className="text-xs text-[var(--brand-text-muted)] py-4 text-center">Add sections below to see a preview</p>
             )}
           </div>
         </SectionCard>
@@ -494,7 +494,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
         titleExtra={<Badge label={`${sections.length}`} color="zinc" />}
         titleIcon={<FileText className="w-4 h-4 text-amber-400" />}
         action={
-          <span className="text-[11px] text-zinc-500">Drag to reorder</span>
+          <span className="t-caption text-[var(--brand-text-muted)]">Drag to reorder</span>
         }
       >
         <div className="space-y-2">
@@ -514,7 +514,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
           ))}
           <button
             onClick={handleAddSection}
-            className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg border border-dashed border-zinc-700 text-xs text-zinc-400 hover:text-teal-400 hover:border-teal-500/30 transition-colors"
+            className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg border border-dashed border-[var(--brand-border-hover)] text-xs text-[var(--brand-text)] hover:text-teal-400 hover:border-teal-500/30 transition-colors"
           >
             <Plus className="w-3.5 h-3.5" /> Add Section
           </button>
@@ -523,7 +523,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
 
       {/* Actions */}
       <div className="flex items-center justify-between pt-2">
-        <button onClick={onCancel} className="px-4 py-2 rounded-lg text-xs text-zinc-400 hover:text-zinc-200 transition-colors">
+        <button onClick={onCancel} className="px-4 py-2 rounded-lg text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
           Cancel
         </button>
         <button

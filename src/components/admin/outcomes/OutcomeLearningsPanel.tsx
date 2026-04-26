@@ -36,7 +36,7 @@ function formatWinRateRecord(record: Record<string, number>): Array<{ label: str
 
 function NoDataMessage({ message = 'Not enough data yet' }: { message?: string }) {
   return (
-    <p className="text-xs text-zinc-600 italic py-2">{message}</p>
+    <p className="text-xs text-[var(--brand-text-muted)] italic py-2">{message}</p>
   );
 }
 
@@ -57,11 +57,11 @@ function ContentSection({ data }: ContentSectionProps) {
         {/* Win rate by format */}
         {formatWins.length > 0 ? (
           <div>
-            <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-2">Win Rate by Format</p>
+            <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-2">Win Rate by Format</p>
             <div className="space-y-1.5">
               {formatWins.map(({ label, value }) => (
                 <div key={label} className="flex items-center justify-between">
-                  <span className="text-xs text-zinc-400 capitalize">{label}</span>
+                  <span className="text-xs text-[var(--brand-text)] capitalize">{label}</span>
                   <span className="text-xs font-semibold text-emerald-400">{value}</span>
                 </div>
               ))}
@@ -74,27 +74,27 @@ function ContentSection({ data }: ContentSectionProps) {
         {/* Key metrics */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-0.5">Avg Days to Page 1</p>
-            <p className="text-sm font-bold text-zinc-200">
+            <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-0.5">Avg Days to Page 1</p>
+            <p className="text-sm font-bold text-[var(--brand-text-bright)]">
               {data.avgDaysToPage1 !== null ? `${data.avgDaysToPage1}d` : '—'}
             </p>
           </div>
           <div>
-            <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-0.5">Refresh Recovery Rate</p>
-            <p className="text-sm font-bold text-zinc-200">{pct(data.refreshRecoveryRate)}</p>
+            <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-0.5">Refresh Recovery Rate</p>
+            <p className="text-sm font-bold text-[var(--brand-text-bright)]">{pct(data.refreshRecoveryRate)}</p>
           </div>
           {data.optimalWordCount && (
             <div>
-              <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-0.5">Optimal Word Count</p>
-              <p className="text-sm font-bold text-zinc-200">
+              <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-0.5">Optimal Word Count</p>
+              <p className="text-sm font-bold text-[var(--brand-text-bright)]">
                 {data.optimalWordCount.min}–{data.optimalWordCount.max}
               </p>
             </div>
           )}
           {data.voiceScoreCorrelation !== null && (
             <div>
-              <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-0.5">Voice Score Correlation</p>
-              <p className="text-sm font-bold text-zinc-200">{data.voiceScoreCorrelation > 0 ? '+' : ''}{data.voiceScoreCorrelation.toFixed(1)} pts</p>
+              <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-0.5">Voice Score Correlation</p>
+              <p className="text-sm font-bold text-[var(--brand-text-bright)]">{data.voiceScoreCorrelation > 0 ? '+' : ''}{data.voiceScoreCorrelation.toFixed(1)} pts</p>
             </div>
           )}
         </div>
@@ -102,7 +102,7 @@ function ContentSection({ data }: ContentSectionProps) {
         {/* Best topics */}
         {data.bestPerformingTopics.length > 0 && (
           <div>
-            <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-2">Best Performing Topics</p>
+            <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-2">Best Performing Topics</p>
             <div className="flex flex-wrap gap-1.5">
               {data.bestPerformingTopics.slice(0, 6).map((topic) => (
                 <Badge key={topic} label={topic} color="blue" />
@@ -135,11 +135,11 @@ function StrategySection({ data }: StrategySectionProps) {
         {/* Win rate by difficulty */}
         {difficultyWins.length > 0 ? (
           <div>
-            <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-2">Win Rate by Difficulty</p>
+            <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-2">Win Rate by Difficulty</p>
             <div className="space-y-1.5">
               {difficultyWins.map(({ label, value }) => (
                 <div key={label} className="flex items-center justify-between">
-                  <span className="text-xs text-zinc-400 capitalize">{label}</span>
+                  <span className="text-xs text-[var(--brand-text)] capitalize">{label}</span>
                   <span className="text-xs font-semibold text-emerald-400">{value}</span>
                 </div>
               ))}
@@ -152,11 +152,11 @@ function StrategySection({ data }: StrategySectionProps) {
         {/* Win rate by checkpoint */}
         {checkpointWinRates.length > 0 && (
           <div>
-            <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-2">Win Rate by Checkpoint</p>
+            <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-2">Win Rate by Checkpoint</p>
             <div className="space-y-1.5">
               {checkpointWinRates.map(([checkpoint, rate]) => (
                 <div key={checkpoint} className="flex items-center justify-between">
-                  <span className="text-xs text-zinc-400 capitalize">{checkpoint}</span>
+                  <span className="text-xs text-[var(--brand-text)] capitalize">{checkpoint}</span>
                   <span className="text-xs font-semibold text-emerald-400">{Math.round(rate * 100)}%</span>
                 </div>
               ))}
@@ -168,8 +168,8 @@ function StrategySection({ data }: StrategySectionProps) {
         <div className="grid grid-cols-2 gap-3">
           {data.keywordVolumeSweetSpot && (
             <div>
-              <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-0.5">Volume Sweet Spot</p>
-              <p className="text-sm font-bold text-zinc-200">
+              <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-0.5">Volume Sweet Spot</p>
+              <p className="text-sm font-bold text-[var(--brand-text-bright)]">
                 {data.keywordVolumeSweetSpot.min.toLocaleString()}–{data.keywordVolumeSweetSpot.max.toLocaleString()}
               </p>
             </div>
@@ -179,7 +179,7 @@ function StrategySection({ data }: StrategySectionProps) {
         {/* Best intent types */}
         {data.bestIntentTypes.length > 0 && (
           <div>
-            <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-2">Best Intent Types</p>
+            <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-2">Best Intent Types</p>
             <div className="flex flex-wrap gap-1.5">
               {data.bestIntentTypes.slice(0, 5).map((intent) => (
                 <Badge key={intent} label={intent} color="blue" />
@@ -209,11 +209,11 @@ function TechnicalSection({ data }: TechnicalSectionProps) {
         {/* Win rate by fix type */}
         {fixTypeWins.length > 0 ? (
           <div>
-            <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-2">Win Rate by Fix Type</p>
+            <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-2">Win Rate by Fix Type</p>
             <div className="space-y-1.5">
               {fixTypeWins.map(({ label, value }) => (
                 <div key={label} className="flex items-center justify-between">
-                  <span className="text-xs text-zinc-400 capitalize">{label}</span>
+                  <span className="text-xs text-[var(--brand-text)] capitalize">{label}</span>
                   <span className="text-xs font-semibold text-emerald-400">{value}</span>
                 </div>
               ))}
@@ -226,19 +226,19 @@ function TechnicalSection({ data }: TechnicalSectionProps) {
         {/* Key metrics */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-0.5">Avg Health Score Gain</p>
-            <p className="text-sm font-bold text-zinc-200">+{data.avgHealthScoreImprovement.toFixed(1)}</p>
+            <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-0.5">Avg Health Score Gain</p>
+            <p className="text-sm font-bold text-[var(--brand-text-bright)]">+{data.avgHealthScoreImprovement.toFixed(1)}</p>
           </div>
           <div>
-            <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-0.5">Internal Link Effectiveness</p>
-            <p className="text-sm font-bold text-zinc-200">{pct(data.internalLinkEffectiveness)}</p>
+            <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-0.5">Internal Link Effectiveness</p>
+            <p className="text-sm font-bold text-[var(--brand-text-bright)]">{pct(data.internalLinkEffectiveness)}</p>
           </div>
         </div>
 
         {/* Schema types with rich results */}
         {data.schemaTypesWithRichResults.length > 0 && (
           <div>
-            <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-2">Schema Types Driving Rich Results</p>
+            <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-2">Schema Types Driving Rich Results</p>
             <div className="flex flex-wrap gap-1.5">
               {data.schemaTypesWithRichResults.map((type) => (
                 <Badge key={type} label={type} color="blue" />
@@ -258,7 +258,8 @@ export default function OutcomeLearningsPanel({ workspaceId }: Props) {
     return (
       <div className="space-y-4">
         {/* Confidence header skeleton */}
-        <div className="bg-zinc-900 border border-zinc-800 px-4 py-3 flex items-center gap-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
+        {/* pr-check-disable-next-line -- learnings confidence header uses brand signature radius intentionally */}
+        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] px-4 py-3 flex items-center gap-3" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
           <Skeleton className="w-5 h-5 rounded-lg" />
           <Skeleton className="w-32 h-3" />
           <div className="ml-auto">
@@ -311,13 +312,13 @@ export default function OutcomeLearningsPanel({ workspaceId }: Props) {
         }
         action={
           <div className="flex items-center gap-1.5">
-            <TrendingUp className="w-3.5 h-3.5 text-zinc-500" />
+            <TrendingUp className="w-3.5 h-3.5 text-[var(--brand-text-muted)]" />
             <span className={`text-xs font-medium ${
               overall.recentTrend === 'improving'
                 ? 'text-emerald-400'
                 : overall.recentTrend === 'declining'
                 ? 'text-red-400'
-                : 'text-zinc-400'
+                : 'text-[var(--brand-text)]'
             }`}>
               {overall.recentTrend}
             </span>
@@ -326,20 +327,20 @@ export default function OutcomeLearningsPanel({ workspaceId }: Props) {
       >
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div>
-            <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-0.5">Win Rate</p>
+            <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-0.5">Win Rate</p>
             <p className="text-xl font-bold text-emerald-400">{pct(overall.totalWinRate)}</p>
           </div>
           <div>
-            <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-0.5">Strong Win Rate</p>
-            <p className="text-xl font-bold text-zinc-200">{pct(overall.strongWinRate)}</p>
+            <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-0.5">Strong Win Rate</p>
+            <p className="text-xl font-bold text-[var(--brand-text-bright)]">{pct(overall.strongWinRate)}</p>
           </div>
           <div>
-            <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-0.5">Scored Actions</p>
+            <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-0.5">Scored Actions</p>
             <p className="text-xl font-bold text-blue-400">{learnings.totalScoredActions}</p>
           </div>
           <div>
-            <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-0.5">Top Action</p>
-            <p className="text-sm font-bold text-zinc-200 leading-tight">
+            <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-0.5">Top Action</p>
+            <p className="text-sm font-bold text-[var(--brand-text-bright)] leading-tight">
               {overall.topActionTypes[0]
                 ? overall.topActionTypes[0].type.replace(/_/g, ' ')
                 : '—'}

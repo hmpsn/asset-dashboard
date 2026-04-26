@@ -12,6 +12,7 @@ import { ChevronDown, ChevronUp, Inbox, MessageSquare, CheckCircle } from 'lucid
 import { SectionCard } from '../ui/SectionCard';
 import { EmptyState } from '../ui/EmptyState';
 import { Skeleton } from '../ui/Skeleton';
+import { Icon, cn } from '../ui/index';
 import { useClientSignals, useUpdateSignalStatus } from '../../hooks/admin/useClientSignals';
 import type { ClientSignal, ClientSignalStatus } from '../../../shared/types/client-signals';
 
@@ -28,7 +29,7 @@ const STATUS_LABELS: Record<ClientSignalStatus, string> = {
 const STATUS_COLORS: Record<ClientSignalStatus, string> = {
   new: 'bg-amber-500/10 text-amber-400/80 border-amber-500/20',
   reviewed: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
-  actioned: 'bg-zinc-700/30 text-zinc-500 border-zinc-600/20',
+  actioned: 'bg-[var(--surface-3)] text-[var(--brand-text-muted)] border-[var(--brand-border)]',
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -45,54 +46,55 @@ function SignalCard({ signal, workspaceId }: { signal: ClientSignal; workspaceId
   };
 
   return (
-    <div className="border border-zinc-800 rounded-xl overflow-hidden">
+    <div className="border border-[var(--brand-border)] rounded-xl overflow-hidden">
       {/* Header row */}
       <button
-        className="w-full flex items-start gap-3 px-4 py-3 hover:bg-zinc-800/30 transition-colors text-left"
+        className="w-full flex items-start gap-3 px-4 py-3 hover:bg-[var(--surface-3)] transition-colors text-left"
         onClick={() => setExpanded(p => !p)}
       >
         <div className="w-6 h-6 rounded-lg bg-teal-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-          <MessageSquare className="w-3 h-3 text-teal-400" />
+          <Icon as={MessageSquare} size="sm" className="text-teal-400" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[11px] font-medium text-zinc-200">
+            <span className="t-caption font-medium text-[var(--brand-text-bright)]">
               {TYPE_LABELS[signal.type] ?? signal.type}
             </span>
-            <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${STATUS_COLORS[signal.status]}`}>
+            <span className={`t-caption-sm font-semibold px-1.5 py-0.5 rounded-full border ${STATUS_COLORS[signal.status]}`}>
               {STATUS_LABELS[signal.status]}
             </span>
           </div>
-          <div className="text-[10px] text-zinc-500 mt-0.5 truncate">{signal.triggerMessage}</div>
-          <div className="text-[9px] text-zinc-600 mt-0.5">
+          <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 truncate">{signal.triggerMessage}</div>
+          <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
             {new Date(signal.createdAt).toLocaleDateString('en-US', {
               month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
             })}
           </div>
         </div>
         {expanded
-          ? <ChevronUp className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0 mt-1" />
-          : <ChevronDown className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0 mt-1" />
+          ? <Icon as={ChevronUp} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0 mt-1" />
+          : <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0 mt-1" />
         }
       </button>
 
       {/* Expanded: chat context + actions */}
       {expanded && (
-        <div className="border-t border-zinc-800 px-4 py-3 bg-zinc-900/50 space-y-3">
+        <div className="border-t border-[var(--brand-border)] px-4 py-3 bg-[var(--surface-2)] space-y-3">
           {/* Chat context */}
           {signal.chatContext.length > 0 ? (
             <div className="space-y-2">
-              <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide">
+              <div className="t-caption-sm font-semibold text-[var(--brand-text-muted)] uppercase tracking-wide">
                 Conversation context
               </div>
               <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                 {signal.chatContext.map((msg, i) => (
                   <div key={i} className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : ''}`}>
-                    <div className={`max-w-[80%] rounded-lg px-2.5 py-1.5 text-[10px] ${
+                    <div className={cn(
+                      'max-w-[80%] rounded-lg px-2.5 py-1.5 t-caption-sm',
                       msg.role === 'user'
-                        ? 'bg-teal-600/15 border border-teal-500/20 text-zinc-200'
-                        : 'bg-zinc-800/60 border border-zinc-700/50 text-zinc-300'
-                    }`}>
+                        ? 'bg-teal-600/15 border border-teal-500/20 text-[var(--brand-text-bright)]'
+                        : 'bg-[var(--surface-1)] border border-[var(--brand-border)] text-[var(--brand-text)]'
+                    )}>
                       {msg.content}
                     </div>
                   </div>
@@ -100,24 +102,25 @@ function SignalCard({ signal, workspaceId }: { signal: ClientSignal; workspaceId
               </div>
             </div>
           ) : (
-            <div className="text-[10px] text-zinc-600">No conversation context available.</div>
+            <div className="t-caption-sm text-[var(--brand-text-muted)]">No conversation context available.</div>
           )}
 
           {/* Status actions */}
           {/* Status workflow: new → reviewed → actioned. Backward transitions (e.g. actioned → reviewed)
               are intentionally allowed so admins can undo accidental status changes. */}
           <div className="flex items-center gap-2 pt-1">
-            <span className="text-[10px] text-zinc-500">Mark as:</span>
+            <span className="t-caption-sm text-[var(--brand-text-muted)]">Mark as:</span>
             {(['reviewed', 'actioned'] as ClientSignalStatus[]).map(s => (
               <button
                 key={s}
                 onClick={() => handleStatus(s)}
                 disabled={signal.status === s || updateStatus.isPending}
-                className={`text-[10px] px-2 py-1 rounded-md border transition-colors disabled:opacity-40 ${
+                className={cn(
+                  't-caption-sm px-2 py-1 rounded-md border transition-colors disabled:opacity-40',
                   signal.status === s
                     ? STATUS_COLORS[s]
-                    : 'border-zinc-700 text-zinc-400 hover:border-teal-500/40 hover:text-teal-400'
-                }`}
+                    : 'border-[var(--brand-border-hover)] text-[var(--brand-text)] hover:border-teal-500/40 hover:text-teal-400'
+                )}
               >
                 {STATUS_LABELS[s]}
               </button>
@@ -137,10 +140,10 @@ export function AdminInbox({ workspaceId }: AdminInboxProps) {
   const newSignals = allSignals.filter(s => s.status === 'new');
   const displayedSignals = activeTab === 'new' ? newSignals : allSignals;
 
-  const titleIcon = <Inbox className="w-4 h-4 text-zinc-400" />;
+  const titleIcon = <Icon as={Inbox} size="md" className="text-[var(--brand-text-muted)]" />;
 
   const newBadge = newSignals.length > 0 ? (
-    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400/80 border border-amber-500/20">
+    <span className="t-caption-sm font-bold px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400/80 border border-amber-500/20">
       {newSignals.length} new
     </span>
   ) : undefined;
@@ -167,11 +170,12 @@ export function AdminInbox({ workspaceId }: AdminInboxProps) {
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-3 py-1 rounded-lg text-[11px] font-medium transition-colors ${
+            className={cn(
+              'px-3 py-1 rounded-lg t-caption font-medium transition-colors',
               activeTab === tab
                 ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20'
-                : 'text-zinc-500 hover:text-zinc-300 border border-transparent'
-            }`}
+                : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] border border-transparent'
+            )}
           >
             {tab === 'new' ? `New (${newSignals.length})` : `All (${allSignals.length})`}
           </button>

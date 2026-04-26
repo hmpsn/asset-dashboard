@@ -52,15 +52,15 @@ export default function OutcomeTopWins({ workspaceId }: Props) {
     >
       <div className="space-y-3">
         {wins.map((win) => (
-          <div key={win.actionId} className="flex items-start gap-3 py-2 border-b border-zinc-800/60 last:border-0">
+          <div key={win.actionId} className="flex items-start gap-3 py-2 border-b border-[var(--brand-border)] last:border-0">
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-zinc-200 truncate">
+              <p className="text-xs font-medium text-[var(--brand-text-bright)] truncate">
                 {winLabel(win)}
               </p>
-              <p className="text-[11px] text-blue-400 mt-0.5">
+              <p className="t-caption text-blue-400 mt-0.5">
                 {win.delta.delta_percent >= 0 ? '+' : ''}{win.delta.delta_percent.toFixed(1)}% {win.delta.primary_metric}
               </p>
-              <p className="text-[11px] text-zinc-600 mt-0.5">{formatOutcomeDate(win.createdAt)}</p>
+              <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">{formatOutcomeDate(win.createdAt)}</p>
             </div>
             <Badge
               label={win.score === 'strong_win' ? 'Strong Win' : 'Win'}

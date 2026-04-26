@@ -17,7 +17,7 @@ interface Props {
 const compoundKey = (sprintId: string, itemId: number | string) => `${sprintId}::${itemId}`;
 
 function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) {
-  if (sortKey !== col) return <ArrowUpDown className="w-3 h-3 text-zinc-600" />;
+  if (sortKey !== col) return <ArrowUpDown className="w-3 h-3 text-[var(--brand-text-muted)]" />;
   return sortDir === 'asc'
     ? <ChevronUp className="w-3 h-3 text-teal-400" />
     : <ChevronDown className="w-3 h-3 text-teal-400" />;
@@ -45,8 +45,8 @@ export function RoadmapBacklogView({ sprints, filters, featureMap, onToggleStatu
     }
   };
 
-  const thStatic = 'px-3 py-2 text-left text-[10px] font-semibold text-zinc-500 uppercase tracking-wider';
-  const sortBtn = 'flex items-center gap-1 text-left text-[10px] font-semibold text-zinc-500 uppercase tracking-wider hover:text-zinc-300 focus:outline-none focus:text-teal-400 select-none';
+  const thStatic = 'px-3 py-2 text-left t-caption-sm font-semibold text-[var(--brand-text-muted)] uppercase tracking-wider';
+  const sortBtn = 'flex items-center gap-1 text-left t-caption-sm font-semibold text-[var(--brand-text-muted)] uppercase tracking-wider hover:text-[var(--brand-text-bright)] focus:outline-none focus:text-teal-400 select-none';
 
   const ariaSortFor = (col: SortKey): 'ascending' | 'descending' | 'none' =>
     sortKey === col ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none';
@@ -64,7 +64,7 @@ export function RoadmapBacklogView({ sprints, filters, featureMap, onToggleStatu
   return (
     <SectionCard variant="subtle" noPadding>
       <table className="w-full text-xs">
-        <thead className="border-b border-zinc-800">
+        <thead className="border-b border-[var(--brand-border)]">
           <tr>
             <th className={thStatic} style={{ width: '40px' }} aria-label="Expand row" />
             <th className={thStatic} style={{ width: '52px' }}>#</th>
@@ -94,7 +94,7 @@ export function RoadmapBacklogView({ sprints, filters, featureMap, onToggleStatu
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-zinc-800/50">
+        <tbody className="divide-y divide-[var(--brand-border)]">
           {sorted.map(item => {
             const pb = priorityBadge(item.priority);
             const featureName = item.featureId != null ? featureMap.get(item.featureId) : undefined;
@@ -103,21 +103,21 @@ export function RoadmapBacklogView({ sprints, filters, featureMap, onToggleStatu
 
             return (
               <Fragment key={key}>
-                <tr className="hover:bg-zinc-800/30 transition-colors">
+                <tr className="hover:bg-[var(--surface-3)] transition-colors">
                   <td className="px-2 py-2.5">
                     <button
                       type="button"
                       onClick={() => setExpandedKey(isExpanded ? null : key)}
                       aria-expanded={isExpanded}
                       aria-label={isExpanded ? `Collapse details for ${item.title}` : `Expand details for ${item.title}`}
-                      className="p-1 rounded hover:bg-zinc-700/40 focus:outline-none focus:ring-1 focus:ring-teal-400/50"
+                      className="p-1 rounded hover:bg-[var(--surface-3)] focus:outline-none focus:ring-1 focus:ring-teal-400/50"
                     >
                       {isExpanded
-                        ? <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
-                        : <ChevronRight className="w-3.5 h-3.5 text-zinc-500" />}
+                        ? <ChevronDown className="w-3.5 h-3.5 text-[var(--brand-text)]" />
+                        : <ChevronRight className="w-3.5 h-3.5 text-[var(--brand-text-muted)]" />}
                     </button>
                   </td>
-                  <td className="px-3 py-2.5 font-mono text-[10px] text-zinc-600">#{item.id}</td>
+                  <td className="px-3 py-2.5 font-mono t-caption-sm text-[var(--brand-text-muted)]">#{item.id}</td>
                   <td className="px-3 py-2.5">
                     <div className="flex items-center gap-2">
                       <button
@@ -129,7 +129,7 @@ export function RoadmapBacklogView({ sprints, filters, featureMap, onToggleStatu
                       >
                         {STATUS_ICON[item.status]}
                       </button>
-                      <span className={item.status === 'done' ? 'text-zinc-500 line-through' : 'text-zinc-200'}>
+                      <span className={item.status === 'done' ? 'text-[var(--brand-text-muted)] line-through' : 'text-[var(--brand-text-bright)]'}>
                         {item.title}
                       </span>
                     </div>
@@ -137,10 +137,10 @@ export function RoadmapBacklogView({ sprints, filters, featureMap, onToggleStatu
                   <td className="px-3 py-2.5">
                     <Badge label={pb.label} color={pb.color} />
                   </td>
-                  <td className="px-3 py-2.5 text-zinc-400 capitalize">
+                  <td className="px-3 py-2.5 text-[var(--brand-text)] capitalize">
                     {item.status.replace('_', ' ')}
                   </td>
-                  <td className="px-3 py-2.5 text-zinc-500 text-[11px] max-w-[120px] truncate">
+                  <td className="px-3 py-2.5 text-[var(--brand-text-muted)] t-caption max-w-[120px] truncate">
                     {item.sprintName}
                   </td>
                   <td className="px-3 py-2.5">
@@ -153,19 +153,19 @@ export function RoadmapBacklogView({ sprints, filters, featureMap, onToggleStatu
                       ))}
                     </div>
                   </td>
-                  <td className="px-3 py-2.5 text-zinc-500 whitespace-nowrap">{item.est}</td>
-                  <td className="px-3 py-2.5 text-zinc-500 font-mono text-[10px] whitespace-nowrap">
+                  <td className="px-3 py-2.5 text-[var(--brand-text-muted)] whitespace-nowrap">{item.est}</td>
+                  <td className="px-3 py-2.5 text-[var(--brand-text-muted)] font-mono t-caption-sm whitespace-nowrap">
                     {item.createdAt ?? '—'}
                   </td>
                 </tr>
                 {isExpanded && (
-                  <tr className="bg-zinc-800/20">
+                  <tr className="bg-[var(--surface-1)]">
                     <td colSpan={10} className="px-4 py-3">
                       <div className="space-y-1.5">
                         {item.notes && (
-                          <p className="text-[11px] text-zinc-300 leading-relaxed">{item.notes}</p>
+                          <p className="t-caption text-[var(--brand-text-bright)] leading-relaxed">{item.notes}</p>
                         )}
-                        <div className="flex items-center gap-4 text-[10px] text-zinc-500">
+                        <div className="flex items-center gap-4 t-caption-sm text-[var(--brand-text-muted)]">
                           {item.source && <span>Source: {item.source}</span>}
                           {item.shippedAt && <span>Shipped: {item.shippedAt}</span>}
                         </div>

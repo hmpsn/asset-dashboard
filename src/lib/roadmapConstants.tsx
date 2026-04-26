@@ -20,9 +20,9 @@ export function priorityBadge(priority: Priority | undefined): { label: string; 
 }
 
 export const STATUS_ICON: Record<Status, ReactNode> = {
-  done: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />,
-  in_progress: <Clock className="w-3.5 h-3.5 text-teal-400 animate-pulse flex-shrink-0" />,
-  pending: <Circle className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" />,
+  done: <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />,
+  in_progress: <Clock className="w-4 h-4 text-teal-400 animate-pulse flex-shrink-0" />,
+  pending: <Circle className="w-4 h-4 text-[var(--brand-text-muted)] flex-shrink-0" />,
 };
 
 interface ChipProps {
@@ -43,7 +43,7 @@ export function FeatureChip({ children, nowrap }: ChipProps) {
 export function TagChip({ children, nowrap }: ChipProps) {
   return (
     <span
-      className={`px-1.5 py-0.5 rounded text-[10px] bg-zinc-800 text-zinc-400 border border-zinc-700${nowrap ? ' whitespace-nowrap' : ''}`}
+      className={`px-1.5 py-0.5 rounded text-[10px] bg-[var(--surface-3)] text-[var(--brand-text)] border border-[var(--brand-border)]${nowrap ? ' whitespace-nowrap' : ''}`}
     >
       {children}
     </span>

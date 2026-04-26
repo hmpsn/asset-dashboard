@@ -27,16 +27,16 @@ function StepIndicator({ current }: { current: Step }) {
     <div className="flex items-center gap-2">
       {([1, 2, 3, 4] as Step[]).map((step, i) => (
         <div key={step} className="flex items-center gap-2">
-          {i > 0 && <div className={`w-8 h-px ${step <= current ? 'bg-teal-500/50' : 'bg-zinc-700'}`} />}
+          {i > 0 && <div className={`w-8 h-px ${step <= current ? 'bg-teal-500/50' : 'bg-[var(--brand-border-hover)]'}`} />}
           <div className="flex items-center gap-1.5">
-            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${
+            <div className={`w-6 h-6 rounded-full flex items-center justify-center t-caption font-bold ${
               step < current ? 'bg-teal-500 text-white' :
               step === current ? 'bg-teal-500/20 text-teal-400 border border-teal-500/40' :
-              'bg-zinc-800 text-zinc-500'
+              'bg-[var(--surface-3)] text-[var(--brand-text-muted)]'
             }`}>
               {step < current ? <Check className="w-3 h-3" /> : step}
             </div>
-            <span className={`text-[11px] font-medium hidden sm:inline ${step === current ? 'text-zinc-200' : 'text-zinc-500'}`}>
+            <span className={`t-caption font-medium hidden sm:inline ${step === current ? 'text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)]'}`}>
               {STEP_LABELS[step]}
             </span>
           </div>
@@ -53,17 +53,17 @@ function TemplateCard({ template, isSelected, onSelect }: { template: ContentTem
       className={`w-full text-left p-4 rounded-xl border transition-all ${
         isSelected
           ? 'bg-teal-500/10 border-teal-500/30 ring-2 ring-teal-400'
-          : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700'
+          : 'bg-[var(--surface-1)] border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]'
       }`}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
-        <span className="text-sm font-semibold text-zinc-200">{template.name}</span>
+        <span className="text-sm font-semibold text-[var(--brand-text-bright)]">{template.name}</span>
         <Badge label={template.pageType.replace(/-/g, ' ')} color="teal" />
       </div>
       {template.description && (
-        <p className="text-xs text-zinc-400 mb-3">{template.description}</p>
+        <p className="text-xs text-[var(--brand-text)] mb-3">{template.description}</p>
       )}
-      <div className="flex items-center gap-3 text-[11px] text-zinc-500">
+      <div className="flex items-center gap-3 t-caption text-[var(--brand-text-muted)]">
         <span className="flex items-center gap-1"><Tag className="w-3 h-3" /> {template.variables.length} variable{template.variables.length !== 1 ? 's' : ''}</span>
         <span className="flex items-center gap-1"><Layers className="w-3 h-3" /> {template.sections.length} section{template.sections.length !== 1 ? 's' : ''}</span>
       </div>
@@ -96,7 +96,7 @@ function TagInput({ values, onChange, placeholder }: { values: string[]; onChang
   };
 
   return (
-    <div className="flex flex-wrap gap-1.5 p-2 bg-zinc-950 border border-zinc-800 rounded-lg min-h-[42px] focus-within:border-teal-500/40 transition-colors">
+    <div className="flex flex-wrap gap-1.5 p-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg min-h-[42px] focus-within:border-teal-500/40 transition-colors">
       {values.map(val => (
         <span key={val} className="flex items-center gap-1 px-2 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-xs text-teal-300">
           {val}
@@ -112,7 +112,7 @@ function TagInput({ values, onChange, placeholder }: { values: string[]; onChang
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}
         placeholder={values.length === 0 ? placeholder : 'Add more...'}
-        className="flex-1 min-w-[100px] bg-transparent text-xs text-zinc-300 placeholder-zinc-600 outline-none"
+        className="flex-1 min-w-[100px] bg-transparent text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] outline-none"
       />
     </div>
   );
@@ -236,7 +236,7 @@ export function MatrixBuilder({ workspaceId, templates, onComplete, onCancel }: 
           subtitle="Build a matrix of planned pages from a template"
           icon={<Layers className="w-5 h-5 text-teal-400" />}
         />
-        <button onClick={onCancel} className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors">
+        <button onClick={onCancel} className="text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
           Cancel
         </button>
       </div>
@@ -270,15 +270,15 @@ export function MatrixBuilder({ workspaceId, templates, onComplete, onCancel }: 
             {selectedTemplate.variables.map(v => (
               <div key={v.name}>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-medium text-zinc-300">{v.label}</label>
-                  {v.description && <span className="text-[10px] text-zinc-500">{v.description}</span>}
+                  <label className="text-xs font-medium text-[var(--brand-text-bright)]">{v.label}</label>
+                  {v.description && <span className="t-caption-sm text-[var(--brand-text-muted)]">{v.description}</span>}
                 </div>
                 <TagInput
                   values={dimensionValues[v.name] ?? []}
                   onChange={vals => setDimensionValues(prev => ({ ...prev, [v.name]: vals }))}
                   placeholder={`Type ${v.label.toLowerCase()} values, separated by commas`}
                 />
-                <p className="text-[10px] text-zinc-500 mt-1">
+                <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">
                   {(dimensionValues[v.name] ?? []).length} value{(dimensionValues[v.name] ?? []).length !== 1 ? 's' : ''} entered
                 </p>
               </div>
@@ -299,21 +299,21 @@ export function MatrixBuilder({ workspaceId, templates, onComplete, onCancel }: 
       {step === 3 && (
         <SectionCard title="Review & Customize" titleIcon={<Eye className="w-4 h-4 text-amber-400" />}>
           <div className="space-y-3">
-            <p className="text-xs text-zinc-400">{totalPages} pages will be generated. Edit individual keywords if needed.</p>
+            <p className="text-xs text-[var(--brand-text)]">{totalPages} pages will be generated. Edit individual keywords if needed.</p>
             <div className="max-h-96 overflow-y-auto space-y-1.5 pr-1">
               {previewCells.map(cell => {
                 const varLabel = Object.values(cell.variableValues).join(' \u00d7 ');
                 return (
-                  <div key={cell.id} className="flex items-center gap-3 px-3 py-2 bg-zinc-950 rounded-lg border border-zinc-800">
+                  <div key={cell.id} className="flex items-center gap-3 px-3 py-2 bg-[var(--surface-1)] rounded-lg border border-[var(--brand-border)]">
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-zinc-300 truncate">{varLabel}</p>
-                      <p className="text-[10px] text-zinc-500 font-mono truncate">{cell.plannedUrl}</p>
+                      <p className="text-xs font-medium text-[var(--brand-text-bright)] truncate">{varLabel}</p>
+                      <p className="t-caption-sm font-mono text-[var(--brand-text-muted)] truncate">{cell.plannedUrl}</p>
                     </div>
                     <input
                       type="text"
                       value={cellKeywordOverrides[cell.id] ?? cell.targetKeyword}
                       onChange={e => setCellKeywordOverrides(prev => ({ ...prev, [cell.id]: e.target.value }))}
-                      className="w-48 px-2 py-1 bg-zinc-900 border border-zinc-800 rounded-lg text-[11px] text-zinc-300 font-mono focus:border-teal-500/40 focus:outline-none transition-colors"
+                      className="w-48 px-2 py-1 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg t-caption text-[var(--brand-text-bright)] font-mono focus:border-teal-500/40 focus:outline-none transition-colors"
                     />
                   </div>
                 );
@@ -327,39 +327,39 @@ export function MatrixBuilder({ workspaceId, templates, onComplete, onCancel }: 
         <SectionCard title="Confirm" titleIcon={<Check className="w-4 h-4 text-emerald-400" />}>
           <div className="space-y-4">
             <div>
-              <label className="text-[11px] text-zinc-500 font-medium">Matrix Name</label>
+              <label className="t-caption text-[var(--brand-text-muted)] font-medium">Matrix Name</label>
               <input
                 type="text"
                 value={matrixName}
                 onChange={e => setMatrixName(e.target.value)}
                 placeholder="e.g. Houston Area Service Pages"
-                className="w-full mt-1 px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 focus:border-teal-500/40 focus:outline-none transition-colors"
+                className="w-full mt-1 px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
               />
             </div>
 
             {/* pr-check-disable-next-line -- stats grid summary panel; pending Phase 4 SectionCard migration */}
-            <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-4 space-y-3">
+            <div className="bg-[var(--surface-1)] rounded-xl border border-[var(--brand-border)] p-4 space-y-3">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="text-center">
-                  <p className="text-lg font-bold text-zinc-200 tabular-nums">{totalPages}</p>
-                  <p className="text-[11px] text-zinc-500">Pages</p>
+                  <p className="text-lg font-bold text-[var(--brand-text-bright)] tabular-nums">{totalPages}</p>
+                  <p className="t-caption text-[var(--brand-text-muted)]">Pages</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-lg font-bold text-zinc-200 tabular-nums">{totalWords.toLocaleString()}</p>
-                  <p className="text-[11px] text-zinc-500">Est. Words</p>
+                  <p className="text-lg font-bold text-[var(--brand-text-bright)] tabular-nums">{totalWords.toLocaleString()}</p>
+                  <p className="t-caption text-[var(--brand-text-muted)]">Est. Words</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-lg font-bold text-zinc-200 tabular-nums">{totalPages}</p>
-                  <p className="text-[11px] text-zinc-500">Keywords</p>
+                  <p className="text-lg font-bold text-[var(--brand-text-bright)] tabular-nums">{totalPages}</p>
+                  <p className="t-caption text-[var(--brand-text-muted)]">Keywords</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-lg font-bold text-zinc-200 tabular-nums">{selectedTemplate?.sections.length ?? 0}</p>
-                  <p className="text-[11px] text-zinc-500">Sections/Page</p>
+                  <p className="text-lg font-bold text-[var(--brand-text-bright)] tabular-nums">{selectedTemplate?.sections.length ?? 0}</p>
+                  <p className="t-caption text-[var(--brand-text-muted)]">Sections/Page</p>
                 </div>
               </div>
               {selectedTemplate && (
-                <p className="text-xs text-zinc-400 text-center">
-                  Using template: <strong className="text-zinc-300">{selectedTemplate.name}</strong> &middot; {dimensionSummary}
+                <p className="text-xs text-[var(--brand-text)] text-center">
+                  Using template: <strong className="text-[var(--brand-text-bright)]">{selectedTemplate.name}</strong> &middot; {dimensionSummary}
                 </p>
               )}
             </div>
@@ -371,7 +371,7 @@ export function MatrixBuilder({ workspaceId, templates, onComplete, onCancel }: 
       <div className="flex items-center justify-between pt-2">
         <button
           onClick={() => step > 1 ? setStep((step - 1) as Step) : onCancel()}
-          className="flex items-center gap-1 px-4 py-2 rounded-lg text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
+          className="flex items-center gap-1 px-4 py-2 rounded-lg text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" /> {step > 1 ? 'Back' : 'Cancel'}
         </button>
