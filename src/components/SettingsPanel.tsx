@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { StripeSettings } from './StripeSettings';
 import { FeatureFlagSettings } from './FeatureFlagSettings';
+import { Icon } from './ui';
 import { get, post, patch, getOptional, getSafe } from '../api/client';
 
 interface Workspace {
@@ -128,119 +129,119 @@ export function SettingsPanel() {
   return (
     <div className="max-w-3xl mx-auto space-y-8">
       <div>
-        <h2 className="text-lg font-semibold text-zinc-200">Settings</h2>
-        <p className="text-xs mt-0.5 text-zinc-500">Account-level connections and configuration</p>
+        <h2 className="text-lg font-semibold text-[var(--brand-text-bright)]">Settings</h2>
+        <p className="t-caption mt-0.5 text-[var(--brand-text-muted)]">Account-level connections and configuration</p>
       </div>
 
       {/* Google Account Connection */}
-      <section className="bg-zinc-900 overflow-hidden border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
-        <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
-          <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
-            <Search className="w-4 h-4 text-blue-400" />
+      <section className="bg-[var(--surface-2)] overflow-hidden border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature)' }}>
+        <div className="px-5 py-4 flex items-center gap-3 border-b border-[var(--brand-border)]">
+          <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-blue-500/10 flex items-center justify-center">
+            <Icon as={Search} size="md" className="text-blue-400" />
           </div>
           <div className="flex-1">
-            <h3 className="text-sm font-semibold text-zinc-200">Google Account</h3>
-            <p className="text-xs text-zinc-500">Connect once to access Search Console &amp; GA4 across all workspaces</p>
+            <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Google Account</h3>
+            <p className="t-caption text-[var(--brand-text-muted)]">Connect once to access Search Console &amp; GA4 across all workspaces</p>
           </div>
           {googleStatus?.connected ? (
             <div className="flex items-center gap-2">
-              <span className="text-[11px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full">Connected</span>
-              <button onClick={disconnectGoogle} className="p-1.5 rounded-lg hover:bg-white/5 transition-colors" title="Disconnect Google">
-                <LogOut className="w-4 h-4 text-zinc-500" />
+              <span className="t-caption-sm font-medium text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full">Connected</span>
+              <button onClick={disconnectGoogle} className="p-1.5 rounded-[var(--radius-lg)] hover:bg-white/5 transition-colors" title="Disconnect Google">
+                <Icon as={LogOut} size="md" className="text-[var(--brand-text-muted)]" />
               </button>
             </div>
           ) : googleStatus?.configured ? (
-            <button onClick={connectGoogle} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition-colors">
-              <LogIn className="w-3.5 h-3.5" /> Connect Google
+            <button onClick={connectGoogle} className="flex items-center gap-1.5 px-3 py-2 rounded-[var(--radius-lg)] bg-blue-600 hover:bg-blue-500 text-white t-caption font-medium transition-colors">
+              <Icon as={LogIn} size="sm" /> Connect Google
             </button>
           ) : (
-            <span className="text-[11px] text-amber-400/80 bg-amber-500/8 px-2 py-1 rounded-full">Not configured</span>
+            <span className="t-caption-sm text-amber-400/80 bg-amber-500/8 px-2 py-1 rounded-full">Not configured</span>
           )}
         </div>
 
         {googleStatus?.connected && (
           <div className="px-5 py-3">
             {loadingGsc ? (
-              <div className="flex items-center gap-2 text-xs py-2 text-zinc-500">
-                <Loader2 className="w-3 h-3 animate-spin" /> Loading properties...
+              <div className="flex items-center gap-2 t-caption py-2 text-[var(--brand-text-muted)]">
+                <Icon as={Loader2} size="sm" className="animate-spin" /> Loading properties...
               </div>
             ) : gscSites.length > 0 ? (
               <div className="flex flex-wrap gap-1.5 py-1">
                 {gscSites.map(s => (
-                  <span key={s.siteUrl} className="text-[11px] px-2 py-1 rounded-md bg-zinc-800 text-zinc-400">{s.siteUrl}</span>
+                  <span key={s.siteUrl} className="t-caption-sm px-2 py-1 rounded-md bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{s.siteUrl}</span>
                 ))}
               </div>
             ) : (
-              <p className="text-xs py-2 text-zinc-500">No properties found. Make sure your Google account has Search Console access.</p>
+              <p className="t-caption py-2 text-[var(--brand-text-muted)]">No properties found. Make sure your Google account has Search Console access.</p>
             )}
           </div>
         )}
       </section>
 
       {/* Webflow Connections Overview */}
-      <section className="bg-zinc-900 overflow-hidden border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
-        <div className="px-5 py-4 border-b border-zinc-800">
+      <section className="bg-[var(--surface-2)] overflow-hidden border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature)' }}>
+        <div className="px-5 py-4 border-b border-[var(--brand-border)]">
           <div className="flex items-center gap-2">
-            <Globe className="w-4 h-4 text-teal-400" />
-            <h3 className="text-sm font-semibold text-zinc-200">Webflow Connections</h3>
+            <Icon as={Globe} size="md" className="text-teal-400" />
+            <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Webflow Connections</h3>
           </div>
-          <p className="text-xs mt-0.5 text-zinc-500">
+          <p className="t-caption mt-0.5 text-[var(--brand-text-muted)]">
             Link sites from the workspace dropdown. Generate tokens at{' '}
             <a href="https://webflow.com/dashboard/account/integrations" target="_blank" rel="noopener noreferrer" className="text-teal-400 hover:text-teal-300 inline-flex items-center gap-0.5">
-              webflow.com <ExternalLink className="w-3 h-3" />
+              webflow.com <Icon as={ExternalLink} size="sm" />
             </a>
           </p>
         </div>
-        <div className="divide-y divide-zinc-800">
+        <div className="divide-y divide-[var(--brand-border)]">
           {linked.map(ws => (
             <div key={ws.id} className="px-5 py-3 flex items-center gap-3">
-              <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span className="text-sm font-medium text-zinc-200">{ws.name}</span>
-              <span className="text-xs text-zinc-500">{ws.webflowSiteName}</span>
+              <Icon as={Check} size="md" className="text-emerald-400 shrink-0" />
+              <span className="text-sm font-medium text-[var(--brand-text-bright)]">{ws.name}</span>
+              <span className="t-caption text-[var(--brand-text-muted)]">{ws.webflowSiteName}</span>
             </div>
           ))}
           {unlinked.map(ws => (
             <div key={ws.id} className="px-5 py-3 flex items-center gap-3 opacity-60">
-              <Unplug className="w-4 h-4 text-zinc-500 shrink-0" />
-              <span className="text-sm text-zinc-500">{ws.name}</span>
-              <span className="text-xs text-zinc-500 ml-auto">Not linked</span>
+              <Icon as={Unplug} size="md" className="text-[var(--brand-text-muted)] shrink-0" />
+              <span className="text-sm text-[var(--brand-text-muted)]">{ws.name}</span>
+              <span className="t-caption text-[var(--brand-text-muted)] ml-auto">Not linked</span>
             </div>
           ))}
           {workspaces.length === 0 && (
             <div className="px-5 py-4">
-              <p className="text-sm text-zinc-500">No workspaces yet. Create one from the workspace dropdown.</p>
+              <p className="text-sm text-[var(--brand-text-muted)]">No workspaces yet. Create one from the workspace dropdown.</p>
             </div>
           )}
         </div>
       </section>
 
       {/* API Keys */}
-      <section className="bg-zinc-900 overflow-hidden border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
-        <div className="px-5 py-4 border-b border-zinc-800">
-          <h3 className="text-sm font-semibold text-zinc-200">API Keys</h3>
+      <section className="bg-[var(--surface-2)] overflow-hidden border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature)' }}>
+        <div className="px-5 py-4 border-b border-[var(--brand-border)]">
+          <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">API Keys</h3>
         </div>
         <div className="px-5 py-3 flex items-center gap-3">
-          <Check className="w-4 h-4 text-emerald-400" />
+          <Icon as={Check} size="md" className="text-emerald-400" />
           <div>
-            <span className="text-sm text-zinc-400">OpenAI API Key</span>
-            <span className="text-xs text-zinc-500 ml-2">Configured via .env</span>
+            <span className="text-sm text-[var(--brand-text-muted)]">OpenAI API Key</span>
+            <span className="t-caption text-[var(--brand-text-muted)] ml-2">Configured via .env</span>
           </div>
         </div>
       </section>
 
       {/* Platform Health */}
-      <section className="bg-zinc-900 overflow-hidden border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
-        <div className="px-5 py-4 border-b border-zinc-800">
+      <section className="bg-[var(--surface-2)] overflow-hidden border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature)' }}>
+        <div className="px-5 py-4 border-b border-[var(--brand-border)]">
           <div className="flex items-center gap-2">
-            <Shield className="w-4 h-4 text-teal-400" />
-            <h3 className="text-sm font-semibold text-zinc-200">Platform Health</h3>
+            <Icon as={Shield} size="md" className="text-teal-400" />
+            <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Platform Health</h3>
           </div>
-          <p className="text-xs mt-0.5 text-zinc-500">Connection status and workspace overview</p>
+          <p className="t-caption mt-0.5 text-[var(--brand-text-muted)]">Connection status and workspace overview</p>
         </div>
         <div className="px-5 py-4 space-y-4">
           {/* Connection status */}
           <div>
-            <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-2">Connections</div>
+            <div className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider mb-2">Connections</div>
             <div className="space-y-1.5">
               {[
                 { label: 'OpenAI', ok: health?.hasOpenAIKey, icon: Key },
@@ -248,30 +249,29 @@ export function SettingsPanel() {
                 { label: 'Google Auth', ok: health?.hasGoogleAuth, icon: Search },
                 { label: 'Email', ok: health?.hasEmailConfig, icon: Mail },
                 { label: 'Stripe', ok: health?.hasStripe, icon: CreditCard },
-              ].map(c => {
-                const Icon = c.icon;
-                return (
-                  <div key={c.label} className="flex items-center gap-2">
-                    <Icon className="w-3 h-3 text-zinc-500" />
-                    <span className="text-xs text-zinc-300 flex-1">{c.label}</span>
-                    {c.ok ? <Wifi className="w-3 h-3 text-emerald-400/80" /> : <WifiOff className="w-3 h-3 text-zinc-600" />}
-                  </div>
-                );
-              })}
+              ].map(c => (
+                <div key={c.label} className="flex items-center gap-2">
+                  <Icon as={c.icon} size="sm" className="text-[var(--brand-text-muted)]" />
+                  <span className="t-caption text-[var(--brand-text)] flex-1">{c.label}</span>
+                  {c.ok
+                    ? <Icon as={Wifi} size="sm" className="text-emerald-400/80" />
+                    : <Icon as={WifiOff} size="sm" className="text-[var(--brand-border-hover)]" />}
+                </div>
+              ))}
             </div>
           </div>
 
           {/* Workspace stats */}
           <div>
-            <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-2">Workspaces</div>
+            <div className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider mb-2">Workspaces</div>
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-zinc-400">Total</span>
-                <span className="text-xs font-medium text-zinc-200">{workspaces.length}</span>
+                <span className="t-caption text-[var(--brand-text-muted)]">Total</span>
+                <span className="t-caption font-medium text-[var(--brand-text-bright)]">{workspaces.length}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs text-zinc-400">With Webflow site</span>
-                <span className="text-xs font-medium text-zinc-200">{workspaces.filter(w => w.webflowSiteId).length}</span>
+                <span className="t-caption text-[var(--brand-text-muted)]">With Webflow site</span>
+                <span className="t-caption font-medium text-[var(--brand-text-bright)]">{workspaces.filter(w => w.webflowSiteId).length}</span>
               </div>
             </div>
           </div>
@@ -279,17 +279,17 @@ export function SettingsPanel() {
       </section>
 
       {/* Storage Monitor */}
-      <section className="bg-zinc-900 overflow-hidden border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
-        <div className="px-5 py-4 border-b border-zinc-800 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-amber-500/8 flex items-center justify-center">
-            <HardDrive className="w-4 h-4 text-amber-400/80" />
+      <section className="bg-[var(--surface-2)] overflow-hidden border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature)' }}>
+        <div className="px-5 py-4 border-b border-[var(--brand-border)] flex items-center gap-3">
+          <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-amber-500/8 flex items-center justify-center">
+            <Icon as={HardDrive} size="md" className="text-amber-400/80" />
           </div>
           <div className="flex-1">
-            <h3 className="text-sm font-semibold text-zinc-200">Storage Monitor</h3>
-            <p className="text-xs text-zinc-500">Persistent disk usage breakdown &amp; cleanup tools</p>
+            <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Storage Monitor</h3>
+            <p className="t-caption text-[var(--brand-text-muted)]">Persistent disk usage breakdown &amp; cleanup tools</p>
           </div>
-          <button onClick={loadStorage} disabled={storageLoading} className="p-1.5 rounded-lg hover:bg-white/5 transition-colors" title="Refresh">
-            <RefreshCw className={`w-4 h-4 text-zinc-500 ${storageLoading ? 'animate-spin' : ''}`} />
+          <button onClick={loadStorage} disabled={storageLoading} className="p-1.5 rounded-[var(--radius-lg)] hover:bg-white/5 transition-colors" title="Refresh">
+            <Icon as={RefreshCw} size="md" className={`text-[var(--brand-text-muted)] ${storageLoading ? 'animate-spin' : ''}`} />
           </button>
         </div>
 
@@ -298,10 +298,10 @@ export function SettingsPanel() {
             {/* Total usage bar */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-medium text-zinc-300">{formatBytes(storage.totalBytes)}</span>
-                <span className="text-[11px] text-zinc-500">{storage.totalFiles.toLocaleString()} files</span>
+                <span className="t-caption font-medium text-[var(--brand-text)]">{formatBytes(storage.totalBytes)}</span>
+                <span className="t-caption-sm text-[var(--brand-text-muted)]">{storage.totalFiles.toLocaleString()} files</span>
               </div>
-              <div className="h-3 bg-zinc-800 rounded-full overflow-hidden flex">
+              <div className="h-3 bg-[var(--surface-3)] rounded-full overflow-hidden flex">
                 {storage.breakdown.slice(0, 6).map((d, i) => {
                   const pct = storage.totalBytes > 0 ? (d.bytes / storage.totalBytes) * 100 : 0;
                   if (pct < 0.5) return null;
@@ -319,106 +319,106 @@ export function SettingsPanel() {
                 return (
                   <div key={d.name} className="flex items-center gap-2 py-1">
                     <span className={`w-1.5 h-1.5 rounded-full ${colors[i % colors.length].replace('text-', 'bg-')}`} />
-                    <span className="text-xs text-zinc-400 flex-1 truncate">{d.label}</span>
-                    <span className="text-[11px] text-zinc-500 tabular-nums">{d.fileCount} files</span>
-                    <span className="text-xs font-medium text-zinc-300 tabular-nums w-16 text-right">{formatBytes(d.bytes)}</span>
-                    <span className="text-[11px] text-zinc-600 tabular-nums w-10 text-right">{pct.toFixed(0)}%</span>
+                    <span className="t-caption text-[var(--brand-text-muted)] flex-1 truncate">{d.label}</span>
+                    <span className="t-caption-sm text-[var(--brand-text-muted)] tabular-nums">{d.fileCount} files</span>
+                    <span className="t-caption font-medium text-[var(--brand-text)] tabular-nums w-16 text-right">{formatBytes(d.bytes)}</span>
+                    <span className="t-caption-sm text-[var(--brand-border-hover)] tabular-nums w-10 text-right">{pct.toFixed(0)}%</span>
                   </div>
                 );
               })}
             </div>
 
             {/* Quick stats */}
-            <div className="grid grid-cols-3 gap-3 pt-2 border-t border-zinc-800">
+            <div className="grid grid-cols-3 gap-3 pt-2 border-t border-[var(--brand-border)]">
               <div className="text-center">
-                <div className="text-xs font-medium text-zinc-300">{storage.chatSessionCount}</div>
-                <div className="text-[11px] text-zinc-500">Chat sessions</div>
+                <div className="t-caption font-medium text-[var(--brand-text)]">{storage.chatSessionCount}</div>
+                <div className="t-caption-sm text-[var(--brand-text-muted)]">Chat sessions</div>
               </div>
               <div className="text-center">
-                <div className="text-xs font-medium text-zinc-300">{storage.backupRetentionDays}d</div>
-                <div className="text-[11px] text-zinc-500">Backup retention</div>
+                <div className="t-caption font-medium text-[var(--brand-text)]">{storage.backupRetentionDays}d</div>
+                <div className="t-caption-sm text-[var(--brand-text-muted)]">Backup retention</div>
               </div>
               <div className="text-center">
-                <div className="text-xs font-medium text-zinc-300">
+                <div className="t-caption font-medium text-[var(--brand-text)]">
                   {storage.oldestChatSession ? new Date(storage.oldestChatSession).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'}
                 </div>
-                <div className="text-[11px] text-zinc-500">Oldest chat</div>
+                <div className="t-caption-sm text-[var(--brand-text-muted)]">Oldest chat</div>
               </div>
             </div>
 
             {/* Prune actions */}
-            <div className="pt-2 border-t border-zinc-800">
-              <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-2">Cleanup Actions</div>
+            <div className="pt-2 border-t border-[var(--brand-border)]">
+              <div className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider mb-2">Cleanup Actions</div>
               <div className="space-y-1.5">
                 <button
                   onClick={() => runPrune('backups')}
                   disabled={!!pruning}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 transition-colors text-left"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] transition-colors text-left"
                 >
-                  <Trash2 className="w-3.5 h-3.5 text-amber-400/80 shrink-0" />
+                  <Icon as={Trash2} size="sm" className="text-amber-400/80 shrink-0" />
                   <div className="flex-1">
-                    <span className="text-xs text-zinc-300">Prune old backups</span>
-                    <span className="text-[11px] text-zinc-500 ml-1.5">Keep last 3 days</span>
+                    <span className="t-caption text-[var(--brand-text)]">Prune old backups</span>
+                    <span className="t-caption-sm text-[var(--brand-text-muted)] ml-1.5">Keep last 3 days</span>
                   </div>
-                  {pruning === 'backups' && <Loader2 className="w-3 h-3 animate-spin text-zinc-500" />}
+                  {pruning === 'backups' && <Icon as={Loader2} size="sm" className="animate-spin text-[var(--brand-text-muted)]" />}
                 </button>
                 <button
                   onClick={() => runPrune('reports')}
                   disabled={!!pruning}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 transition-colors text-left"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] transition-colors text-left"
                 >
-                  <Trash2 className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                  <Icon as={Trash2} size="sm" className="text-[var(--brand-text-muted)] shrink-0" />
                   <div className="flex-1">
-                    <span className="text-xs text-zinc-300">Prune audit snapshots</span>
-                    <span className="text-[11px] text-zinc-500 ml-1.5">Keep last 20 per site</span>
+                    <span className="t-caption text-[var(--brand-text)]">Prune audit snapshots</span>
+                    <span className="t-caption-sm text-[var(--brand-text-muted)] ml-1.5">Keep last 20 per site</span>
                   </div>
-                  {pruning === 'reports' && <Loader2 className="w-3 h-3 animate-spin text-zinc-500" />}
+                  {pruning === 'reports' && <Icon as={Loader2} size="sm" className="animate-spin text-[var(--brand-text-muted)]" />}
                 </button>
                 <button
                   onClick={() => runPrune('chat')}
                   disabled={!!pruning}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 transition-colors text-left"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] transition-colors text-left"
                 >
-                  <Trash2 className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+                  <Icon as={Trash2} size="sm" className="text-teal-400 shrink-0" />
                   <div className="flex-1">
-                    <span className="text-xs text-zinc-300">Prune chat history</span>
-                    <span className="text-[11px] text-zinc-500 ml-1.5">&gt;90 days old</span>
+                    <span className="t-caption text-[var(--brand-text)]">Prune chat history</span>
+                    <span className="t-caption-sm text-[var(--brand-text-muted)] ml-1.5">&gt;90 days old</span>
                   </div>
-                  {pruning === 'chat' && <Loader2 className="w-3 h-3 animate-spin text-zinc-500" />}
+                  {pruning === 'chat' && <Icon as={Loader2} size="sm" className="animate-spin text-[var(--brand-text-muted)]" />}
                 </button>
                 <button
                   onClick={() => runPrune('activity')}
                   disabled={!!pruning}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 transition-colors text-left"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] transition-colors text-left"
                 >
-                  <Trash2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                  <Icon as={Trash2} size="sm" className="text-blue-400 shrink-0" />
                   <div className="flex-1">
-                    <span className="text-xs text-zinc-300">Prune activity logs</span>
-                    <span className="text-[11px] text-zinc-500 ml-1.5">&gt;6 months old</span>
+                    <span className="t-caption text-[var(--brand-text)]">Prune activity logs</span>
+                    <span className="t-caption-sm text-[var(--brand-text-muted)] ml-1.5">&gt;6 months old</span>
                   </div>
-                  {pruning === 'activity' && <Loader2 className="w-3 h-3 animate-spin text-zinc-500" />}
+                  {pruning === 'activity' && <Icon as={Loader2} size="sm" className="animate-spin text-[var(--brand-text-muted)]" />}
                 </button>
               </div>
             </div>
           </div>
         ) : storageLoading ? (
-          <div className="px-5 py-8 flex items-center justify-center gap-2 text-xs text-zinc-500">
-            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Scanning storage...
+          <div className="px-5 py-8 flex items-center justify-center gap-2 t-caption text-[var(--brand-text-muted)]">
+            <Icon as={Loader2} size="sm" className="animate-spin" /> Scanning storage...
           </div>
         ) : (
-          <div className="px-5 py-4 text-xs text-zinc-500">Unable to load storage stats</div>
+          <div className="px-5 py-4 t-caption text-[var(--brand-text-muted)]">Unable to load storage stats</div>
         )}
       </section>
 
       {/* Studio Config — Booking URL */}
-      <section className="bg-zinc-900 overflow-hidden border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
-        <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
-          <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
-            <CalendarDays className="w-4 h-4 text-teal-400" />
+      <section className="bg-[var(--surface-2)] overflow-hidden border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature)' }}>
+        <div className="px-5 py-4 flex items-center gap-3 border-b border-[var(--brand-border)]">
+          <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-teal-500/10 flex items-center justify-center">
+            <Icon as={CalendarDays} size="md" className="text-teal-400" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-zinc-200">Booking Link</h3>
-            <p className="text-[11px] text-zinc-500 mt-0.5">Shown as a "Book a call" button in the client AI chat when service interest is detected.</p>
+            <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Booking Link</h3>
+            <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">Shown as a "Book a call" button in the client AI chat when service interest is detected.</p>
           </div>
         </div>
         <div className="px-5 py-4 space-y-3">
@@ -428,7 +428,7 @@ export function SettingsPanel() {
               value={bookingUrl}
               onChange={e => setBookingUrl(e.target.value)}
               placeholder="https://cal.com/yourname or https://calendly.com/yourname"
-              className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500"
+              className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
             />
             <button
               onClick={async () => {
@@ -440,15 +440,15 @@ export function SettingsPanel() {
                 finally { setBookingSaving(false); }
               }}
               disabled={bookingSaving}
-              className="px-3 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-lg text-xs text-white transition-colors flex items-center gap-1.5"
+              className="px-3 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-[var(--radius-lg)] t-caption text-white transition-colors flex items-center gap-1.5"
             >
-              {bookingSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+              {bookingSaving ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Check} size="sm" />}
               Save
             </button>
           </div>
           {bookingUrl && (
-            <a href={bookingUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] text-teal-400 hover:text-teal-300 transition-colors">
-              <ExternalLink className="w-3 h-3" /> Preview link
+            <a href={bookingUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 t-caption-sm text-teal-400 hover:text-teal-300 transition-colors">
+              <Icon as={ExternalLink} size="sm" /> Preview link
             </a>
           )}
         </div>
@@ -461,7 +461,7 @@ export function SettingsPanel() {
       <StripeSettings />
 
       {/* Hint */}
-      <p className="text-xs text-center py-4 text-zinc-500">
+      <p className="t-caption text-center py-4 text-[var(--brand-text-muted)]">
         Workspace-specific settings (GSC, GA4, client dashboards) are now in the gear icon next to each workspace.
       </p>
     </div>

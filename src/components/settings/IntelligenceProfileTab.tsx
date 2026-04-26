@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BrainCircuit, Save, Loader2, Sparkles } from 'lucide-react';
 import { put, post } from '../../api/client';
-import { SectionCard } from '../ui';
+import { SectionCard, Icon, Button } from '../ui';
 
 interface IntelligenceProfile {
   industry?: string;
@@ -73,21 +73,21 @@ export function IntelligenceProfileTab({ workspaceId, intelligenceProfile, toast
     }
   };
 
-  const fieldClass = 'w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors';
-  const labelClass = 'block text-[11px] font-medium text-zinc-400 mb-1';
+  const fieldClass = 'w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors';
+  const labelClass = 'block t-caption-sm font-medium text-[var(--brand-text)] mb-1';
 
   return (
     <div className="space-y-8">
       {/* Card */}
       <SectionCard noPadding>
-        <div className="px-5 py-4 flex items-center justify-between border-b border-zinc-800">
+        <div className="px-5 py-4 flex items-center justify-between border-b border-[var(--brand-border)]">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
-              <BrainCircuit className="w-4 h-4 text-teal-400" />
+            <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-teal-500/10 flex items-center justify-center">
+              <Icon as={BrainCircuit} size="md" className="text-teal-400" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-zinc-200">Business Intelligence Profile</h3>
-              <p className="text-xs text-zinc-500">
+              <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Business Intelligence Profile</h3>
+              <p className="t-caption text-[var(--brand-text-muted)]">
                 Strategy context — industry, goals, and target audience used to personalise AI insights
               </p>
             </div>
@@ -95,9 +95,9 @@ export function IntelligenceProfileTab({ workspaceId, intelligenceProfile, toast
           <button
             onClick={handleAutofill}
             disabled={autofilling || saving}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
-            {autofilling ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+            {autofilling ? <Icon as={Loader2} size="xs" className="animate-spin" /> : <Icon as={Sparkles} size="xs" />}
             {autofilling ? 'Analysing…' : 'Auto-fill from site data'}
           </button>
         </div>
@@ -117,7 +117,7 @@ export function IntelligenceProfileTab({ workspaceId, intelligenceProfile, toast
           {/* Goals */}
           <div>
             <label className={labelClass}>Goals</label>
-            <p className="text-[11px] text-zinc-500 mb-1.5">Enter goals separated by commas (e.g. increase organic traffic, generate more leads)</p>
+            <p className="t-caption-sm text-[var(--brand-text-muted)] mb-1.5">Enter goals separated by commas (e.g. increase organic traffic, generate more leads)</p>
             <textarea
               className={`${fieldClass} resize-none`}
               rows={3}
@@ -141,27 +141,28 @@ export function IntelligenceProfileTab({ workspaceId, intelligenceProfile, toast
 
           {/* Autofill error */}
           {autofillError && (
-            <p className="text-[11px] text-red-400">{autofillError}</p>
+            <p className="t-caption-sm text-red-400">{autofillError}</p>
           )}
 
           {/* Save */}
-          <div className="flex justify-end pt-2 border-t border-zinc-800">
-            <button
+          <div className="flex justify-end pt-2 border-t border-[var(--brand-border)]">
+            <Button
+              variant="primary"
               onClick={handleSave}
               disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium bg-gradient-to-r from-teal-600 to-emerald-600 text-white hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              loading={saving}
+              icon={saving ? undefined : Save}
             >
-              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
               {saving ? 'Saving…' : 'Save Intelligence Profile'}
-            </button>
+            </Button>
           </div>
         </div>
       </SectionCard>
 
       {/* Context note */}
       <SectionCard variant="subtle">
-        <p className="font-medium text-zinc-400 text-[11px]">How this is used</p>
-        <p className="text-[11px] text-zinc-500 mt-1">The intelligence profile feeds into AI-generated insights, keyword strategy recommendations, and chat context. It helps the platform understand the business's strategic direction, not just its contact details.</p>
+        <p className="font-medium text-[var(--brand-text)] t-caption-sm">How this is used</p>
+        <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">The intelligence profile feeds into AI-generated insights, keyword strategy recommendations, and chat context. It helps the platform understand the business's strategic direction, not just its contact details.</p>
       </SectionCard>
     </div>
   );
