@@ -167,7 +167,7 @@ export function ContentPipelineGuide() {
           <SectionCard key={section.id} noPadding>
             <button
               onClick={() => toggle(section.id)}
-              className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-[var(--surface-3)]/30 transition-colors rounded-[var(--radius-lg)]"
+              className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-[var(--surface-3)]/30 transition-colors rounded-[var(--radius-xl)]"
             >
               <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center flex-shrink-0">
                 <Icon as={SectionIcon} size="md" className="text-teal-400" />

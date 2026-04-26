@@ -86,19 +86,19 @@ export function ReviewChecklist({
         <SectionCard noPadding className="overflow-hidden">
           <button
             onClick={onToggleShowChecklist}
-            className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-zinc-800/50 transition-colors"
+            className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-[var(--surface-3)]/50 transition-colors"
           >
             <div className="flex items-center gap-2">
               <Icon as={ClipboardCheck} size="md" className={allChecked ? 'text-emerald-400/80' : 'text-[var(--brand-text-muted)]'} />
               <span className="text-xs font-medium text-zinc-300">Review Checklist</span>
-              <span className={`text-[11px] px-1.5 py-0.5 rounded border ${allChecked ? 'text-emerald-400/80 bg-emerald-500/8 border-emerald-500/20' : 'text-zinc-500 bg-zinc-800 border-zinc-700'}`}>
+              <span className={`text-[11px] px-1.5 py-0.5 rounded border ${allChecked ? 'text-emerald-400/80 bg-emerald-500/8 border-emerald-500/20' : 'text-[var(--brand-text-muted)] bg-[var(--surface-3)] border-[var(--brand-border-hover)]'}`}>
                 {checkedCount}/{CHECKLIST_ITEMS.length}
               </span>
             </div>
             {showChecklist ? <Icon as={ChevronUp} size="sm" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text-muted)]" />}
           </button>
           {showChecklist && (
-            <div className="px-4 pb-3 space-y-1.5 border-t border-zinc-800/50 pt-2.5">
+            <div className="px-4 pb-3 space-y-1.5 border-t border-[var(--brand-border)]/50 pt-2.5">
               {onRunAIReview && (
                 <button
                   onClick={handleAIReview}
@@ -113,12 +113,12 @@ export function ReviewChecklist({
                 <div key={item.key}>
                   <button
                     onClick={() => onToggleItem(item.key)}
-                    className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left hover:bg-zinc-800/50 transition-colors group"
+                    className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left hover:bg-[var(--surface-3)]/50 transition-colors group"
                   >
                     {checklist[item.key]
                       ? <Icon as={CheckSquare} size="md" className="text-emerald-400/80 flex-shrink-0" />
                       : <Icon as={Square} size="md" className="text-[var(--brand-text-muted)] group-hover:text-[var(--brand-text)] flex-shrink-0" />}
-                    <span className={`text-[11px] ${checklist[item.key] ? 'text-zinc-300 line-through decoration-zinc-600' : 'text-zinc-400'}`}>
+                    <span className={`text-[11px] ${checklist[item.key] ? 'text-[var(--brand-text-bright)] line-through decoration-[var(--brand-border-hover)]' : 'text-[var(--brand-text)]'}`}>
                       {item.label}
                     </span>
                     {aiResults?.[item.key] && (
@@ -128,7 +128,7 @@ export function ReviewChecklist({
                     )}
                   </button>
                   {aiResults?.[item.key] && (
-                    <div className={`ml-8 mr-2 mb-1 px-2 py-1.5 rounded text-[10px] leading-relaxed ${aiResults[item.key].pass ? 'text-zinc-500' : 'text-amber-400/80 bg-amber-500/5 border border-amber-500/10'}`}>
+                    <div className={`ml-8 mr-2 mb-1 px-2 py-1.5 rounded text-[10px] leading-relaxed ${aiResults[item.key].pass ? 'text-[var(--brand-text-muted)]' : 'text-amber-400/80 bg-amber-500/5 border border-amber-500/10'}`}>
                       {aiResults[item.key].reason}
                     </div>
                   )}

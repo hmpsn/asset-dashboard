@@ -2,7 +2,7 @@ import { useAiSuggestedBriefs } from '../../hooks/admin/useAiSuggestedBriefs.js'
 import { SectionCard } from '../ui/SectionCard.js';
 import { EmptyState } from '../ui/EmptyState.js';
 import { Badge } from '../ui/Badge.js';
-import { Icon as IconPrimitive } from '../ui/Icon.js';
+import { Icon } from '../ui/Icon.js';
 import { Sparkles, FileText, RefreshCw } from 'lucide-react';
 
 interface Props {
@@ -10,7 +10,7 @@ interface Props {
   onCreateBrief?: (keyword: string, pageUrl?: string) => void;
 }
 
-const iconMap: Record<string, typeof FileText> = {
+const signalIconMap: Record<string, typeof FileText> = {
   suggested_brief: FileText,
   refresh_suggestion: RefreshCw,
 };
@@ -23,7 +23,7 @@ export function AiSuggested({ workspaceId, onCreateBrief }: Props) {
     return (
       <SectionCard
         title="AI Suggested"
-        titleIcon={<IconPrimitive as={Sparkles} size="md" className="text-teal-400" />}
+        titleIcon={<Icon as={Sparkles} size="md" className="text-teal-400" />}
       >
         <div className="animate-pulse space-y-3">
           {[1, 2].map(i => (
@@ -38,7 +38,7 @@ export function AiSuggested({ workspaceId, onCreateBrief }: Props) {
     return (
       <SectionCard
         title="AI Suggested"
-        titleIcon={<IconPrimitive as={Sparkles} size="md" className="text-teal-400" />}
+        titleIcon={<Icon as={Sparkles} size="md" className="text-teal-400" />}
       >
         <EmptyState
           icon={Sparkles}
@@ -52,18 +52,18 @@ export function AiSuggested({ workspaceId, onCreateBrief }: Props) {
   return (
     <SectionCard
       title="AI Suggested"
-      titleIcon={<IconPrimitive as={Sparkles} size="md" className="text-teal-400" />}
+      titleIcon={<Icon as={Sparkles} size="md" className="text-teal-400" />}
       titleExtra={<Badge label={`${signals.length}`} color="teal" />}
     >
       <div className="space-y-2">
         {signals.slice(0, 8).map(signal => {
-          const Icon = iconMap[signal.type] ?? FileText;
+          const SignalIcon = signalIconMap[signal.type] ?? FileText;
           return (
             <div
               key={signal.insightId}
               className="flex items-start gap-3 p-3 rounded-lg bg-[var(--surface-3)]/30 hover:bg-[var(--surface-3)]/50 transition-colors"
             >
-              <IconPrimitive as={Icon} size="md" className="mt-0.5 text-teal-400 shrink-0" />
+              <Icon as={SignalIcon} size="md" className="mt-0.5 text-teal-400 shrink-0" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-[var(--brand-text-bright)] truncate">

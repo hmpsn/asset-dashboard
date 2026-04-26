@@ -94,7 +94,7 @@ export function BriefDetail({
           <Icon as={Copy} size="sm" /> Copy JSON
         </button>
         <button onClick={() => setShowRegenerate(!showRegenerate)} disabled={regeneratingBrief === brief.id} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg t-caption-sm font-medium transition-colors disabled:opacity-50 ${
-          showRegenerate ? 'bg-purple-600/20 border border-purple-500/30 text-purple-300' : 'bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] border border-[var(--brand-border)]'
+          showRegenerate ? 'bg-teal-600/20 border border-teal-500/30 text-teal-300' : 'bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] border border-[var(--brand-border)]'
         }`}>
           <Icon as={RefreshCw} size="sm" className={regeneratingBrief === brief.id ? 'animate-spin' : ''} />
           {regeneratingBrief === brief.id ? 'Regenerating...' : 'Regenerate'}
@@ -103,20 +103,20 @@ export function BriefDetail({
 
       {/* Regenerate with feedback */}
       {showRegenerate && regeneratingBrief !== brief.id && (
-        <div className="bg-purple-500/5 border border-purple-500/20 rounded-lg px-4 py-3 space-y-2">
-          <div className="text-[11px] text-purple-400 font-medium uppercase tracking-wider">Regenerate with Instructions</div>
+        <div className="bg-teal-500/5 border border-teal-500/20 rounded-lg px-4 py-3 space-y-2">
+          <div className="t-caption-sm text-teal-400 font-medium uppercase tracking-wider">Regenerate with Instructions</div>
           <textarea
             value={regenFeedback}
             onChange={e => setRegenFeedback(e.target.value)}
             placeholder="e.g. 'Make it more commercial', 'Add a comparison table section', 'Target a different audience'..."
-            className="w-full text-xs text-[var(--brand-text-bright)] bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg px-3 py-2 focus:border-purple-500/50 focus:outline-none resize-y min-h-[60px]"
+            className="w-full text-xs text-[var(--brand-text-bright)] bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg px-3 py-2 focus:border-teal-500/50 focus:outline-none resize-y min-h-[60px]"
             rows={2}
           />
           <div className="flex items-center gap-2">
             <button
               onClick={() => { if (regenFeedback.trim()) { onRegenerate(brief.id, regenFeedback.trim()); setShowRegenerate(false); setRegenFeedback(''); } }}
               disabled={!regenFeedback.trim()}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg t-caption-sm font-medium bg-purple-600/20 border border-purple-500/30 text-purple-300 hover:bg-purple-600/30 transition-colors disabled:opacity-40"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-40"
             >
               <Icon as={Send} size="sm" /> Regenerate Brief
             </button>
@@ -279,7 +279,7 @@ export function BriefDetail({
           <div className="flex items-center gap-1.5 mb-1.5"><Icon as={Target} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-micro text-[var(--brand-text-muted)] font-medium">Topical Entities to Cover</span></div>
           <div className="flex flex-wrap gap-1.5">
             {brief.topicalEntities.map((entity, i) => (
-              <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-300">{entity}</span>
+              <span key={i} className="t-caption-sm px-2 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-300">{entity}</span>
             ))}
           </div>
         </div>

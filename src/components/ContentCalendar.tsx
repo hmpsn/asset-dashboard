@@ -39,7 +39,7 @@ const STATUS_ICONS: Record<string, { icon: typeof Clock; color: string }> = {
   review:           { icon: Eye,          color: 'text-cyan-400' },
   approved:         { icon: CheckCircle2, color: 'text-emerald-400' },
   requested:        { icon: Send,         color: 'text-blue-400' },
-  pending_payment:  { icon: Clock,        color: 'text-zinc-400' },
+  pending_payment:  { icon: Clock,        color: 'text-[var(--brand-text)]' },
   brief_generated:  { icon: Clipboard,    color: 'text-teal-400' },
   client_review:    { icon: Eye,          color: 'text-cyan-400' },
   in_progress:      { icon: Sparkles,     color: 'text-amber-400' },
@@ -163,7 +163,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <div className="w-6 h-6 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" />
+        <div className="w-6 h-6 border-2 rounded-full animate-spin border-[var(--surface-3)] border-t-teal-400" />
       </div>
     );
   }

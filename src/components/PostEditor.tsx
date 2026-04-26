@@ -260,7 +260,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           {/* pr-check-disable-next-line -- modal dialog */}
-          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] p-6 max-w-sm w-full mx-4 shadow-2xl">
+          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] p-6 max-w-sm w-full mx-4 shadow-2xl">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0">
                 <Icon as={AlertTriangle} size="lg" className="text-red-400" />
@@ -492,7 +492,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
       {/* Publish confirmation dialog */}
       {publishConfirm && post && (
         // pr-check-disable-next-line -- publish confirmation card with teal accent border; not a standard section card
-        <div className="bg-[var(--surface-2)] rounded-[var(--radius-lg)] border border-teal-500/30 p-4 space-y-3">
+        <div className="bg-[var(--surface-2)] rounded-[var(--radius-xl)] border border-teal-500/30 p-4 space-y-3">
           <div className="flex items-center gap-2">
             <Icon as={Globe} size="md" className="text-teal-400" />
             <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">
@@ -538,7 +538,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
       {/* SEO Metadata */}
       {!showPreview && (
         // pr-check-disable-next-line -- SEO metadata summary row with reduced opacity; not a section card
-        <div className="bg-[var(--surface-2)]/50 rounded-[var(--radius-lg)] border border-[var(--brand-border)]/50 px-4 py-3 space-y-3">
+        <div className="bg-[var(--surface-2)]/50 rounded-[var(--radius-xl)] border border-[var(--brand-border)]/50 px-4 py-3 space-y-3">
           {post.seoTitle && (
             <div>
               <div className="t-micro text-[var(--brand-text-muted)] uppercase tracking-wider font-medium mb-1">SEO Title Tag <span className="normal-case text-[var(--brand-text-muted)]">({post.seoTitle.length} chars)</span></div>

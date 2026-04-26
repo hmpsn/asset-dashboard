@@ -144,7 +144,7 @@ function SuggestionRow({ suggestion: s, isSelecting, onSelect }: {
             {s.pageTitle}
           </span>
           <span className="t-micro text-[var(--brand-text-muted)]">/{s.pageSlug}</span>
-          <span className={`t-micro px-1.5 py-0.5 rounded ${s.field === 'title' ? 'bg-blue-500/10 text-blue-400' : 'bg-purple-500/10 text-purple-400'}`}>
+          <span className={`t-micro px-1.5 py-0.5 rounded ${s.field === 'title' ? 'bg-blue-500/10 text-blue-400' : 'bg-amber-500/10 text-amber-400'}`}>
             {fieldLabel}
           </span>
         </div>

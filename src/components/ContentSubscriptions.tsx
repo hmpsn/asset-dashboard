@@ -17,9 +17,9 @@ type BadgeColor = 'teal' | 'blue' | 'emerald' | 'amber' | 'red' | 'orange' | 'zi
 const STATUS_CONFIG: Record<string, { icon: typeof CheckCircle2; color: string; label: string; badgeColor: BadgeColor }> = {
   active:    { icon: CheckCircle2,  color: 'text-emerald-400', label: 'Active',    badgeColor: 'emerald' },
   pending:   { icon: Loader2,       color: 'text-amber-400',   label: 'Pending',   badgeColor: 'amber' },
-  paused:    { icon: PauseCircle,   color: 'text-zinc-400',    label: 'Paused',    badgeColor: 'zinc' },
+  paused:    { icon: PauseCircle,   color: 'text-[var(--brand-text)]',    label: 'Paused',    badgeColor: 'zinc' },
   past_due:  { icon: AlertTriangle, color: 'text-red-400',     label: 'Past Due',  badgeColor: 'red' },
-  cancelled: { icon: XCircle,       color: 'text-zinc-500',    label: 'Cancelled', badgeColor: 'zinc' },
+  cancelled: { icon: XCircle,       color: 'text-[var(--brand-text-muted)]',    label: 'Cancelled', badgeColor: 'zinc' },
 };
 
 export function ContentSubscriptions({ workspaceId }: Props) {
@@ -95,7 +95,7 @@ export function ContentSubscriptions({ workspaceId }: Props) {
 
       {loading && (
         <div className="flex items-center justify-center py-12 gap-3 text-[var(--brand-text-muted)]">
-          <Icon as={Loader2} size="md" className="animate-spin" />
+          <Icon as={Loader2} size="lg" className="animate-spin" />
           <p className="text-sm">Loading subscriptions...</p>
         </div>
       )}
@@ -159,7 +159,7 @@ export function ContentSubscriptions({ workspaceId }: Props) {
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setShowCreate(false)}
-                className="px-4 py-2 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 transition-colors"
+                className="px-4 py-2 rounded-lg text-xs font-medium text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
               >
                 Cancel
               </button>
