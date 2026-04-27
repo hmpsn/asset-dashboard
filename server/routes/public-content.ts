@@ -518,8 +518,8 @@ router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', valid
 
   const { title, metaDescription, introduction, sections, conclusion } = req.body;
   const updates: Record<string, unknown> = {};
-  if (title !== undefined) updates.title = title;
-  if (metaDescription !== undefined) updates.metaDescription = metaDescription;
+  if (title !== undefined) updates.title = stripHtmlTags(title);
+  if (metaDescription !== undefined) updates.metaDescription = stripHtmlTags(metaDescription);
   if (introduction !== undefined) updates.introduction = stripHtmlTags(introduction);
   if (conclusion !== undefined) updates.conclusion = stripHtmlTags(conclusion);
   if (sections !== undefined) {
