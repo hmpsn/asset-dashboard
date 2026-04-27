@@ -1202,8 +1202,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       {/* ── Decline Reason Modal ── */}
       {declineReason && (
         <Modal open onClose={() => setDeclineReason(null)} size="sm">
+          <Modal.Header title="Decline keyword" onClose={() => setDeclineReason(null)} />
           <Modal.Body>
-            <h3 className="t-body font-semibold text-[var(--brand-text)] mb-1">Decline keyword</h3>
             <p className="t-caption-sm text-[var(--brand-text-muted)] mb-3">
               <span className="text-red-400 font-medium">&ldquo;{declineReason.keyword}&rdquo;</span> will be excluded from future strategy recommendations.
             </p>

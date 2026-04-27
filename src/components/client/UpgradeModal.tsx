@@ -13,12 +13,12 @@ interface Props {
 export function UpgradeModal({ workspaceId, onClose, onError }: Props) {
   return (
     <Modal open onClose={onClose} size="sm">
+      <Modal.Header title="SEO Strategy — Premium Feature" onClose={onClose} />
       <Modal.Body>
         <div className="text-center">
           <div className="w-14 h-14 rounded-full bg-teal-500/10 border border-teal-500/20 flex items-center justify-center mx-auto mb-4">
             <Icon as={Sparkles} size="2xl" className="text-teal-400" />
           </div>
-          <h3 className="text-lg font-semibold text-[var(--brand-text-bright)] mb-2">SEO Strategy — Premium Feature</h3>
           <p className="t-body text-[var(--brand-text)] leading-relaxed mb-6">
             Unlock your full keyword strategy with page-level keyword targets, competitor gap analysis, and growth opportunities tailored to your business.
           </p>
