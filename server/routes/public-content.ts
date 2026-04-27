@@ -156,7 +156,7 @@ router.get('/api/public/content-requests/:workspaceId', (req, res) => {
     // Include briefId only when in client_review or later
     briefId: ['client_review', 'approved', 'changes_requested', 'in_progress', 'delivered', 'published'].includes(r.status) ? r.briefId : undefined,
     // Include postId only when post is ready for client review or beyond
-    postId: ['post_review', 'delivered', 'published'].includes(r.status) ? r.postId : undefined,
+    postId: ['post_review', 'changes_requested', 'delivered', 'published'].includes(r.status) ? r.postId : undefined,
     clientFeedback: r.clientFeedback,
   })));
 });
@@ -539,6 +539,18 @@ router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', valid
         wordCount: edit.wordCount,
       };
     });
+  }
+
+  // Recompute totalWordCount whenever content fields are updated
+  const willChangeContent = sections !== undefined || introduction !== undefined || conclusion !== undefined;
+  if (willChangeContent) {
+    const finalIntro = updates.introduction !== undefined ? (updates.introduction as string) : post.introduction;
+    const finalConclusion = updates.conclusion !== undefined ? (updates.conclusion as string) : post.conclusion;
+    const finalSections = (updates.sections as { wordCount: number }[] | undefined) ?? post.sections;
+    const introWords = (finalIntro || '').split(/\s+/).filter(Boolean).length;
+    const conclusionWords = (finalConclusion || '').split(/\s+/).filter(Boolean).length;
+    const sectionWords = finalSections.reduce((sum, s) => sum + (s.wordCount || 0), 0);
+    updates.totalWordCount = introWords + conclusionWords + sectionWords;
   }
 
   let updated;
