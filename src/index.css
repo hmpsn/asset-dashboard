@@ -259,7 +259,12 @@ body::after {
 
    Law: Phase 2 codemods replace arbitrary text sizes → .t-* classes.
          Phase 3 pr-check blocks new text-[Npx] usages.
+
+   Wrapped in @layer components so Tailwind utilities (font-semibold,
+   leading-none, etc.) can override font-weight / line-height when needed.
    ─────────────────────────────────────────────────────────────────────────── */
+
+@layer components {
 
 /* Display / Hero */
 .t-hero {
@@ -380,6 +385,8 @@ body::after {
   text-transform: uppercase;
   font-variant-numeric: tabular-nums;
 }
+
+} /* end @layer components — .t-* typography utilities */
 
 /* ─── Client Dashboard Light Theme ─── */
 
