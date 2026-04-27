@@ -1425,7 +1425,9 @@ function makeStubPost(workspaceId: string, briefId: string): GeneratedPost {
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 async function createRequest(topic: string, kw: string): Promise<{ id: string; status: string }> {
-  const res = await postJson(`/api/content-requests/${testWsId}`, {
+  // Use the public endpoint — there is no POST /api/content-requests/:wsId admin route.
+  // Admin routes for content-requests only register GET, PATCH, DELETE, and POST .../generate-brief.
+  const res = await postJson(`/api/public/content-request/${testWsId}`, {
     topic, targetKeyword: kw, intent: 'informational',
     priority: 'medium', rationale: '', serviceType: 'full_post',
   });
