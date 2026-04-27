@@ -1,4 +1,5 @@
 import { Component, type ReactNode, type ErrorInfo } from 'react';
+import { Icon } from './ui';
 import { AlertTriangle } from 'lucide-react';
 
 interface Props {
@@ -30,19 +31,19 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       if (this.props.fallback) return this.props.fallback;
       return (
-        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-red-500/8 border border-red-500/15">
-          <AlertTriangle className="w-4 h-4 text-red-400/80 flex-shrink-0" />
+        <div className="flex items-center gap-3 px-4 py-3 rounded-[var(--radius-xl)] bg-red-500/8 border border-red-500/15">
+          <Icon as={AlertTriangle} size="md" className="text-red-400/80 flex-shrink-0" />
           <div className="flex-1 min-w-0">
-            <div className="text-xs font-medium text-red-300">
+            <div className="t-caption font-medium text-red-300">
               {this.props.label ? `${this.props.label} failed to load` : 'Something went wrong'}
             </div>
-            <div className="text-[11px] text-zinc-500 mt-0.5 truncate">
+            <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 truncate">
               {this.state.error?.message || 'An unexpected error occurred'}
             </div>
           </div>
           <button
             onClick={() => this.setState({ hasError: false, error: null })}
-            className="text-[11px] text-zinc-400 hover:text-zinc-200 px-2 py-1 rounded-lg border border-zinc-700 hover:border-zinc-600 transition-colors flex-shrink-0"
+            className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] px-2 py-1 rounded-[var(--radius-lg)] border border-[var(--brand-border-hover)] hover:border-[var(--brand-border-hover)] transition-colors flex-shrink-0"
           >
             Retry
           </button>

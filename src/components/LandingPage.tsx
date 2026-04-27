@@ -17,11 +17,11 @@ const SIGNUP_URL = '#signup'; // Replace with actual signup/trial URL
 
 function NavBar() {
   return (
-    <nav className="fixed top-0 w-full z-50 border-b border-zinc-800/60 bg-[#0f1219]/80 backdrop-blur-xl">
+    <nav className="fixed top-0 w-full z-50 border-b border-[var(--brand-border)] bg-[var(--surface-1)]/80 backdrop-blur-xl">
       <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
         <img src="/hmpsn-studio-logo-wordmark-white.svg" alt="hmpsn studio" className="h-6 opacity-90" />
         <div className="flex items-center gap-4">
-          <a href="#pricing" className="text-sm text-zinc-400 hover:text-zinc-200 transition-colors hidden sm:block">Pricing</a>
+          <a href="#pricing" className="text-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors hidden sm:block">Pricing</a>
           <a href={SIGNUP_URL} className="px-4 py-2 rounded-lg text-sm font-semibold bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white transition-all">
             Start Free
           </a>
@@ -63,7 +63,7 @@ function Hero() {
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <a href={SIGNUP_URL} className="group px-8 py-3.5 rounded-xl text-base font-semibold bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white transition-all flex items-center gap-2 shadow-lg shadow-teal-500/20">
+          <a href={SIGNUP_URL} className="group px-8 py-3.5 rounded-[var(--radius-xl)] text-base font-semibold bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white transition-all flex items-center gap-2 shadow-lg shadow-teal-500/20">
             Start Free — 14 Day Trial
             <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
           </a>
@@ -87,14 +87,14 @@ function Hero() {
                   { label: 'Keywords Ranking', value: '342', delta: '+18', color: 'text-teal-400' },
                   { label: 'Traffic Value', value: '$4,210', delta: '+$890', color: 'text-teal-300' },
                 ].map(m => (
-                  <div key={m.label} className="rounded-xl bg-zinc-800/50 border border-zinc-700/50 p-4">
+                  <div key={m.label} className="rounded-[var(--radius-xl)] bg-zinc-800/50 border border-zinc-700/50 p-4">
                     <div className="text-[11px] text-zinc-500 mb-1">{m.label}</div>
                     <div className="text-xl sm:text-2xl font-bold text-zinc-100">{m.value}</div>
                     <div className={`text-xs font-medium ${m.color} mt-1`}>{m.delta}</div>
                   </div>
                 ))}
               </div>
-              <div className="h-32 rounded-xl bg-zinc-800/30 border border-zinc-700/30 flex items-end px-4 pb-4 gap-1">
+              <div className="h-32 rounded-[var(--radius-xl)] bg-zinc-800/30 border border-zinc-700/30 flex items-end px-4 pb-4 gap-1">
                 {[35,42,38,55,48,62,58,72,68,80,75,90,85,95].map((h, i) => (
                   <div key={i} className="flex-1 rounded-t bg-gradient-to-t from-teal-600/60 to-teal-400/40" style={{ height: `${h}%` }} />
                 ))}
@@ -143,7 +143,7 @@ function Problem() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {problems.map((p, i) => (
             <div key={i} className="border border-zinc-800 bg-zinc-900/50 p-6 hover:border-zinc-700 transition-colors" style={{ borderRadius: '6px 12px 6px 12px' }}>
-              <div className="w-10 h-10 rounded-xl bg-red-500/8 border border-red-500/20 flex items-center justify-center mb-4">
+              <div className="w-10 h-10 rounded-[var(--radius-xl)] bg-red-500/8 border border-red-500/20 flex items-center justify-center mb-4">
                 <p.icon className="w-5 h-5 text-red-400/80" />
               </div>
               <h3 className="text-sm font-semibold text-zinc-200 mb-2">{p.title}</h3>
@@ -196,7 +196,7 @@ function Solution() {
   ];
 
   return (
-    <section className="py-20 sm:py-28 border-t border-zinc-800/50">
+    <section className="py-20 sm:py-28 border-t border-[var(--brand-border)]">
       <div className="max-w-5xl mx-auto px-6">
         <div className="text-center mb-14">
           <SectionLabel>The Solution</SectionLabel>
@@ -212,7 +212,7 @@ function Solution() {
             <div key={i} className={`border ${p.border} bg-gradient-to-br ${p.gradient} to-zinc-900/50 p-6 relative overflow-hidden`} style={{ borderRadius: '6px 12px 6px 12px' }}>
               <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-gradient-to-br from-white/[0.02] to-transparent -translate-y-1/2 translate-x-1/2" />
               <div className="relative">
-                <div className={`w-10 h-10 rounded-xl ${p.iconBg} flex items-center justify-center mb-4`}>
+                <div className={`w-10 h-10 rounded-[var(--radius-xl)] ${p.iconBg} flex items-center justify-center mb-4`}>
                   <p.icon className={`w-5 h-5 ${p.iconColor}`} />
                 </div>
                 <div className={`text-[11px] font-bold uppercase tracking-widest ${p.iconColor} mb-1`}>{p.label}</div>
@@ -245,7 +245,7 @@ function HowItWorks() {
   ];
 
   return (
-    <section className="py-20 sm:py-28 border-t border-zinc-800/50">
+    <section className="py-20 sm:py-28 border-t border-[var(--brand-border)]">
       <div className="max-w-4xl mx-auto px-6">
         <div className="text-center mb-14">
           <SectionLabel>How It Works</SectionLabel>
@@ -265,7 +265,7 @@ function HowItWorks() {
           ))}
         </div>
         <div className="text-center mt-12">
-          <a href={SIGNUP_URL} className="group inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white transition-all shadow-lg shadow-teal-500/15">
+          <a href={SIGNUP_URL} className="group inline-flex items-center gap-2 px-6 py-3 rounded-[var(--radius-xl)] text-sm font-semibold bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white transition-all shadow-lg shadow-teal-500/15">
             Start Your Free Trial
             <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
           </a>
@@ -286,7 +286,7 @@ function Pricing() {
       period: '',
       tagline: 'Your site at a glance',
       cta: 'Start Free',
-      ctaStyle: 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700',
+      ctaStyle: 'bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)] border border-[var(--brand-border-hover)]',
       features: [
         'AI-powered site insights',
         'Site health audits',
@@ -324,7 +324,7 @@ function Pricing() {
       period: '/mo',
       tagline: 'Managed SEO partnership',
       cta: 'Contact Us',
-      ctaStyle: 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700',
+      ctaStyle: 'bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)] border border-[var(--brand-border-hover)]',
       features: [
         'Everything in Growth',
         'Competitor keyword analysis',
@@ -355,7 +355,7 @@ function Pricing() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {plans.map(plan => (
-            <div key={plan.id} className={`relative rounded-2xl border p-6 transition-all ${plan.highlighted ? 'bg-teal-500/[0.03] border-teal-500/30 ring-1 ring-teal-500/20' : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700'}`}>
+            <div key={plan.id} className={`relative rounded-2xl border p-6 transition-all ${plan.highlighted ? 'bg-teal-500/[0.03] border-teal-500/30 ring-1 ring-teal-500/20' : 'bg-[var(--surface-2)] border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]'}`}>
               {plan.highlighted && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-teal-500/20 border border-teal-500/30 text-teal-300">
                   Most Popular
@@ -402,7 +402,7 @@ function Trust() {
   ];
 
   return (
-    <section className="py-16 border-t border-zinc-800/50">
+    <section className="py-16 border-t border-[var(--brand-border)]">
       <div className="max-w-4xl mx-auto px-6">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
           {stats.map((s, i) => (
@@ -422,7 +422,7 @@ function Trust() {
 function FAQItem({ q, a }: { q: string; a: string }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="border-b border-zinc-800/50">
+    <div className="border-b border-[var(--brand-border)]">
       <button onClick={() => setOpen(!open)} className="w-full py-5 flex items-center justify-between text-left group">
         <span className="text-sm font-medium text-zinc-200 group-hover:text-zinc-100 pr-4">{q}</span>
         <ChevronDown className={`w-4 h-4 text-zinc-500 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -465,7 +465,7 @@ function FAQ() {
   ];
 
   return (
-    <section className="py-20 sm:py-28 border-t border-zinc-800/50">
+    <section className="py-20 sm:py-28 border-t border-[var(--brand-border)]">
       <div className="max-w-2xl mx-auto px-6">
         <div className="text-center mb-12">
           <SectionLabel>FAQ</SectionLabel>
@@ -499,7 +499,7 @@ function FinalCTA() {
         <p className="text-zinc-400 max-w-lg mx-auto mb-8">
           Start with a free dashboard. See your site health, traffic data, and AI insights in under 5 minutes. No credit card. No commitment.
         </p>
-        <a href={SIGNUP_URL} className="group inline-flex items-center gap-2 px-8 py-3.5 rounded-xl text-base font-semibold bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white transition-all shadow-lg shadow-teal-500/20">
+        <a href={SIGNUP_URL} className="group inline-flex items-center gap-2 px-8 py-3.5 rounded-[var(--radius-xl)] text-base font-semibold bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white transition-all shadow-lg shadow-teal-500/20">
           Start Free — 14 Day Trial
           <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
         </a>
@@ -512,7 +512,7 @@ function FinalCTA() {
 
 function Footer() {
   return (
-    <footer className="border-t border-zinc-800/50 py-10">
+    <footer className="border-t border-[var(--brand-border)] py-10">
       <div className="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
         <img src="/hmpsn-studio-logo-wordmark-white.svg" alt="hmpsn studio" className="h-5 opacity-60" />
         <p className="text-xs text-zinc-600">&copy; {new Date().getFullYear()} {STUDIO_NAME}. All rights reserved.</p>
@@ -525,7 +525,7 @@ function Footer() {
 
 export function LandingPage() {
   return (
-    <div className="min-h-screen bg-[#0f1219] text-zinc-200 antialiased">
+    <div className="min-h-screen bg-[var(--surface-1)] text-[var(--brand-text)] antialiased">
       <NavBar />
       <Hero />
       <Trust />
