@@ -20,10 +20,7 @@ import {
 } from '../../hooks/admin/useCopyPipeline';
 import { copyIntelligence } from '../../api/brand-engine';
 import { queryKeys } from '../../lib/queryKeys';
-import { SectionCard } from '../ui/SectionCard';
-import { Badge } from '../ui/Badge';
-import { SectionCardSkeleton } from '../ui/Skeleton';
-import { EmptyState } from '../ui/EmptyState';
+import { SectionCard, Badge, SectionCardSkeleton, EmptyState, Icon, cn } from '../ui';
 import { ErrorBoundary } from '../ErrorBoundary';
 import type { CopyIntelligencePattern, IntelligencePatternType } from '../../../shared/types/copy-pipeline';
 
@@ -93,14 +90,16 @@ function ToggleSwitch({ checked, onChange, disabled, label }: ToggleSwitchProps)
       aria-label={label ?? (checked ? 'Deactivate pattern' : 'Activate pattern')}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-900 disabled:cursor-not-allowed disabled:opacity-50 ${
-        checked ? 'bg-teal-500' : 'bg-zinc-600'
-      }`}
+      className={cn(
+        'relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-2)] disabled:cursor-not-allowed disabled:opacity-50',
+        checked ? 'bg-teal-500' : 'bg-[var(--brand-border-hover)]'
+      )}
     >
       <span
-        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform ${
+        className={cn(
+          'inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform',
           checked ? 'translate-x-4' : 'translate-x-0.5'
-        }`}
+        )}
       />
     </button>
   );
@@ -170,7 +169,7 @@ function PatternRow({ pattern, workspaceId }: PatternRowProps) {
   const isSaving = updateMutation.isPending;
 
   return (
-    <div className="flex items-center gap-3 py-2.5 px-3 rounded-lg bg-zinc-800/50 hover:bg-zinc-800/80 transition-colors group">
+    <div className="flex items-center gap-3 py-2.5 px-3 rounded-[var(--radius-md)] bg-[var(--surface-3)]/50 hover:bg-[var(--surface-3)] transition-colors group">
       {/* Toggle */}
       <ToggleSwitch
         checked={pattern.active}
@@ -190,16 +189,17 @@ function PatternRow({ pattern, workspaceId }: PatternRowProps) {
             onBlur={handleEditCommit}
             onKeyDown={handleKeyDown}
             disabled={isSaving}
-            className="w-full bg-zinc-700 border border-teal-500/50 rounded px-2 py-0.5 text-sm text-zinc-100 focus:outline-none focus:border-teal-500 disabled:opacity-60"
+            className="w-full bg-[var(--surface-3)] border border-teal-500/50 rounded px-2 py-0.5 text-sm text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500 disabled:opacity-60"
             aria-label="Edit pattern text"
           />
         ) : (
           <button
             onClick={handleEditStart}
             disabled={isDeleting}
-            className={`text-left w-full text-sm truncate transition-colors hover:text-teal-300 disabled:cursor-not-allowed ${
-              pattern.active ? 'text-zinc-200' : 'text-zinc-500 line-through'
-            }`}
+            className={cn(
+              'text-left w-full text-sm truncate transition-colors hover:text-teal-300 disabled:cursor-not-allowed',
+              pattern.active ? 'text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] line-through'
+            )}
             title="Click to edit"
             aria-label={`Edit: ${pattern.pattern}`}
           >
@@ -210,7 +210,7 @@ function PatternRow({ pattern, workspaceId }: PatternRowProps) {
 
       {/* Frequency badge */}
       <span
-        className="shrink-0 text-xs text-zinc-500 tabular-nums"
+        className="shrink-0 t-caption text-[var(--brand-text-muted)] tabular-nums"
         title={`Seen ${pattern.frequency} time${pattern.frequency === 1 ? '' : 's'}`}
         aria-label={`Frequency: ${pattern.frequency}`}
       >
@@ -219,7 +219,7 @@ function PatternRow({ pattern, workspaceId }: PatternRowProps) {
 
       {/* Saving indicator */}
       {isSaving && (
-        <Loader2 className="w-3.5 h-3.5 text-teal-400 animate-spin shrink-0" aria-label="Saving..." />
+        <Icon as={Loader2} size="md" className="text-teal-400 animate-spin shrink-0" aria-label="Saving..." />
       )}
 
       {/* Delete */}
@@ -227,12 +227,12 @@ function PatternRow({ pattern, workspaceId }: PatternRowProps) {
         onClick={() => deleteMutation.mutate(pattern.id)}
         disabled={isDeleting || isEditing}
         aria-label={`Delete pattern: ${pattern.pattern}`}
-        className="shrink-0 text-zinc-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 disabled:cursor-not-allowed disabled:opacity-30"
+        className="shrink-0 text-[var(--brand-text-muted)] hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 disabled:cursor-not-allowed disabled:opacity-30"
       >
         {isDeleting ? (
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          <Icon as={Loader2} size="md" className="animate-spin" />
         ) : (
-          <Trash2 className="w-3.5 h-3.5" />
+          <Icon as={Trash2} size="md" />
         )}
       </button>
     </div>
@@ -249,15 +249,15 @@ interface PatternGroupProps {
 
 function PatternGroup({ type, patterns, workspaceId }: PatternGroupProps) {
   const config = PATTERN_TYPE_CONFIG[type];
-  const Icon = config.icon;
+  const GroupIcon = config.icon;
 
   if (patterns.length === 0) return null;
 
   return (
     <div className="space-y-1.5">
       <div className="flex items-center gap-2 mb-2">
-        <Icon className="w-3.5 h-3.5 text-zinc-500" />
-        <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">
+        <Icon as={GroupIcon} size="md" className="text-[var(--brand-text-muted)]" />
+        <span className="t-caption font-semibold text-[var(--brand-text-muted)] uppercase tracking-wide">
           {config.label}
         </span>
         <Badge label={String(patterns.length)} color={config.badgeColor} />
@@ -291,12 +291,12 @@ function PromotableSection({ workspaceId }: PromotableSectionProps) {
   return (
     <SectionCard
       title="Ready to Promote"
-      titleIcon={<Star className="w-4 h-4 text-amber-400" />}
+      titleIcon={<Icon as={Star} size="md" className="text-amber-400" />}
       titleExtra={
         <Badge label={`${promotable.length} pattern${promotable.length === 1 ? '' : 's'}`} color="amber" />
       }
     >
-      <p className="text-xs text-zinc-500 mb-3">
+      <p className="t-caption text-[var(--brand-text-muted)] mb-3">
         Patterns seen 3+ times across copy reviews. Promote them to Voice Guardrails for persistent application.
       </p>
       <div className="space-y-2">
@@ -305,20 +305,20 @@ function PromotableSection({ workspaceId }: PromotableSectionProps) {
           return (
             <div
               key={p.id}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-amber-500/5 border border-amber-500/20"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-md)] bg-amber-500/5 border border-amber-500/20"
             >
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-zinc-200 truncate">{p.pattern}</p>
+                <p className="text-sm text-[var(--brand-text)] truncate">{p.pattern}</p>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <Badge label={config.label} color={config.badgeColor} />
-                  <span className="text-xs text-zinc-500">×{p.frequency}</span>
+                  <span className="t-caption text-[var(--brand-text-muted)]">×{p.frequency}</span>
                 </div>
               </div>
               <button
                 disabled
                 title="Coming soon — Tier 2 feature"
                 aria-label={`Promote "${p.pattern}" to Voice Guardrail (coming soon)`}
-                className="shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg bg-gradient-to-r from-teal-600/40 to-emerald-600/40 text-teal-400/60 cursor-not-allowed border border-teal-500/20"
+                className="shrink-0 px-3 py-1.5 t-caption font-medium rounded-[var(--radius-md)] bg-gradient-to-r from-teal-600/40 to-emerald-600/40 text-teal-400/60 cursor-not-allowed border border-teal-500/20"
               >
                 Promote to Guardrail
               </button>
@@ -349,13 +349,13 @@ function CopyIntelligenceManagerInner({ workspaceId }: Props) {
   if (isError) {
     return (
       <div
-        className="flex items-start gap-3 bg-red-900/20 border border-red-900/40 rounded-xl px-4 py-4"
+        className="flex items-start gap-3 bg-red-900/20 border border-red-900/40 rounded-[var(--radius-xl)] px-4 py-4"
         role="alert"
       >
-        <AlertCircle className="w-5 h-5 text-red-400 mt-0.5 shrink-0" />
+        <Icon as={AlertCircle} size="lg" className="text-red-400 mt-0.5 shrink-0" />
         <div>
           <p className="text-sm font-medium text-red-300">Failed to load patterns</p>
-          <p className="text-xs text-red-400/80 mt-0.5">
+          <p className="t-caption text-red-400/80 mt-0.5">
             Check your connection and try refreshing the page.
           </p>
         </div>
@@ -393,7 +393,7 @@ function CopyIntelligenceManagerInner({ workspaceId }: Props) {
       {/* Pattern library */}
       <SectionCard
         title="Learned Patterns"
-        titleIcon={<Brain className="w-4 h-4 text-zinc-500" />}
+        titleIcon={<Icon as={Brain} size="md" className="text-[var(--brand-text-muted)]" />}
         titleExtra={
           <Badge
             label={`${totalActive} active`}

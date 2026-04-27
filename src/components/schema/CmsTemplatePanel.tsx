@@ -1,6 +1,7 @@
 import {
   Loader2, Copy, CheckCircle, Upload,
 } from 'lucide-react';
+import { Icon, Button } from '../ui';
 
 interface CmsTemplatePage {
   pageId: string;
@@ -44,13 +45,13 @@ export function CmsTemplatePanel({
     <>
       {/* CMS Template Panel */}
       {showCmsPanel && (
-        <div className="w-full max-w-lg bg-zinc-900 border border-amber-500/20 overflow-hidden mt-2" style={{ borderRadius: '10px 24px 10px 24px' }}>
-          <div className="px-4 py-2.5 border-b border-zinc-800 flex items-center justify-between">
-            <span className="text-xs font-medium text-amber-300">CMS Collection Templates</span>
-            <button onClick={onClose} className="text-[11px] text-zinc-500 hover:text-zinc-400">Close</button>
+        <div className="w-full max-w-lg bg-[var(--surface-2)] border border-amber-500/20 overflow-hidden mt-2" style={{ borderRadius: '10px 24px 10px 24px' }}>
+          <div className="px-4 py-2.5 border-b border-[var(--brand-border)] flex items-center justify-between">
+            <span className="t-caption font-medium text-amber-300">CMS Collection Templates</span>
+            <button onClick={onClose} className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]">Close</button>
           </div>
           {cmsTemplatePages.length === 0 ? (
-            <div className="px-4 py-6 text-xs text-zinc-500 text-center">No CMS collections found</div>
+            <div className="px-4 py-6 t-caption text-[var(--brand-text-muted)] text-center">No CMS collections found</div>
           ) : (
             <div className="max-h-[200px] overflow-y-auto">
               {cmsTemplatePages.map(p => (
@@ -58,13 +59,13 @@ export function CmsTemplatePanel({
                   key={p.collectionId}
                   onClick={() => onGenerateCmsTemplate(p)}
                   disabled={generatingCmsTemplate === p.collectionId}
-                  className="w-full text-left px-4 py-2.5 hover:bg-zinc-800/50 transition-colors border-b border-zinc-800/30 last:border-b-0 disabled:opacity-50"
+                  className="w-full text-left px-4 py-2.5 hover:bg-[var(--surface-3)]/50 transition-colors border-b border-[var(--brand-border)]/30 last:border-b-0 disabled:opacity-50"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-zinc-300">{p.collectionName}</span>
-                    {generatingCmsTemplate === p.collectionId && <Loader2 className="w-3 h-3 animate-spin text-amber-400/80" />}
+                    <span className="t-caption text-[var(--brand-text)]">{p.collectionName}</span>
+                    {generatingCmsTemplate === p.collectionId && <Icon as={Loader2} size="sm" className="animate-spin text-amber-400/80" />}
                   </div>
-                  <span className="text-[11px] text-zinc-500">/{p.collectionSlug}/{'{'} slug {'}'} · Template: {p.pageTitle}</span>
+                  <span className="t-caption-sm text-[var(--brand-text-muted)]">/{p.collectionSlug}/{'{'} slug {'}'} · Template: {p.pageTitle}</span>
                 </button>
               ))}
             </div>
@@ -74,51 +75,55 @@ export function CmsTemplatePanel({
 
       {/* CMS Template Result */}
       {cmsTemplateResult && (
-        <div className="w-full max-w-2xl bg-zinc-900 border border-amber-500/20 overflow-hidden mt-2" style={{ borderRadius: '10px 24px 10px 24px' }}>
-          <div className="px-4 py-2.5 border-b border-zinc-800">
+        <div className="w-full max-w-2xl bg-[var(--surface-2)] border border-amber-500/20 overflow-hidden mt-2" style={{ borderRadius: '10px 24px 10px 24px' }}>
+          <div className="px-4 py-2.5 border-b border-[var(--brand-border)]">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-xs font-medium text-amber-300">Template: {cmsTemplateResult.collectionName}</span>
+                <span className="t-caption font-medium text-amber-300">Template: {cmsTemplateResult.collectionName}</span>
                 <div className="flex gap-1.5 mt-1">
                   {cmsTemplateResult.schemaTypes.map((t, i) => (
-                    <span key={i} className="px-1.5 py-0.5 rounded text-[11px] font-mono bg-amber-500/8 text-amber-300 border border-amber-500/20">{t}</span>
+                    <span key={i} className="px-1.5 py-0.5 rounded t-caption-sm font-mono bg-amber-500/8 text-amber-300 border border-amber-500/20">{t}</span>
                   ))}
                 </div>
               </div>
-              <span className="text-[11px] text-zinc-500">{cmsTemplateResult.fieldsUsed.length} CMS fields used</span>
+              <span className="t-caption-sm text-[var(--brand-text-muted)]">{cmsTemplateResult.fieldsUsed.length} CMS fields used</span>
             </div>
           </div>
           <div className="px-4 py-3">
             <div className="relative">
-              <pre className="text-xs font-mono bg-zinc-950 rounded-lg p-3 overflow-x-auto text-zinc-400 border border-zinc-800 max-h-64 overflow-y-auto whitespace-pre-wrap">
+              <pre className="t-caption font-mono bg-[var(--surface-1)] rounded-[var(--radius-md)] p-3 overflow-x-auto text-[var(--brand-text-muted)] border border-[var(--brand-border)] max-h-64 overflow-y-auto whitespace-pre-wrap">
                 {cmsTemplateResult.templateString}
               </pre>
               <div className="absolute top-2 right-2 flex items-center gap-1.5">
                 <button
                   onClick={onCopyCmsTemplate}
-                  className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors"
+                  className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
                 >
-                  {cmsCopied ? <><CheckCircle className="w-3 h-3 text-emerald-400/80" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
+                  {cmsCopied ? <><Icon as={CheckCircle} size="sm" className="text-emerald-400/80" /> Copied</> : <><Icon as={Copy} size="sm" /> Copy</>}
                 </button>
               </div>
             </div>
             <div className="mt-3 flex items-center gap-2">
               {cmsPublished ? (
-                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20">
-                  <CheckCircle className="w-3.5 h-3.5" /> Published to Webflow
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20">
+                  <Icon as={CheckCircle} size="md" /> Published to Webflow
                 </span>
               ) : (
-                <button
+                <Button
                   onClick={onPublishCmsTemplate}
                   disabled={publishingCmsTemplate}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 bg-gradient-to-r from-amber-600/80 to-orange-600/80 hover:from-amber-500 hover:to-orange-500 text-white"
+                  variant="primary"
+                  size="sm"
+                  icon={publishingCmsTemplate ? Loader2 : Upload}
+                  loading={publishingCmsTemplate}
+                  className="bg-gradient-to-r from-amber-600/80 to-orange-600/80 hover:from-amber-500 hover:to-orange-500"
                 >
-                  {publishingCmsTemplate ? <><Loader2 className="w-3 h-3 animate-spin" /> Publishing...</> : <><Upload className="w-3.5 h-3.5" /> Publish to Template Page</>}
-                </button>
+                  {publishingCmsTemplate ? 'Publishing...' : 'Publish to Template Page'}
+                </Button>
               )}
-              {cmsError && <span className="text-xs text-red-400/80">{cmsError}</span>}
+              {cmsError && <span className="t-caption text-red-400/80">{cmsError}</span>}
             </div>
-            <p className="text-[11px] text-zinc-500 mt-2">This template uses {'{{wf}}'} tags — each CMS item page gets unique schema with its own field values.</p>
+            <p className="t-caption-sm text-[var(--brand-text-muted)] mt-2">This template uses {'{{wf}}'} tags — each CMS item page gets unique schema with its own field values.</p>
           </div>
         </div>
       )}
@@ -126,7 +131,7 @@ export function CmsTemplatePanel({
       {/* Loading states */}
       {generatingCmsTemplate && !cmsTemplateResult && (
         <div className="flex items-center gap-2 text-amber-400/70 text-sm mt-2">
-          <Loader2 className="w-4 h-4 animate-spin" /> Generating CMS template schema...
+          <Icon as={Loader2} size="md" className="animate-spin" /> Generating CMS template schema...
         </div>
       )}
     </>

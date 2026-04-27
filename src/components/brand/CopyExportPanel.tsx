@@ -6,12 +6,9 @@ import {
   Layout,
   CheckCircle2,
   AlertCircle,
-  Loader2,
 } from 'lucide-react';
 import { useExportCopy } from '../../hooks/admin/useCopyPipeline';
-import { SectionCard } from '../ui/SectionCard';
-import { Badge } from '../ui/Badge';
-import { EmptyState } from '../ui/EmptyState';
+import { SectionCard, Badge, EmptyState, Icon, Button, cn } from '../ui';
 import { ErrorBoundary } from '../ErrorBoundary';
 import type { ExportFormat, ExportScope } from '../../../shared/types/copy-pipeline';
 import type { BlueprintEntry } from '../../../shared/types/page-strategy';
@@ -188,11 +185,11 @@ function CopyExportPanelInner({ workspaceId, blueprintId, entries }: Props) {
       {/* Format selector */}
       <SectionCard
         title="Export Format"
-        titleIcon={<Download className="w-4 h-4 text-zinc-500" />}
+        titleIcon={<Icon as={Download} size="md" className="text-[var(--brand-text-muted)]" />}
       >
         <div className="space-y-2" role="radiogroup" aria-label="Export format">
           {FORMAT_OPTIONS.map(option => {
-            const Icon = option.icon;
+            const OptionIcon = option.icon;
             const isSelected = selectedFormat === option.value;
             const isDisabled = option.disabled;
 
@@ -204,24 +201,28 @@ function CopyExportPanelInner({ workspaceId, blueprintId, entries }: Props) {
                 aria-disabled={isDisabled}
                 disabled={isDisabled}
                 onClick={() => !isDisabled && setSelectedFormat(option.value)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-colors ${
+                className={cn(
+                  'w-full flex items-center gap-3 px-4 py-3 rounded-[var(--radius-xl)] border text-left transition-colors',
                   isDisabled
-                    ? 'border-zinc-800 bg-zinc-900 opacity-40 cursor-not-allowed'
+                    ? 'border-[var(--brand-border)] bg-[var(--surface-2)] opacity-40 cursor-not-allowed'
                     : isSelected
                     ? 'border-teal-500 bg-teal-500/10 cursor-pointer'
-                    : 'border-zinc-800 bg-zinc-800/70 hover:border-zinc-700 cursor-pointer'
-                }`}
+                    : 'border-[var(--brand-border)] bg-[var(--surface-3)]/70 hover:border-[var(--brand-border-hover)] cursor-pointer'
+                )}
               >
                 <Icon
-                  className={`w-4 h-4 shrink-0 ${
-                    isDisabled ? 'text-zinc-600' : isSelected ? 'text-teal-400' : 'text-zinc-400'
-                  }`}
+                  as={OptionIcon}
+                  size="md"
+                  className={cn(
+                    'shrink-0',
+                    isDisabled ? 'text-[var(--brand-text-muted)]' : isSelected ? 'text-teal-400' : 'text-[var(--brand-text-muted)]'
+                  )}
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span
                       className={`text-sm font-medium ${
-                        isDisabled ? 'text-zinc-600' : isSelected ? 'text-teal-300' : 'text-zinc-200'
+                        isDisabled ? 'text-[var(--brand-text-muted)]' : isSelected ? 'text-teal-300' : 'text-[var(--brand-text)]'
                       }`}
                     >
                       {option.label}
@@ -231,15 +232,15 @@ function CopyExportPanelInner({ workspaceId, blueprintId, entries }: Props) {
                     )}
                   </div>
                   <p
-                    className={`text-xs mt-0.5 ${
-                      isDisabled ? 'text-zinc-700' : 'text-zinc-500'
+                    className={`t-caption mt-0.5 ${
+                      isDisabled ? 'text-[var(--brand-text-muted)]' : 'text-[var(--brand-text-muted)]'
                     }`}
                   >
                     {option.description}
                   </p>
                 </div>
                 {isSelected && !isDisabled && (
-                  <CheckCircle2 className="w-4 h-4 text-teal-400 shrink-0" />
+                  <Icon as={CheckCircle2} size="md" className="text-teal-400 shrink-0" />
                 )}
               </button>
             );
@@ -250,7 +251,7 @@ function CopyExportPanelInner({ workspaceId, blueprintId, entries }: Props) {
       {/* Scope selector */}
       <SectionCard
         title="Export Scope"
-        titleIcon={<FileText className="w-4 h-4 text-zinc-500" />}
+        titleIcon={<Icon as={FileText} size="md" className="text-[var(--brand-text-muted)]" />}
       >
         <div className="space-y-2" role="radiogroup" aria-label="Export scope">
           {SCOPE_OPTIONS.map(option => {
@@ -262,23 +263,24 @@ function CopyExportPanelInner({ workspaceId, blueprintId, entries }: Props) {
                 role="radio"
                 aria-checked={isSelected}
                 onClick={() => setSelectedScope(option.value)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-colors cursor-pointer ${
+                className={cn(
+                  'w-full flex items-center gap-3 px-4 py-3 rounded-[var(--radius-xl)] border text-left transition-colors cursor-pointer',
                   isSelected
                     ? 'border-teal-500 bg-teal-500/10'
-                    : 'border-zinc-800 bg-zinc-800/70 hover:border-zinc-700'
-                }`}
+                    : 'border-[var(--brand-border)] bg-[var(--surface-3)]/70 hover:border-[var(--brand-border-hover)]'
+                )}
               >
                 <div className="flex-1 min-w-0">
                   <p
                     className={`text-sm font-medium ${
-                      isSelected ? 'text-teal-300' : 'text-zinc-200'
+                      isSelected ? 'text-teal-300' : 'text-[var(--brand-text)]'
                     }`}
                   >
                     {option.label}
                   </p>
-                  <p className="text-xs text-zinc-500 mt-0.5">{option.description}</p>
+                  <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">{option.description}</p>
                 </div>
-                {isSelected && <CheckCircle2 className="w-4 h-4 text-teal-400 shrink-0" />}
+                {isSelected && <Icon as={CheckCircle2} size="md" className="text-teal-400 shrink-0" />}
               </button>
             );
           })}
@@ -287,7 +289,7 @@ function CopyExportPanelInner({ workspaceId, blueprintId, entries }: Props) {
         {/* Selected entries picker */}
         {selectedScope === 'selected' && (
           <div className="mt-4 space-y-2">
-            <p className="text-xs text-zinc-400 font-medium uppercase tracking-wide">
+            <p className="t-caption text-[var(--brand-text-muted)] font-medium uppercase tracking-wide">
               Choose entries
             </p>
             <div
@@ -303,18 +305,20 @@ function CopyExportPanelInner({ workspaceId, blueprintId, entries }: Props) {
                     role="checkbox"
                     aria-checked={checked}
                     onClick={() => toggleEntryId(entry.id)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left transition-colors cursor-pointer ${
+                    className={cn(
+                      'w-full flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-md)] border text-left transition-colors cursor-pointer',
                       checked
                         ? 'border-teal-500/50 bg-teal-500/8'
-                        : 'border-zinc-800 bg-zinc-800/50 hover:border-zinc-700'
-                    }`}
+                        : 'border-[var(--brand-border)] bg-[var(--surface-3)]/50 hover:border-[var(--brand-border-hover)]'
+                    )}
                   >
                     <div
-                      className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
+                      className={cn(
+                        'w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors',
                         checked
                           ? 'bg-teal-600 border-teal-600'
-                          : 'border-zinc-600 bg-transparent'
-                      }`}
+                          : 'border-[var(--brand-border-hover)] bg-transparent'
+                      )}
                     >
                       {checked && (
                         <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="currentColor">
@@ -323,17 +327,17 @@ function CopyExportPanelInner({ workspaceId, blueprintId, entries }: Props) {
                       )}
                     </div>
                     <div className="min-w-0">
-                      <p className={`text-sm font-medium truncate ${checked ? 'text-teal-300' : 'text-zinc-200'}`}>
+                      <p className={`text-sm font-medium truncate ${checked ? 'text-teal-300' : 'text-[var(--brand-text)]'}`}>
                         {entry.name}
                       </p>
-                      <p className="text-xs text-zinc-500 truncate">{entry.primaryKeyword}</p>
+                      <p className="t-caption text-[var(--brand-text-muted)] truncate">{entry.primaryKeyword}</p>
                     </div>
                   </button>
                 );
               })}
             </div>
             {selectedEntryIds.size > 0 && (
-              <p className="text-xs text-zinc-500">
+              <p className="t-caption text-[var(--brand-text-muted)]">
                 {selectedEntryIds.size} entr{selectedEntryIds.size === 1 ? 'y' : 'ies'} selected
               </p>
             )}
@@ -345,7 +349,7 @@ function CopyExportPanelInner({ workspaceId, blueprintId, entries }: Props) {
           <div className="mt-4 space-y-2">
             <label
               htmlFor="single-entry-select"
-              className="text-xs text-zinc-400 font-medium uppercase tracking-wide"
+              className="t-caption text-[var(--brand-text-muted)] font-medium uppercase tracking-wide"
             >
               Choose entry
             </label>
@@ -353,7 +357,7 @@ function CopyExportPanelInner({ workspaceId, blueprintId, entries }: Props) {
               id="single-entry-select"
               value={singleEntryId}
               onChange={e => setSingleEntryId(e.target.value)}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-teal-500 appearance-none cursor-pointer"
+              className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500 appearance-none cursor-pointer"
               aria-label="Select entry to export"
             >
               <option value="" disabled>
@@ -374,13 +378,13 @@ function CopyExportPanelInner({ workspaceId, blueprintId, entries }: Props) {
         {/* Error message */}
         {exportMutation.isError && (
           <div
-            className="flex items-start gap-2.5 bg-red-900/20 border border-red-900/40 rounded-xl px-4 py-3"
+            className="flex items-start gap-2.5 bg-red-900/20 border border-red-900/40 rounded-[var(--radius-xl)] px-4 py-3"
             role="alert"
           >
-            <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+            <Icon as={AlertCircle} size="md" className="text-red-400 mt-0.5 shrink-0" />
             <div>
               <p className="text-sm font-medium text-red-300">Export failed</p>
-              <p className="text-xs text-red-400/80 mt-0.5">
+              <p className="t-caption text-red-400/80 mt-0.5">
                 {exportMutation.error instanceof Error
                   ? exportMutation.error.message
                   : 'An unexpected error occurred. Please try again.'}
@@ -392,13 +396,13 @@ function CopyExportPanelInner({ workspaceId, blueprintId, entries }: Props) {
         {/* Partial export error from result */}
         {exportMutation.data && !exportMutation.data.success && (
           <div
-            className="flex items-start gap-2.5 bg-red-900/20 border border-red-900/40 rounded-xl px-4 py-3"
+            className="flex items-start gap-2.5 bg-red-900/20 border border-red-900/40 rounded-[var(--radius-xl)] px-4 py-3"
             role="alert"
           >
-            <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+            <Icon as={AlertCircle} size="md" className="text-red-400 mt-0.5 shrink-0" />
             <div>
               <p className="text-sm font-medium text-red-300">Export failed</p>
-              <p className="text-xs text-red-400/80 mt-0.5">
+              <p className="t-caption text-red-400/80 mt-0.5">
                 {exportMutation.data.error ?? 'An unexpected error occurred.'}
               </p>
             </div>
@@ -408,33 +412,27 @@ function CopyExportPanelInner({ workspaceId, blueprintId, entries }: Props) {
         {/* Success message */}
         {successMessage && exportMutation.isSuccess && exportMutation.data?.success && (
           <div
-            className="flex items-start gap-2.5 bg-emerald-900/20 border border-emerald-900/40 rounded-xl px-4 py-3"
+            className="flex items-start gap-2.5 bg-emerald-900/20 border border-emerald-900/40 rounded-[var(--radius-xl)] px-4 py-3"
             role="status"
             aria-live="polite"
           >
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+            <Icon as={CheckCircle2} size="md" className="text-emerald-400 mt-0.5 shrink-0" />
             <p className="text-sm text-emerald-300">{successMessage}</p>
           </div>
         )}
 
-        <button
+        <Button
           onClick={handleExport}
           disabled={!canExport}
+          variant="primary"
+          size="md"
+          icon={Download}
+          loading={exportMutation.isPending}
+          className="w-full justify-center"
           aria-label="Export copy"
-          className="flex items-center justify-center gap-2 w-full px-5 py-3 bg-gradient-to-r from-teal-600 to-emerald-600 text-white text-sm rounded-xl font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {exportMutation.isPending ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Exporting…
-            </>
-          ) : (
-            <>
-              <Download className="w-4 h-4" />
-              Export Copy
-            </>
-          )}
-        </button>
+          {exportMutation.isPending ? 'Exporting…' : 'Export Copy'}
+        </Button>
       </div>
     </div>
   );

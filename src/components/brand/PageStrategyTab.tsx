@@ -6,8 +6,7 @@ import type { SiteBlueprint, BlueprintGenerationInput } from '../../../shared/ty
 import { useToast } from '../Toast';
 import { useBlueprints } from '../../hooks/admin/useBlueprints';
 import { queryKeys } from '../../lib/queryKeys';
-import { EmptyState } from '../ui/EmptyState';
-import { SectionCard } from '../ui/SectionCard';
+import { EmptyState, SectionCard, Icon, Button } from '../ui';
 
 interface Props {
   workspaceId: string;
@@ -86,15 +85,16 @@ export function PageStrategyTab({ workspaceId, onSelectBlueprint }: Props) {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-zinc-100">Site Blueprints</h2>
+        <h2 className="text-lg font-semibold text-[var(--brand-text-bright)]">Site Blueprints</h2>
         {!showCreateForm && (
-          <button
+          <Button
             onClick={() => setShowCreateForm(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white text-sm rounded-lg font-medium hover:opacity-90 transition-opacity"
+            variant="primary"
+            size="sm"
+            icon={Plus}
           >
-            <Plus className="w-4 h-4" />
             New Blueprint
-          </button>
+          </Button>
         )}
       </div>
 
@@ -103,70 +103,60 @@ export function PageStrategyTab({ workspaceId, onSelectBlueprint }: Props) {
         <SectionCard title="New Blueprint">
           <div className="space-y-4">
             <div className="space-y-1">
-              <label htmlFor="bp-name" className="text-xs text-zinc-400">Name</label>
+              <label htmlFor="bp-name" className="t-caption text-[var(--brand-text-muted)]">Name</label>
               <input
                 id="bp-name"
                 value={name}
                 onChange={e => setName(e.target.value)}
                 placeholder="e.g. Main Site Blueprint"
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-teal-500"
+                className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
                 disabled={isCreating || isGenerating}
               />
             </div>
 
             <div className="space-y-1">
-              <label htmlFor="bp-industry" className="text-xs text-zinc-400">Industry Type</label>
+              <label htmlFor="bp-industry" className="t-caption text-[var(--brand-text-muted)]">Industry Type</label>
               <input
                 id="bp-industry"
                 value={industryType}
                 onChange={e => setIndustryType(e.target.value)}
                 placeholder="e.g. SaaS, E-commerce, Agency"
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-teal-500"
+                className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
                 disabled={isCreating || isGenerating}
               />
             </div>
 
             <div className="flex gap-2 pt-1">
-              <button
+              <Button
                 onClick={handleCreateEmpty}
                 disabled={!name.trim() || isCreating || isGenerating}
-                className="px-3 py-1.5 bg-zinc-700 text-zinc-200 text-sm rounded-lg font-medium hover:bg-zinc-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                variant="secondary"
+                size="sm"
+                loading={isCreating}
               >
-                {isCreating ? (
-                  <span className="flex items-center gap-1.5">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Creating...
-                  </span>
-                ) : (
-                  'Create Empty'
-                )}
-              </button>
+                {isCreating ? 'Creating...' : 'Create Empty'}
+              </Button>
 
-              <button
+              <Button
                 onClick={handleGenerateWithAI}
                 disabled={!industryType.trim() || isCreating || isGenerating}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white text-sm rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+                variant="primary"
+                size="sm"
+                icon={Sparkles}
+                loading={isGenerating}
               >
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4" />
-                    Generate with AI
-                  </>
-                )}
-              </button>
+                {isGenerating ? 'Generating...' : 'Generate with AI'}
+              </Button>
 
-              <button
+              <Button
                 onClick={resetForm}
                 disabled={isCreating || isGenerating}
-                className="ml-auto px-3 py-1.5 text-zinc-500 text-sm hover:text-zinc-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                variant="ghost"
+                size="sm"
+                className="ml-auto"
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         </SectionCard>
@@ -174,7 +164,7 @@ export function PageStrategyTab({ workspaceId, onSelectBlueprint }: Props) {
 
       {/* Blueprint list */}
       {isLoading ? (
-        <div className="flex items-center gap-2 text-zinc-400 text-sm py-4">
+        <div className="flex items-center gap-2 text-[var(--brand-text-muted)] text-sm py-4">
           <Loader2 className="w-4 h-4 animate-spin" />
           Loading blueprints...
         </div>
@@ -184,13 +174,14 @@ export function PageStrategyTab({ workspaceId, onSelectBlueprint }: Props) {
           title="No blueprints yet"
           description="Create one to start planning your site strategy."
           action={
-            <button
+            <Button
               onClick={() => setShowCreateForm(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white text-sm rounded-lg font-medium hover:opacity-90 transition-opacity"
+              variant="primary"
+              size="sm"
+              icon={Plus}
             >
-              <Plus className="w-4 h-4" />
               New Blueprint
-            </button>
+            </Button>
           }
         />
       ) : (
@@ -199,14 +190,14 @@ export function PageStrategyTab({ workspaceId, onSelectBlueprint }: Props) {
             // pr-check-disable-next-line -- list item row used as a clickable navigation element, not a section card
             <div
               key={bp.id}
-              className="group flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 cursor-pointer hover:border-zinc-700 transition-colors"
+              className="group flex items-center gap-3 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] px-4 py-3 cursor-pointer hover:border-[var(--brand-border-hover)] transition-colors"
               onClick={() => onSelectBlueprint(bp.id)}
             >
-              <Map className="w-4 h-4 text-zinc-400 shrink-0" />
+              <Icon as={Map} size="md" className="text-[var(--brand-text-muted)] shrink-0" />
 
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-zinc-100 truncate">{bp.name}</div>
-                <div className="text-xs text-zinc-500">
+                <div className="text-sm font-medium text-[var(--brand-text-bright)] truncate">{bp.name}</div>
+                <div className="t-caption text-[var(--brand-text-muted)]">
                   v{bp.version} · {bp.status}
                   {bp.industryType ? ` · ${bp.industryType}` : ''}
                 </div>
@@ -220,16 +211,16 @@ export function PageStrategyTab({ workspaceId, onSelectBlueprint }: Props) {
                   deleteMutation.mutate(bp.id);
                 }}
                 disabled={deletingId === bp.id}
-                className="opacity-0 group-hover:opacity-100 p-1 text-zinc-500 hover:text-red-400 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                className="opacity-0 group-hover:opacity-100 p-1 text-[var(--brand-text-muted)] hover:text-red-400 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                 aria-label={`Delete ${bp.name}`}
               >
                 {deletingId === bp.id
-                  ? <Loader2 className="w-4 h-4 animate-spin" />
-                  : <Trash2 className="w-4 h-4" />
+                  ? <Icon as={Loader2} size="md" className="animate-spin" />
+                  : <Icon as={Trash2} size="md" />
                 }
               </button>
 
-              <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
+              <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)] shrink-0" />
             </div>
           ))}
         </div>

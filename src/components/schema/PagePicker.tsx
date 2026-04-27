@@ -3,6 +3,7 @@
  * Extracted from SchemaSuggester.tsx page picker rendering.
  */
 import { Search } from 'lucide-react';
+import { Icon } from '../ui';
 
 export interface PagePickerProps {
   availablePages: Array<{ id: string; title: string; slug: string }>;
@@ -24,16 +25,16 @@ export function PagePicker({
 
   return (
     // pr-check-disable-next-line -- dropdown popover
-    <div className="absolute right-0 top-full mt-1 w-72 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-xl z-20">
-      <div className="px-3 py-2 border-b border-zinc-800">
+    <div className="absolute right-0 top-full mt-1 w-72 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] overflow-hidden shadow-xl z-20">
+      <div className="px-3 py-2 border-b border-[var(--brand-border)]">
         <div className="relative">
-          <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+          <Icon as={Search} size="sm" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
           <input
             type="text"
             value={pageSearch}
             onChange={e => onPageSearchChange(e.target.value)}
             placeholder="Search pages..."
-            className="w-full pl-7 pr-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
+            className="w-full pl-7 pr-3 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] t-caption text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
             autoFocus
           />
         </div>
@@ -46,22 +47,22 @@ export function PagePicker({
               key={p.id}
               onClick={() => onSelectPage(p.id)}
               disabled={generatingSingle === p.id}
-              className="w-full text-left px-4 py-2 hover:bg-zinc-800/50 transition-colors border-b border-zinc-800/30 last:border-b-0 disabled:opacity-50"
+              className="w-full text-left px-4 py-2 hover:bg-[var(--surface-3)]/50 transition-colors border-b border-[var(--brand-border)]/30 last:border-b-0 disabled:opacity-50"
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs text-zinc-300">{p.title}</span>
-                {alreadyGenerated && <span className="text-[11px] text-zinc-500">exists</span>}
+                <span className="t-caption text-[var(--brand-text)]">{p.title}</span>
+                {alreadyGenerated && <span className="t-caption-sm text-[var(--brand-text-muted)]">exists</span>}
               </div>
-              <span className="text-[11px] text-zinc-500">/{p.slug}</span>
+              <span className="t-caption-sm text-[var(--brand-text-muted)]">/{p.slug}</span>
             </button>
           );
         })}
         {filtered.length === 0 && (
-          <div className="px-4 py-3 text-xs text-zinc-500 text-center">No pages found</div>
+          <div className="px-4 py-3 t-caption text-[var(--brand-text-muted)] text-center">No pages found</div>
         )}
       </div>
-      <div className="px-3 py-2 border-t border-zinc-800">
-        <button onClick={onClose} className="text-[11px] text-zinc-500 hover:text-zinc-400 transition-colors">Close</button>
+      <div className="px-3 py-2 border-t border-[var(--brand-border)]">
+        <button onClick={onClose} className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">Close</button>
       </div>
     </div>
   );
@@ -89,16 +90,16 @@ export function InitialPagePicker({
 
   return (
     // pr-check-disable-next-line -- full-page picker view container; not a section card
-    <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden mt-2">
-      <div className="px-3 py-2 border-b border-zinc-800">
+    <div className="w-full max-w-md bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] overflow-hidden mt-2">
+      <div className="px-3 py-2 border-b border-[var(--brand-border)]">
         <div className="relative">
-          <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+          <Icon as={Search} size="sm" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
           <input
             type="text"
             value={pageSearch}
             onChange={e => onPageSearchChange(e.target.value)}
             placeholder="Search pages..."
-            className="w-full pl-7 pr-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
+            className="w-full pl-7 pr-3 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] t-caption text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
             autoFocus
           />
         </div>
@@ -109,18 +110,18 @@ export function InitialPagePicker({
             key={p.id}
             onClick={() => onSelectPage(p.id)}
             disabled={generatingSingle === p.id}
-            className="w-full text-left px-4 py-2 hover:bg-zinc-800/50 transition-colors border-b border-zinc-800/30 last:border-b-0 disabled:opacity-50"
+            className="w-full text-left px-4 py-2 hover:bg-[var(--surface-3)]/50 transition-colors border-b border-[var(--brand-border)]/30 last:border-b-0 disabled:opacity-50"
           >
-            <span className="text-xs text-zinc-300 block">{p.title}</span>
-            <span className="text-[11px] text-zinc-500">/{p.slug}</span>
+            <span className="t-caption text-[var(--brand-text)] block">{p.title}</span>
+            <span className="t-caption-sm text-[var(--brand-text-muted)]">/{p.slug}</span>
           </button>
         ))}
         {filtered.length === 0 && (
-          <div className="px-4 py-3 text-xs text-zinc-500 text-center">No pages found</div>
+          <div className="px-4 py-3 t-caption text-[var(--brand-text-muted)] text-center">No pages found</div>
         )}
       </div>
-      <div className="px-3 py-2 border-t border-zinc-800">
-        <button onClick={onClose} className="text-[11px] text-zinc-500 hover:text-zinc-400 transition-colors">Cancel</button>
+      <div className="px-3 py-2 border-t border-[var(--brand-border)]">
+        <button onClick={onClose} className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">Cancel</button>
       </div>
     </div>
   );

@@ -11,7 +11,7 @@ import type {
   VoiceSampleContext,
 } from '../../../shared/types/brand-engine';
 import { PROMPT_TYPE_TO_SECTION_TYPE } from '../../../shared/types/brand-engine';
-import { SectionCard, EmptyState, Skeleton, TabBar } from '../ui';
+import { SectionCard, EmptyState, Skeleton, TabBar, Icon, Button, cn } from '../ui';
 import { useToast } from '../Toast';
 
 type VoiceSection = 'samples' | 'dna' | 'guardrails' | 'calibration';
@@ -44,10 +44,10 @@ const CONTEXT_TAG_COLORS: Record<VoiceSampleContext, string> = {
   headline: 'bg-teal-500/10 text-teal-400',
   body: 'bg-blue-500/10 text-blue-400',
   cta: 'bg-emerald-500/10 text-emerald-400',
-  about: 'bg-zinc-700 text-zinc-300',
-  service: 'bg-zinc-700 text-zinc-300',
-  social: 'bg-zinc-700 text-zinc-300',
-  seo: 'bg-zinc-700 text-zinc-300',
+  about: 'bg-[var(--surface-3)] text-[var(--brand-text)]',
+  service: 'bg-[var(--surface-3)] text-[var(--brand-text)]',
+  social: 'bg-[var(--surface-3)] text-[var(--brand-text)]',
+  seo: 'bg-[var(--surface-3)] text-[var(--brand-text)]',
 };
 
 // ─── Module-level defaults ────────────────────────────────────────────────────
@@ -72,7 +72,7 @@ const defaultGuardrails: VoiceGuardrails = {
 function ContextTagBadge({ tag }: { tag: VoiceSampleContext }) {
   const colorClass = CONTEXT_TAG_COLORS[tag];
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colorClass}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded t-caption font-medium ${colorClass}`}>
       {tag}
     </span>
   );
@@ -134,14 +134,15 @@ function SamplesSection({ workspaceId, samples, onChanged }: SamplesSectionProps
       {/* Toolbar */}
       {!showAdd && (
         <div className="flex justify-end">
-          <button
+          <Button
             type="button"
             onClick={() => setShowAdd(true)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 text-white text-sm font-medium hover:opacity-90 transition-opacity"
+            variant="primary"
+            size="sm"
+            icon={Plus}
           >
-            <Plus className="w-4 h-4" />
             Add Sample
-          </button>
+          </Button>
         </div>
       )}
 
@@ -150,12 +151,12 @@ function SamplesSection({ workspaceId, samples, onChanged }: SamplesSectionProps
         <SectionCard title="Add Voice Sample">
           <form onSubmit={handleAdd} className="space-y-4">
             <div className="space-y-1">
-              <label htmlFor="sample-context-tag" className="text-xs text-zinc-400">Context tag</label>
+              <label htmlFor="sample-context-tag" className="t-caption text-[var(--brand-text-muted)]">Context tag</label>
               <select
                 id="sample-context-tag"
                 value={contextTag}
                 onChange={e => setContextTag(e.target.value as VoiceSampleContext)}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
               >
                 {CONTEXT_TAG_OPTIONS.map(o => (
                   <option key={o.value} value={o.value}>{o.label}</option>
@@ -164,33 +165,36 @@ function SamplesSection({ workspaceId, samples, onChanged }: SamplesSectionProps
             </div>
 
             <div className="space-y-1">
-              <label htmlFor="sample-content" className="text-xs text-zinc-400">Content</label>
+              <label htmlFor="sample-content" className="t-caption text-[var(--brand-text-muted)]">Content</label>
               <textarea
                 id="sample-content"
                 value={content}
                 onChange={e => setContent(e.target.value)}
                 placeholder="Paste an example of on-brand copy..."
                 rows={4}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 resize-none"
+                className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40 resize-none"
               />
             </div>
 
             <div className="flex items-center gap-3">
-              <button
+              <Button
                 type="submit"
                 disabled={!content.trim() || submitting}
-                className="flex items-center gap-2 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                variant="primary"
+                size="sm"
+                icon={Plus}
+                loading={submitting}
               >
-                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                 Add
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={() => { setShowAdd(false); setContent(''); }}
-                className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm transition-colors"
+                variant="secondary"
+                size="sm"
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </form>
         </SectionCard>
@@ -203,14 +207,15 @@ function SamplesSection({ workspaceId, samples, onChanged }: SamplesSectionProps
           title="No voice samples yet"
           description="Add examples of on-brand copy to train the voice engine."
           action={
-            <button
+            <Button
               type="button"
               onClick={() => setShowAdd(true)}
-              className="flex items-center gap-2 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+              variant="primary"
+              size="sm"
+              icon={Plus}
             >
-              <Plus className="w-4 h-4" />
               Add Sample
-            </button>
+            </Button>
           }
         />
       ) : (
@@ -219,23 +224,23 @@ function SamplesSection({ workspaceId, samples, onChanged }: SamplesSectionProps
             // pr-check-disable-next-line -- list item row with delete control, not a section card
             <div
               key={sample.id}
-              className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex items-start gap-3"
+              className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] p-4 flex items-start gap-3"
             >
               <div className="flex-1 min-w-0 space-y-2">
                 {sample.contextTag && <ContextTagBadge tag={sample.contextTag} />}
-                <p className="text-sm text-zinc-200 leading-relaxed">{sample.content}</p>
+                <p className="text-sm text-[var(--brand-text)] leading-relaxed">{sample.content}</p>
               </div>
               <button
                 type="button"
                 onClick={() => handleDelete(sample.id)}
                 disabled={deletingId === sample.id}
                 aria-label="Delete sample"
-                className="shrink-0 text-zinc-600 hover:text-red-400 transition-colors p-1 rounded disabled:opacity-50"
+                className="shrink-0 text-[var(--brand-text-muted)] hover:text-red-400 transition-colors p-1 rounded disabled:opacity-50"
               >
                 {deletingId === sample.id ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Icon as={Loader2} size="md" className="animate-spin" />
                 ) : (
-                  <Trash2 className="w-4 h-4" />
+                  <Icon as={Trash2} size="md" />
                 )}
               </button>
             </div>
@@ -300,21 +305,21 @@ function DNASection({ workspaceId, voiceDNA, onChanged }: DNASectionProps) {
     <div className="space-y-6">
       {/* Personality Traits */}
       <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-zinc-200">Personality Traits</h3>
+        <h3 className="text-sm font-semibold text-[var(--brand-text)]">Personality Traits</h3>
         <div className="flex flex-wrap gap-2">
           {dna.personalityTraits.map(trait => (
             <span
               key={trait}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-zinc-800 rounded-lg text-xs text-zinc-300"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[var(--surface-3)] rounded-[var(--radius-md)] t-caption text-[var(--brand-text)]"
             >
               {trait}
               <button
                 type="button"
                 onClick={() => removeTrait(trait)}
                 aria-label={`Remove trait: ${trait}`}
-                className="text-zinc-500 hover:text-red-400 transition-colors"
+                className="text-[var(--brand-text-muted)] hover:text-red-400 transition-colors"
               >
-                <Trash2 className="w-3 h-3" />
+                <Icon as={Trash2} size="sm" />
               </button>
             </span>
           ))}
@@ -328,23 +333,24 @@ function DNASection({ workspaceId, voiceDNA, onChanged }: DNASectionProps) {
             onChange={e => setNewTrait(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTrait(); } }}
             placeholder="e.g. Witty but never sarcastic"
-            className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+            className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
           />
-          <button
+          <Button
             type="button"
             onClick={addTrait}
             disabled={!newTrait.trim()}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+            variant="primary"
+            size="sm"
+            icon={Plus}
           >
-            <Plus className="w-4 h-4" />
             Add
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Tone Spectrum */}
       <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-zinc-200">Tone Spectrum</h3>
+        <h3 className="text-sm font-semibold text-[var(--brand-text)]">Tone Spectrum</h3>
 
         {(
           [
@@ -355,10 +361,10 @@ function DNASection({ workspaceId, voiceDNA, onChanged }: DNASectionProps) {
         ).map(({ key, leftLabel, rightLabel }) => (
           <div key={key} className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <label htmlFor={`tone-${key}`} className="text-xs text-zinc-400">
+              <label htmlFor={`tone-${key}`} className="t-caption text-[var(--brand-text-muted)]">
                 {leftLabel} ↔ {rightLabel}
               </label>
-              <span className="text-xs font-medium text-teal-400">{dna.toneSpectrum[key]}</span>
+              <span className="t-caption font-medium text-teal-400">{dna.toneSpectrum[key]}</span>
             </div>
             <input
               id={`tone-${key}`}
@@ -370,7 +376,7 @@ function DNASection({ workspaceId, voiceDNA, onChanged }: DNASectionProps) {
               onChange={e => updateSpectrum(key, Number(e.target.value))}
               className="w-full accent-teal-500"
             />
-            <div className="flex justify-between text-xs text-zinc-600">
+            <div className="flex justify-between t-caption text-[var(--brand-text-muted)]">
               <span>1</span>
               <span>10</span>
             </div>
@@ -381,52 +387,54 @@ function DNASection({ workspaceId, voiceDNA, onChanged }: DNASectionProps) {
       {/* Style fields */}
       <div className="space-y-4">
         <div className="space-y-1">
-          <label htmlFor="dna-sentence-style" className="text-xs text-zinc-400">Sentence Style</label>
+          <label htmlFor="dna-sentence-style" className="t-caption text-[var(--brand-text-muted)]">Sentence Style</label>
           <input
             id="dna-sentence-style"
             type="text"
             value={dna.sentenceStyle}
             onChange={e => setDna(prev => ({ ...prev, sentenceStyle: e.target.value }))}
             placeholder="e.g. Short punchy lines with occasional longer payoff"
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
           />
         </div>
 
         <div className="space-y-1">
-          <label htmlFor="dna-vocabulary-level" className="text-xs text-zinc-400">Vocabulary Level</label>
+          <label htmlFor="dna-vocabulary-level" className="t-caption text-[var(--brand-text-muted)]">Vocabulary Level</label>
           <input
             id="dna-vocabulary-level"
             type="text"
             value={dna.vocabularyLevel}
             onChange={e => setDna(prev => ({ ...prev, vocabularyLevel: e.target.value }))}
             placeholder="e.g. Conversational, 8th grade reading level"
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
           />
         </div>
 
         <div className="space-y-1">
-          <label htmlFor="dna-humor-style" className="text-xs text-zinc-400">Humor Style</label>
+          <label htmlFor="dna-humor-style" className="t-caption text-[var(--brand-text-muted)]">Humor Style</label>
           <input
             id="dna-humor-style"
             type="text"
             value={dna.humorStyle ?? ''}
             onChange={e => setDna(prev => ({ ...prev, humorStyle: e.target.value }))}
             placeholder="e.g. Self-deprecating, observational"
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
           />
         </div>
       </div>
 
       <div className="flex justify-end pt-2">
-        <button
+        <Button
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="flex items-center gap-2 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+          variant="primary"
+          size="sm"
+          icon={Save}
+          loading={saving}
         >
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           Save DNA
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -479,12 +487,12 @@ function GuardrailsSection({ workspaceId, guardrails, onChanged }: GuardrailsSec
     <div className="space-y-6">
       {/* Forbidden Words */}
       <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-zinc-200">Forbidden Words</h3>
+        <h3 className="text-sm font-semibold text-[var(--brand-text)]">Forbidden Words</h3>
         <div className="flex flex-wrap gap-2">
           {gr.forbiddenWords.map(word => (
             <span
               key={word}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-500/10 text-red-400 rounded-lg text-xs"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-500/10 text-red-400 rounded-[var(--radius-md)] t-caption"
             >
               {word}
               <button
@@ -493,7 +501,7 @@ function GuardrailsSection({ workspaceId, guardrails, onChanged }: GuardrailsSec
                 aria-label={`Remove forbidden word: ${word}`}
                 className="hover:text-red-300 transition-colors"
               >
-                <Trash2 className="w-3 h-3" />
+                <Icon as={Trash2} size="sm" />
               </button>
             </span>
           ))}
@@ -512,65 +520,66 @@ function GuardrailsSection({ workspaceId, guardrails, onChanged }: GuardrailsSec
               }
             }}
             placeholder="e.g. synergy, leverage"
-            className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+            className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
           />
-          <button
+          <Button
             type="button"
             onClick={() => addToList(gr.forbiddenWords, list => setGr(prev => ({ ...prev, forbiddenWords: list })), newForbidden, () => setNewForbidden(''))}
             disabled={!newForbidden.trim()}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+            variant="primary"
+            size="sm"
+            icon={Plus}
           >
-            <Plus className="w-4 h-4" />
             Add
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Required Terminology */}
       <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-zinc-200">Required Terminology</h3>
+        <h3 className="text-sm font-semibold text-[var(--brand-text)]">Required Terminology</h3>
         <div className="space-y-2">
           {gr.requiredTerminology.map((term, i) => (
-            <div key={`${term.use}::${term.insteadOf}`} className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2">
-              <span className="text-xs text-zinc-400 shrink-0">Use</span>
+            <div key={`${term.use}::${term.insteadOf}`} className="flex items-center gap-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2">
+              <span className="t-caption text-[var(--brand-text-muted)] shrink-0">Use</span>
               <span className="text-sm text-teal-400 font-medium">{term.use}</span>
-              <span className="text-xs text-zinc-500 shrink-0">instead of</span>
-              <span className="text-sm text-zinc-400 line-through">{term.insteadOf}</span>
+              <span className="t-caption text-[var(--brand-text-muted)] shrink-0">instead of</span>
+              <span className="text-sm text-[var(--brand-text-muted)] line-through">{term.insteadOf}</span>
               <button
                 type="button"
                 onClick={() => setGr(prev => ({ ...prev, requiredTerminology: prev.requiredTerminology.filter((_, idx) => idx !== i) }))}
                 aria-label={`Remove terminology: use ${term.use} instead of ${term.insteadOf}`}
-                className="ml-auto text-zinc-600 hover:text-red-400 transition-colors"
+                className="ml-auto text-[var(--brand-text-muted)] hover:text-red-400 transition-colors"
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Icon as={Trash2} size="md" />
               </button>
             </div>
           ))}
         </div>
         <div className="flex items-center gap-2">
           <div className="space-y-1 flex-1">
-            <label htmlFor="gr-term-use" className="text-xs text-zinc-400">Use</label>
+            <label htmlFor="gr-term-use" className="t-caption text-[var(--brand-text-muted)]">Use</label>
             <input
               id="gr-term-use"
               type="text"
               value={newTermUse}
               onChange={e => setNewTermUse(e.target.value)}
               placeholder="e.g. clients"
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+              className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
             />
           </div>
           <div className="space-y-1 flex-1">
-            <label htmlFor="gr-term-instead-of" className="text-xs text-zinc-400">Instead of</label>
+            <label htmlFor="gr-term-instead-of" className="t-caption text-[var(--brand-text-muted)]">Instead of</label>
             <input
               id="gr-term-instead-of"
               type="text"
               value={newTermInsteadOf}
               onChange={e => setNewTermInsteadOf(e.target.value)}
               placeholder="e.g. customers"
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+              className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
             />
           </div>
-          <button
+          <Button
             type="button"
             onClick={() => {
               const use = newTermUse.trim();
@@ -582,31 +591,33 @@ function GuardrailsSection({ workspaceId, guardrails, onChanged }: GuardrailsSec
               }
             }}
             disabled={!newTermUse.trim() || !newTermInsteadOf.trim()}
-            className="mt-5 flex items-center gap-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 shrink-0"
+            variant="primary"
+            size="sm"
+            icon={Plus}
+            className="mt-5 shrink-0"
           >
-            <Plus className="w-4 h-4" />
             Add
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Tone Boundaries */}
       <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-zinc-200">Tone Boundaries</h3>
+        <h3 className="text-sm font-semibold text-[var(--brand-text)]">Tone Boundaries</h3>
         <div className="flex flex-wrap gap-2">
           {gr.toneBoundaries.map(boundary => (
             <span
               key={boundary}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-zinc-800 text-zinc-300 rounded-lg text-xs"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[var(--surface-3)] text-[var(--brand-text)] rounded-[var(--radius-md)] t-caption"
             >
               {boundary}
               <button
                 type="button"
                 onClick={() => setGr(prev => ({ ...prev, toneBoundaries: prev.toneBoundaries.filter(b => b !== boundary) }))}
                 aria-label={`Remove tone boundary: ${boundary}`}
-                className="text-zinc-500 hover:text-red-400 transition-colors"
+                className="text-[var(--brand-text-muted)] hover:text-red-400 transition-colors"
               >
-                <Trash2 className="w-3 h-3" />
+                <Icon as={Trash2} size="sm" />
               </button>
             </span>
           ))}
@@ -625,28 +636,29 @@ function GuardrailsSection({ workspaceId, guardrails, onChanged }: GuardrailsSec
               }
             }}
             placeholder="e.g. Never condescending"
-            className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+            className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
           />
-          <button
+          <Button
             type="button"
             onClick={() => addToList(gr.toneBoundaries, list => setGr(prev => ({ ...prev, toneBoundaries: list })), newToneBoundary, () => setNewToneBoundary(''))}
             disabled={!newToneBoundary.trim()}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+            variant="primary"
+            size="sm"
+            icon={Plus}
           >
-            <Plus className="w-4 h-4" />
             Add
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Anti-patterns */}
       <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-zinc-200">Anti-patterns</h3>
+        <h3 className="text-sm font-semibold text-[var(--brand-text)]">Anti-patterns</h3>
         <div className="flex flex-wrap gap-2">
           {gr.antiPatterns.map(pattern => (
             <span
               key={pattern}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/10 text-amber-400 rounded-lg text-xs"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/10 text-amber-400 rounded-[var(--radius-md)] t-caption"
             >
               {pattern}
               <button
@@ -655,7 +667,7 @@ function GuardrailsSection({ workspaceId, guardrails, onChanged }: GuardrailsSec
                 aria-label={`Remove anti-pattern: ${pattern}`}
                 className="hover:text-amber-300 transition-colors"
               >
-                <Trash2 className="w-3 h-3" />
+                <Icon as={Trash2} size="sm" />
               </button>
             </span>
           ))}
@@ -674,30 +686,33 @@ function GuardrailsSection({ workspaceId, guardrails, onChanged }: GuardrailsSec
               }
             }}
             placeholder="e.g. Starting every sentence with 'We'"
-            className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+            className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
           />
-          <button
+          <Button
             type="button"
             onClick={() => addToList(gr.antiPatterns, list => setGr(prev => ({ ...prev, antiPatterns: list })), newAntiPattern, () => setNewAntiPattern(''))}
             disabled={!newAntiPattern.trim()}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+            variant="primary"
+            size="sm"
+            icon={Plus}
           >
-            <Plus className="w-4 h-4" />
             Add
-          </button>
+          </Button>
         </div>
       </div>
 
       <div className="flex justify-end pt-2">
-        <button
+        <Button
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="flex items-center gap-2 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+          variant="primary"
+          size="sm"
+          icon={Save}
+          loading={saving}
         >
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           Save Guardrails
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -820,36 +835,29 @@ function CalibrationSection({ workspaceId, onSampleSaved }: CalibrationSectionPr
       {/* Controls */}
       <div className="flex items-end gap-3">
         <div className="space-y-1 flex-1">
-          <label htmlFor="calib-prompt-type" className="text-xs text-zinc-400">Prompt type</label>
+          <label htmlFor="calib-prompt-type" className="t-caption text-[var(--brand-text-muted)]">Prompt type</label>
           <select
             id="calib-prompt-type"
             value={promptType}
             onChange={e => setPromptType(e.target.value)}
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
           >
             {PROMPT_TYPE_OPTIONS.map(pt => (
               <option key={pt} value={pt}>{pt.replace(/_/g, ' ')}</option>
             ))}
           </select>
         </div>
-        <button
+        <Button
           type="button"
           onClick={handleGenerate}
           disabled={generating}
-          className="flex items-center gap-2 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+          variant="primary"
+          size="sm"
+          icon={Sparkles}
+          loading={generating}
         >
-          {generating ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Generating…
-            </>
-          ) : (
-            <>
-              <Sparkles className="w-4 h-4" />
-              Generate
-            </>
-          )}
-        </button>
+          {generating ? 'Generating…' : 'Generate'}
+        </Button>
       </div>
 
       {/* Loading state */}
@@ -870,42 +878,44 @@ function CalibrationSection({ workspaceId, onSampleSaved }: CalibrationSectionPr
               // pr-check-disable-next-line -- variation card uses dynamic border color for rating feedback; SectionCard does not support dynamic border overrides
               <div
                 key={i}
-                className={`bg-zinc-900 border rounded-xl p-4 space-y-3 transition-colors ${
+                className={cn(
+                  'bg-[var(--surface-2)] border rounded-[var(--radius-xl)] p-4 space-y-3 transition-colors',
                   rating === 'on_brand'
                     ? 'border-teal-500/50'
                     : rating === 'close'
-                    ? 'border-zinc-600'
+                    ? 'border-[var(--brand-border-hover)]'
                     : rating === 'wrong'
                     ? 'border-red-500/30'
-                    : 'border-zinc-800'
-                }`}
+                    : 'border-[var(--brand-border)]'
+                )}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <span className="text-xs text-zinc-500 font-medium">Variation {i + 1}</span>
+                  <span className="t-caption text-[var(--brand-text-muted)] font-medium">Variation {i + 1}</span>
                   {rating && (
                     <span
-                      className={`text-xs font-medium px-2 py-0.5 rounded ${
+                      className={cn(
+                        't-caption font-medium px-2 py-0.5 rounded',
                         rating === 'on_brand'
                           ? 'bg-teal-500/10 text-teal-400'
                           : rating === 'close'
-                          ? 'bg-zinc-700 text-zinc-300'
+                          ? 'bg-[var(--surface-3)] text-[var(--brand-text)]'
                           : 'bg-red-500/10 text-red-400'
-                      }`}
+                      )}
                     >
                       {rating.replace('_', ' ')}
                     </span>
                   )}
                 </div>
 
-                <p className="text-sm text-zinc-200 leading-relaxed">{variation.text}</p>
+                <p className="text-sm text-[var(--brand-text)] leading-relaxed">{variation.text}</p>
 
                 {/* Rating buttons */}
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs text-zinc-500">Rate:</span>
+                  <span className="t-caption text-[var(--brand-text-muted)]">Rate:</span>
                   {(
                     [
                       { value: 'on_brand' as const, label: 'On-brand', activeClass: 'bg-teal-600 text-white' },
-                      { value: 'close' as const, label: 'Close', activeClass: 'bg-zinc-600 text-white' },
+                      { value: 'close' as const, label: 'Close', activeClass: 'bg-[var(--brand-border-hover)] text-white' },
                       { value: 'wrong' as const, label: 'Wrong', activeClass: 'bg-red-600 text-white' },
                     ] as const
                   ).map(({ value, label, activeClass }) => (
@@ -913,11 +923,12 @@ function CalibrationSection({ workspaceId, onSampleSaved }: CalibrationSectionPr
                       key={value}
                       type="button"
                       onClick={() => setLocalRatings(prev => ({ ...prev, [i]: value }))}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                      className={cn(
+                        'px-2.5 py-1 rounded-[var(--radius-md)] t-caption font-medium transition-colors',
                         rating === value
                           ? activeClass
-                          : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
-                      }`}
+                          : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:bg-[var(--brand-border-hover)]'
+                      )}
                     >
                       {label}
                     </button>
@@ -926,7 +937,7 @@ function CalibrationSection({ workspaceId, onSampleSaved }: CalibrationSectionPr
 
                 {/* Feedback input */}
                 <div className="space-y-1">
-                  <label htmlFor={`calib-feedback-${i}`} className="text-xs text-zinc-400">
+                  <label htmlFor={`calib-feedback-${i}`} className="t-caption text-[var(--brand-text-muted)]">
                     Feedback (optional)
                   </label>
                   <input
@@ -935,38 +946,34 @@ function CalibrationSection({ workspaceId, onSampleSaved }: CalibrationSectionPr
                     value={localFeedback[i] ?? ''}
                     onChange={e => setLocalFeedback(prev => ({ ...prev, [i]: e.target.value }))}
                     placeholder="e.g. Good tone but too long"
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                    className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
                   />
                 </div>
 
                 {/* Actions: Save feedback + Save as Sample */}
                 <div className="flex justify-end gap-2">
-                  <button
+                  <Button
                     type="button"
                     onClick={() => handleSaveFeedback(i)}
                     disabled={savingFeedbackIndex === i || !localFeedback[i]?.trim()}
-                    className="flex items-center gap-1.5 px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+                    variant="secondary"
+                    size="sm"
+                    icon={savingFeedbackIndex === i ? Loader2 : Save}
+                    loading={savingFeedbackIndex === i}
                   >
-                    {savingFeedbackIndex === i ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Save className="w-3.5 h-3.5" />
-                    )}
                     Save feedback
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     onClick={() => handleSaveAsSample(i, variation.text)}
                     disabled={savingIndex === i}
-                    className="flex items-center gap-1.5 px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+                    variant="secondary"
+                    size="sm"
+                    icon={savingIndex === i ? Loader2 : Save}
+                    loading={savingIndex === i}
                   >
-                    {savingIndex === i ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Save className="w-3.5 h-3.5" />
-                    )}
                     Save as Sample
-                  </button>
+                  </Button>
                 </div>
               </div>
             );
@@ -977,7 +984,7 @@ function CalibrationSection({ workspaceId, onSampleSaved }: CalibrationSectionPr
             <SectionCard title="Refine">
               <div className="space-y-3">
                 <div className="space-y-1">
-                  <label htmlFor="calib-refine-direction" className="text-xs text-zinc-400">
+                  <label htmlFor="calib-refine-direction" className="t-caption text-[var(--brand-text-muted)]">
                     Steering direction (optional)
                   </label>
                   <input
@@ -986,27 +993,20 @@ function CalibrationSection({ workspaceId, onSampleSaved }: CalibrationSectionPr
                     value={refineDirection}
                     onChange={e => setRefineDirection(e.target.value)}
                     placeholder="e.g. Make it punchier and shorter"
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                    className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40"
                   />
                 </div>
-                <button
+                <Button
                   type="button"
                   onClick={handleRefine}
                   disabled={refining}
-                  className="flex items-center gap-2 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                  variant="primary"
+                  size="sm"
+                  icon={refining ? Loader2 : Sparkles}
+                  loading={refining}
                 >
-                  {refining ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Refining…
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-4 h-4" />
-                      Refine
-                    </>
-                  )}
-                </button>
+                  {refining ? 'Refining…' : 'Refine'}
+                </Button>
               </div>
             </SectionCard>
           )}
@@ -1016,8 +1016,8 @@ function CalibrationSection({ workspaceId, onSampleSaved }: CalibrationSectionPr
       {/* Empty state — before first generate */}
       {!generating && !session && (
         <div className="text-center py-10 space-y-2">
-          <Sparkles className="w-8 h-8 text-zinc-600 mx-auto" />
-          <p className="text-sm text-zinc-500">Select a prompt type and generate variations to start calibrating.</p>
+          <Icon as={Sparkles} size="2xl" className="text-[var(--brand-text-muted)] mx-auto" />
+          <p className="text-sm text-[var(--brand-text-muted)]">Select a prompt type and generate variations to start calibrating.</p>
         </div>
       )}
     </div>
@@ -1062,7 +1062,7 @@ export function VoiceTab({ workspaceId }: { workspaceId: string }) {
     return (
       <SectionCard
         title="Voice Calibration"
-        titleIcon={<Mic className="w-4 h-4 text-teal-400" />}
+        titleIcon={<Icon as={Mic} size="md" className="text-teal-400" />}
       >
         <div className="space-y-3">
           <Skeleton className="h-8 w-full" />
@@ -1077,28 +1077,24 @@ export function VoiceTab({ workspaceId }: { workspaceId: string }) {
     return (
       <SectionCard
         title="Voice Calibration"
-        titleIcon={<Mic className="w-4 h-4 text-teal-400" />}
+        titleIcon={<Icon as={Mic} size="md" className="text-teal-400" />}
       >
         <EmptyState
           icon={Mic}
           title="No voice profile yet"
           description="Create a voice profile to start calibrating your brand's tone and style."
           action={
-            <button
+            <Button
               type="button"
               onClick={() => createProfileMutation.mutate()}
               disabled={createProfileMutation.isPending}
-              className="flex items-center gap-2 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+              variant="primary"
+              size="sm"
+              icon={createProfileMutation.isPending ? Loader2 : undefined}
+              loading={createProfileMutation.isPending}
             >
-              {createProfileMutation.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Creating…
-                </>
-              ) : (
-                'Create voice profile'
-              )}
-            </button>
+              {createProfileMutation.isPending ? 'Creating…' : 'Create voice profile'}
+            </Button>
           }
         />
       </SectionCard>
@@ -1108,7 +1104,7 @@ export function VoiceTab({ workspaceId }: { workspaceId: string }) {
   return (
     <SectionCard
       title="Voice Calibration"
-      titleIcon={<Mic className="w-4 h-4 text-teal-400" />}
+      titleIcon={<Icon as={Mic} size="md" className="text-teal-400" />}
     >
       {/* Section tabs */}
       {/* tab-deeplink-ok: VoiceTab section tabs (samples/calibration/analytics) are not externally deep-linked */}

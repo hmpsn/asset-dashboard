@@ -24,10 +24,7 @@ import {
   useGenerateCopy,
   useSendEntryToClientReview,
 } from '../../hooks/admin/useCopyPipeline';
-import { SectionCard } from '../ui/SectionCard';
-import { Badge } from '../ui/Badge';
-import { SectionCardSkeleton } from '../ui/Skeleton';
-import { EmptyState } from '../ui/EmptyState';
+import { SectionCard, Badge, SectionCardSkeleton, EmptyState, Icon, Button } from '../ui';
 import { ErrorBoundary } from '../ErrorBoundary';
 import type { CopySection, QualityFlag } from '../../../shared/types/copy-pipeline';
 import { COPY_STATUS_BADGE } from '../../lib/copyStatusConfig';
@@ -48,16 +45,16 @@ function QualityFlagRow({ flag }: { flag: QualityFlag }) {
   const isError = flag.severity === 'error';
   return (
     <div
-      className={`flex items-start gap-2 px-3 py-2 rounded-lg text-xs ${
+      className={`flex items-start gap-2 px-3 py-2 rounded-[var(--radius-md)] t-caption ${
         isError ? 'bg-red-900/20 text-red-300' : 'bg-amber-900/20 text-amber-300'
       }`}
       role="alert"
       aria-label={`Quality flag: ${flag.message}`}
     >
       {isError ? (
-        <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+        <Icon as={AlertCircle} size="md" className="mt-0.5 shrink-0" />
       ) : (
-        <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+        <Icon as={AlertTriangle} size="md" className="mt-0.5 shrink-0" />
       )}
       <span>{flag.message}</span>
     </div>
@@ -131,7 +128,7 @@ function SectionItem({ section, workspaceId, blueprintId, entryId, index }: Sect
     <SectionCard
       staggerIndex={index}
       title={sectionLabel}
-      titleIcon={<FileText className="w-4 h-4 text-zinc-500" />}
+      titleIcon={<Icon as={FileText} size="md" className="text-[var(--brand-text-muted)]" />}
       titleExtra={
         <div className="flex items-center gap-1.5">
           <Badge label={statusConfig.label} color={statusConfig.color} />
@@ -142,10 +139,10 @@ function SectionItem({ section, workspaceId, blueprintId, entryId, index }: Sect
       action={
         <button
           onClick={() => setExpanded(v => !v)}
-          className="p-1 text-zinc-500 hover:text-zinc-300 transition-colors"
+          className="p-1 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
           aria-label={expanded ? `Collapse section ${sectionLabel}` : `Expand section ${sectionLabel}`}
         >
-          <Chevron className="w-4 h-4" />
+          <Icon as={Chevron} size="md" />
         </button>
       }
     >
@@ -159,43 +156,42 @@ function SectionItem({ section, workspaceId, blueprintId, entryId, index }: Sect
                 value={editText}
                 onChange={e => setEditText(e.target.value)}
                 rows={8}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-teal-500 resize-y"
+                className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-y"
                 aria-label={`Edit copy for ${sectionLabel}`}
                 disabled={updateText.isPending}
               />
               <div className="flex gap-2">
-                <button
+                <Button
                   onClick={handleSaveEdit}
                   disabled={updateText.isPending || !editText.trim()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white text-xs rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+                  variant="primary"
+                  size="sm"
+                  icon={Save}
+                  loading={updateText.isPending}
                   aria-label={`Save edits for ${sectionLabel}`}
                 >
-                  {updateText.isPending ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Save className="w-3.5 h-3.5" />
-                  )}
                   Save
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={handleCancelEdit}
                   disabled={updateText.isPending}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-zinc-400 text-xs hover:text-zinc-200 transition-colors disabled:opacity-40"
+                  variant="ghost"
+                  size="sm"
+                  icon={X}
                   aria-label="Cancel editing"
                 >
-                  <X className="w-3.5 h-3.5" />
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
           ) : (
             <div className="relative group">
               {section.generatedCopy ? (
-                <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap">
+                <p className="text-sm text-[var(--brand-text)] leading-relaxed whitespace-pre-wrap">
                   {section.generatedCopy}
                 </p>
               ) : (
-                <p className="text-sm text-zinc-600 italic">No copy generated yet.</p>
+                <p className="text-sm text-[var(--brand-text-muted)] italic">No copy generated yet.</p>
               )}
               {section.generatedCopy && (
                 <button
@@ -203,11 +199,11 @@ function SectionItem({ section, workspaceId, blueprintId, entryId, index }: Sect
                     setEditText(section.generatedCopy ?? '');
                     setEditMode(true);
                   }}
-                  className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 p-1 text-zinc-500 hover:text-teal-400 transition-all"
+                  className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 p-1 text-[var(--brand-text-muted)] hover:text-teal-400 transition-all"
                   aria-label={`Edit copy for ${sectionLabel}`}
                   tabIndex={0}
                 >
-                  <Pencil className="w-3.5 h-3.5" />
+                  <Icon as={Pencil} size="md" />
                 </button>
               )}
             </div>
@@ -215,11 +211,11 @@ function SectionItem({ section, workspaceId, blueprintId, entryId, index }: Sect
 
           {/* AI Annotation */}
           {section.aiAnnotation && (
-            <div className="flex items-start gap-2 bg-zinc-800/50 rounded-lg px-3 py-2.5">
-              <MessageSquare className="w-3.5 h-3.5 text-blue-400 mt-0.5 shrink-0" />
+            <div className="flex items-start gap-2 bg-[var(--surface-3)]/50 rounded-[var(--radius-md)] px-3 py-2.5">
+              <Icon as={MessageSquare} size="md" className="text-blue-400 mt-0.5 shrink-0" />
               <div>
-                <p className="text-[11px] text-zinc-500 font-medium uppercase tracking-wide mb-0.5">AI Note</p>
-                <p className="text-xs text-zinc-400">{section.aiAnnotation}</p>
+                <p className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wide mb-0.5">AI Note</p>
+                <p className="t-caption text-[var(--brand-text-muted)]">{section.aiAnnotation}</p>
               </div>
             </div>
           )}
@@ -236,7 +232,7 @@ function SectionItem({ section, workspaceId, blueprintId, entryId, index }: Sect
           {/* Regenerate with note */}
           {showRegenInput ? (
             <div className="space-y-2">
-              <label htmlFor={`regen-note-${section.id}`} className="text-xs text-zinc-400">
+              <label htmlFor={`regen-note-${section.id}`} className="t-caption text-[var(--brand-text-muted)]">
                 Steering note for regeneration
               </label>
               <textarea
@@ -245,80 +241,76 @@ function SectionItem({ section, workspaceId, blueprintId, entryId, index }: Sect
                 onChange={e => setRegenNote(e.target.value)}
                 rows={3}
                 placeholder="e.g. Make it more concise, lead with the value prop..."
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-teal-500 resize-none"
+                className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-none"
                 disabled={regenerate.isPending}
                 onKeyDown={e => {
                   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleRegenerate();
                 }}
               />
               <div className="flex gap-2">
-                <button
+                <Button
                   onClick={handleRegenerate}
                   disabled={regenerate.isPending || !regenNote.trim()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white text-xs rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+                  variant="primary"
+                  size="sm"
+                  icon={RefreshCw}
+                  loading={regenerate.isPending}
                   aria-label={`Submit regeneration note for ${sectionLabel}`}
                 >
-                  {regenerate.isPending ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <RefreshCw className="w-3.5 h-3.5" />
-                  )}
                   Regenerate
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => {
                     setShowRegenInput(false);
                     setRegenNote('');
                   }}
                   disabled={regenerate.isPending}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-zinc-400 text-xs hover:text-zinc-200 transition-colors disabled:opacity-40"
+                  variant="ghost"
+                  size="sm"
+                  icon={X}
                   aria-label="Cancel regeneration"
                 >
-                  <X className="w-3.5 h-3.5" />
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
           ) : (
             /* Action buttons row */
-            <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-zinc-800">
-              <button
+            <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-[var(--brand-border)]">
+              <Button
                 onClick={handleApprove}
                 disabled={isMutating || section.status === 'approved'}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white text-xs rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+                variant="primary"
+                size="sm"
+                icon={CheckCircle}
+                loading={updateStatus.isPending && updateStatus.variables?.status === 'approved'}
                 aria-label={`Approve section ${sectionLabel}`}
               >
-                {updateStatus.isPending && updateStatus.variables?.status === 'approved' ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <CheckCircle className="w-3.5 h-3.5" />
-                )}
                 Approve
-              </button>
+              </Button>
 
-              <button
+              <Button
                 onClick={() => setShowRegenInput(true)}
                 disabled={isMutating}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 text-zinc-300 text-xs rounded-lg font-medium hover:bg-zinc-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                variant="secondary"
+                size="sm"
+                icon={RefreshCw}
                 aria-label={`Regenerate section ${sectionLabel} with steering note`}
               >
-                <RefreshCw className="w-3.5 h-3.5" />
                 Regenerate
-              </button>
+              </Button>
 
-              <button
+              <Button
                 onClick={handleSendClientReview}
                 disabled={isMutating || section.status === 'client_review'}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 text-zinc-300 text-xs rounded-lg font-medium hover:bg-zinc-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                variant="secondary"
+                size="sm"
+                icon={Send}
+                loading={updateStatus.isPending && updateStatus.variables?.status === 'client_review'}
                 aria-label={`Send section ${sectionLabel} to client review`}
               >
-                {updateStatus.isPending && updateStatus.variables?.status === 'client_review' ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Send className="w-3.5 h-3.5" />
-                )}
                 Send to Client Review
-              </button>
+              </Button>
             </div>
           )}
         </div>
@@ -339,13 +331,13 @@ function ProgressBar({ approved, total, percentage }: ProgressBarProps) {
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-zinc-400">
+        <span className="t-caption text-[var(--brand-text-muted)]">
           {approved}/{total} section{total !== 1 ? 's' : ''} approved
         </span>
-        <span className="text-xs font-medium text-zinc-300">{Math.round(percentage)}%</span>
+        <span className="t-caption font-medium text-[var(--brand-text)]">{Math.round(percentage)}%</span>
       </div>
       <div
-        className="h-1.5 bg-zinc-800 rounded-full overflow-hidden"
+        className="h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden"
         role="progressbar"
         aria-valuenow={Math.round(percentage)}
         aria-valuemin={0}
@@ -375,7 +367,7 @@ function CopyReviewPanelInner({ workspaceId, blueprintId, entryId }: Props) {
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <div className="flex items-center gap-2 text-zinc-400 text-sm">
+        <div className="flex items-center gap-2 text-[var(--brand-text-muted)] text-sm">
           <Loader2 className="w-4 h-4 animate-spin" />
           Loading copy sections...
         </div>
@@ -392,8 +384,8 @@ function CopyReviewPanelInner({ workspaceId, blueprintId, entryId }: Props) {
     return (
       <SectionCard title="Failed to load copy sections" className="!border-red-900/40">
         <div className="flex flex-col items-center text-center gap-3">
-          <AlertCircle className="w-8 h-8 text-red-400" />
-          <p className="text-xs text-zinc-500">Check your connection and try again.</p>
+          <Icon as={AlertCircle} size="2xl" className="text-red-400" />
+          <p className="t-caption text-[var(--brand-text-muted)]">Check your connection and try again.</p>
         </div>
       </SectionCard>
     );
@@ -408,24 +400,17 @@ function CopyReviewPanelInner({ workspaceId, blueprintId, entryId }: Props) {
         title="No copy sections yet"
         description="Generate the first draft to begin review. AI will create copy for each section based on the blueprint plan."
         action={
-          <button
+          <Button
             onClick={() => generateCopy.mutate(entryId)}
             disabled={generateCopy.isPending}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-600 to-emerald-600 text-white text-sm rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+            variant="primary"
+            size="md"
+            icon={RefreshCw}
+            loading={generateCopy.isPending}
             aria-label="Generate copy for this entry"
           >
-            {generateCopy.isPending ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="w-4 h-4" />
-                Generate Copy
-              </>
-            )}
-          </button>
+            {generateCopy.isPending ? 'Generating...' : 'Generate Copy'}
+          </Button>
         }
       />
     );
@@ -446,10 +431,10 @@ function CopyReviewPanelInner({ workspaceId, blueprintId, entryId }: Props) {
       {/* Progress header */}
       <SectionCard
         title="Copy Review"
-        titleIcon={<FileText className="w-4 h-4 text-zinc-500" />}
+        titleIcon={<Icon as={FileText} size="md" className="text-[var(--brand-text-muted)]" />}
         titleExtra={
           metadata ? (
-            <span className="text-[11px] text-zinc-500 truncate max-w-xs">
+            <span className="t-caption-sm text-[var(--brand-text-muted)] truncate max-w-xs">
               {metadata.seoTitle ?? ''}
             </span>
           ) : undefined
@@ -457,33 +442,29 @@ function CopyReviewPanelInner({ workspaceId, blueprintId, entryId }: Props) {
         action={
           <div className="flex items-center gap-2">
             {draftCount > 0 && (
-              <button
+              <Button
                 onClick={() => sendToClient.mutate(entryId)}
                 disabled={sendToClient.isPending}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white text-xs rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+                variant="primary"
+                size="sm"
+                icon={Send}
+                loading={sendToClient.isPending}
                 aria-label="Send all draft sections to client review"
               >
-                {sendToClient.isPending ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Send className="w-3.5 h-3.5" />
-                )}
                 Send for Client Review
-              </button>
+              </Button>
             )}
-            <button
+            <Button
               onClick={() => generateCopy.mutate(entryId)}
               disabled={generateCopy.isPending}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 text-zinc-300 text-xs rounded-lg font-medium hover:bg-zinc-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              variant="secondary"
+              size="sm"
+              icon={RefreshCw}
+              loading={generateCopy.isPending}
               aria-label="Regenerate all copy"
             >
-              {generateCopy.isPending ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <RefreshCw className="w-3.5 h-3.5" />
-              )}
               Regenerate All
-            </button>
+            </Button>
           </div>
         }
       >

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Clock, ChevronDown, ChevronRight } from 'lucide-react';
+import { Icon } from '../ui';
 import { useBlueprintVersions } from '../../hooks/admin/useBlueprints';
 import type { BlueprintVersion } from '../../../shared/types/page-strategy';
 
@@ -28,16 +29,16 @@ export function BlueprintVersionHistory({ workspaceId, blueprintId }: Props) {
 
   return (
     <div className="mt-6">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-teal-400 mb-3">
+      <h3 className="t-caption font-semibold uppercase tracking-wider text-teal-400 mb-3">
         Version History
       </h3>
 
       {isLoading && (
-        <p className="text-sm text-zinc-500">Loading version history...</p>
+        <p className="text-sm text-[var(--brand-text-muted)]">Loading version history...</p>
       )}
 
       {!isLoading && (!versions || versions.length === 0) && (
-        <p className="text-sm text-zinc-500">No version history yet.</p>
+        <p className="text-sm text-[var(--brand-text-muted)]">No version history yet.</p>
       )}
 
       {!isLoading && versions && versions.length > 0 && (
@@ -50,48 +51,48 @@ export function BlueprintVersionHistory({ workspaceId, blueprintId }: Props) {
             const timeStr = formatVersionDate(v.createdAt);
 
             return (
-              <li key={v.id} className="rounded-md border border-zinc-800 bg-zinc-900">
+              <li key={v.id} className="rounded-md border border-[var(--brand-border)] bg-[var(--surface-2)]">
                 <button
                   type="button"
                   onClick={() => toggleVersion(v.id)}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-zinc-800/50 transition-colors rounded-md"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-[var(--surface-3)]/50 transition-colors rounded-md"
                 >
-                  <Clock className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
-                  <span className="font-mono text-xs text-teal-400 shrink-0">
+                  <Icon as={Clock} size="md" className="shrink-0 text-[var(--brand-text-muted)]" />
+                  <span className="t-mono text-xs text-teal-400 shrink-0">
                     v{v.version}
                   </span>
-                  <span className="text-xs text-zinc-400 shrink-0">{timeStr}</span>
-                  <span className="ml-auto text-xs text-zinc-500 shrink-0">
+                  <span className="t-caption text-[var(--brand-text)] shrink-0">{timeStr}</span>
+                  <span className="ml-auto t-caption text-[var(--brand-text-muted)] shrink-0">
                     {includedCount}/{entryCount} pages
                   </span>
                   {isExpanded ? (
-                    <ChevronDown className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+                    <Icon as={ChevronDown} size="md" className="shrink-0 text-[var(--brand-text-muted)]" />
                   ) : (
-                    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+                    <Icon as={ChevronRight} size="md" className="shrink-0 text-[var(--brand-text-muted)]" />
                   )}
                 </button>
 
                 {isExpanded && (
-                  <div className="border-t border-zinc-800 px-3 py-2 space-y-2">
+                  <div className="border-t border-[var(--brand-border)] px-3 py-2 space-y-2">
                     {v.changeNotes && (
-                      <p className="text-xs text-zinc-400 italic">{v.changeNotes}</p>
+                      <p className="t-caption text-[var(--brand-text)] italic">{v.changeNotes}</p>
                     )}
                     {entryCount > 0 ? (
                       <ul className="space-y-1">
                         {v.snapshot.entries.map((entry) => (
                           <li
                             key={entry.id}
-                            className="flex items-center justify-between text-xs"
+                            className="flex items-center justify-between t-caption"
                           >
-                            <span className="text-zinc-300 truncate">{entry.name}</span>
-                            <span className="ml-2 shrink-0 text-zinc-500">
+                            <span className="text-[var(--brand-text)] truncate">{entry.name}</span>
+                            <span className="ml-2 shrink-0 text-[var(--brand-text-muted)]">
                               {entry.sectionPlan?.length ?? 0} sections
                             </span>
                           </li>
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-xs text-zinc-500">No entries in this snapshot.</p>
+                      <p className="t-caption text-[var(--brand-text-muted)]">No entries in this snapshot.</p>
                     )}
                   </div>
                 )}
