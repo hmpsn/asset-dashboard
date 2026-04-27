@@ -54,7 +54,7 @@ export function TrendBadge({
     <span className={cn(`inline-flex items-center gap-0.5 ${textSize} font-medium ${color}`, className)}>
       {positive ? <TrendingUp className={iconSize} /> : <TrendingDown className={iconSize} />}
       {!iconOnly && <>{sign}{displayValue}{suffix}</>}
-      {label ? ` ${label}` : null}
+      {!iconOnly && label ? ` ${label}` : null}
     </span>
   );
 }
