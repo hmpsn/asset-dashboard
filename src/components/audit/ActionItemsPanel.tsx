@@ -145,7 +145,7 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
             </div>
             <div className="flex gap-2">
               <button onClick={() => setAdding(false)} className="px-3 py-1.5 rounded-[var(--radius-md)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]">Cancel</button>
-              <button onClick={addItem} className="px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-teal-400 text-[var(--surface-1)]">Add</button>
+              <button onClick={addItem} className="px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-teal-400 text-[#0f1219]" /* arbitrary-text-ok: has .dashboard-light override */>Add</button>
             </div>
           </div>
         </div>

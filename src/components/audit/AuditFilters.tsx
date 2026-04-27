@@ -52,7 +52,7 @@ export function AuditToolbar({
         <button
           onClick={onSaveAndShare}
           disabled={saving}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-[var(--radius-lg)] t-caption font-medium transition-colors bg-teal-400 text-[var(--surface-1)]"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-[var(--radius-lg)] t-caption font-medium transition-colors bg-teal-400 text-[#0f1219]" /* arbitrary-text-ok: has .dashboard-light override */
         >
           <Icon as={Share2} size="md" /> {saving ? 'Saving...' : 'Save & Share'}
         </button>
