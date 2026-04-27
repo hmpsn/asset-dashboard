@@ -39,8 +39,8 @@ export function TrendBadge({
     return (
       <span className={cn(`inline-flex items-center gap-0.5 ${textSize} font-medium text-[var(--brand-text)]`, className)}>
         <Minus className={iconSize} />
-        0{suffix}
-        {label ? ` ${label}` : null}
+        {!iconOnly && <>0{suffix}</>}
+        {!iconOnly && label ? ` ${label}` : null}
       </span>
     );
   }
