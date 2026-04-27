@@ -168,7 +168,7 @@ export function AIContextIndicator({ workspaceId, feature = 'all', compact = fal
                 {!isConnected && source.fixAction && (
                   <button
                     onClick={(e) => { e.stopPropagation(); navigate(adminPath(workspaceId, source.fixAction! as import('../../routes').Page)); }}
-                    className="flex items-center gap-1 px-2 py-0.5 rounded t-micro bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--brand-border-hover)] transition-colors flex-shrink-0"
+                    className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--brand-border-hover)] transition-colors flex-shrink-0" /* arbitrary-text-ok — 10px action button, t-micro would add unwanted uppercase+monospace */
                   >
                     Set up <ExternalLink className="w-2.5 h-2.5" />
                   </button>
