@@ -23,10 +23,10 @@ function JobRow({ job, onDismiss, onCancel }: { job: BackgroundJob; onDismiss: (
   return (
     <div className="px-3 py-2.5 border-b border-[var(--brand-border)] last:border-0 group">
       <div className="flex items-center gap-2">
-        {isActive && <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400 flex-shrink-0" />}
-        {job.status === 'done' && <Icon as={CheckCircle2} size="sm" className="text-emerald-400 flex-shrink-0" />}
-        {job.status === 'error' && <Icon as={AlertTriangle} size="sm" className="text-red-400/80 flex-shrink-0" />}
-        {job.status === 'cancelled' && <Icon as={Ban} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />}
+        {isActive && <Icon as={Loader2} size="md" className="animate-spin text-teal-400 flex-shrink-0" />}
+        {job.status === 'done' && <Icon as={CheckCircle2} size="md" className="text-emerald-400 flex-shrink-0" />}
+        {job.status === 'error' && <Icon as={AlertTriangle} size="md" className="text-red-400/80 flex-shrink-0" />}
+        {job.status === 'cancelled' && <Icon as={Ban} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />}
         <div className="flex-1 min-w-0">
           <div className="t-caption font-medium text-[var(--brand-text-bright)] truncate">{label}</div>
           <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{job.message}</div>
@@ -72,9 +72,9 @@ export function TaskPanel() {
         style={!expanded ? { borderRadius: 'var(--radius-xl)' } : undefined}
       >
         {activeJobs.length > 0 ? (
-          <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400" />
+          <Icon as={Loader2} size="md" className="animate-spin text-teal-400" />
         ) : (
-          <Icon as={Activity} size="sm" className="text-[var(--brand-text-muted)]" />
+          <Icon as={Activity} size="md" className="text-[var(--brand-text-muted)]" />
         )}
         <span className="t-caption font-medium text-[var(--brand-text)] flex-1 text-left">
           {activeJobs.length > 0
