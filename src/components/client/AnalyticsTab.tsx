@@ -156,7 +156,7 @@ export function AnalyticsTab({
     <div className="space-y-6">
     <div>
       <h2 className="text-xl font-semibold text-[var(--brand-text)]">Analytics</h2>
-      <p className="text-sm text-[var(--brand-text-muted)] mt-1 leading-relaxed">{ga4Overview.dateRange ? `${ga4Overview.dateRange.start} — ${ga4Overview.dateRange.end}` : 'Google Analytics overview'}</p>
+      <p className="t-body text-[var(--brand-text-muted)] mt-1 leading-relaxed">{ga4Overview.dateRange ? `${ga4Overview.dateRange.start} — ${ga4Overview.dateRange.end}` : 'Google Analytics overview'}</p>
     </div>
 
     {/* GA4 Overview Cards */}
@@ -173,8 +173,9 @@ export function AnalyticsTab({
     {ga4Trend.length > 0 && (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Traffic Trend (2/3) */}
-        <div className="lg:col-span-2 bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
-          <h3 className="text-sm font-semibold text-[var(--brand-text)] mb-4">Traffic Trend</h3>
+        {/* pr-check-disable-next-line -- Brand signature radius intentional */}
+        <div className="lg:col-span-2 bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+          <h3 className="t-body font-semibold text-[var(--brand-text)] mb-4">Traffic Trend</h3>
           <ResponsiveContainer width="100%" height={192}>
             <AreaChart data={ga4Trend} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
               <defs>
@@ -192,7 +193,7 @@ export function AnalyticsTab({
                 const row = payload[0]?.payload as GA4DailyTrend | undefined;
                 if (!row) return null;
                 return (
-                  <div className="bg-[var(--surface-2)] border border-[var(--brand-border-strong)] rounded-lg shadow-xl shadow-black/40 min-w-[140px] overflow-hidden">
+                  <div className="bg-[var(--surface-2)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] shadow-xl shadow-black/40 min-w-[140px] overflow-hidden">
                     <div className="px-3 py-1.5 border-b border-[var(--brand-border)] t-caption-sm font-semibold text-[var(--brand-text)]">{row.date}</div>
                     <div className="px-3 py-1.5 space-y-1">
                       <div className="flex justify-between t-caption-sm"><span className="text-teal-400">Users</span><span className="text-[var(--brand-text)] font-medium">{row.users.toLocaleString()}</span></div>
@@ -215,9 +216,9 @@ export function AnalyticsTab({
         </div>
 
         {/* Devices Pie Chart (1/3) */}
-        {ga4Devices.length > 0 && (
-          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 flex flex-col" style={{ borderRadius: '10px 24px 10px 24px' }}>
-            <h3 className="text-sm font-semibold text-[var(--brand-text)] mb-4">Devices</h3>
+        {ga4Devices.length > 0 && ( // pr-check-disable-next-line -- Brand signature radius intentional
+          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 flex flex-col" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+            <h3 className="t-body font-semibold text-[var(--brand-text)] mb-4">Devices</h3>
             <div className="flex-1 flex flex-col items-center justify-center">
               {(() => {
                 const PIE_COLORS = ['#14b8a6', '#60a5fa', '#34d399', '#fbbf24'];
@@ -250,14 +251,15 @@ export function AnalyticsTab({
 
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Top Pages */}
-      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
-        <h3 className="text-sm font-semibold text-[var(--brand-text)] mb-3">Top Pages</h3>
+      {/* pr-check-disable-next-line -- Brand signature radius intentional */}
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+        <h3 className="t-body font-semibold text-[var(--brand-text)] mb-3">Top Pages</h3>
         <div className="space-y-1 max-h-[350px] overflow-y-auto">
           {ga4Pages.slice(0, 15).map((p, i) => (
-            <div key={i} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-[var(--surface-3)]">
+            <div key={i} className="flex items-center gap-2 py-1.5 px-2 rounded-[var(--radius-lg)] hover:bg-[var(--surface-3)]">
               <span className="t-caption-sm text-[var(--brand-text-muted)] w-5 text-right">{i + 1}</span>
-              <span className="text-xs text-[var(--brand-text)] flex-1 truncate font-mono">{p.path}</span>
-              <span className="text-xs text-teal-400 font-medium tabular-nums">{p.pageviews.toLocaleString()}</span>
+              <span className="t-caption text-[var(--brand-text)] flex-1 truncate font-mono">{p.path}</span>
+              <span className="t-caption text-teal-400 font-medium tabular-nums">{p.pageviews.toLocaleString()}</span>
               <span className="t-caption-sm text-[var(--brand-text-muted)] w-14 text-right">{p.users.toLocaleString()} u</span>
             </div>
           ))}
@@ -265,20 +267,21 @@ export function AnalyticsTab({
       </div>
 
       {/* Traffic Sources */}
-      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
-        <h3 className="text-sm font-semibold text-[var(--brand-text)] mb-3">Traffic Sources</h3>
+      {/* pr-check-disable-next-line -- Brand signature radius intentional */}
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+        <h3 className="t-body font-semibold text-[var(--brand-text)] mb-3">Traffic Sources</h3>
         <div className="space-y-2">
           {ga4Sources.slice(0, 10).map((s, i) => {
             const totalSessions = ga4Sources.reduce((sum, x) => sum + x.sessions, 0);
             const pct = totalSessions > 0 ? (s.sessions / totalSessions) * 100 : 0;
             return (
               <div key={i} className="relative">
-                <div className="flex items-center gap-2 py-1.5 px-2 rounded-lg relative z-10">
-                  <span className="text-xs text-[var(--brand-text)] flex-1 truncate">{s.source}{s.medium !== '(none)' ? ` / ${s.medium}` : ''}</span>
-                  <span className="text-xs text-blue-400 font-medium tabular-nums">{s.sessions.toLocaleString()}</span>
+                <div className="flex items-center gap-2 py-1.5 px-2 rounded-[var(--radius-lg)] relative z-10">
+                  <span className="t-caption text-[var(--brand-text)] flex-1 truncate">{s.source}{s.medium !== '(none)' ? ` / ${s.medium}` : ''}</span>
+                  <span className="t-caption text-blue-400 font-medium tabular-nums">{s.sessions.toLocaleString()}</span>
                   <span className="t-caption-sm text-[var(--brand-text-muted)] w-12 text-right">{pct.toFixed(1)}%</span>
                 </div>
-                <div className="absolute inset-0 rounded-lg bg-blue-500/5" style={{ width: `${pct}%` }} />
+                <div className="absolute inset-0 rounded-[var(--radius-lg)] bg-blue-500/5" style={{ width: `${pct}%` }} />
               </div>
             );
           })}
@@ -313,7 +316,7 @@ export function AnalyticsTab({
         return (
           <button key={i} onClick={() => loadEventTrend(c.eventName)}
             className={`text-left border p-4 transition-colors ${isSelected ? 'bg-teal-500/10 border-teal-500/30' : pinned ? 'bg-teal-500/5 border-teal-500/15 hover:border-teal-500/30' : 'bg-[var(--surface-3)] border-[var(--brand-border)] hover:border-[var(--brand-border-strong)]'}`}
-            style={{ borderRadius: '6px 12px 6px 12px' }}>
+            style={{ borderRadius: 'var(--radius-signature)' }}>
             <div className="flex items-center justify-between mb-2">
               <span className="t-caption-sm text-[var(--brand-text-muted)] truncate max-w-[140px]">{eventDisplayName(c.eventName)}</span>
               <div className="flex items-center gap-1.5">
@@ -356,11 +359,11 @@ export function AnalyticsTab({
           {groups.map(group => {
             const groupEvents = getEventsForModule(group.id);
             const noResults = modulePageFilters[group.id] && groupEvents.length === 0 && !modulePageLoading[group.id];
-            return (
-              <div key={group.id} className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
+            return ( // pr-check-disable-next-line -- Brand signature radius intentional
+              <div key={group.id} className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: group.color }} />
-                  <h3 className="text-sm font-semibold text-[var(--brand-text)]">{group.name}</h3>
+                  <h3 className="t-body font-semibold text-[var(--brand-text)]">{group.name}</h3>
                   <span className="t-caption-sm text-[var(--brand-text-muted)] ml-auto">{groupEvents.length} events</span>
                 </div>
                 {renderPageFilter(group.id, group.allowedPages)}
@@ -375,9 +378,9 @@ export function AnalyticsTab({
             );
           })}
           {/* Ungrouped events */}
-          {(ungroupedEvents.length > 0 || modulePageFilters['__ungrouped__']) && (
-            <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
-              <h3 className="text-sm font-semibold text-[var(--brand-text)] mb-1">{groups.length > 0 ? 'Other Events' : 'Key Events'}</h3>
+          {(ungroupedEvents.length > 0 || modulePageFilters['__ungrouped__']) && ( // pr-check-disable-next-line -- Brand signature radius intentional
+            <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+              <h3 className="t-body font-semibold text-[var(--brand-text)] mb-1">{groups.length > 0 ? 'Other Events' : 'Key Events'}</h3>
               <p className="t-caption-sm text-[var(--brand-text-muted)] mb-2">{groups.length > 0 ? 'Events not assigned to a group' : 'Custom and conversion events tracked on your site'}</p>
               {renderPageFilter('__ungrouped__')}
               {modulePageFilters['__ungrouped__'] && ungroupedEvents.length === 0 && !modulePageLoading['__ungrouped__'] ? (
@@ -391,11 +394,11 @@ export function AnalyticsTab({
           )}
 
           {/* Event Trend (shown when an event is selected) */}
-          {ga4SelectedEvent && ga4EventTrend.length > 2 && (
-            <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
+          {ga4SelectedEvent && ga4EventTrend.length > 2 && ( // pr-check-disable-next-line -- Brand signature radius intentional
+            <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <h3 className="text-sm font-semibold text-[var(--brand-text)]">{eventDisplayName(ga4SelectedEvent)}</h3>
+                  <h3 className="t-body font-semibold text-[var(--brand-text)]">{eventDisplayName(ga4SelectedEvent)}</h3>
                   <p className="t-caption-sm text-[var(--brand-text-muted)]">Daily event count over the selected period</p>
                 </div>
                 <button onClick={() => { setGa4SelectedEvent(null); setGa4EventTrend([]); }} className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]">Clear</button>
@@ -415,7 +418,7 @@ export function AnalyticsTab({
                     const row = payload[0]?.payload as GA4EventTrend | undefined;
                     if (!row) return null;
                     return (
-                      <div className="bg-[var(--surface-2)] border border-[var(--brand-border-strong)] rounded-lg shadow-xl shadow-black/40 min-w-[100px] overflow-hidden">
+                      <div className="bg-[var(--surface-2)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] shadow-xl shadow-black/40 min-w-[100px] overflow-hidden">
                         <div className="px-3 py-1.5 border-b border-[var(--brand-border)] t-caption-sm font-semibold text-[var(--brand-text)]">{row.date}</div>
                         <div className="px-3 py-1.5">
                           <div className="flex justify-between t-caption-sm"><span className="text-teal-400">Count</span><span className="text-[var(--brand-text)] font-medium">{row.eventCount.toLocaleString()}</span></div>
@@ -438,11 +441,12 @@ export function AnalyticsTab({
     })()}
 
     {/* ── Collapsible Event Explorer ── */}
-    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
+    {/* pr-check-disable-next-line -- Brand signature radius intentional */}
+    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
       <button onClick={() => setShowExplorer(!showExplorer)} className="w-full flex items-center justify-between px-5 py-3 hover:bg-[var(--surface-3)] transition-colors">
         <div className="flex items-center gap-2">
           <Icon as={Filter} size="md" className="text-teal-400" />
-          <span className="text-sm font-medium text-[var(--brand-text-muted)]">Event Explorer</span>
+          <span className="t-body font-medium text-[var(--brand-text-muted)]">Event Explorer</span>
         </div>
         {showExplorer ? <Icon as={ChevronUp} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" />}
       </button>
@@ -466,15 +470,15 @@ export function AnalyticsTab({
               <input value={explorerPage} onChange={e => setExplorerPage(e.target.value)}
                 placeholder="/contact, /blog, etc."
                 onKeyDown={e => e.key === 'Enter' && runExplorer(explorerEvent || undefined, explorerPage || undefined)}
-                className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text)] focus:outline-none focus:border-teal-500 placeholder:text-[var(--brand-text-faint)]" />
+                className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:outline-none focus:border-teal-500 placeholder:text-[var(--brand-text-faint)]" />
             </div>
             <button onClick={() => runExplorer(explorerEvent || undefined, explorerPage || undefined)}
-              className="px-4 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-medium transition-colors flex items-center gap-1.5">
+              className="px-4 py-1.5 rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 text-white t-caption font-medium transition-colors flex items-center gap-1.5">
               {explorerLoading ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Search} size="sm" />} Explore
             </button>
             {explorerData.length > 0 && (
               <button onClick={() => { setExplorerData([]); setExplorerEvent(''); setExplorerPage(''); }}
-                className="px-3 py-1.5 rounded-lg text-xs text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">Clear</button>
+                className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">Clear</button>
             )}
           </div>
           {explorerData.length > 0 && (
@@ -496,21 +500,21 @@ export function AnalyticsTab({
                       <tr key={i} className="border-b border-[var(--brand-border)] hover:bg-[var(--surface-3)]">
                         <td className="py-2 pr-3">
                           <button onClick={() => { setExplorerEvent(row.eventName); runExplorer(row.eventName, explorerPage || undefined); }}
-                            className="text-xs text-teal-400 hover:text-teal-300">{eventDisplayName(row.eventName)}</button>
+                            className="t-caption text-teal-400 hover:text-teal-300">{eventDisplayName(row.eventName)}</button>
                         </td>
                         <td className="py-2 pr-3">
                           <button onClick={() => { setExplorerPage(row.pagePath); runExplorer(explorerEvent || undefined, row.pagePath); }}
-                            className="text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] font-mono truncate max-w-[250px] block">{row.pagePath}</button>
+                            className="t-caption text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] font-mono truncate max-w-[250px] block">{row.pagePath}</button>
                         </td>
                         <td className="py-2 pr-3 text-right">
                           <div className="flex items-center justify-end gap-2">
                             <div className="w-16 h-1 rounded-full bg-[var(--surface-3)] overflow-hidden">
                               <div className="h-full rounded-full bg-teal-500/40" style={{ width: `${pct}%` }} />
                             </div>
-                            <span className="text-xs text-[var(--brand-text)] tabular-nums font-medium">{row.eventCount.toLocaleString()}</span>
+                            <span className="t-caption text-[var(--brand-text)] tabular-nums font-medium">{row.eventCount.toLocaleString()}</span>
                           </div>
                         </td>
-                        <td className="py-2 text-right text-xs text-[var(--brand-text-muted)] tabular-nums">{row.users.toLocaleString()}</td>
+                        <td className="py-2 text-right t-caption text-[var(--brand-text-muted)] tabular-nums">{row.users.toLocaleString()}</td>
                       </tr>
                     );
                   })}

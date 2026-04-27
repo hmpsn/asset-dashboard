@@ -26,10 +26,10 @@ export function HealthScoreCard({ score }: HealthScoreCardProps) {
             <span className={`text-3xl font-bold ${scoreColorClass(rounded)}`}>
               {rounded}
             </span>
-            <span className="text-sm text-zinc-500">/ 100</span>
+            <span className="t-body text-[var(--brand-text-muted)]">/ 100</span>
           </div>
-          <p className="text-sm text-zinc-400 leading-relaxed">{label}</p>
-          <div className="flex flex-wrap gap-3 text-[11px] text-zinc-500">
+          <p className="t-body text-[var(--brand-text)] leading-relaxed">{label}</p>
+          <div className="flex flex-wrap gap-3 text-[11px] text-[var(--brand-text-muted)]">
             <span className="flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
               80+ Healthy

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Check, X, ChevronDown, ChevronUp, Edit3 } from 'lucide-react';
+import { Icon } from '../ui';
 import type { ClientContentRequest } from './types';
 import type { GeneratedPost, ContentTopicRequest } from '../../../shared/types/content';
 import { publicPostReview } from '../../api/content';
@@ -50,8 +51,8 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
   if (fetchedPost && !post) setPost(fetchedPost);
 
   // Early returns AFTER all hooks — this is the correct order per Rules of Hooks
-  if (postLoading) return <p className="text-xs text-zinc-500 mt-3 animate-pulse">Loading post…</p>;
-  if (!post) return <p className="text-xs text-zinc-500 mt-3">Post not available.</p>;
+  if (postLoading) return <p className="t-caption text-[var(--brand-text-muted)] mt-3 animate-pulse">Loading post…</p>;
+  if (!post) return <p className="t-caption text-[var(--brand-text-muted)] mt-3">Post not available.</p>;
 
   async function saveSection(index: number, content: string) {
     try {
@@ -137,16 +138,16 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
     <div className="space-y-4 mt-3">
       {/* Post header */}
       <div className="px-1">
-        <h3 className="text-sm font-semibold text-zinc-100">{post.title}</h3>
+        <h3 className="t-body font-semibold text-[var(--brand-text-bright)]">{post.title}</h3>
         {post.metaDescription && (
-          <p className="text-xs text-zinc-400 mt-1 italic">{post.metaDescription}</p>
+          <p className="t-caption text-[var(--brand-text)] mt-1 italic">{post.metaDescription}</p>
         )}
       </div>
 
       {/* Introduction */}
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
+      <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)]/50 p-3">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Introduction</span>
+          <span className="t-label text-[var(--brand-text-muted)]">Introduction</span>
           {!editingIntro && (
             <button
               // v1 simplification: HTML tags are stripped for the textarea draft. Saving plain
@@ -154,9 +155,9 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
               // Markdown or WYSIWYG editor would be needed to preserve formatting in a future
               // iteration. The strip is intentional — it avoids exposing raw HTML to clients.
               onClick={() => { setIntroDraft(post.introduction.replace(/<[^>]+>/g, '')); setEditingIntro(true); }}
-              className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-teal-400 transition-colors"
+              className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-400 transition-colors"
             >
-              <Edit3 className="w-3 h-3" /> Edit
+              <Icon as={Edit3} size="sm" /> Edit
             </button>
           )}
         </div>
@@ -165,18 +166,18 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
             <textarea
               value={introDraft}
               onChange={e => setIntroDraft(e.target.value)}
-              className="w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-xs text-zinc-300 focus:border-teal-500/50 focus:outline-none resize-y"
+              className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:border-teal-500/50 focus:outline-none resize-y"
               rows={4}
               autoFocus
             />
             <div className="flex gap-2">
-              <button onClick={() => saveIntro(introDraft)} className="px-2.5 py-1 rounded bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 hover:bg-teal-600/30 transition-colors">Save</button>
-              <button onClick={() => setEditingIntro(false)} className="px-2.5 py-1 rounded text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors">Cancel</button>
+              <button onClick={() => saveIntro(introDraft)} className="px-2.5 py-1 rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors">Save</button>
+              <button onClick={() => setEditingIntro(false)} className="px-2.5 py-1 rounded t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">Cancel</button>
             </div>
           </div>
         ) : (
           <div
-            className="text-xs text-zinc-300 leading-relaxed prose prose-invert prose-sm max-w-none"
+            className="t-caption text-[var(--brand-text)] leading-relaxed prose prose-invert prose-sm max-w-none"
             dangerouslySetInnerHTML={{ __html: post.introduction }}
           />
         )}
@@ -184,15 +185,15 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
 
       {/* Sections */}
       {post.sections.map(section => (
-        <div key={section.index} className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
+        <div key={section.index} className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)]/50 p-3">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-zinc-200">{section.heading}</span>
+            <span className="t-caption font-semibold text-[var(--brand-text-bright)]">{section.heading}</span>
             {editingSection !== section.index && (
               <button
                 onClick={() => { setSectionDraft(section.content.replace(/<[^>]+>/g, '')); setEditingSection(section.index); }}
-                className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-teal-400 transition-colors"
+                className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-400 transition-colors"
               >
-                <Edit3 className="w-3 h-3" /> Edit
+                <Icon as={Edit3} size="sm" /> Edit
               </button>
             )}
           </div>
@@ -201,18 +202,18 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
               <textarea
                 value={sectionDraft}
                 onChange={e => setSectionDraft(e.target.value)}
-                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-xs text-zinc-300 focus:border-teal-500/50 focus:outline-none resize-y"
+                className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:border-teal-500/50 focus:outline-none resize-y"
                 rows={6}
                 autoFocus
               />
               <div className="flex gap-2">
-                <button onClick={() => saveSection(section.index, sectionDraft)} className="px-2.5 py-1 rounded bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 hover:bg-teal-600/30 transition-colors">Save</button>
-                <button onClick={() => setEditingSection(null)} className="px-2.5 py-1 rounded text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors">Cancel</button>
+                <button onClick={() => saveSection(section.index, sectionDraft)} className="px-2.5 py-1 rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors">Save</button>
+                <button onClick={() => setEditingSection(null)} className="px-2.5 py-1 rounded t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">Cancel</button>
               </div>
             </div>
           ) : (
             <div
-              className="text-xs text-zinc-300 leading-relaxed prose prose-invert prose-sm max-w-none"
+              className="t-caption text-[var(--brand-text)] leading-relaxed prose prose-invert prose-sm max-w-none"
               dangerouslySetInnerHTML={{ __html: section.content }}
             />
           )}
@@ -220,15 +221,15 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
       ))}
 
       {/* Conclusion */}
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
+      <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)]/50 p-3">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Conclusion</span>
+          <span className="t-label text-[var(--brand-text-muted)]">Conclusion</span>
           {!editingConclusion && (
             <button
               onClick={() => { setConclusionDraft(post.conclusion.replace(/<[^>]+>/g, '')); setEditingConclusion(true); }}
-              className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-teal-400 transition-colors"
+              className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-400 transition-colors"
             >
-              <Edit3 className="w-3 h-3" /> Edit
+              <Icon as={Edit3} size="sm" /> Edit
             </button>
           )}
         </div>
@@ -237,38 +238,38 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
             <textarea
               value={conclusionDraft}
               onChange={e => setConclusionDraft(e.target.value)}
-              className="w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-xs text-zinc-300 focus:border-teal-500/50 focus:outline-none resize-y"
+              className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:border-teal-500/50 focus:outline-none resize-y"
               rows={4}
               autoFocus
             />
             <div className="flex gap-2">
-              <button onClick={() => saveConclusion(conclusionDraft)} className="px-2.5 py-1 rounded bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 hover:bg-teal-600/30 transition-colors">Save</button>
-              <button onClick={() => setEditingConclusion(false)} className="px-2.5 py-1 rounded text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors">Cancel</button>
+              <button onClick={() => saveConclusion(conclusionDraft)} className="px-2.5 py-1 rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors">Save</button>
+              <button onClick={() => setEditingConclusion(false)} className="px-2.5 py-1 rounded t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">Cancel</button>
             </div>
           </div>
         ) : (
           <div
-            className="text-xs text-zinc-300 leading-relaxed prose prose-invert prose-sm max-w-none"
+            className="t-caption text-[var(--brand-text)] leading-relaxed prose prose-invert prose-sm max-w-none"
             dangerouslySetInnerHTML={{ __html: post.conclusion }}
           />
         )}
       </div>
 
       {/* Steering feedback */}
-      <div className="rounded-lg border border-zinc-700 bg-zinc-900/80 p-3">
+      <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)]/80 p-3">
         <button
           onClick={() => setShowFeedback(v => !v)}
           className="flex items-center justify-between w-full text-left"
         >
-          <span className="text-[11px] font-medium text-zinc-400">Notes for the team <span className="text-zinc-600">(optional steering feedback)</span></span>
-          {showFeedback ? <ChevronUp className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />}
+          <span className="t-caption-sm font-medium text-[var(--brand-text)]">Notes for the team <span className="text-[var(--brand-text-dim)]">(optional steering feedback)</span></span>
+          {showFeedback ? <Icon as={ChevronUp} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" />}
         </button>
         {showFeedback && (
           <textarea
             value={feedback}
             onChange={e => setFeedback(e.target.value)}
             placeholder="e.g. 'Please make the tone less formal' or 'Add more specifics about our pricing model in section 2'"
-            className="mt-2 w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 focus:border-teal-500/50 focus:outline-none resize-y"
+            className="mt-2 w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:border-teal-500/50 focus:outline-none resize-y"
             rows={3}
           />
         )}
@@ -279,22 +280,22 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
         <button
           onClick={handleApprove}
           disabled={approving || submitting}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 text-white text-xs font-medium hover:from-teal-500 hover:to-emerald-500 transition-all disabled:opacity-50"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-lg)] bg-gradient-to-r from-teal-600 to-emerald-600 text-white t-caption font-medium hover:from-teal-500 hover:to-emerald-500 transition-all disabled:opacity-50"
         >
-          <Check className="w-3.5 h-3.5" />
+          <Icon as={Check} size="sm" />
           {approving ? 'Approving…' : 'Approve Post'}
         </button>
         <button
           onClick={() => { setShowFeedback(true); handleRequestChanges(); }}
           disabled={approving || submitting}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-zinc-700 text-zinc-400 text-xs font-medium hover:border-zinc-600 hover:text-zinc-300 transition-all disabled:opacity-50"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-lg)] border border-[var(--brand-border)] text-[var(--brand-text)] t-caption font-medium hover:border-[var(--brand-border-strong)] hover:text-[var(--brand-text)] transition-all disabled:opacity-50"
         >
-          <X className="w-3.5 h-3.5" />
+          <Icon as={X} size="sm" />
           {submitting ? 'Sending…' : 'Request Changes'}
         </button>
       </div>
       {showFeedback && !feedback.trim() && (
-        <p className="text-[11px] text-amber-400">Please add notes describing what you'd like changed before requesting revisions.</p>
+        <p className="t-caption-sm text-amber-400">Please add notes describing what you'd like changed before requesting revisions.</p>
       )}
     </div>
   );

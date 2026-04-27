@@ -35,7 +35,7 @@ export function MonthlyDigest({ workspaceId, tier }: Props) {
         <div className="space-y-6">
           {/* AI summary */}
           {digest.summary && (
-            <p className="text-sm text-[var(--brand-text-bright)] leading-relaxed">{digest.summary}</p>
+            <p className="t-body text-[var(--brand-text-bright)] leading-relaxed">{digest.summary}</p>
           )}
 
           {/* Metrics row */}
@@ -54,7 +54,7 @@ export function MonthlyDigest({ workspaceId, tier }: Props) {
               </h4>
               <ul className="space-y-1.5">
                 {digest.wins.map((win: DigestItem, i: number) => (
-                  <li key={win.insightId ?? i} className="flex items-start gap-2 text-sm">
+                  <li key={win.insightId ?? i} className="flex items-start gap-2 t-body">
                     <Icon as={CheckCircle} size="md" className="text-emerald-400 mt-0.5 shrink-0" />
                     <div>
                       <span className="text-[var(--brand-text-bright)] font-medium">{win.title}</span>
@@ -74,7 +74,7 @@ export function MonthlyDigest({ workspaceId, tier }: Props) {
               </h4>
               <ul className="space-y-1.5">
                 {digest.issuesAddressed.map((issue: DigestItem, i: number) => (
-                  <li key={issue.insightId ?? i} className="text-sm text-[var(--brand-text)]">
+                  <li key={issue.insightId ?? i} className="t-body text-[var(--brand-text)]">
                     <span className="text-[var(--brand-text-bright)]">{issue.title}</span>
                     <span className="ml-1">— {issue.detail}</span>
                   </li>
@@ -93,10 +93,10 @@ export function MonthlyDigest({ workspaceId, tier }: Props) {
               <ul className="space-y-2">
                 {digest.roiHighlights.map((roi: ROIHighlight, i: number) => (
                   <li key={i} className="p-2.5 rounded-[var(--radius-md)] bg-blue-500/5 border border-blue-500/10">
-                    <div className="text-sm font-medium text-[var(--brand-text-bright)]">{roi.pageTitle}</div>
+                    <div className="t-body font-medium text-[var(--brand-text-bright)]">{roi.pageTitle}</div>
                     <div className="t-caption text-[var(--brand-text)] mt-0.5">{roi.action} — {roi.result}</div>
                     {roi.clicksGained > 0 && (
-                      <div className="text-xs text-blue-400 mt-0.5">+{roi.clicksGained.toLocaleString()} clicks</div>
+                      <div className="t-caption text-blue-400 mt-0.5">+{roi.clicksGained.toLocaleString()} clicks</div>
                     )}
                   </li>
                 ))}

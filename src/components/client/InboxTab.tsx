@@ -127,7 +127,7 @@ export function InboxTab({
           <Icon as={Inbox} size="lg" className="text-teal-400" />
           <div>
             <h2 className="text-xl font-semibold text-[var(--brand-text)]">Inbox</h2>
-            <p className="text-sm text-[var(--brand-text-muted)] mt-0.5">{betaMode ? 'SEO changes and requests — all in one place.' : 'SEO changes, requests, and content — all in one place.'}</p>
+            <p className="t-body text-[var(--brand-text-muted)] mt-0.5">{betaMode ? 'SEO changes and requests — all in one place.' : 'SEO changes, requests, and content — all in one place.'}</p>
           </div>
         </div>
         <div className="flex items-center gap-1.5">
@@ -135,10 +135,10 @@ export function InboxTab({
             <button
               key={f.id}
               onClick={() => setFilter(f.id)}
-              className={`flex items-center gap-1.5 px-3.5 py-2.5 min-h-[44px] rounded-lg text-xs font-medium transition-colors ${
+              className={`flex items-center gap-1.5 px-3.5 py-2.5 min-h-[44px] rounded-[var(--radius-lg)] t-caption font-medium transition-colors ${
                 filter === f.id
                   ? 'bg-teal-500/15 border border-teal-500/30 text-teal-300'
-                  : 'bg-zinc-800/50 border border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]'
+                  : 'bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]'
               }`}
             >
               <f.icon className="w-3.5 h-3.5" />
@@ -157,7 +157,7 @@ export function InboxTab({
           {filter === 'all' && (
             <div className="flex items-center gap-2 mb-3">
               <Icon as={ClipboardCheck} size="md" className="text-teal-400" />
-              <span className="text-sm font-medium text-[var(--brand-text)]">SEO Changes</span>
+              <span className="t-body font-medium text-[var(--brand-text)]">SEO Changes</span>
               {pendingApprovals > 0 && <span className="t-caption-sm px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20">Waiting on you · {pendingApprovals}</span>}
               {pendingApprovals === 0 && approvalBatches.length > 0 && <span className="t-caption-sm px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">All reviewed</span>}
             </div>
@@ -182,7 +182,7 @@ export function InboxTab({
           {filter === 'all' && (
             <div className="flex items-center gap-2 mb-3 mt-2">
               <Icon as={MessageSquare} size="md" className="text-blue-400" />
-              <span className="text-sm font-medium text-[var(--brand-text)]">Requests</span>
+              <span className="t-body font-medium text-[var(--brand-text)]">Requests</span>
               {(() => {
                 const awaitingReply = requests.filter(r => r.notes.length > 0 && r.notes[r.notes.length - 1].author === 'team' && r.status !== 'completed' && r.status !== 'closed').length;
                 if (awaitingReply > 0) return <span className="t-caption-sm px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20">Team replied · {awaitingReply}</span>;
@@ -208,7 +208,7 @@ export function InboxTab({
           {filter === 'all' && (
             <div className="flex items-center gap-2 mb-3 mt-2">
               <Icon as={PenLine} size="md" className="text-teal-400" />
-              <span className="text-sm font-medium text-[var(--brand-text)]">Copy Review</span>
+              <span className="t-body font-medium text-[var(--brand-text)]">Copy Review</span>
             </div>
           )}
           <ClientCopyReview workspaceId={workspaceId} />
@@ -221,7 +221,7 @@ export function InboxTab({
           {filter === 'all' && (
             <div className="flex items-center gap-2 mb-3 mt-2">
               <Icon as={Layers} size="md" className="text-teal-400" />
-              <span className="text-sm font-medium text-[var(--brand-text)]">Content Plan</span>
+              <span className="t-body font-medium text-[var(--brand-text)]">Content Plan</span>
               <span className="t-caption-sm px-1.5 py-0.5 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/20">{planReviewCount} needs review</span>
             </div>
           )}
@@ -229,13 +229,13 @@ export function InboxTab({
             {contentPlanReviewCells.map(cell => {
               const isFlagging = flaggingCell === cell.cellId;
               const isFlagged = cell.status === 'flagged';
-              return (
-                <div key={cell.cellId} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
+              return ( // pr-check-disable-next-line -- Brand signature radius intentional
+                <div key={cell.cellId} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
                   <div className="px-5 py-4">
                     <div className="flex items-center justify-between">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-medium text-[var(--brand-text)]">{cell.targetKeyword}</span>
+                          <span className="t-caption font-medium text-[var(--brand-text)]">{cell.targetKeyword}</span>
                           <span className={`t-caption-sm px-1.5 py-0.5 rounded border ${
                             isFlagged
                               ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
@@ -259,7 +259,7 @@ export function InboxTab({
                       {!isFlagged && !isFlagging && (
                         <button
                           onClick={() => setFlaggingCell(cell.cellId)}
-                          className="flex items-center gap-1 px-2.5 py-1.5 bg-[var(--surface-3)] hover:bg-zinc-700 border border-[var(--brand-border-strong)] rounded-lg t-caption-sm font-medium text-[var(--brand-text)] transition-colors"
+                          className="flex items-center gap-1 px-2.5 py-1.5 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text)] transition-colors"
                         >
                           <Icon as={Flag} size="sm" /> Request Changes
                         </button>
@@ -272,13 +272,13 @@ export function InboxTab({
                           onChange={e => setFlagComment(e.target.value)}
                           placeholder="Describe what you'd like changed..."
                           rows={2}
-                          className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-lg text-xs text-[var(--brand-text)] placeholder-zinc-500 focus:outline-none focus:border-teal-500 resize-none"
+                          className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500 resize-none"
                         />
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => handleFlagCell(cell)}
                             disabled={flagSubmitting || !flagComment.trim()}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-lg t-caption-sm font-medium transition-colors"
+                            className="flex items-center gap-1 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors"
                           >
                             {flagSubmitting ? 'Submitting...' : 'Submit Feedback'}
                           </button>
@@ -308,7 +308,7 @@ export function InboxTab({
           {filter === 'all' && (
             <div className="flex items-center gap-2 mb-3 mt-2">
               <Icon as={FileText} size="md" className="text-teal-400" />
-              <span className="text-sm font-medium text-[var(--brand-text)]">Content</span>
+              <span className="t-body font-medium text-[var(--brand-text)]">Content</span>
               {contentReviews > 0 && <span className="t-caption-sm px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20">Waiting on you · {contentReviews}</span>}
               {contentReviews === 0 && contentRequests.filter(r => r.status === 'in_progress' || r.status === 'approved').length > 0 && <span className="t-caption-sm px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">In progress</span>}
             </div>
@@ -338,7 +338,7 @@ export function InboxTab({
           action={
             <button
               onClick={() => setFilter('requests')}
-              className="mt-2 px-4 py-2 rounded-lg bg-teal-600/20 border border-teal-500/30 text-teal-400 text-xs font-medium hover:bg-teal-600/30 transition-colors"
+              className="mt-2 px-4 py-2 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 text-teal-400 t-caption font-medium hover:bg-teal-600/30 transition-colors"
             >
               Submit a Request Instead
             </button>
@@ -359,7 +359,7 @@ export function InboxTab({
           action={
             <button
               onClick={() => setFilter('requests')}
-              className="mt-2 px-4 py-2 rounded-lg bg-teal-600/20 border border-teal-500/30 text-teal-400 text-xs font-medium hover:bg-teal-600/30 transition-colors"
+              className="mt-2 px-4 py-2 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 text-teal-400 t-caption font-medium hover:bg-teal-600/30 transition-colors"
             >
               Submit a Request
             </button>

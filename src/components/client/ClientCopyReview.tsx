@@ -179,8 +179,8 @@ function ClientCopyReviewInner({ workspaceId }: ClientCopyReviewProps) {
         <SectionCard title="Copy Review" titleIcon={<FileText className="w-4 h-4 text-[var(--brand-text)]" />}>
           <div className="flex flex-col items-center py-8 gap-3">
             <AlertCircle className="w-8 h-8 text-red-400" />
-            <p className="text-sm text-[var(--brand-text)]">Something went wrong loading your copy review.</p>
-            <Button variant="primary" onClick={() => refetchEntries()} className="text-xs px-3 py-1.5">
+            <p className="t-body text-[var(--brand-text)]">Something went wrong loading your copy review.</p>
+            <Button variant="primary" onClick={() => refetchEntries()} className="t-caption px-3 py-1.5">
               Try Again
             </Button>
           </div>
@@ -216,13 +216,13 @@ function ClientCopyReviewInner({ workspaceId }: ClientCopyReviewProps) {
       {/* Header */}
       <div>
         <h2 className="text-lg font-semibold text-[var(--brand-text-bright)]">Copy Review</h2>
-        <p className="text-sm text-[var(--brand-text)] mt-1">
+        <p className="t-body text-[var(--brand-text)] mt-1">
           Review your website copy and approve sections or suggest changes.
         </p>
       </div>
 
       {/* Summary stats */}
-      <div className="flex gap-4 text-xs text-[var(--brand-text)]">
+      <div className="flex gap-4 t-caption text-[var(--brand-text)]">
         <span className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-teal-500" />
           {entries.reduce((n, e) => n + e.copyStatus.clientReviewSections, 0)} awaiting your review
@@ -236,7 +236,7 @@ function ClientCopyReviewInner({ workspaceId }: ClientCopyReviewProps) {
       {/* Entry list grouped by blueprint */}
       {Object.entries(grouped).map(([bpId, { blueprintName, items }]) => (
         <div key={bpId} className="space-y-3">
-          <h3 className="text-xs font-medium text-[var(--brand-text-muted)] uppercase tracking-wide">{blueprintName}</h3>
+          <h3 className="t-caption font-medium text-[var(--brand-text-muted)] uppercase tracking-wide">{blueprintName}</h3>
           {items.map((entry, idx) => (
             <EntryCard
               key={entry.id}
@@ -278,15 +278,15 @@ function EntryCard({ entry, workspaceId, isExpanded, onToggle, staggerIndex }: E
         <div className="flex items-center gap-3 min-w-0">
           <FileText className="w-4 h-4 text-[var(--brand-text)] shrink-0" />
           <div className="min-w-0">
-            <span className="text-sm font-medium text-[var(--brand-text-bright)] block truncate">{entry.name}</span>
-            <span className="text-xs text-[var(--brand-text-muted)]">{pageLabel}</span>
+            <span className="t-body font-medium text-[var(--brand-text-bright)] block truncate">{entry.name}</span>
+            <span className="t-caption text-[var(--brand-text-muted)]">{pageLabel}</span>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Badge label={badgeConfig.label} color={badgeConfig.color} />
           {/* Progress indicator — both fraction and bar use totalSections as denominator */}
           {copyStatus.totalSections > 0 && (
-            <span className="text-xs text-[var(--brand-text-muted)]">
+            <span className="t-caption text-[var(--brand-text-muted)]">
               {copyStatus.approvedSections}/{copyStatus.totalSections}
             </span>
           )}
@@ -389,10 +389,10 @@ function EntrySections({ workspaceId, entryId }: { workspaceId: string; entryId:
     return (
       <div className="flex flex-col items-center py-6 gap-2">
         <AlertCircle className="w-5 h-5 text-red-400" />
-        <p className="text-xs text-[var(--brand-text)]">Could not load sections.</p>
+        <p className="t-caption text-[var(--brand-text)]">Could not load sections.</p>
         <button
           onClick={() => refetch()}
-          className="text-xs text-teal-400 hover:text-teal-300 transition-colors"
+          className="t-caption text-teal-400 hover:text-teal-300 transition-colors"
         >
           Retry
         </button>
@@ -402,7 +402,7 @@ function EntrySections({ workspaceId, entryId }: { workspaceId: string; entryId:
 
   if (sections.length === 0) {
     return (
-      <p className="text-xs text-[var(--brand-text-muted)] py-4 text-center">
+      <p className="t-caption text-[var(--brand-text-muted)] py-4 text-center">
         No sections are ready for review yet.
       </p>
     );
@@ -411,7 +411,7 @@ function EntrySections({ workspaceId, entryId }: { workspaceId: string; entryId:
   return (
     <div className="space-y-4">
       {mutationError && (
-        <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded px-3 py-2">
+        <div className="flex items-center gap-2 t-caption text-red-400 bg-red-500/10 border border-red-500/20 rounded px-3 py-2">
           <AlertCircle className="w-3.5 h-3.5 shrink-0" />
           <span>{mutationError}</span>
         </div>
@@ -462,26 +462,26 @@ function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSugge
   }, [suggestedText, section.generatedCopy, onSuggest]);
 
   return (
-    <div className="border border-[var(--brand-border)] rounded-lg p-4 space-y-3 bg-[var(--surface-2)]/50">
+    <div className="border border-[var(--brand-border)] rounded-[var(--radius-lg)] p-4 space-y-3 bg-[var(--surface-2)]/50">
       {/* Section header */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <PenLine className="w-3.5 h-3.5 text-[var(--brand-text)] shrink-0" />
-          <span className="text-xs font-medium text-[var(--brand-text)]">{sectionLabel}</span>
+          <span className="t-caption font-medium text-[var(--brand-text)]">{sectionLabel}</span>
         </div>
         <Badge label={badgeConfig.label} color={badgeConfig.color} />
       </div>
 
       {/* Copy text */}
       {section.generatedCopy && (
-        <div className="text-sm text-[var(--brand-text)] leading-relaxed whitespace-pre-wrap bg-[var(--surface-3)]/30 rounded p-3">
+        <div className="t-body text-[var(--brand-text)] leading-relaxed whitespace-pre-wrap bg-[var(--surface-3)]/30 rounded p-3">
           {section.generatedCopy}
         </div>
       )}
 
       {/* AI annotation (context for client — why this section was written this way) */}
       {section.aiAnnotation && (
-        <div className="text-xs text-[var(--brand-text-muted)] italic border-l-2 border-[var(--brand-border)] pl-2">
+        <div className="t-caption text-[var(--brand-text-muted)] italic border-l-2 border-[var(--brand-border)] pl-2">
           {section.aiAnnotation}
         </div>
       )}
@@ -489,9 +489,9 @@ function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSugge
       {/* Previous suggestions */}
       {section.clientSuggestions && section.clientSuggestions.length > 0 && (
         <div className="space-y-2">
-          <span className="text-xs font-medium text-[var(--brand-text-muted)]">Your previous suggestions</span>
+          <span className="t-caption font-medium text-[var(--brand-text-muted)]">Your previous suggestions</span>
           {section.clientSuggestions.map((s, i) => (
-            <div key={i} className="text-xs bg-[var(--surface-3)]/50 rounded p-2 space-y-1">
+            <div key={i} className="t-caption bg-[var(--surface-3)]/50 rounded p-2 space-y-1">
               <div className="flex items-center gap-1.5">
                 <MessageSquare className="w-3 h-3 text-[var(--brand-text-muted)]" />
                 <span className="text-[var(--brand-text)]">
@@ -519,14 +519,14 @@ function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSugge
             onClick={onApprove}
             disabled={isApproving}
             loading={isApproving}
-            className="flex items-center gap-1.5 text-xs px-3 py-1.5"
+            className="flex items-center gap-1.5 t-caption px-3 py-1.5"
           >
             {!isApproving && <Check className="w-3 h-3" />}
             Approve
           </Button>
           <button
             onClick={() => setShowSuggestForm(!showSuggestForm)}
-            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-[var(--brand-border)] text-[var(--brand-text)] hover:border-[var(--brand-border-hover)] hover:text-[var(--brand-text-bright)] transition-colors"
+            className="flex items-center gap-1.5 t-caption px-3 py-1.5 rounded border border-[var(--brand-border)] text-[var(--brand-text)] hover:border-[var(--brand-border-hover)] hover:text-[var(--brand-text-bright)] transition-colors"
           >
             <MessageSquare className="w-3 h-3" />
             Suggest Changes
@@ -536,7 +536,7 @@ function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSugge
 
       {/* Approved confirmation */}
       {isApproved && (
-        <div className="flex items-center gap-1.5 text-xs text-emerald-400">
+        <div className="flex items-center gap-1.5 t-caption text-emerald-400">
           <Check className="w-3.5 h-3.5" />
           <span>This section is approved and ready to go.</span>
         </div>
@@ -545,7 +545,7 @@ function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSugge
       {/* Suggestion form */}
       {showSuggestForm && isReviewable && (
         <div className="border-t border-[var(--brand-border)] pt-3 space-y-2">
-          <label className="text-xs text-[var(--brand-text)] block">
+          <label className="t-caption text-[var(--brand-text)] block">
             How would you like this section to read?
           </label>
           <textarea
@@ -553,7 +553,7 @@ function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSugge
             onChange={e => setSuggestedText(e.target.value)}
             placeholder="Type your suggested version here..."
             rows={4}
-            className="w-full text-sm bg-[var(--surface-3)] border border-[var(--brand-border)] rounded p-2 text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-teal-600 focus:outline-none resize-y"
+            className="w-full t-body bg-[var(--surface-3)] border border-[var(--brand-border)] rounded p-2 text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-teal-600 focus:outline-none resize-y"
           />
           <div className="flex items-center gap-2">
             <Button
@@ -561,14 +561,14 @@ function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSugge
               onClick={handleSubmitSuggestion}
               disabled={!suggestedText.trim() || isSuggesting}
               loading={isSuggesting}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5"
+              className="flex items-center gap-1.5 t-caption px-3 py-1.5"
             >
               {!isSuggesting && <MessageSquare className="w-3 h-3" />}
               Submit Suggestion
             </Button>
             <button
               onClick={() => { setShowSuggestForm(false); setSuggestedText(''); }}
-              className="text-xs text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+              className="t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
             >
               Cancel
             </button>

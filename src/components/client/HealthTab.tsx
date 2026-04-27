@@ -168,11 +168,11 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
       <div className="flex items-start justify-between">
         <div>
           <h2 className="text-xl font-semibold text-[var(--brand-text)]">Site Health</h2>
-          <p className="text-sm text-[var(--brand-text-muted)] mt-1">{auditDetail.audit.totalPages} pages · Last scanned {new Date(auditDetail.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+          <p className="t-body text-[var(--brand-text-muted)] mt-1">{auditDetail.audit.totalPages} pages · Last scanned {new Date(auditDetail.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
         </div>
         <div className="relative" ref={shareRef}>
           <button onClick={() => setShareOpen(!shareOpen)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] hover:bg-zinc-700 hover:text-[var(--brand-text)] transition-colors">
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption font-medium bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)] hover:text-[var(--brand-text)] transition-colors">
             <Icon as={Share2} size="md" />
             Share Report
           </button>
@@ -180,16 +180,16 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
             // pr-check-disable-next-line -- Shareable Reports popover dropdown; positioned absolute, not a content card
             <div className="absolute right-0 top-full mt-2 w-80 bg-[var(--surface-2)] border border-[var(--brand-border-strong)] rounded-[var(--radius-xl)] shadow-xl z-50 overflow-hidden">
               <div className="px-4 py-3 border-b border-[var(--brand-border)]">
-                <div className="text-xs font-medium text-[var(--brand-text)]">Shareable Reports</div>
+                <div className="t-caption font-medium text-[var(--brand-text)]">Shareable Reports</div>
                 <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">Copy a link to share with your team</div>
               </div>
-              <div className="max-h-64 overflow-y-auto divide-y divide-zinc-800/50">
+              <div className="max-h-64 overflow-y-auto divide-y divide-[var(--brand-border)]/50">
                 {reports.length === 0 && (
-                  <div className="px-4 py-6 text-center text-xs text-[var(--brand-text-muted)]">Loading reports...</div>
+                  <div className="px-4 py-6 text-center t-caption text-[var(--brand-text-muted)]">Loading reports...</div>
                 )}
                 {reports.map(r => (
-                  <div key={r.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-zinc-800/50 transition-colors">
-                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${r.type === 'audit' ? 'bg-emerald-500/10' : 'bg-blue-500/10'}`}>
+                  <div key={r.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-[var(--surface-3)]/50 transition-colors">
+                    <div className={`w-7 h-7 rounded-[var(--radius-lg)] flex items-center justify-center flex-shrink-0 ${r.type === 'audit' ? 'bg-emerald-500/10' : 'bg-blue-500/10'}`}>
                       {r.type === 'audit' ? <Icon as={BarChart3} size="md" className="text-emerald-400" /> : <Icon as={FileText} size="md" className="text-blue-400" />}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -225,21 +225,21 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
           : score >= 50
           ? 'Several issues are holding back your search performance — prioritize the fixes below.'
           : 'Critical issues need immediate attention to establish search visibility.';
-        return (
-          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
+        return ( // pr-check-disable-next-line -- Brand signature radius intentional
+          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
             <div className="flex items-center gap-4">
               <div className={`text-4xl font-bold ${scoreColorClass(score)}`}>{score}</div>
               <div className="flex-1">
-                <div className="text-sm font-medium text-[var(--brand-text)]">Your site's health</div>
-                <div className="text-xs text-[var(--brand-text-muted)] mt-0.5">{summary}</div>
+                <div className="t-body font-medium text-[var(--brand-text)]">Your site's health</div>
+                <div className="t-caption text-[var(--brand-text-muted)] mt-0.5">{summary}</div>
               </div>
               {auditDetail.previousScore != null && (
-                <div className={`text-xs ${auditDetail.audit.siteScore > auditDetail.previousScore ? 'text-emerald-400' : auditDetail.audit.siteScore < auditDetail.previousScore ? 'text-red-400' : 'text-[var(--brand-text-muted)]'}`}>
+                <div className={`t-caption ${auditDetail.audit.siteScore > auditDetail.previousScore ? 'text-emerald-400' : auditDetail.audit.siteScore < auditDetail.previousScore ? 'text-red-400' : 'text-[var(--brand-text-muted)]'}`}>
                   {auditDetail.audit.siteScore > auditDetail.previousScore ? '↑' : '↓'} {Math.abs(auditDetail.audit.siteScore - auditDetail.previousScore)} from previous
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-4 mt-3 pt-3 border-t border-zinc-800/50 text-xs">
+            <div className="flex items-center gap-4 mt-3 pt-3 border-t border-[var(--brand-border)]/50 t-caption">
               <span className="text-[var(--brand-text-muted)]">{auditDetail.audit.totalPages} pages scanned</span>
               <button
                 onClick={() => { setSeverityFilter(severityFilter === 'error' ? 'all' : 'error'); setTimeout(() => allPagesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }}
@@ -284,18 +284,18 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
         const ratingColor = (r: CwvStrategyResult['metrics']['LCP']['rating']) =>
           r === 'good' ? 'text-emerald-400' : r === 'needs-improvement' ? 'text-amber-400' : r === 'poor' ? 'text-red-400' : 'text-[var(--brand-text-muted)]';
         const ratingBg = (r: CwvStrategyResult['metrics']['LCP']['rating']) =>
-          r === 'good' ? 'bg-emerald-500/10 border-emerald-500/20' : r === 'needs-improvement' ? 'bg-amber-500/10 border-amber-500/20' : r === 'poor' ? 'bg-red-500/10 border-red-500/20' : 'bg-zinc-800/50 border-zinc-700/30';
+          r === 'good' ? 'bg-emerald-500/10 border-emerald-500/20' : r === 'needs-improvement' ? 'bg-amber-500/10 border-amber-500/20' : r === 'poor' ? 'bg-red-500/10 border-red-500/20' : 'bg-[var(--surface-3)]/50 border-[var(--brand-border)]/30';
         const assessBadge = (a: CwvStrategyResult['assessment']) =>
           a === 'good' ? { text: 'Passed', cls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' }
           : a === 'needs-improvement' ? { text: 'Needs Work', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/30' }
           : a === 'poor' ? { text: 'Failed', cls: 'bg-red-500/15 text-red-400 border-red-500/30' }
-          : { text: 'No Data', cls: 'bg-zinc-800/50 text-[var(--brand-text-muted)] border-zinc-700/30' };
+          : { text: 'No Data', cls: 'bg-[var(--surface-3)]/50 text-[var(--brand-text-muted)] border-[var(--brand-border)]/30' };
         const renderStrategy = (label: string, s: CwvStrategyResult) => {
           const badge = assessBadge(s.assessment);
           return (
             <div key={label} className="flex-1 min-w-[200px]">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-[var(--brand-text-muted)] tracking-wider">{label}</span>
+                <span className="t-caption font-medium text-[var(--brand-text-muted)] tracking-wider">{label}</span>
                 <span className={`t-caption-sm px-2 py-0.5 rounded border font-medium ${badge.cls}`}>{badge.text}</span>
               </div>
               <div className="space-y-1.5">
@@ -306,12 +306,12 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                 ].map(m => {
                   const metric = s.metrics[m.key];
                   return (
-                    <div key={m.key} className={`flex items-center justify-between px-3 py-2 rounded-lg border ${ratingBg(metric.rating)}`}>
+                    <div key={m.key} className={`flex items-center justify-between px-3 py-2 rounded-[var(--radius-lg)] border ${ratingBg(metric.rating)}`}>
                       <div>
-                        <span className="text-xs font-medium text-[var(--brand-text)]">{m.label}</span>
+                        <span className="t-caption font-medium text-[var(--brand-text)]">{m.label}</span>
                         <span className="t-caption-sm text-[var(--brand-text-muted)] ml-1.5">{m.desc}</span>
                       </div>
-                      <span className={`text-sm font-mono font-medium ${ratingColor(metric.rating)}`}>
+                      <span className={`t-body font-mono font-medium ${ratingColor(metric.rating)}`}>
                         {metric.value !== null ? m.fmt(metric.value) : '—'}
                       </span>
                     </div>
@@ -319,7 +319,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                 })}
               </div>
               {!s.fieldDataAvailable && (
-                <div className="mt-2 flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                <div className="mt-2 flex items-start gap-2 px-3 py-2 rounded-[var(--radius-lg)] bg-amber-500/10 border border-amber-500/20">
                   <Icon as={AlertTriangle} size="md" className="text-amber-400 flex-shrink-0 mt-0.5" />
                   <p className="t-caption-sm text-amber-300">These are simulated scores, not real user data. Real metrics appear once Chrome has enough traffic data for your site.</p>
                 </div>
@@ -327,11 +327,11 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
             </div>
           );
         };
-        return (
-          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
+        return ( // pr-check-disable-next-line -- Brand signature radius intentional
+          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
             <div className="flex items-center gap-2 mb-3">
               <Icon as={Globe} size="md" className="text-teal-400" />
-              <span className="text-sm font-medium text-[var(--brand-text)]">Page Speed &amp; Core Web Vitals</span>
+              <span className="t-body font-medium text-[var(--brand-text)]">Page Speed &amp; Core Web Vitals</span>
               <span className="t-caption-sm text-[var(--brand-text-muted)] ml-2">Google uses these to rank your site</span>
             </div>
             <div className="flex gap-4 flex-wrap">
@@ -383,16 +383,17 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
               {/* Fix These First */}
-              <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
+              {/* pr-check-disable-next-line -- Brand signature radius intentional */}
+              <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
                 <div className="px-4 py-3 border-b border-[var(--brand-border)] flex items-center gap-2">
                   <Icon as={AlertTriangle} size="md" className="text-red-400" />
-                  <span className="text-sm font-medium text-[var(--brand-text)]">Fix these first</span>
+                  <span className="t-body font-medium text-[var(--brand-text)]">Fix these first</span>
                 </div>
-                <div className="divide-y divide-zinc-800/50">
+                <div className="divide-y divide-[var(--brand-border)]/50">
                   {prioritized.length === 0 ? (
                     <div className="px-4 py-6 text-center">
                       <Icon as={CheckCircle2} size="2xl" className="text-emerald-500/50 mx-auto mb-2" />
-                      <p className="text-xs text-[var(--brand-text-muted)]">No critical issues found!</p>
+                      <p className="t-caption text-[var(--brand-text-muted)]">No critical issues found!</p>
                     </div>
                   ) : (
                     prioritized.map((item, i) => {
@@ -429,11 +430,12 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
               </div>
 
               {/* Page Cards */}
-              <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
+              {/* pr-check-disable-next-line -- Brand signature radius intentional */}
+              <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <Icon as={FileText} size="md" className="text-[var(--brand-text-muted)]" />
-                    <span className="text-sm font-medium text-[var(--brand-text)]">Pages needing attention</span>
+                    <span className="t-body font-medium text-[var(--brand-text)]">Pages needing attention</span>
                   </div>
                   <span className="t-caption-sm text-[var(--brand-text-muted)]">Top {sortedPages.length}</span>
                 </div>
@@ -443,31 +445,31 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                     const warns = page.issues.filter(i => i.severity === 'warning').length;
                     const isExpanded = expandedPages.has(page.pageId);
                     return (
-                      <div key={page.pageId} className={`rounded-lg border transition-all ${isExpanded ? 'bg-zinc-950/50 border-[var(--brand-border-strong)]' : 'bg-zinc-950/50 border-zinc-800/50 hover:border-[var(--brand-border-strong)]'}`}>
+                      <div key={page.pageId} className={`rounded-[var(--radius-lg)] border transition-all ${isExpanded ? 'bg-[var(--surface-1)]/50 border-[var(--brand-border-strong)]' : 'bg-[var(--surface-1)]/50 border-[var(--brand-border)]/50 hover:border-[var(--brand-border-strong)]'}`}>
                         <button
                           onClick={() => togglePage(page.pageId)}
                           className="w-full flex items-center gap-3 p-3 text-left"
                         >
                           <div className="flex-1 min-w-0">
-                            <div className="text-xs font-medium text-[var(--brand-text)] truncate">{page.page}</div>
+                            <div className="t-caption font-medium text-[var(--brand-text)] truncate">{page.page}</div>
                             <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{toLiveUrl(page.url, liveDomain)}</div>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
                             {errs > 0 && <span className="t-caption-sm text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">{errs}E</span>}
                             {warns > 0 && <span className="t-caption-sm text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">{warns}W</span>}
-                            <div className={`text-xs font-bold ${scoreColorClass(page.score)}`}>{page.score}</div>
+                            <div className={`t-caption font-bold ${scoreColorClass(page.score)}`}>{page.score}</div>
                             <ChevronDown className={`w-3.5 h-3.5 text-[var(--brand-text-muted)] transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
                           </div>
                         </button>
                         
                         {/* Expanded issues accordion inside the card */}
                         {isExpanded && (
-                          <div className="px-3 pb-3 border-t border-zinc-800/50">
+                          <div className="px-3 pb-3 border-t border-[var(--brand-border)]/50">
                             <div className="pt-3 space-y-2">
                               {page.issues.map((issue, i) => {
                                 const sc = SEV[issue.severity];
                                 return (
-                                  <div key={i} className={`px-3 py-2 rounded-lg ${sc.bg} border ${sc.border}`}>
+                                  <div key={i} className={`px-3 py-2 rounded-[var(--radius-lg)] ${sc.bg} border ${sc.border}`}>
                                     <div className="flex items-start gap-2">
                                       {issue.severity === 'error' && <AlertTriangle className={`w-3.5 h-3.5 ${sc.text} flex-shrink-0 mt-0.5`} />}
                                       {issue.severity === 'warning' && <Info className={`w-3.5 h-3.5 ${sc.text} flex-shrink-0 mt-0.5`} />}
@@ -488,7 +490,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                                 <button
                                   onClick={() => { setRequestError(null); requestContentImprovement(page); }}
                                   disabled={requestedPages.has(page.pageId) || requestingPage === page.pageId}
-                                  className={`mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg t-caption-sm font-medium transition-colors ${
+                                  className={`mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors ${
                                     requestedPages.has(page.pageId)
                                       ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 cursor-default'
                                       : 'bg-teal-600 hover:bg-teal-500 text-white'
@@ -512,7 +514,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                   onClick={() => {
                     setTimeout(() => allPagesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
                   }}
-                  className="w-full mt-3 text-center py-2 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors border border-dashed border-[var(--brand-border)] rounded-lg hover:border-[var(--brand-border-strong)]"
+                  className="w-full mt-3 text-center py-2 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors border border-dashed border-[var(--brand-border)] rounded-[var(--radius-lg)] hover:border-[var(--brand-border-strong)]"
                 >
                   View all {auditDetail.audit.totalPages} pages
                 </button>
@@ -526,15 +528,15 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
       {actionPlanSlot}
 
       {/* ── 5. SITE-WIDE ISSUES ── */}
-      {auditDetail.audit.siteWideIssues.length > 0 && (
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      {auditDetail.audit.siteWideIssues.length > 0 && ( // pr-check-disable-next-line -- Brand signature radius intentional
+        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
           <div className="px-4 py-3 border-b border-[var(--brand-border)] bg-[var(--surface-2)]">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-[var(--surface-3)] flex items-center justify-center">
+              <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-[var(--surface-3)] flex items-center justify-center">
                 <Icon as={Info} size="md" className="text-amber-400" />
               </div>
               <div>
-                <div className="text-sm font-medium text-[var(--brand-text)]">Site-Wide Issues</div>
+                <div className="t-body font-medium text-[var(--brand-text)]">Site-Wide Issues</div>
                 <div className="t-caption-sm text-[var(--brand-text-muted)]">{auditDetail.audit.siteWideIssues.length} issues affecting your entire site</div>
               </div>
             </div>
@@ -545,7 +547,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
               {auditDetail.audit.siteWideIssues.slice(0, 3).map((issue, i) => {
                 const sc = SEV[issue.severity];
                 return (
-                  <div key={i} className={`px-2.5 py-1.5 rounded-lg ${sc.bg} border ${sc.border} t-caption-sm`}>
+                  <div key={i} className={`px-2.5 py-1.5 rounded-[var(--radius-lg)] ${sc.bg} border ${sc.border} t-caption-sm`}>
                     <span className={sc.text}>{issue.message}</span>
                   </div>
                 );
@@ -553,7 +555,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
               {auditDetail.audit.siteWideIssues.length > 3 && (
                 <button 
                   onClick={() => toggleSection('site-wide-all')}
-                  className="px-2.5 py-1.5 rounded-lg bg-[var(--surface-3)] border border-[var(--brand-border-strong)] t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
+                  className="px-2.5 py-1.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
                 >
                   +{auditDetail.audit.siteWideIssues.length - 3} more
                 </button>
@@ -561,11 +563,11 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
             </div>
             
             {expandedSections.has('site-wide-all') && (
-              <div className="mt-3 pt-3 border-t border-zinc-800/50 space-y-2">
+              <div className="mt-3 pt-3 border-t border-[var(--brand-border)]/50 space-y-2">
                 {auditDetail.audit.siteWideIssues.map((issue, i) => {
                   const sc = SEV[issue.severity];
                   return (
-                    <div key={i} className={`px-3 py-2 rounded-lg ${sc.bg} border ${sc.border}`}>
+                    <div key={i} className={`px-3 py-2 rounded-[var(--radius-lg)] ${sc.bg} border ${sc.border}`}>
                       <div className={`t-caption-sm font-medium ${sc.text}`}>{issue.message}</div>
                       {issue.recommendation && <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{issue.recommendation}</div>}
                     </div>
@@ -579,34 +581,35 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
 
       {/* ── 6. ALL PAGES LIST ── */}
       <div ref={allPagesRef}>
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
-          <div className="px-4 py-3 border-b border-[var(--brand-border)] flex items-center gap-2 flex-wrap bg-zinc-950/50">
+        {/* pr-check-disable-next-line -- Brand signature radius intentional */}
+        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+          <div className="px-4 py-3 border-b border-[var(--brand-border)] flex items-center gap-2 flex-wrap bg-[var(--surface-1)]/50">
             {/* View mode toggle */}
-            <div className="flex items-center gap-1 bg-[var(--surface-3)] rounded-lg p-0.5">
+            <div className="flex items-center gap-1 bg-[var(--surface-3)] rounded-[var(--radius-lg)] p-0.5">
               <button onClick={() => setViewMode('by-page')}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md t-caption-sm font-medium transition-colors ${viewMode === 'by-page' ? 'bg-zinc-700 text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}>
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md t-caption-sm font-medium transition-colors ${viewMode === 'by-page' ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}>
                 <Icon as={LayoutList} size="sm" /> By Page
               </button>
               <button onClick={() => setViewMode('by-fix-type')}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md t-caption-sm font-medium transition-colors ${viewMode === 'by-fix-type' ? 'bg-zinc-700 text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}>
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md t-caption-sm font-medium transition-colors ${viewMode === 'by-fix-type' ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}>
                 <Icon as={Layers} size="sm" /> By Fix Type
               </button>
             </div>
             {/* Severity filter */}
-            <div className="flex items-center gap-1 bg-[var(--surface-3)] rounded-lg p-0.5">
+            <div className="flex items-center gap-1 bg-[var(--surface-3)] rounded-[var(--radius-lg)] p-0.5">
               {(['all', 'error', 'warning'] as const).map(s => (
                 <button key={s} onClick={() => setSeverityFilter(s)}
                   className={`px-3 py-2 min-h-[44px] rounded-md t-caption-sm font-medium transition-colors ${
-                    severityFilter === s ? (s === 'all' ? 'bg-zinc-700 text-[var(--brand-text)]' : `${SEV[s].bg} ${SEV[s].text}`) : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'
+                    severityFilter === s ? (s === 'all' ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)]' : `${SEV[s].bg} ${SEV[s].text}`) : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'
                   }`}>{s === 'all' ? 'Issues' : s.charAt(0).toUpperCase() + s.slice(1)}</button>
               ))}
             </div>
             {infoIssueCount > 0 && (
               <button
                 onClick={() => setShowInfoItems(!showInfoItems)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg t-caption-sm transition-colors border ${
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm transition-colors border ${
                   showInfoItems
-                    ? 'bg-zinc-700 text-[var(--brand-text)] border-zinc-600'
+                    ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)] border-[var(--brand-border-strong)]'
                     : 'bg-transparent text-[var(--brand-text-muted)] border-[var(--brand-border-strong)] hover:text-[var(--brand-text)]'
                 }`}
               >
@@ -616,31 +619,31 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
             )}
             {viewMode === 'by-page' && (
               <input type="text" value={auditSearch} onChange={e => setAuditSearch(e.target.value)} placeholder="Search pages..."
-                className="bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-lg px-2.5 py-1.5 t-caption-sm text-[var(--brand-text)] placeholder-zinc-600 focus:outline-none focus:border-zinc-600 w-40" />
+                className="bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] px-2.5 py-1.5 t-caption-sm text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-[var(--brand-border-strong)] w-40" />
             )}
           </div>
 
           {/* By-page view */}
           {viewMode === 'by-page' && (
-          <div className="divide-y divide-zinc-800/50 max-h-[500px] overflow-y-auto">
+          <div className="divide-y divide-[var(--brand-border)]/50 max-h-[500px] overflow-y-auto">
             {filteredPages.map(page => {
               const errs = page.issues.filter(i => i.severity === 'error').length;
               const warns = page.issues.filter(i => i.severity === 'warning').length;
               const isExpanded = expandedPages.has(page.pageId);
               return (
-                <div key={page.pageId} className={`transition-all ${isExpanded ? 'bg-zinc-950/50' : ''}`}>
+                <div key={page.pageId} className={`transition-all ${isExpanded ? 'bg-[var(--surface-1)]/50' : ''}`}>
                   <button
                     onClick={() => togglePage(page.pageId)}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/30 transition-colors text-left"
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)]/30 transition-colors text-left"
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-medium text-[var(--brand-text)] truncate">{page.page}</div>
+                      <div className="t-caption font-medium text-[var(--brand-text)] truncate">{page.page}</div>
                       <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{toLiveUrl(page.url, liveDomain)}</div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       {errs > 0 && <span className="t-caption-sm text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">{errs} err</span>}
                       {warns > 0 && <span className="t-caption-sm text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">{warns} warn</span>}
-                      <div className={`text-xs font-bold ${scoreColorClass(page.score)}`}>{page.score}</div>
+                      <div className={`t-caption font-bold ${scoreColorClass(page.score)}`}>{page.score}</div>
                       <ChevronDown className={`w-3.5 h-3.5 text-[var(--brand-text-muted)] transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
                     </div>
                   </button>
@@ -651,7 +654,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                         {page.issues.filter(i => showInfoItems || i.severity !== 'info').map((issue, i) => {
                           const sc = SEV[issue.severity];
                           return (
-                            <div key={i} className={`px-3 py-2 rounded-lg ${sc.bg} border ${sc.border}`}>
+                            <div key={i} className={`px-3 py-2 rounded-[var(--radius-lg)] ${sc.bg} border ${sc.border}`}>
                               <div className="flex items-start gap-2">
                                 {issue.severity === 'error' && <AlertTriangle className={`w-3.5 h-3.5 ${sc.text} flex-shrink-0 mt-0.5`} />}
                                 {issue.severity === 'warning' && <Info className={`w-3.5 h-3.5 ${sc.text} flex-shrink-0 mt-0.5`} />}
@@ -669,7 +672,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                           <button
                             onClick={() => { setRequestError(null); requestContentImprovement(page); }}
                             disabled={requestedPages.has(page.pageId) || requestingPage === page.pageId}
-                            className={`mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg t-caption-sm font-medium transition-colors ${
+                            className={`mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors ${
                               requestedPages.has(page.pageId)
                                 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 cursor-default'
                                 : 'bg-teal-600 hover:bg-teal-500 text-white'
@@ -688,7 +691,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                 </div>
               );
             })}
-            {filteredPages.length === 0 && <div className="px-4 py-8 text-center text-xs text-[var(--brand-text-muted)]">No pages match your filters</div>}
+            {filteredPages.length === 0 && <div className="px-4 py-8 text-center t-caption text-[var(--brand-text-muted)]">No pages match your filters</div>}
           </div>
           )}
 
@@ -736,19 +739,19 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
             });
 
             return (
-              <div className="divide-y divide-zinc-800/50 max-h-[500px] overflow-y-auto">
-                {sorted.length === 0 && <div className="px-4 py-8 text-center text-xs text-[var(--brand-text-muted)]">No issues match your filters</div>}
+              <div className="divide-y divide-[var(--brand-border)]/50 max-h-[500px] overflow-y-auto">
+                {sorted.length === 0 && <div className="px-4 py-8 text-center t-caption text-[var(--brand-text-muted)]">No issues match your filters</div>}
                 {sorted.map(group => {
                   const sc = SEV[group.severity];
                   const isExpanded = expandedPages.has(`fix-type-${group.check}`);
                   return (
-                    <div key={group.check} className={`transition-all ${isExpanded ? 'bg-zinc-950/50' : ''}`}>
+                    <div key={group.check} className={`transition-all ${isExpanded ? 'bg-[var(--surface-1)]/50' : ''}`}>
                       <button
                         onClick={() => togglePage(`fix-type-${group.check}`)}
-                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/30 transition-colors text-left"
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)]/30 transition-colors text-left"
                       >
                         <div className="flex-1 min-w-0">
-                          <div className="text-xs font-medium text-[var(--brand-text)]">{group.label}</div>
+                          <div className="t-caption font-medium text-[var(--brand-text)]">{group.label}</div>
                           <div className="t-caption-sm text-[var(--brand-text-muted)]">{group.pages.length} {group.pages.length === 1 ? 'page' : 'pages'} affected</div>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
@@ -765,7 +768,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                           )}
                           <div className="space-y-1.5">
                             {group.pages.map((p, i) => (
-                              <div key={`${p.pageId}-${i}`} className={`px-3 py-2 rounded-lg ${sc.bg} border ${sc.border}`}>
+                              <div key={`${p.pageId}-${i}`} className={`px-3 py-2 rounded-[var(--radius-lg)] ${sc.bg} border ${sc.border}`}>
                                 <div className="t-caption-sm font-medium text-[var(--brand-text)] truncate">{p.page}</div>
                                 <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{toLiveUrl(p.url, liveDomain)}</div>
                                 {p.recommendation && <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{p.recommendation}</div>}
@@ -784,11 +787,12 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
       </div>
 
       {/* ── 7. HISTORY (Collapsed by default - at the bottom) ── */}
-      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
-        <button onClick={() => toggleSection('history')} className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors">
+      {/* pr-check-disable-next-line -- Brand signature radius intentional */}
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+        <button onClick={() => toggleSection('history')} className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors">
           <div className="flex items-center gap-2">
             <Icon as={BarChart3} size="md" className="text-[var(--brand-text-muted)]" />
-            <span className="text-sm font-medium text-[var(--brand-text)]">History &amp; Details</span>
+            <span className="t-body font-medium text-[var(--brand-text)]">History &amp; Details</span>
           </div>
           <ChevronDown className={`w-4 h-4 text-[var(--brand-text-muted)] transition-transform ${expandedSections.has('history') ? '' : '-rotate-90'}`} />
         </button>
@@ -797,13 +801,13 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
             {/* Score History */}
             {auditDetail.scoreHistory.length >= 2 && (
               <div className="pt-4">
-                <div className="text-xs font-medium text-[var(--brand-text-muted)] mb-2">Score History</div>
+                <div className="t-caption font-medium text-[var(--brand-text-muted)] mb-2">Score History</div>
                 <ScoreHistoryChart history={auditDetail.scoreHistory} />
               </div>
             )}
             {/* Category Breakdown */}
             <div>
-              <div className="text-xs font-medium text-[var(--brand-text-muted)] mb-2">Issues by Category</div>
+              <div className="t-caption font-medium text-[var(--brand-text-muted)] mb-2">Issues by Category</div>
               <div className="space-y-2">
                 {Object.entries(categoryStats).map(([cat, counts]) => {
                   const info = CAT_LABELS[cat] || { label: cat, color: themeColor('#71717a', '#94a3b8') };
@@ -827,14 +831,14 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
     </div>
   );
 
-  if (audit) return (
-    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-6" style={{ borderRadius: '10px 24px 10px 24px' }}>
+  if (audit) return ( // pr-check-disable-next-line -- Brand signature radius intentional
+    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-6" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
       <div className="flex items-center gap-4">
         <ScoreRing score={audit.siteScore} size={100} />
         <div>
-          <div className="text-sm font-medium text-[var(--brand-text)]">Site Health Score</div>
-          <div className="text-xs text-[var(--brand-text-muted)]">{audit.totalPages} pages • {new Date(audit.createdAt).toLocaleDateString()}</div>
-          <div className="flex gap-3 mt-2"><span className="text-xs text-red-400">{audit.errors} errors</span><span className="text-xs text-amber-400">{audit.warnings} warnings</span></div>
+          <div className="t-body font-medium text-[var(--brand-text)]">Site Health Score</div>
+          <div className="t-caption text-[var(--brand-text-muted)]">{audit.totalPages} pages • {new Date(audit.createdAt).toLocaleDateString()}</div>
+          <div className="flex gap-3 mt-2"><span className="t-caption text-red-400">{audit.errors} errors</span><span className="t-caption text-amber-400">{audit.warnings} warnings</span></div>
         </div>
       </div>
     </div>
@@ -842,11 +846,11 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
 
   return (
     <div className="text-center py-16">
-      <div className="w-16 h-16 rounded-2xl bg-[var(--surface-2)] border border-[var(--brand-border)] flex items-center justify-center mx-auto mb-4">
+      <div className="w-16 h-16 rounded-[var(--radius-xl)] bg-[var(--surface-2)] border border-[var(--brand-border)] flex items-center justify-center mx-auto mb-4">
         <Icon as={Shield} size="2xl" className="text-[var(--brand-text-faint)]" />
       </div>
-      <p className="text-sm font-medium text-[var(--brand-text-muted)]">Site Health Check Coming Soon</p>
-      <p className="text-xs text-[var(--brand-text-muted)] mt-1 max-w-sm mx-auto">Once {STUDIO_NAME} runs a site audit, you'll see a detailed health score, page-by-page issues, and recommendations to improve your site.</p>
+      <p className="t-body font-medium text-[var(--brand-text-muted)]">Site Health Check Coming Soon</p>
+      <p className="t-caption text-[var(--brand-text-muted)] mt-1 max-w-sm mx-auto">Once {STUDIO_NAME} runs a site audit, you'll see a detailed health score, page-by-page issues, and recommendations to improve your site.</p>
     </div>
   );
 }

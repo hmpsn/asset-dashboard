@@ -37,7 +37,7 @@ const STATUS_CONFIG: Record<FeedbackStatus, { label: string; color: string; bg: 
   new: { label: 'Submitted', color: 'text-blue-400', bg: 'bg-blue-500/10' },
   acknowledged: { label: 'Acknowledged', color: 'text-amber-400', bg: 'bg-amber-500/10' },
   fixed: { label: 'Resolved', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-  wontfix: { label: 'Noted', color: 'text-zinc-400', bg: 'bg-zinc-500/10' },
+  wontfix: { label: 'Noted', color: 'text-[var(--brand-text)]', bg: 'bg-[var(--surface-3)]/10' },
 };
 
 interface Props {
@@ -111,30 +111,30 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
     return (
       <button
         onClick={() => setOpen(true)}
-        className={cn('fixed bottom-6 left-6 flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border)]/50 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] text-xs font-medium shadow-lg transition-all z-40 backdrop-blur-sm', chatExpanded ? 'sm:flex hidden' : '')}
+        className={cn('fixed bottom-6 left-6 flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border)]/50 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] t-caption font-medium shadow-lg transition-all z-40 backdrop-blur-sm', chatExpanded ? 'sm:flex hidden' : '')}
       >
         <Icon as={MessageSquarePlus} size="md" />
         Feedback
         {unreadCount > 0 && (
-          <span className="w-4 h-4 rounded-full bg-teal-500 text-[9px] font-bold text-white flex items-center justify-center">{unreadCount}</span>
+          <span className="w-4 h-4 rounded-full bg-teal-500 text-[9px] /* arbitrary-text-ok */ font-bold text-white flex items-center justify-center">{unreadCount}</span>
         )}
       </button>
     );
   }
 
   return (
-    <div className={cn('fixed bottom-6 left-6 w-[360px] max-h-[520px] bg-[var(--surface-2)] rounded-2xl border border-[var(--brand-border)] shadow-2xl shadow-black/40 overflow-hidden z-40 flex flex-col', chatExpanded ? 'sm:flex hidden' : '')}>
+    <div className={cn('fixed bottom-6 left-6 w-[360px] max-h-[520px] bg-[var(--surface-2)] rounded-[var(--radius-xl)] border border-[var(--brand-border)] shadow-2xl shadow-black/40 overflow-hidden z-40 flex flex-col', chatExpanded ? 'sm:flex hidden' : '')}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--brand-border)] flex-shrink-0">
         <div className="flex items-center gap-2">
           <Icon as={MessageSquarePlus} size="md" className="text-teal-400" />
-          <span className="text-sm font-medium text-[var(--brand-text-bright)]">Beta Feedback</span>
+          <span className="t-body font-medium text-[var(--brand-text-bright)]">Beta Feedback</span>
           <span className="t-caption-sm text-teal-400/70 bg-teal-500/10 px-1.5 py-0.5 rounded border border-teal-500/20">beta</span>
         </div>
         <div className="flex items-center gap-1">
           <button
             onClick={() => setView(view === 'form' ? 'list' : 'form')}
-            className={cn('text-xs px-2 py-1 rounded transition-colors', view === 'list' ? 'text-teal-400 bg-teal-500/10' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]')}
+            className={cn('t-caption px-2 py-1 rounded transition-colors', view === 'list' ? 'text-teal-400 bg-teal-500/10' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]')}
           >
             {view === 'form' ? `History${items.length > 0 ? ` (${items.length})` : ''}` : '+ New'}
           </button>
@@ -152,7 +152,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
               <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-3">
                 <Icon as={CheckCircle2} size="xl" className="text-emerald-400" />
               </div>
-              <p className="text-sm font-medium text-[var(--brand-text-bright)]">Thank you!</p>
+              <p className="t-body font-medium text-[var(--brand-text-bright)]">Thank you!</p>
               <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">Your feedback has been submitted.</p>
             </div>
           ) : (
@@ -180,7 +180,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
                 value={title}
                 onChange={e => setTitle(e.target.value)}
                 placeholder={type === 'bug' ? 'What went wrong?' : type === 'feature' ? 'What would you like?' : 'Quick summary'}
-                className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-lg px-3 py-2 text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors"
+                className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors"
               />
 
               {/* Description */}
@@ -189,7 +189,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
                 onChange={e => setDescription(e.target.value)}
                 placeholder={type === 'bug' ? 'Steps to reproduce, what you expected, what happened...' : type === 'feature' ? 'Describe the feature and how it would help you...' : 'Tell us what you think...'}
                 rows={4}
-                className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-lg px-3 py-2 text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors resize-none"
+                className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors resize-none"
               />
 
               {/* Auto-context badge */}
@@ -206,7 +206,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
               <button
                 onClick={handleSubmit}
                 disabled={submitting || !title.trim() || !description.trim()}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-teal-600 hover:bg-teal-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-medium transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 disabled:opacity-40 disabled:cursor-not-allowed text-white t-caption font-medium transition-colors"
               >
                 {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                 {submitting ? 'Submitting...' : 'Submit Feedback'}
@@ -239,7 +239,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
                     onClick={() => setExpandedId(isExpanded ? null : item.id)}
                     className="w-full flex items-start gap-2.5 px-3 py-2.5 text-left hover:bg-[var(--surface-3)]/60 transition-colors"
                   >
-                    <div className={`w-6 h-6 rounded-lg ${cfg.bg} flex items-center justify-center flex-shrink-0 mt-0.5`}>
+                    <div className={`w-6 h-6 rounded-[var(--radius-lg)] ${cfg.bg} flex items-center justify-center flex-shrink-0 mt-0.5`}>
                       <Icon className={`w-3 h-3 ${cfg.color}`} />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -263,7 +263,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
                       {item.replies.length > 0 && (
                         <div className="mt-3 space-y-2">
                           {item.replies.map(reply => (
-                            <div key={reply.id} className={cn('rounded-lg px-2.5 py-2', reply.author === 'team' ? 'bg-teal-500/5 border border-teal-500/10' : 'bg-[var(--surface-3)]/60 border border-[var(--brand-border)]/50')}>
+                            <div key={reply.id} className={cn('rounded-[var(--radius-lg)] px-2.5 py-2', reply.author === 'team' ? 'bg-teal-500/5 border border-teal-500/10' : 'bg-[var(--surface-3)]/60 border border-[var(--brand-border)]/50')}>
                               <div className="flex items-center gap-1.5 mb-1">
                                 <span className={cn('t-micro font-medium', reply.author === 'team' ? 'text-teal-400' : 'text-[var(--brand-text)]')}>
                                   {reply.author === 'team' ? 'Team' : 'You'}
@@ -286,10 +286,10 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
                               onChange={e => setReplyText(e.target.value)}
                               onKeyDown={e => e.key === 'Enter' && handleReply(item.id)}
                               placeholder="Add a reply..."
-                              className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-lg px-2.5 py-1.5 t-caption-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
+                              className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-2.5 py-1.5 t-caption-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
                               autoFocus
                             />
-                            <button onClick={() => handleReply(item.id)} disabled={!replyText.trim()} className="px-2 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-40 rounded-lg transition-colors">
+                            <button onClick={() => handleReply(item.id)} disabled={!replyText.trim()} className="px-2 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-40 rounded-[var(--radius-lg)] transition-colors">
                               <Send className="w-3 h-3 text-white" />
                             </button>
                             <button onClick={() => { setReplyingTo(null); setReplyText(''); }} className="px-2 py-1.5 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]">

@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import {
-  Download, FileDown, Flag, Eye, X, CheckCircle2,
+  Download, FileDown, Flag, Eye, CheckCircle2,
   Clock, FileText, PenTool,
 } from 'lucide-react';
 import { SectionCard, Badge, PageHeader } from '../ui';
 import { Icon } from '../ui/Icon';
+import { Modal } from '../ui/overlay/Modal';
 import type { ContentMatrix, MatrixCell } from '../matrix/types';
 
 interface MatrixProgressViewProps {
@@ -33,16 +34,10 @@ function CellPreviewModal({ cell, onClose, onFlag }: { cell: MatrixCell; onClose
   const title = Object.values(cell.variableValues).join(' — ');
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md">
-      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-2xl shadow-2xl max-w-md w-full mx-4 animate-[scaleIn_0.2s_ease-out]">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--brand-border)]">
-          <span className="text-sm font-semibold text-[var(--brand-text-bright)]">{title}</span>
-          <button onClick={onClose} className="p-1 rounded-[var(--radius-md)] hover:bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
-            <Icon as={X} size="md" />
-          </button>
-        </div>
-
-        <div className="px-5 py-4 space-y-3">
+    <Modal open onClose={onClose} size="sm">
+      <Modal.Header title={title} onClose={onClose} />
+      <Modal.Body>
+        <div className="space-y-3">
           <div className="flex items-center gap-2">
             <StatusIcon className={`w-4 h-4 ${cfg.color}`} />
             <Badge label={cfg.label} color={cfg.badgeColor} />
@@ -102,8 +97,8 @@ function CellPreviewModal({ cell, onClose, onFlag }: { cell: MatrixCell; onClose
             </button>
           )}
         </div>
-      </div>
-    </div>
+      </Modal.Body>
+    </Modal>
   );
 }
 

@@ -355,8 +355,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   if (error || !ws) return (
     <div className="min-h-screen bg-[var(--surface-1)] flex items-center justify-center">
       <div className="text-center">
-        <p className="text-red-400/80 text-sm mb-3">{error || 'Dashboard not found'}</p>
-        <button onClick={() => window.location.reload()} className="text-xs text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] px-3 py-1.5 rounded-lg border border-[var(--brand-border)] hover:border-[var(--brand-border-strong)] transition-colors">Try Again</button>
+        <p className="text-red-400/80 t-body mb-3">{error || 'Dashboard not found'}</p>
+        <button onClick={() => window.location.reload()} className="t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] px-3 py-1.5 rounded-[var(--radius-lg)] border border-[var(--brand-border)] hover:border-[var(--brand-border-strong)] transition-colors">Try Again</button>
       </div>
     </div>
   );
@@ -492,18 +492,18 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
         {/* Trial countdown banner — shows at day 10 and under */}
         {!betaMode && !isExternalBilling && ws.isTrial && (ws.trialDaysRemaining ?? 0) <= 10 && (ws.trialDaysRemaining ?? 0) > 0 && (
-          <div className="flex items-center gap-3 px-4 py-3 bg-amber-500/8 border border-amber-500/20" style={{ borderRadius: '6px 12px 6px 12px' }}>
+          <div className="flex items-center gap-3 px-4 py-3 bg-amber-500/8 border border-amber-500/20" style={{ borderRadius: 'var(--radius-signature)' }}>
             <Icon as={Clock} size="md" className="text-amber-400/80 flex-shrink-0" />
-            <p className="text-sm text-amber-300">
+            <p className="t-body text-amber-300">
               <strong>{ws.trialDaysRemaining} day{ws.trialDaysRemaining === 1 ? '' : 's'}</strong> left on your Growth trial.
               {' '}Upgrade to keep access to all features.
             </p>
           </div>
         )}
         {!betaMode && !isExternalBilling && ws.isTrial && (ws.trialDaysRemaining ?? 0) === 0 && (
-          <div className="flex items-center gap-3 px-4 py-3 bg-red-500/8 border border-red-500/20" style={{ borderRadius: '6px 12px 6px 12px' }}>
+          <div className="flex items-center gap-3 px-4 py-3 bg-red-500/8 border border-red-500/20" style={{ borderRadius: 'var(--radius-signature)' }}>
             <Icon as={Clock} size="md" className="text-red-400/80 flex-shrink-0" />
-            <p className="text-sm text-red-300">
+            <p className="t-body text-red-300">
               Your Growth trial has ended. Some features are now limited.
               {' '}Upgrade to restore full access.
             </p>
@@ -512,9 +512,9 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
         {/* Section loading errors */}
         {Object.keys(sectionErrors).length > 0 && (
-          <div className="flex items-start gap-3 px-4 py-3 bg-red-500/8 border border-red-500/15" style={{ borderRadius: '6px 12px 6px 12px' }}>
+          <div className="flex items-start gap-3 px-4 py-3 bg-red-500/8 border border-red-500/15" style={{ borderRadius: 'var(--radius-signature)' }}>
             <Icon as={AlertTriangle} size="md" className="text-red-400/80 flex-shrink-0 mt-0.5" />
-            <div className="text-sm text-red-300 space-y-0.5">
+            <div className="t-body text-red-300 space-y-0.5">
               {Object.values(sectionErrors).map((msg, i) => <p key={i}>{msg} — try refreshing the page.</p>)}
             </div>
           </div>
@@ -698,7 +698,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       {toast && (
         <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] px-5 py-3 rounded-[var(--radius-xl)] border shadow-lg backdrop-blur-sm flex items-center gap-2.5 animate-[slideUp_0.3s_ease] ${toast.type === 'success' ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' : 'bg-red-500/15 border-red-500/30 text-red-300'}`}>
           {toast.type === 'success' ? <Icon as={CheckCircle2} size="md" className="flex-shrink-0" /> : <Icon as={AlertTriangle} size="md" className="flex-shrink-0" />}
-          <span className="text-xs font-medium">{toast.message}</span>
+          <span className="t-caption font-medium">{toast.message}</span>
           <button onClick={clearToast} className="ml-2 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"><Icon as={X} size="md" /></button>
         </div>
       )}

@@ -81,14 +81,14 @@ export function SearchTab({
     {/* Header with takeaway */}
     <div className="mb-2">
       <h2 className="text-xl font-semibold text-[var(--brand-text)]">Search Performance</h2>
-      <p className="text-sm text-[var(--brand-text-muted)] mt-1">{overview.dateRange.start} — {overview.dateRange.end}</p>
+      <p className="t-body text-[var(--brand-text-muted)] mt-1">{overview.dateRange.start} — {overview.dateRange.end}</p>
     </div>
 
     {/* AI-style takeaway */}
     {/* pr-check-disable-next-line -- AI takeaway summary bar; compact bar with no section header */}
-    <div className="bg-zinc-900/60 border border-[var(--brand-border)] rounded-[var(--radius-xl)] px-5 py-3.5 flex items-start gap-3">
+    <div className="bg-[var(--surface-2)]/60 border border-[var(--brand-border)] rounded-[var(--radius-xl)] px-5 py-3.5 flex items-start gap-3">
       <Icon as={Sparkles} size="md" className="text-teal-400 mt-0.5 shrink-0" />
-      <p className="text-xs text-[var(--brand-text)] leading-relaxed">{buildTakeaway(overview, searchComparison, insights)}</p>
+      <p className="t-caption text-[var(--brand-text)] leading-relaxed">{buildTakeaway(overview, searchComparison, insights)}</p>
     </div>
 
     {/* Compact metrics bar */}
@@ -155,10 +155,10 @@ export function SearchTab({
       <SectionCard title="Timeline Annotations" titleIcon={<Icon as={Activity} size="md" className="text-[var(--brand-text-muted)]" />} titleExtra={<span className="t-caption-sm px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{annotations.length}</span>}>
         <div className="space-y-1.5">
           {annotations.map(ann => (
-            <div key={ann.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-zinc-950/50">
+            <div key={ann.id} className="flex items-center gap-2 px-2 py-1.5 rounded-[var(--radius-lg)] bg-[var(--surface-1)]/50">
               <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: ann.color || '#2dd4bf' }} />
               <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">{ann.date}</span>
-              <span className="text-xs text-[var(--brand-text)] flex-1 truncate">{ann.label}</span>
+              <span className="t-caption text-[var(--brand-text)] flex-1 truncate">{ann.label}</span>
               {ann.description && <span className="t-caption-sm text-[var(--brand-text-muted)] truncate max-w-[120px]">{ann.description}</span>}
             </div>
           ))}
@@ -171,11 +171,11 @@ export function SearchTab({
     <div className="bg-[var(--surface-2)] rounded-[var(--radius-xl)] border border-[var(--brand-border)] overflow-hidden">
       <button
         onClick={() => setShowRawData(!showRawData)}
-        className="w-full px-5 py-3.5 flex items-center gap-2 hover:bg-zinc-800/30 transition-colors text-left"
+        className="w-full px-5 py-3.5 flex items-center gap-2 hover:bg-[var(--surface-3)]/30 transition-colors text-left"
       >
         {showRawData ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)]" />}
         <Icon as={Table2} size="md" className="text-[var(--brand-text-muted)]" />
-        <span className="text-sm font-medium text-[var(--brand-text)]">Raw Data</span>
+        <span className="t-body font-medium text-[var(--brand-text)]">Raw Data</span>
         <span className="t-caption-sm text-[var(--brand-text-muted)] ml-1">{overview.topQueries.length} queries, {overview.topPages.length} pages</span>
       </button>
       {showRawData && (
@@ -183,11 +183,11 @@ export function SearchTab({
           <div className="flex items-center gap-1 px-4 pb-1 border-t border-[var(--brand-border)]">
             {(['queries', 'pages'] as const).map(st => (
               <button key={st} onClick={() => setSearchSubTab(st)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${searchSubTab === st ? 'bg-zinc-700 text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}
+                className={`px-3 py-1.5 rounded-md t-caption font-medium transition-colors ${searchSubTab === st ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}
               >{st === 'queries' ? 'Queries' : 'Pages'}</button>
             ))}
           </div>
-          <table className="w-full text-xs">
+          <table className="w-full t-caption">
             <thead><tr className="border-b border-[var(--brand-border)]">
               <th className="text-left py-3 px-4 text-[var(--brand-text-muted)] font-medium">{searchSubTab === 'queries' ? 'Query' : 'Page'}</th>
               {(['clicks', 'impressions', 'ctr', 'position'] as SortKey[]).map(key => (
@@ -202,7 +202,7 @@ export function SearchTab({
             </tr></thead>
             <tbody>
               {searchSubTab === 'queries' && sortedQueries().map((q, i) => (
-                <tr key={i} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                <tr key={i} className="border-b border-[var(--brand-border)]/50 hover:bg-[var(--surface-3)]/30">
                   <td className="py-2.5 px-4 text-[var(--brand-text)] font-medium">{q.query}</td>
                   <td className="py-2.5 px-3 text-right text-blue-400 font-semibold">{q.clicks}</td>
                   <td className="py-2.5 px-3 text-right text-[var(--brand-text-muted)]">{q.impressions.toLocaleString()}</td>
@@ -214,7 +214,7 @@ export function SearchTab({
                 let pagePath: string;
                 try { pagePath = new URL(p.page).pathname; } catch { pagePath = p.page; }
                 return (
-                  <tr key={i} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                  <tr key={i} className="border-b border-[var(--brand-border)]/50 hover:bg-[var(--surface-3)]/30">
                     <td className="py-2.5 px-4 text-[var(--brand-text)] font-medium max-w-xs truncate">{pagePath}</td>
                     <td className="py-2.5 px-3 text-right text-blue-400 font-semibold">{p.clicks}</td>
                     <td className="py-2.5 px-3 text-right text-[var(--brand-text-muted)]">{p.impressions.toLocaleString()}</td>

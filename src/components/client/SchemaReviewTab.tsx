@@ -41,17 +41,17 @@ const ROLE_COLORS: Partial<Record<SchemaPageRole, string>> = {
   audience: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
   'lead-gen': 'bg-orange-500/15 text-orange-300 border-orange-500/30',
   blog: 'bg-lime-500/15 text-lime-300 border-lime-500/30',
-  about: 'bg-zinc-500/15 text-[var(--brand-text)] border-zinc-500/30',
-  contact: 'bg-zinc-500/15 text-[var(--brand-text)] border-zinc-500/30',
+  about: 'bg-[var(--surface-3)]/15 text-[var(--brand-text)] border-[var(--brand-border)]/30',
+  contact: 'bg-[var(--surface-3)]/15 text-[var(--brand-text)] border-[var(--brand-border)]/30',
   location: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
   product: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
   partnership: 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30',
   faq: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
   'case-study': 'bg-blue-500/15 text-blue-300 border-blue-500/30',
   comparison: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-  generic: 'bg-zinc-500/10 text-[var(--brand-text-muted)] border-zinc-600/30',
+  generic: 'bg-[var(--surface-3)]/10 text-[var(--brand-text-muted)] border-[var(--brand-border-strong)]/30',
 };
-const DEFAULT_ROLE_COLOR = 'bg-zinc-500/10 text-[var(--brand-text-muted)] border-zinc-600/30';
+const DEFAULT_ROLE_COLOR = 'bg-[var(--surface-3)]/10 text-[var(--brand-text-muted)] border-[var(--brand-border-strong)]/30';
 
 export function SchemaReviewTab({ workspaceId, setToast }: Props) {
   const [plan, setPlan] = useState<SchemaSitePlan | null>(null);
@@ -156,17 +156,17 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
         <Icon as={Shield} size="lg" className="text-teal-400" />
         <div>
           <h2 className="text-xl font-semibold text-[var(--brand-text)]">Schema Strategy Review</h2>
-          <p className="text-sm text-[var(--brand-text-muted)] mt-1">
+          <p className="t-body text-[var(--brand-text-muted)] mt-1">
             Review the structured data plan for your website. This determines how your pages appear in Google search results.
           </p>
         </div>
       </div>
 
       {/* What is schema — education blurb */}
-      <div className="bg-zinc-900/50 border border-[var(--brand-border)] px-5 py-4" style={{ borderRadius: '6px 12px 6px 12px' }}>
+      <div className="bg-[var(--surface-2)]/50 border border-[var(--brand-border)] px-5 py-4" style={{ borderRadius: 'var(--radius-signature)' }}>
         <div className="flex items-start gap-3">
           <Icon as={Sparkles} size="md" className="text-teal-400 mt-0.5 shrink-0" />
-          <div className="text-xs text-[var(--brand-text-muted)] leading-relaxed">
+          <div className="t-caption text-[var(--brand-text-muted)] leading-relaxed">
             <strong className="text-[var(--brand-text)]">What is structured data?</strong> It's code added to your website that helps Google understand your content better.
             This can lead to enhanced search results (rich snippets) — like star ratings, FAQ dropdowns, product info,
             and company details appearing directly in Google. Each page type gets different markup to maximize your search visibility.
@@ -176,11 +176,11 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
 
       {/* Plan status + actions */}
       {plan && (
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: '6px 12px 6px 12px' }}>
+        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature)' }}>
           <div className="px-5 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Icon as={Globe} size="md" className="text-teal-400" />
-              <span className="text-sm font-medium text-[var(--brand-text)]">Your Schema Plan</span>
+              <span className="t-body font-medium text-[var(--brand-text)]">Your Schema Plan</span>
               {statusBadge(plan.status)}
             </div>
             <span className="t-caption-sm text-[var(--brand-text-muted)]">
@@ -189,7 +189,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
           </div>
 
           {/* Summary stats */}
-          <div className="px-5 py-3 border-t border-[var(--brand-border)] bg-zinc-900/50">
+          <div className="px-5 py-3 border-t border-[var(--brand-border)] bg-[var(--surface-2)]/50">
             <div className="flex flex-wrap gap-2">
               {Object.entries(roleGroups)
                 .sort((a, b) => b[1].length - a[1].length)
@@ -205,7 +205,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
           </div>
 
           {/* Page roles grouped by type */}
-          <div className="divide-y divide-zinc-800/50">
+          <div className="divide-y divide-[var(--brand-border)]/50">
             {Object.entries(roleGroups)
               .sort((a, b) => b[1].length - a[1].length)
               .map(([role, pages]) => {
@@ -215,7 +215,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
                   <div key={role}>
                     <button
                       onClick={() => toggleRole(role)}
-                      className="w-full px-5 py-3 flex items-center gap-3 hover:bg-zinc-800/30 transition-colors text-left"
+                      className="w-full px-5 py-3 flex items-center gap-3 hover:bg-[var(--surface-3)]/30 transition-colors text-left"
                     >
                       {isExpanded
                         ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] shrink-0" />
@@ -223,15 +223,15 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
                       <span className={`inline-flex items-center px-2 py-0.5 rounded t-caption-sm font-medium border ${ROLE_COLORS[role as SchemaPageRole] ?? DEFAULT_ROLE_COLOR}`}>
                         {SCHEMA_ROLE_LABELS[role as SchemaPageRole] || role}
                       </span>
-                      <span className="text-xs text-[var(--brand-text-muted)] flex-1 min-w-0 truncate">{desc}</span>
+                      <span className="t-caption text-[var(--brand-text-muted)] flex-1 min-w-0 truncate">{desc}</span>
                       <span className="t-caption-sm text-[var(--brand-text-muted)] shrink-0">{pages.length} page{pages.length !== 1 ? 's' : ''}</span>
                     </button>
                     {isExpanded && (
                       <div className="px-5 pb-3 pl-12 space-y-1">
                         {pages.map(pr => (
-                          <div key={pr.pagePath} className="flex items-center gap-3 py-1.5 px-3 rounded-lg bg-zinc-800/30">
+                          <div key={pr.pagePath} className="flex items-center gap-3 py-1.5 px-3 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/30">
                             <div className="flex-1 min-w-0">
-                              <div className="text-xs text-[var(--brand-text)] truncate">{pr.pageTitle}</div>
+                              <div className="t-caption text-[var(--brand-text)] truncate">{pr.pageTitle}</div>
                               <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{pr.pagePath}</div>
                             </div>
                             <span className="t-caption-sm text-[var(--brand-text-muted)] font-mono shrink-0">{pr.primaryType}</span>
@@ -250,7 +250,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
               <div className="t-caption-sm text-[var(--brand-text-muted)] font-medium mb-2">Site Entities</div>
               <div className="flex flex-wrap gap-2">
                 {plan.canonicalEntities.map((entity, i) => (
-                  <span key={i} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg t-caption-sm bg-zinc-800/50 border border-[var(--brand-border-strong)]">
+                  <span key={i} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[var(--radius-lg)] t-caption-sm bg-[var(--surface-3)]/50 border border-[var(--brand-border-strong)]">
                     <span className="text-teal-400 font-mono t-caption-sm">{entity.type}</span>
                     <span className="text-[var(--brand-text)]">{entity.name}</span>
                   </span>
@@ -261,7 +261,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
 
           {/* Approve / Request Changes */}
           {(plan.status === 'sent_to_client' || plan.status === 'draft') && (
-            <div className="px-5 py-4 border-t border-[var(--brand-border)] bg-zinc-900/50">
+            <div className="px-5 py-4 border-t border-[var(--brand-border)] bg-[var(--surface-2)]/50">
               {showFeedback ? (
                 <div className="space-y-3">
                   <textarea
@@ -269,20 +269,20 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
                     onChange={e => setFeedbackNote(e.target.value)}
                     placeholder="What changes would you like? (optional)"
                     rows={3}
-                    className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-lg text-xs text-[var(--brand-text)] placeholder-zinc-500 focus:outline-none focus:border-teal-500 resize-none"
+                    className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500 resize-none"
                   />
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleFeedback('request_changes')}
                       disabled={submitting}
-                      className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 transition-colors disabled:opacity-50"
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-lg)] t-caption font-medium bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 transition-colors disabled:opacity-50"
                     >
                       {submitting ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={MessageSquare} size="sm" />}
                       Send Feedback
                     </button>
                     <button
                       onClick={() => { setShowFeedback(false); setFeedbackNote(''); }}
-                      className="px-3 py-2 rounded-lg text-xs text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)] transition-colors"
+                      className="px-3 py-2 rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)] transition-colors"
                     >
                       Cancel
                     </button>
@@ -293,14 +293,14 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
                   <button
                     onClick={() => handleFeedback('approve')}
                     disabled={submitting}
-                    className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-sm font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-5 py-2.5 rounded-[var(--radius-lg)] t-body font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-colors disabled:opacity-50"
                   >
                     {submitting ? <Icon as={Loader2} size="md" className="animate-spin" /> : <Icon as={CheckCircle} size="md" />}
                     Approve Strategy
                   </button>
                   <button
                     onClick={() => setShowFeedback(true)}
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-medium bg-[var(--surface-3)] hover:bg-zinc-700 text-[var(--brand-text)] border border-[var(--brand-border-strong)] transition-colors"
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-[var(--radius-lg)] t-body font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text)] border border-[var(--brand-border-strong)] transition-colors"
                   >
                     <Icon as={MessageSquare} size="md" /> Request Changes
                   </button>
@@ -311,23 +311,23 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
 
           {/* Already approved / active */}
           {plan.status === 'client_approved' && (
-            <div className="px-5 py-3 border-t border-[var(--brand-border)] flex items-center gap-2 text-xs text-emerald-400">
+            <div className="px-5 py-3 border-t border-[var(--brand-border)] flex items-center gap-2 t-caption text-emerald-400">
               <Icon as={CheckCircle} size="md" /> You approved this strategy. Your agency is implementing it.
             </div>
           )}
           {plan.status === 'active' && (
-            <div className="px-5 py-3 border-t border-[var(--brand-border)] flex items-center gap-2 text-xs text-emerald-400">
+            <div className="px-5 py-3 border-t border-[var(--brand-border)] flex items-center gap-2 t-caption text-emerald-400">
               <Icon as={CheckCircle} size="md" /> This schema strategy is live on your website.
             </div>
           )}
           {plan.status === 'client_changes_requested' && (
-            <div className="px-5 py-3 border-t border-[var(--brand-border)] flex items-center gap-2 text-xs text-amber-400">
+            <div className="px-5 py-3 border-t border-[var(--brand-border)] flex items-center gap-2 t-caption text-amber-400">
               <Icon as={MessageSquare} size="md" /> Your feedback has been sent. Your agency is reviewing your notes.
             </div>
           )}
 
           {/* Metadata */}
-          <div className="px-5 py-2 border-t border-zinc-800/50 t-caption-sm text-[var(--brand-text-faint)] flex items-center gap-3">
+          <div className="px-5 py-2 border-t border-[var(--brand-border)]/50 t-caption-sm text-[var(--brand-text-faint)] flex items-center gap-3">
             <span>Created {new Date(plan.generatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
             {plan.updatedAt !== plan.generatedAt && (
               <span>Updated {new Date(plan.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
@@ -338,21 +338,21 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
 
       {/* Schema snapshot summary (if no plan but snapshot exists) */}
       {!plan && snapshot && (
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: '6px 12px 6px 12px' }}>
+        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature)' }}>
           <div className="px-5 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Icon as={Globe} size="md" className="text-teal-400" />
-              <span className="text-sm font-medium text-[var(--brand-text)]">Schema Analysis</span>
+              <span className="t-body font-medium text-[var(--brand-text)]">Schema Analysis</span>
             </div>
             <span className="t-caption-sm text-[var(--brand-text-muted)]">
               {snapshot.pageCount} pages analyzed · {new Date(snapshot.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </span>
           </div>
-          <div className="divide-y divide-zinc-800/50">
+          <div className="divide-y divide-[var(--brand-border)]/50">
             {snapshot.pages.map(page => (
               <div key={page.pageId} className="px-5 py-3 flex items-center gap-3">
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs text-[var(--brand-text)] truncate">{page.pageTitle}</div>
+                  <div className="t-caption text-[var(--brand-text)] truncate">{page.pageTitle}</div>
                   <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">/{page.slug}</div>
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap justify-end">

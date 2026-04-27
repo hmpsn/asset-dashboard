@@ -71,7 +71,7 @@ export function PricingConfirmationModal({
               {/* Close button */}
               <button
                 onClick={() => !pricingConfirming && setPricingModal(null)}
-                className="absolute top-3 right-3 w-7 h-7 rounded-lg flex items-center justify-center bg-[var(--surface-3)]/80 hover:bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors z-10"
+                className="absolute top-3 right-3 w-7 h-7 rounded-[var(--radius-lg)] flex items-center justify-center bg-[var(--surface-3)]/80 hover:bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors z-10"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -83,11 +83,11 @@ export function PricingConfirmationModal({
 
                 <div className="relative flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-xl flex items-center justify-center ring-1 bg-gradient-to-br from-teal-500/25 to-emerald-500/25 ring-teal-500/20">
+                    <div className="w-11 h-11 rounded-[var(--radius-xl)] flex items-center justify-center ring-1 bg-gradient-to-br from-teal-500/25 to-emerald-500/25 ring-teal-500/20">
                       {isFull ? <Sparkles className="w-5 h-5 text-teal-400" /> : <FileText className="w-5 h-5 text-teal-400" />}
                     </div>
                     <div>
-                      <div className="text-sm font-semibold text-[var(--brand-text-bright)]">
+                      <div className="t-body font-semibold text-[var(--brand-text-bright)]">
                         {isUpgrade ? 'Upgrade to Full Blog Post' : isFull ? (pricing?.fullPostLabel || 'Full Blog Post') : (pricing?.briefLabel || 'Content Brief')}
                       </div>
                       <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
@@ -103,19 +103,19 @@ export function PricingConfirmationModal({
                     <Target className="w-3 h-3 text-teal-400/70" />
                     <span className="t-micro text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Topic</span>
                   </div>
-                  <div className="text-xs text-[var(--brand-text-bright)] font-medium leading-relaxed">{pricingModal.topic}</div>
+                  <div className="t-caption text-[var(--brand-text-bright)] font-medium leading-relaxed">{pricingModal.topic}</div>
                   <div className="t-caption-sm mt-1 text-teal-400/80">Keyword: &ldquo;{pricingModal.targetKeyword}&rdquo;</div>
                 </div>
               </div>
 
               {/* Price banner */}
               {displayPrice != null && (
-                <div className="mx-6 flex items-center justify-between px-4 py-3 border bg-teal-500/5 border-teal-500/15" style={{ borderRadius: '6px 12px 6px 12px' }}>
+                <div className="mx-6 flex items-center justify-between px-4 py-3 border bg-teal-500/5 border-teal-500/15" style={{ borderRadius: 'var(--radius-signature)' }}>
                   <div>
                     <div className="text-2xl font-bold tracking-tight text-teal-300">{fmt(displayPrice)}</div>
                     <div className="t-micro text-[var(--brand-text-muted)] mt-0.5">{isUpgrade ? 'Upgrade difference' : 'One-time payment'}</div>
                   </div>
-                  <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-teal-500/10">
+                  <div className="w-9 h-9 rounded-[var(--radius-lg)] flex items-center justify-center bg-teal-500/10">
                     <Shield className="w-4 h-4 text-teal-400/60" />
                   </div>
                 </div>
@@ -134,7 +134,7 @@ export function PricingConfirmationModal({
                 <button
                   disabled={pricingConfirming}
                   onClick={confirmPricingAndSubmit}
-                  className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 shadow-lg active:scale-[0.98] bg-gradient-to-r from-teal-600 to-emerald-600 text-white hover:from-teal-500 hover:to-emerald-500 shadow-teal-900/40"
+                  className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-[var(--radius-xl)] t-body font-semibold transition-all disabled:opacity-50 shadow-lg active:scale-[0.98] bg-gradient-to-r from-teal-600 to-emerald-600 text-white hover:from-teal-500 hover:to-emerald-500 shadow-teal-900/40"
                 >
                   {pricingConfirming ? (
                     <>
@@ -156,7 +156,7 @@ export function PricingConfirmationModal({
                 <button
                   disabled={pricingConfirming}
                   onClick={() => setPricingModal(null)}
-                  className="w-full px-4 py-2 rounded-xl text-xs text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]/50 transition-all"
+                  className="w-full px-4 py-2 rounded-[var(--radius-xl)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]/50 transition-all"
                 >
                   Cancel
                 </button>

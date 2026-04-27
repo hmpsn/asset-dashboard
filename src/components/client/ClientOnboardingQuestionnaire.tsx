@@ -138,14 +138,14 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
     onComplete({ business, audience, brand, competitors });
   };
 
-  const inputCls = 'w-full bg-[var(--surface-3)]/60 border border-[var(--brand-border)]/50 rounded-[var(--radius-xl)] px-3.5 py-2.5 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/20 transition-all';
+  const inputCls = 'w-full bg-[var(--surface-3)]/60 border border-[var(--brand-border)]/50 rounded-[var(--radius-xl)] px-3.5 py-2.5 t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/20 transition-all';
   const textareaCls = `${inputCls} resize-none`;
-  const labelCls = 'block text-xs font-medium text-[var(--brand-text)] mb-1.5';
+  const labelCls = 'block t-caption font-medium text-[var(--brand-text)] mb-1.5';
   const hintCls = 't-caption-sm text-[var(--brand-text-muted)] mt-1';
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
-      <div className="bg-[var(--surface-2)] rounded-2xl border border-[var(--brand-border)] shadow-2xl max-w-xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-[var(--surface-2)] rounded-[var(--radius-xl)] border border-[var(--brand-border)] shadow-2xl max-w-xl w-full max-h-[90vh] overflow-hidden flex flex-col">
 
         {/* Progress bar */}
         {step !== 'intro' && (
@@ -170,11 +170,11 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
           {/* ── Intro ── */}
           {step === 'intro' && (
             <div className="text-center py-6">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-teal-500/20 to-emerald-500/20 ring-1 ring-teal-500/20 flex items-center justify-center mx-auto mb-5">
+              <div className="w-16 h-16 rounded-[var(--radius-xl)] bg-gradient-to-br from-teal-500/20 to-emerald-500/20 ring-1 ring-teal-500/20 flex items-center justify-center mx-auto mb-5">
                 <Icon as={Sparkles} size="2xl" className="text-teal-400" />
               </div>
               <h2 className="text-xl font-bold text-[var(--brand-text-bright)] mb-2">Help us create better content for you</h2>
-              <p className="text-sm text-[var(--brand-text)] leading-relaxed max-w-md mx-auto mb-6">
+              <p className="t-body text-[var(--brand-text)] leading-relaxed max-w-md mx-auto mb-6">
                 Answer a few quick questions about your business, audience, and brand voice.
                 This helps {STUDIO_NAME} generate content that sounds like <em>you</em> and resonates with <em>your</em> customers.
               </p>
@@ -289,7 +289,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
                 <div className="grid grid-cols-2 gap-3 mt-1">
                   {BUYING_STAGE_OPTIONS.map(opt => (
                     <button key={opt.value} onClick={() => setAudience({ ...audience, buyingStage: opt.value })}
-                      className={cn('text-left px-3 py-2.5 rounded-xl border transition-all', audience.buyingStage === opt.value ? 'bg-teal-500/10 border-teal-500/30 ring-1 ring-teal-500/20' : 'bg-[var(--surface-3)]/40 border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]')}>
+                      className={cn('text-left px-3 py-2.5 rounded-[var(--radius-xl)] border transition-all', audience.buyingStage === opt.value ? 'bg-teal-500/10 border-teal-500/30 ring-1 ring-teal-500/20' : 'bg-[var(--surface-3)]/40 border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]')}>
                       <div className={cn('t-caption-sm font-semibold', audience.buyingStage === opt.value ? 'text-teal-300' : 'text-[var(--brand-text)]')}>{opt.label}</div>
                       <div className="t-caption-sm text-[var(--brand-text-muted)]">{opt.desc}</div>
                     </button>
@@ -319,7 +319,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
                 <div className="flex flex-wrap gap-2 mt-1">
                   {PERSONALITY_OPTIONS.map(p => (
                     <button key={p} onClick={() => togglePersonality(p)}
-                      className={cn('px-3 py-1.5 rounded-lg border t-caption-sm font-medium transition-all', brand.personality.includes(p) ? 'bg-teal-500/15 border-teal-500/30 text-teal-300' : 'bg-[var(--surface-3)]/40 border-[var(--brand-border)] text-[var(--brand-text)] hover:border-[var(--brand-border-hover)] hover:text-[var(--brand-text-bright)]')}>
+                      className={cn('px-3 py-1.5 rounded-[var(--radius-lg)] border t-caption-sm font-medium transition-all', brand.personality.includes(p) ? 'bg-teal-500/15 border-teal-500/30 text-teal-300' : 'bg-[var(--surface-3)]/40 border-[var(--brand-border)] text-[var(--brand-text)] hover:border-[var(--brand-border-hover)] hover:text-[var(--brand-text-bright)]')}>
                       {brand.personality.includes(p) && <Check className="w-3 h-3 inline mr-1" />}{p}
                     </button>
                   ))}
@@ -344,7 +344,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
                 <div className="flex flex-wrap gap-2 mt-1">
                   {CONTENT_FORMAT_OPTIONS.map(f => (
                     <button key={f} onClick={() => toggleFormat(f)}
-                      className={cn('px-3 py-1.5 rounded-lg border t-caption-sm font-medium transition-all', brand.contentFormats.includes(f) ? 'bg-teal-500/15 border-teal-500/30 text-teal-300' : 'bg-[var(--surface-3)]/40 border-[var(--brand-border)] text-[var(--brand-text)] hover:border-[var(--brand-border-hover)] hover:text-[var(--brand-text-bright)]')}>
+                      className={cn('px-3 py-1.5 rounded-[var(--radius-lg)] border t-caption-sm font-medium transition-all', brand.contentFormats.includes(f) ? 'bg-teal-500/15 border-teal-500/30 text-teal-300' : 'bg-[var(--surface-3)]/40 border-[var(--brand-border)] text-[var(--brand-text)] hover:border-[var(--brand-border-hover)] hover:text-[var(--brand-text-bright)]')}>
                       {brand.contentFormats.includes(f) && <Check className="w-3 h-3 inline mr-1" />}{f}
                     </button>
                   ))}
@@ -399,7 +399,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
           {step === 'review' && (
             <div className="space-y-4">
               <div className="text-center mb-4">
-                <div className="w-12 h-12 rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/20 flex items-center justify-center mx-auto mb-3">
+                <div className="w-12 h-12 rounded-[var(--radius-xl)] bg-emerald-500/10 ring-1 ring-emerald-500/20 flex items-center justify-center mx-auto mb-3">
                   <Check className="w-6 h-6 text-emerald-400" />
                 </div>
                 <h3 className="text-base font-semibold text-[var(--brand-text-bright)]">Ready to submit</h3>
@@ -455,7 +455,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
             </>
           ) : step === 'review' ? (
             <>
-              <button onClick={prev} className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-xl)] bg-[var(--surface-3)] border border-[var(--brand-border)] text-xs text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)] transition-colors">
+              <button onClick={prev} className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-xl)] bg-[var(--surface-3)] border border-[var(--brand-border)] t-caption text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)] transition-colors">
                 <ChevronLeft className="w-3.5 h-3.5" /> Back
               </button>
               <Button variant="primary" onClick={handleSubmit} disabled={saving} loading={saving} className="flex items-center gap-2 px-5 py-2.5">
@@ -465,7 +465,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
             </>
           ) : (
             <>
-              <button onClick={prev} className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-xl)] bg-[var(--surface-3)] border border-[var(--brand-border)] text-xs text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)] transition-colors">
+              <button onClick={prev} className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-xl)] bg-[var(--surface-3)] border border-[var(--brand-border)] t-caption text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)] transition-colors">
                 <ChevronLeft className="w-3.5 h-3.5" /> Back
               </button>
               <Button variant="primary" onClick={next} className="flex items-center gap-1.5 px-5 py-2.5">
@@ -489,7 +489,7 @@ function SummaryCard({ icon: Icon, title, filled, onClick, children }: {
       <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-2">
           <Icon className={cn('w-3.5 h-3.5', filled ? 'text-teal-400' : 'text-[var(--brand-border)]')} />
-          <span className="text-xs font-medium text-[var(--brand-text-bright)]">{title}</span>
+          <span className="t-caption font-medium text-[var(--brand-text-bright)]">{title}</span>
           {filled && <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />}
         </div>
         <span className="t-caption-sm text-[var(--brand-text-muted)] group-hover:text-[var(--brand-text)] transition-colors">Edit →</span>

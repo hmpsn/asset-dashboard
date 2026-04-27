@@ -65,9 +65,9 @@ export function ServiceInterestCTA({ type, workspaceId, onAction, bookingUrl }: 
   // Confirmed — permanent state, mutation.reset() is never called here
   if (mutation.isSuccess) {
     return (
-      <div className="mt-3 flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-teal-500/10 border border-teal-500/20">
+      <div className="mt-3 flex items-center gap-2 px-3.5 py-2.5 rounded-[var(--radius-xl)] bg-teal-500/10 border border-teal-500/20">
         <CheckCircle className="w-4 h-4 text-teal-400 flex-shrink-0" />
-        <span className="text-xs text-teal-300">
+        <span className="t-caption text-teal-300">
           {hasBooking ? "Booked! We'll see you soon." : "Got it — we'll be in touch soon."}
         </span>
       </div>
@@ -77,14 +77,14 @@ export function ServiceInterestCTA({ type, workspaceId, onAction, bookingUrl }: 
   // Rate limited — show retry button so user can actually try again
   if (isRateLimited) {
     return (
-      <div className="mt-3 flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
+      <div className="mt-3 flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-[var(--radius-xl)] bg-amber-500/10 border border-amber-500/20">
         <div className="flex items-center gap-2">
           <Clock className="w-4 h-4 text-amber-400 flex-shrink-0" />
-          <span className="text-xs text-amber-300">Please try again in a moment.</span>
+          <span className="t-caption text-amber-300">Please try again in a moment.</span>
         </div>
         <button
           onClick={() => mutation.reset()}
-          className="flex items-center gap-1 text-[10px] text-amber-400 hover:text-amber-300 transition-colors"
+          className="flex items-center gap-1 text-[10px] /* arbitrary-text-ok */ text-amber-400 hover:text-amber-300 transition-colors"
           aria-label="Retry"
         >
           <RefreshCw className="w-3 h-3" />
@@ -97,8 +97,8 @@ export function ServiceInterestCTA({ type, workspaceId, onAction, bookingUrl }: 
   // Network/server error — retry button resets mutation to idle
   if (mutation.isError) {
     return (
-      <div className="mt-3 flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-[var(--surface-3)]/50 border border-[var(--brand-border)]/50">
-        <span className="text-xs text-[var(--brand-text)]">Something went wrong.</span>
+      <div className="mt-3 flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-[var(--radius-xl)] bg-[var(--surface-3)]/50 border border-[var(--brand-border)]/50">
+        <span className="t-caption text-[var(--brand-text)]">Something went wrong.</span>
         <button
           onClick={() => mutation.reset()}
           className="flex items-center gap-1 t-micro text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
@@ -116,12 +116,12 @@ export function ServiceInterestCTA({ type, workspaceId, onAction, bookingUrl }: 
       <button
         onClick={handleClick}
         disabled={mutation.isPending}
-        className="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-teal-600/10 hover:bg-teal-600/20 border border-teal-500/20 hover:border-teal-500/40 transition-all disabled:opacity-60 group"
+        className="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-[var(--radius-xl)] bg-teal-600/10 hover:bg-teal-600/20 border border-teal-500/20 hover:border-teal-500/40 transition-all disabled:opacity-60 group"
         aria-label={label}
       >
         <div className="text-left">
-          <div className="text-xs font-medium text-teal-300">{label}</div>
-          <div className="text-[10px] text-teal-400/60 mt-0.5">{subtext}</div>
+          <div className="t-caption font-medium text-teal-300">{label}</div>
+          <div className="text-[10px] /* arbitrary-text-ok */ text-teal-400/60 mt-0.5">{subtext}</div>
         </div>
         {mutation.isPending ? (
           <Loader2 className="w-3.5 h-3.5 text-teal-400 animate-spin flex-shrink-0" />
