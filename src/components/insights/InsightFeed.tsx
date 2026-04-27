@@ -95,7 +95,7 @@ export function InsightFeed({ feed, summary, loading, domain, limit, showPills, 
       )}
       {expanded && limit && totalFiltered > limit && (
         <div className="text-center pt-1">
-          <button onClick={() => setExpanded(false)} className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">
+          <button onClick={() => setExpanded(false)} className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
             Show less
           </button>
         </div>
