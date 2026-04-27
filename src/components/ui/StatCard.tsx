@@ -44,7 +44,7 @@ export function StatCard({
     >
       <div className="flex items-center gap-1.5 mb-2">
         {Icon && <Icon className="w-3.5 h-3.5 flex-shrink-0" style={iconColor ? { color: iconColor } : undefined} />}
-        <span className="inline-flex items-center gap-0.5 t-label text-[var(--brand-text-muted)] leading-none">{label}</span>
+        <span className="inline-flex items-center gap-0.5 t-label text-[var(--brand-text-muted)]">{label}</span>
       </div>
       <div className="flex items-baseline gap-1.5">
         <div

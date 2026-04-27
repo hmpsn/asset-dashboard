@@ -327,7 +327,7 @@ function ModalBody({
   ...rest
 }: HTMLAttributes<HTMLDivElement> & { children: ReactNode }): React.ReactElement {
   return (
-    <div className={cn('px-6 py-4 text-[var(--brand-text)] t-body leading-relaxed', className)} {...rest}>
+    <div className={cn('px-6 py-4 text-[var(--brand-text)] t-body', className)} {...rest}>
       {children}
     </div>
   );
