@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useContentCalendar } from '../hooks/admin';
-import { EmptyState } from './ui';
+import { EmptyState, Icon } from './ui';
 import { adminPath } from '../routes';
 import { timeAgo } from '../lib/timeAgo';
 
@@ -37,14 +37,14 @@ const STATUS_ICONS: Record<string, { icon: typeof Clock; color: string }> = {
   generating:       { icon: Sparkles,     color: 'text-amber-400' },
   draft:            { icon: PenLine,      color: 'text-blue-400' },
   review:           { icon: Eye,          color: 'text-cyan-400' },
-  approved:         { icon: CheckCircle2, color: 'text-green-400' },
+  approved:         { icon: CheckCircle2, color: 'text-emerald-400' },
   requested:        { icon: Send,         color: 'text-blue-400' },
-  pending_payment:  { icon: Clock,        color: 'text-zinc-400' },
+  pending_payment:  { icon: Clock,        color: 'text-[var(--brand-text)]' },
   brief_generated:  { icon: Clipboard,    color: 'text-teal-400' },
   client_review:    { icon: Eye,          color: 'text-cyan-400' },
   in_progress:      { icon: Sparkles,     color: 'text-amber-400' },
-  delivered:        { icon: CheckCircle2, color: 'text-green-400' },
-  published:        { icon: Globe,        color: 'text-green-400' },
+  delivered:        { icon: CheckCircle2, color: 'text-emerald-400' },
+  published:        { icon: Globe,        color: 'text-emerald-400' },
   declined:         { icon: Clock,        color: 'text-red-400' },
 };
 
@@ -163,7 +163,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <div className="w-6 h-6 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" />
+        <div className="w-6 h-6 border-2 rounded-full animate-spin border-[var(--surface-3)] border-t-teal-400" />
       </div>
     );
   }
@@ -173,8 +173,8 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <CalendarIcon className="w-5 h-5 text-amber-400" />
-          <h2 className="text-lg font-semibold text-zinc-100">Content Calendar</h2>
+          <Icon as={CalendarIcon} size="lg" className="text-amber-400" />
+          <h2 className="text-lg font-semibold text-[var(--brand-text-bright)]">Content Calendar</h2>
         </div>
         <div className="flex items-center gap-2">
           {/* Type filter pills */}
@@ -182,10 +182,10 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
             <button
               key={t}
               onClick={() => setTypeFilter(t)}
-              className={`text-[11px] px-2.5 py-1 rounded-full border font-medium transition-colors ${
+              className={`t-caption-sm px-2.5 py-1 rounded-full border font-medium transition-colors ${
                 typeFilter === t
-                  ? 'bg-zinc-700 border-zinc-600 text-zinc-200'
-                  : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-zinc-300'
+                  ? 'bg-[var(--surface-3)] border-[var(--brand-border-hover)] text-[var(--brand-text-bright)]'
+                  : 'bg-[var(--surface-2)] border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
               }`}
             >
               {t === 'all' ? 'All' : TYPE_CONFIG[t].label + 's'}
@@ -201,29 +201,29 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
           { label: 'Posts', value: stats.posts, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
           { label: 'Requests', value: stats.requests, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
           { label: 'Matrix Cells', value: stats.matrixCells, color: 'text-teal-400', bg: 'bg-teal-500/10', border: 'border-teal-500/20' },
-          { label: 'Published', value: stats.published, color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
+          { label: 'Published', value: stats.published, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
         ].map(s => (
           <div key={s.label} className={`border ${s.border} ${s.bg} px-4 py-3`} style={{ borderRadius: '6px 12px 6px 12px' }}>
             <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
-            <div className="text-[11px] text-zinc-500 mt-0.5">{s.label}</div>
+            <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{s.label}</div>
           </div>
         ))}
       </div>
 
       {/* Month navigation */}
-      <div className="flex items-center justify-between bg-zinc-900 border border-zinc-800 px-4 py-2.5" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      <div className="flex items-center justify-between bg-[var(--surface-2)] border border-[var(--brand-border)] px-4 py-2.5" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <button
           onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))}
-          className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
+          className="p-1.5 rounded-lg hover:bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
         >
-          <ChevronLeft className="w-4 h-4" />
+          <Icon as={ChevronLeft} size="md" />
         </button>
         <div className="flex items-center gap-3">
-          <span className="text-sm font-medium text-zinc-200">{formatMonthYear(currentMonth)}</span>
+          <span className="text-sm font-medium text-[var(--brand-text-bright)]">{formatMonthYear(currentMonth)}</span>
           {!isCurrentMonth && (
             <button
               onClick={() => setCurrentMonth(startOfMonth(new Date()))}
-              className="text-[11px] px-2 py-0.5 rounded border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-600 transition-colors"
+              className="t-caption-sm px-2 py-0.5 rounded border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)] transition-colors"
             >
               Today
             </button>
@@ -231,18 +231,18 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
         </div>
         <button
           onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))}
-          className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
+          className="p-1.5 rounded-lg hover:bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
         >
-          <ChevronRight className="w-4 h-4" />
+          <Icon as={ChevronRight} size="md" />
         </button>
       </div>
 
       {/* Calendar grid */}
-      <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
         {/* Day headers */}
-        <div className="grid grid-cols-7 border-b border-zinc-800">
+        <div className="grid grid-cols-7 border-b border-[var(--brand-border)]">
           {DAYS.map(d => (
-            <div key={d} className="text-center text-[11px] font-medium text-zinc-500 py-2">{d}</div>
+            <div key={d} className="text-center t-caption-sm font-medium text-[var(--brand-text-muted)] py-2">{d}</div>
           ))}
         </div>
 
@@ -259,12 +259,12 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
               <button
                 key={i}
                 onClick={() => setSelectedDay(isSelected ? null : key)}
-                className={`min-h-[80px] p-1.5 border-b border-r border-zinc-800/50 text-left transition-colors relative ${
-                  isSelected ? 'bg-zinc-800/80' : 'hover:bg-zinc-800/30'
+                className={`min-h-[80px] p-1.5 border-b border-r border-[var(--brand-border)]/50 text-left transition-colors relative ${
+                  isSelected ? 'bg-[var(--surface-3)]/80' : 'hover:bg-[var(--surface-3)]/30'
                 } ${!isThisMonth ? 'opacity-40' : ''}`}
               >
-                <div className={`text-[11px] font-medium mb-1 ${
-                  isToday ? 'text-amber-400' : isThisMonth ? 'text-zinc-400' : 'text-zinc-600'
+                <div className={`t-caption-sm font-medium mb-1 ${
+                  isToday ? 'text-amber-400' : isThisMonth ? 'text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)]'
                 }`}>
                   {isToday && <span className="inline-block w-5 h-5 leading-5 text-center rounded-full bg-amber-500/20">{day.getDate()}</span>}
                   {!isToday && day.getDate()}
@@ -285,7 +285,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
                     );
                   })}
                   {dayItems.length > 3 && (
-                    <div className="text-[9px] text-zinc-500 px-1">+{dayItems.length - 3} more</div>
+                    <div className="text-[9px] text-[var(--brand-text-muted)] px-1">+{dayItems.length - 3} more</div>
                   )}
                 </div>
               </button>
@@ -296,41 +296,41 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
 
       {/* Selected day detail panel */}
       {selectedDay && (
-        <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
-          <div className="px-4 py-3 border-b border-zinc-800/50 flex items-center justify-between">
-            <span className="text-xs font-medium text-zinc-300">
+        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
+          <div className="px-4 py-3 border-b border-[var(--brand-border)]/50 flex items-center justify-between">
+            <span className="text-xs font-medium text-[var(--brand-text-bright)]">
               {new Date(selectedDay + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
             </span>
-            <span className="text-[11px] text-zinc-500">{selectedItems.length} item{selectedItems.length !== 1 ? 's' : ''}</span>
+            <span className="t-caption-sm text-[var(--brand-text-muted)]">{selectedItems.length} item{selectedItems.length !== 1 ? 's' : ''}</span>
           </div>
 
           {selectedItems.length === 0 ? (
-            <div className="px-4 py-8 text-center text-sm text-zinc-500">No content items on this day</div>
+            <div className="px-4 py-8 text-center text-sm text-[var(--brand-text-muted)]">No content items on this day</div>
           ) : (
-            <div className="divide-y divide-zinc-800/50">
+            <div className="divide-y divide-[var(--brand-border)]/50">
               {selectedItems.map(item => {
                 const cfg = TYPE_CONFIG[item.type];
-                const Icon = cfg.icon;
+                const ItemIcon = cfg.icon;
                 const statusCfg = STATUS_ICONS[item.status];
                 const StatusIcon = statusCfg?.icon || Clock;
-                const statusColor = statusCfg?.color || 'text-zinc-500';
+                const statusColor = statusCfg?.color || 'text-[var(--brand-text-muted)]';
 
                 return (
-                  <div key={item.id} className="px-4 py-3 flex items-start gap-3 hover:bg-zinc-800/30 transition-colors">
+                  <div key={item.id} className="px-4 py-3 flex items-start gap-3 hover:bg-[var(--surface-3)]/30 transition-colors">
                     <div className={`mt-0.5 p-1.5 rounded-lg ${cfg.bg} border ${cfg.border}`}>
-                      <Icon className={`w-3.5 h-3.5 ${cfg.color}`} />
+                      <Icon as={ItemIcon} size="md" className={cfg.color} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-zinc-200 truncate">{item.label}</div>
-                      <div className="text-[11px] text-zinc-500 truncate mt-0.5">{item.sublabel}</div>
+                      <div className="text-sm font-medium text-[var(--brand-text-bright)] truncate">{item.label}</div>
+                      <div className="t-caption-sm text-[var(--brand-text-muted)] truncate mt-0.5">{item.sublabel}</div>
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <StatusIcon className={`w-3 h-3 ${statusColor}`} />
-                      <span className={`text-[11px] capitalize ${statusColor}`}>
+                      <Icon as={StatusIcon} size="sm" className={statusColor} />
+                      <span className={`t-caption-sm capitalize ${statusColor}`}>
                         {item.status.replace(/_/g, ' ')}
                       </span>
                     </div>
-                    <div className="text-[11px] text-zinc-600 flex-shrink-0">
+                    <div className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">
                       {timeAgo(item.date)}
                     </div>
                   </div>
@@ -352,7 +352,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
               onClick={() => navigate(adminPath(workspaceId, 'seo-briefs'))}
               className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 transition-colors"
             >
-              <PenLine className="w-3 h-3" />
+              <Icon as={PenLine} size="sm" />
               Create a Brief
             </button>
           }

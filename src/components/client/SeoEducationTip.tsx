@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Lightbulb, ChevronRight } from 'lucide-react';
+import { Icon } from '../ui';
 
 interface TabTip {
   title: string;
@@ -73,36 +74,36 @@ export function SeoEducationTip({ tab, workspaceId }: Props) {
       <div className="px-4 py-3">
         <div className="flex items-start gap-3">
           <div className="w-8 h-8 rounded-lg bg-teal-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <Lightbulb className="w-4 h-4 text-teal-400" />
+            <Icon as={Lightbulb} size="md" className="text-teal-400" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <h4 className="text-xs font-semibold text-zinc-200">{tip.title}</h4>
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-teal-500/10 text-teal-400 font-medium">SEO Tip</span>
+              <h4 className="text-xs font-semibold text-[var(--brand-text-bright)]">{tip.title}</h4>
+              <span className="t-micro px-1.5 py-0.5 rounded-full bg-teal-500/10 text-teal-400 font-medium">SEO Tip</span>
             </div>
-            <p className="text-[12px] text-zinc-400 leading-relaxed">{tip.body}</p>
+            <p className="text-[12px] text-[var(--brand-text)] leading-relaxed">{tip.body}</p>
             {showLearnMore && tip.learnMore && (
-              <p className="text-[12px] text-zinc-500 leading-relaxed mt-2 pl-3 border-l-2 border-teal-500/20">{tip.learnMore}</p>
+              <p className="text-[12px] text-[var(--brand-text-muted)] leading-relaxed mt-2 pl-3 border-l-2 border-teal-500/20">{tip.learnMore}</p>
             )}
             <div className="flex items-center gap-3 mt-2">
               {tip.learnMore && !showLearnMore && (
                 <button
                   onClick={() => setShowLearnMore(true)}
-                  className="flex items-center gap-1 text-[11px] text-teal-400 hover:text-teal-300 transition-colors font-medium"
+                  className="flex items-center gap-1 t-caption-sm text-teal-400 hover:text-teal-300 transition-colors font-medium"
                 >
                   Learn more <ChevronRight className="w-3 h-3" />
                 </button>
               )}
               <button
                 onClick={dismiss}
-                className="text-[11px] text-zinc-600 hover:text-zinc-400 transition-colors"
+                className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
               >
                 Got it
               </button>
             </div>
           </div>
-          <button onClick={dismiss} className="p-1 rounded text-zinc-600 hover:text-zinc-400 hover:bg-zinc-800/50 transition-colors flex-shrink-0">
-            <X className="w-3.5 h-3.5" />
+          <button onClick={dismiss} className="p-1 rounded text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]/50 transition-colors flex-shrink-0">
+            <Icon as={X} size="md" />
           </button>
         </div>
       </div>

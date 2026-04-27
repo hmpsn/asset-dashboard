@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, Suspense } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { Clipboard, FileText, RefreshCw, Download, ChevronDown, Layers, HelpCircle, X, TrendingDown, CalendarDays } from 'lucide-react';
-import { LoadingState } from './ui';
+import { LoadingState, Icon, cn } from './ui';
 import { useContentPipeline, useWorkspaces } from '../hooks/admin';
 import { ContentBriefs } from './ContentBriefs';
 import { ContentManager } from './ContentManager';
@@ -123,27 +123,23 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
 
       {/* Health summary bar */}
       {summary && (summary.briefs > 0 || summary.matrices > 0) && (
-        <div className="flex items-center gap-3 px-4 py-2 bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-400" style={{ borderRadius: '10px 24px 10px 24px' }}>
-          {summary.briefs > 0 && <span className="flex items-center gap-1"><Clipboard className="w-3 h-3 text-teal-400" /><span className="font-medium text-zinc-300">{summary.briefs}</span> brief{summary.briefs !== 1 ? 's' : ''}</span>}
-          {summary.posts > 0 && <><span className="text-zinc-700">&middot;</span><span className="flex items-center gap-1"><FileText className="w-3 h-3 text-amber-400" /><span className="font-medium text-zinc-300">{summary.posts}</span> post{summary.posts !== 1 ? 's' : ''}</span></>}
-          {summary.matrices > 0 && <><span className="text-zinc-700">&middot;</span><span className="flex items-center gap-1"><Layers className="w-3 h-3 text-teal-400" /><span className="font-medium text-zinc-300">{summary.matrices}</span> matri{summary.matrices !== 1 ? 'ces' : 'x'}</span></>}
-          {summary.cells > 0 && <><span className="text-zinc-700">&middot;</span><span className="flex items-center gap-1"><span className="font-medium text-zinc-300">{summary.cells}</span> cell{summary.cells !== 1 ? 's' : ''}</span>{summary.published > 0 && <span className="text-green-400 ml-0.5">({Math.round(summary.published / summary.cells * 100)}% published)</span>}</>}
+        <div className="flex items-center gap-3 px-4 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] t-caption-sm text-[var(--brand-text)]" style={{ borderRadius: '10px 24px 10px 24px' }}>
+          {summary.briefs > 0 && <span className="flex items-center gap-1"><Icon as={Clipboard} size="sm" className="text-teal-400" /><span className="font-medium text-[var(--brand-text-bright)]">{summary.briefs}</span> brief{summary.briefs !== 1 ? 's' : ''}</span>}
+          {summary.posts > 0 && <><span className="text-[var(--brand-border)]">&middot;</span><span className="flex items-center gap-1"><Icon as={FileText} size="sm" className="text-amber-400" /><span className="font-medium text-[var(--brand-text-bright)]">{summary.posts}</span> post{summary.posts !== 1 ? 's' : ''}</span></>}
+          {summary.matrices > 0 && <><span className="text-[var(--brand-border)]">&middot;</span><span className="flex items-center gap-1"><Icon as={Layers} size="sm" className="text-teal-400" /><span className="font-medium text-[var(--brand-text-bright)]">{summary.matrices}</span> matri{summary.matrices !== 1 ? 'ces' : 'x'}</span></>}
+          {summary.cells > 0 && <><span className="text-[var(--brand-border)]">&middot;</span><span className="flex items-center gap-1"><span className="font-medium text-[var(--brand-text-bright)]">{summary.cells}</span> cell{summary.cells !== 1 ? 's' : ''}</span>{summary.published > 0 && <span className="text-emerald-400 ml-0.5">({Math.round(summary.published / summary.cells * 100)}% published)</span>}</>}
         </div>
       )}
 
       {/* Content decay alert */}
       {decay && !decayDismissed && (decay.critical > 0 || decay.warning > 0) && (
-        <div className={`flex items-center gap-3 px-4 py-2.5 border text-xs ${
-          decay.critical > 0
-            ? 'bg-red-500/5 border-red-500/20'
-            : 'bg-amber-500/5 border-amber-500/20'
-        }`} style={{ borderRadius: '10px 24px 10px 24px' }}>
-          <TrendingDown className={`w-4 h-4 flex-shrink-0 ${decay.critical > 0 ? 'text-red-400' : 'text-amber-400'}`} />
+        <div className={cn('flex items-center gap-3 px-4 py-2.5 border text-xs', decay.critical > 0 ? 'bg-red-500/5 border-red-500/20' : 'bg-amber-500/5 border-amber-500/20')} style={{ borderRadius: '10px 24px 10px 24px' }}>
+          <Icon as={TrendingDown} size="md" className={cn('flex-shrink-0', decay.critical > 0 ? 'text-red-400' : 'text-amber-400')} />
           <div className="flex-1">
-            <span className="font-medium text-zinc-200">
+            <span className="font-medium text-[var(--brand-text-bright)]">
               {decay.totalDecaying} page{decay.totalDecaying !== 1 ? 's' : ''} losing traffic
             </span>
-            <span className="text-zinc-500 ml-1.5">
+            <span className="text-[var(--brand-text-muted)] ml-1.5">
               {decay.critical > 0 && <span className="text-red-400">{decay.critical} critical</span>}
               {decay.critical > 0 && decay.warning > 0 && <span> · </span>}
               {decay.warning > 0 && <span className="text-amber-400">{decay.warning} warning</span>}
@@ -152,9 +148,9 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
           </div>
           <button
             onClick={() => setDecayDismissed(true)}
-            className="p-0.5 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 transition-colors flex-shrink-0"
+            className="p-0.5 rounded hover:bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors flex-shrink-0"
           >
-            <X className="w-3.5 h-3.5" />
+            <Icon as={X} size="md" />
           </button>
         </div>
       )}
@@ -169,21 +165,17 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
       <AiSuggested workspaceId={workspaceId} onCreateBrief={handleCreateBrief} />
 
       {/* Sub-tab bar */}
-      <div className="flex items-center gap-1 border-b border-zinc-800 pb-0">
+      <div className="flex items-center gap-1 border-b border-[var(--brand-border)] pb-0">
         {TABS.map(t => {
-          const Icon = t.icon;
+          const TabIcon = t.icon;
           const active = activeTab === t.id;
           return (
             <button
               key={t.id}
               onClick={() => handleTabChange(t.id)}
-              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px ${
-                active
-                  ? 'border-teal-400 text-teal-300'
-                  : 'border-transparent text-zinc-500 hover:text-zinc-300'
-              }`}
+              className={cn('flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px', active ? 'border-teal-400 text-teal-300' : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}
             >
-              <Icon className="w-3.5 h-3.5" />
+              <Icon as={TabIcon} size="md" />
               {t.label}
             </button>
           );
@@ -193,20 +185,21 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
         <div className="ml-auto relative" ref={exportRef}>
           <button
             onClick={() => setExportOpen(!exportOpen)}
-            className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium text-zinc-500 hover:text-zinc-300 transition-colors rounded-md hover:bg-zinc-800/50"
+            className="flex items-center gap-1 px-2.5 py-1.5 t-caption-sm font-medium text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors rounded-md hover:bg-[var(--surface-3)]"
           >
-            <Download className="w-3 h-3" />
+            <Icon as={Download} size="sm" />
             Export
-            <ChevronDown className={`w-3 h-3 transition-transform ${exportOpen ? 'rotate-180' : ''}`} />
+            <Icon as={ChevronDown} size="sm" className={cn('transition-transform', exportOpen && 'rotate-180')} />
           </button>
           {exportOpen && (
-            <div className="absolute right-0 top-full mt-1 w-56 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl z-20 py-1 overflow-hidden">
+            // pr-check-disable-next-line -- export menu dropdown
+            <div className="absolute right-0 top-full mt-1 w-56 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl z-20 py-1 overflow-hidden">
               {EXPORTS.map(exp => (
-                <div key={exp.key} className="flex items-center justify-between px-3 py-2 hover:bg-zinc-800/50 group">
-                  <span className="text-xs text-zinc-300">{exp.label}</span>
+                <div key={exp.key} className="flex items-center justify-between px-3 py-2 hover:bg-[var(--surface-3)] group">
+                  <span className="text-xs text-[var(--brand-text-bright)]">{exp.label}</span>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => handleExport(exp.key, 'csv')} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 hover:text-teal-300 hover:bg-teal-500/10 transition-colors">CSV</button>
-                    <button onClick={() => handleExport(exp.key, 'json')} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 hover:text-teal-300 hover:bg-teal-500/10 transition-colors">JSON</button>
+                    <button onClick={() => handleExport(exp.key, 'csv')} className="t-caption-sm px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-teal-300 hover:bg-teal-500/10 transition-colors">CSV</button>
+                    <button onClick={() => handleExport(exp.key, 'json')} className="t-caption-sm px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-teal-300 hover:bg-teal-500/10 transition-colors">JSON</button>
                   </div>
                 </div>
               ))}
@@ -238,21 +231,21 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
       {/* Floating help button */}
       <button
         onClick={() => setGuideOpen(true)}
-        className="fixed bottom-6 right-6 z-30 w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700 hover:border-teal-500/50 hover:bg-zinc-700 shadow-lg flex items-center justify-center transition-all group"
+        className="fixed bottom-6 right-6 z-30 w-10 h-10 rounded-full bg-[var(--surface-3)] border border-[var(--brand-border)] hover:border-teal-500/50 hover:bg-[var(--brand-border-hover)] shadow-lg flex items-center justify-center transition-all group"
         title="Content Pipeline Guide"
       >
-        <HelpCircle className="w-4.5 h-4.5 text-zinc-400 group-hover:text-teal-400 transition-colors" />
+        <Icon as={HelpCircle} size="md" className="text-[var(--brand-text)] group-hover:text-teal-400 transition-colors" />
       </button>
 
       {/* Guide slide-over */}
       {guideOpen && (
         <div className="fixed inset-0 z-40 flex justify-end">
           <div className="absolute inset-0 bg-black/40" onClick={() => setGuideOpen(false)} />
-          <div className="relative w-full max-w-md bg-zinc-950 border-l border-zinc-800 shadow-2xl overflow-y-auto animate-in slide-in-from-right">
-            <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-3.5 bg-zinc-950/95 backdrop-blur border-b border-zinc-800">
-              <span className="text-sm font-semibold text-zinc-200">Content Pipeline Guide</span>
-              <button onClick={() => setGuideOpen(false)} className="p-1 rounded-md hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 transition-colors">
-                <X className="w-4 h-4" />
+          <div className="relative w-full max-w-md bg-[var(--surface-1)] border-l border-[var(--brand-border)] shadow-2xl overflow-y-auto animate-in slide-in-from-right">
+            <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-3.5 bg-[var(--surface-1)]/95 backdrop-blur border-b border-[var(--brand-border)]">
+              <span className="text-sm font-semibold text-[var(--brand-text-bright)]">Content Pipeline Guide</span>
+              <button onClick={() => setGuideOpen(false)} className="p-1 rounded-md hover:bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
+                <Icon as={X} size="md" />
               </button>
             </div>
             <div className="p-5">

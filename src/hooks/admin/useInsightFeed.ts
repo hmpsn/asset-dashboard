@@ -290,7 +290,7 @@ export function computeSummaryCounts(feed: FeedInsight[]): SummaryCount[] {
     counts.push({ label: 'opportunities', count: opportunities, color: 'amber', filterKey: INSIGHT_FILTER_KEYS.OPPORTUNITIES });
   }
   if (wins > 0) {
-    counts.push({ label: 'wins', count: wins, color: 'green', filterKey: INSIGHT_FILTER_KEYS.WINS });
+    counts.push({ label: 'wins', count: wins, color: 'emerald', filterKey: INSIGHT_FILTER_KEYS.WINS });
   }
   if (schemaGaps > 0) {
     counts.push({ label: 'schema gaps', count: schemaGaps, color: 'blue', filterKey: INSIGHT_FILTER_KEYS.SCHEMA });

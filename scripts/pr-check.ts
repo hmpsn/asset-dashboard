@@ -797,6 +797,22 @@ export const CHECKS: Check[] = [
     severity: 'error',
   },
   {
+    // Tailwind v4 emits the substring inside `[...]` verbatim, with `_` -> space.
+    // Commas are NOT replaced. So `grid-cols-[1fr,80px,80px]` emits invalid CSS
+    // (`grid-template-columns: 1fr,80px,80px`) and the browser falls back to a
+    // single column — items stack vertically. v3 silently swapped commas for
+    // spaces; v4 does not. Typecheck and build do not flag it.
+    //
+    // The match `[^(]*,` allows commas INSIDE a CSS function like
+    // `minmax(100px,1fr)` or `repeat(3,1fr)` (commas are valid as function args)
+    // while still catching top-level track-list commas like `[1fr,80px]`.
+    name: 'Comma in arbitrary grid-cols/grid-rows (Tailwind v4)',
+    pattern: 'grid-(cols|rows)-\\[[^(]*,',
+    fileGlobs: ['*.ts', '*.tsx'],
+    message: 'Tailwind v4 needs underscores, not commas, in arbitrary grid track lists. Replace `,` with `_` inside the `[...]` (e.g. `grid-cols-[1fr_80px_80px]`). Commas inside CSS functions like `minmax(100px,1fr)` are fine.',
+    severity: 'error',
+  },
+  {
     name: 'Bare JSON.parse on server',
     pattern: 'JSON\\.parse\\(',
     fileGlobs: ['*.ts'],
@@ -957,6 +973,24 @@ export const CHECKS: Check[] = [
     severity: 'warn',
   },
   {
+    // Hand-rolled trend badge: `<TrendingUp/>` + `<TrendingDown/>` in one ternary.
+    // This is the canonical signature of a delta indicator assembled inline rather
+    // than using `<TrendBadge>` from src/components/ui/TrendBadge.tsx. Ships as
+    // warn — promote to error once the long tail (currently ChatBlocks, SeoChangeImpact)
+    // is migrated.
+    name: 'Hand-rolled trend badge',
+    pattern: '<TrendingUp[^>]*/>[^<]*:[^<]*<TrendingDown|<TrendingDown[^>]*/>[^<]*:[^<]*<TrendingUp',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: ['src/components/ui/TrendBadge.tsx'],
+    excludeLines: ['// trend-badge-ok'],
+    message: 'Use <TrendBadge value={delta} /> from src/components/ui/ instead of hand-rolled TrendingUp/TrendingDown ternaries. Props: value, suffix, invert, showSign, label, size, hideOnZero.',
+    // Promoted warn → error in Phase 5 Phase 3 (2026-04-25) after backlog reached zero.
+    severity: 'error',
+    rationale: 'Hand-rolled trend badges drift in color (text-green-400 vs text-emerald-400), sign handling, and zero-state across 7+ callsites. <TrendBadge> consolidates the canonical form.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+  },
+  {
     name: 'z.array(z.unknown()) on server',
     pattern: 'z\\.array\\(z\\.unknown\\(\\)\\)',
     fileGlobs: ['*.ts'],
@@ -998,7 +1032,6 @@ export const CHECKS: Check[] = [
   },
   {
     name: 'SVG with hardcoded dark fill/stroke',
-    pattern: '(fill|stroke)=\\"(#0f1219|#18181b|#27272a|#303036|#52525b)\\"',
     fileGlobs: ['*.tsx'],
     pathFilter: 'src/components/',
     exclude: 'Styleguide.tsx',
@@ -1006,6 +1039,25 @@ export const CHECKS: Check[] = [
     excludeLines: ['chartDotStroke(', 'chartDotFill(', 'chartAxisColor(', 'chartGridColor('],
     message: 'Use chartDotStroke()/chartAxisColor() from ui/constants.ts for SVG colors. Dark hex breaks light mode.',
     severity: 'warn',
+    // Converted from pattern to customCheck — the original pattern contained `\"`
+    // inside outer shell double-quotes. The safePattern escaping would double-escape
+    // these to `\\"`, breaking the shell command silently (swallowed by || true).
+    customCheck: (files) => {
+      const SVG_ATTR = /(?:fill|stroke)="(#0f1219|#18181b|#27272a|#303036|#52525b)"/gi;
+      const hits: CustomCheckMatch[] = [];
+      files.forEach(filePath => {
+        try {
+          const fileLines = readFileSync(filePath, 'utf-8').split('\n');
+          fileLines.forEach((line, i) => {
+            if (SVG_ATTR.test(line)) {
+              hits.push({ file: filePath, line: i + 1, text: line.trim() });
+            }
+            SVG_ATTR.lastIndex = 0;
+          });
+        } catch { /* file not found in worktree */ }
+      });
+      return hits;
+    },
   },
   {
     name: 'Direct listPages() outside workspace-data',
@@ -3697,6 +3749,621 @@ export const CHECKS: Check[] = [
       return hits;
     },
   },
+  // ─── Design system enforcement rules (Phase 1) ─────────────────────────────
+  {
+    name: 'Legacy surface token in new code',
+    pattern: 'var\\(--brand-bg-',
+    fileGlobs: ['*.tsx', '*.css'],
+    exclude: ['src/index.css'],
+    message: 'Use var(--surface-1/2/3) instead of var(--brand-bg-*). The --brand-bg-* names are legacy aliases — see DESIGN_SYSTEM.md.',
+    severity: 'error',
+    rationale: 'Prevents new code from using deprecated token names that bypass the 3-tier surface system.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+  },
+  {
+    name: 'Hand-rolled card div (use SectionCard)',
+    // customCheck (was pattern) — the original regex contained literal double
+    // quotes which broke the shell `grep -E "..."` invocation in checkDirectory;
+    // the error was swallowed by `2>/dev/null || true`, so the rule silently
+    // reported ✓ despite 26 violations. Converted to customCheck to avoid the
+    // shell-quoting hazard and to support pr-check-disable-next-line with a
+    // 5-line lookback (multi-attribute JSX puts className= 3-4 lines below the
+    // opening tag where the hatch comment sits).
+    fileGlobs: ['*.tsx'],
+    exclude: [
+      'src/components/ui/',
+    ],
+    message: 'Use <SectionCard> or <SectionCard variant="subtle"> instead of hand-rolling bg-zinc-9xx + rounded-xl. Add a // pr-check-disable-next-line comment with justification for modals and non-card elements.',
+    severity: 'error',
+    rationale: 'Prevents hand-rolled card divs that bypass the SectionCard primitive and the --surface-N token system.',
+    claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const cardRe = /className="[^"]*bg-zinc-9\d{2}[^"]*rounded-xl/;
+      // Look back up to 5 lines for the hatch comment. Multi-attribute JSX
+      // commonly places className= 3-4 lines below the opening tag where the
+      // disable comment sits, so the standard 1-line lookback in hasHatch() is
+      // insufficient here.
+      const localHasHatch = (lines: string[], i: number) => {
+        for (let j = Math.max(0, i - 5); j <= i; j++) {
+          if (lines[j].includes('pr-check-disable-next-line')) return true;
+        }
+        return false;
+      };
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!cardRe.test(lines[i])) continue;
+          if (localHasHatch(lines, i)) continue;
+          hits.push({ file, line: i + 1, text: lines[i] });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'SectionCard titleExtra with ml-auto (use action prop)',
+    // `titleExtra` renders inside the left-aligned title cluster. The cluster
+    // has no flex-grow, so `ml-auto` on a child has no effect — the content
+    // does NOT push to the right edge. Callers who want right-aligned content
+    // must use the `action` prop instead, which lives on the outer flex row
+    // that uses `justify-between`. This rule catches the recurring migration
+    // bug where `ml-auto` is carried over from a hand-rolled card into
+    // `titleExtra`, silently producing left-clustered content.
+    fileGlobs: ['*.tsx'],
+    exclude: ['src/components/ui/'],
+    message: 'titleExtra renders inside the left-aligned title cluster — ml-auto has no effect there. Use the `action` prop for right-aligned content (date pickers, counts, export links, tier badges). See src/components/ui/SectionCard.tsx JSDoc.',
+    severity: 'error',
+    rationale: 'Prevents the recurring "right-aligned metadata lands on the left" bug seen across 5 SectionCard migrations (OrderStatus, RankTable, DataSnapshots, SearchTab, FixRecommendations).',
+    claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const idx = line.indexOf('titleExtra=');
+          if (idx === -1) continue;
+          if (line.includes('pr-check-disable-next-line')) continue;
+          if (i > 0 && lines[i - 1].includes('pr-check-disable-next-line')) continue;
+          // Scan forward up to 10 lines to find the closing `}` of the prop.
+          // Use brace balancing starting from the `{` that follows `titleExtra=`.
+          const openIdx = line.indexOf('{', idx);
+          if (openIdx === -1) continue;
+          let depth = 0;
+          let sawMlAuto = false;
+          let endLine = i;
+          outer: for (let j = i; j < Math.min(lines.length, i + 15); j++) {
+            const scan = j === i ? lines[j].slice(openIdx) : lines[j];
+            if (scan.includes('ml-auto')) sawMlAuto = true;
+            for (const ch of scan) {
+              if (ch === '{') depth++;
+              else if (ch === '}') {
+                depth--;
+                if (depth === 0) { endLine = j; break outer; }
+              }
+            }
+          }
+          void endLine;
+          if (sawMlAuto) hits.push({ file, line: i + 1, text: line.trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // SectionCard wraps children in `<div className={noPadding ? '' : 'p-4'}>`,
+    // so the outer div ALWAYS has exactly one direct child: the inner wrapper.
+    // Two consequences of passing layout-affecting utilities via `className`:
+    //
+    // 1. `space-y-N` / `space-x-N` adds margin-top to the 2nd+ direct children.
+    //    With only one direct child (the inner wrapper), space-y-* has ZERO
+    //    effect on the actual content elements. ALWAYS a bug — no `noPadding`
+    //    escape; the fix is to wrap children in a spaced div.
+    //
+    // 2. `p-N` / `px-N` / `py-N` compounds with the inner `p-4`, doubling
+    //    padding. Fix: add the `noPadding` prop so the inner wrapper drops its
+    //    p-4, leaving the outer custom padding as the sole padding layer.
+    //
+    // Devin caught 6 sites in PR #307 (SeoAudit, SeoAuditGuide×3, RedirectManager×2)
+    // and the LinkChecker asymmetric-radius regression in the same review pass.
+    // This rule mechanizes the SectionCard className traps so future migrations
+    // fail at PR time, not at deploy.
+    //
+    // Hatch: `// sectioncard-className-ok` on the `<SectionCard` line or the
+    // line immediately above. Used for rare legitimate overrides (e.g.
+    // `mt-N` for an offset margin against a parent; `mx-auto` for centering
+    // when the parent doesn't already do it).
+    name: 'SectionCard className double-wrap trap (space-y-* always wrong; p[xy]?-* needs noPadding)',
+    fileGlobs: ['*.tsx'],
+    exclude: ['src/components/ui/'],
+    message: 'SectionCard wraps children in `<div className={noPadding ? \'\' : \'p-4\'}>`. (a) `space-y-*`/`space-x-*` on outer never reaches children — wrap children in a spaced div instead. (b) `p[xy]?-*` doubles with the inner p-4 — add `noPadding` prop. Hatch with `// sectioncard-className-ok` if the override is legitimate (rare).',
+    severity: 'error',
+    rationale: 'Devin Phase 2.3a flagged 6 instances of this trap in PR #307 (SeoAudit, SeoAuditGuide×3, RedirectManager×2). Memorialized in feedback_sectioncard_classname_double_wrap.md.',
+    claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const SPACE_RE = /\bspace-[xy]-\d/;
+      const PAD_RE = /\bp[xy]?-(?:\d|\[)/;
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const idx = line.indexOf('<SectionCard');
+          if (idx === -1) continue;
+          // Skip if it's actually `<SectionCardProps` or `<SectionCardX` etc.
+          const after = line[idx + '<SectionCard'.length] ?? '';
+          if (after && /[A-Za-z0-9_]/.test(after)) continue;
+          // Hatch checks
+          if (line.includes('sectioncard-className-ok')) continue;
+          if (i > 0 && lines[i - 1].includes('sectioncard-className-ok')) continue;
+          // Walk forward up to 15 lines, tracking `{` `}` depth, looking for
+          // the closing `>` of the opening tag. Capture the entire opening
+          // tag span as `tagText`.
+          let tagText = '';
+          let braceDepth = 0;
+          let endLine = -1;
+          outer: for (let j = i; j < Math.min(lines.length, i + 15); j++) {
+            const scan = j === i ? lines[j].slice(idx) : lines[j];
+            tagText += (j === i ? '' : '\n') + scan;
+            for (let k = 0; k < scan.length; k++) {
+              const ch = scan[k];
+              if (ch === '{') braceDepth++;
+              else if (ch === '}') braceDepth--;
+              else if (ch === '>' && braceDepth === 0) {
+                // Could be `>` or `/>`; either way the opening tag is closed
+                endLine = j;
+                break outer;
+              }
+            }
+          }
+          if (endLine === -1) continue;
+          // Look for className=... and noPadding presence on the captured tag
+          const hasNoPadding = /\bnoPadding\b/.test(tagText);
+          // Extract the className value — handles className="..." and
+          // className={...}. For className={cn('a', cond && 'b', ...)} we
+          // run the regex over the entire expression (string-literal args
+          // will match if they contain the forbidden tokens).
+          const clsMatch = tagText.match(/className=(?:"([^"]*)"|\{([^}]*(?:\{[^}]*\}[^}]*)*)\})/);
+          if (!clsMatch) continue;
+          const cls = clsMatch[1] ?? clsMatch[2] ?? '';
+          const hasSpace = SPACE_RE.test(cls);
+          const hasPad = PAD_RE.test(cls);
+          if (hasSpace) {
+            hits.push({ file, line: i + 1, text: `<SectionCard ... className contains space-[xy]-* (always ineffective — wrap children instead)` });
+          } else if (hasPad && !hasNoPadding) {
+            hits.push({ file, line: i + 1, text: `<SectionCard ... className contains p[xy]?-* without noPadding (doubles inner p-4)` });
+          }
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'Page component missing PageHeader',
+    fileGlobs: [],
+    message: 'Top-level page components must use <PageHeader>. Add <PageHeader title="..." subtitle="..." /> or add this file to the exclude list in pr-check.ts with a justification comment.',
+    severity: 'warn',
+    rationale: 'Enforces consistent page-level header structure across all navigable views.',
+    claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
+    customCheck: (_files) => {
+      const PAGE_COMPONENTS = [
+        // Currently missing PageHeader (Phase 3 migration targets):
+        'src/components/ContentPipeline.tsx',
+        'src/components/ContentManager.tsx',
+        'src/components/SeoAudit.tsx',
+        'src/components/KeywordStrategy.tsx',
+        'src/components/Performance.tsx',
+        'src/components/PageSpeedPanel.tsx',
+        'src/components/RankTracker.tsx',
+        'src/components/ContentBriefs.tsx',
+        'src/components/RevenueDashboard.tsx',
+        'src/components/ClientDashboard.tsx',
+        'src/components/KeywordAnalysis.tsx',
+        // Already have PageHeader (guard against regression):
+        'src/components/WorkspaceHome.tsx',
+        'src/components/WorkspaceOverview.tsx',
+        'src/components/AnalyticsHub.tsx',
+        'src/components/BrandHub.tsx',
+        'src/components/InternalLinks.tsx',
+        'src/components/RedirectManager.tsx',
+        'src/components/SiteArchitecture.tsx',
+        'src/components/Roadmap.tsx',
+        'src/components/LlmsTxtGenerator.tsx',
+        'src/components/ContentPerformance.tsx',
+        'src/components/ContentPlanner.tsx',
+        'src/components/ContentSubscriptions.tsx',
+        'src/components/FeatureLibrary.tsx',
+      ];
+      return PAGE_COMPONENTS
+        .filter(p => {
+          try {
+            const content = readFileSync(path.join(ROOT, p), 'utf-8');
+            return !content.includes('<PageHeader');
+          } catch {
+            return false;
+          }
+        })
+        .map(p => ({ file: p, line: 1, text: 'Missing <PageHeader>' }));
+    },
+  },
+  {
+    name: 'Hardcoded card radius outside ui primitives',
+    pattern: 'className="[^"]*rounded-xl',
+    fileGlobs: ['*.tsx'],
+    exclude: [
+      'src/components/ui/',
+      'public/styleguide.html',
+    ],
+    message: 'Use rounded-[var(--radius-lg)] instead of rounded-xl so the radius is themeable. Add a // pr-check-disable-next-line comment with justification for modals or non-card elements.',
+    severity: 'warn',
+    rationale: 'Prevents hardcoded Tailwind radius classes that bypass the --radius-* token system.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+  },
+  {
+    name: 'radius-signature-lg used outside SectionCard',
+    // Converted from pattern-based to customCheck so that
+    // `// pr-check-disable-next-line` escape hatches work — the pattern runner
+    // does not honor disable comments. SectionCard.tsx owns the canonical
+    // implementation; consumer files using the asymmetric radius directly
+    // must declare intent with a hatch comment so design-system stewards can
+    // audit which surfaces have brand-asymmetric chrome and which are
+    // accidentally bypassing SectionCard.
+    fileGlobs: ['*.tsx', '*.css'],
+    exclude: [
+      'src/components/ui/SectionCard.tsx',
+      'src/tokens.css',
+      'public/tokens.css',
+      'public/styleguide.html',
+      'public/styleguide.css',
+    ],
+    message: '--radius-signature-lg outside SectionCard is the brand asymmetric radius (10px 24px 10px 24px). Either use SectionCard, or add a // pr-check-disable-next-line -- <reason> comment justifying why this surface needs the brand signature.',
+    severity: 'error',
+    rationale: 'The asymmetric corner is the brand visual signature. SectionCard.tsx owns the canonical implementation; consumer files MAY use --radius-signature-lg directly when the asymmetric look is intentional, but they must justify the choice with a hatch comment per site so design-system stewards can audit drift.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('.tsx') && !file.endsWith('.css')) continue;
+        let content: string;
+        try { content = readFileSync(file, 'utf-8'); } catch { continue; }
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (!line.includes('--radius-signature-lg')) continue;
+          // Inline disable: same line as the violation
+          if (line.includes('pr-check-disable-next-line')) continue;
+          // Lookback: 5 prior lines may carry the hatch comment (multi-attribute
+          // JSX often pushes className= 3-4 lines below the opening tag)
+          let isDisabled = false;
+          for (let j = Math.max(0, i - 5); j < i; j++) {
+            if (lines[j].includes('pr-check-disable-next-line')) {
+              isDisabled = true;
+              break;
+            }
+          }
+          if (!isDisabled) {
+            hits.push({ file, line: i + 1, text: line });
+          }
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'Non-standard transition duration',
+    // Implemented as customCheck — grep -E does not support negative lookahead,
+    // so the original pattern `transition-duration-\\[(?!120ms|180ms|400ms)` was
+    // silently ineffective (always matched zero lines).
+    fileGlobs: ['*.tsx', '*.css'],
+    exclude: [
+      'src/components/ui/',
+      'public/styleguide.html',
+      'public/styleguide.css',
+    ],
+    message: 'Use transition-duration-[120ms], transition-duration-[180ms], or transition-duration-[400ms]. Non-standard durations break motion consistency.',
+    // Promoted warn → error in Phase 5 Phase 3 (2026-04-25) after backlog reached zero.
+    severity: 'error',
+    rationale: 'Enforces the three-speed motion system: 120ms (micro), 180ms (standard), 400ms (entrance).',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+    customCheck: (files) => {
+      const ALLOWED = new Set(['120ms', '180ms', '400ms']);
+      const violations: Array<{ file: string; line: number; text: string }> = [];
+      // files are absolute paths from resolveCheckFileList — use directly
+      files.forEach(filePath => {
+        try {
+          const lines = readFileSync(filePath, 'utf-8').split('\n');
+          lines.forEach((line, i) => {
+            for (const m of line.matchAll(/transition-duration-\[([^\]]+)\]/g)) {
+              if (!ALLOWED.has(m[1])) {
+                violations.push({ file: filePath, line: i + 1, text: line.trim() });
+              }
+            }
+          });
+        } catch { /* file not found in worktree */ }
+      });
+      return violations;
+    },
+  },
+
+  // ─── Phase 5 Phase 3 — Design system enforcement hardening ───────────────────
+  // Locks in the Phase 2 codemod gains. Error-severity rules below have a
+  // verified zero-hit precondition (the one TemplateEditor gradient was migrated
+  // in the same PR that introduced this rule). Warn-severity rules ratchet the
+  // long-tail backlogs identified during Phase 3 audit (text-[Npx], raw zinc
+  // utilities, hardcoded radii) — promote to error once each backlog reaches
+  // zero. See docs/superpowers/plans/2026-04-24-design-system-phase5-sweep.md.
+  {
+    // The rose- and pink- hue families are not in the Three Laws of Color
+    // palette. Forbidden alongside violet/indigo. Ships at error because the
+    // backlog is genuinely zero (verified 2026-04-25). Word-boundary anchor
+    // prevents `prose-` (Tailwind typography plugin) false positives.
+    name: 'Forbidden hues (rose/pink) in components',
+    pattern: '\\b(rose|pink)-[0-9]',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    message: 'rose- and pink- are forbidden. Use teal (actions), blue (data), emerald (success), amber (warning), or red (error) per the Three Laws of Color.',
+    severity: 'error',
+    rationale: 'Prevents the Three Laws palette from drifting via new rose/pink imports — the same class of bug that violet/indigo represented before they were banned.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+  },
+  {
+    // Hand-rolled gradient CTA: <button> with `bg-gradient-to-{r,l} from-(teal|emerald) ... to-(teal|emerald)`.
+    // The Button primitive (src/components/ui/Button.tsx variant="primary") owns the
+    // canonical teal→emerald gradient. Inline gradients drift in: shadow handling,
+    // disabled opacity, focus ring, icon-size mapping, and gap. Verified zero-hit
+    // after migrating the two TemplateEditor sites in the same PR.
+    //
+    // We match the gradient classes directly (one line) rather than scanning
+    // multi-line `<button>` JSX — gradients in <a>, <Link>, or div elements
+    // are caught by `Forbidden hues` only if they use violet/indigo/rose/pink,
+    // so this rule narrows to gradient-CTA buttons. False positives possible
+    // for legit non-CTA gradients (loading bars, charts) — those use `<div>`,
+    // not `<button>`, so the `<button` proximity scan filters them out.
+    name: 'Hand-rolled gradient CTA button',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/',
+    exclude: ['src/components/ui/Button.tsx'],
+    message: 'Use <Button variant="primary"> from src/components/ui/ instead of inlining bg-gradient-to-r from-teal-600 to-emerald-600. The primitive owns the canonical gradient, hover, disabled, and focus states.',
+    // Ships at warn — TemplateEditor + ClientDashboardTab + AiSuggested +
+    // BlueprintDetail migrations in this PR cleared the most-touched surfaces,
+    // but a full-repo --all scan still finds ~11 remaining hand-rolled gradient
+    // CTAs across older areas (ConfirmDialog, ClientChatWidget,
+    // PricingConfirmationModal, SchemaPageCard, ContentSubscriptions,
+    // FeatureFlagSettings, etc). Promote to error in a follow-up PR after a
+    // focused migration sweep.
+    severity: 'warn',
+    rationale: 'Prevents primary-CTA drift across hand-rolled gradient buttons. Future gradients must extend Button rather than reinvent its gradient inline.',
+    claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Match an inline gradient that uses teal/emerald hue stops. Multi-line
+      // JSX is normalized by joining each <button> open-tag to its className.
+      // Simpler: scan each line for the gradient signature, then look up to
+      // 8 lines back for `<button` to confirm it is a CTA (not a div banner
+      // or a chart fill).
+      //
+      // Direction class `[tlbr]{1,2}` covers all 8 Tailwind gradient
+      // directions: t, tr, r, br, b, bl, l, tl. Devin Review on the PR #319
+      // fixup commit flagged the original `[rl]` as a silent-bypass class —
+      // `bg-gradient-to-br from-teal-600 to-emerald-600` would slip through.
+      // `\b` after the direction prevents matches on `bg-gradient-to-tableau`
+      // and similar non-Tailwind suffixes.
+      const gradRe = /bg-gradient-to-[tlbr]{1,2}\b[^"'\s]*\s+from-(teal|emerald)-\d{3}[^"'\s]*\s+(?:[^"]*\s+)?to-(teal|emerald)-\d{3}/;
+      // Hatch lookback covers up to 8 lines because multi-line JSX commonly
+      // places className= 4-6 lines below the opening tag (and the hatch
+      // comment sits above the opening tag). The same pattern is used by
+      // Hand-rolled card div / SectionCard rules.
+      const hasHatchInRange = (lines: string[], i: number, span = 8): boolean => {
+        for (let j = Math.max(0, i - span); j <= i; j++) {
+          if (lines[j].includes('pr-check-disable-next-line')) return true;
+        }
+        return false;
+      };
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!gradRe.test(lines[i])) continue;
+          if (hasHatchInRange(lines, i)) continue;
+          // 8-line proximity window matches the hatch-lookback span. Multi-line
+          // <button> JSX with many props commonly puts className 5-7 lines below
+          // the opening tag — Devin Review on PR #319 flagged that the original
+          // 4-line window silently missed BlueprintDetail Review Copy where
+          // <button is 6 lines above the gradient class.
+          let isButton = false;
+          for (let j = Math.max(0, i - 8); j <= i; j++) {
+            if (/<button\b/.test(lines[j])) { isButton = true; break; }
+          }
+          if (!isButton) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // Three Laws of Color, Law #3: success/score uses emerald, never green.
+    // CLAUDE.md explicitly forbids `text-green-400` for success/score indicators —
+    // emerald and green are distinct hues and emerald is canonical. Verified zero
+    // backlog (2026-04-25). The rule covers the full text-green-{N} family
+    // because the rationale (emerald canonicality) applies to every shade.
+    name: 'text-green-{N} for success/score (use emerald)',
+    pattern: 'text-green-[0-9]',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    excludeLines: ['// green-ok'],
+    message: 'Use text-emerald-400 (or scoreColorClass() for scores). Per the Three Laws of Color, emerald is the canonical success hue — green-* drifts the palette. If green is genuinely intended (non-success indicator like an unrelated brand or chart series), add // green-ok inline.',
+    severity: 'error',
+    rationale: 'Mechanizes the Three Laws Law #3 emerald-vs-green distinction. The CLAUDE.md warning is otherwise unenforced, and the bug recurs every codemod batch as workers default to "green = success" from training data.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+  },
+  {
+    // Long-tail warn rules (ship at warn, ratchet to error per backlog clear):
+
+    // Arbitrary text sizes (`text-[Npx]`) bypass the .t-* typography utility
+    // system. The 14 .t-* classes (t-hero, t-h1, t-h2, t-stat, t-stat-sm,
+    // t-page, t-body, t-ui, t-label, t-caption, t-caption-sm, t-mono, t-micro)
+    // own the canonical font-size + line-height + family + weight pairing.
+    // Inlining `text-[Npx]` drifts line-height (defaults to Tailwind's
+    // `text-base` line-height of 1.5) and never picks up font-family
+    // overrides. Backlog: ~318 sites at audit.
+    name: 'Arbitrary pixel text-size (use .t-* utility)',
+    pattern: 'text-\\[[0-9]+px\\]',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    exclude: [
+      // Button primitive owns the canonical sm-size text scale (text-[11px])
+      // — it is the source-of-truth this rule routes other code TOWARD, so
+      // excluded for symmetry with the raw-zinc rules below. Devin Review on
+      // PR #319 flagged the asymmetric exclusion handling.
+      'src/components/ui/Button.tsx',
+    ],
+    excludeLines: ['// arbitrary-text-ok'],
+    message: 'Use a .t-* typography utility (.t-caption, .t-caption-sm, .t-stat-sm, etc.) instead of text-[Npx]. The .t-* classes pair font-size with the correct line-height and family. See src/index.css for the 14 utilities. Add // arbitrary-text-ok inline if the size is genuinely outside the type scale (rare).',
+    severity: 'warn',
+    rationale: 'Inline pixel text-sizes drift line-height and font-family because Tailwind only sets the size — the matching leading and font-family come from the .t-* utility wrapper.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+  },
+  {
+    // Raw `text-zinc-N` utilities bypass the --brand-text-{bright,muted,dim}
+    // token semantics. Light theme exists (Phase 5 Phase 4 work) but
+    // theme-responsive switching only kicks in for tokens, not for hardcoded
+    // zinc shades. Ships at warn — backlog ~210 sites.
+    name: 'Raw text-zinc-N (use --brand-text-* token)',
+    pattern: 'text-zinc-[0-9]+',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    exclude: [
+      'src/components/ui/Button.tsx',                  // Button primitive owns its own zinc shades for variants
+      'src/components/StripePaymentForm.tsx',           // Stripe Elements is theme:'night' — must stay dark regardless of theme
+      'src/components/StripePaymentModal.tsx',          // Stripe modal must be ALWAYS DARK
+    ],
+    excludeLines: ['// raw-zinc-ok'],
+    message: 'Use text-[var(--brand-text)], text-[var(--brand-text-bright)], or text-[var(--brand-text-muted)] instead of text-zinc-N. Raw zinc shades do not theme-switch in light mode. Add // raw-zinc-ok inline if dark-only is intentional (e.g. always-dark surfaces like Stripe Elements).',
+    severity: 'warn',
+    rationale: 'Light-theme parity requires every text color to flow through the --brand-text-* token system. Raw text-zinc-N is dark-only and produces invisible-on-light bugs.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+  },
+  {
+    // Same rationale as text-zinc, applied to backgrounds. Use --surface-{1,2,3}
+    // for the three-tier elevation. Backlog ~185 sites.
+    name: 'Raw bg-zinc-N (use --surface-* token)',
+    pattern: 'bg-zinc-[0-9]+',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    exclude: [
+      'src/components/ui/Button.tsx',
+      'src/components/StripePaymentForm.tsx',
+      'src/components/StripePaymentModal.tsx',
+    ],
+    excludeLines: ['// raw-zinc-ok'],
+    message: 'Use bg-[var(--surface-1)], bg-[var(--surface-2)], or bg-[var(--surface-3)] instead of bg-zinc-N. Raw zinc backgrounds do not theme-switch. Add // raw-zinc-ok inline if dark-only is intentional.',
+    severity: 'warn',
+    rationale: 'Light-theme parity requires the three-tier --surface system. Raw bg-zinc-N produces dark-on-light invisible-element bugs.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+  },
+  {
+    // Same rationale, applied to borders. Use --brand-border / --brand-border-hover.
+    // Backlog ~119 sites.
+    name: 'Raw border-zinc-N (use --brand-border token)',
+    pattern: 'border-zinc-[0-9]+',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    exclude: [
+      'src/components/ui/Button.tsx',
+      'src/components/StripePaymentForm.tsx',
+      'src/components/StripePaymentModal.tsx',
+    ],
+    excludeLines: ['// raw-zinc-ok'],
+    message: 'Use border-[var(--brand-border)] or border-[var(--brand-border-hover)] instead of border-zinc-N. Raw zinc borders do not theme-switch. Add // raw-zinc-ok inline if dark-only is intentional.',
+    severity: 'warn',
+    rationale: 'Light-theme parity requires the --brand-border token system. Raw border-zinc-N produces wrong-contrast borders in light mode.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+  },
+  {
+    // Inline asymmetric border-radius via style={{ borderRadius: '10px 24px 10px 24px' }}.
+    // The brand asymmetric corner is the --radius-signature / --radius-signature-lg
+    // token, which SectionCard already applies. Hand-rolled values drift the
+    // exact pixel pairing (10/24 vs 8/20 vs 12/28) and bypass the SectionCard
+    // ownership audit. Backlog ~114 sites.
+    name: 'Inline asymmetric border-radius (use --radius-signature token)',
+    // POSIX `[[:space:]]` instead of `\s` because BSD grep -E (macOS) treats
+    // `\s` as literal `s` per the codebase note at the top of the Map rule
+    // (line ~905). Mixing the two in a single pattern silently bypasses on
+    // BSD — Devin Review on PR #319 round 2 caught this. Both BSD and GNU
+    // grep accept `[[:space:]]`.
+    pattern: 'borderRadius:[[:space:]]*[\'"][0-9]+[a-z%]+[[:space:]][0-9]',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    exclude: [
+      'src/components/ui/SectionCard.tsx',
+    ],
+    excludeLines: ['// asymmetric-radius-ok'],
+    message: 'Use SectionCard (which applies --radius-signature-lg automatically) or var(--radius-signature) / var(--radius-signature-lg) tokens instead of inline asymmetric borderRadius values. The brand corner is centrally owned. Add // asymmetric-radius-ok inline if the surface genuinely needs a one-off corner.',
+    severity: 'warn',
+    rationale: 'Hand-rolled asymmetric corners drift from the brand 10/24 pairing and bypass the SectionCard ownership audit. Centralizing through tokens keeps every brand-signature surface in lockstep.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+  },
+
+  // ─── Phase 5 Phase 3 — Promotions: warn → error ──────────────────────────────
+  // Rules whose backlog reached zero are upgraded to error so they cannot
+  // regress. Verified zero-hit at promotion time (2026-04-25):
+  //   - Hand-rolled trend badge: 0
+  //   - Non-standard transition duration: 0
+  // Hardcoded card radius (`rounded-xl` outside ui/) still has 26 hits — stays
+  // at warn until the rounded-literal cleanup PR drives it to zero.
+
+  // ─── Phase 5 — Token authority ───────────────────────────────────────────────
+  {
+    name: 'styleguide-token-parity',
+    severity: 'warn', // promoted to error in Phase 3 after Phase 2 clears the backlog
+    fileGlobs: ['*.css'],
+    message:
+      'public/styleguide.css must only @import url(\'/tokens.css\'); redeclaring tokens creates drift. ' +
+      'Run `npx tsx scripts/verify-styleguide-parity.ts` for details.',
+    rationale:
+      'src/tokens.css is the single canonical token source. public/styleguide.css must import ' +
+      'from /tokens.css — not redeclare — so styleguide and app always use identical values.',
+    claudeMdRef: 'Design System — Token source of truth',
+    // customCheck because this requires cross-file parsing (tokens.css vs styleguide.css)
+    // rather than per-file pattern matching.
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+
+      // Only check files in the provided list that look like public/styleguide.css
+      const pathsToCheck = files.filter(f => f.endsWith('public/styleguide.css') || f.endsWith('public' + path.sep + 'styleguide.css'));
+
+      for (const styleguidePath of pathsToCheck) {
+        try {
+          const css = readFileSync(styleguidePath, 'utf-8');
+          const matches = [...css.matchAll(/^\s*(--[\w-]+)\s*:/gm)];
+          for (const m of matches) {
+            const lineNum = (css.slice(0, m.index ?? 0).match(/\n/g) ?? []).length + 1;
+            hits.push({
+              file: styleguidePath,
+              line: lineNum,
+              text: `re-declared token ${m[1]} in public/styleguide.css (must come via @import url('/tokens.css'))`,
+            });
+          }
+        } catch {
+          // File doesn't exist — skip (not an error in Phase 0 before styleguide is created)
+        }
+      }
+      return hits;
+    },
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
@@ -3712,11 +4379,21 @@ function applyExcludeLines(lines: string[], excludeLines?: string[]): string[] {
   return lines.filter(line => !excludeLines.some(ex => line.includes(ex)));
 }
 
-function checkFile(file: string, check: Check): string[] {
+// Exported for tests/pr-check.test.ts — regression-test harness for the
+// `-`-prefix-pattern silent-bug class fixed in PR #299. Not part of the public
+// API; do not import from anywhere except the test harness.
+export function checkFile(file: string, check: Check): string[] {
   if (isExcluded(file, check.exclude)) return [];
+  if (!check.pattern) return [];
   try {
+    const safePattern = check.pattern.replace(/"/g, '\\"');
+    // Pass the pattern via `-e` so grep does not interpret patterns that
+    // start with `-` (e.g. `--radius-signature-lg`) as command-line flags.
+    // Without `-e`, grep errors with "unrecognized option `--…`", the error
+    // is swallowed by `2>/dev/null || true`, and the rule silently reports
+    // ✓ — the exact silent-false-negative class the audit prevents.
     const out = execSync(
-      `grep -n -E "${check.pattern}" "${file}" 2>/dev/null || true`,
+      `grep -n -E -e "${safePattern}" "${file}" 2>/dev/null || true`,
       { cwd: ROOT, encoding: 'utf-8' }
     );
     const lines = out.trim() ? out.trim().split('\n').filter(Boolean).map(l => `${file}:${l}`) : [];
@@ -3727,7 +4404,7 @@ function checkFile(file: string, check: Check): string[] {
 }
 
 // Directories that should never be scanned (vendor code, test fixtures, build output)
-const EXCLUDED_DIRS = ['node_modules', 'dist', '.git', '.claude', 'scripts', 'tests'];
+const EXCLUDED_DIRS = ['node_modules', 'dist', '.git', '.claude', '.worktrees', 'scripts', 'tests'];
 // Root-level files to skip (--exclude-dir doesn't work on files)
 const EXCLUDED_FILES = ['test-branding.ts'];
 
@@ -3735,6 +4412,7 @@ const EXCLUDED_FILES = ['test-branding.ts'];
 // collision' regression test. Not part of the public API; do not import from
 // anywhere except the test harness.
 export function checkDirectory(dir: string, check: Check): string[] {
+  if (!check.pattern) return [];
   const globs = check.fileGlobs.map(g => `--include="${g}"`).join(' ');
   // If the rule opts into a normally-excluded directory via pathFilter (e.g.
   // 'tests/'), that directory must NOT be in the grep --exclude-dir list.
@@ -3746,8 +4424,22 @@ export function checkDirectory(dir: string, check: Check): string[] {
   const excludeDirs = effectiveExcludeDirs.map(d => `--exclude-dir="${d}"`).join(' ');
   const excludeFiles = EXCLUDED_FILES.map(f => `--exclude="${f}"`).join(' ');
   try {
+    // Escape any literal double quotes in the pattern before interpolating into
+    // the shell command string. Without this, patterns like `className="[^"]*...`
+    // break the outer double-quote boundary, causing grep to misparse the
+    // command. The error is swallowed by `2>/dev/null || true`, so the rule
+    // silently reports ✓ — the exact silent-false-negative class this audit
+    // tries to prevent. Rule C ("Hardcoded card radius outside ui primitives")
+    // has this pattern; Rule B was already converted to customCheck.
+    //
+    // Pass the pattern via `-e` so grep does not interpret patterns that start
+    // with `-` (e.g. `--radius-signature-lg`) as command-line flags. Same
+    // silent-false-negative class as above; this one bit `radius-signature-lg
+    // used outside SectionCard` from its introduction until the Phase 2 prep
+    // hotfix discovered it.
+    const safePattern = check.pattern.replace(/"/g, '\\"');
     const out = execSync(
-      `grep -rn ${globs} ${excludeDirs} ${excludeFiles} -E "${check.pattern}" "${dir}" 2>/dev/null || true`,
+      `grep -rn ${globs} ${excludeDirs} ${excludeFiles} -E -e "${safePattern}" "${dir}" 2>/dev/null || true`,
       { cwd: ROOT, encoding: 'utf-8' }
     );
     let lines = out.trim() ? out.trim().split('\n').filter(Boolean) : [];

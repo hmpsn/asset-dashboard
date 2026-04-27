@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Flag, RotateCcw, Loader2 } from 'lucide-react';
 import { put, get } from '../api/client';
 import { useToast } from './Toast';
+import { Icon } from './ui';
 import { queryKeys } from '../lib/queryKeys';
 
 interface FlagMeta {
@@ -157,35 +158,36 @@ export function FeatureFlagSettings() {
   const flagMap = new Map<string, FlagMeta>(flags?.map(f => [f.key, f]) ?? []);
 
   return (
-    <section className="bg-zinc-900 overflow-hidden border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
-      <div className="px-5 py-4 border-b border-zinc-800 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
-          <Flag className="w-4 h-4 text-teal-400" />
+    // pr-check-disable-next-line -- hand-rolled section card with inner subsections; mirrors SectionCard brand signature intentionally
+    <section className="bg-[var(--surface-2)] overflow-hidden border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+      <div className="px-5 py-4 border-b border-[var(--brand-border)] flex items-center gap-3">
+        <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-teal-500/10 flex items-center justify-center">
+          <Icon as={Flag} size="md" className="text-teal-400" />
         </div>
         <div className="flex-1">
-          <h3 className="text-sm font-semibold text-zinc-200">Feature Flags</h3>
-          <p className="text-xs text-zinc-500">Toggle dark-launched features. DB overrides take priority over env vars.</p>
+          <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Feature Flags</h3>
+          <p className="t-caption text-[var(--brand-text-muted)]">Toggle dark-launched features. DB overrides take priority over env vars.</p>
         </div>
-        {isPending && <Loader2 className="w-4 h-4 text-zinc-500 animate-spin" />}
+        {isPending && <Icon as={Loader2} size="md" className="text-[var(--brand-text-muted)] animate-spin" />}
       </div>
 
       {isLoading ? (
-        <div className="px-5 py-8 flex items-center justify-center gap-2 text-xs text-zinc-500">
-          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading flags...
+        <div className="px-5 py-8 flex items-center justify-center gap-2 t-caption text-[var(--brand-text-muted)]">
+          <Icon as={Loader2} size="md" className="animate-spin" /> Loading flags...
         </div>
       ) : isError ? (
-        <div className="px-5 py-6 text-xs text-red-400 space-y-1">
+        <div className="px-5 py-6 t-caption text-red-400 space-y-1">
           <p className="font-medium">Failed to load feature flags</p>
-          <p className="text-zinc-500 font-mono break-all">{error instanceof Error ? error.message : String(error)}</p>
+          <p className="text-[var(--brand-text-muted)] font-mono break-all">{error instanceof Error ? error.message : String(error)}</p>
         </div>
       ) : (
-        <div className="divide-y divide-zinc-800/60">
+        <div className="divide-y divide-[var(--brand-border)]/60">
           {FLAG_GROUPS.map(group => {
             const groupFlags = group.keys.map(k => flagMap.get(k)).filter(Boolean) as FlagMeta[];
             if (groupFlags.length === 0) return null;
             return (
               <div key={group.label} className="px-5 py-3 space-y-2.5">
-                <div className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider pt-1">
+                <div className="t-caption-sm font-medium text-[var(--brand-text-muted)] uppercase tracking-wider pt-1">
                   {group.label}
                 </div>
                 {groupFlags.map(flag => (
@@ -208,7 +210,7 @@ export function FeatureFlagSettings() {
             if (ungrouped.length === 0) return null;
             return (
               <div className="px-5 py-3 space-y-2.5">
-                <div className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider pt-1">Other</div>
+                <div className="t-caption-sm font-medium text-[var(--brand-text-muted)] uppercase tracking-wider pt-1">Other</div>
                 {ungrouped.map(flag => (
                   <FlagRow
                     key={flag.key}
@@ -250,7 +252,7 @@ function FlagRow({ flag, disabled, onToggle, onReset }: FlagRowProps) {
         className={`relative w-9 h-5 rounded-full transition-colors shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 disabled:opacity-50 ${
           flag.enabled
             ? 'bg-gradient-to-r from-teal-600 to-emerald-600'
-            : 'bg-zinc-700'
+            : 'bg-[var(--brand-border-hover)]'
         }`}
       >
         <span
@@ -262,18 +264,18 @@ function FlagRow({ flag, disabled, onToggle, onReset }: FlagRowProps) {
 
       {/* Label */}
       <div className="flex-1 min-w-0">
-        <span className="text-xs text-zinc-300 truncate">{label}</span>
-        <span className="ml-2 text-[10px] text-zinc-600 font-mono">{flag.key}</span>
+        <span className="t-caption text-[var(--brand-text)] truncate">{label}</span>
+        <span className="ml-2 t-caption-sm font-mono text-[var(--brand-text-muted)]">{flag.key}</span>
       </div>
 
       {/* Source badge */}
       <span
-        className={`text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${
+        className={`t-caption-sm px-1.5 py-0.5 rounded font-medium shrink-0 ${
           flag.source === 'db'
             ? 'bg-teal-500/10 text-teal-400'
             : flag.source === 'env'
             ? 'bg-blue-500/10 text-blue-400'
-            : 'bg-zinc-800 text-zinc-500'
+            : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)]'
         }`}
       >
         {SOURCE_LABEL[flag.source]}
@@ -287,7 +289,7 @@ function FlagRow({ flag, disabled, onToggle, onReset }: FlagRowProps) {
           title="Remove DB override (revert to env var or default)"
           className="p-1 rounded hover:bg-white/5 transition-colors disabled:opacity-50 shrink-0"
         >
-          <RotateCcw className="w-3 h-3 text-zinc-500 hover:text-zinc-300" />
+          <Icon as={RotateCcw} size="sm" className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]" />
         </button>
       ) : (
         <div className="w-5 shrink-0" />

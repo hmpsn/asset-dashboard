@@ -14,24 +14,24 @@ export function scoreColor(score: number): string {
   return score >= 80 ? '#34d399' : score >= 60 ? '#fbbf24' : '#f87171';
 }
 
-/** Tailwind class version of scoreColor */
+/** Tailwind class version of scoreColor — Law 03: emerald for success (matches scoreColor() hex #34d399) */
 export function scoreColorClass(score: number): string {
-  return score >= 80 ? 'text-green-400' : score >= 60 ? 'text-amber-400' : 'text-red-400';
+  return score >= 80 ? 'text-emerald-400' : score >= 60 ? 'text-amber-400' : 'text-red-400';
 }
 
 /** Score background class (for borders, badges) */
 export function scoreBgClass(score: number): string {
-  return score >= 80 ? 'bg-green-500/10' : score >= 60 ? 'bg-amber-500/10' : 'bg-red-500/10';
+  return score >= 80 ? 'bg-emerald-500/10' : score >= 60 ? 'bg-amber-500/10' : 'bg-red-500/10';
 }
 
 /** Solid score background class (for progress bar fills) */
 export function scoreBgBarClass(score: number): string {
-  return score >= 80 ? 'bg-green-500' : score >= 60 ? 'bg-amber-500' : score >= 40 ? 'bg-orange-500' : 'bg-red-500';
+  return score >= 80 ? 'bg-emerald-500' : score >= 60 ? 'bg-amber-500' : score >= 40 ? 'bg-orange-500' : 'bg-red-500';
 }
 
 /** AEO score color — 4-tier scale (80/60/30) for AEO readiness scores */
 export function aeoScoreColorClass(score: number): string {
-  if (score >= 80) return 'text-green-400';
+  if (score >= 80) return 'text-emerald-400';
   if (score >= 60) return 'text-teal-400';
   if (score >= 30) return 'text-amber-400';
   return 'text-red-400';
@@ -39,7 +39,7 @@ export function aeoScoreColorClass(score: number): string {
 
 /** AEO score bar fill — 4-tier solid background */
 export function aeoScoreBgBarClass(score: number): string {
-  if (score >= 80) return 'bg-green-500';
+  if (score >= 80) return 'bg-emerald-500';
   if (score >= 60) return 'bg-teal-500';
   if (score >= 30) return 'bg-amber-500';
   return 'bg-red-500';

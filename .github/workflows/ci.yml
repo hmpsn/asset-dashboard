@@ -19,7 +19,9 @@ jobs:
       # pr-check.ts falls back to a full codebase scan gracefully.
       - name: Fetch base branch for diff
         if: github.event_name == 'pull_request'
-        run: git fetch origin ${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }} --depth=1 || true
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: git fetch origin "$BASE_REF:refs/remotes/origin/$BASE_REF" --depth=1 || true
 
       - uses: actions/setup-node@v5
         with:
@@ -44,6 +46,42 @@ jobs:
 
       - name: PR checks
         run: npm run pr-check
+
+      # Phase 2 frozen-paths guard. Only gates branches that are part of the
+      # Phase 5 Phase 2 migration cycle (workers + integrator). Non-Phase-2
+      # work is unaffected so the check doesn't block unrelated PRs that
+      # legitimately touch Phase 1 primitives (e.g. round-3-style polish
+      # follow-ups).
+      #
+      # Pattern: feat/design-system-phase5-2* (workers),
+      #          feat/design-system-phase2-integrator* (coordinator).
+      # The integrator branch auto-passes --integrator so BRAND_DESIGN_LANGUAGE.md
+      # batched doc updates don't trip the check.
+      #
+      # See docs/superpowers/plans/2026-04-24-phase-2-kickoff.md §5 and
+      # scripts/phase2-guard.ts.
+      # Branch refs are surfaced via `env:` rather than `${{ }}` interpolation
+      # in the run block — `${{ }}` is expanded by the Actions runner before
+      # bash sees it, so a head_ref like `feat/design-system-phase$(curl ...)`
+      # would shell-inject. Reading from $HEAD_REF / $BASE_REF keeps the value
+      # opaque to the shell parser. The `if:` filter is fine — startsWith()
+      # is a GitHub-expression-layer call, not passed to bash.
+      # See: https://securitylab.github.com/research/github-actions-untrusted-input/
+      - name: Phase 2 frozen-paths guard
+        if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'feat/design-system-phase')
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [[ "$HEAD_REF" == *"integrator"* || "$HEAD_REF" == *"phase2-integrator"* ]]; then
+            echo "[ci] integrator branch — running guard with --integrator"
+            npx tsx scripts/phase2-guard.ts --integrator --against="origin/$BASE_REF"
+          elif [[ "$HEAD_REF" == feat/design-system-phase5-2* ]]; then
+            echo "[ci] Phase 2 worker branch — running strict guard"
+            npx tsx scripts/phase2-guard.ts --against="origin/$BASE_REF"
+          else
+            echo "[ci] Phase 5 branch but not a Phase 2 worker/integrator pattern — skipping guard"
+          fi
 
       # Regenerate docs/rules/automated-rules.md from the CHECKS array in
       # scripts/pr-check.ts and fail if the committed file drifts. This is

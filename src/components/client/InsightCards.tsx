@@ -1,4 +1,5 @@
 import { TrendingUp, TrendingDown, Clock, Target, Award, Code2, HeartPulse } from 'lucide-react';
+import { Icon } from '../ui/Icon';
 import { SectionCard } from '../ui/SectionCard';
 import { Skeleton } from '../ui/Skeleton';
 import { TierGate } from '../ui/TierGate';
@@ -23,7 +24,7 @@ function TrafficMomentumCard({ insights, loading }: { insights: AnalyticsInsight
   return (
     <SectionCard
       title="Traffic Momentum"
-      titleIcon={<TrendingUp size={14} className="text-teal-400" />}
+      titleIcon={<Icon as={TrendingUp} size="sm" className="text-teal-400" />}
     >
       {loading ? (
         <div className="space-y-2">
@@ -33,15 +34,15 @@ function TrafficMomentumCard({ insights, loading }: { insights: AnalyticsInsight
       ) : (
         <div className="space-y-2 text-sm">
           {improvingCount > 0 ? (
-            <p className="text-zinc-200">
+            <p className="text-[var(--brand-text-bright)]">
               <span className="text-teal-400 font-medium">{improvingCount} page{improvingCount !== 1 ? 's' : ''}</span>
               {' '}gaining momentum this month
             </p>
           ) : (
-            <p className="text-zinc-400">No momentum data yet — check back after analytics sync</p>
+            <p className="text-[var(--brand-text)]">No momentum data yet — check back after analytics sync</p>
           )}
           {decliningCount > 0 && (
-            <p className="text-zinc-400 text-xs">
+            <p className="t-caption text-[var(--brand-text-muted)]">
               {decliningCount} page{decliningCount !== 1 ? 's' : ''} showing decay signals
             </p>
           )}
@@ -66,15 +67,15 @@ function QuickWinsCard({
 
   const cardAction =
     tier === 'premium' ? (
-      <span className="text-xs text-zinc-400">Your strategist is tracking this</span>
+      <span className="t-caption text-[var(--brand-text-muted)]">Your strategist is tracking this</span>
     ) : tier === 'growth' ? (
-      <span className="text-xs text-teal-400 cursor-pointer hover:underline">View in Strategy</span>
+      <span className="t-caption text-teal-400 cursor-pointer hover:underline">View in Strategy</span>
     ) : null;
 
   return (
     <SectionCard
       title="Quick Wins"
-      titleIcon={<Target size={14} className="text-teal-400" />}
+      titleIcon={<Icon as={Target} size="sm" className="text-teal-400" />}
       action={cardAction ?? undefined}
     >
       {loading ? (
@@ -85,25 +86,25 @@ function QuickWinsCard({
         </div>
       ) : tier === 'free' ? (
         <div className="space-y-2">
-          <p className="text-sm text-zinc-400">
+          <p className="text-sm text-[var(--brand-text)]">
             {quickWins.length > 0
               ? `${quickWins.length} page${quickWins.length !== 1 ? 's' : ''} close to page 1`
               : 'Quick wins analysis available'}
           </p>
-          <p className="text-xs text-teal-400 cursor-pointer hover:underline">
+          <p className="t-caption text-teal-400 cursor-pointer hover:underline">
             Upgrade to Growth to unlock quick wins
           </p>
         </div>
       ) : quickWins.length === 0 ? (
-        <p className="text-sm text-zinc-400">No quick wins identified yet</p>
+        <p className="text-sm text-[var(--brand-text)]">No quick wins identified yet</p>
       ) : (
         <ul className="space-y-2">
           {quickWins.slice(0, 3).map(insight => {
             const d = insight.data as unknown as QuickWinData;
             return (
               <li key={insight.id} className="flex items-start justify-between gap-2 text-sm">
-                <span className="text-zinc-300 truncate">{d.pageUrl || insight.pageId}</span>
-                <span className="text-zinc-500 shrink-0">pos {d.currentPosition}</span>
+                <span className="text-[var(--brand-text-bright)] truncate">{d.pageUrl || insight.pageId}</span>
+                <span className="text-[var(--brand-text-muted)] shrink-0">pos {d.currentPosition}</span>
               </li>
             );
           })}
@@ -137,13 +138,13 @@ function TopPerformersCard({
 
   const premiumCta =
     tier === 'premium' ? (
-      <span className="text-xs text-zinc-400">Your strategist is tracking this</span>
+      <span className="t-caption text-[var(--brand-text-muted)]">Your strategist is tracking this</span>
     ) : null;
 
   return (
     <SectionCard
       title="Top Performers"
-      titleIcon={<Award size={14} className="text-teal-400" />}
+      titleIcon={<Icon as={Award} size="sm" className="text-teal-400" />}
       action={premiumCta ?? undefined}
     >
       {loading ? (
@@ -154,7 +155,7 @@ function TopPerformersCard({
       ) : (
         <div className="space-y-2 text-sm">
           {totalConversions > 0 && (
-            <p className="text-zinc-200">
+            <p className="text-[var(--brand-text-bright)]">
               Your best content drove{' '}
               <span className="text-teal-400 font-medium">{totalConversions} conversions</span>
             </p>
@@ -162,16 +163,16 @@ function TopPerformersCard({
           {topPages.length > 0 ? (
             <ul className="space-y-1">
               {topPages.map(insight => (
-                <li key={insight.id} className="flex items-center justify-between text-zinc-400 text-xs">
+                <li key={insight.id} className="flex items-center justify-between text-[var(--brand-text)] t-caption">
                   <span className="truncate">{insight.pageId ?? 'site'}</span>
-                  <span className="text-zinc-500 shrink-0">
+                  <span className="text-[var(--brand-text-muted)] shrink-0">
                     score {(insight.data as Record<string, unknown>).score as number}
                   </span>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-zinc-400">No performance data yet</p>
+            <p className="text-[var(--brand-text)]">No performance data yet</p>
           )}
         </div>
       )}
@@ -199,15 +200,15 @@ export function SchemaOpportunitiesCard({
 
   const cardAction =
     tier === 'premium' ? (
-      <span className="text-xs text-zinc-400">Your strategist is tracking this</span>
+      <span className="t-caption text-[var(--brand-text-muted)]">Your strategist is tracking this</span>
     ) : tier === 'growth' ? (
-      <span className="text-xs text-teal-400 cursor-pointer hover:underline">View Schema tab</span>
+      <span className="t-caption text-teal-400 cursor-pointer hover:underline">View Schema tab</span>
     ) : null;
 
   return (
     <SectionCard
       title="Schema Opportunities"
-      titleIcon={<Code2 size={14} className="text-teal-400" />}
+      titleIcon={<Icon as={Code2} size="sm" className="text-teal-400" />}
       action={cardAction ?? undefined}
     >
       {loading ? (
@@ -217,20 +218,20 @@ export function SchemaOpportunitiesCard({
         </div>
       ) : tier === 'free' ? (
         <div className="space-y-2">
-          <p className="text-sm text-zinc-400">
+          <p className="text-sm text-[var(--brand-text)]">
             {highTrafficPages.length > 0
               ? `${highTrafficPages.length} page${highTrafficPages.length !== 1 ? 's' : ''} could qualify for rich results`
               : 'Schema analysis available'}
           </p>
-          <p className="text-xs text-teal-400 cursor-pointer hover:underline">
+          <p className="t-caption text-teal-400 cursor-pointer hover:underline">
             Upgrade to Growth to unlock schema insights
           </p>
         </div>
       ) : highTrafficPages.length === 0 ? (
-        <p className="text-sm text-zinc-400">No schema opportunity data yet</p>
+        <p className="text-sm text-[var(--brand-text)]">No schema opportunity data yet</p>
       ) : (
         <div className="space-y-2 text-sm">
-          <p className="text-zinc-200">
+          <p className="text-[var(--brand-text-bright)]">
             <span className="text-teal-400 font-medium">{highTrafficPages.length} page{highTrafficPages.length !== 1 ? 's' : ''}</span>
             {' '}could qualify for rich results
           </p>
@@ -239,9 +240,9 @@ export function SchemaOpportunitiesCard({
               let path: string;
               try { path = new URL(insight.pageId || '').pathname; } catch { path = insight.pageId || 'page'; }
               return (
-                <li key={insight.id} className="flex items-center justify-between text-zinc-400 text-xs">
+                <li key={insight.id} className="flex items-center justify-between text-[var(--brand-text)] t-caption">
                   <span className="truncate">{path}</span>
-                  <span className="text-zinc-500 shrink-0">
+                  <span className="text-[var(--brand-text-muted)] shrink-0">
                     {(insight.data as Record<string, unknown>).impressions as number} imp
                   </span>
                 </li>
@@ -277,15 +278,15 @@ export function ContentHealthCard({
 
   const cardAction =
     tier === 'premium' ? (
-      <span className="text-xs text-zinc-400">Your strategist is tracking this</span>
+      <span className="t-caption text-[var(--brand-text-muted)]">Your strategist is tracking this</span>
     ) : tier === 'growth' ? (
-      <span className="text-xs text-teal-400 cursor-pointer hover:underline">View details</span>
+      <span className="t-caption text-teal-400 cursor-pointer hover:underline">View details</span>
     ) : null;
 
   return (
     <SectionCard
       title="Content Health"
-      titleIcon={<HeartPulse size={14} className="text-teal-400" />}
+      titleIcon={<Icon as={HeartPulse} size="sm" className="text-teal-400" />}
       action={cardAction ?? undefined}
     >
       {loading ? (
@@ -295,24 +296,24 @@ export function ContentHealthCard({
         </div>
       ) : tier === 'free' ? (
         <div className="space-y-2">
-          <p className="text-sm text-zinc-400">
+          <p className="text-sm text-[var(--brand-text)]">
             {decayInsights.length > 0
               ? `${decayInsights.length} post${decayInsights.length !== 1 ? 's' : ''} showing decay`
               : 'Content health analysis available'}
           </p>
-          <p className="text-xs text-teal-400 cursor-pointer hover:underline">
+          <p className="t-caption text-teal-400 cursor-pointer hover:underline">
             Upgrade to Growth to see content health
           </p>
         </div>
       ) : decayInsights.length === 0 ? (
-        <p className="text-sm text-zinc-400">No content decay data yet</p>
+        <p className="text-sm text-[var(--brand-text)]">No content decay data yet</p>
       ) : (
         <div className="space-y-2 text-sm">
-          <p className="text-zinc-200">
+          <p className="text-[var(--brand-text-bright)]">
             <span className="text-teal-400 font-medium">{decayInsights.length}</span>
             {' '}post{decayInsights.length !== 1 ? 's' : ''} showing decay
             {estimatedRecovery > 0 && (
-              <span className="text-zinc-400 text-xs">
+              <span className="text-[var(--brand-text-muted)] t-caption">
                 {' '}— a refresh could restore ~{estimatedRecovery} sessions/mo
               </span>
             )}
@@ -322,7 +323,7 @@ export function ContentHealthCard({
               let path: string;
               try { path = new URL(d.pageId || '').pathname; } catch { path = d.pageId || 'page'; }
               return (
-                <li key={i} className="flex items-center justify-between text-zinc-400 text-xs">
+                <li key={i} className="flex items-center justify-between text-[var(--brand-text)] t-caption">
                   <span className="truncate">{path}</span>
                   <span className="text-red-400 shrink-0">{d.deltaPercent}%</span>
                 </li>
@@ -354,7 +355,7 @@ export function SiteHealthCard({
   return (
     <SectionCard
       title="Site Health"
-      titleIcon={<HeartPulse size={14} className="text-teal-400" />}
+      titleIcon={<Icon as={HeartPulse} size="sm" className="text-teal-400" />}
     >
       {loading ? (
         <div className="space-y-2">
@@ -362,27 +363,27 @@ export function SiteHealthCard({
           <Skeleton className="h-4 w-1/2" />
         </div>
       ) : !data ? (
-        <p className="text-sm text-zinc-400">No site health data yet — run an audit to get started</p>
+        <p className="text-sm text-[var(--brand-text)]">No site health data yet — run an audit to get started</p>
       ) : (
         <div className="space-y-2 text-sm">
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-semibold text-zinc-100">{data.siteScore}</span>
-            <span className="text-zinc-500 text-xs">/ 100</span>
+            <span className="text-2xl font-semibold text-[var(--brand-text-bright)]">{data.siteScore}</span>
+            <span className="text-[var(--brand-text-muted)] t-caption">/ 100</span>
             {data.scoreDelta != null && (
               <span
                 className={
                   deltaPositive
-                    ? 'text-teal-400 text-xs font-medium'
+                    ? 'text-teal-400 t-caption font-medium'
                     : deltaNegative
-                      ? 'text-red-400 text-xs font-medium'
-                      : 'text-zinc-500 text-xs'
+                      ? 'text-red-400 t-caption font-medium'
+                      : 'text-[var(--brand-text-muted)] t-caption'
                 }
               >
                 {deltaPositive ? '+' : ''}{data.scoreDelta} pts
               </span>
             )}
           </div>
-          <div className="flex gap-4 text-xs text-zinc-400">
+          <div className="flex gap-4 t-caption text-[var(--brand-text)]">
             {data.errors > 0 && (
               <span>
                 <span className="text-red-400 font-medium">{data.errors}</span> error{data.errors !== 1 ? 's' : ''}
@@ -413,7 +414,7 @@ function CompetitorAlertCard({ insights, tier, loading }: { insights: AnalyticsI
   return (
     <SectionCard
       title="Competitor Alerts"
-      titleIcon={<TrendingDown size={14} className="text-blue-400" />}
+      titleIcon={<Icon as={TrendingDown} size="sm" className="text-blue-400" />}
     >
       <TierGate
         tier={tier}
@@ -429,22 +430,22 @@ function CompetitorAlertCard({ insights, tier, loading }: { insights: AnalyticsI
           </div>
         ) : data ? (
           <div className="space-y-2 text-sm">
-            <p className="text-zinc-200">
+            <p className="text-[var(--brand-text-bright)]">
               <span className="text-blue-400 font-medium">{data.competitorDomain}</span>
               {data.keyword ? ` — "${data.keyword}"` : ''}
             </p>
             {data.previousPosition != null && data.currentPosition != null && (
-              <p className="text-zinc-400 text-xs">
+              <p className="text-[var(--brand-text)] t-caption">
                 Position {data.previousPosition} → {data.currentPosition}
                 {data.volume ? ` · ${Number(data.volume).toLocaleString()} searches/mo` : ''}
               </p>
             )}
             {alerts.length > 1 && (
-              <p className="text-zinc-500 text-xs">{alerts.length - 1} more competitor movement{alerts.length > 2 ? 's' : ''}</p>
+              <p className="text-[var(--brand-text-muted)] t-caption">{alerts.length - 1} more competitor movement{alerts.length > 2 ? 's' : ''}</p>
             )}
           </div>
         ) : (
-          <p className="text-sm text-zinc-400">No competitor movements detected yet</p>
+          <p className="text-sm text-[var(--brand-text)]">No competitor movements detected yet</p>
         )}
       </TierGate>
     </SectionCard>
@@ -461,7 +462,7 @@ function EmergingKeywordCard({ insights, tier, loading }: { insights: AnalyticsI
   return (
     <SectionCard
       title="Rising Search Trends"
-      titleIcon={<TrendingUp size={14} className="text-blue-400" />}
+      titleIcon={<Icon as={TrendingUp} size="sm" className="text-blue-400" />}
     >
       <TierGate
         tier={tier}
@@ -477,28 +478,28 @@ function EmergingKeywordCard({ insights, tier, loading }: { insights: AnalyticsI
           </div>
         ) : data ? (
           <div className="space-y-2 text-sm">
-            <p className="text-zinc-200 font-medium">"{data.keyword}"</p>
+            <p className="text-[var(--brand-text-bright)] font-medium">"{data.keyword}"</p>
             <div className="flex items-center gap-2">
               {data.volume != null && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-500/10 text-blue-400">
+                <span className="inline-flex items-center px-2 py-0.5 rounded t-caption bg-blue-500/10 text-blue-400">
                   {Number(data.volume).toLocaleString()} searches/mo
                 </span>
               )}
               {data.difficulty != null && (
-                <span className="text-zinc-500 text-xs">KD {data.difficulty}</span>
+                <span className="text-[var(--brand-text-muted)] t-caption">KD {data.difficulty}</span>
               )}
             </div>
             {data.currentPosition != null ? (
-              <p className="text-zinc-400 text-xs">Currently ranking at position {Math.round(data.currentPosition)}</p>
+              <p className="text-[var(--brand-text)] t-caption">Currently ranking at position {Math.round(data.currentPosition)}</p>
             ) : (
-              <p className="text-zinc-400 text-xs">Not yet ranking — opportunity to get ahead early</p>
+              <p className="text-[var(--brand-text)] t-caption">Not yet ranking — opportunity to get ahead early</p>
             )}
             {emerging.length > 1 && (
-              <p className="text-zinc-500 text-xs">{emerging.length - 1} more trending keyword{emerging.length > 2 ? 's' : ''}</p>
+              <p className="text-[var(--brand-text-muted)] t-caption">{emerging.length - 1} more trending keyword{emerging.length > 2 ? 's' : ''}</p>
             )}
           </div>
         ) : (
-          <p className="text-sm text-zinc-400">No rising trends detected yet</p>
+          <p className="text-sm text-[var(--brand-text)]">No rising trends detected yet</p>
         )}
       </TierGate>
     </SectionCard>
@@ -515,7 +516,7 @@ function FreshnessAlertCard({ insights, tier, loading }: { insights: AnalyticsIn
   return (
     <SectionCard
       title="Content Freshness"
-      titleIcon={<Clock size={14} className="text-amber-400" />}
+      titleIcon={<Icon as={Clock} size="sm" className="text-amber-400" />}
     >
       <TierGate
         tier={tier}
@@ -531,21 +532,21 @@ function FreshnessAlertCard({ insights, tier, loading }: { insights: AnalyticsIn
           </div>
         ) : data ? (
           <div className="space-y-2 text-sm">
-            <p className="text-zinc-200 text-xs font-mono truncate">{data.pagePath}</p>
-            <p className="text-amber-400 text-xs font-medium">
+            <p className="text-[var(--brand-text-bright)] t-caption font-mono truncate">{data.pagePath}</p>
+            <p className="text-amber-400 t-caption font-medium">
               {data.daysSinceLastAnalysis} days since last analysis
             </p>
             {data.impressions != null && (
-              <p className="text-zinc-400 text-xs">
+              <p className="text-[var(--brand-text)] t-caption">
                 {Number(data.impressions).toLocaleString()} monthly impressions at risk
               </p>
             )}
             {stale.length > 1 && (
-              <p className="text-zinc-500 text-xs">{stale.length - 1} more stale page{stale.length > 2 ? 's' : ''}</p>
+              <p className="text-[var(--brand-text-muted)] t-caption">{stale.length - 1} more stale page{stale.length > 2 ? 's' : ''}</p>
             )}
           </div>
         ) : (
-          <p className="text-sm text-zinc-400">All analyzed pages are up to date</p>
+          <p className="text-sm text-[var(--brand-text)]">All analyzed pages are up to date</p>
         )}
       </TierGate>
     </SectionCard>

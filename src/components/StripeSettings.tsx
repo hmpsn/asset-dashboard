@@ -3,7 +3,7 @@ import {
   CreditCard, Eye, EyeOff, Save, Trash2, Loader2,
   CheckCircle2, AlertTriangle, ChevronDown, ChevronUp, DollarSign,
 } from 'lucide-react';
-import { SectionCard, Badge } from './ui';
+import { SectionCard, Badge, Icon } from './ui';
 import { useToast } from '../hooks/useToast';
 import { stripe } from '../api';
 
@@ -148,9 +148,9 @@ export function StripeSettings() {
 
   if (loading) {
     return (
-      <SectionCard title="Payments" titleIcon={<CreditCard className="w-4 h-4 text-teal-400" />}>
+      <SectionCard title="Payments" titleIcon={<Icon as={CreditCard} size="md" className="text-teal-400" />}>
         <div className="flex items-center justify-center py-6">
-          <Loader2 className="w-4 h-4 animate-spin text-zinc-500" />
+          <Icon as={Loader2} size="md" className="animate-spin text-[var(--brand-text-muted)]" />
         </div>
       </SectionCard>
     );
@@ -161,10 +161,10 @@ export function StripeSettings() {
   return (
     <SectionCard
       title="Payments"
-      titleIcon={<CreditCard className="w-4 h-4 text-teal-400" />}
+      titleIcon={<Icon as={CreditCard} size="md" className="text-teal-400" />}
       action={
         config?.configured ? (
-          <Badge label="Connected" color="green" />
+          <Badge label="Connected" color="emerald" />
         ) : (
           <Badge label="Not configured" color="zinc" />
         )
@@ -172,41 +172,49 @@ export function StripeSettings() {
     >
       {/* Toast */}
       {toast && (
-        <div className={`mb-3 px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 ${
+        <div className={`mb-3 px-3 py-2 rounded-[var(--radius-lg)] t-caption font-medium flex items-center gap-2 ${
           toast.type === 'success' ? 'bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20' : 'bg-red-500/8 text-red-400/80 border border-red-500/20'
         }`}>
-          {toast.type === 'success' ? <CheckCircle2 className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
+          {toast.type === 'success'
+            ? <Icon as={CheckCircle2} size="sm" />
+            : <Icon as={AlertTriangle} size="sm" />}
           {toast.message}
         </div>
       )}
 
       <div className="space-y-4">
         {/* Status summary */}
-        <div className="flex items-center gap-3 text-xs">
+        <div className="flex items-center gap-3 t-caption">
           <div className="flex items-center gap-1.5">
-            {config?.hasSecretKey ? <CheckCircle2 className="w-3 h-3 text-emerald-400/80" /> : <AlertTriangle className="w-3 h-3 text-zinc-600" />}
-            <span className={config?.hasSecretKey ? 'text-zinc-300' : 'text-zinc-500'}>Secret Key</span>
+            {config?.hasSecretKey
+              ? <Icon as={CheckCircle2} size="sm" className="text-emerald-400/80" />
+              : <Icon as={AlertTriangle} size="sm" className="text-[var(--brand-border-hover)]" />}
+            <span className={config?.hasSecretKey ? 'text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)]'}>Secret Key</span>
           </div>
           <div className="flex items-center gap-1.5">
-            {config?.hasWebhookSecret ? <CheckCircle2 className="w-3 h-3 text-emerald-400/80" /> : <AlertTriangle className="w-3 h-3 text-zinc-600" />}
-            <span className={config?.hasWebhookSecret ? 'text-zinc-300' : 'text-zinc-500'}>Webhook Secret</span>
+            {config?.hasWebhookSecret
+              ? <Icon as={CheckCircle2} size="sm" className="text-emerald-400/80" />
+              : <Icon as={AlertTriangle} size="sm" className="text-[var(--brand-border-hover)]" />}
+            <span className={config?.hasWebhookSecret ? 'text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)]'}>Webhook Secret</span>
           </div>
           <div className="flex items-center gap-1.5">
-            {config?.hasPublishableKey ? <CheckCircle2 className="w-3 h-3 text-emerald-400/80" /> : <AlertTriangle className="w-3 h-3 text-zinc-600" />}
-            <span className={config?.hasPublishableKey ? 'text-zinc-300' : 'text-zinc-500'}>Publishable Key</span>
+            {config?.hasPublishableKey
+              ? <Icon as={CheckCircle2} size="sm" className="text-emerald-400/80" />
+              : <Icon as={AlertTriangle} size="sm" className="text-[var(--brand-border-hover)]" />}
+            <span className={config?.hasPublishableKey ? 'text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)]'}>Publishable Key</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <DollarSign className={`w-3 h-3 ${configuredCount > 0 ? 'text-emerald-400/80' : 'text-zinc-600'}`} />
-            <span className={configuredCount > 0 ? 'text-zinc-300' : 'text-zinc-500'}>{configuredCount}/{products.length} products</span>
+            <Icon as={DollarSign} size="sm" className={configuredCount > 0 ? 'text-emerald-400/80' : 'text-[var(--brand-border-hover)]'} />
+            <span className={configuredCount > 0 ? 'text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)]'}>{configuredCount}/{products.length} products</span>
           </div>
         </div>
 
         {/* API Keys */}
         <div>
-          <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-2">API Keys</div>
+          <div className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider mb-2">API Keys</div>
           <div className="space-y-2">
             <div>
-              <label className="text-[11px] text-zinc-400 block mb-1">Secret Key {config?.hasSecretKey && <span className="text-emerald-400/80">(saved)</span>}</label>
+              <label className="t-caption-sm text-[var(--brand-text)] block mb-1">Secret Key {config?.hasSecretKey && <span className="text-emerald-400/80">(saved)</span>}</label>
               <div className="flex items-center gap-1.5">
                 <div className="relative flex-1">
                   <input
@@ -214,19 +222,19 @@ export function StripeSettings() {
                     value={secretKey}
                     onChange={e => setSecretKey(e.target.value)}
                     placeholder={config?.hasSecretKey ? '••••••••••••••••' : 'sk_test_... or sk_live_...'}
-                    className="w-full px-2.5 py-1.5 rounded-lg text-xs bg-zinc-800/50 border border-zinc-700 text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-teal-500/50 pr-8 font-mono"
+                    className="w-full px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-bright)] placeholder:text-[var(--brand-border-hover)] focus:outline-none focus:border-teal-500/50 pr-8 font-mono"
                   />
                   <button
                     onClick={() => setShowSecretKey(!showSecretKey)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
                   >
-                    {showSecretKey ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                    {showSecretKey ? <Icon as={EyeOff} size="sm" /> : <Icon as={Eye} size="sm" />}
                   </button>
                 </div>
               </div>
             </div>
             <div>
-              <label className="text-[11px] text-zinc-400 block mb-1">Webhook Secret {config?.hasWebhookSecret && <span className="text-emerald-400/80">(saved)</span>}</label>
+              <label className="t-caption-sm text-[var(--brand-text)] block mb-1">Webhook Secret {config?.hasWebhookSecret && <span className="text-emerald-400/80">(saved)</span>}</label>
               <div className="flex items-center gap-1.5">
                 <div className="relative flex-1">
                   <input
@@ -234,19 +242,19 @@ export function StripeSettings() {
                     value={webhookSecret}
                     onChange={e => setWebhookSecret(e.target.value)}
                     placeholder={config?.hasWebhookSecret ? '••••••••••••••••' : 'whsec_...'}
-                    className="w-full px-2.5 py-1.5 rounded-lg text-xs bg-zinc-800/50 border border-zinc-700 text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-teal-500/50 pr-8 font-mono"
+                    className="w-full px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-bright)] placeholder:text-[var(--brand-border-hover)] focus:outline-none focus:border-teal-500/50 pr-8 font-mono"
                   />
                   <button
                     onClick={() => setShowWebhookSecret(!showWebhookSecret)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
                   >
-                    {showWebhookSecret ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                    {showWebhookSecret ? <Icon as={EyeOff} size="sm" /> : <Icon as={Eye} size="sm" />}
                   </button>
                 </div>
               </div>
             </div>
             <div>
-              <label className="text-[11px] text-zinc-400 block mb-1">Publishable Key {config?.hasPublishableKey && <span className="text-emerald-400/80">(saved)</span>}</label>
+              <label className="t-caption-sm text-[var(--brand-text)] block mb-1">Publishable Key {config?.hasPublishableKey && <span className="text-emerald-400/80">(saved)</span>}</label>
               <div className="flex items-center gap-1.5">
                 <div className="relative flex-1">
                   <input
@@ -254,27 +262,27 @@ export function StripeSettings() {
                     value={publishableKey}
                     onChange={e => setPublishableKey(e.target.value)}
                     placeholder={config?.hasPublishableKey ? config.publishableKey.slice(0, 12) + '...' : 'pk_test_... or pk_live_...'}
-                    className="w-full px-2.5 py-1.5 rounded-lg text-xs bg-zinc-800/50 border border-zinc-700 text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-teal-500/50 font-mono"
+                    className="w-full px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-bright)] placeholder:text-[var(--brand-border-hover)] focus:outline-none focus:border-teal-500/50 font-mono"
                   />
                 </div>
               </div>
-              <p className="text-[10px] text-zinc-600 mt-1">Required for inline payment form (Stripe Elements). Found in Stripe Dashboard → API keys.</p>
+              <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">Required for inline payment form (Stripe Elements). Found in Stripe Dashboard → API keys.</p>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={saveKeys}
                 disabled={saving || (!secretKey && !webhookSecret && !publishableKey)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 border border-teal-500/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption font-medium bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 border border-teal-500/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                {saving ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Save} size="sm" />}
                 Save Keys
               </button>
               {config?.configured && (
                 <button
                   onClick={clearConfig}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-red-400 hover:bg-red-500/10 border border-zinc-800 hover:border-red-500/20 transition-all"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption font-medium text-red-400 hover:bg-red-500/10 border border-[var(--brand-border)] hover:border-red-500/20 transition-all"
                 >
-                  <Trash2 className="w-3 h-3" /> Disconnect
+                  <Icon as={Trash2} size="sm" /> Disconnect
                 </button>
               )}
             </div>
@@ -287,15 +295,17 @@ export function StripeSettings() {
             onClick={() => setProductsExpanded(!productsExpanded)}
             className="flex items-center gap-2 w-full text-left group"
           >
-            <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Product Price IDs</div>
-            <span className="text-[11px] text-zinc-600">({configuredCount} configured)</span>
-            {productsExpanded ? <ChevronUp className="w-3 h-3 text-zinc-500 ml-auto" /> : <ChevronDown className="w-3 h-3 text-zinc-500 ml-auto" />}
+            <div className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Product Price IDs</div>
+            <span className="t-caption-sm text-[var(--brand-text-muted)]">({configuredCount} configured)</span>
+            {productsExpanded
+              ? <Icon as={ChevronUp} size="sm" className="text-[var(--brand-text-muted)] ml-auto" />
+              : <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text-muted)] ml-auto" />}
           </button>
 
           {productsExpanded && (
             <div className="mt-2 space-y-1.5">
-              <p className="text-[11px] text-zinc-500 mb-2">
-                Paste the <code className="text-zinc-400">price_...</code> ID from your Stripe Dashboard → Products for each item.
+              <p className="t-caption-sm text-[var(--brand-text-muted)] mb-2">
+                Paste the <code className="text-[var(--brand-text)]">price_...</code> ID from your Stripe Dashboard → Products for each item.
               </p>
               {(() => {
                 let lastGroup = '';
@@ -305,35 +315,35 @@ export function StripeSettings() {
                   return (
                     <div key={product.productType}>
                       {showGroupHeader && (
-                        <div className={`text-[10px] uppercase tracking-wider font-medium mt-3 mb-1.5 flex items-center gap-2 ${
-                          product.recurring ? 'text-teal-400' : 'text-zinc-500'
+                        <div className={`t-caption-sm uppercase tracking-wider font-medium mt-3 mb-1.5 flex items-center gap-2 ${
+                          product.recurring ? 'text-teal-400' : 'text-[var(--brand-text-muted)]'
                         }`}>
                           {product.group}
-                          {product.recurring && <span className="text-[9px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400 normal-case tracking-normal font-medium">recurring</span>}
+                          {product.recurring && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400 normal-case tracking-normal font-medium">recurring</span>}
                         </div>
                       )}
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => updateProduct(idx, { enabled: !product.enabled })}
                           className={`w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${
-                            product.enabled ? 'bg-teal-500/20 border-teal-500/40' : 'bg-zinc-800 border-zinc-700'
+                            product.enabled ? 'bg-teal-500/20 border-teal-500/40' : 'bg-[var(--surface-3)] border-[var(--brand-border)]'
                           }`}
                         >
-                          {product.enabled && <CheckCircle2 className="w-2.5 h-2.5 text-teal-400" />}
+                          {product.enabled && <Icon as={CheckCircle2} size="xs" className="text-teal-400" />}
                         </button>
-                        <span className={`text-[11px] w-44 truncate flex-shrink-0 ${product.enabled ? 'text-zinc-300' : 'text-zinc-600'}`}>
+                        <span className={`t-caption-sm w-44 truncate flex-shrink-0 ${product.enabled ? 'text-[var(--brand-text)]' : 'text-[var(--brand-border-hover)]'}`}>
                           {product.displayName}
                         </span>
                         <div className="flex items-center w-16 flex-shrink-0">
-                          <span className="text-[11px] text-zinc-500">$</span>
+                          <span className="t-caption-sm text-[var(--brand-text-muted)]">$</span>
                           <input
                             type="number"
                             value={product.priceUsd}
                             onChange={e => updateProduct(idx, { priceUsd: Math.max(0, Number(e.target.value)) })}
                             disabled={!product.enabled}
-                            className="w-full px-1 py-0.5 rounded text-[11px] text-right bg-zinc-800/50 border border-zinc-700 text-zinc-200 focus:outline-none focus:border-teal-500/50 disabled:opacity-30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            className="w-full px-1 py-0.5 rounded t-caption-sm text-right bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500/50 disabled:opacity-30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
-                          {product.recurring && <span className="text-[10px] text-zinc-600 ml-0.5">/mo</span>}
+                          {product.recurring && <span className="t-caption-sm text-[var(--brand-text-muted)] ml-0.5">/mo</span>}
                         </div>
                         <input
                           type="text"
@@ -341,7 +351,7 @@ export function StripeSettings() {
                           onChange={e => updateProduct(idx, { stripePriceId: e.target.value.trim() })}
                           placeholder="price_..."
                           disabled={!product.enabled}
-                          className="flex-1 px-2 py-1 rounded text-[11px] bg-zinc-800/50 border border-zinc-700 text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-teal-500/50 font-mono disabled:opacity-30"
+                          className="flex-1 px-2 py-1 rounded t-caption-sm bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-bright)] placeholder:text-[var(--brand-border-hover)] focus:outline-none focus:border-teal-500/50 font-mono disabled:opacity-30"
                         />
                       </div>
                     </div>
@@ -351,9 +361,9 @@ export function StripeSettings() {
               <button
                 onClick={saveProductConfig}
                 disabled={savingProducts}
-                className="mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 border border-teal-500/20 transition-all disabled:opacity-40"
+                className="mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption font-medium bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 border border-teal-500/20 transition-all disabled:opacity-40"
               >
-                {savingProducts ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                {savingProducts ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Save} size="sm" />}
                 Save Products
               </button>
             </div>
@@ -362,20 +372,20 @@ export function StripeSettings() {
 
         {/* Help text */}
         {!config?.configured && (
-          <div className="text-[11px] text-zinc-500 leading-relaxed border-t border-zinc-800 pt-3">
-            <strong className="text-zinc-400">Setup:</strong> Create products in your{' '}
+          <div className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed border-t border-[var(--brand-border)] pt-3">
+            <strong className="text-[var(--brand-text)]">Setup:</strong> Create products in your{' '}
             <a href="https://dashboard.stripe.com/products" target="_blank" rel="noopener noreferrer" className="text-teal-400 hover:text-teal-300 underline">
               Stripe Dashboard
             </a>
-            , copy the <code className="text-zinc-400">price_...</code> IDs, then add a webhook endpoint pointing to{' '}
-            <code className="text-zinc-400">/api/stripe/webhook</code> for events{' '}
-            <code className="text-zinc-400">checkout.session.completed</code> and{' '}
-            <code className="text-zinc-400">payment_intent.payment_failed</code>.
+            , copy the <code className="text-[var(--brand-text)]">price_...</code> IDs, then add a webhook endpoint pointing to{' '}
+            <code className="text-[var(--brand-text)]">/api/stripe/webhook</code> for events{' '}
+            <code className="text-[var(--brand-text)]">checkout.session.completed</code> and{' '}
+            <code className="text-[var(--brand-text)]">payment_intent.payment_failed</code>.
           </div>
         )}
 
         {config?.updatedAt && (
-          <div className="text-[11px] text-zinc-600 pt-1">
+          <div className="t-caption-sm text-[var(--brand-text-muted)] pt-1">
             Last updated: {new Date(config.updatedAt).toLocaleString()}
           </div>
         )}

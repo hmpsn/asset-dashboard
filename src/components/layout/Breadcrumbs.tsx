@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { type Page, adminPath } from '../../routes';
 import type { Workspace } from '../WorkspaceSelector';
+import { Icon } from '../ui';
 import { ArrowLeft, ChevronRight, Search, MessageSquare } from 'lucide-react';
 
 const TAB_LABELS: Record<string, string> = {
@@ -26,19 +27,19 @@ export function Breadcrumbs({
   const navigate = useNavigate();
 
   return (
-    <div className="flex items-center gap-1.5 px-5 py-2 border-b border-zinc-800 text-[11px] min-h-[36px]">
+    <div className="flex items-center gap-1.5 px-5 py-2 border-b border-[var(--brand-border)] t-caption-sm min-h-[36px]">
       {selected && tab !== 'home' && (
         <button
           onClick={() => navigate(adminPath(selected.id))}
-          className="p-1 -ml-1 mr-0.5 rounded text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800/50 transition-colors"
+          className="p-1 -ml-1 mr-0.5 rounded text-zinc-600 hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)] transition-colors"
           title="Back to workspace home"
         >
-          <ArrowLeft className="w-3 h-3" />
+          <Icon as={ArrowLeft} size="sm" />
         </button>
       )}
       <button
         onClick={() => navigate('/')}
-        className={`font-medium transition-colors ${!selected ? 'text-teal-400' : 'text-zinc-500 hover:text-zinc-300'}`}
+        className={`font-medium transition-colors ${!selected ? 'text-teal-400' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}
       >
         Command Center
       </button>
@@ -46,17 +47,17 @@ export function Breadcrumbs({
         <>
           <span className="text-zinc-700">/</span>
           <div className="relative group">
-            <button className="font-medium text-zinc-300 hover:text-teal-400 transition-colors flex items-center gap-1">
+            <button className="font-medium text-[var(--brand-text)] hover:text-teal-400 transition-colors flex items-center gap-1">
               {selected.webflowSiteName || selected.name}
-              <ChevronRight className="w-2.5 h-2.5 text-zinc-600 rotate-90" />
+              <Icon as={ChevronRight} size="sm" className="text-zinc-600 rotate-90" />
             </button>
-            <div className="absolute top-full left-0 mt-1 w-48 max-h-[300px] overflow-y-auto bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 py-1">
+            <div className="absolute top-full left-0 mt-1 w-48 max-h-[300px] overflow-y-auto bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 py-1">
               {workspaces.map(ws => (
                 <button
                   key={ws.id}
                   onClick={() => navigate(adminPath(ws.id))}
-                  className={`w-full text-left px-3 py-1.5 text-[11px] transition-colors ${
-                    ws.id === selected.id ? 'text-teal-400 bg-teal-500/5' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
+                  className={`w-full text-left px-3 py-1.5 t-caption-sm transition-colors ${
+                    ws.id === selected.id ? 'text-teal-400 bg-teal-500/5' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]'
                   }`}
                 >
                   <span className="truncate block">{ws.webflowSiteName || ws.name}</span>
@@ -67,7 +68,7 @@ export function Breadcrumbs({
           {tab !== 'home' && (
             <>
               <span className="text-zinc-700">/</span>
-              <span className="text-zinc-500">
+              <span className="text-[var(--brand-text-muted)]">
                 {TAB_LABELS[tab] || tab}
               </span>
             </>
@@ -77,7 +78,7 @@ export function Breadcrumbs({
       {!selected && tab !== 'home' && (
         <>
           <span className="text-zinc-700">/</span>
-          <span className="text-zinc-500">
+          <span className="text-[var(--brand-text-muted)]">
             {TAB_LABELS[tab] || tab}
           </span>
         </>
@@ -96,20 +97,20 @@ export function Breadcrumbs({
             window.dispatchEvent(event);
           }}
           title="Command Palette (⌘K)"
-          className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 transition-all"
+          className="p-1.5 rounded-[var(--radius-lg)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)] transition-all"
         >
-          <Search className="w-3.5 h-3.5" />
+          <Icon as={Search} size="sm" />
         </button>
         {/* Requests widget */}
         {selected && (
           <button
             onClick={() => selected && navigate(adminPath(selected.id, 'requests'))}
             title="Client Requests"
-            className={`relative p-1.5 rounded-lg transition-all ${tab === 'requests' ? 'text-teal-400 bg-teal-500/10' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'}`}
+            className={`relative p-1.5 rounded-[var(--radius-lg)] transition-all ${tab === 'requests' ? 'text-teal-400 bg-teal-500/10' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]'}`}
           >
-            <MessageSquare className="w-3.5 h-3.5" />
+            <Icon as={MessageSquare} size="sm" />
             {pendingContentRequests > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 text-[9px] font-bold px-1 py-0 rounded-full bg-amber-500/90 text-[#0f1219] min-w-[14px] text-center leading-[14px]">
+              <span className="absolute -top-0.5 -right-0.5 t-micro font-bold px-1 py-0 rounded-full bg-amber-500/90 text-[#0f1219] min-w-[14px] text-center leading-[14px]">
                 {pendingContentRequests}
               </span>
             )}

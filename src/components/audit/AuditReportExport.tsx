@@ -3,6 +3,7 @@
  * Extracted from SeoAudit.tsx to keep the orchestrator lean.
  */
 import { FileText, Download, X } from 'lucide-react';
+import { Icon } from '../ui';
 import type { SeoAuditResult } from './types';
 
 // ── Pure helpers ────────────────────────────────────────────────────
@@ -161,29 +162,32 @@ interface ReportModalProps {
 export function ReportModal({ onExportHtml, onExportCsv, onClose }: ReportModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={onClose}>
-      <div className="relative max-w-md w-full mx-4 bg-zinc-900 rounded-xl border border-zinc-700 p-6" onClick={e => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute top-4 right-4 text-zinc-400 hover:text-white"><X className="w-4 h-4" /></button>
-        <h3 className="text-lg font-semibold mb-1">Export SEO Report</h3>
-        <p className="text-xs text-zinc-500 mb-5">Choose a format to view the audit results</p>
+      {/* pr-check-disable-next-line -- modal dialog */}
+      <div className="relative max-w-md w-full mx-4 bg-[var(--surface-2)] rounded-xl border border-[var(--brand-border)] p-6" onClick={e => e.stopPropagation()}>
+        <button onClick={onClose} className="absolute top-4 right-4 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]">
+          <Icon as={X} size="md" />
+        </button>
+        <h3 className="t-body font-semibold mb-1">Export SEO Report</h3>
+        <p className="t-caption text-[var(--brand-text-muted)] mb-5">Choose a format to view the audit results</p>
         <div className="space-y-3">
           <button
             onClick={onExportHtml}
             className="w-full flex items-center gap-3 px-4 py-3 bg-teal-600 hover:bg-teal-500 rounded-lg transition-colors text-left"
           >
-            <FileText className="w-5 h-5" />
+            <Icon as={FileText} size="lg" />
             <div>
-              <div className="text-sm font-medium">HTML Report</div>
-              <div className="text-xs text-teal-200">Beautifully formatted, client-ready report. Print to PDF.</div>
+              <div className="t-body font-medium">HTML Report</div>
+              <div className="t-caption text-teal-200">Beautifully formatted, client-ready report. Print to PDF.</div>
             </div>
           </button>
           <button
             onClick={onExportCsv}
-            className="w-full flex items-center gap-3 px-4 py-3 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors text-left"
+            className="w-full flex items-center gap-3 px-4 py-3 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] rounded-lg transition-colors text-left"
           >
-            <Download className="w-5 h-5" />
+            <Icon as={Download} size="lg" />
             <div>
-              <div className="text-sm font-medium">CSV Spreadsheet</div>
-              <div className="text-xs text-zinc-400">Raw data for analysis in Excel or Google Sheets.</div>
+              <div className="t-body font-medium">CSV Spreadsheet</div>
+              <div className="t-caption text-[var(--brand-text-muted)]">Raw data for analysis in Excel or Google Sheets.</div>
             </div>
           </button>
         </div>
@@ -203,15 +207,15 @@ interface ReportViewerProps {
 export function ReportViewer({ reportView, data, onClose }: ReportViewerProps) {
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black/90 backdrop-blur-sm">
-      <div className="flex items-center justify-between px-4 py-3 bg-zinc-900 border-b border-zinc-800">
-        <div className="text-sm font-medium text-zinc-200">
+      <div className="flex items-center justify-between px-4 py-3 bg-[var(--surface-2)] border-b border-[var(--brand-border)]">
+        <div className="t-body font-medium text-[var(--brand-text-bright)]">
           {reportView === 'html' ? 'SEO Audit Report' : 'CSV Export'}
         </div>
         <div className="flex items-center gap-2">
           {reportView === 'csv' && (
             <button
               onClick={() => { navigator.clipboard.writeText(getCSV(data)); }}
-              className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-lg text-xs font-medium transition-colors"
+              className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-lg t-caption font-medium transition-colors"
             >
               Copy to Clipboard
             </button>
@@ -222,16 +226,16 @@ export function ReportViewer({ reportView, data, onClose }: ReportViewerProps) {
                 const iframe = document.getElementById('report-iframe') as HTMLIFrameElement;
                 if (iframe?.contentWindow) iframe.contentWindow.print();
               }}
-              className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-lg text-xs font-medium transition-colors"
+              className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-lg t-caption font-medium transition-colors"
             >
               Print / Save as PDF
             </button>
           )}
           <button
             onClick={onClose}
-            className="p-1.5 hover:bg-zinc-800 rounded-lg transition-colors"
+            className="p-1.5 hover:bg-[var(--surface-3)] rounded-lg transition-colors"
           >
-            <X className="w-4 h-4 text-zinc-400" />
+            <Icon as={X} size="md" className="text-[var(--brand-text)]" />
           </button>
         </div>
       </div>
@@ -247,7 +251,7 @@ export function ReportViewer({ reportView, data, onClose }: ReportViewerProps) {
           <textarea
             readOnly
             value={getCSV(data)}
-            className="w-full h-full p-4 bg-zinc-950 text-zinc-300 text-xs font-mono resize-none focus:outline-none"
+            className="w-full h-full p-4 bg-[var(--surface-1)] text-[var(--brand-text)] t-mono resize-none focus:outline-none"
           />
         )}
       </div>

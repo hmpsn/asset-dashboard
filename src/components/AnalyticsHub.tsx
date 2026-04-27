@@ -1,7 +1,7 @@
 // src/components/AnalyticsHub.tsx
 import { useState } from 'react';
 import { BarChart3, Search, Activity, StickyNote } from 'lucide-react';
-import { PageHeader, TabBar } from './ui';
+import { PageHeader, TabBar, Icon } from './ui';
 import { AnalyticsOverview } from './AnalyticsOverview';
 import { SearchDetail } from './SearchDetail';
 import { TrafficDetail } from './TrafficDetail';
@@ -31,7 +31,7 @@ export function AnalyticsHub({ workspaceId, siteId, gscPropertyUrl, ga4PropertyI
       <PageHeader
         title="Analytics"
         subtitle="Search performance, traffic insights, and annotations"
-        icon={<BarChart3 className="w-5 h-5 text-teal-400" />}
+        icon={<Icon as={BarChart3} size="lg" className="text-teal-400" />}
       />
 
       {/* tab-deeplink-ok — analytics tabs are not navigated to via ?tab= from other components */}

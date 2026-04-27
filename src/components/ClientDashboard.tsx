@@ -9,7 +9,7 @@ import {
   CheckCircle2, LineChart, Trophy, Layers,
   Clock, CreditCard, Building2, Sparkles,
 } from 'lucide-react';
-import { type Tier, Skeleton, OverviewSkeleton, ScannerReveal } from './ui';
+import { type Tier, Skeleton, OverviewSkeleton, ScannerReveal, Icon } from './ui';
 import { STUDIO_NAME, STUDIO_URL } from '../constants';
 import { HealthTab } from './client/HealthTab';
 import { InsightsEngine } from './client/InsightsEngine';
@@ -335,11 +335,11 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   };
 
   if (loading) return (
-    <div className="min-h-screen bg-[#0f1219] text-zinc-200">
-      <header className="border-b border-zinc-800">
+    <div className="min-h-screen bg-[var(--surface-1)] text-[var(--brand-text)]">
+      <header className="border-b border-[var(--brand-border)]">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-4">
           <Skeleton className="h-6 w-24" />
-          <div className="w-px h-8 bg-zinc-800" />
+          <div className="w-px h-8 bg-[var(--brand-border)]" />
           <div><Skeleton className="h-5 w-40" /><Skeleton className="h-3 w-28 mt-1.5" /></div>
         </div>
         <div className="max-w-6xl mx-auto px-6 pb-3 flex gap-4">
@@ -352,10 +352,10 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     </div>
   );
   if (error || !ws) return (
-    <div className="min-h-screen bg-[#0f1219] flex items-center justify-center">
+    <div className="min-h-screen bg-[var(--surface-1)] flex items-center justify-center">
       <div className="text-center">
         <p className="text-red-400/80 text-sm mb-3">{error || 'Dashboard not found'}</p>
-        <button onClick={() => window.location.reload()} className="text-xs text-zinc-400 hover:text-zinc-200 px-3 py-1.5 rounded-lg border border-zinc-700 hover:border-zinc-600 transition-colors">Try Again</button>
+        <button onClick={() => window.location.reload()} className="text-xs text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] px-3 py-1.5 rounded-lg border border-[var(--brand-border)] hover:border-[var(--brand-border-strong)] transition-colors">Try Again</button>
       </div>
     </div>
   );
@@ -453,7 +453,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     <ErrorBoundary label="Client Dashboard">
     <BetaProvider value={betaMode}>
     <CartProvider>
-    <div className={`min-h-screen bg-[#0f1219] text-zinc-200 ${theme === 'light' ? 'dashboard-light' : ''}`}>
+    <div className={`min-h-screen bg-[var(--surface-1)] text-[var(--brand-text)] ${theme === 'light' ? 'dashboard-light' : ''}`}>
       {!betaMode && !isExternalBilling && <SeoCartDrawer workspaceId={workspaceId} tier={effectiveTier} />}
 
       <ClientHeader
@@ -492,7 +492,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         {/* Trial countdown banner — shows at day 10 and under */}
         {!betaMode && !isExternalBilling && ws.isTrial && (ws.trialDaysRemaining ?? 0) <= 10 && (ws.trialDaysRemaining ?? 0) > 0 && (
           <div className="flex items-center gap-3 px-4 py-3 bg-amber-500/8 border border-amber-500/20" style={{ borderRadius: '6px 12px 6px 12px' }}>
-            <Clock className="w-4 h-4 text-amber-400/80 flex-shrink-0" />
+            <Icon as={Clock} size="md" className="text-amber-400/80 flex-shrink-0" />
             <p className="text-sm text-amber-300">
               <strong>{ws.trialDaysRemaining} day{ws.trialDaysRemaining === 1 ? '' : 's'}</strong> left on your Growth trial.
               {' '}Upgrade to keep access to all features.
@@ -501,7 +501,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         )}
         {!betaMode && !isExternalBilling && ws.isTrial && (ws.trialDaysRemaining ?? 0) === 0 && (
           <div className="flex items-center gap-3 px-4 py-3 bg-red-500/8 border border-red-500/20" style={{ borderRadius: '6px 12px 6px 12px' }}>
-            <Clock className="w-4 h-4 text-red-400/80 flex-shrink-0" />
+            <Icon as={Clock} size="md" className="text-red-400/80 flex-shrink-0" />
             <p className="text-sm text-red-300">
               Your Growth trial has ended. Some features are now limited.
               {' '}Upgrade to restore full access.
@@ -512,7 +512,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         {/* Section loading errors */}
         {Object.keys(sectionErrors).length > 0 && (
           <div className="flex items-start gap-3 px-4 py-3 bg-red-500/8 border border-red-500/15" style={{ borderRadius: '6px 12px 6px 12px' }}>
-            <AlertTriangle className="w-4 h-4 text-red-400/80 flex-shrink-0 mt-0.5" />
+            <Icon as={AlertTriangle} size="md" className="text-red-400/80 flex-shrink-0 mt-0.5" />
             <div className="text-sm text-red-300 space-y-0.5">
               {Object.values(sectionErrors).map((msg, i) => <p key={i}>{msg} — try refreshing the page.</p>)}
             </div>
@@ -695,18 +695,18 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
       {/* Toast notification */}
       {toast && (
-        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] px-5 py-3 rounded-xl border shadow-lg backdrop-blur-sm flex items-center gap-2.5 animate-[slideUp_0.3s_ease] ${toast.type === 'success' ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' : 'bg-red-500/15 border-red-500/30 text-red-300'}`}>
-          {toast.type === 'success' ? <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> : <AlertTriangle className="w-4 h-4 flex-shrink-0" />}
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] px-5 py-3 rounded-[var(--radius-xl)] border shadow-lg backdrop-blur-sm flex items-center gap-2.5 animate-[slideUp_0.3s_ease] ${toast.type === 'success' ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' : 'bg-red-500/15 border-red-500/30 text-red-300'}`}>
+          {toast.type === 'success' ? <Icon as={CheckCircle2} size="md" className="flex-shrink-0" /> : <Icon as={AlertTriangle} size="md" className="flex-shrink-0" />}
           <span className="text-xs font-medium">{toast.message}</span>
-          <button onClick={clearToast} className="ml-2 text-zinc-400 hover:text-zinc-200"><X className="w-3.5 h-3.5" /></button>
+          <button onClick={clearToast} className="ml-2 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"><Icon as={X} size="md" /></button>
         </div>
       )}
 
       {/* Powered by footer */}
-      <footer className="border-t border-zinc-800/50 mt-12">
+      <footer className="border-t border-[var(--brand-border)] mt-12">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <span className="text-[11px] text-zinc-700">Powered by {STUDIO_NAME}</span>
-          <a href={STUDIO_URL} target="_blank" rel="noopener noreferrer" className="text-[11px] text-zinc-700 hover:text-zinc-500 transition-colors">{STUDIO_NAME}</a>
+          <span className="t-caption-sm text-[var(--brand-text-faint)]">Powered by {STUDIO_NAME}</span>
+          <a href={STUDIO_URL} target="_blank" rel="noopener noreferrer" className="t-caption-sm text-[var(--brand-text-faint)] hover:text-[var(--brand-text-muted)] transition-colors">{STUDIO_NAME}</a>
         </div>
       </footer>
     </div>

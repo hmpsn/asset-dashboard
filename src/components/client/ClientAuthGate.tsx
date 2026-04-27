@@ -1,9 +1,10 @@
 import { useCallback } from 'react';
 import type React from 'react';
-import { Loader2, Lock } from 'lucide-react';
+import { Lock } from 'lucide-react';
 import { post } from '../../api/client';
 import TurnstileWidget from '../TurnstileWidget';
 import { STUDIO_NAME } from '../../constants';
+import { Icon, Button } from '../ui';
 import type { WorkspaceInfo } from './types';
 
 export interface ClientAuthGateProps {
@@ -146,16 +147,17 @@ export function ClientAuthGate({
   );
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+    <div className="min-h-screen bg-[var(--surface-1)] flex items-center justify-center">
       <div className="w-full max-w-sm">
-        <div className="bg-zinc-900 border border-zinc-800 p-8 shadow-2xl shadow-black/40" style={{ borderRadius: '10px 24px 10px 24px' }}>
+        {/* pr-check-disable-next-line -- full-screen auth gate card uses brand signature radius intentionally */}
+        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-8 shadow-2xl shadow-black/40" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
           <div className="flex flex-col items-center mb-6">
             <img src="/logo.svg" alt={STUDIO_NAME} className="h-7 opacity-60 mb-4" />
             <div className="w-12 h-12 rounded-2xl bg-teal-500/10 flex items-center justify-center mb-4">
-              <Lock className="w-6 h-6 text-teal-400" />
+              <Icon as={Lock} size="xl" className="text-teal-400" />
             </div>
-            <h2 className="text-lg font-semibold text-zinc-200">{ws?.name}</h2>
-            <p className="text-xs text-zinc-500 mt-1">
+            <h2 className="text-lg font-semibold text-[var(--brand-text-bright)]">{ws?.name}</h2>
+            <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">
               {loginTab === 'user' ? 'Sign in with your account' : 'Enter the password to access this dashboard'}
             </p>
           </div>
@@ -167,7 +169,7 @@ export function ClientAuthGate({
                 setLoginTab('user');
                 setAuthError('');
               }}
-              className="w-full text-center text-xs text-zinc-500 hover:text-zinc-300 mb-4 transition-colors"
+              className="w-full text-center t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] mb-4 transition-colors"
             >
               Sign in with your email instead
             </button>
@@ -180,9 +182,9 @@ export function ClientAuthGate({
               <div className="space-y-3">
                 {forgotSent ? (
                   <>
-                    <div className="bg-teal-500/10 border border-teal-500/20 p-4 text-center" style={{ borderRadius: '6px 12px 6px 12px' }}>
+                    <div className="bg-teal-500/10 border border-teal-500/20 p-4 text-center" style={{ borderRadius: 'var(--radius-signature)' }}>
                       <p className="text-sm text-teal-400 font-medium">Check your email</p>
-                      <p className="text-xs text-zinc-400 mt-1">
+                      <p className="t-caption-sm text-[var(--brand-text)] mt-1">
                         If an account exists with that email, we've sent a password reset link.
                       </p>
                     </div>
@@ -193,14 +195,14 @@ export function ClientAuthGate({
                         setForgotEmail('');
                         setAuthError('');
                       }}
-                      className="w-full py-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium transition-all"
+                      className="w-full py-3 rounded-[var(--radius-xl)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text)] text-sm font-medium transition-all"
                     >
                       Back to Sign In
                     </button>
                   </>
                 ) : (
                   <form onSubmit={handleForgotPasswordSubmit} className="space-y-3">
-                    <p className="text-xs text-zinc-400 text-center">
+                    <p className="t-caption-sm text-[var(--brand-text)] text-center">
                       Enter your email and we'll send you a link to reset your password.
                     </p>
                     <input
@@ -212,24 +214,26 @@ export function ClientAuthGate({
                       }}
                       placeholder="Email address"
                       autoFocus
-                      className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors"
+                      className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] px-4 py-3 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors"
                     />
                     <TurnstileWidget onToken={(t) => { tokenRef.current = t; }} resetTrigger={turnstileReset} />
-                    {authError && <p className="text-xs text-red-400/80">{authError}</p>}
-                    <button
+                    {authError && <p className="t-caption-sm text-red-400/80">{authError}</p>}
+                    <Button
                       type="submit"
+                      variant="primary"
                       disabled={authLoading || !forgotEmail.trim()}
-                      className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white text-sm font-medium transition-all flex items-center justify-center gap-2"
+                      loading={authLoading}
+                      className="w-full"
                     >
-                      {authLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send Reset Link'}
-                    </button>
+                      {authLoading ? '' : 'Send Reset Link'}
+                    </Button>
                     <button
                       type="button"
                       onClick={() => {
                         setLoginView('login');
                         setAuthError('');
                       }}
-                      className="w-full py-2 text-xs text-zinc-500 hover:text-zinc-400 transition-colors"
+                      className="w-full py-2 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
                     >
                       Back to Sign In
                     </button>
@@ -241,11 +245,12 @@ export function ClientAuthGate({
               <div className="space-y-3">
                 {resetDone ? (
                   <>
-                    <div className="bg-teal-500/10 border border-teal-500/20 p-4 text-center" style={{ borderRadius: '6px 12px 6px 12px' }}>
+                    <div className="bg-teal-500/10 border border-teal-500/20 p-4 text-center" style={{ borderRadius: 'var(--radius-signature)' }}>
                       <p className="text-sm text-teal-400 font-medium">Password updated!</p>
-                      <p className="text-xs text-zinc-400 mt-1">You can now sign in with your new password.</p>
+                      <p className="t-caption-sm text-[var(--brand-text)] mt-1">You can now sign in with your new password.</p>
                     </div>
-                    <button
+                    <Button
+                      variant="primary"
                       onClick={() => {
                         setLoginView('login');
                         setResetDone(false);
@@ -253,14 +258,14 @@ export function ClientAuthGate({
                         setResetConfirm('');
                         setAuthError('');
                       }}
-                      className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-sm font-medium transition-all"
+                      className="w-full"
                     >
                       Sign In
-                    </button>
+                    </Button>
                   </>
                 ) : (
                   <form onSubmit={handleResetPasswordSubmit} className="space-y-3">
-                    <p className="text-xs text-zinc-400 text-center">Choose a new password for your account.</p>
+                    <p className="t-caption-sm text-[var(--brand-text)] text-center">Choose a new password for your account.</p>
                     <input
                       type="password"
                       value={resetPassword}
@@ -270,7 +275,7 @@ export function ClientAuthGate({
                       }}
                       placeholder="New password"
                       autoFocus
-                      className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors"
+                      className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] px-4 py-3 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors"
                     />
                     <input
                       type="password"
@@ -280,16 +285,18 @@ export function ClientAuthGate({
                         setAuthError('');
                       }}
                       placeholder="Confirm new password"
-                      className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors"
+                      className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] px-4 py-3 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors"
                     />
-                    {authError && <p className="text-xs text-red-400/80">{authError}</p>}
-                    <button
+                    {authError && <p className="t-caption-sm text-red-400/80">{authError}</p>}
+                    <Button
                       type="submit"
+                      variant="primary"
                       disabled={authLoading || !resetPassword || !resetConfirm}
-                      className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white text-sm font-medium transition-all flex items-center justify-center gap-2"
+                      loading={authLoading}
+                      className="w-full"
                     >
-                      {authLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Set New Password'}
-                    </button>
+                      {authLoading ? '' : 'Set New Password'}
+                    </Button>
                   </form>
                 )}
               </div>
@@ -305,7 +312,7 @@ export function ClientAuthGate({
                       setAuthError('');
                     }}
                     placeholder="Email address"
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors"
+                    className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] px-4 py-3 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors"
                     autoFocus
                   />
                 </div>
@@ -318,25 +325,27 @@ export function ClientAuthGate({
                       setAuthError('');
                     }}
                     placeholder="Password"
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors"
+                    className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] px-4 py-3 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors"
                   />
                 </div>
                 <TurnstileWidget onToken={(t) => { tokenRef.current = t; }} resetTrigger={turnstileReset} />
-                {authError && <p className="text-xs text-red-400/80">{authError}</p>}
-                <button
+                {authError && <p className="t-caption-sm text-red-400/80">{authError}</p>}
+                <Button
                   type="submit"
+                  variant="primary"
                   disabled={authLoading || !loginEmail.trim() || !loginPassword.trim()}
-                  className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white text-sm font-medium transition-all flex items-center justify-center gap-2"
+                  loading={authLoading}
+                  className="w-full"
                 >
-                  {authLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Sign In'}
-                </button>
+                  {authLoading ? '' : 'Sign In'}
+                </Button>
                 <button
                   type="button"
                   onClick={() => {
                     setLoginView('forgot');
                     setAuthError('');
                   }}
-                  className="w-full py-1 text-xs text-zinc-500 hover:text-zinc-400 transition-colors"
+                  className="w-full py-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
                 >
                   Forgot your password?
                 </button>
@@ -347,7 +356,7 @@ export function ClientAuthGate({
                       setLoginTab('password');
                       setAuthError('');
                     }}
-                    className="w-full py-1 text-xs text-zinc-500 hover:text-zinc-400 transition-colors"
+                    className="w-full py-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
                   >
                     Have a shared password instead?
                   </button>
@@ -366,18 +375,20 @@ export function ClientAuthGate({
                     setAuthError('');
                   }}
                   placeholder="Dashboard password"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors"
+                  className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] px-4 py-3 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors"
                   autoFocus={loginTab === 'password' || showsPasswordLogin}
                 />
-                {authError && <p className="text-xs text-red-400/80 mt-2">{authError}</p>}
+                {authError && <p className="t-caption-sm text-red-400/80 mt-2">{authError}</p>}
               </div>
-              <button
+              <Button
                 type="submit"
+                variant="primary"
                 disabled={authLoading || !passwordInput.trim()}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white text-sm font-medium transition-all flex items-center justify-center gap-2"
+                loading={authLoading}
+                className="w-full"
               >
-                {authLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Access Dashboard'}
-              </button>
+                {authLoading ? '' : 'Access Dashboard'}
+              </Button>
             </form>
           )}
         </div>

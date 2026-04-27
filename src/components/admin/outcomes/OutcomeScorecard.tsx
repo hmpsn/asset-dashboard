@@ -21,13 +21,13 @@ interface Props {
 function TrendIcon({ trend }: { trend: 'improving' | 'stable' | 'declining' }) {
   if (trend === 'improving') return <TrendingUp className="w-4 h-4 text-emerald-400" />;
   if (trend === 'declining') return <TrendingDown className="w-4 h-4 text-red-400" />;
-  return <Minus className="w-4 h-4 text-zinc-400" />;
+  return <Minus className="w-4 h-4 text-[var(--brand-text)]" />;
 }
 
 function TrendLabel({ trend }: { trend: 'improving' | 'stable' | 'declining' }) {
   const map = {
     improving: { label: 'Improving', color: 'text-emerald-400' },
-    stable: { label: 'Stable', color: 'text-zinc-400' },
+    stable: { label: 'Stable', color: 'text-[var(--brand-text)]' },
     declining: { label: 'Declining', color: 'text-red-400' },
   };
   const { label, color } = map[trend];
@@ -42,7 +42,7 @@ export default function OutcomeScorecard({ workspaceId }: Props) {
       <div className="space-y-5">
         {/* Win rate ring + stat cards */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-          <div className="flex flex-col items-center justify-center bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+          <div className="flex flex-col items-center justify-center bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-2xl p-6">
             <Skeleton className="w-36 h-36 rounded-full" />
             <Skeleton className="w-20 h-3 mt-3" />
           </div>
@@ -92,10 +92,10 @@ export default function OutcomeScorecard({ workspaceId }: Props) {
       {/* Top row: ring + stat cards */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         {/* Win rate ring */}
-        <SectionCard className="flex flex-col items-center justify-center gap-3 py-6">
+        <SectionCard noPadding className="flex flex-col items-center justify-center gap-3 py-6 px-4">
           <MetricRing score={winRateScore} size={144} />
           <div className="flex flex-col items-center gap-1">
-            <span className="text-xs text-zinc-500 uppercase tracking-wider font-medium">Overall Win Rate</span>
+            <span className="t-caption text-[var(--brand-text-muted)] uppercase tracking-wider font-medium">Overall Win Rate</span>
             <div className="flex items-center gap-1.5">
               <TrendIcon trend={scorecard.trend} />
               <TrendLabel trend={scorecard.trend} />
@@ -142,10 +142,10 @@ export default function OutcomeScorecard({ workspaceId }: Props) {
               const pct = Math.round(cat.winRate * 100);
               return (
                 <div key={cat.actionType} className="flex items-center gap-3">
-                  <span className="text-xs text-zinc-400 w-36 shrink-0">
+                  <span className="text-xs text-[var(--brand-text)] w-36 shrink-0">
                     {ACTION_TYPE_LABELS[cat.actionType] ?? cat.actionType}
                   </span>
-                  <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
+                  <div className="flex-1 h-2 bg-[var(--surface-1)] rounded-full overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all duration-700 ${scoreBgBarClass(pct)}`}
                       style={{ width: `${pct}%` }}

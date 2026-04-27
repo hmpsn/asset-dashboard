@@ -45,3 +45,49 @@ export type { WorkflowStep, WorkflowStepperProps } from './WorkflowStepper';
 export { WorkspaceHealthBar } from './WorkspaceHealthBar';
 export type { HealthMetric, WorkspaceHealthBarProps } from './WorkspaceHealthBar';
 export { ConfirmDialog } from './ConfirmDialog';
+export { TrendBadge, type TrendBadgeProps } from './TrendBadge';
+export { ChartCard, type ChartCardProps } from './ChartCard';
+
+// ─── Phase 1 primitives (pre-committed stubs; Phase 1 agents fill implementations) ───
+
+// Typography
+export { Heading, Stat, BodyText, Caption, Label, Mono } from './typography';
+
+// Icon
+export { Icon } from './Icon';
+export type { IconSize, IconProps } from './Icon';
+
+// Actions
+export { Button } from './Button';
+export { IconButton } from './IconButton';
+export { ActionPill } from './ActionPill';
+export { SegmentedControl } from './SegmentedControl';
+
+// Forms
+export { FormField, FormInput, FormSelect, FormTextarea, Checkbox, Toggle } from './forms';
+export type { FormFieldProps, FormFieldContextValue } from './forms/FormField';
+export type { FormInputProps } from './forms/FormInput';
+export type { FormSelectProps, SelectOption } from './forms/FormSelect';
+export type { FormTextareaProps } from './forms/FormTextarea';
+export type { CheckboxProps } from './forms/Checkbox';
+export type { ToggleProps } from './forms/Toggle';
+
+// Layout
+export { Row, Stack, Column, Grid, Divider } from './layout';
+export type {
+  RowProps, GapSize, RowAlign, RowJustify,
+  StackProps, StackDir, StackAlign,
+  ColumnProps,
+  GridProps, GridCols, GridColCount,
+  DividerProps, DividerOrientation,
+} from './layout';
+
+// Overlays
+export { Modal, Popover, Tooltip } from './overlay';
+
+// className merge helper — re-exported so Phase 2 consumers can write
+// `import { cn } from '../ui'` alongside the primitives they're using
+// (per playbook §6.1). The canonical implementation lives in
+// `src/lib/utils.ts`; ui primitives import from there directly to avoid a
+// circular dependency through this barrel.
+export { cn } from '../../lib/utils';

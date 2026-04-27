@@ -52,7 +52,7 @@ function ReportDetail({ report }: { report: DiagnosticReport }) {
       {/* Root Causes */}
       {report.rootCauses.length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold text-zinc-300 mb-3">Root Causes</h2>
+          <h2 className="text-sm font-semibold text-[var(--brand-text)] mb-3">Root Causes</h2>
           <div className="space-y-2">
             {report.rootCauses.map((cause) => (
               <RootCauseCard key={cause.rank} cause={cause} />
@@ -64,14 +64,14 @@ function ReportDetail({ report }: { report: DiagnosticReport }) {
       {/* Remediation Plan */}
       {report.remediationActions.length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold text-zinc-300 mb-3">Remediation Plan</h2>
+          <h2 className="text-sm font-semibold text-[var(--brand-text)] mb-3">Remediation Plan</h2>
           <RemediationPlan actions={report.remediationActions} />
         </div>
       )}
 
       {/* Raw Evidence */}
       <div>
-        <h2 className="text-sm font-semibold text-zinc-300 mb-3">Evidence</h2>
+        <h2 className="text-sm font-semibold text-[var(--brand-text)] mb-3">Evidence</h2>
         <EvidenceAccordion context={ctx} />
       </div>
     </div>
@@ -151,8 +151,8 @@ function DiagnosticReportList({ workspaceId }: { workspaceId: string }) {
           <SectionCard>
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-medium text-zinc-200">{pageLabel(r.affectedPages, r.anomalyType)}</h3>
-                <p className="text-xs text-zinc-500">{r.anomalyType} - {new Date(r.createdAt).toLocaleDateString()}</p>
+                <h3 className="text-sm font-medium text-[var(--brand-text-bright)]">{pageLabel(r.affectedPages, r.anomalyType)}</h3>
+                <p className="text-xs text-[var(--brand-text-muted)]">{r.anomalyType} - {new Date(r.createdAt).toLocaleDateString()}</p>
               </div>
               <Badge
                 label={r.status}

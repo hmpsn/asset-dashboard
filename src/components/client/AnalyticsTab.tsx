@@ -3,7 +3,7 @@ import {
   LineChart as LineChartIcon, ChevronDown, ChevronUp, Filter, Search, Loader2,
   Users, Clock, ArrowDownRight, UserPlus,
 } from 'lucide-react';
-import { StatCard, EmptyState } from '../ui';
+import { StatCard, EmptyState, Icon } from '../ui';
 import { chartDotStroke } from '../ui/constants';
 import {
   ResponsiveContainer, AreaChart, Area,
@@ -155,8 +155,8 @@ export function AnalyticsTab({
   return (<>
     <div className="space-y-6">
     <div>
-      <h2 className="text-xl font-semibold text-zinc-100">Analytics</h2>
-      <p className="text-sm text-zinc-500 mt-1 leading-relaxed">{ga4Overview.dateRange ? `${ga4Overview.dateRange.start} — ${ga4Overview.dateRange.end}` : 'Google Analytics overview'}</p>
+      <h2 className="text-xl font-semibold text-[var(--brand-text)]">Analytics</h2>
+      <p className="text-sm text-[var(--brand-text-muted)] mt-1 leading-relaxed">{ga4Overview.dateRange ? `${ga4Overview.dateRange.start} — ${ga4Overview.dateRange.end}` : 'Google Analytics overview'}</p>
     </div>
 
     {/* GA4 Overview Cards */}
@@ -173,8 +173,8 @@ export function AnalyticsTab({
     {ga4Trend.length > 0 && (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Traffic Trend (2/3) */}
-        <div className="lg:col-span-2 bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
-          <h3 className="text-sm font-semibold text-zinc-200 mb-4">Traffic Trend</h3>
+        <div className="lg:col-span-2 bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
+          <h3 className="text-sm font-semibold text-[var(--brand-text)] mb-4">Traffic Trend</h3>
           <ResponsiveContainer width="100%" height={192}>
             <AreaChart data={ga4Trend} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
               <defs>
@@ -192,12 +192,12 @@ export function AnalyticsTab({
                 const row = payload[0]?.payload as GA4DailyTrend | undefined;
                 if (!row) return null;
                 return (
-                  <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl shadow-black/40 min-w-[140px] overflow-hidden">
-                    <div className="px-3 py-1.5 border-b border-zinc-800 text-[11px] font-semibold text-zinc-200">{row.date}</div>
+                  <div className="bg-[var(--surface-2)] border border-[var(--brand-border-strong)] rounded-lg shadow-xl shadow-black/40 min-w-[140px] overflow-hidden">
+                    <div className="px-3 py-1.5 border-b border-[var(--brand-border)] t-caption-sm font-semibold text-[var(--brand-text)]">{row.date}</div>
                     <div className="px-3 py-1.5 space-y-1">
-                      <div className="flex justify-between text-[11px]"><span className="text-teal-400">Users</span><span className="text-zinc-200 font-medium">{row.users.toLocaleString()}</span></div>
-                      <div className="flex justify-between text-[11px]"><span className="text-blue-400">Sessions</span><span className="text-zinc-200 font-medium">{row.sessions.toLocaleString()}</span></div>
-                      <div className="flex justify-between text-[11px]"><span className="text-teal-400/40">Pageviews</span><span className="text-zinc-200 font-medium">{row.pageviews.toLocaleString()}</span></div>
+                      <div className="flex justify-between t-caption-sm"><span className="text-teal-400">Users</span><span className="text-[var(--brand-text)] font-medium">{row.users.toLocaleString()}</span></div>
+                      <div className="flex justify-between t-caption-sm"><span className="text-blue-400">Sessions</span><span className="text-[var(--brand-text)] font-medium">{row.sessions.toLocaleString()}</span></div>
+                      <div className="flex justify-between t-caption-sm"><span className="text-teal-400/40">Pageviews</span><span className="text-[var(--brand-text)] font-medium">{row.pageviews.toLocaleString()}</span></div>
                     </div>
                   </div>
                 );
@@ -208,16 +208,16 @@ export function AnalyticsTab({
             </AreaChart>
           </ResponsiveContainer>
           <div className="flex items-center justify-center gap-6 mt-2">
-            <span className="flex items-center gap-1.5 text-[11px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-teal-400 inline-block" /> Users</span>
-            <span className="flex items-center gap-1.5 text-[11px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-blue-400 inline-block" /> Sessions</span>
-            <span className="flex items-center gap-1.5 text-[11px] text-zinc-500"><span className="w-3 h-0.5 rounded bg-teal-400/40 inline-block" /> Pageviews</span>
+            <span className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)]"><span className="w-3 h-0.5 rounded bg-teal-400 inline-block" /> Users</span>
+            <span className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)]"><span className="w-3 h-0.5 rounded bg-blue-400 inline-block" /> Sessions</span>
+            <span className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)]"><span className="w-3 h-0.5 rounded bg-teal-400/40 inline-block" /> Pageviews</span>
           </div>
         </div>
 
         {/* Devices Pie Chart (1/3) */}
         {ga4Devices.length > 0 && (
-          <div className="bg-zinc-900 border border-zinc-800 p-5 flex flex-col" style={{ borderRadius: '10px 24px 10px 24px' }}>
-            <h3 className="text-sm font-semibold text-zinc-200 mb-4">Devices</h3>
+          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 flex flex-col" style={{ borderRadius: '10px 24px 10px 24px' }}>
+            <h3 className="text-sm font-semibold text-[var(--brand-text)] mb-4">Devices</h3>
             <div className="flex-1 flex flex-col items-center justify-center">
               {(() => {
                 const PIE_COLORS = ['#14b8a6', '#60a5fa', '#34d399', '#fbbf24'];
@@ -232,10 +232,10 @@ export function AnalyticsTab({
                     </ResponsiveContainer>
                     <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 mt-3">
                       {ga4Devices.map((d, i) => (
-                        <span key={i} className="flex items-center gap-1.5 text-[11px] text-zinc-400">
+                        <span key={i} className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)]">
                           <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
                           <span className="capitalize">{d.device}</span>
-                          <span className="text-zinc-500">{d.percentage}%</span>
+                          <span className="text-[var(--brand-text-muted)]">{d.percentage}%</span>
                         </span>
                       ))}
                     </div>
@@ -250,23 +250,23 @@ export function AnalyticsTab({
 
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Top Pages */}
-      <div className="bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
-        <h3 className="text-sm font-semibold text-zinc-200 mb-3">Top Pages</h3>
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
+        <h3 className="text-sm font-semibold text-[var(--brand-text)] mb-3">Top Pages</h3>
         <div className="space-y-1 max-h-[350px] overflow-y-auto">
           {ga4Pages.slice(0, 15).map((p, i) => (
-            <div key={i} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-zinc-800/50">
-              <span className="text-[11px] text-zinc-500 w-5 text-right">{i + 1}</span>
-              <span className="text-xs text-zinc-300 flex-1 truncate font-mono">{p.path}</span>
+            <div key={i} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-[var(--surface-3)]">
+              <span className="t-caption-sm text-[var(--brand-text-muted)] w-5 text-right">{i + 1}</span>
+              <span className="text-xs text-[var(--brand-text)] flex-1 truncate font-mono">{p.path}</span>
               <span className="text-xs text-teal-400 font-medium tabular-nums">{p.pageviews.toLocaleString()}</span>
-              <span className="text-[11px] text-zinc-500 w-14 text-right">{p.users.toLocaleString()} u</span>
+              <span className="t-caption-sm text-[var(--brand-text-muted)] w-14 text-right">{p.users.toLocaleString()} u</span>
             </div>
           ))}
         </div>
       </div>
 
       {/* Traffic Sources */}
-      <div className="bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
-        <h3 className="text-sm font-semibold text-zinc-200 mb-3">Traffic Sources</h3>
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
+        <h3 className="text-sm font-semibold text-[var(--brand-text)] mb-3">Traffic Sources</h3>
         <div className="space-y-2">
           {ga4Sources.slice(0, 10).map((s, i) => {
             const totalSessions = ga4Sources.reduce((sum, x) => sum + x.sessions, 0);
@@ -274,9 +274,9 @@ export function AnalyticsTab({
             return (
               <div key={i} className="relative">
                 <div className="flex items-center gap-2 py-1.5 px-2 rounded-lg relative z-10">
-                  <span className="text-xs text-zinc-300 flex-1 truncate">{s.source}{s.medium !== '(none)' ? ` / ${s.medium}` : ''}</span>
+                  <span className="text-xs text-[var(--brand-text)] flex-1 truncate">{s.source}{s.medium !== '(none)' ? ` / ${s.medium}` : ''}</span>
                   <span className="text-xs text-blue-400 font-medium tabular-nums">{s.sessions.toLocaleString()}</span>
-                  <span className="text-[11px] text-zinc-500 w-12 text-right">{pct.toFixed(1)}%</span>
+                  <span className="t-caption-sm text-[var(--brand-text-muted)] w-12 text-right">{pct.toFixed(1)}%</span>
                 </div>
                 <div className="absolute inset-0 rounded-lg bg-blue-500/5" style={{ width: `${pct}%` }} />
               </div>
@@ -312,17 +312,17 @@ export function AnalyticsTab({
         const pinned = isEventPinned(c.eventName);
         return (
           <button key={i} onClick={() => loadEventTrend(c.eventName)}
-            className={`text-left border p-4 transition-colors ${isSelected ? 'bg-teal-500/10 border-teal-500/30' : pinned ? 'bg-teal-500/5 border-teal-500/15 hover:border-teal-500/30' : 'bg-zinc-800/30 border-zinc-800 hover:border-zinc-700'}`}
+            className={`text-left border p-4 transition-colors ${isSelected ? 'bg-teal-500/10 border-teal-500/30' : pinned ? 'bg-teal-500/5 border-teal-500/15 hover:border-teal-500/30' : 'bg-[var(--surface-3)] border-[var(--brand-border)] hover:border-[var(--brand-border-strong)]'}`}
             style={{ borderRadius: '6px 12px 6px 12px' }}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] text-zinc-400 truncate max-w-[140px]">{eventDisplayName(c.eventName)}</span>
+              <span className="t-caption-sm text-[var(--brand-text-muted)] truncate max-w-[140px]">{eventDisplayName(c.eventName)}</span>
               <div className="flex items-center gap-1.5">
                 {pinned && <span className="w-1.5 h-1.5 rounded-full bg-teal-400" title="Pinned" />}
-                {c.rate > 0 && <span className="text-[11px] font-medium text-emerald-400">{c.rate}%</span>}
+                {c.rate > 0 && <span className="t-caption-sm font-medium text-emerald-400">{c.rate}%</span>}
               </div>
             </div>
-            <div className="text-xl font-bold text-zinc-200">{c.conversions.toLocaleString()}</div>
-            <div className="text-[11px] text-zinc-500 mt-0.5">{c.users.toLocaleString()} users</div>
+            <div className="text-xl font-bold text-[var(--brand-text)]">{c.conversions.toLocaleString()}</div>
+            <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{c.users.toLocaleString()} users</div>
           </button>
         );
       };
@@ -345,7 +345,7 @@ export function AnalyticsTab({
               emptyLabel="All Pages"
               className="max-w-[240px]"
             />
-            {modulePageLoading[moduleId] && <Loader2 className="w-3 h-3 animate-spin text-teal-400" />}
+            {modulePageLoading[moduleId] && <Icon as={Loader2} size="sm" className="animate-spin text-teal-400" />}
           </div>
         );
       };
@@ -357,15 +357,15 @@ export function AnalyticsTab({
             const groupEvents = getEventsForModule(group.id);
             const noResults = modulePageFilters[group.id] && groupEvents.length === 0 && !modulePageLoading[group.id];
             return (
-              <div key={group.id} className="bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
+              <div key={group.id} className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: group.color }} />
-                  <h3 className="text-sm font-semibold text-zinc-300">{group.name}</h3>
-                  <span className="text-[11px] text-zinc-500 ml-auto">{groupEvents.length} events</span>
+                  <h3 className="text-sm font-semibold text-[var(--brand-text)]">{group.name}</h3>
+                  <span className="t-caption-sm text-[var(--brand-text-muted)] ml-auto">{groupEvents.length} events</span>
                 </div>
                 {renderPageFilter(group.id, group.allowedPages)}
                 {noResults ? (
-                  <div className="text-center py-4 text-[11px] text-zinc-500">No events found for this page</div>
+                  <div className="text-center py-4 t-caption-sm text-[var(--brand-text-muted)]">No events found for this page</div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {groupEvents.map(renderEventCard)}
@@ -376,12 +376,12 @@ export function AnalyticsTab({
           })}
           {/* Ungrouped events */}
           {(ungroupedEvents.length > 0 || modulePageFilters['__ungrouped__']) && (
-            <div className="bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
-              <h3 className="text-sm font-semibold text-zinc-300 mb-1">{groups.length > 0 ? 'Other Events' : 'Key Events'}</h3>
-              <p className="text-[11px] text-zinc-500 mb-2">{groups.length > 0 ? 'Events not assigned to a group' : 'Custom and conversion events tracked on your site'}</p>
+            <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
+              <h3 className="text-sm font-semibold text-[var(--brand-text)] mb-1">{groups.length > 0 ? 'Other Events' : 'Key Events'}</h3>
+              <p className="t-caption-sm text-[var(--brand-text-muted)] mb-2">{groups.length > 0 ? 'Events not assigned to a group' : 'Custom and conversion events tracked on your site'}</p>
               {renderPageFilter('__ungrouped__')}
               {modulePageFilters['__ungrouped__'] && ungroupedEvents.length === 0 && !modulePageLoading['__ungrouped__'] ? (
-                <div className="text-center py-4 text-[11px] text-zinc-500">No events found for this page</div>
+                <div className="text-center py-4 t-caption-sm text-[var(--brand-text-muted)]">No events found for this page</div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {ungroupedEvents.slice(0, 12).map(renderEventCard)}
@@ -392,13 +392,13 @@ export function AnalyticsTab({
 
           {/* Event Trend (shown when an event is selected) */}
           {ga4SelectedEvent && ga4EventTrend.length > 2 && (
-            <div className="bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
+            <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <h3 className="text-sm font-semibold text-zinc-300">{eventDisplayName(ga4SelectedEvent)}</h3>
-                  <p className="text-[11px] text-zinc-500">Daily event count over the selected period</p>
+                  <h3 className="text-sm font-semibold text-[var(--brand-text)]">{eventDisplayName(ga4SelectedEvent)}</h3>
+                  <p className="t-caption-sm text-[var(--brand-text-muted)]">Daily event count over the selected period</p>
                 </div>
-                <button onClick={() => { setGa4SelectedEvent(null); setGa4EventTrend([]); }} className="text-[11px] text-zinc-500 hover:text-zinc-300">Clear</button>
+                <button onClick={() => { setGa4SelectedEvent(null); setGa4EventTrend([]); }} className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]">Clear</button>
               </div>
               <ResponsiveContainer width="100%" height={112}>
                 <AreaChart data={ga4EventTrend} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
@@ -415,10 +415,10 @@ export function AnalyticsTab({
                     const row = payload[0]?.payload as GA4EventTrend | undefined;
                     if (!row) return null;
                     return (
-                      <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl shadow-black/40 min-w-[100px] overflow-hidden">
-                        <div className="px-3 py-1.5 border-b border-zinc-800 text-[11px] font-semibold text-zinc-200">{row.date}</div>
+                      <div className="bg-[var(--surface-2)] border border-[var(--brand-border-strong)] rounded-lg shadow-xl shadow-black/40 min-w-[100px] overflow-hidden">
+                        <div className="px-3 py-1.5 border-b border-[var(--brand-border)] t-caption-sm font-semibold text-[var(--brand-text)]">{row.date}</div>
                         <div className="px-3 py-1.5">
-                          <div className="flex justify-between text-[11px]"><span className="text-teal-400">Count</span><span className="text-zinc-200 font-medium">{row.eventCount.toLocaleString()}</span></div>
+                          <div className="flex justify-between t-caption-sm"><span className="text-teal-400">Count</span><span className="text-[var(--brand-text)] font-medium">{row.eventCount.toLocaleString()}</span></div>
                         </div>
                       </div>
                     );
@@ -426,7 +426,7 @@ export function AnalyticsTab({
                   <Area type="monotone" dataKey="eventCount" stroke="#2dd4bf" strokeWidth={2} fill="url(#evtGrad)" dot={{ r: 2.5, fill: '#2dd4bf', opacity: 0.6, strokeWidth: 0 }} activeDot={{ r: 3, fill: '#2dd4bf', stroke: chartDotStroke(), strokeWidth: 1.5 }} />
                 </AreaChart>
               </ResponsiveContainer>
-              <div className="flex items-center justify-between mt-2 text-[11px] text-zinc-500">
+              <div className="flex items-center justify-between mt-2 t-caption-sm text-[var(--brand-text-muted)]">
                 <span>{ga4EventTrend[0]?.date}</span>
                 <span>Total: {ga4EventTrend.reduce((s, d) => s + d.eventCount, 0).toLocaleString()}</span>
                 <span>{ga4EventTrend[ga4EventTrend.length - 1]?.date}</span>
@@ -438,20 +438,20 @@ export function AnalyticsTab({
     })()}
 
     {/* ── Collapsible Event Explorer ── */}
-    <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
-      <button onClick={() => setShowExplorer(!showExplorer)} className="w-full flex items-center justify-between px-5 py-3 hover:bg-zinc-800/30 transition-colors">
+    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      <button onClick={() => setShowExplorer(!showExplorer)} className="w-full flex items-center justify-between px-5 py-3 hover:bg-[var(--surface-3)] transition-colors">
         <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-teal-400" />
-          <span className="text-sm font-medium text-zinc-400">Event Explorer</span>
+          <Icon as={Filter} size="md" className="text-teal-400" />
+          <span className="text-sm font-medium text-[var(--brand-text-muted)]">Event Explorer</span>
         </div>
-        {showExplorer ? <ChevronUp className="w-4 h-4 text-zinc-500" /> : <ChevronDown className="w-4 h-4 text-zinc-500" />}
+        {showExplorer ? <Icon as={ChevronUp} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" />}
       </button>
       {showExplorer && (
         <div className="px-5 pb-5">
-          <p className="text-[11px] text-zinc-500 mb-4">Break down events by page, or see which events fire on a specific page.</p>
+          <p className="t-caption-sm text-[var(--brand-text-muted)] mb-4">Break down events by page, or see which events fire on a specific page.</p>
           <div className="flex flex-wrap items-end gap-3 mb-4">
             <div className="flex-1 min-w-[180px]">
-              <label className="text-[11px] text-zinc-500 mb-1 block">Event Name</label>
+              <label className="t-caption-sm text-[var(--brand-text-muted)] mb-1 block">Event Name</label>
               <SearchableSelect
                 options={ga4Events.map(ev => ({ value: ev.eventName, label: eventDisplayName(ev.eventName) }))}
                 value={explorerEvent}
@@ -462,30 +462,30 @@ export function AnalyticsTab({
               />
             </div>
             <div className="flex-1 min-w-[180px]">
-              <label className="text-[11px] text-zinc-500 mb-1 block">Page Path (contains)</label>
+              <label className="t-caption-sm text-[var(--brand-text-muted)] mb-1 block">Page Path (contains)</label>
               <input value={explorerPage} onChange={e => setExplorerPage(e.target.value)}
                 placeholder="/contact, /blog, etc."
                 onKeyDown={e => e.key === 'Enter' && runExplorer(explorerEvent || undefined, explorerPage || undefined)}
-                className="w-full px-2.5 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-teal-500 placeholder:text-zinc-500" />
+                className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text)] focus:outline-none focus:border-teal-500 placeholder:text-[var(--brand-text-faint)]" />
             </div>
             <button onClick={() => runExplorer(explorerEvent || undefined, explorerPage || undefined)}
               className="px-4 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-medium transition-colors flex items-center gap-1.5">
-              {explorerLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />} Explore
+              {explorerLoading ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Search} size="sm" />} Explore
             </button>
             {explorerData.length > 0 && (
               <button onClick={() => { setExplorerData([]); setExplorerEvent(''); setExplorerPage(''); }}
-                className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Clear</button>
+                className="px-3 py-1.5 rounded-lg text-xs text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">Clear</button>
             )}
           </div>
           {explorerData.length > 0 && (
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
-                  <tr className="border-b border-zinc-800">
-                    <th className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider py-2 pr-3">Event</th>
-                    <th className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider py-2 pr-3">Page</th>
-                    <th className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider py-2 pr-3 text-right">Count</th>
-                    <th className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider py-2 text-right">Users</th>
+                  <tr className="border-b border-[var(--brand-border)]">
+                    <th className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium py-2 pr-3">Event</th>
+                    <th className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium py-2 pr-3">Page</th>
+                    <th className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium py-2 pr-3 text-right">Count</th>
+                    <th className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium py-2 text-right">Users</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -493,30 +493,30 @@ export function AnalyticsTab({
                     const maxCount = explorerData[0]?.eventCount || 1;
                     const pct = (row.eventCount / maxCount) * 100;
                     return (
-                      <tr key={i} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                      <tr key={i} className="border-b border-[var(--brand-border)] hover:bg-[var(--surface-3)]">
                         <td className="py-2 pr-3">
                           <button onClick={() => { setExplorerEvent(row.eventName); runExplorer(row.eventName, explorerPage || undefined); }}
                             className="text-xs text-teal-400 hover:text-teal-300">{eventDisplayName(row.eventName)}</button>
                         </td>
                         <td className="py-2 pr-3">
                           <button onClick={() => { setExplorerPage(row.pagePath); runExplorer(explorerEvent || undefined, row.pagePath); }}
-                            className="text-xs text-zinc-300 hover:text-zinc-100 font-mono truncate max-w-[250px] block">{row.pagePath}</button>
+                            className="text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] font-mono truncate max-w-[250px] block">{row.pagePath}</button>
                         </td>
                         <td className="py-2 pr-3 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <div className="w-16 h-1 rounded-full bg-zinc-800 overflow-hidden">
+                            <div className="w-16 h-1 rounded-full bg-[var(--surface-3)] overflow-hidden">
                               <div className="h-full rounded-full bg-teal-500/40" style={{ width: `${pct}%` }} />
                             </div>
-                            <span className="text-xs text-zinc-200 tabular-nums font-medium">{row.eventCount.toLocaleString()}</span>
+                            <span className="text-xs text-[var(--brand-text)] tabular-nums font-medium">{row.eventCount.toLocaleString()}</span>
                           </div>
                         </td>
-                        <td className="py-2 text-right text-xs text-zinc-500 tabular-nums">{row.users.toLocaleString()}</td>
+                        <td className="py-2 text-right text-xs text-[var(--brand-text-muted)] tabular-nums">{row.users.toLocaleString()}</td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
-              <div className="text-[11px] text-zinc-500 mt-2 text-right">{explorerData.length} results</div>
+              <div className="t-caption-sm text-[var(--brand-text-muted)] mt-2 text-right">{explorerData.length} results</div>
             </div>
           )}
         </div>

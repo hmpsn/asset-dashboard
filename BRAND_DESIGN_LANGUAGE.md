@@ -67,18 +67,36 @@
 | **Purple** | `#a78bfa` | `#7c3aed` | `purple-400`/`purple-600` | **Admin AI chat only** — FAB, messages, input focus, send button. Also admin "Flag for Client" in SeoAudit |
 | **Zinc** | `#a1a1aa` | `#475569` | `zinc-400`/`zinc-500` | Muted text, inactive states, disabled UI, free-tier badges |
 
-### Surface Colors (Dark Mode — Default)
+### Surface Colors
 
-| Token | Value | Tailwind | Usage |
-|-------|-------|----------|-------|
-| `--bg-base` | `#0f1219` | — | Page background |
-| `--bg-card` | `#18181b` | `bg-zinc-900` | Card backgrounds |
-| `--bg-elevated` | `#27272a` | `bg-zinc-800` | Inputs, active tabs, hover states |
-| `--border-default` | `#27272a` | `border-zinc-800` | Card borders |
-| `--border-hover` | `#3f3f46` | `border-zinc-700` | Hover border state |
-| `--text-primary` | `#f4f4f5` | `text-zinc-100` | Headings, key content |
-| `--text-secondary` | `#b4b4bc` | `text-zinc-400` | Descriptions |
-| `--text-muted` | `#a1a1aa` | `text-zinc-500` | Captions, labels |
+> **Canonical tokens are `--surface-N`.** The `--brand-bg-*` names are legacy aliases kept for backward compatibility — do not use them in new code.
+
+#### Dark Mode (default)
+
+| Canonical Token | Value | Tailwind Equivalent | Legacy Alias | Usage |
+|-----------------|-------|---------------------|--------------|-------|
+| `--surface-1` | `#0f1219` | body background | `--brand-bg` | Page background / absolute base |
+| `--surface-2` | `#18181b` | `bg-zinc-900` | `--brand-bg-surface`, `--brand-bg-elevated` | Primary card surfaces |
+| `--surface-3` | `#27272a` | `bg-zinc-800` | `--brand-bg-card` | Elevated: inputs, active tabs, hover states |
+| `--border-default` | `#27272a` | `border-zinc-800` | `--brand-border` | Card borders |
+| `--border-hover` | `#3f3f46` | `border-zinc-700` | `--brand-border-hover` | Hover border state |
+| `--text-primary` | `#f4f4f5` | `text-zinc-100` | — | Headings, key content |
+| `--text-secondary` | `#b4b4bc` | `text-zinc-400` | — | Descriptions, supporting text |
+| `--text-muted` | `#a1a1aa` | `text-zinc-500` | — | Captions, timestamps, labels |
+| `--text-subtle` | `#71717a` | `text-zinc-600/700` | — | Disabled, dividers |
+
+#### Light Mode (`.dashboard-light`)
+
+| Canonical Token | Value | Usage |
+|-----------------|-------|-------|
+| `--surface-1` | `#f8fafc` | Page background |
+| `--surface-2` | `#ffffff` | Card backgrounds |
+| `--surface-3` | `#f1f5f9` | Inputs, active tabs |
+| `--border-default` | `#e2e8f0` | Card borders |
+| `--text-primary` | `#0f172a` | Dark navy — headings, key content |
+| `--text-secondary` | `#334155` | Descriptions |
+| `--text-muted` | `#475569` | Captions, labels |
+| `--text-subtle` | `#64748b` | Disabled |
 
 ### Tier Color Rules
 
@@ -102,6 +120,8 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **MetricRing** | `MetricRing.tsx` | Auto from `scoreColor()`: ≥80 green, ≥60 amber, <60 red | DIN Pro 700, font size = `0.38 × ring size` |
 | **MetricRingSvg** | `MetricRing.tsx` | Same as MetricRing | Smaller inline SVG variant for tight spaces |
 | **SectionCard** | `SectionCard.tsx` | `bg-zinc-900 border-zinc-800` | Header row optional; title: `text-sm font-semibold text-zinc-200` |
+| **ChartCard** | `ChartCard.tsx` | Same as SectionCard (`bg-[var(--surface-2)] border-zinc-800`) | Thin SectionCard wrapper for chart-friendly defaults: tighter padding (`px-4 py-3`), inline title + optional `<TrendBadge>` row, no `border-b` separator. Preserves signature `10px 24px` radius. |
+| **TrendBadge** | `TrendBadge.tsx` | Positive: `text-emerald-400` + `TrendingUp`; Negative: `text-red-400` + `TrendingDown`; Zero (when `hideOnZero={false}`): `text-zinc-400` + `Minus` | Canonical directional delta indicator. Props: `value`, `suffix='%'`, `invert`, `showSign`, `label`, `size='sm'\|'md'`, `hideOnZero=true`. Replaces all hand-rolled `TrendingUp/Down + emerald/red` ternaries. Use `invert` when lower=better (positions, error counts). |
 | **PageHeader** | `PageHeader.tsx` | `text-lg font-semibold text-zinc-100` | Title + optional subtitle + action slot |
 | **Badge** | `Badge.tsx` | 9 colors: `teal`, `blue`, `emerald`, `green`, `amber`, `red`, `orange`, `purple`, `zinc` | Pattern: `bg-{color}-500/10 text-{color}-400` |
 | **TabBar** | `TabBar.tsx` | Active: `border-teal-500 text-teal-200` | Underline style, `border-b-2` |
@@ -118,6 +138,29 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **OnboardingChecklist** | `ui/OnboardingChecklist.tsx` | Progress bar: `bg-blue-500` (data); checkmarks: `text-teal-400` (action); celebration: `text-teal-400` | Modal overlay. Blue = read-only progress metric. Teal = completion/action state. |
 | **WorkflowStepper** | `ui/WorkflowStepper.tsx` | Current: `bg-teal-500/10 border-teal-500 text-teal-400`; Completed: `bg-green-500/10 border-green-500/40 text-green-400`; Future: `bg-zinc-800/50 border-zinc-700 text-zinc-500` | Horizontal step indicator. Green = success/done state. Teal = active step. |
 | **WorkspaceHealthBar** | `ui/WorkspaceHealthBar.tsx` | Progress bars: `bg-blue-500` (data/read-only); recommendation arrows: `text-teal-500` hover `text-teal-400` (action) | Wraps SectionCard. Blue = data metrics. Teal = actionable next steps. |
+| **Heading** | `ui/typography/Heading.tsx` | Inherits `var(--brand-text-bright)`; `level={1\|2\|3}` → `.t-h1` / `.t-h2` / `.t-page` | Phase 5. `as` prop overrides HTML tag. forwardRef. |
+| **Stat** | `ui/typography/Stat.tsx` | Inherits text color (caller controls via parent `text-*`); `size="hero"\|"default"\|"sm"` → `.t-stat-lg` / `.t-stat` / `.t-stat-sm` | Phase 5. DIN Pro numerals. forwardRef. |
+| **BodyText** | `ui/typography/BodyText.tsx` | `tone="default"` → `var(--brand-text)` (zinc-400); `tone="muted"` → `var(--brand-text-muted)` (zinc-500); `tone="dim"` → `var(--brand-text-dim)` (zinc-600). Tone is the API for color — Tailwind color utilities passed via `className` are overridden by inline tone style. | Phase 5. Renders `.t-body`. forwardRef. |
+| **Caption** | `ui/typography/Caption.tsx` | Inherits muted text (`var(--brand-text-muted)`); `size="default"\|"sm"` → `.t-caption` / `.t-caption-sm` | Phase 5. Secondary metadata, timestamps. forwardRef. |
+| **Label** | `ui/typography/Label.tsx` | Inherits muted text; uppercase DIN Pro via `.t-label` | Phase 5. Form labels, uppercase section markers. forwardRef. |
+| **Mono** | `ui/typography/Mono.tsx` | Fira Code / JetBrains Mono / Menlo. `size="default"\|"micro"` → `.t-mono` (12px) / `.t-micro` (10px). Both monospace. | Phase 5. IDs, slugs, tokens, timestamps. forwardRef. |
+| **Icon** | `ui/Icon.tsx` | Inherits `currentColor`; consumer supplies hue via `className` (e.g. `text-teal-400`). Inner SVG `aria-hidden="true"` by default — pass `aria-label` for semantic icons. | Phase 5. Wraps any Lucide component. Strict size enum: `xs\|sm\|md\|lg\|xl\|2xl` (8/12/16/20/24/32px). Inline-flex `<span>` wrapper so it is safe inside `<p>`, `<li>`, flex rows. forwardRef. |
+| **FormField** | `ui/forms/FormField.tsx` | Label text: `text-zinc-300`; error message: `text-red-400`; hint: `text-zinc-500`; required asterisk: `text-red-400` | Phase 5. Wraps an input with label + optional error/hint. Generates `useId()` and wires `htmlFor` ↔ child `id` via Context so label clicks focus the input. forwardRef. |
+| **FormInput / FormSelect / FormTextarea** | `ui/forms/Form{Input,Select,Textarea}.tsx` | Default border: `border-zinc-700`, focus: `border-[var(--brand-mint)]` + `ring-[var(--brand-mint-glow)]` (Law 01). Error border: `border-red-500/50`. Placeholder: `text-zinc-500`. | Phase 5. Dark-theme inputs, mint focus ring. Consume error state + id from FormFieldContext. FormTextarea shows optional `maxLength` counter (red near limit). forwardRef. |
+| **Checkbox** | `ui/forms/Checkbox.tsx` | Checked: `bg-[var(--brand-mint)] border-[var(--brand-mint)]` (Law 01). Unchecked: `bg-zinc-800 border-zinc-700`. Check icon: `text-zinc-900`. | Phase 5. Custom visual checkbox over hidden native input (preserves Space-key + a11y). Required `label` string. forwardRef to input. |
+| **Toggle** | `ui/forms/Toggle.tsx` | Track ON: `bg-[var(--brand-mint)]` (Law 01). Track OFF: `bg-zinc-700`. Knob: `bg-white` with translate transition. | Phase 5. `role="switch"` with implicit aria-checked from `checked` attribute. Required `label` string. forwardRef to input. |
+| **Button** | `ui/Button.tsx` | Primary: `from-teal-600 to-emerald-600` (Law 1 teal gradient); secondary: `bg-zinc-800`; ghost: transparent; danger: `bg-red-600`; link: `text-teal-400` | 5 variants × 3 sizes (sm/md/lg). Spinner replaces icon while `loading`. `link` variant skips size padding. |
+| **IconButton** | `ui/IconButton.tsx` | Ghost: `text-zinc-400 hover:text-zinc-200`; solid: `bg-zinc-800` | Icon-only with required `label` for ARIA. 3 sizes (sm/md/lg), 2 variants (ghost/solid). |
+| **ActionPill** | `ui/ActionPill.tsx` | start: teal tint; approve: emerald tint; decline: red tint; send: blue tint; request-changes: amber tint | Compact tinted pill for workflow action buttons. Each variant maps to the status-color family (Law 1/success/error/data/warning). |
+| **SegmentedControl** | `ui/SegmentedControl.tsx` | Active: `bg-zinc-700 text-white`; inactive: `text-zinc-400`; container: `bg-zinc-900 border-zinc-800` | WAI-ARIA radiogroup. Roving tabIndex (selected=0, others=-1). Arrow-key navigation (Left/Right + Home/End). Fallback tab stop on first non-disabled option when `value` matches none. 2 sizes (sm/md). |
+| **Row** | `ui/layout/Row.tsx` | No color — structural only | `flex flex-row`. Props: `gap` (xs–xl), `align` (start/center/end/baseline, default: center), `justify` (start/center/end/between/around), `wrap` (bool). `forwardRef`. |
+| **Stack** | `ui/layout/Stack.tsx` | No color — structural only | `flex flex-col` (or `flex-row` with `dir="row"`). Props: `gap`, `align` (start/center/end/stretch), `dir`. `forwardRef`. |
+| **Column** | `ui/layout/Column.tsx` | No color — structural only | Strict `flex flex-col` — never `flex-row`. Convenience alias for vertical stacks. Props: `gap`, `align`, `className`. `forwardRef`. |
+| **Grid** | `ui/layout/Grid.tsx` | No color — structural only | Responsive CSS grid. Props: `cols` (`{ sm?, md?, lg?, xl? }` with values 1–12), `gap`. Uses static `Record<number, string>` maps per breakpoint so Tailwind's scanner can detect all class strings. `forwardRef`. |
+| **Divider** | `ui/layout/Divider.tsx` | `border-[var(--brand-border)]` | Thin rule. `orientation="horizontal"` (default, `border-b w-full`) or `"vertical"` (`border-r h-full`). Role=separator + aria-orientation. `forwardRef`. |
+| **Modal** | `ui/overlay/Modal.tsx` | Panel: `bg-zinc-900 border-zinc-800`; close ×: `text-zinc-400 hover:text-zinc-200`; focus ring: `focus-visible:ring-teal-500` | Compound: `<Modal.Header>`, `<Modal.Body>`, `<Modal.Footer>`. Portals to `document.body`. Focus trap + Escape + backdrop-click to close. Restores focus to trigger on close. Backdrop at `--z-modal-backdrop` (40), panel at `--z-modal` (50). |
+| **Popover** | `ui/overlay/Popover.tsx` | Panel: `bg-zinc-900 border-zinc-800`; normal item: `text-zinc-200 hover:bg-zinc-800`; danger item: `text-red-400 hover:bg-red-500/10` | Compound: `<Popover.Item>`, `<Popover.Separator>`. Portals to `document.body`. Arrow key + Home/End navigation. Tab closes (focus moves naturally). Outside-click + Escape to close. |
+| **Tooltip** | `ui/overlay/Tooltip.tsx` | `bg-zinc-950 text-zinc-100 text-xs px-2 py-1 rounded shadow-lg` | Hover (500 ms delay) + focus (instant). `role="tooltip"`, `aria-describedby` on trigger. Portals to `document.body` — safe under `transform`/`filter` ancestors. |
 
 ### Helper Functions (`constants.ts`)
 
@@ -360,6 +403,8 @@ The platform's signature shape is an asymmetric diagonal radius — tight top-le
 | `src/components/ui/StatCard.tsx` | Default + CompactStatBar |
 | `src/components/ui/MetricRing.tsx` | MetricRing + MetricRingSvg |
 | `src/components/ui/SectionCard.tsx` | Standard card container |
+| `src/components/ui/ChartCard.tsx` | SectionCard variant for charts (tighter padding, inline title+trend) |
+| `src/components/ui/TrendBadge.tsx` | Canonical directional delta indicator (emerald/red/zinc) |
 | `src/components/ui/PageHeader.tsx` | Consistent page header |
 | `src/components/ui/TabBar.tsx` | Underline tab navigation |
 | `src/components/ui/DateRangeSelector.tsx` | Segmented date picker |
@@ -468,6 +513,7 @@ When shipping UI changes that affect color or design patterns:
 | 2026-04-09 | **Page Rewriter UI** (Feature #138): Apply interaction uses teal highlight — `background-color: rgba(13,148,136,0.2)` + `border-left: 2px solid #0d9488` — fades over 2s via CSS transition (all three properties cleared). Floating formatting toolbar uses `bg-zinc-700 border-zinc-600` (no teal — it's a utility tool, not an action). Issue chips: `red-*` for errors, `amber-*` for warnings, `blue-*` for info — follows existing status color convention. Focus mode toggle: teal active state (`text-teal-400 bg-teal-500/10`) per Law 1 (toggle = action). **Integration note for Copy & Brand Engine:** `data-section` attribute on all document headings and `applyToSection()` in `PageRewriteChat.tsx` are the designated extension points for inline text-selection targeting. |
 | 2026-04-13 | **Admin UX PR4 — Onboarding & Guided Flows**: Added 3 new shared UI primitives. `OnboardingChecklist`: modal overlay with blue progress bar (data), teal checkmarks (action accomplished), focus trap, Escape-key dismiss, localStorage persistence per workspace. `WorkflowStepper`: horizontal numbered stepper — green=completed, teal=current, zinc=future; compact variant. `WorkspaceHealthBar`: blue progress fills (data metric law) + teal Recommended Next CTA (action law). Added per-component color map rows for all three. Also fixed purple violations in `PageIntelligence` (admin-only component with no client-facing exposure — purple removed per Three Laws). |
 | 2026-04-20 | **Light Mode Overhaul (client portal)**: `.dashboard-light` token set expanded from 10 → 25 variables (WCAG AA verified). New tokens: `--brand-bg-hover`, `--brand-bg-active`, `--brand-text-disabled`, `--brand-border-strong`, `--brand-shadow-sm/md`, `--scrollbar-thumb/hover`, `--chart-grid`, `--chart-tooltip-bg/text`, `--brand-overlay`, `--brand-mint/hover/dim`, `--metric-ring-track`. `--brand-text-muted` adjusted `#64748b`→`#475569` (slate-600, 6.5:1 contrast). Four-step text hierarchy restored. `chartGridColor()` and `chartTooltipStyle()` now read from CSS variables via `getCssVar()`. New UI primitive: `ConfirmDialog` (centered modal, teal CTA, Escape/Enter keyboard support, destructive variant). ApprovalsTab: 3 `window.confirm()` calls replaced with `ConfirmDialog`; filter bar added (All / Needs Action / Ready to Apply / Applied with live batch counts). |
+| 2026-04-25 | **Phase 5 Phase 3 — Design system enforcement hardening**: Added 8 new pr-check rules (3 error, 5 warn) to lock in Phase 2's codemod gains. **Error severity** (zero-hit verified): `Forbidden hues (rose/pink) in components`, `text-green-{N} for success/score`, plus warn→error promotions for `Hand-rolled trend badge` and `Non-standard transition duration`. **Warn severity** (long-tail backlog): `Hand-rolled gradient CTA button` (~10 sites), `Arbitrary pixel text-size` (use .t-* utility, ~318 sites), `Raw text-zinc-N` / `bg-zinc-N` / `border-zinc-N` (use --brand-*/--surface-* tokens, ~514 sites combined), `Inline asymmetric border-radius` (use --radius-signature, ~114 sites). Migrations in same PR: 5 hand-rolled gradient CTAs (TemplateEditor×2, ClientDashboardTab×2, AiSuggested, BlueprintDetail) → `<Button variant="primary">`; 1 green button (RequestList Deliver Brief) → emerald; 1 preview-disabled gradient button hatched. Total pr-check rule count: 83 → 91 (49 error, 42 warn). 28 fixture tests added. CLAUDE.md "Forbidden" list and Three Laws Law #3 now mechanized rather than prose-only. |
 
 ---
 

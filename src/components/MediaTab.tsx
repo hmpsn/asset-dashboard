@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Upload, FolderSearch, ShieldCheck, Clipboard } from 'lucide-react';
+import { Icon, cn } from './ui';
 import { DropZone } from './DropZone';
 import { ProcessingQueue, type QueueItem } from './ProcessingQueue';
 import { AssetBrowser } from './AssetBrowser';
@@ -28,15 +29,17 @@ export function MediaTab({ siteId, workspaceId, workspaceFolder, queue }: Props)
       {/* Sub-tab navigation */}
       <div className="flex items-center gap-0.5 mb-4">
         {subTabs.map(t => {
-          const Icon = t.icon;
           const active = sub === t.id;
           return (
             <button
               key={t.id}
               onClick={() => setSub(t.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium ${active ? 'bg-teal-500/10 text-teal-400' : 'text-zinc-500'}`}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] text-xs font-medium',
+                active ? 'bg-teal-500/10 text-teal-400' : 'text-[var(--brand-text-muted)]',
+              )}
             >
-              <Icon className="w-3 h-3" /> {t.label}
+              <Icon as={t.icon} size="sm" /> {t.label}
             </button>
           );
         })}
@@ -49,12 +52,12 @@ export function MediaTab({ siteId, workspaceId, workspaceFolder, queue }: Props)
             <DropZone workspaceId={workspaceFolder} type="asset" />
             <DropZone workspaceId={workspaceFolder} type="meta" />
           </div>
-          <div className="flex items-center justify-center gap-2 text-[11px] text-zinc-500">
-            <Clipboard className="w-3 h-3" />
-            <span>Press <kbd className="px-1.5 py-0.5 rounded font-mono text-[11px] bg-zinc-900 text-zinc-400">⌘V</kbd> to paste images from clipboard</span>
+          <div className="flex items-center justify-center gap-2 t-caption-sm text-[var(--brand-text-muted)]">
+            <Icon as={Clipboard} size="sm" />
+            <span>Press <kbd className="px-1.5 py-0.5 rounded t-mono text-xs bg-[var(--surface-2)] text-[var(--brand-text)]">⌘V</kbd> to paste images from clipboard</span>
           </div>
           <div>
-            <h2 className="text-xs font-medium mb-2.5 px-0.5 text-zinc-500 uppercase tracking-wider">Processing Queue</h2>
+            <h2 className="text-xs font-medium mb-2.5 px-0.5 text-[var(--brand-text-muted)] uppercase tracking-wider">Processing Queue</h2>
             <ProcessingQueue items={queue} />
           </div>
         </div>
@@ -66,10 +69,10 @@ export function MediaTab({ siteId, workspaceId, workspaceFolder, queue }: Props)
       )}
       {sub === 'browse' && !siteId && (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-zinc-900">
-            <FolderSearch className="w-5 h-5 text-zinc-500" />
+          <div className="w-12 h-12 rounded-[var(--radius-xl)] flex items-center justify-center bg-[var(--surface-2)]">
+            <Icon as={FolderSearch} size="lg" className="text-[var(--brand-text-muted)]" />
           </div>
-          <p className="text-sm text-zinc-500">Link a Webflow site to browse assets</p>
+          <p className="text-sm text-[var(--brand-text-muted)]">Link a Webflow site to browse assets</p>
         </div>
       )}
 
@@ -79,10 +82,10 @@ export function MediaTab({ siteId, workspaceId, workspaceFolder, queue }: Props)
       )}
       {sub === 'audit' && !siteId && (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-zinc-900">
-            <ShieldCheck className="w-5 h-5 text-zinc-500" />
+          <div className="w-12 h-12 rounded-[var(--radius-xl)] flex items-center justify-center bg-[var(--surface-2)]">
+            <Icon as={ShieldCheck} size="lg" className="text-[var(--brand-text-muted)]" />
           </div>
-          <p className="text-sm text-zinc-500">Link a Webflow site to run an audit</p>
+          <p className="text-sm text-[var(--brand-text-muted)]">Link a Webflow site to run an audit</p>
         </div>
       )}
     </div>

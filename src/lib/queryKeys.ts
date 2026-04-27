@@ -172,6 +172,13 @@ export const queryKeys = {
 
     // Client Copy Review
     copyEntries: (wsId: string) => ['client-copy-entries', wsId] as const,
+    /**
+     * Lightweight count-only query for the Copy Review tab visibility gate in
+     * InboxTab. Distinct from `copyEntries` so the count hook's resilient
+     * `getSafe` fallback does NOT dedupe with the full ClientCopyReview
+     * query (which uses `get()` and must surface errors to its error UI).
+     */
+    copyEntriesCount: (wsId: string) => ['client-copy-entries-count', wsId] as const,
     copySections: (wsId: string, entryId: string) => ['client-copy-sections', wsId, entryId] as const,
     copySectionsAll: (wsId: string) => ['client-copy-sections', wsId] as const,
   },

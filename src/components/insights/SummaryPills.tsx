@@ -4,7 +4,8 @@ import { Skeleton } from '../ui';
 const PILL_COLORS: Record<string, { dot: string; activeBg: string }> = {
   red: { dot: 'bg-red-400', activeBg: 'bg-red-500/15 border-red-500/30' },
   amber: { dot: 'bg-amber-400', activeBg: 'bg-amber-500/15 border-amber-500/30' },
-  green: { dot: 'bg-emerald-400', activeBg: 'bg-emerald-500/15 border-emerald-500/30' },
+  green: { dot: 'bg-emerald-400', activeBg: 'bg-emerald-500/15 border-emerald-500/30' },   // legacy alias
+  emerald: { dot: 'bg-emerald-400', activeBg: 'bg-emerald-500/15 border-emerald-500/30' },
   blue: { dot: 'bg-blue-400', activeBg: 'bg-blue-500/15 border-blue-500/30' },
   purple: { dot: 'bg-purple-400', activeBg: 'bg-purple-500/15 border-purple-500/30' },
 };

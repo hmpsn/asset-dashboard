@@ -15,7 +15,7 @@ import type { WorkspaceOutcomeOverview, LearningsTrend } from '../../../../share
 function trendIcon(trend: LearningsTrend) {
   if (trend === 'improving') return <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />;
   if (trend === 'declining') return <TrendingDown className="w-3.5 h-3.5 text-red-400" />;
-  return <Minus className="w-3.5 h-3.5 text-zinc-400" />;
+  return <Minus className="w-3.5 h-3.5 text-[var(--brand-text)]" />;
 }
 
 function trendLabel(trend: LearningsTrend): string {
@@ -27,7 +27,7 @@ function trendLabel(trend: LearningsTrend): string {
 function trendColor(trend: LearningsTrend): string {
   if (trend === 'improving') return 'text-emerald-400';
   if (trend === 'declining') return 'text-red-400';
-  return 'text-zinc-400';
+  return 'text-[var(--brand-text)]';
 }
 
 function winRatePct(rate: number): string {
@@ -71,7 +71,7 @@ function AggregateStats({ workspaces }: { workspaces: WorkspaceOutcomeOverview[]
       <StatCard
         label="Need attention"
         value={attentionCount.toString()}
-        valueColor={attentionCount > 0 ? 'text-amber-400' : 'text-zinc-400'}
+        valueColor={attentionCount > 0 ? 'text-amber-400' : 'text-[var(--brand-text)]'}
       />
     </div>
   );
@@ -83,11 +83,11 @@ function WorkspaceRow({ ws }: { ws: WorkspaceOutcomeOverview }) {
   const winPct = Math.round(ws.winRate * 100);
 
   return (
-    <tr className="border-t border-zinc-800/60 hover:bg-zinc-800/20 transition-colors">
+    <tr className="border-t border-[var(--brand-border)] hover:bg-[var(--surface-3)] transition-colors">
       {/* Workspace name */}
       <td className="py-3 px-4">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-zinc-100">{ws.workspaceName}</span>
+          <span className="text-sm font-medium text-[var(--brand-text-bright)]">{ws.workspaceName}</span>
           {ws.attentionNeeded && (
             <span title={ws.attentionReason ?? 'Needs attention'}>
               <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
@@ -101,7 +101,7 @@ function WorkspaceRow({ ws }: { ws: WorkspaceOutcomeOverview }) {
 
       {/* Win rate */}
       <td className={`py-3 px-4 text-sm font-semibold ${winRateClass(ws.winRate)}`}>
-        {ws.scoredLast30d > 0 ? `${winPct}%` : <span className="text-zinc-500 font-normal">—</span>}
+        {ws.scoredLast30d > 0 ? `${winPct}%` : <span className="text-[var(--brand-text-muted)] font-normal">—</span>}
       </td>
 
       {/* Trend */}
@@ -113,7 +113,7 @@ function WorkspaceRow({ ws }: { ws: WorkspaceOutcomeOverview }) {
       </td>
 
       {/* Active actions */}
-      <td className="py-3 px-4 text-sm text-zinc-300">
+      <td className="py-3 px-4 text-sm text-[var(--brand-text-bright)]">
         {ws.activeActions}
       </td>
 
@@ -126,7 +126,7 @@ function WorkspaceRow({ ws }: { ws: WorkspaceOutcomeOverview }) {
       <td className="py-3 px-4 max-w-xs">
         {ws.topWin ? (
           <div className="space-y-0.5">
-            <p className="text-xs text-zinc-300 truncate">
+            <p className="text-xs text-[var(--brand-text-bright)] truncate">
               {ws.topWin.targetKeyword
                 ? `"${ws.topWin.targetKeyword}"`
                 : ws.topWin.pageUrl?.replace(/^https?:\/\/[^/]+/, '') ?? 'Unknown page'}
@@ -136,7 +136,7 @@ function WorkspaceRow({ ws }: { ws: WorkspaceOutcomeOverview }) {
             </p>
           </div>
         ) : (
-          <span className="text-xs text-zinc-600">No wins yet</span>
+          <span className="text-xs text-[var(--brand-text-muted)]">No wins yet</span>
         )}
       </td>
 
@@ -145,7 +145,7 @@ function WorkspaceRow({ ws }: { ws: WorkspaceOutcomeOverview }) {
         {ws.attentionNeeded ? (
           <Badge label="Review" color="amber" />
         ) : (
-          <Badge label="On track" color="green" />
+          <Badge label="On track" color="emerald" />
         )}
       </td>
     </tr>
@@ -218,8 +218,8 @@ export default function OutcomesOverview() {
               <SectionCard>
                 <div className="flex items-center gap-2 mb-4">
                   <Activity className="w-4 h-4 text-blue-400" />
-                  <h3 className="text-sm font-semibold text-zinc-100">All workspaces</h3>
-                  <span className="text-xs text-zinc-500 ml-auto">
+                  <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">All workspaces</h3>
+                  <span className="text-xs text-[var(--brand-text-muted)] ml-auto">
                     {workspaces.length} {workspaces.length === 1 ? 'workspace' : 'workspaces'}
                   </span>
                 </div>
@@ -227,7 +227,7 @@ export default function OutcomesOverview() {
                 <div className="overflow-x-auto -mx-1">
                   <table className="w-full text-left min-w-[640px]">
                     <thead>
-                      <tr className="text-xs font-medium uppercase tracking-wider text-zinc-500">
+                      <tr className="text-xs font-medium uppercase tracking-wider text-[var(--brand-text-muted)]">
                         <th scope="col" className="pb-2 px-4">Workspace</th>
                         <th scope="col" className="pb-2 px-4">Win rate</th>
                         <th scope="col" className="pb-2 px-4">Trend</th>

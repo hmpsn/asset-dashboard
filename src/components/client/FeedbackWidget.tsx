@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { MessageSquarePlus, X, Bug, Lightbulb, MessageCircle, Send, ChevronDown, CheckCircle2, Clock, Loader2 } from 'lucide-react';
 import { get, post } from '../../api/client';
+import { Icon, cn } from '../ui';
 
 type FeedbackType = 'bug' | 'feature' | 'general';
 type FeedbackStatus = 'new' | 'acknowledged' | 'fixed' | 'wontfix';
@@ -110,9 +111,9 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
     return (
       <button
         onClick={() => setOpen(true)}
-        className={`fixed bottom-6 left-6 flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-zinc-800 hover:bg-zinc-700 border border-zinc-700/50 text-zinc-300 hover:text-zinc-100 text-xs font-medium shadow-lg transition-all z-40 backdrop-blur-sm ${chatExpanded ? 'sm:flex hidden' : ''}`}
+        className={cn('fixed bottom-6 left-6 flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border)]/50 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] text-xs font-medium shadow-lg transition-all z-40 backdrop-blur-sm', chatExpanded ? 'sm:flex hidden' : '')}
       >
-        <MessageSquarePlus className="w-3.5 h-3.5" />
+        <Icon as={MessageSquarePlus} size="md" />
         Feedback
         {unreadCount > 0 && (
           <span className="w-4 h-4 rounded-full bg-teal-500 text-[9px] font-bold text-white flex items-center justify-center">{unreadCount}</span>
@@ -122,23 +123,23 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
   }
 
   return (
-    <div className={`fixed bottom-6 left-6 w-[360px] max-h-[520px] bg-zinc-900 rounded-2xl border border-zinc-800 shadow-2xl shadow-black/40 overflow-hidden z-40 flex flex-col ${chatExpanded ? 'sm:flex hidden' : ''}`}>
+    <div className={cn('fixed bottom-6 left-6 w-[360px] max-h-[520px] bg-[var(--surface-2)] rounded-2xl border border-[var(--brand-border)] shadow-2xl shadow-black/40 overflow-hidden z-40 flex flex-col', chatExpanded ? 'sm:flex hidden' : '')}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 flex-shrink-0">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--brand-border)] flex-shrink-0">
         <div className="flex items-center gap-2">
-          <MessageSquarePlus className="w-4 h-4 text-teal-400" />
-          <span className="text-sm font-medium text-zinc-200">Beta Feedback</span>
-          <span className="text-[10px] text-teal-400/70 bg-teal-500/10 px-1.5 py-0.5 rounded border border-teal-500/20">beta</span>
+          <Icon as={MessageSquarePlus} size="md" className="text-teal-400" />
+          <span className="text-sm font-medium text-[var(--brand-text-bright)]">Beta Feedback</span>
+          <span className="t-caption-sm text-teal-400/70 bg-teal-500/10 px-1.5 py-0.5 rounded border border-teal-500/20">beta</span>
         </div>
         <div className="flex items-center gap-1">
           <button
             onClick={() => setView(view === 'form' ? 'list' : 'form')}
-            className={`text-xs px-2 py-1 rounded transition-colors ${view === 'list' ? 'text-teal-400 bg-teal-500/10' : 'text-zinc-500 hover:text-zinc-300'}`}
+            className={cn('text-xs px-2 py-1 rounded transition-colors', view === 'list' ? 'text-teal-400 bg-teal-500/10' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]')}
           >
             {view === 'form' ? `History${items.length > 0 ? ` (${items.length})` : ''}` : '+ New'}
           </button>
-          <button onClick={() => setOpen(false)} className="text-zinc-500 hover:text-zinc-300 p-1">
-            <X className="w-4 h-4" />
+          <button onClick={() => setOpen(false)} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] p-1">
+            <Icon as={X} size="md" />
           </button>
         </div>
       </div>
@@ -149,10 +150,10 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
           submitted ? (
             <div className="flex flex-col items-center justify-center py-12 px-4">
               <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-3">
-                <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                <Icon as={CheckCircle2} size="xl" className="text-emerald-400" />
               </div>
-              <p className="text-sm font-medium text-zinc-200">Thank you!</p>
-              <p className="text-xs text-zinc-500 mt-1">Your feedback has been submitted.</p>
+              <p className="text-sm font-medium text-[var(--brand-text-bright)]">Thank you!</p>
+              <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">Your feedback has been submitted.</p>
             </div>
           ) : (
             <div className="p-4 space-y-3">
@@ -164,11 +165,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
                     <button
                       key={key}
                       onClick={() => setType(key)}
-                      className={`flex flex-col items-center gap-1.5 px-2 py-2.5 rounded-xl border text-[11px] font-medium transition-all ${
-                        type === key
-                          ? `${cfg.bg} ${cfg.border} ${cfg.color}`
-                          : 'bg-zinc-800/50 border-zinc-800 text-zinc-500 hover:text-zinc-400 hover:border-zinc-700'
-                      }`}
+                      className={cn('flex flex-col items-center gap-1.5 px-2 py-2.5 rounded-[var(--radius-xl)] border t-caption-sm font-medium transition-all', type === key ? `${cfg.bg} ${cfg.border} ${cfg.color}` : 'bg-[var(--surface-3)]/50 border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:border-[var(--brand-border-hover)]')}
                     >
                       <Icon className="w-4 h-4" />
                       {cfg.label.split(' ')[0]}
@@ -183,8 +180,8 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
                 value={title}
                 onChange={e => setTitle(e.target.value)}
                 placeholder={type === 'bug' ? 'What went wrong?' : type === 'feature' ? 'What would you like?' : 'Quick summary'}
-                              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors"
-                            />
+                className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-lg px-3 py-2 text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors"
+              />
 
               {/* Description */}
               <textarea
@@ -192,18 +189,18 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
                 onChange={e => setDescription(e.target.value)}
                 placeholder={type === 'bug' ? 'Steps to reproduce, what you expected, what happened...' : type === 'feature' ? 'Describe the feature and how it would help you...' : 'Tell us what you think...'}
                 rows={4}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors resize-none"
+                className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-lg px-3 py-2 text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors resize-none"
               />
 
               {/* Auto-context badge */}
-              <div className="flex items-center gap-1.5 text-[10px] text-zinc-600">
-                <div className="w-1.5 h-1.5 rounded-full bg-zinc-600" />
+              <div className="flex items-center gap-1.5 t-micro text-[var(--brand-text-muted)]">
+                <div className="w-1.5 h-1.5 rounded-full bg-[var(--brand-text-muted)]" />
                 Context auto-attached: current tab, browser, screen size
               </div>
 
               {/* Error */}
               {submitError && (
-                <p className="text-[11px] text-red-400">{submitError}</p>
+                <p className="t-caption-sm text-red-400">{submitError}</p>
               )}
               {/* Submit */}
               <button
@@ -214,6 +211,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
                 {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                 {submitting ? 'Submitting...' : 'Submit Feedback'}
               </button>
+
             </div>
           )
         ) : (
@@ -221,9 +219,9 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
           <div className="p-3 space-y-2">
             {items.length === 0 && (
               <div className="py-8 text-center">
-                <MessageSquarePlus className="w-6 h-6 text-zinc-700 mx-auto mb-2" />
-                <p className="text-xs text-zinc-500">No feedback submitted yet.</p>
-                <button onClick={() => setView('form')} className="text-xs text-teal-400 hover:text-teal-300 mt-2 transition-colors">
+                <Icon as={MessageSquarePlus} size="xl" className="text-[var(--brand-border)] mx-auto mb-2" />
+                <p className="t-caption-sm text-[var(--brand-text-muted)]">No feedback submitted yet.</p>
+                <button onClick={() => setView('form')} className="t-caption-sm text-teal-400 hover:text-teal-300 mt-2 transition-colors">
                   Submit your first feedback
                 </button>
               </div>
@@ -236,43 +234,43 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
               const hasTeamReply = item.replies.some(r => r.author === 'team');
 
               return (
-                <div key={item.id} className="bg-zinc-800/50 border border-zinc-800 overflow-hidden" style={{ borderRadius: '6px 12px 6px 12px' }}>
+                <div key={item.id} className="bg-[var(--surface-3)]/50 border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature)' }}>
                   <button
                     onClick={() => setExpandedId(isExpanded ? null : item.id)}
-                    className="w-full flex items-start gap-2.5 px-3 py-2.5 text-left hover:bg-zinc-800/60 transition-colors"
+                    className="w-full flex items-start gap-2.5 px-3 py-2.5 text-left hover:bg-[var(--surface-3)]/60 transition-colors"
                   >
                     <div className={`w-6 h-6 rounded-lg ${cfg.bg} flex items-center justify-center flex-shrink-0 mt-0.5`}>
                       <Icon className={`w-3 h-3 ${cfg.color}`} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-medium text-zinc-200 truncate">{item.title}</span>
+                        <span className="t-caption-sm font-medium text-[var(--brand-text-bright)] truncate">{item.title}</span>
                         {hasTeamReply && <span className="w-1.5 h-1.5 rounded-full bg-teal-400 flex-shrink-0" />}
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <span className={`text-[9px] px-1.5 py-0.5 rounded ${statusCfg.bg} ${statusCfg.color} font-medium`}>{statusCfg.label}</span>
-                        <span className="text-[9px] text-zinc-600">{new Date(item.createdAt).toLocaleDateString()}</span>
+                        <span className={cn('t-micro px-1.5 py-0.5 rounded font-medium', statusCfg.bg, statusCfg.color)}>{statusCfg.label}</span>
+                        <span className="t-micro text-[var(--brand-text-muted)]">{new Date(item.createdAt).toLocaleDateString()}</span>
                       </div>
                     </div>
-                    <ChevronDown className={`w-3.5 h-3.5 text-zinc-600 flex-shrink-0 mt-1 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                    <ChevronDown className={cn('w-3.5 h-3.5 text-[var(--brand-text-muted)] flex-shrink-0 mt-1 transition-transform', isExpanded ? 'rotate-180' : '')} />
                   </button>
 
                   {isExpanded && (
-                    <div className="px-3 pb-3 border-t border-zinc-800">
-                      <p className="text-[11px] text-zinc-400 mt-2 leading-relaxed">{item.description}</p>
+                    <div className="px-3 pb-3 border-t border-[var(--brand-border)]">
+                      <p className="t-caption-sm text-[var(--brand-text)] mt-2 leading-relaxed">{item.description}</p>
 
                       {/* Replies */}
                       {item.replies.length > 0 && (
                         <div className="mt-3 space-y-2">
                           {item.replies.map(reply => (
-                            <div key={reply.id} className={`rounded-lg px-2.5 py-2 ${reply.author === 'team' ? 'bg-teal-500/5 border border-teal-500/10' : 'bg-zinc-800/60 border border-zinc-700/50'}`}>
+                            <div key={reply.id} className={cn('rounded-lg px-2.5 py-2', reply.author === 'team' ? 'bg-teal-500/5 border border-teal-500/10' : 'bg-[var(--surface-3)]/60 border border-[var(--brand-border)]/50')}>
                               <div className="flex items-center gap-1.5 mb-1">
-                                <span className={`text-[9px] font-medium ${reply.author === 'team' ? 'text-teal-400' : 'text-zinc-400'}`}>
+                                <span className={cn('t-micro font-medium', reply.author === 'team' ? 'text-teal-400' : 'text-[var(--brand-text)]')}>
                                   {reply.author === 'team' ? 'Team' : 'You'}
                                 </span>
-                                <span className="text-[9px] text-zinc-600">{new Date(reply.createdAt).toLocaleDateString()}</span>
+                                <span className="t-micro text-[var(--brand-text-muted)]">{new Date(reply.createdAt).toLocaleDateString()}</span>
                               </div>
-                              <p className="text-[11px] text-zinc-300 leading-relaxed">{reply.content}</p>
+                              <p className="t-caption-sm text-[var(--brand-text)] leading-relaxed">{reply.content}</p>
                             </div>
                           ))}
                         </div>
@@ -288,20 +286,20 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
                               onChange={e => setReplyText(e.target.value)}
                               onKeyDown={e => e.key === 'Enter' && handleReply(item.id)}
                               placeholder="Add a reply..."
-                              className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-[11px] text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500"
+                              className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-lg px-2.5 py-1.5 t-caption-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
                               autoFocus
                             />
                             <button onClick={() => handleReply(item.id)} disabled={!replyText.trim()} className="px-2 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-40 rounded-lg transition-colors">
                               <Send className="w-3 h-3 text-white" />
                             </button>
-                            <button onClick={() => { setReplyingTo(null); setReplyText(''); }} className="px-2 py-1.5 text-zinc-500 hover:text-zinc-300">
+                            <button onClick={() => { setReplyingTo(null); setReplyText(''); }} className="px-2 py-1.5 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]">
                               <X className="w-3 h-3" />
                             </button>
                           </div>
                         ) : (
                           <button
                             onClick={() => setReplyingTo(item.id)}
-                            className="mt-2 text-[10px] text-teal-400 hover:text-teal-300 transition-colors"
+                            className="mt-2 t-micro text-teal-400 hover:text-teal-300 transition-colors"
                           >
                             Reply
                           </button>
@@ -311,8 +309,8 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
                       {/* Context info */}
                       {item.context?.currentTab && (
                         <div className="mt-2 flex items-center gap-1.5">
-                          <Clock className="w-2.5 h-2.5 text-zinc-600" />
-                          <span className="text-[9px] text-zinc-600">Submitted from: {item.context.currentTab} tab</span>
+                          <Clock className="w-2.5 h-2.5 text-[var(--brand-text-muted)]" />
+                          <span className="t-micro text-[var(--brand-text-muted)]">Submitted from: {item.context.currentTab} tab</span>
                         </div>
                       )}
                     </div>

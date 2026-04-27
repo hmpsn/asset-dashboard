@@ -8,8 +8,8 @@ interface Props {
   workspaceId: string;
 }
 
-function confidenceColor(confidence: PlaybookConfidence): 'green' | 'amber' | 'red' {
-  if (confidence === 'high') return 'green';
+function confidenceColor(confidence: PlaybookConfidence): 'emerald' | 'amber' | 'red' {
+  if (confidence === 'high') return 'emerald';
   if (confidence === 'medium') return 'amber';
   return 'red';
 }
@@ -18,9 +18,9 @@ function PlaybookCard({ playbook }: { playbook: ActionPlaybook }) {
   const steps = playbook.actionSequence.map(s => s.actionType.replace(/_/g, ' '));
 
   return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 space-y-3">
+    <div className="rounded-lg border border-[var(--brand-border)] bg-[var(--surface-2)] p-4 space-y-3">
       <div className="flex items-start justify-between gap-3">
-        <h3 className="text-sm font-medium text-zinc-100 capitalize">{playbook.name}</h3>
+        <h3 className="text-sm font-medium text-[var(--brand-text-bright)] capitalize">{playbook.name}</h3>
         <Badge label={`${playbook.confidence} confidence`} color={confidenceColor(playbook.confidence)} />
       </div>
 
@@ -28,24 +28,24 @@ function PlaybookCard({ playbook }: { playbook: ActionPlaybook }) {
       <div className="flex flex-wrap items-center gap-1.5">
         {steps.map((step, i) => (
           <span key={i} className="flex items-center gap-1.5">
-            <span className="rounded bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300 capitalize">
+            <span className="rounded bg-[var(--surface-3)] px-2 py-0.5 text-xs text-[var(--brand-text-bright)] capitalize">
               {step}
             </span>
             {i < steps.length - 1 && (
-              <ArrowRight className="h-3 w-3 text-zinc-600 flex-shrink-0" />
+              <ArrowRight className="h-3 w-3 text-[var(--brand-text-muted)] flex-shrink-0" />
             )}
           </span>
         ))}
       </div>
 
       {/* Stats */}
-      <div className="flex items-center gap-4 text-xs text-zinc-400">
+      <div className="flex items-center gap-4 text-xs text-[var(--brand-text)]">
         <span>
           <span className="font-medium text-blue-400">{pct(playbook.historicalWinRate)}</span>{' '}
           win rate
         </span>
         <span>
-          <span className="font-medium text-zinc-200">{playbook.sampleSize}</span>{' '}
+          <span className="font-medium text-[var(--brand-text-bright)]">{playbook.sampleSize}</span>{' '}
           {playbook.sampleSize === 1 ? 'page' : 'pages'}
         </span>
       </div>
@@ -82,7 +82,7 @@ export default function OutcomePlaybooks({ workspaceId }: Props) {
     <SectionCard
       title="Action Playbooks"
       titleExtra={
-        <span className="text-xs text-zinc-500">
+        <span className="text-xs text-[var(--brand-text-muted)]">
           {`${playbooks.length} pattern${playbooks.length === 1 ? '' : 's'} discovered`}
         </span>
       }

@@ -47,21 +47,36 @@ Inter loaded from Google Fonts: 300–700.
 
 ---
 
+## Radius Scale
+
+| Token | Value | Tailwind Equivalent | Usage |
+|-------|-------|---------------------|-------|
+| `--radius-sm` | `6px` | `rounded` | Small controls, pills, badges |
+| `--radius-md` | `8px` | `rounded-md` | Buttons, inputs |
+| `--radius-lg` | `12px` | `rounded-xl` | Cards, panels — new code uses `rounded-[var(--radius-lg)]` |
+| `--radius-xl` | `16px` | `rounded-2xl` | Modals, large overlays |
+
+**Brand asymmetric radius:** `SectionCard` default variant uses `10px 24px 10px 24px` (the brand signature). This is intentional and correct. The `--radius-lg` token governs new generic cards; the asymmetric radius is a SectionCard-specific design decision, not a token.
+
+**Rule for new card elements:** use `rounded-[var(--radius-lg)]` not the hardcoded Tailwind class `rounded-xl`. This makes the radius system themeable.
+
+---
+
 ## Color System
 
 ### Dark Mode (default)
 
-| Token | Value | Tailwind | Usage |
-|-------|-------|----------|-------|
-| `--bg-base` | #0f1219 | — | Page background |
-| `--bg-card` | #18181b | bg-zinc-900 | Card backgrounds |
-| `--bg-elevated` | #27272a | bg-zinc-800 | Inputs, active tabs, hover states |
-| `--border-default` | #27272a | border-zinc-800 | Card borders |
-| `--border-hover` | #3f3f46 | border-zinc-700 | Hover border state |
-| `--text-primary` | #f4f4f5 | text-zinc-100/200 | Headings, key content |
-| `--text-secondary` | #b4b4bc | text-zinc-400 | Descriptions, supporting text |
-| `--text-muted` | #a1a1aa | text-zinc-500 | Captions, timestamps, labels |
-| `--text-subtle` | #71717a | text-zinc-600/700 | Disabled, dividers |
+| Canonical Token | Legacy Name | Value | Tailwind | Usage |
+|-----------------|-------------|-------|----------|-------|
+| `--surface-1` | `--brand-bg` | #0f1219 | — | Page background |
+| `--surface-2` | `--brand-bg-surface/elevated` | #18181b | bg-zinc-900 | Card backgrounds |
+| `--surface-3` | `--brand-bg-card` | #27272a | bg-zinc-800 | Inputs, active tabs, hover states |
+| — | `--brand-border` | #27272a | border-zinc-800 | Card borders |
+| — | `--brand-border-hover` | #3f3f46 | border-zinc-700 | Hover border state |
+| — | — | #f4f4f5 | text-zinc-100/200 | Headings, key content |
+| — | — | #b4b4bc | text-zinc-400 | Descriptions, supporting text |
+| — | — | #a1a1aa | text-zinc-500 | Captions, timestamps, labels |
+| — | — | #71717a | text-zinc-600/700 | Disabled, dividers |
 
 ### Light Mode (.dashboard-light)
 
@@ -191,6 +206,44 @@ Standard card container for content sections.
 - Action buttons: `text-xs font-medium text-teal-400`
 - `interactive` prop: adds teal left-border accent on hover (`hover:border-l-teal-500/40`) for clickable cards
 - `staggerIndex` prop: entrance animation delay (0-based, 60ms per index)
+
+### 4a. ChartCard
+
+Thin `SectionCard` wrapper with chart-friendly defaults. Used for sparkline/mini-chart panels where the header needs to fit a title plus a directional trend indicator inline.
+
+```
+┌──────────────────────────────────────────────────────┐
+│ Title  ↗ +12.4%                        [optional action]│  ← inline title + TrendBadge
+│ <chart body>                                          │
+└──────────────────────────────────────────────────────┘
+```
+
+- Container: same `bg-[var(--surface-2)] border-zinc-800` + signature `10px 24px 10px 24px` radius as SectionCard
+- Tighter padding than SectionCard: header `px-4 py-3`, body `px-4 pb-3`
+- No `border-b` separator — chart visuals flow directly under header
+- `trend?: number` prop renders an inline `<TrendBadge>` next to the title; `trendProps` passes through (`invert`, `showSign`, `label`, etc.)
+- Omit all header props → header row doesn't render, body gets `px-4 py-3`
+
+### 4b. TrendBadge
+
+Canonical directional delta indicator. Replaces hand-rolled `TrendingUp/Down + emerald/red-400` ternaries across the app.
+
+```
+↗ +12.4%        ↘ -3.2%        — 0%
+```
+
+- Positive (or negative with `invert`): `text-emerald-400` + `TrendingUp` icon
+- Negative (or positive with `invert`): `text-red-400` + `TrendingDown` icon
+- Zero (only when `hideOnZero={false}`): `text-zinc-400` + `Minus` icon
+- Props:
+  - `value: number` — raw delta (e.g. `-12.4` or `3`)
+  - `suffix='%'` — unit string appended after the number
+  - `invert=false` — flip color mapping (use when lower = better, e.g. position, error count)
+  - `showSign=false` — show `+`/`-` sign prefix (default shows `Math.abs(value)`)
+  - `label?: string` — optional trailing context string (e.g. `"vs last month"`)
+  - `size='sm' | 'md'` — `sm` = `text-[11px]` + `w-3 h-3` icon (default), `md` = `text-xs` + `w-3.5 h-3.5`
+  - `hideOnZero=true` — return `null` when `value === 0` (override to `false` to keep a neutral Minus visible)
+- Always use `<TrendBadge>` instead of inlining `TrendingUp/Down` + emerald/red. Enforced by the pr-check `Hand-rolled trend badge` warn rule.
 
 ### 5. DateRangeSelector
 
@@ -347,6 +400,46 @@ Centered modal overlay for confirming destructive or irreversible actions. Repla
 | **Ghost** | `text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 rounded-md px-2 py-1 text-xs font-medium` |
 | **Accent text** | `text-teal-400 hover:bg-zinc-800 rounded-md px-2 py-1 text-xs font-medium` |
 
+### 16. Typography primitives (Phase 5)
+
+Thin wrappers over `.t-*` utilities. Each forwards refs and merges `className`. Live in `src/components/ui/typography/`.
+
+| Primitive | API | Renders | Notes |
+|-----------|-----|---------|-------|
+| **Heading** | `level={1\|2\|3}`, `as?="h1\|h2\|h3\|div"` | `.t-h1` (level=1) / `.t-h2` (level=2) / `.t-page` (level=3) | Default tag tracks `level`; `as="div"` for semantic-heading nesting issues. |
+| **Stat** | `size?="hero"\|"default"\|"sm"` | `.t-stat-lg` / `.t-stat` / `.t-stat-sm` | DIN Pro numerals. Use for KPIs / dashboard numbers. |
+| **BodyText** | `tone?="default"\|"muted"\|"dim"` | `.t-body` + inline `style.color` from CSS var | Tone is the color API. Tailwind color utilities via `className` are overridden by the inline tone style — pass `tone="default"` and let parent context drive color if you need a custom hue. |
+| **Caption** | `size?="default"\|"sm"` | `.t-caption` / `.t-caption-sm` | Secondary metadata, timestamps. |
+| **Label** | (no props) | `.t-label` (uppercase DIN) | Form labels, uppercase section markers. |
+| **Mono** | `size?="default"\|"micro"` | `.t-mono` (12px) / `.t-micro` (10px) | Both monospace (Fira Code → JetBrains Mono → Menlo fallback). IDs, slugs, tokens, timestamps. |
+
+Codemod scaffold: `scripts/codemods/phase5-typography.ts` (dry-run) reports candidate sites. Phase 2 applies migrations.
+
+### 21. Icon (Phase 5)
+
+Strict-enum wrapper around any Lucide component. Inline-flex `<span>` so it is safe inside `<p>`, `<li>`, or flex rows without breaking layout.
+
+```tsx
+import { TrendingUp } from 'lucide-react';
+import { Icon } from '@/components/ui';
+
+<Icon as={TrendingUp} size="sm" className="text-teal-400" />
+```
+
+- **Strict size enum** (no freeform `size={N}`):
+  - `xs` → `w-2 h-2` (8px)
+  - `sm` → `w-3 h-3` (12px) — default in most usage
+  - `md` → `w-4 h-4` (16px)
+  - `lg` → `w-5 h-5` (20px)
+  - `xl` → `w-6 h-6` (24px)
+  - `2xl` → `w-8 h-8` (32px)
+- **Color via `className`**: `currentColor` inheritance (`className="text-teal-400"`). No color enum; composes with the Three Laws color tokens.
+- **A11y**:
+  - Inner SVG is `aria-hidden="true"` by default — decorative icons are ignored by screen readers.
+  - For a semantic icon that conveys meaning on its own, pass `aria-label` as a prop; it is forwarded to the `<span>` wrapper via the HTMLAttributes rest spread.
+- **Ref**: forwarded to the `<span>` (`HTMLSpanElement`).
+- **Exception list (do NOT wrap)**: Lucide icons passed as props to other primitives (e.g. `<EmptyState icon={Clock} />`, `<Button icon={Send}>`, `<IconButton icon={X} />`) — those primitives manage sizing themselves.
+
 ---
 
 ## Spacing
@@ -383,6 +476,8 @@ src/components/ui/
 ├── MetricToggleCard.tsx    # Toggleable stat card for chart series visibility (active/inactive states)
 ├── PageHeader.tsx          # Consistent page header
 ├── SectionCard.tsx         # Standard card container
+├── ChartCard.tsx           # SectionCard variant for charts (inline title+TrendBadge)
+├── TrendBadge.tsx          # Canonical directional delta indicator (emerald/red/zinc)
 ├── DateRangeSelector.tsx   # Unified date/period picker
 ├── DataList.tsx            # Ranked list display
 ├── Badge.tsx               # Status/category pill
@@ -407,8 +502,110 @@ src/components/ui/
 ├── SocialPreview.tsx       # Social sharing card preview for Facebook and Twitter/X
 ├── constants.ts            # scoreColor, scoreColorClass, scoreBgBarClass, DATE_PRESETS
 ├── statusConfig.ts         # Status→color mapping for StatusBadge
+├── Icon.tsx                # Strict-enum wrapper around Lucide components (Phase 5)
+├── Button.tsx              # Primary/secondary/ghost/danger/link button (Phase 5)
+├── IconButton.tsx          # Square icon button with required a11y label (Phase 5)
+├── ActionPill.tsx          # Workflow pill: start/approve/decline/send/request-changes (Phase 5)
+├── SegmentedControl.tsx    # Radiogroup with roving tabIndex (Phase 5)
+├── typography/
+│   ├── Heading.tsx
+│   ├── Stat.tsx
+│   ├── BodyText.tsx
+│   ├── Caption.tsx
+│   ├── Label.tsx
+│   ├── Mono.tsx
+│   └── index.ts
+├── forms/
+│   ├── FormField.tsx
+│   ├── FormInput.tsx
+│   ├── FormSelect.tsx
+│   ├── FormTextarea.tsx
+│   ├── Checkbox.tsx
+│   ├── Toggle.tsx
+│   └── index.ts
+├── layout/
+│   ├── Row.tsx
+│   ├── Stack.tsx
+│   ├── Column.tsx
+│   ├── Grid.tsx
+│   ├── Divider.tsx
+│   ├── utils.ts            # Shared GapSize + gapMap
+│   └── index.ts
+├── overlay/
+│   ├── Modal.tsx
+│   ├── Popover.tsx
+│   ├── Tooltip.tsx
+│   ├── reducedMotion.ts
+│   └── index.ts
 ├── index.ts                # Barrel export
 ```
+
+---
+
+## § 17 Form Primitives (Phase 5 — 2026-04-24)
+
+Thin wrappers over dark-theme inputs with mint focus ring + error states.
+Live in `src/components/ui/forms/`. Each forwards refs and merges `className`
+via `cn()`. FormField generates a `useId()` and pipes it to child inputs via
+Context so `<label htmlFor>` ↔ `<input id>` is wired automatically.
+
+| Primitive | API | Behavior |
+|-----------|-----|----------|
+| **FormField** | `label`, `error?`, `hint?`, `required?`, `children` | Wraps input with label above + error/hint below. Generates `inputId` + `descriptionId` via Context for a11y. forwardRef to the wrapping div. |
+| **FormInput** | `value`, `onChange(value)`, `type?`, `placeholder?`, plus HTMLInput attrs (minus `onChange`) | Native input with mint focus ring. Reads error state + id from FormFieldContext. |
+| **FormSelect** | `options={[{value,label}]}`, `value`, `onChange(value)`, `placeholder?`, plus HTMLSelect attrs (minus `onChange`, `children`, `multiple`) | Select with the same dark-theme styling. Accepts `size`, `autoFocus`, `form`, `name`, etc. through rest spread. `multiple` is intentionally Omit'd — the single-string onChange can't represent multi-select; build a dedicated MultiSelect primitive if needed. |
+| **FormTextarea** | `value`, `onChange(value)`, `rows?`, `maxLength?` | Textarea with optional character counter (turns red at ≥90% of limit). |
+| **Checkbox** | `checked`, `onChange(boolean)`, `label` (required), `disabled?` | Custom visual checkbox over hidden native input — Space-key + a11y preserved. Mint on checked (Law 01). |
+| **Toggle** | `checked`, `onChange(boolean)`, `label` (required), `disabled?` | `role="switch"` with implicit aria-checked. Mint track on (Law 01), knob slides with transition. |
+
+### Validation states
+
+- **Default**: `border-zinc-700`, `focus:border-[var(--brand-mint)]` + `focus:ring-2 focus:ring-[var(--brand-mint-glow)]`
+- **Error** (FormField `error="…"` set): `border-red-500/50`, `aria-invalid="true"`, `aria-describedby` → error id. Error message `text-red-400 role="alert"`.
+- **Hint** (FormField `hint="…"` set, no error): `aria-describedby` → hint id. Hint `text-zinc-500`.
+- **Disabled**: `opacity-50`, `cursor-not-allowed` on the wrapping label and the input.
+
+### `required` flag
+
+Adds a visible red asterisk after the label text and propagates `required` into the Context. Does NOT set the native `required` attribute automatically — callers pass it to the input as needed.
+
+---
+
+## § 20 Overlay Primitives (Phase 5 — 2026-04-24)
+
+All three overlay primitives portal into `document.body` so `position: fixed` resolves relative to the viewport regardless of ancestor `transform` / `filter` / `contain` / `will-change`.
+
+**`<Modal>`** — `src/components/ui/overlay/Modal.tsx`
+
+| Prop | Type | Notes |
+|------|------|-------|
+| `open` | `boolean` | Controls visibility |
+| `onClose` | `() => void` | Called on Escape, backdrop click, or header × button |
+| `size` | `'sm' \| 'md' \| 'lg' \| 'xl'` | Max-width: 24rem / 32rem / 48rem / 64rem. Default `md` |
+| `labelledById` | `string?` | Override for `aria-labelledby`; auto-generated otherwise |
+
+Compound sub-components: `<Modal.Header title onClose?>`, `<Modal.Body>`, `<Modal.Footer>`. Focus trap (Tab / Shift+Tab wraps), Escape to close, backdrop-click closes (drag-out safe), body-scroll lock, focus restores to trigger on close. Respects `prefers-reduced-motion`. Backdrop sits at `var(--z-modal-backdrop)` (40); panel at `var(--z-modal)` (50).
+
+**`<Popover>`** — `src/components/ui/overlay/Popover.tsx`
+
+| Prop | Type | Notes |
+|------|------|-------|
+| `trigger` | `ReactElement` | Cloned to receive `aria-haspopup`, `aria-expanded`, `aria-controls` |
+| `placement` | `PopoverPlacement` | 8 values: `bottom-start` (default), `bottom-end`, `bottom`, `top-*`, `left`, `right` |
+| `closeOnSelect` | `boolean` | Default `true` |
+| `offset` | `number` | Gap from trigger in px. Default `8` |
+
+Compound sub-components: `<Popover.Item onClick danger?>`, `<Popover.Separator>`. Keyboard: ArrowDown/Up cycle items, Home/End jump to first/last, Tab closes (focus moves naturally to next page element), Escape + outside-click close. Focus returns to trigger on close. Viewport-clamped positioning with scroll/resize tracking.
+
+**`<Tooltip>`** — `src/components/ui/overlay/Tooltip.tsx`
+
+| Prop | Type | Notes |
+|------|------|-------|
+| `content` | `ReactNode` | Tooltip body |
+| `placement` | `'top' \| 'bottom' \| 'left' \| 'right'` | Default `top` |
+| `delay` | `number` | Hover show delay in ms. Default `500`. Focus shows instantly |
+
+Wraps a single child element (cloned to add `aria-describedby` while visible). `role="tooltip"`, `pointerEvents: none`. Respects `prefers-reduced-motion`.
 
 ---
 
@@ -448,6 +645,121 @@ src/components/ui/
 - Score rings use both color AND numeric value
 - Severity badges use both color AND icon (AlertTriangle, Info, CheckCircle)
 - Delta indicators use both color AND directional arrow (↑/↓)
+
+---
+
+## § 18 Action Primitives (Phase 5 — 2026-04-24)
+
+Four new primitives added in Phase 5 Task 1.3. All from `src/components/ui/`.
+
+### Button
+
+| Variant | Classes | Use |
+|---------|---------|-----|
+| `primary` | `bg-gradient-to-r from-teal-600 to-emerald-600 text-white` | Primary CTA (Law 1) |
+| `secondary` | `bg-zinc-800 border border-zinc-700 text-zinc-200` | Secondary action |
+| `ghost` | `bg-transparent hover:bg-zinc-800/50 text-zinc-300` | Inline / low-emphasis |
+| `danger` | `bg-red-600 hover:bg-red-500 text-white` | Destructive actions |
+| `link` | `text-teal-400 hover:text-teal-300 underline` | Text-link style; no size padding |
+
+Sizes: `sm` / `md` (default) / `lg`. Props: `icon`, `iconPosition`, `loading` (spinner replaces icon).
+
+### IconButton
+
+| Variant | Classes | Use |
+|---------|---------|-----|
+| `ghost` | `text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800` | Toolbar / utility icons |
+| `solid` | `bg-zinc-800 hover:bg-zinc-700 text-zinc-200` | Raised icon button |
+
+Sizes: `sm` (24px) / `md` (32px, default) / `lg` (40px). Requires `label` prop (maps to `aria-label`).
+
+### ActionPill
+
+| Variant | Color family | Semantic use |
+|---------|-------------|-------------|
+| `start` | teal | Initiate a workflow |
+| `approve` | emerald | Accept / approve |
+| `decline` | red | Reject / decline |
+| `send` | blue | Transmit / publish (data-adjacent action) |
+| `request-changes` | amber | Flag for revision |
+
+Fixed size: `px-2.5 py-1 text-[11px]`. All use tinted border + bg pattern (`border-X-500/30 bg-X-500/10`).
+
+### SegmentedControl
+
+WAI-ARIA `radiogroup` with roving tabIndex (selected button = `tabIndex={0}`, others = `tabIndex={-1}`). Arrow-key navigation (Left/Right plus Home/End) moves both selection and DOM focus. Supports `disabled` options (skipped during keyboard nav). When the current `value` does not match any option, the first non-disabled option becomes the fallback tab stop so the widget remains keyboard-reachable.
+
+| State | Classes |
+|-------|---------|
+| Active segment | `bg-zinc-700 text-white` |
+| Inactive segment | `text-zinc-400 hover:text-zinc-200` |
+| Container | `bg-zinc-900 border border-zinc-800 rounded-md p-0.5` |
+
+Sizes: `sm` (`px-2 py-1 text-[11px]`) / `md` (`px-3 py-1.5 text-xs`, default).
+
+---
+
+## § 19 Layout Primitives (Phase 5 — 2026-04-24)
+
+Five structural layout primitives live in `src/components/ui/layout/`. Import from the barrel: `import { Row, Stack, Column, Grid, Divider } from '@/components/ui/layout'`. All are `React.forwardRef` components that accept an optional `className` prop for composition.
+
+### API Reference
+
+#### `<Row>`
+
+Horizontal flex container (`flex flex-row`).
+
+| Prop | Type | Default | Notes |
+|------|------|---------|-------|
+| `gap` | `GapSize` | — | `xs`=gap-1, `sm`=gap-2, `md`=gap-3, `lg`=gap-4, `xl`=gap-6 |
+| `align` | `'start' \| 'center' \| 'end' \| 'baseline'` | `'center'` | `items-*` |
+| `justify` | `'start' \| 'center' \| 'end' \| 'between' \| 'around'` | — | `justify-*` |
+| `wrap` | `boolean` | — | `true`→`flex-wrap`, `false`→`flex-nowrap`, omit→no class |
+| `className` | `string` | — | Merged at end |
+
+#### `<Stack>`
+
+Vertical flex container (`flex flex-col`) with optional horizontal mode.
+
+| Prop | Type | Default | Notes |
+|------|------|---------|-------|
+| `gap` | `GapSize` | — | Same scale as Row |
+| `align` | `'start' \| 'center' \| 'end' \| 'stretch'` | — | `items-*` |
+| `dir` | `'col' \| 'row'` | `'col'` | Override to `flex-row` when needed |
+| `className` | `string` | — | Merged at end |
+
+#### `<Column>`
+
+Strict vertical flex container. Never produces `flex-row`. Use when intent must be unambiguously vertical.
+
+| Prop | Type | Default | Notes |
+|------|------|---------|-------|
+| `gap` | `GapSize` | — | Same scale as Row |
+| `align` | `'start' \| 'center' \| 'end' \| 'stretch'` | — | `items-*` |
+| `className` | `string` | — | Merged at end |
+
+#### `<Grid>`
+
+Responsive CSS grid with static Tailwind class maps (Tailwind-scanner-safe).
+
+| Prop | Type | Default | Notes |
+|------|------|---------|-------|
+| `cols` | `{ sm?: number; md?: number; lg?: number; xl?: number }` | required | Values 1–12. First defined breakpoint also applied as unscoped base class. |
+| `gap` | `GapSize` | — | Same scale as Row |
+| `className` | `string` | — | Merged at end |
+
+**Important:** Grid uses `Record<number, string>` maps (not template literals) for each breakpoint so Tailwind's v4 static scanner can detect all `grid-cols-*` class strings. Adding a custom column count outside 1–12 requires adding it to each map in `Grid.tsx`.
+
+#### `<Divider>`
+
+Thin decorative rule using `var(--brand-border)`.
+
+| Prop | Type | Default | Notes |
+|------|------|---------|-------|
+| `orientation` | `'horizontal' \| 'vertical'` | `'horizontal'` | `horizontal`→`border-b w-full`, `vertical`→`border-r h-full` |
+| `className` | `string` | — | Merged at end |
+
+Renders a `<div role="separator" aria-orientation="...">`.
 
 ---
 

@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { loadStripe, type Stripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { Loader2, Lock, CheckCircle2, AlertTriangle, X, Shield, ArrowLeft } from 'lucide-react';
+import { Icon, Button } from './ui';
 
 // --- Stripe singleton (loaded once per publishable key) ---
 
@@ -62,16 +63,16 @@ function PaymentFormInner({ amount, productName, onSuccess, onCancel }: PaymentF
     }
   }, [stripe, elements, onSuccess]);
 
-  // Success state
+  // Success state — always-dark per Stripe modal constraint (see line 178 + 316 warnings)
   if (succeeded) {
     return (
       <div className="flex flex-col items-center justify-center py-10 gap-4 animate-[scaleIn_0.3s_ease-out]">
         <div className="w-16 h-16 rounded-full flex items-center justify-center bg-teal-500/15 ring-1 ring-teal-500/30">
-          <CheckCircle2 className="w-8 h-8 text-teal-400" />
+          <Icon as={CheckCircle2} size="2xl" className="text-teal-400" />
         </div>
         <div className="text-center">
           <div className="text-sm font-semibold text-zinc-100">Payment Successful</div>
-          <div className="text-[11px] text-zinc-500 mt-1">{fmt(amount)} paid for {productName}</div>
+          <div className="text-xs text-zinc-500 mt-1">{fmt(amount)} paid for {productName}</div>
         </div>
       </div>
     );
@@ -88,54 +89,47 @@ function PaymentFormInner({ amount, productName, onSuccess, onCancel }: PaymentF
         />
       </div>
 
-      {/* Error message */}
+      {/* Error message — preserve red error emphasis for payment safety */}
       {error && (
-        <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-red-500/8 border border-red-500/20">
-          <AlertTriangle className="w-3.5 h-3.5 text-red-400/80 mt-0.5 flex-shrink-0" />
-          <span className="text-[11px] text-red-300 leading-relaxed">{error}</span>
+        <div className="flex items-start gap-2 px-3 py-2.5 rounded-[var(--radius-lg)] bg-red-500/8 border border-red-500/20">
+          <Icon as={AlertTriangle} size="md" className="text-red-400/80 mt-0.5 flex-shrink-0" />
+          <span className="t-caption-sm text-red-300 leading-relaxed">{error}</span>
         </div>
       )}
 
       {/* Submit button */}
-      <button
+      <Button
         type="submit"
+        variant="primary"
         disabled={!stripe || processing}
-        className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 shadow-lg active:scale-[0.98] bg-gradient-to-r from-teal-600 to-emerald-600 text-white hover:from-teal-500 hover:to-emerald-500 shadow-teal-900/40"
+        loading={processing}
+        icon={processing ? undefined : Lock}
+        className="w-full py-3 text-sm font-semibold shadow-lg shadow-teal-900/40 active:scale-[0.98]"
       >
-        {processing ? (
-          <>
-            <Loader2 className="w-4 h-4 animate-spin" />
-            <span>Processing…</span>
-          </>
-        ) : (
-          <>
-            <Lock className="w-3.5 h-3.5" />
-            <span>Pay {fmt(amount)}</span>
-          </>
-        )}
-      </button>
+        {processing ? 'Processing…' : `Pay ${fmt(amount)}`}
+      </Button>
 
-      {/* Cancel */}
+      {/* Cancel — always-dark per Stripe modal constraint */}
       <button
         type="button"
         onClick={onCancel}
         disabled={processing}
-        className="w-full px-4 py-2 rounded-xl text-xs text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 transition-all flex items-center justify-center gap-1.5"
+        className="w-full px-4 py-2 rounded-[var(--radius-xl)] text-xs text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 transition-all flex items-center justify-center gap-1.5"
       >
-        <ArrowLeft className="w-3 h-3" />
+        <Icon as={ArrowLeft} size="md" />
         Back
       </button>
 
-      {/* Trust footer */}
+      {/* Trust footer — always-dark per Stripe modal constraint */}
       <div className="flex items-center justify-center gap-4 pt-1">
         <div className="flex items-center gap-1.5">
-          <Shield className="w-3 h-3 text-zinc-600" />
-          <span className="text-[10px] text-zinc-600">SSL Encrypted</span>
+          <Icon as={Shield} size="sm" className="text-zinc-500" />
+          <span className="text-xs text-zinc-500">SSL Encrypted</span>
         </div>
-        <div className="w-px h-3 bg-zinc-800" />
+        <div className="w-px h-3 bg-zinc-700" />
         <div className="flex items-center gap-1.5">
-          <svg className="w-3 h-3 text-zinc-600" viewBox="0 0 24 24" fill="currentColor"><path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z"/></svg>
-          <span className="text-[10px] text-zinc-600">Powered by Stripe</span>
+          <svg className="w-3 h-3 text-zinc-500" viewBox="0 0 24 24" fill="currentColor"><path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z"/></svg>
+          <span className="text-xs text-zinc-500">Powered by Stripe</span>
         </div>
       </div>
     </form>
@@ -171,7 +165,7 @@ export function StripePaymentForm({
   if (!stripePromise || !clientSecret) {
     return (
       <div className="flex items-center justify-center py-10">
-        <Loader2 className="w-5 h-5 animate-spin text-zinc-500" />
+        <Icon as={Loader2} size="lg" className="animate-spin text-zinc-500" />
       </div>
     );
   }
@@ -319,35 +313,42 @@ export function StripePaymentModal({
       className="fixed inset-0 bg-black/70 backdrop-blur-md z-[70] flex items-center justify-center p-4"
       onClick={onClose}
     >
+      {/* Stripe payment modal must be ALWAYS DARK regardless of dashboard theme.
+          Stripe Elements is hardcoded to theme: 'night' (line ~180); using
+          theme-responsive `--surface-*` / `--brand-*` tokens here would create
+          a white-modal + dark-form mismatch when client uses light mode.
+          Same constraint applies to all child color classes below. Do NOT
+          replace these zinc-* values with `--surface-*` / `--brand-text-*`
+          tokens. See the same warning at line 178. */}
       <div
         className="relative bg-zinc-900 border border-zinc-700/50 rounded-2xl shadow-2xl shadow-black/50 w-full max-w-md overflow-hidden animate-[scaleIn_0.2s_ease-out]"
         onClick={e => e.stopPropagation()}
       >
-        {/* Close button */}
+        {/* Close button — always-dark per modal constraint */}
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 w-7 h-7 rounded-lg flex items-center justify-center bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors z-10"
+          className="absolute top-3 right-3 w-7 h-7 rounded-[var(--radius-lg)] flex items-center justify-center bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors z-10"
         >
-          <X className="w-4 h-4" />
+          <Icon as={X} size="md" />
         </button>
 
-        {/* Header */}
+        {/* Header — always-dark per modal constraint */}
         <div className="relative px-6 pt-6 pb-4 overflow-hidden bg-gradient-to-br from-teal-600/15 via-emerald-600/10 to-transparent">
           <div className="absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl opacity-20 bg-teal-500" />
           <div className="relative">
             <div className="text-sm font-semibold text-zinc-100 mb-1">{productName}</div>
-            <div className="text-[11px] text-zinc-500">{topic}</div>
-            <div className="text-[11px] mt-0.5 text-teal-400/80">
+            <div className="text-xs text-zinc-500">{topic}</div>
+            <div className="text-xs mt-0.5 text-teal-400/80">
               Keyword: &ldquo;{targetKeyword}&rdquo;
             </div>
           </div>
 
-          {/* Price badge */}
-          <div className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-lg border bg-teal-500/5 border-teal-500/20">
+          {/* Price badge — always-dark per modal constraint */}
+          <div className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-[var(--radius-lg)] border bg-teal-500/5 border-teal-500/20">
             <span className="text-lg font-bold tracking-tight text-teal-300">
               {fmt(amount)}
             </span>
-            <span className="text-[10px] text-zinc-500">one-time</span>
+            <span className="text-xs text-zinc-500">one-time</span>
           </div>
         </div>
 

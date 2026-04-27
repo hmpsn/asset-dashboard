@@ -25,7 +25,7 @@ import { useToast } from '../Toast';
 import { useBlueprint } from '../../hooks/admin/useBlueprints';
 import { queryKeys } from '../../lib/queryKeys';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
-import { TabBar } from '../ui/TabBar';
+import { TabBar, Icon, Button, cn } from '../ui/index';
 import { useCopyStatus, useGenerateCopy } from '../../hooks/admin/useCopyPipeline';
 import { CopyReviewPanel } from './CopyReviewPanel';
 import { BatchGenerationPanel } from './BatchGenerationPanel';
@@ -70,26 +70,27 @@ function EntryCardCopyBadge({ workspaceId, entryId }: { workspaceId: string; ent
 
   const config = COPY_STATUS_BADGE[status.overallStatus] ?? COPY_STATUS_BADGE.pending;
 
-  const Icon =
+  const BadgeIcon =
     status.overallStatus === 'approved' ? CheckCircle2 :
     status.overallStatus === 'client_review' ? FileText :
     Clock;
 
   // Map shared color names to inline badge classes
   const colorClass: Record<string, string> = {
-    green: 'bg-emerald-900/40 text-emerald-400',
+    green: 'bg-emerald-900/40 text-emerald-400',   // legacy alias
+    emerald: 'bg-emerald-900/40 text-emerald-400',
     teal: 'bg-teal-900/40 text-teal-400',
     blue: 'bg-blue-900/40 text-blue-400',
     orange: 'bg-amber-900/40 text-amber-400',
-    zinc: 'bg-zinc-700 text-zinc-400',
+    zinc: 'bg-[var(--surface-3)] text-[var(--brand-text)]',
   };
 
   return (
-    <span className={`shrink-0 flex items-center gap-1 px-1.5 py-0.5 text-xs rounded font-medium ${colorClass[config.color] ?? colorClass.zinc}`}>
-      <Icon className="w-3 h-3" />
+    <span className={cn('shrink-0 flex items-center gap-1 px-1.5 py-0.5 t-caption rounded font-medium', colorClass[config.color] ?? colorClass.zinc)}>
+      <Icon as={BadgeIcon} size="sm" />
       {config.label}
       {status.totalSections > 0 && (
-        <span className="text-[10px] opacity-70">
+        <span className="t-caption-sm opacity-70">
           ({status.approvedSections}/{status.totalSections})
         </span>
       )}
@@ -114,43 +115,44 @@ function EntryCard({
   onGenerateCopy,
   isGenerating,
 }: EntryCardProps) {
-  const Chevron = expanded ? ChevronDown : ChevronRight;
+  const ChevronIcon = expanded ? ChevronDown : ChevronRight;
   const isIncluded = entry.scope === 'included';
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+    // pr-check-disable-next-line -- section card pending Phase 4 SectionCard migration
+    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] overflow-hidden">
       {/* Header row */}
       <div className="flex items-center gap-3 px-4 py-3">
         <button
           onClick={onToggle}
-          className="text-zinc-500 hover:text-zinc-300 transition-colors shrink-0"
+          className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors shrink-0"
           aria-label={expanded ? 'Collapse entry' : 'Expand entry'}
         >
-          <Chevron className="w-4 h-4" />
+          <Icon as={ChevronIcon} size="md" />
         </button>
 
-        <Layout className="w-4 h-4 text-zinc-400 shrink-0" />
+        <Icon as={Layout} size="md" className="text-[var(--brand-text)] shrink-0" />
 
-        <span className="flex-1 min-w-0 text-sm font-medium text-zinc-100 truncate">
+        <span className="flex-1 min-w-0 text-sm font-medium text-[var(--brand-text-bright)] truncate">
           {entry.name}
         </span>
 
         {/* Page type badge */}
-        <span className="shrink-0 px-1.5 py-0.5 text-xs bg-zinc-800 text-zinc-400 rounded font-medium">
+        <span className="shrink-0 px-1.5 py-0.5 t-caption bg-[var(--surface-3)] text-[var(--brand-text)] rounded font-medium">
           {PAGE_TYPE_LABELS[entry.pageType] ?? entry.pageType}
         </span>
 
         {/* CMS badge */}
         {entry.isCollection && (
-          <span className="shrink-0 px-1.5 py-0.5 text-xs bg-zinc-700 text-zinc-300 rounded font-medium">
+          <span className="shrink-0 px-1.5 py-0.5 t-caption bg-[var(--brand-border-hover)] text-[var(--brand-text)] rounded font-medium">
             CMS
           </span>
         )}
 
         {/* Primary keyword badge */}
         {entry.primaryKeyword && (
-          <span className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 text-xs bg-teal-900/40 text-teal-400 rounded font-medium">
-            <Tag className="w-3 h-3" />
+          <span className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 t-caption bg-teal-900/40 text-teal-400 rounded font-medium">
+            <Icon as={Tag} size="sm" />
             {entry.primaryKeyword}
           </span>
         )}
@@ -164,15 +166,16 @@ function EntryCard({
         <button
           onClick={onScopeToggle}
           disabled={isScopeToggling}
-          className={`shrink-0 px-2 py-0.5 text-xs rounded font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+          className={cn(
+            'shrink-0 px-2 py-0.5 t-caption rounded font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
             isIncluded
               ? 'bg-emerald-900/40 text-emerald-400 hover:bg-emerald-900/60'
               : 'bg-amber-900/40 text-amber-400 hover:bg-amber-900/60'
-          }`}
+          )}
           aria-label={isIncluded ? 'Mark as upsell' : 'Mark as included'}
         >
           {isScopeToggling ? (
-            <Loader2 className="w-3 h-3 animate-spin" />
+            <Icon as={Loader2} size="sm" className="animate-spin" />
           ) : (
             isIncluded ? 'Included' : 'Upsell'
           )}
@@ -182,57 +185,57 @@ function EntryCard({
         <button
           onClick={onRemove}
           disabled={isRemoving}
-          className="shrink-0 p-1 text-zinc-500 hover:text-red-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="shrink-0 p-1 text-[var(--brand-text-muted)] hover:text-red-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           aria-label={`Remove ${entry.name}`}
         >
           {isRemoving ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            <Icon as={Loader2} size="md" className="animate-spin" />
           ) : (
-            <Trash2 className="w-3.5 h-3.5" />
+            <Icon as={Trash2} size="md" />
           )}
         </button>
       </div>
 
       {/* Expanded: section plan */}
       {expanded && entry.sectionPlan.length > 0 && (
-        <div className="border-t border-zinc-800 px-4 py-3 space-y-2">
-          <p className="text-xs text-zinc-500 font-medium uppercase tracking-wide mb-2">
+        <div className="border-t border-[var(--brand-border)] px-4 py-3 space-y-2">
+          <p className="t-caption text-[var(--brand-text-muted)] font-medium uppercase tracking-wide mb-2">
             Section Plan
           </p>
           {entry.sectionPlan.map((section, idx) => (
             <div
               key={section.id}
-              className="flex items-start gap-3 bg-zinc-800/50 rounded-lg px-3 py-2.5"
+              className="flex items-start gap-3 bg-[var(--surface-3)]/50 rounded-[var(--radius-md)] px-3 py-2.5"
             >
-              <span className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-zinc-700 text-zinc-400 text-xs font-medium">
+              <span className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-[var(--brand-border-hover)] text-[var(--brand-text)] t-caption font-medium">
                 {idx + 1}
               </span>
               <div className="flex-1 min-w-0 space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-medium text-zinc-200 capitalize">
+                  <span className="text-sm font-medium text-[var(--brand-text-bright)] capitalize">
                     {section.sectionType.replace(/-/g, ' ')}
                   </span>
                   {/* narrative role — purple (admin-only) */}
                   {section.narrativeRole && (
-                    <span className="px-1.5 py-0.5 text-xs bg-purple-900/30 text-purple-400 rounded font-medium capitalize">
+                    <span className="px-1.5 py-0.5 t-caption bg-purple-900/30 text-purple-400 rounded font-medium capitalize">
                       {section.narrativeRole.replace(/-/g, ' ')}
                     </span>
                   )}
                   {section.wordCountTarget > 0 && (
-                    <span className="text-xs text-zinc-500">
+                    <span className="t-caption text-[var(--brand-text-muted)]">
                       ~{section.wordCountTarget} words
                     </span>
                   )}
                 </div>
                 {section.brandNote && (
-                  <p className="text-xs text-zinc-400">
-                    <span className="text-zinc-500">Brand: </span>
+                  <p className="t-caption text-[var(--brand-text)]">
+                    <span className="text-[var(--brand-text-muted)]">Brand: </span>
                     {section.brandNote}
                   </p>
                 )}
                 {section.seoNote && (
-                  <p className="text-xs text-zinc-400">
-                    <span className="text-zinc-500">SEO: </span>
+                  <p className="t-caption text-[var(--brand-text)]">
+                    <span className="text-[var(--brand-text-muted)]">SEO: </span>
                     {section.seoNote}
                   </p>
                 )}
@@ -243,14 +246,14 @@ function EntryCard({
       )}
 
       {expanded && entry.sectionPlan.length === 0 && (
-        <div className="border-t border-zinc-800 px-4 py-3">
-          <p className="text-xs text-zinc-500 italic">No section plan defined.</p>
+        <div className="border-t border-[var(--brand-border)] px-4 py-3">
+          <p className="t-caption text-[var(--brand-text-muted)] italic">No section plan defined.</p>
         </div>
       )}
 
       {/* Copy action buttons (feature-gated) */}
       {copyEnabled && expanded && (
-        <div className="border-t border-zinc-800 px-4 py-2.5 flex items-center gap-2">
+        <div className="border-t border-[var(--brand-border)] px-4 py-2.5 flex items-center gap-2">
           <CopyActionButtons
             workspaceId={workspaceId!}
             entryId={entry.id}
@@ -265,7 +268,7 @@ function EntryCard({
 
       {/* Inline copy review panel */}
       {copyEnabled && expanded && isReviewing && workspaceId && blueprintId && (
-        <div className="border-t border-zinc-800">
+        <div className="border-t border-[var(--brand-border)]">
           <CopyReviewPanel
             workspaceId={workspaceId}
             blueprintId={blueprintId}
@@ -302,44 +305,39 @@ function CopyActionButtons({
   return (
     <>
       {hasCopy ? (
+        // pr-check-disable-next-line -- toggle CTA conditionally applies the gradient only when !isReviewing; Button primitive's primary variant does not support a two-state conditional gradient
         <button
           onClick={isReviewing ? onCloseReview : onReviewCopy}
-          className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg font-medium transition-colors ${
+          className={cn(
+            'flex items-center gap-1.5 px-2.5 py-1 t-caption rounded-[var(--radius-md)] font-medium transition-colors',
             isReviewing
-              ? 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600'
+              ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)]/80'
               : 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white hover:opacity-90'
-          }`}
+          )}
         >
           {isReviewing ? (
             <>
-              <X className="w-3 h-3" />
+              <Icon as={X} size="sm" />
               Close Review
             </>
           ) : (
             <>
-              <PenLine className="w-3 h-3" />
+              <Icon as={PenLine} size="sm" />
               Review Copy
             </>
           )}
         </button>
       ) : (
-        <button
-          onClick={onGenerateCopy}
+        <Button
+          variant="primary"
+          size="sm"
+          icon={Sparkles}
+          loading={isGenerating}
           disabled={isGenerating}
-          className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg font-medium bg-gradient-to-r from-teal-600 to-emerald-600 text-white hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+          onClick={onGenerateCopy}
         >
-          {isGenerating ? (
-            <>
-              <Loader2 className="w-3 h-3 animate-spin" />
-              Generating...
-            </>
-          ) : (
-            <>
-              <Sparkles className="w-3 h-3" />
-              Generate Copy
-            </>
-          )}
-        </button>
+          {isGenerating ? 'Generating...' : 'Generate Copy'}
+        </Button>
       )}
     </>
   );
@@ -478,8 +476,8 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 text-zinc-400 text-sm py-8">
-        <Loader2 className="w-4 h-4 animate-spin" />
+      <div className="flex items-center gap-2 text-[var(--brand-text)] text-sm py-8">
+        <Icon as={Loader2} size="md" className="animate-spin" />
         Loading blueprint...
       </div>
     );
@@ -488,7 +486,7 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
   if (isError || !blueprint) {
     return (
       <div className="space-y-3 py-8">
-        <p className="text-sm text-zinc-400">Blueprint not found or failed to load.</p>
+        <p className="text-sm text-[var(--brand-text)]">Blueprint not found or failed to load.</p>
         <button
           onClick={onBack}
           className="text-sm text-teal-400 hover:text-teal-300 transition-colors"
@@ -506,33 +504,28 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
         <div className="flex items-start gap-3">
           <button
             onClick={onBack}
-            className="mt-0.5 p-1 text-zinc-400 hover:text-zinc-100 transition-colors rounded"
+            className="mt-0.5 p-1 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors rounded"
             aria-label="Back to blueprints"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <Icon as={ArrowLeft} size="md" />
           </button>
           <div>
-            <h2 className="text-lg font-semibold text-zinc-100">{blueprint.name}</h2>
-            <p className="text-xs text-zinc-500 mt-0.5">
+            <h2 className="text-lg font-semibold text-[var(--brand-text-bright)]">{blueprint.name}</h2>
+            <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">
               v{blueprint.version} · {inScope.length} page{inScope.length !== 1 ? 's' : ''} in scope{recommended.length > 0 ? ` · ${recommended.length} recommended` : ''}
             </p>
           </div>
         </div>
 
-        <button
-          onClick={() => saveVersionMutation.mutate()}
+        <Button
+          variant="primary"
+          size="sm"
+          loading={saveVersionMutation.isPending}
           disabled={saveVersionMutation.isPending}
-          className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white text-sm rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+          onClick={() => saveVersionMutation.mutate()}
         >
-          {saveVersionMutation.isPending ? (
-            <>
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            'Save Version'
-          )}
-        </button>
+          {saveVersionMutation.isPending ? 'Saving...' : 'Save Version'}
+        </Button>
       </div>
 
       {/* ── Tab bar ───────────────────────────────────────────────────────── */}
@@ -551,15 +544,15 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
           {/* In Scope section */}
           <section className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-zinc-300">
+              <h3 className="text-sm font-semibold text-[var(--brand-text)]">
                 In Scope ({inScope.length})
               </h3>
               {!showAddForm && (
                 <button
                   onClick={() => setShowAddForm(true)}
-                  className="flex items-center gap-1 text-xs text-teal-400 hover:text-teal-300 transition-colors"
+                  className="flex items-center gap-1 t-caption text-teal-400 hover:text-teal-300 transition-colors"
                 >
-                  <Plus className="w-3.5 h-3.5" />
+                  <Icon as={Plus} size="md" />
                   Add page
                 </button>
               )}
@@ -567,10 +560,11 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
 
             {/* Add page form */}
             {showAddForm && (
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
+              // pr-check-disable-next-line -- inline stats summary panel; pending Phase 4 SectionCard migration
+              <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] p-4 space-y-3">
                 <div className="flex gap-3">
                   <div className="flex-1 space-y-1">
-                    <label htmlFor="new-entry-name" className="text-xs text-zinc-400">
+                    <label htmlFor="new-entry-name" className="t-caption text-[var(--brand-text)]">
                       Page name
                     </label>
                     <input
@@ -578,20 +572,20 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
                       value={newEntryName}
                       onChange={e => setNewEntryName(e.target.value)}
                       placeholder="e.g. Home, Services, About Us"
-                      className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-teal-500"
+                      className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
                       disabled={addEntryMutation.isPending}
                       onKeyDown={e => e.key === 'Enter' && handleAddEntry()}
                     />
                   </div>
                   <div className="space-y-1">
-                    <label htmlFor="new-entry-type" className="text-xs text-zinc-400">
+                    <label htmlFor="new-entry-type" className="t-caption text-[var(--brand-text)]">
                       Page type
                     </label>
                     <select
                       id="new-entry-type"
                       value={newEntryType}
                       onChange={e => setNewEntryType(e.target.value as BlueprintPageType)}
-                      className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-teal-500"
+                      className="bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
                       disabled={addEntryMutation.isPending}
                     >
                       {Object.entries(PAGE_TYPE_LABELS).map(([value, label]) => (
@@ -604,20 +598,15 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
                 </div>
 
                 <div className="flex gap-2">
-                  <button
-                    onClick={handleAddEntry}
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    loading={addEntryMutation.isPending}
                     disabled={!newEntryName.trim() || addEntryMutation.isPending}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white text-sm rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+                    onClick={handleAddEntry}
                   >
-                    {addEntryMutation.isPending ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        Adding...
-                      </>
-                    ) : (
-                      'Add Page'
-                    )}
-                  </button>
+                    {addEntryMutation.isPending ? 'Adding...' : 'Add Page'}
+                  </Button>
                   <button
                     onClick={() => {
                       setShowAddForm(false);
@@ -625,7 +614,7 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
                       setNewEntryType('service');
                     }}
                     disabled={addEntryMutation.isPending}
-                    className="px-3 py-1.5 text-zinc-500 text-sm hover:text-zinc-300 transition-colors disabled:opacity-40"
+                    className="px-3 py-1.5 text-[var(--brand-text-muted)] text-sm hover:text-[var(--brand-text)] transition-colors disabled:opacity-40"
                   >
                     Cancel
                   </button>
@@ -634,7 +623,7 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
             )}
 
             {inScope.length === 0 && !showAddForm && (
-              <p className="text-sm text-zinc-500 italic">No pages in scope yet. Add one above.</p>
+              <p className="text-sm text-[var(--brand-text-muted)] italic">No pages in scope yet. Add one above.</p>
             )}
 
             {inScope.map(entry => (
@@ -665,7 +654,7 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
           {/* Recommended — Upsell Opportunities */}
           {recommended.length > 0 && (
             <section className="space-y-3">
-              <h3 className="text-sm font-semibold text-zinc-300">
+              <h3 className="text-sm font-semibold text-[var(--brand-text)]">
                 Recommended — Upsell Opportunities ({recommended.length})
               </h3>
 

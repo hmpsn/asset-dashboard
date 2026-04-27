@@ -1,6 +1,7 @@
 import { Sparkles, CheckCircle2 } from 'lucide-react';
 import { post } from '../../api/client';
 import { STUDIO_NAME } from '../../constants';
+import { Icon } from '../ui';
 
 interface Props {
   workspaceId: string;
@@ -11,18 +12,19 @@ interface Props {
 export function UpgradeModal({ workspaceId, onClose, onError }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-zinc-900 border border-zinc-700 p-8 max-w-md w-full mx-4 text-center shadow-2xl" style={{ borderRadius: '10px 24px 10px 24px' }} onClick={e => e.stopPropagation()}>
+      {/* pr-check-disable-next-line -- upgrade modal surface uses brand signature radius intentionally */}
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-8 max-w-md w-full mx-4 text-center shadow-2xl" style={{ borderRadius: 'var(--radius-signature-lg)' }} onClick={e => e.stopPropagation()}>
         <div className="w-14 h-14 rounded-full bg-teal-500/10 border border-teal-500/20 flex items-center justify-center mx-auto mb-4">
-          <Sparkles className="w-7 h-7 text-teal-400" />
+          <Icon as={Sparkles} size="2xl" className="text-teal-400" />
         </div>
-        <h3 className="text-lg font-semibold text-zinc-100 mb-2">SEO Strategy — Premium Feature</h3>
-        <p className="text-sm text-zinc-400 leading-relaxed mb-6">
+        <h3 className="text-lg font-semibold text-[var(--brand-text-bright)] mb-2">SEO Strategy — Premium Feature</h3>
+        <p className="text-sm text-[var(--brand-text)] leading-relaxed mb-6">
           Unlock your full keyword strategy with page-level keyword targets, competitor gap analysis, and growth opportunities tailored to your business.
         </p>
         <div className="space-y-2 text-left mb-6">
           {['Target keywords mapped to every page', 'Competitor keyword gap analysis', 'Content opportunity recommendations', `Ongoing strategy refinement by ${STUDIO_NAME}`].map(f => (
-            <div key={f} className="flex items-center gap-2 text-xs text-zinc-300">
-              <CheckCircle2 className="w-3.5 h-3.5 text-teal-400 flex-shrink-0" />
+            <div key={f} className="flex items-center gap-2 text-xs text-[var(--brand-text)]">
+              <Icon as={CheckCircle2} size="sm" className="text-teal-400 flex-shrink-0" />
               {f}
             </div>
           ))}
@@ -36,9 +38,9 @@ export function UpgradeModal({ workspaceId, onClose, onError }: Props) {
           }
         }}
           className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium transition-colors cursor-pointer">
-          <Sparkles className="w-4 h-4" /> Upgrade to Premium
+          <Icon as={Sparkles} size="md" /> Upgrade to Premium
         </button>
-        <button onClick={onClose} className="block mx-auto mt-3 text-xs text-zinc-500 hover:text-zinc-400 transition-colors">
+        <button onClick={onClose} className="block mx-auto mt-3 text-xs text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">
           Maybe later
         </button>
       </div>

@@ -5,6 +5,7 @@
 import {
   Loader2, Sparkles, Check, X, Type, ArrowRight, Eye, CheckSquare, Square,
 } from 'lucide-react';
+import { SectionCard, Icon } from '../ui';
 
 interface PageMeta {
   id: string;
@@ -51,25 +52,25 @@ export function BulkOperations({
     <>
       {/* Select all + bulk actions */}
       <div className="flex items-center gap-2 flex-wrap">
-        <button onClick={onSelectAll} className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors">
-          {approvalSelected.size === filteredPages.length && filteredPages.length > 0 ? <CheckSquare className="w-3.5 h-3.5 text-teal-400" /> : <Square className="w-3.5 h-3.5" />}
+        <button onClick={onSelectAll} className="flex items-center gap-1.5 text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
+          {approvalSelected.size === filteredPages.length && filteredPages.length > 0 ? <Icon as={CheckSquare} size="md" className="text-teal-400" /> : <Icon as={Square} size="md" />}
           {approvalSelected.size === filteredPages.length && filteredPages.length > 0 ? 'Deselect all' : 'Select all'}
         </button>
         {approvalSelected.size > 0 && <span className="text-xs text-teal-400">{approvalSelected.size} selected</span>}
         {approvalSelected.size > 0 && bulkMode === 'idle' && (
           <>
-            <span className="text-zinc-700">|</span>
-            <button onClick={() => { onSetBulkField('title'); onSetBulkMode('pattern'); }} className="flex items-center gap-1 px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-300 transition-colors">
-              <Type className="w-3 h-3" /> Pattern Apply
+            <span className="text-[var(--brand-border)]">|</span>
+            <button onClick={() => { onSetBulkField('title'); onSetBulkMode('pattern'); }} className="flex items-center gap-1 px-2 py-1 rounded bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-xs text-[var(--brand-text-bright)] transition-colors">
+              <Icon as={Type} size="sm" /> Pattern Apply
             </button>
             <button onClick={() => onBulkAiRewrite('both')} className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600 hover:bg-teal-500 text-xs text-white font-medium transition-colors">
-              <Sparkles className="w-3 h-3" /> AI Rewrite Both
+              <Icon as={Sparkles} size="sm" /> AI Rewrite Both
             </button>
             <button onClick={() => onBulkAiRewrite('title')} className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/60 hover:bg-teal-500/80 text-xs text-white transition-colors">
-              <Sparkles className="w-3 h-3" /> Titles Only
+              <Icon as={Sparkles} size="sm" /> Titles Only
             </button>
             <button onClick={() => onBulkAiRewrite('description')} className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/60 hover:bg-teal-500/80 text-xs text-white transition-colors">
-              <Sparkles className="w-3 h-3" /> Descriptions Only
+              <Icon as={Sparkles} size="sm" /> Descriptions Only
             </button>
           </>
         )}
@@ -77,18 +78,19 @@ export function BulkOperations({
 
       {/* Pattern Apply Modal */}
       {bulkMode === 'pattern' && (
-        <div className="bg-zinc-900 rounded-xl border border-teal-500/30 p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-zinc-200 flex items-center gap-2">
-              <Type className="w-4 h-4 text-teal-400" /> Pattern Apply — {approvalSelected.size} pages
-            </h4>
-            <button onClick={() => { onSetBulkMode('idle'); onSetPatternText(''); }} className="text-zinc-500 hover:text-zinc-300"><X className="w-4 h-4" /></button>
-          </div>
+        <SectionCard
+          title={`Pattern Apply — ${approvalSelected.size} pages`}
+          titleIcon={<Icon as={Type} size="md" className="text-teal-400" />}
+          action={<button onClick={() => { onSetBulkMode('idle'); onSetPatternText(''); }} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"><Icon as={X} size="md" /></button>}
+          className="!border-teal-500/30"
+          noPadding
+        >
+          <div className="p-4 space-y-3">
           <div className="flex items-center gap-2">
             <select
               value={bulkField}
               onChange={e => onSetBulkField(e.target.value as 'title' | 'description')}
-              className="px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-200"
+              className="px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded text-xs text-[var(--brand-text-bright)]"
             >
               <option value="title">SEO Title</option>
               <option value="description">Meta Description</option>
@@ -96,7 +98,7 @@ export function BulkOperations({
             <select
               value={patternAction}
               onChange={e => onSetPatternAction(e.target.value as 'append' | 'prepend')}
-              className="px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-200"
+              className="px-2 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded text-xs text-[var(--brand-text-bright)]"
             >
               <option value="append">Append</option>
               <option value="prepend">Prepend</option>
@@ -106,7 +108,7 @@ export function BulkOperations({
               value={patternText}
               onChange={e => onSetPatternText(e.target.value)}
               placeholder={patternAction === 'append' ? 'e.g. | Brand Name' : 'e.g. Brand Name |'}
-              className="flex-1 px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-200 focus:outline-none focus:border-teal-500"
+              className="flex-1 px-3 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded text-xs text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
               autoFocus
             />
             <button
@@ -114,57 +116,58 @@ export function BulkOperations({
               disabled={!patternText.trim()}
               className="flex items-center gap-1 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded text-xs font-medium text-white transition-colors"
             >
-              <Eye className="w-3 h-3" /> Preview
+              <Icon as={Eye} size="sm" /> Preview
             </button>
           </div>
-          <p className="text-[11px] text-zinc-500">
+          <p className="t-caption-sm text-[var(--brand-text-muted)]">
             {patternAction === 'append' ? 'Text will be added after' : 'Text will be added before'} each page's {bulkField === 'title' ? 'SEO title' : 'meta description'}.
             {bulkField === 'title' && ' Titles will be truncated to 60 characters.'}
           </p>
-        </div>
+          </div>
+        </SectionCard>
       )}
 
       {/* Bulk Rewrite Preview / Diff */}
       {bulkMode === 'rewrite-preview' && bulkPreview.length > 0 && (
-        <div className="bg-zinc-900 rounded-xl border border-teal-500/30 overflow-hidden">
-          <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
-            <div>
-              <h4 className="text-sm font-semibold text-zinc-200 flex items-center gap-2">
-                <Eye className="w-4 h-4 text-teal-400" /> Preview Changes — {bulkPreview.length} pages
-              </h4>
-              <p className="text-[11px] text-zinc-500 mt-0.5">Review before applying to Webflow</p>
-            </div>
+        <SectionCard
+          title={`Preview Changes — ${bulkPreview.length} pages`}
+          titleIcon={<Icon as={Eye} size="md" className="text-teal-400" />}
+          action={
             <div className="flex items-center gap-2">
               <button onClick={bulkSource === 'ai' ? onApplyBulkRewrite : onApplyPattern} className="flex items-center gap-1 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded text-xs font-medium text-white transition-colors">
-                <Check className="w-3 h-3" /> Apply All
+                <Icon as={Check} size="sm" /> Apply All
               </button>
-              <button onClick={onClearPreview} className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded text-xs text-zinc-300 transition-colors">
-                <X className="w-3 h-3" /> Cancel
+              <button onClick={onClearPreview} className="flex items-center gap-1 px-3 py-1.5 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] rounded text-xs text-[var(--brand-text-bright)] transition-colors">
+                <Icon as={X} size="sm" /> Cancel
               </button>
             </div>
-          </div>
-          <div className="max-h-[350px] overflow-y-auto divide-y divide-zinc-800/50">
+          }
+          className="!border-teal-500/30"
+          noPadding
+        >
+          <p className="t-caption-sm text-[var(--brand-text-muted)] px-4 pb-2">Review before applying to Webflow</p>
+          <div className="max-h-[350px] overflow-y-auto divide-y divide-[var(--brand-border)]/50">
             {bulkPreview.map(item => {
               const page = pages.find(p => p.id === item.pageId);
               return (
                 <div key={item.pageId} className="px-4 py-2.5">
-                  <div className="text-xs font-medium text-zinc-300 mb-1">/{page?.slug || '?'} — {page?.title || ''}</div>
+                  <div className="text-xs font-medium text-[var(--brand-text-bright)] mb-1">/{page?.slug || '?'} — {page?.title || ''}</div>
                   <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-start">
-                    <div className="text-[11px] text-red-400/80 bg-red-500/5 rounded px-2 py-1 font-mono leading-relaxed line-through">{item.oldValue || '(empty)'}</div>
-                    <ArrowRight className="w-3 h-3 text-zinc-500 mt-1.5 flex-shrink-0" />
-                    <div className="text-[11px] text-green-400/80 bg-green-500/5 rounded px-2 py-1 font-mono leading-relaxed">{item.newValue} <span className="text-zinc-500">({item.newValue.length})</span></div>
+                    <div className="t-caption-sm text-red-400/80 bg-red-500/5 rounded px-2 py-1 font-mono leading-relaxed line-through">{item.oldValue || '(empty)'}</div>
+                    <Icon as={ArrowRight} size="sm" className="text-[var(--brand-text-muted)] mt-1.5 flex-shrink-0" />
+                    <div className="t-caption-sm text-emerald-400/80 bg-emerald-500/5 rounded px-2 py-1 font-mono leading-relaxed">{item.newValue} <span className="text-[var(--brand-text-muted)]">({item.newValue.length})</span></div>
                   </div>
                 </div>
               );
             })}
           </div>
-        </div>
+        </SectionCard>
       )}
 
       {/* Bulk operation progress */}
       {bulkMode === 'rewriting' && (
         <div className="flex items-center gap-3 px-4 py-3 bg-teal-500/10 border border-teal-500/30 rounded-lg">
-          <Loader2 className="w-4 h-4 animate-spin text-teal-400" />
+          <Icon as={Loader2} size="md" className="animate-spin text-teal-400" />
           <div className="flex-1">
             <div className="text-sm text-teal-300">
               {bulkProgress.total > 0 ? `Processing ${bulkProgress.done}/${bulkProgress.total} pages...` : 'Generating AI rewrites...'}
@@ -176,7 +179,7 @@ export function BulkOperations({
             )}
           </div>
           {onCancelRewrite && (
-            <button onClick={onCancelRewrite} className="text-[11px] text-red-400 hover:text-red-300">Cancel</button>
+            <button onClick={onCancelRewrite} className="t-caption-sm text-red-400 hover:text-red-300">Cancel</button>
           )}
         </div>
       )}

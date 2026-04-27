@@ -5,6 +5,7 @@
 import {
   Loader2, RefreshCw, Check, ChevronDown, ChevronUp, Pencil, Clock, AlertTriangle,
 } from 'lucide-react';
+import { SectionCard, Icon } from '../ui';
 
 interface PostSection {
   index: number;
@@ -45,13 +46,13 @@ export function SectionEditor({
   onToggleExpand, onStartEdit, onSaveEdit, onCancelEdit, onRegenerate, onChangeBuffer,
 }: SectionEditorProps) {
   return (
-    <div className={`bg-zinc-900 rounded-xl border overflow-hidden ${section.status === 'error' ? 'border-red-500/30' : section.status === 'generating' ? 'border-amber-500/20' : 'border-zinc-800'}`}>
+    <SectionCard noPadding className={`overflow-hidden ${section.status === 'error' ? '!border-red-500/30' : section.status === 'generating' ? '!border-amber-500/20' : ''}`}>
       <button onClick={() => onToggleExpand(section.index)} className="w-full px-4 py-3 flex items-center justify-between hover:bg-zinc-800/30 transition-colors">
         <div className="flex items-center gap-2">
-          {section.status === 'generating' ? <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400/80" /> :
-           section.status === 'error' ? <AlertTriangle className="w-3.5 h-3.5 text-red-400/80" /> :
-           section.status === 'done' ? <Check className="w-3.5 h-3.5 text-emerald-400/80" /> :
-           <Clock className="w-3.5 h-3.5 text-zinc-500" />}
+          {section.status === 'generating' ? <Icon as={Loader2} size="md" className="animate-spin text-amber-400/80" /> :
+           section.status === 'error' ? <Icon as={AlertTriangle} size="md" className="text-red-400/80" /> :
+           section.status === 'done' ? <Icon as={Check} size="md" className="text-emerald-400/80" /> :
+           <Icon as={Clock} size="md" className="text-[var(--brand-text-muted)]" />}
           <span className="text-xs font-medium text-zinc-200">{section.heading}</span>
           {section.status === 'done' && <WordBadge actual={section.wordCount} target={section.targetWordCount} />}
         </div>
@@ -63,7 +64,7 @@ export function SectionEditor({
               ))}
             </div>
           )}
-          {expanded ? <ChevronUp className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />}
+          {expanded ? <Icon as={ChevronUp} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" />}
         </div>
       </button>
       {expanded && (
@@ -71,12 +72,12 @@ export function SectionEditor({
           {section.status === 'pending' && isGenerating ? (
             <div className="text-xs text-zinc-500 italic">Waiting to be generated...</div>
           ) : section.status === 'generating' ? (
-            <div className="flex items-center gap-2 text-xs text-amber-400/80"><Loader2 className="w-3 h-3 animate-spin" /> Writing this section...</div>
+            <div className="flex items-center gap-2 text-xs text-amber-400/80"><Icon as={Loader2} size="sm" className="animate-spin" /> Writing this section...</div>
           ) : section.status === 'error' ? (
             <div className="space-y-2">
               <div className="text-xs text-red-400/80">{section.error || 'Generation failed'}</div>
-              <button onClick={() => onRegenerate(section.index)} disabled={regenerating} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50">
-                {regenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />} Retry
+              <button onClick={() => onRegenerate(section.index)} disabled={regenerating} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50">
+                <Icon as={regenerating ? Loader2 : RefreshCw} size="sm" className={regenerating ? 'animate-spin' : ''} /> Retry
               </button>
             </div>
           ) : editing ? (
@@ -92,15 +93,15 @@ export function SectionEditor({
             <div>
               <div className="text-xs text-zinc-300 leading-relaxed [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:text-zinc-100 [&_h2]:mb-2 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:text-zinc-200 [&_h3]:mt-3 [&_h3]:mb-1 [&_p]:mb-2 [&_ul]:pl-4 [&_ul]:mb-2 [&_ol]:pl-4 [&_ol]:mb-2 [&_li]:mb-1 [&_strong]:text-zinc-100 [&_a]:text-teal-400" dangerouslySetInnerHTML={{ __html: section.content }} />
               <div className="flex items-center gap-2 mt-3 pt-2 border-t border-zinc-800/50">
-                <button onClick={() => onStartEdit(section.index, section.content)} className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"><Pencil className="w-3 h-3" /> Edit</button>
-                <button onClick={() => onRegenerate(section.index)} disabled={regenerating} className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-teal-300 transition-colors disabled:opacity-50">
-                  {regenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />} Regenerate
+                <button onClick={() => onStartEdit(section.index, section.content)} className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"><Icon as={Pencil} size="sm" /> Edit</button>
+                <button onClick={() => onRegenerate(section.index)} disabled={regenerating} className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-300 transition-colors disabled:opacity-50">
+                  <Icon as={regenerating ? Loader2 : RefreshCw} size="sm" className={regenerating ? 'animate-spin' : ''} /> Regenerate
                 </button>
               </div>
             </div>
           )}
         </div>
       )}
-    </div>
+    </SectionCard>
   );
 }

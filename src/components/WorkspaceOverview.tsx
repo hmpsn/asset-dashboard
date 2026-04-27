@@ -12,7 +12,7 @@ import {
   Map, Rocket, FileSearch, Clock, DollarSign, Flag, Layers,
   MessageSquarePlus, Bug, Lightbulb, MessageCircle, Send,
 } from 'lucide-react';
-import { MetricRingSvg, PageHeader, SectionCard, Badge, StatCard } from './ui';
+import { MetricRingSvg, PageHeader, SectionCard, Badge, StatCard, Icon, cn } from './ui';
 import { themeColor } from './ui/constants';
 import { STUDIO_NAME } from '../constants';
 import { timeAgo } from '../lib/timeAgo';
@@ -48,7 +48,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <Loader2 className="w-5 h-5 animate-spin text-teal-400" />
+        <Icon as={Loader2} size="lg" className="animate-spin text-teal-400" />
       </div>
     );
   }
@@ -58,8 +58,8 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
       <div className="flex flex-col items-center justify-center h-full gap-6">
         <img src="/logo.svg" alt={STUDIO_NAME} className="h-10 opacity-40" />
         <div className="text-center max-w-sm">
-          <p className="text-base font-semibold mb-1 text-zinc-200">Welcome to {STUDIO_NAME}</p>
-          <p className="text-xs leading-relaxed text-zinc-500">Create a workspace to get started.</p>
+          <p className="text-base font-semibold mb-1 text-[var(--brand-text-bright)]">Welcome to {STUDIO_NAME}</p>
+          <p className="t-caption-sm text-[var(--brand-text-muted)]">Create a workspace to get started.</p>
         </div>
       </div>
     );
@@ -99,23 +99,23 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
       <PageHeader
         title="Command Center"
         subtitle={`${data.length} workspace${data.length !== 1 ? 's' : ''} · ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`}
-        icon={<Rocket className="w-5 h-5 text-teal-400" />}
+        icon={<Icon as={Rocket} size="lg" className="text-teal-400" />}
         actions={
           <div className="flex items-center gap-2">
-            <button onClick={() => navigate('/prospect')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-800 transition-all">
-              <FileSearch className="w-3.5 h-3.5" /> Prospect
+            <button onClick={() => navigate('/prospect')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] transition-all">
+              <Icon as={FileSearch} size="sm" /> Prospect
             </button>
-            <button onClick={() => navigate('/roadmap')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-800 transition-all">
-              <Map className="w-3.5 h-3.5" /> Roadmap
+            <button onClick={() => navigate('/roadmap')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] transition-all">
+              <Icon as={Map} size="sm" /> Roadmap
             </button>
-            <button onClick={() => navigate('/ai-usage')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-amber-400/80 hover:text-amber-300 bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20 transition-all">
-              <Zap className="w-3.5 h-3.5" /> AI Usage
+            <button onClick={() => navigate('/ai-usage')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-amber-400/80 hover:text-amber-300 bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20 transition-all">
+              <Icon as={Zap} size="sm" /> AI Usage
             </button>
-            <button onClick={() => navigate('/revenue')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-emerald-400/80 hover:text-emerald-300 bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/20 transition-all">
-              <DollarSign className="w-3.5 h-3.5" /> Revenue
+            <button onClick={() => navigate('/revenue')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-emerald-400/80 hover:text-emerald-300 bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/20 transition-all">
+              <Icon as={DollarSign} size="sm" /> Revenue
             </button>
-            <button onClick={() => navigate('/features')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-teal-400/80 hover:text-teal-300 bg-teal-500/5 hover:bg-teal-500/10 border border-teal-500/20 transition-all">
-              <Layers className="w-3.5 h-3.5" /> Features
+            <button onClick={() => navigate('/features')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-teal-400/80 hover:text-teal-300 bg-teal-500/5 hover:bg-teal-500/10 border border-teal-500/20 transition-all">
+              <Icon as={Layers} size="sm" /> Features
             </button>
           </div>
         }
@@ -123,14 +123,14 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
 
       {/* ── Needs Attention ── */}
       {attentionItems.length > 0 && (
-        <SectionCard title="Needs Attention" titleIcon={<AlertTriangle className="w-4 h-4 text-amber-400" />} noPadding>
-          <div className="divide-y divide-zinc-800/50">
+        <SectionCard title="Needs Attention" titleIcon={<Icon as={AlertTriangle} size="md" className="text-amber-400" />} noPadding>
+          <div className="divide-y divide-[var(--brand-border)]">
             {attentionItems.map((item, i) => {
-              const Icon = item.icon;
+              const ItemIcon = item.icon;
               return (
                 <div key={i} className="flex items-center gap-3 px-4 py-2.5">
-                  <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${item.color}`} />
-                  <span className="text-xs text-zinc-200 flex-1">{item.label}</span>
+                  <ItemIcon className={cn('w-3.5 h-3.5 flex-shrink-0', item.color)} />
+                  <span className="t-caption text-[var(--brand-text-bright)] flex-1">{item.label}</span>
                   <Badge label={item.value} color="zinc" />
                 </div>
               );
@@ -160,25 +160,25 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
             title={`Online Now · ${totalOnline}`}
             titleIcon={
               <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
               </span>
             }
             noPadding
           >
-            <div className="divide-y divide-zinc-800/50">
+            <div className="divide-y divide-[var(--brand-border)]">
               {Object.entries(presence).map(([wsId, users]) =>
                 users.map(u => (
                   <div key={`${wsId}-${u.userId}`} className="flex items-center gap-3 px-4 py-2.5">
-                    <div className="flex items-center justify-center w-7 h-7 rounded-full bg-green-500/15 text-green-400 text-xs font-bold flex-shrink-0">
+                    <div className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-500/15 text-emerald-400 t-caption font-bold flex-shrink-0">
                       {(u.name || u.email)[0].toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <span className="text-xs font-medium text-zinc-200">{u.name || u.email.split('@')[0]}</span>
-                      <span className="text-[10px] text-zinc-500 ml-2">{u.email}</span>
+                      <span className="t-caption font-medium text-[var(--brand-text-bright)]">{u.name || u.email.split('@')[0]}</span>
+                      <span className="t-micro text-[var(--brand-text-muted)] ml-2">{u.email}</span>
                     </div>
-                    <span className="text-[10px] text-zinc-500 flex-shrink-0">{wsNames[wsId] || wsId}</span>
-                    <Badge label={u.role === 'admin' ? 'Admin' : 'Client'} color={u.role === 'admin' ? 'blue' : 'green'} />
+                    <span className="t-micro text-[var(--brand-text-muted)] flex-shrink-0">{wsNames[wsId] || wsId}</span>
+                    <Badge label={u.role === 'admin' ? 'Admin' : 'Client'} color={u.role === 'admin' ? 'blue' : 'emerald'} />
                   </div>
                 ))
               )}
@@ -190,8 +190,8 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
       {/* ── Workspace Cards ── */}
       <div>
         <div className="flex items-center gap-2 mb-3">
-          <Globe className="w-4 h-4 text-zinc-500" />
-          <h2 className="text-sm font-semibold text-zinc-200">Workspaces</h2>
+          <Icon as={Globe} size="md" className="text-[var(--brand-text-muted)]" />
+          <h2 className="t-caption font-semibold text-[var(--brand-text-bright)]">Workspaces</h2>
         </div>
         <div className="space-y-3">
           {data.map(ws => {
@@ -204,24 +204,30 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
               <button
                 key={ws.id}
                 onClick={() => onSelectWorkspace(ws.id)}
-                className={`w-full text-left p-5 transition-all hover:scale-[1.005] hover:shadow-lg group relative bg-zinc-900 border ${onlineUsers.length > 0 ? 'border-green-500/40' : isAtRisk && (ws.churnSignals?.critical || 0) > 0 ? 'border-red-500/30' : hasAlerts || isAtRisk ? 'border-amber-500/30' : 'border-zinc-800'}`}
+                className={cn(
+                  'w-full text-left p-5 transition-all hover:scale-[1.005] hover:shadow-lg group relative bg-[var(--surface-2)] border',
+                  onlineUsers.length > 0 ? 'border-emerald-500/40'
+                    : isAtRisk && (ws.churnSignals?.critical || 0) > 0 ? 'border-red-500/30'
+                    : hasAlerts || isAtRisk ? 'border-amber-500/30'
+                    : 'border-[var(--brand-border)]'
+                )}
                 style={{ borderRadius: '10px 24px 10px 24px' }}
               >
                 {/* New request badge */}
                 {ws.requests.new > 0 && (
-                  <div className="absolute -top-2 -right-2 flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-500 text-white shadow-lg">
-                    <Bell className="w-2.5 h-2.5" /> {ws.requests.new} new
+                  <div className="absolute -top-2 -right-2 flex items-center gap-1 px-2 py-0.5 rounded-full t-caption-sm font-bold bg-red-500 text-white shadow-lg">
+                    <Icon as={Bell} size="sm" /> {ws.requests.new} new
                   </div>
                 )}
 
                 {/* Online users banner */}
                 {onlineUsers.length > 0 && (
-                  <div className="flex items-center gap-2 px-3 py-1.5 -mx-5 -mt-5 mb-3 rounded-t-xl bg-green-500/10 border-b border-green-500/20">
+                  <div className="flex items-center gap-2 px-3 py-1.5 -mx-5 -mt-5 mb-3 rounded-t-xl bg-emerald-500/10 border-b border-emerald-500/20">
                     <span className="relative flex h-2.5 w-2.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500" />
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
                     </span>
-                    <span className="text-[11px] font-semibold text-green-400">
+                    <span className="t-caption-sm font-semibold text-emerald-400">
                       {onlineUsers.map(u => u.name || u.email.split('@')[0]).join(', ')} online now
                     </span>
                   </div>
@@ -230,33 +236,34 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                 {/* Top row: name + badges + site info */}
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div className="flex items-center gap-2 min-w-0">
-                    <h3 className="text-sm font-semibold truncate group-hover:text-teal-400 transition-colors text-zinc-200">{ws.name}</h3>
+                    <h3 className="t-caption font-semibold truncate group-hover:text-teal-400 transition-colors text-[var(--brand-text-bright)]">{ws.name}</h3>
                     {isAtRisk && (
-                      <span className={`flex-shrink-0 flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md border ${
+                      <span className={cn(
+                        'flex-shrink-0 flex items-center gap-1 px-1.5 py-0.5 t-micro font-bold rounded-md border',
                         (ws.churnSignals?.critical || 0) > 0
                           ? 'bg-red-500/15 text-red-400 border-red-500/20'
                           : 'bg-amber-500/15 text-amber-400 border-amber-500/20'
-                      }`}>
-                        <Flag className="w-2.5 h-2.5" />
+                      )}>
+                        <Icon as={Flag} size="sm" />
                         At Risk
                       </span>
                     )}
                     {ws.isTrial && (
-                      <span className="flex-shrink-0 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                      <span className="flex-shrink-0 px-1.5 py-0.5 t-micro font-bold rounded-md bg-amber-500/15 text-amber-400 border border-amber-500/20">
                         Trial{ws.trialDaysRemaining != null ? ` · ${ws.trialDaysRemaining}d` : ''}
                       </span>
                     )}
                     {ws.tier && ws.tier !== 'free' && !ws.isTrial && (
-                      <span className="flex-shrink-0 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md border bg-teal-500/15 text-teal-400 border-teal-500/20">{ws.tier}</span>
+                      <span className="flex-shrink-0 px-1.5 py-0.5 t-micro font-bold rounded-md border bg-teal-500/15 text-teal-400 border-teal-500/20">{ws.tier}</span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 text-[11px] text-zinc-500 flex-shrink-0">
-                    {ws.webflowSiteName && <span className="flex items-center gap-1"><Globe className="w-2.5 h-2.5" />{ws.webflowSiteName}</span>}
-                    {!ws.webflowSiteId && <span className="flex items-center gap-1 text-amber-400"><AlertTriangle className="w-2.5 h-2.5" />No site linked</span>}
-                    {ws.hasGsc && <span className="flex items-center gap-1"><Search className="w-2.5 h-2.5" />GSC</span>}
-                    {ws.hasGa4 && <span className="flex items-center gap-1"><BarChart3 className="w-2.5 h-2.5" />GA4</span>}
-                    {ws.hasPassword && <span className="flex items-center gap-1"><Lock className="w-2.5 h-2.5" />Client</span>}
-                    <ExternalLink className="w-3.5 h-3.5 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" />
+                  <div className="flex items-center gap-2 t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">
+                    {ws.webflowSiteName && <span className="flex items-center gap-1"><Icon as={Globe} size="sm" />{ws.webflowSiteName}</span>}
+                    {!ws.webflowSiteId && <span className="flex items-center gap-1 text-amber-400"><Icon as={AlertTriangle} size="sm" />No site linked</span>}
+                    {ws.hasGsc && <span className="flex items-center gap-1"><Icon as={Search} size="sm" />GSC</span>}
+                    {ws.hasGa4 && <span className="flex items-center gap-1"><Icon as={BarChart3} size="sm" />GA4</span>}
+                    {ws.hasPassword && <span className="flex items-center gap-1"><Icon as={Lock} size="sm" />Client</span>}
+                    <Icon as={ExternalLink} size="sm" className="shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" />
                   </div>
                 </div>
 
@@ -269,16 +276,16 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                         <ScoreRing score={ws.audit.score} size={40} strokeWidth={3.5} />
                         <div>
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[11px] font-medium text-zinc-400">Health</span>
+                            <span className="t-caption-sm font-medium text-[var(--brand-text-muted)]">Health</span>
                             {scoreDelta !== null && scoreDelta !== 0 && (
-                              <span className={`flex items-center text-[11px] font-medium ${scoreDelta > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              <span className={cn('flex items-center t-caption-sm font-medium', scoreDelta > 0 ? 'text-emerald-400' : 'text-red-400')}>
                                 {scoreDelta > 0 ? <ArrowUpRight className="w-2.5 h-2.5" /> : <ArrowDownRight className="w-2.5 h-2.5" />}
                                 {Math.abs(scoreDelta)}
                               </span>
                             )}
-                            {scoreDelta === 0 && <Minus className="w-2.5 h-2.5 text-zinc-500" />}
+                            {scoreDelta === 0 && <Minus className="w-2.5 h-2.5 text-[var(--brand-text-muted)]" />}
                           </div>
-                          <div className="text-[11px] text-zinc-500">
+                          <div className="t-caption-sm text-[var(--brand-text-muted)]">
                             {ws.audit.errors > 0 && <span className="text-red-400">{ws.audit.errors} err</span>}
                             {ws.audit.errors > 0 && ws.audit.warnings > 0 && ' · '}
                             {ws.audit.warnings > 0 && <span className="text-amber-400">{ws.audit.warnings} warn</span>}
@@ -286,72 +293,72 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                         </div>
                       </>
                     ) : (
-                      <span className="text-[11px] text-zinc-500">No audit</span>
+                      <span className="t-caption-sm text-[var(--brand-text-muted)]">No audit</span>
                     )}
                   </div>
 
-                  <div className="w-px h-8 bg-zinc-800" />
+                  <div className="w-px h-8 bg-[var(--brand-border)]" />
 
                   {/* Requests */}
                   <div>
-                    <div className="text-[11px] font-medium text-zinc-500 mb-0.5">Requests</div>
+                    <div className="t-caption-sm font-medium text-[var(--brand-text-muted)] mb-0.5">Requests</div>
                     {ws.requests.total > 0 ? (
-                      <div className="flex items-center gap-2 text-[11px]">
+                      <div className="flex items-center gap-2 t-caption-sm">
                         {ws.requests.new > 0 && <span className="text-red-400 font-medium">{ws.requests.new} new</span>}
                         {ws.requests.active > 0 && <span className="text-teal-400">{ws.requests.active} active</span>}
-                        {ws.requests.latestDate && <span className="text-zinc-500">{timeAgo(ws.requests.latestDate)}</span>}
+                        {ws.requests.latestDate && <span className="text-[var(--brand-text-muted)]">{timeAgo(ws.requests.latestDate)}</span>}
                       </div>
                     ) : (
-                      <div className="text-[11px] text-zinc-500">None</div>
+                      <div className="t-caption-sm text-[var(--brand-text-muted)]">None</div>
                     )}
                   </div>
 
-                  <div className="w-px h-8 bg-zinc-800" />
+                  <div className="w-px h-8 bg-[var(--brand-border)]" />
 
                   {/* Approvals */}
                   <div>
-                    <div className="text-[11px] font-medium text-zinc-500 mb-0.5">Approvals</div>
+                    <div className="t-caption-sm font-medium text-[var(--brand-text-muted)] mb-0.5">Approvals</div>
                     {ws.approvals.total > 0 ? (
                       ws.approvals.pending > 0 ? (
-                        <div className="text-[11px] text-teal-400 font-medium">{ws.approvals.pending} pending</div>
+                        <div className="t-caption-sm text-teal-400 font-medium">{ws.approvals.pending} pending</div>
                       ) : (
-                        <div className="flex items-center gap-1 text-[11px] text-green-400">
+                        <div className="flex items-center gap-1 t-caption-sm text-emerald-400">
                           <CheckCircle2 className="w-2.5 h-2.5" /> All clear
                         </div>
                       )
                     ) : (
-                      <div className="text-[11px] text-zinc-500">None</div>
+                      <div className="t-caption-sm text-[var(--brand-text-muted)]">None</div>
                     )}
                   </div>
 
-                  <div className="w-px h-8 bg-zinc-800" />
+                  <div className="w-px h-8 bg-[var(--brand-border)]" />
 
                   {/* Content Pipeline */}
                   <div>
-                    <div className="text-[11px] font-medium text-zinc-500 mb-0.5">Content</div>
+                    <div className="t-caption-sm font-medium text-[var(--brand-text-muted)] mb-0.5">Content</div>
                     {(ws.contentRequests?.total || 0) > 0 ? (
-                      <div className="flex items-center gap-2 text-[11px]">
+                      <div className="flex items-center gap-2 t-caption-sm">
                         {(ws.contentRequests?.pending || 0) > 0 && <span className="text-amber-400 font-medium">{ws.contentRequests!.pending} pending</span>}
                         {(ws.contentRequests?.inProgress || 0) > 0 && <span className="text-blue-400">{ws.contentRequests!.inProgress} in progress</span>}
                         {(ws.contentRequests?.delivered || 0) > 0 && <span className="text-teal-400">{ws.contentRequests!.delivered} delivered</span>}
                       </div>
                     ) : (
-                      <div className="text-[11px] text-zinc-500">None</div>
+                      <div className="t-caption-sm text-[var(--brand-text-muted)]">None</div>
                     )}
                   </div>
 
                   {/* SEO Status (inline badges) */}
                   {(ws.pageStates?.total || 0) > 0 && (
                     <>
-                      <div className="w-px h-8 bg-zinc-800" />
+                      <div className="w-px h-8 bg-[var(--brand-border)]" />
                       <div>
-                        <div className="text-[11px] font-medium text-zinc-500 mb-0.5">SEO Status</div>
+                        <div className="t-caption-sm font-medium text-[var(--brand-text-muted)] mb-0.5">SEO Status</div>
                         <div className="flex flex-wrap gap-1">
-                          {(ws.pageStates?.issueDetected || 0) > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400">{ws.pageStates!.issueDetected} issues</span>}
-                          {(ws.pageStates?.inReview || 0) > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400">{ws.pageStates!.inReview} in review</span>}
-                          {(ws.pageStates?.approved || 0) > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-green-400">{ws.pageStates!.approved} approved</span>}
-                          {(ws.pageStates?.rejected || 0) > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-red-400">{ws.pageStates!.rejected} rejected</span>}
-                          {(ws.pageStates?.live || 0) > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400">{ws.pageStates!.live} live</span>}
+                          {(ws.pageStates?.issueDetected || 0) > 0 && <span className="t-micro px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400">{ws.pageStates!.issueDetected} issues</span>}
+                          {(ws.pageStates?.inReview || 0) > 0 && <span className="t-micro px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400">{ws.pageStates!.inReview} in review</span>}
+                          {(ws.pageStates?.approved || 0) > 0 && <span className="t-micro px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">{ws.pageStates!.approved} approved</span>}
+                          {(ws.pageStates?.rejected || 0) > 0 && <span className="t-micro px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-red-400">{ws.pageStates!.rejected} rejected</span>}
+                          {(ws.pageStates?.live || 0) > 0 && <span className="t-micro px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400">{ws.pageStates!.live} live</span>}
                         </div>
                       </div>
                     </>
@@ -368,7 +375,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
         const fbTypeIcon: Record<string, typeof Bug> = { bug: Bug, feature: Lightbulb, general: MessageCircle };
         const fbTypeColor: Record<string, string> = { bug: 'text-red-400', feature: 'text-amber-400', general: 'text-teal-400' };
         const fbTypeBg: Record<string, string> = { bug: 'bg-red-500/10', feature: 'bg-amber-500/10', general: 'bg-teal-500/10' };
-        const fbStatusColor: Record<string, string> = { new: 'text-blue-400 bg-blue-500/10', acknowledged: 'text-amber-400 bg-amber-500/10', fixed: 'text-emerald-400 bg-emerald-500/10', wontfix: 'text-zinc-400 bg-zinc-500/10' };
+        const fbStatusColor: Record<string, string> = { new: 'text-blue-400 bg-blue-500/10', acknowledged: 'text-amber-400 bg-amber-500/10', fixed: 'text-emerald-400 bg-emerald-500/10', wontfix: 'text-[var(--brand-text-muted)] bg-[var(--surface-3)]' };
         const fbStatusLabel: Record<string, string> = { new: 'New', acknowledged: 'Acknowledged', fixed: 'Resolved', wontfix: 'Noted' };
         const newCount = feedback.filter(f => f.status === 'new').length;
 
@@ -394,38 +401,38 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
         return (
           <SectionCard
             title={`Client Feedback${newCount > 0 ? ` · ${newCount} new` : ''}`}
-            titleIcon={<MessageSquarePlus className="w-4 h-4 text-teal-400" />}
+            titleIcon={<Icon as={MessageSquarePlus} size="md" className="text-teal-400" />}
             noPadding
           >
-            <div className="divide-y divide-zinc-800/50">
+            <div className="divide-y divide-[var(--brand-border)]">
               {feedback.slice(0, 20).map(item => {
-                const Icon = fbTypeIcon[item.type] || MessageCircle;
+                const ItemIcon = fbTypeIcon[item.type] || MessageCircle;
                 const wsName = data.find(w => w.id === item.workspaceId)?.name || item.workspaceId;
                 return (
                   <div key={item.id} className="px-4 py-3">
                     <div className="flex items-start gap-3">
-                      <div className={`w-7 h-7 rounded-lg ${fbTypeBg[item.type]} flex items-center justify-center flex-shrink-0 mt-0.5`}>
-                        <Icon className={`w-3.5 h-3.5 ${fbTypeColor[item.type]}`} />
+                      <div className={cn('w-7 h-7 rounded-[var(--radius-lg)]', fbTypeBg[item.type], 'flex items-center justify-center flex-shrink-0 mt-0.5')}>
+                        <ItemIcon className={cn('w-3.5 h-3.5', fbTypeColor[item.type])} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs font-medium text-zinc-200">{item.title}</span>
-                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${fbStatusColor[item.status]}`}>{fbStatusLabel[item.status]}</span>
-                          <span className="text-[9px] text-zinc-600 capitalize">{item.type}</span>
+                          <span className="t-caption font-medium text-[var(--brand-text-bright)]">{item.title}</span>
+                          <span className={cn('t-micro px-1.5 py-0.5 rounded font-medium', fbStatusColor[item.status])}>{fbStatusLabel[item.status]}</span>
+                          <span className="t-micro text-[var(--brand-text-muted)] capitalize">{item.type}</span>
                         </div>
-                        <p className="text-[11px] text-zinc-400 mt-1 line-clamp-2">{item.description}</p>
+                        <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1 line-clamp-2">{item.description}</p>
                         <div className="flex items-center gap-3 mt-1.5">
-                          <span className="text-[10px] text-zinc-500">{wsName}</span>
-                          <span className="text-[10px] text-zinc-600">{timeAgo(item.createdAt)}</span>
-                          {item.context?.currentTab && <span className="text-[10px] text-zinc-600">from: {item.context.currentTab}</span>}
-                          {item.submittedBy && <span className="text-[10px] text-zinc-600">by: {item.submittedBy}</span>}
+                          <span className="t-micro text-[var(--brand-text-muted)]">{wsName}</span>
+                          <span className="t-micro text-[var(--brand-text-muted)]">{timeAgo(item.createdAt)}</span>
+                          {item.context?.currentTab && <span className="t-micro text-[var(--brand-text-muted)]">from: {item.context.currentTab}</span>}
+                          {item.submittedBy && <span className="t-micro text-[var(--brand-text-muted)]">by: {item.submittedBy}</span>}
                         </div>
 
                         {/* Replies */}
                         {item.replies.length > 0 && (
                           <div className="mt-2 space-y-1.5">
                             {item.replies.map(r => (
-                              <div key={r.id} className={`rounded-lg px-2.5 py-1.5 text-[11px] ${r.author === 'team' ? 'bg-teal-500/5 border border-teal-500/10 text-teal-300' : 'bg-zinc-800/80 border border-zinc-700/50 text-zinc-300'}`}>
+                              <div key={r.id} className={cn('rounded-[var(--radius-lg)] px-2.5 py-1.5 t-caption-sm', r.author === 'team' ? 'bg-teal-500/5 border border-teal-500/10 text-teal-300' : 'bg-[var(--surface-3)] border border-[var(--brand-border-hover)] text-[var(--brand-text)]')}>
                                 <span className="font-medium">{r.author === 'team' ? 'You' : 'Client'}:</span> {r.content}
                               </div>
                             ))}
@@ -435,13 +442,13 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                         {/* Actions */}
                         <div className="flex items-center gap-2 mt-2">
                           {item.status === 'new' && (
-                            <button onClick={() => handleStatusChange(item.workspaceId, item.id, 'acknowledged')} className="text-[10px] px-2 py-1 rounded bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors">Acknowledge</button>
+                            <button onClick={() => handleStatusChange(item.workspaceId, item.id, 'acknowledged')} className="t-micro px-2 py-1 rounded bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors">Acknowledge</button>
                           )}
                           {(item.status === 'new' || item.status === 'acknowledged') && (
-                            <button onClick={() => handleStatusChange(item.workspaceId, item.id, 'fixed')} className="text-[10px] px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors">Resolve</button>
+                            <button onClick={() => handleStatusChange(item.workspaceId, item.id, 'fixed')} className="t-micro px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors">Resolve</button>
                           )}
                           {item.status !== 'wontfix' && item.status !== 'fixed' && (
-                            <button onClick={() => handleStatusChange(item.workspaceId, item.id, 'wontfix')} className="text-[10px] px-2 py-1 rounded bg-zinc-800 text-zinc-400 hover:bg-zinc-700 transition-colors">Won't Fix</button>
+                            <button onClick={() => handleStatusChange(item.workspaceId, item.id, 'wontfix')} className="t-micro px-2 py-1 rounded bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:bg-[var(--brand-border-hover)] hover:border-[var(--brand-border-hover)] border border-[var(--brand-border)] transition-colors">Won't Fix</button>
                           )}
                         </div>
 
@@ -454,10 +461,10 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                               onChange={e => setFeedbackReply(prev => ({ ...prev, [item.id]: e.target.value }))}
                               onKeyDown={e => e.key === 'Enter' && handleReply(item.workspaceId, item.id)}
                               placeholder="Reply to client..."
-                              className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-[11px] text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500"
+                              className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-2.5 py-1.5 t-caption-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
                             />
-                            <button onClick={() => handleReply(item.workspaceId, item.id)} disabled={!feedbackReply[item.id]?.trim()} className="px-2 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-40 rounded-lg transition-colors">
-                              <Send className="w-3 h-3 text-white" />
+                            <button onClick={() => handleReply(item.workspaceId, item.id)} disabled={!feedbackReply[item.id]?.trim()} className="px-2 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-40 rounded-[var(--radius-lg)] transition-colors">
+                              <Icon as={Send} size="sm" className="text-white" />
                             </button>
                           </div>
                         )}
@@ -473,8 +480,8 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
 
       {/* ── Recent Activity ── */}
       {recentActivity.length > 0 && (
-        <SectionCard title="Recent Activity" titleIcon={<Activity className="w-4 h-4 text-zinc-500" />} noPadding>
-          <div className="divide-y divide-zinc-800/50">
+        <SectionCard title="Recent Activity" titleIcon={<Icon as={Activity} size="md" className="text-[var(--brand-text-muted)]" />} noPadding>
+          <div className="divide-y divide-[var(--brand-border)]">
             {recentActivity.map(entry => {
               const wsName = data.find(w => w.id === entry.workspaceId)?.name || '';
               const iconMap: Record<string, typeof Zap> = {
@@ -490,20 +497,20 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                 strategy_generated: BarChart3,
                 rank_snapshot: Search,
               };
-              const Icon = iconMap[entry.type] || Activity;
+              const EntryIcon = iconMap[entry.type] || Activity;
               return (
                 <div
                   key={entry.id}
                   className="flex items-start gap-3 px-4 py-2.5"
                 >
-                  <Icon className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-teal-400" />
+                  <EntryIcon className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-teal-400" />
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs text-zinc-200">{entry.title}</div>
-                    {entry.description && <div className="text-[11px] mt-0.5 text-zinc-500">{entry.description}</div>}
+                    <div className="t-caption text-[var(--brand-text-bright)]">{entry.title}</div>
+                    {entry.description && <div className="t-caption-sm mt-0.5 text-[var(--brand-text-muted)]">{entry.description}</div>}
                   </div>
                   <div className="flex-shrink-0 text-right">
-                    {wsName && <div className="text-[11px] text-zinc-500">{wsName}</div>}
-                    <div className="text-[11px] text-zinc-500">{timeAgo(entry.createdAt)}</div>
+                    {wsName && <div className="t-caption-sm text-[var(--brand-text-muted)]">{wsName}</div>}
+                    <div className="t-caption-sm text-[var(--brand-text-muted)]">{timeAgo(entry.createdAt)}</div>
                   </div>
                 </div>
               );

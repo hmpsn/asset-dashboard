@@ -31,7 +31,7 @@ export function HealthScoreCard({ score }: HealthScoreCardProps) {
           <p className="text-sm text-zinc-400 leading-relaxed">{label}</p>
           <div className="flex flex-wrap gap-3 text-[11px] text-zinc-500">
             <span className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
               80+ Healthy
             </span>
             <span className="flex items-center gap-1">

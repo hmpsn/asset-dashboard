@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, X } from 'lucide-react';
+import { Icon } from '../ui';
 import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
 import { WS_EVENTS } from '../../lib/wsEvents';
 import { jobs as jobsApi } from '../../api/misc';
@@ -165,11 +166,11 @@ export function BulkAcceptPanel({
   if (!bulkError) return null;
 
   return (
-    <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400">
+    <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/20 t-body text-red-400">
       <AlertTriangle className="w-4 h-4 flex-shrink-0" />
       <span>{bulkError}</span>
       <button onClick={() => setBulkError(null)} className="ml-auto p-0.5 rounded hover:bg-white/10">
-        <X className="w-3.5 h-3.5" />
+        <Icon as={X} size="md" />
       </button>
     </div>
   );

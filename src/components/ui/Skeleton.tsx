@@ -16,7 +16,7 @@ export function Skeleton({ className }: SkeletonProps) {
 /** Skeleton that mimics a StatCard layout */
 export function StatCardSkeleton({ className }: SkeletonProps) {
   return (
-    <div className={`bg-zinc-900 p-4 border border-zinc-800 ${className ?? ''}`} style={{ borderRadius: '6px 12px 6px 12px' }}>
+    <div className={`bg-[var(--surface-2)] p-4 border border-zinc-800 ${className ?? ''}`} style={{ borderRadius: '6px 12px 6px 12px' }}>
       <div className="flex items-center gap-1.5 mb-3">
         <Skeleton className="w-3.5 h-3.5 rounded" />
         <Skeleton className="w-16 h-2.5" />
@@ -30,7 +30,7 @@ export function StatCardSkeleton({ className }: SkeletonProps) {
 /** Skeleton that mimics a SectionCard with a few text lines */
 export function SectionCardSkeleton({ lines = 3, className }: SkeletonProps & { lines?: number }) {
   return (
-    <div className={`bg-zinc-900 border border-zinc-800 p-5 space-y-3 ${className ?? ''}`} style={{ borderRadius: '10px 24px 10px 24px' }}>
+    <div className={`bg-[var(--surface-2)] border border-zinc-800 p-5 space-y-3 ${className ?? ''}`} style={{ borderRadius: '10px 24px 10px 24px' }}>
       <div className="flex items-center gap-2 mb-1">
         <Skeleton className="w-5 h-5 rounded-lg" />
         <Skeleton className="w-28 h-3" />
@@ -83,7 +83,7 @@ export function AnalyticsSkeleton() {
         ))}
       </div>
       {/* Chart placeholder */}
-      <div className="bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      <div className="bg-[var(--surface-2)] border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <Skeleton className="w-32 h-3 mb-4" />
         <Skeleton className="w-full h-48 rounded-lg" />
       </div>

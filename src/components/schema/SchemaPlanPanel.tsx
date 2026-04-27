@@ -10,6 +10,7 @@ import {
 import { schemaPlan } from '../../api/seo';
 import type { SchemaSitePlan, SchemaPageRole } from '../../../shared/types/schema-plan';
 import { SCHEMA_ROLE_LABELS, SCHEMA_ROLE_INDEX } from '../../../shared/types/schema-plan';
+import { Icon, cn } from '../ui';
 
 interface Props {
   siteId: string;
@@ -30,12 +31,12 @@ const ROLE_COLORS: Partial<Record<SchemaPageRole, string>> = {
   blog: 'bg-purple-500/15 text-purple-300 border-purple-500/30',
   about: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30',
   contact: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30',
-  location: 'bg-green-500/15 text-green-300 border-green-500/30',
+  location: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
   product: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
   partnership: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
   faq: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
-  'case-study': 'bg-pink-500/15 text-pink-300 border-pink-500/30',
-  comparison: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+  'case-study': 'bg-blue-500/15 text-blue-300 border-blue-500/30',
+  comparison: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
   generic: 'bg-zinc-500/10 text-zinc-400 border-zinc-600/30',
 };
 const DEFAULT_ROLE_COLOR = 'bg-zinc-500/10 text-zinc-400 border-zinc-600/30';
@@ -144,18 +145,18 @@ export function SchemaPlanPanel({ siteId }: Props) {
     const map: Record<string, { label: string; cls: string }> = {
       draft: { label: 'Draft', cls: 'bg-zinc-500/15 text-zinc-400 border-zinc-500/30' },
       sent_to_client: { label: 'Sent to Client', cls: 'bg-blue-500/15 text-blue-300 border-blue-500/30' },
-      client_approved: { label: 'Client Approved', cls: 'bg-green-500/15 text-green-300 border-green-500/30' },
+      client_approved: { label: 'Client Approved', cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
       client_changes_requested: { label: 'Changes Requested', cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
       active: { label: 'Active', cls: 'bg-teal-500/15 text-teal-300 border-teal-500/30' },
     };
     const s = map[status] || map.draft;
-    return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border ${s.cls}`}>{s.label}</span>;
+    return <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full t-caption-sm font-medium border', s.cls)}>{s.label}</span>;
   };
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 py-3 text-xs text-zinc-500">
-        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading schema plan...
+      <div className="flex items-center gap-2 py-3 t-caption text-[var(--brand-text-muted)]">
+        <Icon as={Loader2} size="md" className="animate-spin" /> Loading schema plan...
       </div>
     );
   }
@@ -163,25 +164,25 @@ export function SchemaPlanPanel({ siteId }: Props) {
   // No plan yet — show generate button
   if (!plan) {
     return (
-      <div className="bg-zinc-900/50 border border-zinc-800 p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      <div className="bg-[var(--surface-2)]/50 border border-[var(--brand-border)] p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="flex items-center gap-2">
-          <Globe className="w-4 h-4 text-teal-400" />
-          <span className="text-sm font-medium text-zinc-200">Schema Site Plan</span>
+          <Icon as={Globe} size="md" className="text-teal-400" />
+          <span className="text-sm font-medium text-[var(--brand-text-bright)]">Schema Site Plan</span>
         </div>
-        <p className="text-xs text-zinc-500">
+        <p className="t-caption text-[var(--brand-text-muted)]">
           Generate a site-wide schema plan that analyzes all pages and your keyword strategy to assign roles and identify canonical entities. This ensures consistent, coordinated schema across your entire site.
         </p>
         {error && (
-          <div className="flex items-center gap-1.5 text-xs text-red-400/80">
-            <AlertCircle className="w-3 h-3" /> {error}
+          <div className="flex items-center gap-1.5 t-caption text-red-400/80">
+            <Icon as={AlertCircle} size="sm" /> {error}
           </div>
         )}
         <button
           onClick={handleGenerate}
           disabled={generating}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors disabled:opacity-50"
+          className="flex items-center gap-2 px-4 py-2 rounded-[var(--radius-md)] t-caption font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors disabled:opacity-50"
         >
-          {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+          {generating ? <Icon as={Loader2} size="md" className="animate-spin" /> : <Icon as={Sparkles} size="md" />}
           {generating ? 'Analyzing site...' : 'Generate Site Plan'}
         </button>
       </div>
@@ -195,37 +196,37 @@ export function SchemaPlanPanel({ siteId }: Props) {
   }, {} as Record<string, number>);
 
   return (
-    <div className="bg-zinc-900/50 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
+    <div className="bg-[var(--surface-2)]/50 border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
       {/* Header */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/30 transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/30 transition-colors"
       >
         <div className="flex items-center gap-2">
-          <Globe className="w-4 h-4 text-teal-400" />
-          <span className="text-sm font-medium text-zinc-200">Schema Site Plan</span>
+          <Icon as={Globe} size="md" className="text-teal-400" />
+          <span className="text-sm font-medium text-[var(--brand-text-bright)]">Schema Site Plan</span>
           {statusBadge(plan.status)}
-          <span className="text-[10px] text-zinc-500">
+          <span className="t-caption-sm text-[var(--brand-text-muted)]">
             {plan.pageRoles.length} pages · {plan.canonicalEntities.length} entities
           </span>
         </div>
         <div className="flex items-center gap-2">
-          {dirty && <span className="text-[10px] text-amber-400/80">Unsaved changes</span>}
-          {expanded ? <ChevronDown className="w-4 h-4 text-zinc-500" /> : <ChevronRight className="w-4 h-4 text-zinc-500" />}
+          {dirty && <span className="t-caption-sm text-amber-400/80">Unsaved changes</span>}
+          {expanded ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)]" />}
         </div>
       </button>
 
       {expanded && (
-        <div className="border-t border-zinc-800 px-4 py-3 space-y-4">
+        <div className="border-t border-[var(--brand-border)] px-4 py-3 space-y-4">
           {/* Status messages */}
           {error && (
-            <div className="flex items-center gap-1.5 text-xs text-red-400/80 bg-red-500/8 border border-red-500/20 rounded-lg px-3 py-2">
-              <AlertCircle className="w-3 h-3 shrink-0" /> {error}
+            <div className="flex items-center gap-1.5 t-caption text-red-400/80 bg-red-500/8 border border-red-500/20 rounded-[var(--radius-md)] px-3 py-2">
+              <Icon as={AlertCircle} size="sm" className="shrink-0" /> {error}
             </div>
           )}
           {success && (
-            <div className="flex items-center gap-1.5 text-xs text-emerald-400/80 bg-emerald-500/8 border border-emerald-500/20 rounded-lg px-3 py-2">
-              <CheckCircle className="w-3 h-3 shrink-0" /> {success}
+            <div className="flex items-center gap-1.5 t-caption text-emerald-400/80 bg-emerald-500/8 border border-emerald-500/20 rounded-[var(--radius-md)] px-3 py-2">
+              <Icon as={CheckCircle} size="sm" className="shrink-0" /> {success}
             </div>
           )}
 
@@ -234,18 +235,18 @@ export function SchemaPlanPanel({ siteId }: Props) {
             <button
               onClick={handleGenerate}
               disabled={generating}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text)] border border-[var(--brand-border)] transition-colors disabled:opacity-50"
             >
-              {generating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+              {generating ? <Icon as={Loader2} size="md" className="animate-spin" /> : <Icon as={Sparkles} size="md" />}
               {generating ? 'Regenerating...' : 'Regenerate'}
             </button>
             {dirty && (
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors disabled:opacity-50"
               >
-                {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
+                {saving ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={CheckCircle} size="sm" />}
                 Save Changes
               </button>
             )}
@@ -254,9 +255,9 @@ export function SchemaPlanPanel({ siteId }: Props) {
                 onClick={handleSendToClient}
                 disabled={sending || dirty}
                 title={dirty ? 'Save changes first' : 'Send strategy preview to client for approval'}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium bg-blue-600/15 hover:bg-blue-600/25 text-blue-300 border border-blue-500/30 transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium bg-blue-600/15 hover:bg-blue-600/25 text-blue-300 border border-blue-500/30 transition-colors disabled:opacity-50"
               >
-                {sending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                {sending ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Send} size="sm" />}
                 Send to Client
               </button>
             )}
@@ -264,15 +265,15 @@ export function SchemaPlanPanel({ siteId }: Props) {
               <button
                 onClick={handleActivate}
                 disabled={activating || dirty}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-300 border border-emerald-500/30 transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-300 border border-emerald-500/30 transition-colors disabled:opacity-50"
               >
-                {activating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+                {activating ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Zap} size="sm" />}
                 Activate Plan
               </button>
             )}
             {confirmRetract ? (
               <div className="flex items-center gap-2">
-                <span className="text-[11px] text-red-400/80">Delete this plan?</span>
+                <span className="t-caption-sm text-red-400/80">Delete this plan?</span>
                 <button
                   onClick={async () => {
                     setRetracting(true);
@@ -289,14 +290,14 @@ export function SchemaPlanPanel({ siteId }: Props) {
                     setConfirmRetract(false);
                   }}
                   disabled={retracting}
-                  className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-red-600 hover:bg-red-500 text-white transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-colors disabled:opacity-50"
                 >
-                  {retracting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                  {retracting ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Trash2} size="sm" />}
                   Yes, delete
                 </button>
                 <button
                   onClick={() => setConfirmRetract(false)}
-                  className="px-2 py-1 rounded-md text-[11px] text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors"
+                  className="px-2 py-1 rounded-[var(--radius-md)] t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] transition-colors"
                 >
                   Cancel
                 </button>
@@ -304,9 +305,9 @@ export function SchemaPlanPanel({ siteId }: Props) {
             ) : (
               <button
                 onClick={() => setConfirmRetract(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium bg-red-500/8 hover:bg-red-500/15 text-red-400/80 border border-red-500/30 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium bg-red-500/8 hover:bg-red-500/15 text-red-400/80 border border-red-500/30 transition-colors"
               >
-                <Trash2 className="w-3 h-3" /> Retract Plan
+                <Icon as={Trash2} size="sm" /> Retract Plan
               </button>
             )}
           </div>
@@ -316,7 +317,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
             {Object.entries(roleCounts).sort((a, b) => b[1] - a[1]).map(([role, count]) => (
               <span
                 key={role}
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${ROLE_COLORS[role as SchemaPageRole] ?? DEFAULT_ROLE_COLOR}`}
+                className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full t-caption-sm font-medium border', ROLE_COLORS[role as SchemaPageRole] ?? DEFAULT_ROLE_COLOR)}
               >
                 {SCHEMA_ROLE_LABELS[role as SchemaPageRole] || role} ({count})
               </span>
@@ -327,27 +328,27 @@ export function SchemaPlanPanel({ siteId }: Props) {
           <div>
             <button
               onClick={() => setShowGuide(!showGuide)}
-              className="flex items-center gap-1.5 text-[11px] text-zinc-400 hover:text-zinc-300 transition-colors"
+              className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
             >
-              <HelpCircle className="w-3 h-3" />
-              {showGuide ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+              <Icon as={HelpCircle} size="sm" />
+              {showGuide ? <Icon as={ChevronDown} size="sm" /> : <Icon as={ChevronRight} size="sm" />}
               Page Type Guide
             </button>
             {showGuide && (
-              <div className="mt-2 bg-zinc-950/50 rounded-lg border border-zinc-800 overflow-hidden max-h-[320px] overflow-y-auto">
+              <div className="mt-2 bg-[var(--surface-1)]/50 rounded-[var(--radius-md)] border border-[var(--brand-border)] overflow-hidden max-h-[320px] overflow-y-auto">
                 {ROLE_OPTIONS.map(role => {
                   const info = SCHEMA_ROLE_INDEX[role];
                   return (
-                    <div key={role} className="px-3 py-2 border-b border-zinc-800/50 last:border-b-0">
+                    <div key={role} className="px-3 py-2 border-b border-[var(--brand-border)]/50 last:border-b-0">
                       <div className="flex items-center gap-2 mb-0.5">
-                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border ${ROLE_COLORS[role] ?? DEFAULT_ROLE_COLOR}`}>
+                        <span className={cn('inline-flex items-center px-1.5 py-0.5 rounded t-caption-sm font-medium border', ROLE_COLORS[role] ?? DEFAULT_ROLE_COLOR)}>
                           {SCHEMA_ROLE_LABELS[role]}
                         </span>
                       </div>
-                      <p className="text-[11px] text-zinc-400 leading-relaxed">{info.description}</p>
+                      <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">{info.description}</p>
                       <div className="flex flex-wrap gap-1 mt-1">
                         {info.examples.map(ex => (
-                          <code key={ex} className="text-[9px] text-zinc-500 bg-zinc-800/60 px-1 py-0.5 rounded font-mono">{ex}</code>
+                          <code key={ex} className="t-mono text-xs text-[var(--brand-text-muted)] bg-[var(--surface-3)]/60 px-1 py-0.5 rounded">{ex}</code>
                         ))}
                       </div>
                     </div>
@@ -362,18 +363,18 @@ export function SchemaPlanPanel({ siteId }: Props) {
             <div>
               <button
                 onClick={() => setShowEntities(!showEntities)}
-                className="flex items-center gap-1.5 text-[11px] text-zinc-400 hover:text-zinc-300 transition-colors"
+                className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
               >
-                {showEntities ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                {showEntities ? <Icon as={ChevronDown} size="sm" /> : <Icon as={ChevronRight} size="sm" />}
                 Canonical Entities ({plan.canonicalEntities.length})
               </button>
               {showEntities && (
                 <div className="mt-2 space-y-1.5">
                   {plan.canonicalEntities.map((entity, i) => (
-                    <div key={i} className="flex items-center gap-3 px-3 py-2 bg-zinc-800/50 rounded-lg border border-zinc-800">
-                      <span className="px-1.5 py-0.5 bg-teal-500/15 text-teal-300 rounded text-[10px] font-mono">{entity.type}</span>
-                      <span className="text-xs text-zinc-300 font-medium">{entity.name}</span>
-                      <span className="text-[10px] text-zinc-500 font-mono truncate">{entity.id}</span>
+                    <div key={i} className="flex items-center gap-3 px-3 py-2 bg-[var(--surface-3)]/50 rounded-[var(--radius-md)] border border-[var(--brand-border)]">
+                      <span className="px-1.5 py-0.5 bg-teal-500/15 text-teal-300 rounded t-mono text-xs">{entity.type}</span>
+                      <span className="t-caption text-[var(--brand-text)] font-medium">{entity.name}</span>
+                      <span className="t-mono text-xs text-[var(--brand-text-muted)] truncate">{entity.id}</span>
                     </div>
                   ))}
                 </div>
@@ -383,31 +384,31 @@ export function SchemaPlanPanel({ siteId }: Props) {
 
           {/* Page roles table */}
           <div className="space-y-1">
-            <div className="text-[11px] text-zinc-500 font-medium px-1">Page Roles</div>
-            <div className="bg-zinc-950/50 rounded-lg border border-zinc-800 overflow-hidden max-h-[400px] overflow-y-auto">
+            <div className="t-caption-sm text-[var(--brand-text-muted)] font-medium px-1">Page Roles</div>
+            <div className="bg-[var(--surface-1)]/50 rounded-[var(--radius-md)] border border-[var(--brand-border)] overflow-hidden max-h-[400px] overflow-y-auto">
               {plan.pageRoles.map((pr) => (
                 <div
                   key={pr.pagePath}
-                  className="flex items-center gap-3 px-3 py-2 border-b border-zinc-800/50 last:border-b-0 hover:bg-zinc-800/20 transition-colors"
+                  className="flex items-center gap-3 px-3 py-2 border-b border-[var(--brand-border)]/50 last:border-b-0 hover:bg-[var(--surface-3)]/20 transition-colors"
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs text-zinc-300 truncate">{pr.pageTitle}</div>
-                    <div className="text-[10px] text-zinc-500 truncate">{pr.pagePath}</div>
+                    <div className="t-caption text-[var(--brand-text)] truncate">{pr.pageTitle}</div>
+                    <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{pr.pagePath}</div>
                   </div>
-                  <span className="text-[10px] text-zinc-500 font-mono shrink-0">{pr.primaryType}</span>
+                  <span className="t-caption-sm text-[var(--brand-text-muted)] font-mono shrink-0">{pr.primaryType}</span>
                   <select
                     value={pr.role}
                     onChange={e => handleRoleChange(pr.pagePath, e.target.value as SchemaPageRole)}
-                    className={`px-2 py-1 rounded text-[11px] font-medium border cursor-pointer focus:outline-none focus:ring-1 focus:ring-teal-500 ${ROLE_COLORS[pr.role] ?? DEFAULT_ROLE_COLOR} bg-transparent`}
+                    className={cn('px-2 py-1 rounded t-caption-sm font-medium border cursor-pointer focus:outline-none focus:ring-1 focus:ring-teal-500 bg-transparent', ROLE_COLORS[pr.role] ?? DEFAULT_ROLE_COLOR)}
                   >
                     {ROLE_OPTIONS.map(role => (
-                      <option key={role} value={role} className="bg-zinc-900 text-zinc-300">
+                      <option key={role} value={role} className="bg-[var(--surface-2)] text-[var(--brand-text)]">
                         {SCHEMA_ROLE_LABELS[role]}
                       </option>
                     ))}
                   </select>
                   {pr.entityRefs.length > 0 && (
-                    <span className="text-[9px] text-zinc-500" title={pr.entityRefs.join(', ')}>
+                    <span className="t-caption-sm text-[var(--brand-text-muted)]" title={pr.entityRefs.join(', ')}>
                       {pr.entityRefs.length} ref{pr.entityRefs.length > 1 ? 's' : ''}
                     </span>
                   )}
@@ -417,7 +418,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
           </div>
 
           {/* Metadata */}
-          <div className="text-[10px] text-zinc-600 flex items-center gap-3">
+          <div className="t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-3">
             <span>Generated {new Date(plan.generatedAt).toLocaleDateString()}</span>
             {plan.updatedAt !== plan.generatedAt && (
               <span>Updated {new Date(plan.updatedAt).toLocaleDateString()}</span>

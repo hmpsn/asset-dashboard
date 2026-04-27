@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, History, ChevronDown, ChevronUp } from 'lucide-react';
+import { Send, History, ChevronDown, ChevronUp } from 'lucide-react';
+import { Icon, Button, cn } from '../ui';
 
 export interface SteeringChatProps {
   content: string;
@@ -62,28 +63,28 @@ export function SteeringChat({ content, onRefine, versions, onSelectVersion }: S
     <div className="flex flex-col gap-4">
       {/* Current content display */}
       <div>
-        <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide mb-2">
+        <p className="t-caption font-medium text-[var(--brand-text)] uppercase tracking-wide mb-2">
           Current Content
         </p>
-        <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4 text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto">
-          {content || <span className="text-zinc-600 italic">No content yet.</span>}
+        <div className="bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-md)] p-4 text-sm text-[var(--brand-text)] leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto">
+          {content || <span className="text-[var(--brand-text-muted)] italic">No content yet.</span>}
         </div>
       </div>
 
       {/* Recent exchanges */}
       {recentExchanges.length > 0 && (
         <div>
-          <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide mb-2">
+          <p className="t-caption font-medium text-[var(--brand-text)] uppercase tracking-wide mb-2">
             Recent Refinements
           </p>
           <div className="flex flex-col gap-2">
             {recentExchanges.map((ex, i) => (
-              <div key={i} className="rounded-lg border border-zinc-800 overflow-hidden text-sm">
-                <div className="bg-zinc-800/50 px-3 py-2 text-zinc-400 flex items-start gap-2">
-                  <Send size={12} className="mt-0.5 shrink-0 text-teal-500" />
+              <div key={i} className="rounded-[var(--radius-md)] border border-[var(--brand-border)] overflow-hidden text-sm">
+                <div className="bg-[var(--surface-3)]/50 px-3 py-2 text-[var(--brand-text)] flex items-start gap-2">
+                  <Icon as={Send} size="sm" className="mt-0.5 shrink-0 text-teal-500" />
                   <span className="italic">{ex.direction}</span>
                 </div>
-                <div className="bg-zinc-900/40 px-3 py-2 text-zinc-300 leading-relaxed whitespace-pre-wrap max-h-28 overflow-y-auto">
+                <div className="bg-[var(--surface-2)]/40 px-3 py-2 text-[var(--brand-text)] leading-relaxed whitespace-pre-wrap max-h-28 overflow-y-auto">
                   {ex.result}
                 </div>
               </div>
@@ -95,7 +96,7 @@ export function SteeringChat({ content, onRefine, versions, onSelectVersion }: S
 
       {/* Steering input */}
       <div>
-        <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide mb-2">
+        <p className="t-caption font-medium text-[var(--brand-text)] uppercase tracking-wide mb-2">
           Steer the Content
         </p>
         <form onSubmit={handleSubmit} className="flex flex-col gap-2">
@@ -111,28 +112,21 @@ export function SteeringChat({ content, onRefine, versions, onSelectVersion }: S
               onChange={e => setDirection(e.target.value)}
               disabled={refining}
               placeholder='e.g. "Make it more conversational"'
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:ring-2 focus:ring-teal-500/40 disabled:opacity-50 disabled:cursor-not-allowed"
             />
-            <button
+            <Button
               type="submit"
+              variant="primary"
+              size="md"
+              icon={refining ? undefined : Send}
+              loading={refining}
               disabled={refining || !direction.trim()}
-              className="bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shrink-0"
             >
-              {refining ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" />
-                  <span>Refining…</span>
-                </>
-              ) : (
-                <>
-                  <Send size={14} />
-                  <span>Refine</span>
-                </>
-              )}
-            </button>
+              {refining ? 'Refining…' : 'Refine'}
+            </Button>
           </div>
           {error && (
-            <p className="text-xs text-red-400 mt-1">{error}</p>
+            <p className="t-caption text-red-400 mt-1">{error}</p>
           )}
         </form>
       </div>
@@ -143,13 +137,13 @@ export function SteeringChat({ content, onRefine, versions, onSelectVersion }: S
           <button
             type="button"
             onClick={() => setHistoryOpen(prev => !prev)}
-            className="flex items-center gap-2 text-xs font-medium text-zinc-400 uppercase tracking-wide hover:text-zinc-200 transition-colors w-full text-left"
+            className="flex items-center gap-2 t-caption font-medium text-[var(--brand-text)] uppercase tracking-wide hover:text-[var(--brand-text-bright)] transition-colors w-full text-left"
             aria-expanded={historyOpen}
             aria-controls="version-history-list"
           >
-            <History size={13} />
+            <Icon as={History} size="sm" />
             <span>Version History ({versions.length})</span>
-            {historyOpen ? <ChevronUp size={13} className="ml-auto" /> : <ChevronDown size={13} className="ml-auto" />}
+            {historyOpen ? <Icon as={ChevronUp} size="sm" className="ml-auto" /> : <Icon as={ChevronDown} size="sm" className="ml-auto" />}
           </button>
 
           {historyOpen && (
@@ -167,13 +161,14 @@ export function SteeringChat({ content, onRefine, versions, onSelectVersion }: S
                       type="button"
                       onClick={() => { onSelectVersion(idx); setSelectedVersionIndex(idx); }}
                       title={v.steeringNotes}
-                      className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-start gap-3 ${
+                      className={cn(
+                        'w-full text-left px-3 py-2 rounded-[var(--radius-md)] text-sm transition-colors flex items-start gap-3',
                         isActive
                           ? 'bg-teal-600/20 border border-teal-600/40 text-teal-300'
-                          : 'bg-zinc-800 border border-zinc-700 text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100'
-                      }`}
+                          : 'bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)] hover:text-[var(--brand-text-bright)]'
+                      )}
                     >
-                      <span className={`shrink-0 text-xs font-mono font-semibold mt-0.5 ${isActive ? 'text-teal-400' : 'text-zinc-500'}`}>
+                      <span className={cn('shrink-0 t-mono text-xs font-semibold mt-0.5', isActive ? 'text-teal-400' : 'text-[var(--brand-text-muted)]')}>
                         v{idx + 1}
                       </span>
                       <div className="min-w-0 flex-1">
@@ -181,11 +176,11 @@ export function SteeringChat({ content, onRefine, versions, onSelectVersion }: S
                           {v.content.slice(0, 80)}{v.content.length > 80 ? '…' : ''}
                         </p>
                         {v.steeringNotes && (
-                          <p className="text-xs text-zinc-500 mt-0.5 truncate">{v.steeringNotes}</p>
+                          <p className="t-caption text-[var(--brand-text-muted)] mt-0.5 truncate">{v.steeringNotes}</p>
                         )}
                       </div>
                       {isActive && (
-                        <span className="shrink-0 text-xs text-teal-400 font-medium self-center">active</span>
+                        <span className="shrink-0 t-caption text-teal-400 font-medium self-center">active</span>
                       )}
                     </button>
                   </li>

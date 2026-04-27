@@ -162,24 +162,25 @@ export function Explainer({ term }: { term: string }) {
     <span className="relative inline-flex items-center" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="ml-0.5 text-zinc-500 hover:text-teal-400 transition-colors focus:outline-none"
+        className="ml-0.5 text-[var(--brand-text-muted)] hover:text-teal-400 transition-colors focus:outline-none"
         aria-label={`Learn about ${entry.term}`}
       >
         <HelpCircle className="w-3 h-3" />
       </button>
       {open && (
-        <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl p-3 text-left animate-in fade-in slide-in-from-bottom-1 duration-150">
-          <div className="text-[11px] font-semibold text-teal-400 mb-1">{entry.term}</div>
-          <p className="text-[11px] text-zinc-300 leading-relaxed mb-2">{entry.definition}</p>
-          <p className="text-[10px] text-zinc-400 leading-relaxed">
-            <span className="font-medium text-zinc-300">Why it matters: </span>{entry.whyItMatters}
+        // pr-check-disable-next-line -- Glossary term tooltip/popover; absolutely positioned floating element, not a content card
+        <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-xl shadow-xl p-3 text-left animate-in fade-in slide-in-from-bottom-1 duration-150">
+          <div className="t-caption-sm font-semibold text-teal-400 mb-1">{entry.term}</div>
+          <p className="t-caption-sm text-[var(--brand-text)] leading-relaxed mb-2">{entry.definition}</p>
+          <p className="t-micro text-[var(--brand-text)] leading-relaxed">
+            <span className="font-medium text-[var(--brand-text-bright)]">Why it matters: </span>{entry.whyItMatters}
           </p>
           {entry.goodBad && (
-            <p className="text-[10px] text-zinc-500 leading-relaxed mt-1.5 pt-1.5 border-t border-zinc-800">
-              <span className="font-medium text-zinc-400">Benchmarks: </span>{entry.goodBad}
+            <p className="t-micro text-[var(--brand-text-muted)] leading-relaxed mt-1.5 pt-1.5 border-t border-[var(--brand-border)]">
+              <span className="font-medium text-[var(--brand-text)]">Benchmarks: </span>{entry.goodBad}
             </p>
           )}
-          <div className="absolute left-1/2 -translate-x-1/2 -bottom-1 w-2 h-2 bg-zinc-900 border-r border-b border-zinc-700 rotate-45" />
+          <div className="absolute left-1/2 -translate-x-1/2 -bottom-1 w-2 h-2 bg-[var(--surface-2)] border-r border-b border-[var(--brand-border)] rotate-45" />
         </div>
       )}
     </span>

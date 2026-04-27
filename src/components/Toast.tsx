@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, createContext, useContext } from 'react';
 import { CheckCircle, AlertTriangle, X, Info } from 'lucide-react';
+import { Icon } from './ui';
 
 interface ToastItem {
   id: string;
@@ -44,7 +45,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 function ToastMessage({ item, onDismiss }: { item: ToastItem; onDismiss: (id: string) => void }) {
   const [visible, setVisible] = useState(false);
 
-  useEffect(() => {
+  useEffect(() => { // effect-layout-ok — intentional post-paint animation + dismiss timer
     requestAnimationFrame(() => setVisible(true));
     const timer = setTimeout(() => {
       setVisible(false);
@@ -54,9 +55,9 @@ function ToastMessage({ item, onDismiss }: { item: ToastItem; onDismiss: (id: st
   }, [item.id, onDismiss]);
 
   const icons = {
-    success: <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />,
-    error: <AlertTriangle className="w-4 h-4 text-red-400/80 shrink-0" />,
-    info: <Info className="w-4 h-4 text-blue-400 shrink-0" />,
+    success: <Icon as={CheckCircle} size="md" className="text-emerald-400 shrink-0" />,
+    error: <Icon as={AlertTriangle} size="md" className="text-red-400/80 shrink-0" />,
+    info: <Icon as={Info} size="md" className="text-blue-400 shrink-0" />,
   };
 
   const borders = {
@@ -67,13 +68,13 @@ function ToastMessage({ item, onDismiss }: { item: ToastItem; onDismiss: (id: st
 
   return (
     <div
-      className={`pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-xl bg-zinc-900 border ${borders[item.type]} shadow-2xl shadow-black/40 text-sm text-zinc-200 transition-all duration-200 ${visible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4'}`}
+      className={`pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-[var(--radius-xl)] bg-[var(--surface-2)] border ${borders[item.type]} shadow-2xl shadow-black/40 t-caption text-[var(--brand-text-bright)] transition-all duration-200 ${visible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4'}`}
     >
-      {icons[item.type]}
-      <span className="text-xs">{item.message}</span>
-      <button onClick={() => { setVisible(false); setTimeout(() => onDismiss(item.id), 200); }} className="ml-1 text-zinc-500 hover:text-zinc-400 transition-colors">
-        <X className="w-3 h-3" />
-      </button>
+        {icons[item.type]}
+        <span className="t-caption">{item.message}</span>
+        <button onClick={() => { setVisible(false); setTimeout(() => onDismiss(item.id), 200); }} className="ml-1 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">
+          <Icon as={X} size="sm" />
+        </button>
     </div>
   );
 }

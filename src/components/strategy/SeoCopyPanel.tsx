@@ -1,3 +1,4 @@
+import { Icon } from '../ui';
 import {
   Loader2, RefreshCw, Wand2, Check, Copy, Link, MessageSquare,
 } from 'lucide-react';
@@ -40,31 +41,31 @@ export function SeoCopyPanel({
   onGenerateSeoCopy, onCopyText,
 }: SeoCopyPanelProps) {
   return (
-    <div className="mt-3 pt-2 border-t border-zinc-800">
+    <div className="mt-3 pt-2 border-t border-[var(--brand-border)]">
       {!seoCopyResults.has(page.pagePath) ? (
         <button
           onClick={(e) => { e.stopPropagation(); onGenerateSeoCopy(page); }}
           disabled={generatingCopy === page.pagePath}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600/20 border border-teal-500/30 hover:bg-teal-600/30 disabled:opacity-50 text-teal-300 text-[11px] font-medium transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 hover:bg-teal-600/30 disabled:opacity-50 text-teal-300 t-caption-sm font-medium transition-colors"
         >
           {generatingCopy === page.pagePath ? (
-            <><Loader2 className="w-3 h-3 animate-spin" /> Generating SEO Copy...</>
+            <><Icon as={Loader2} size="sm" className="animate-spin" /> Generating SEO Copy...</>
           ) : (
-            <><Wand2 className="w-3 h-3" /> Generate SEO Copy</>
+            <><Icon as={Wand2} size="sm" className="text-teal-300" /> Generate SEO Copy</>
           )}
         </button>
       ) : (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <h5 className="text-[11px] font-semibold text-teal-300 uppercase tracking-wider flex items-center gap-1">
-              <Wand2 className="w-3 h-3" /> Generated SEO Copy
+            <h5 className="t-caption-sm font-semibold text-teal-300 uppercase tracking-wider flex items-center gap-1">
+              <Icon as={Wand2} size="sm" className="text-teal-300" /> Generated SEO Copy
             </h5>
             <button
               onClick={(e) => { e.stopPropagation(); onGenerateSeoCopy(page); }}
               disabled={generatingCopy === page.pagePath}
-              className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-teal-400 transition-colors"
+              className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-400 transition-colors"
             >
-              {generatingCopy === page.pagePath ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <RefreshCw className="w-2.5 h-2.5" />} Regenerate
+              {generatingCopy === page.pagePath ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={RefreshCw} size="sm" />} Regenerate
             </button>
           </div>
           {(() => {
@@ -72,63 +73,63 @@ export function SeoCopyPanel({
             return (
               <div className="space-y-2">
                 {/* SEO Title */}
-                <div className="bg-zinc-800/60 rounded-lg p-2.5">
+                <div className="bg-[var(--surface-3)]/60 rounded-[var(--radius-lg)] p-2.5">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">SEO Title</span>
-                    <button onClick={(e) => { e.stopPropagation(); onCopyText(copy.seoTitle, 'seoTitle'); }} className="flex items-center gap-0.5 text-[11px] text-zinc-500 hover:text-teal-400">
-                      {copiedField === 'seoTitle' ? <Check className="w-2.5 h-2.5 text-emerald-400" /> : <Copy className="w-2.5 h-2.5" />}
+                    <span className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">SEO Title</span>
+                    <button onClick={(e) => { e.stopPropagation(); onCopyText(copy.seoTitle, 'seoTitle'); }} className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-400">
+                      {copiedField === 'seoTitle' ? <Icon as={Check} size="sm" className="text-emerald-400" /> : <Icon as={Copy} size="sm" />}
                       {copiedField === 'seoTitle' ? 'Copied!' : 'Copy'}
                     </button>
                   </div>
-                  <p className="text-xs text-zinc-200">{copy.seoTitle}</p>
-                  <span className="text-[11px] text-zinc-500 mt-0.5 block">{copy.seoTitle.length} chars</span>
+                  <p className="t-caption text-[var(--brand-text-bright)]">{copy.seoTitle}</p>
+                  <span className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 block">{copy.seoTitle.length} chars</span>
                 </div>
                 {/* Meta Description */}
-                <div className="bg-zinc-800/60 rounded-lg p-2.5">
+                <div className="bg-[var(--surface-3)]/60 rounded-[var(--radius-lg)] p-2.5">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Meta Description</span>
-                    <button onClick={(e) => { e.stopPropagation(); onCopyText(copy.metaDescription, 'metaDesc'); }} className="flex items-center gap-0.5 text-[11px] text-zinc-500 hover:text-teal-400">
-                      {copiedField === 'metaDesc' ? <Check className="w-2.5 h-2.5 text-emerald-400" /> : <Copy className="w-2.5 h-2.5" />}
+                    <span className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Meta Description</span>
+                    <button onClick={(e) => { e.stopPropagation(); onCopyText(copy.metaDescription, 'metaDesc'); }} className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-400">
+                      {copiedField === 'metaDesc' ? <Icon as={Check} size="sm" className="text-emerald-400" /> : <Icon as={Copy} size="sm" />}
                       {copiedField === 'metaDesc' ? 'Copied!' : 'Copy'}
                     </button>
                   </div>
-                  <p className="text-xs text-zinc-300">{copy.metaDescription}</p>
-                  <span className="text-[11px] text-zinc-500 mt-0.5 block">{copy.metaDescription.length} chars</span>
+                  <p className="t-caption text-[var(--brand-text-bright)]">{copy.metaDescription}</p>
+                  <span className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 block">{copy.metaDescription.length} chars</span>
                 </div>
                 {/* H1 */}
-                <div className="bg-zinc-800/60 rounded-lg p-2.5">
+                <div className="bg-[var(--surface-3)]/60 rounded-[var(--radius-lg)] p-2.5">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Suggested H1</span>
-                    <button onClick={(e) => { e.stopPropagation(); onCopyText(copy.h1, 'h1'); }} className="flex items-center gap-0.5 text-[11px] text-zinc-500 hover:text-teal-400">
-                      {copiedField === 'h1' ? <Check className="w-2.5 h-2.5 text-emerald-400" /> : <Copy className="w-2.5 h-2.5" />}
+                    <span className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Suggested H1</span>
+                    <button onClick={(e) => { e.stopPropagation(); onCopyText(copy.h1, 'h1'); }} className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-400">
+                      {copiedField === 'h1' ? <Icon as={Check} size="sm" className="text-emerald-400" /> : <Icon as={Copy} size="sm" />}
                       {copiedField === 'h1' ? 'Copied!' : 'Copy'}
                     </button>
                   </div>
-                  <p className="text-xs text-zinc-200 font-medium">{copy.h1}</p>
+                  <p className="t-caption font-medium text-[var(--brand-text-bright)]">{copy.h1}</p>
                 </div>
                 {/* Intro Paragraph */}
-                <div className="bg-zinc-800/60 rounded-lg p-2.5">
+                <div className="bg-[var(--surface-3)]/60 rounded-[var(--radius-lg)] p-2.5">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Intro Paragraph</span>
-                    <button onClick={(e) => { e.stopPropagation(); onCopyText(copy.introParagraph, 'intro'); }} className="flex items-center gap-0.5 text-[11px] text-zinc-500 hover:text-teal-400">
-                      {copiedField === 'intro' ? <Check className="w-2.5 h-2.5 text-emerald-400" /> : <Copy className="w-2.5 h-2.5" />}
+                    <span className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Intro Paragraph</span>
+                    <button onClick={(e) => { e.stopPropagation(); onCopyText(copy.introParagraph, 'intro'); }} className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-400">
+                      {copiedField === 'intro' ? <Icon as={Check} size="sm" className="text-emerald-400" /> : <Icon as={Copy} size="sm" />}
                       {copiedField === 'intro' ? 'Copied!' : 'Copy'}
                     </button>
                   </div>
-                  <p className="text-xs text-zinc-300 leading-relaxed">{copy.introParagraph}</p>
+                  <p className="t-caption text-[var(--brand-text-bright)] leading-relaxed">{copy.introParagraph}</p>
                 </div>
                 {/* Internal Link Suggestions */}
                 {copy.internalLinkSuggestions && copy.internalLinkSuggestions.length > 0 && (
-                  <div className="bg-zinc-800/60 rounded-lg p-2.5">
-                    <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-1 mb-1.5">
-                      <Link className="w-2.5 h-2.5" /> Internal Link Suggestions
+                  <div className="bg-[var(--surface-3)]/60 rounded-[var(--radius-lg)] p-2.5">
+                    <span className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider flex items-center gap-1 mb-1.5">
+                      <Icon as={Link} size="sm" /> Internal Link Suggestions
                     </span>
                     <div className="space-y-1">
                       {copy.internalLinkSuggestions.map((link, li) => (
-                        <div key={li} className="flex items-start gap-2 text-[11px]">
+                        <div key={li} className="flex items-start gap-2 t-caption-sm">
                           <span className="text-teal-400 font-mono shrink-0">{link.targetPath}</span>
-                          <span className="text-zinc-400">"{link.anchorText}"</span>
-                          <span className="text-zinc-500 italic">{link.context}</span>
+                          <span className="text-[var(--brand-text)]">"{link.anchorText}"</span>
+                          <span className="text-[var(--brand-text-muted)] italic">{link.context}</span>
                         </div>
                       ))}
                     </div>
@@ -136,13 +137,13 @@ export function SeoCopyPanel({
                 )}
                 {/* Changes Rationale */}
                 {copy.changes && copy.changes.length > 0 && (
-                  <div className="bg-zinc-800/40 rounded-lg p-2.5">
-                    <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-1 mb-1.5">
-                      <MessageSquare className="w-2.5 h-2.5" /> Why These Changes
+                  <div className="bg-[var(--surface-3)]/40 rounded-[var(--radius-lg)] p-2.5">
+                    <span className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider flex items-center gap-1 mb-1.5">
+                      <Icon as={MessageSquare} size="sm" /> Why These Changes
                     </span>
                     <ul className="space-y-0.5">
                       {copy.changes.map((c, ci) => (
-                        <li key={ci} className="text-[11px] text-zinc-400 flex items-start gap-1">
+                        <li key={ci} className="t-caption-sm text-[var(--brand-text)] flex items-start gap-1">
                           <span className="text-teal-400 mt-0.5">•</span> {c}
                         </li>
                       ))}

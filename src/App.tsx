@@ -28,7 +28,6 @@ import { Activity, Clipboard, Globe, Sparkles } from 'lucide-react';
 
 // ── Lazy-loaded route-level chunks ──
 const ClientDashboard = lazyWithRetry(() => import('./components/ClientDashboard').then(m => ({ default: m.ClientDashboard })));
-const Styleguide = lazyWithRetry(() => import('./components/Styleguide').then(m => ({ default: m.Styleguide })));
 const LandingPage = lazyWithRetry(() => import('./components/LandingPage').then(m => ({ default: m.LandingPage })));
 const PageRewriteChat = lazyWithRetry(() => import('./components/PageRewriteChat').then(m => ({ default: m.PageRewriteChat })));
 
@@ -68,7 +67,14 @@ const MeetingBriefPage = lazyWithRetry(() => import('./components/admin/MeetingB
 const DiagnosticReportPage = lazyWithRetry(() => import('./components/admin/DiagnosticReport/DiagnosticReportPage').then(m => ({ default: m.DiagnosticReportPage })));
 
 function ChunkFallback() {
-  return <div className="flex items-center justify-center py-24"><div className="w-6 h-6 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>;
+  return <div className="flex items-center justify-center py-24"><div className="w-6 h-6 border-2 rounded-full animate-spin border-[var(--surface-3)] border-t-teal-400" /></div>;
+}
+
+// Not lazy-loaded — the redirect fires immediately so a lazy chunk would add
+// pointless network overhead before navigation.
+function StyleguideRedirect() {
+  useEffect(() => { window.location.replace('/styleguide.html'); }, []);
+  return null;
 }
 
 export interface FixContext {
@@ -116,7 +122,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/welcome" element={<Suspense fallback={<ChunkFallback />}><LandingPage /></Suspense>} />
-        <Route path="/styleguide" element={<Suspense fallback={<ChunkFallback />}><Styleguide /></Suspense>} />
+        <Route path="/styleguide" element={<StyleguideRedirect />} />
         <Route path="/client/beta/:workspaceId/*" element={<MobileGuard><Suspense fallback={<ChunkFallback />}><ClientRoutes betaMode /></Suspense></MobileGuard>} />
         <Route path="/client/:workspaceId/*" element={<MobileGuard><Suspense fallback={<ChunkFallback />}><ClientRoutes /></Suspense></MobileGuard>} />
         <Route path="/*" element={<ToastProvider><BackgroundTaskProvider><AdminApp /></BackgroundTaskProvider></ToastProvider>} />
@@ -137,7 +143,7 @@ function AdminApp() {
   };
 
   if (auth.checking) {
-    return <div className={`flex items-center justify-center h-screen bg-[#0f1219] ${theme === 'light' ? 'dashboard-light' : ''}`}><div className="w-6 h-6 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>;
+    return <div className={`flex items-center justify-center h-screen bg-[var(--surface-1)] ${theme === 'light' ? 'dashboard-light' : ''}`}><div className="w-6 h-6 border-2 rounded-full animate-spin border-[var(--surface-3)] border-t-teal-400" /></div>;
   }
   if (auth.required && !auth.authenticated) {
     return <div className={theme === 'light' ? 'dashboard-light' : ''}><LoginScreen onLogin={auth.login} /></div>;
@@ -366,10 +372,10 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (needsSite && !selected.webflowSiteId) {
       return (
         <div className="flex flex-col items-center justify-center py-24 gap-3">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-zinc-900">
-            <Globe className="w-5 h-5 text-zinc-500" />
+          <div className="w-12 h-12 rounded-[var(--radius-xl)] flex items-center justify-center bg-[var(--surface-2)]">
+            <Globe className="w-5 h-5 text-[var(--brand-text-muted)]" />
           </div>
-          <p className="text-sm text-zinc-500">Link a Webflow site to use this tool</p>
+          <p className="text-sm text-[var(--brand-text-muted)]">Link a Webflow site to use this tool</p>
           <button onClick={() => navigate('/settings')} className="mt-3 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors bg-teal-500/10 text-teal-400">Go to Settings</button>
         </div>
       );
@@ -450,7 +456,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   };
 
   return (
-    <div className="flex h-screen bg-[#0f1219] text-zinc-200">
+    <div className="flex h-screen bg-[var(--surface-1)] text-[var(--brand-text)]">
       <Sidebar
         workspaces={workspaces}
         selected={selected}
@@ -487,7 +493,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
               {pendingContentRequests > 0 && selected && tab !== 'content-pipeline' && (
                 <button
                   onClick={() => selected && navigate(adminPath(selected.id, 'content-pipeline'))}
-                  className="w-full mb-4 flex items-center gap-3 px-4 py-3 rounded-xl border transition-all hover:border-amber-400/40"
+                  className="w-full mb-4 flex items-center gap-3 px-4 py-3 rounded-[var(--radius-xl)] border transition-all hover:border-amber-400/40"
                   style={{ backgroundColor: 'rgba(245,158,11,0.06)', borderColor: 'rgba(245,158,11,0.2)' }}
                 >
                   <div className="w-7 h-7 rounded-lg bg-amber-500/15 flex items-center justify-center flex-shrink-0">
@@ -495,9 +501,9 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
                   </div>
                   <div className="text-left flex-1">
                     <span className="text-xs font-medium text-amber-300">{pendingContentRequests} new content {pendingContentRequests === 1 ? 'request' : 'requests'}</span>
-                    <span className="text-[11px] text-zinc-500 ml-2">from client portal</span>
+                    <span className="t-caption-sm text-[var(--brand-text-muted)] ml-2">from client portal</span>
                   </div>
-                  <span className="text-[11px] text-zinc-500">View →</span>
+                  <span className="t-caption-sm text-[var(--brand-text-muted)]">View →</span>
                 </button>
               )}
               <ErrorBoundary label={tab}>

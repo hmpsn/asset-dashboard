@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { Upload, Image, FileImage } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { Icon, cn } from './ui';
 import { themeColor } from './ui/constants';
 import { postForm } from '../api/client';
 
@@ -69,7 +69,7 @@ export function DropZone({ workspaceId, type, disabled }: Props) {
     }
   };
 
-  const Icon = type === 'meta' ? FileImage : Image;
+  const DropIcon = type === 'meta' ? FileImage : Image;
 
   return (
     <div
@@ -78,10 +78,10 @@ export function DropZone({ workspaceId, type, disabled }: Props) {
       onDragLeave={handleDragLeave}
       onClick={handleClick}
       className={cn(
-        'relative flex flex-col items-center justify-center gap-3 p-8 rounded-xl border-2 border-dashed transition-all cursor-pointer min-h-[180px]',
+        'relative flex flex-col items-center justify-center gap-3 p-8 rounded-[var(--radius-xl)] border-2 border-dashed transition-all cursor-pointer min-h-[180px]',
         disabled && 'opacity-40 cursor-not-allowed',
         dragging ? 'scale-[1.01]' : '',
-        uploading && 'border-emerald-500/50 bg-emerald-500/5'
+        uploading && 'border-emerald-500/50 bg-emerald-500/5',
       )}
       style={!uploading ? {
         borderColor: dragging ? '#2dd4bf' : themeColor('#3f3f46', '#cbd5e1'),
@@ -99,13 +99,13 @@ export function DropZone({ workspaceId, type, disabled }: Props) {
 
       {uploading ? (
         <>
-          <div className="w-8 h-8 border-2 rounded-full animate-spin border-zinc-700 border-t-teal-400" />
-          <p className="text-sm text-zinc-400">Processing...</p>
+          <div className="w-8 h-8 border-2 rounded-full animate-spin border-[var(--brand-border-hover)] border-t-teal-400" />
+          <p className="text-sm text-[var(--brand-text)]">Processing...</p>
         </>
       ) : lastCount !== null ? (
         <>
           <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
-            <Upload className="w-5 h-5 text-emerald-400" />
+            <Icon as={Upload} size="lg" className="text-emerald-400" />
           </div>
           <p className="text-sm text-emerald-400 font-medium">
             {lastCount} file{lastCount !== 1 ? 's' : ''} sent to pipeline
@@ -113,20 +113,20 @@ export function DropZone({ workspaceId, type, disabled }: Props) {
         </>
       ) : (
         <>
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-teal-500/10">
-            <Icon className="w-5 h-5 text-teal-400" />
+          <div className="w-10 h-10 rounded-[var(--radius-md)] flex items-center justify-center bg-teal-500/10">
+            <Icon as={DropIcon} size="lg" className="text-teal-400" />
           </div>
           <div className="text-center">
-            <p className="text-sm font-medium text-zinc-200">
+            <p className="text-sm font-medium text-[var(--brand-text-bright)]">
               {type === 'meta' ? 'Meta / OG Images' : 'Assets'}
             </p>
-            <p className="text-xs mt-1 text-zinc-500">
+            <p className="text-xs mt-1 text-[var(--brand-text-muted)]">
               {type === 'meta'
                 ? 'Optimized JPEG — keeps format for social sharing'
                 : 'Converts to AVIF, minifies SVGs'}
             </p>
           </div>
-          <p className="text-xs text-zinc-500">Drop files or click to browse</p>
+          <p className="text-xs text-[var(--brand-text-muted)]">Drop files or click to browse</p>
         </>
       )}
     </div>

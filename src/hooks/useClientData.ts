@@ -81,6 +81,11 @@ export function useClientData(workspaceId: string) {
   const annotationsQ = useClientAnnotations(workspaceId, dataEnabled);
   const anomaliesQ = useClientAnomalies(workspaceId, dataEnabled);
   const approvalsQ = useClientApprovals(workspaceId, dataEnabled);
+  // copyEntries fires for every workspace once dataEnabled — adds one request
+  // per session even for workspaces that don't use the copy pipeline. Acceptable
+  // for now: getSafe falls back to {entries:[]} on any error, and React Query
+  // dedupes with the default stale window. Future: gate on `ws?.copyPipelineEnabled`
+  // (workspace.ts feature toggles) once the admin UI exposes that flag.
   const copyEntriesQ = useClientCopyEntries(workspaceId, dataEnabled);
   const requestsQ = useClientRequestsQuery(workspaceId, dataEnabled);
   const contentReqQ = useClientContentRequests(workspaceId, dataEnabled);
@@ -201,12 +206,21 @@ export function useClientData(workspaceId: string) {
 
   // ── refetchClient: invalidate the appropriate query ─────────────
   const refetchClient = useCallback((key: string, _url: string) => {
+    // `copy` invalidates both the full-entries query (ClientCopyReview) and
+    // the lightweight count probe (useClientCopyEntries / InboxTab tab
+    // visibility gate). The two use distinct query keys so the count's
+    // getSafe fallback doesn't dedupe with the full query's error-aware
+    // get() — see queryKeys.client.copyEntriesCount JSDoc.
+    if (key === 'copy') {
+      queryClient.invalidateQueries({ queryKey: queryKeys.client.copyEntries(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.client.copyEntriesCount(workspaceId) });
+      return;
+    }
     const keyFns: Record<string, readonly unknown[]> = {
       activity: queryKeys.client.activity(workspaceId),
       approvals: queryKeys.client.approvals(workspaceId),
       requests: queryKeys.client.requests(workspaceId),
       content: queryKeys.client.contentRequests(workspaceId),
-      copy: queryKeys.client.copyEntries(workspaceId),
       audit: queryKeys.client.auditSummary(workspaceId),
       'audit-detail': queryKeys.client.auditDetail(workspaceId),
       recommendations: queryKeys.shared.recommendations(workspaceId),

@@ -5,7 +5,7 @@ const PRIORITY_COLORS = {
   P0: 'bg-red-500/10 text-red-400',
   P1: 'bg-amber-500/10 text-amber-400',
   P2: 'bg-blue-500/10 text-blue-400',
-  P3: 'bg-zinc-500/10 text-zinc-400',
+  P3: 'bg-[var(--surface-3)] text-[var(--brand-text)]',
 } as const;
 
 const EFFORT_LABELS = { low: 'Low effort', medium: 'Medium effort', high: 'High effort' } as const;
@@ -31,22 +31,22 @@ export function RemediationPlan({ actions }: Props) {
               <span className={`px-2 py-0.5 rounded text-xs font-bold ${PRIORITY_COLORS[action.priority]}`}>
                 {action.priority}
               </span>
-              <h4 className="text-sm font-medium text-zinc-200">{action.title}</h4>
+              <h4 className="text-sm font-medium text-[var(--brand-text-bright)]">{action.title}</h4>
             </div>
-            <span className="px-2 py-0.5 rounded text-xs bg-zinc-800 text-zinc-400">
+            <span className="px-2 py-0.5 rounded text-xs bg-[var(--surface-3)] text-[var(--brand-text)]">
               {OWNER_LABELS[action.owner]}
             </span>
           </div>
-          <p className="text-sm text-zinc-400 mb-2">{action.description}</p>
-          <div className="flex gap-3 text-xs text-zinc-500">
+          <p className="text-sm text-[var(--brand-text)] mb-2">{action.description}</p>
+          <div className="flex gap-3 text-xs text-[var(--brand-text-muted)]">
             <span>{EFFORT_LABELS[action.effort]}</span>
-            <span className="text-zinc-700">|</span>
+            <span className="text-[var(--brand-border-hover)]">|</span>
             <span>{IMPACT_LABELS[action.impact]}</span>
           </div>
           {action.pageUrls && action.pageUrls.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">
               {action.pageUrls.map((url) => (
-                <span key={url} className="text-xs bg-zinc-800/50 text-blue-400 px-2 py-0.5 rounded font-mono truncate max-w-[200px]">
+                <span key={url} className="text-xs bg-[var(--surface-1)] text-blue-400 px-2 py-0.5 rounded font-mono truncate max-w-[200px]">
                   {url}
                 </span>
               ))}

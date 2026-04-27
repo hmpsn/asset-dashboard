@@ -39,7 +39,7 @@ export function StatCard({
   return (
     <Tag
       onClick={onClick}
-      className={`bg-zinc-900 ${isHero ? 'p-4' : 'p-3'} border border-zinc-800 text-left ${onClick ? 'hover:border-zinc-700 transition-colors cursor-pointer group' : ''} ${className ?? ''}`}
+      className={`bg-[var(--surface-2)] ${isHero ? 'p-4' : 'p-3'} border border-zinc-800 text-left ${onClick ? 'hover:border-zinc-700 transition-colors cursor-pointer group' : ''} ${className ?? ''}`}
       style={baseStyle}
     >
       <div className="flex items-center gap-1.5 mb-2">
@@ -76,7 +76,7 @@ interface CompactStatProps {
 export function CompactStatBar({ items, className }: { items: CompactStatProps[]; className?: string }) {
   return (
     <div
-      className={`bg-zinc-900 border border-zinc-800 px-5 py-3 flex items-center justify-between flex-wrap gap-3 ${className ?? ''}`}
+      className={`bg-[var(--surface-2)] border border-zinc-800 px-5 py-3 flex items-center justify-between flex-wrap gap-3 ${className ?? ''}`}
       style={{ borderRadius: '6px 12px 6px 12px' }}
     >
       {items.map(m => (

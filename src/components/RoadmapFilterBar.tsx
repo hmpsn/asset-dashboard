@@ -1,6 +1,7 @@
 import { useSearchParams } from 'react-router-dom';
 import { X } from 'lucide-react';
 import type { SprintData } from '../../shared/types/roadmap';
+import { Icon } from './ui';
 
 const PRIORITY_OPTIONS = [
   { value: 'all', label: 'All Priorities' },
@@ -52,7 +53,7 @@ export function RoadmapFilterBar({ sprints, featureMap, allTags }: Props) {
 
   const hasActiveFilter = [priority, status, sprint, feature, tags].some(v => v !== 'all');
 
-  const cls = 'px-2.5 py-1.5 rounded-lg text-[11px] bg-zinc-900 border border-zinc-800 text-zinc-200 cursor-pointer hover:border-zinc-600 transition-colors';
+  const cls = 'px-2.5 py-1.5 rounded-lg t-caption bg-[var(--surface-2)] border border-[var(--brand-border)] text-[var(--brand-text-bright)] cursor-pointer hover:border-[var(--brand-border-hover)] transition-colors';
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
@@ -92,9 +93,9 @@ export function RoadmapFilterBar({ sprints, featureMap, allTags }: Props) {
       {hasActiveFilter && (
         <button
           onClick={clearAll}
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] text-zinc-400 hover:text-zinc-200 border border-zinc-800 hover:border-zinc-600 transition-colors"
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg t-caption text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] transition-colors"
         >
-          <X className="w-3 h-3" />
+          <Icon as={X} size="sm" />
           Clear filters
         </button>
       )}

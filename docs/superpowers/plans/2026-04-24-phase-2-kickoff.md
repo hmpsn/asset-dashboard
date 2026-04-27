@@ -304,9 +304,12 @@ the hard way in Phase 1 — don't re-discover them.
 ### 6.1 className merge — ALWAYS `cn()`
 
 ```tsx
-// ✓ correct
-import { cn } from '@/lib/utils';
+// ✓ correct — re-exported from the ui barrel for convenience
+import { cn } from '../ui';
 <div className={cn('flex flex-row gap-2', active && 'bg-teal-500/10', className)} />
+
+// ✓ also correct — direct import from the canonical implementation
+import { cn } from '../../lib/utils';
 
 // ✗ wrong — template literal
 <div className={`flex flex-row gap-2 ${active ? 'bg-teal-500/10' : ''} ${className ?? ''}`} />
@@ -317,6 +320,11 @@ import { cn } from '@/lib/utils';
 // ✗ wrong — string concat
 <div className={baseClass + ' ' + (className ?? '')} />
 ```
+
+> **Path note.** This codebase has no `@/`-style tsconfig path alias. Use the
+> relative path that matches your file's depth: `'../ui'` from
+> `src/components/`, `'../../ui'` from `src/components/<subdir>/`. The form
+> `'@/lib/utils'` shown in older docs is incorrect — it would fail to resolve.
 
 ### 6.2 Test file location — ALWAYS `tests/components/ui/`
 
@@ -338,8 +346,8 @@ If Phase 2 adds a test file for a consumer migration:
 ### 6.4 Icon sizing — use the primitive, not template literals
 
 ```tsx
-// ✓ correct
-import { Icon } from '@/components/ui';
+// ✓ correct (path is relative — see §6.1 path note)
+import { Icon } from '../ui';
 import { TrendingUp } from 'lucide-react';
 <Icon as={TrendingUp} size="sm" className="text-teal-400" />
 
@@ -350,11 +358,49 @@ import { TrendingUp } from 'lucide-react';
 <TrendingUp className={`w-${sizeMap[size]}`} />
 ```
 
+#### Icon SIZE_MAP — match the original Tailwind class exactly
+
+The Icon primitive's SIZE_MAP (`src/components/ui/Icon.tsx`) is **exact**:
+
+| `size=` | Tailwind class | Pixels |
+|---|---|---:|
+| `xs` | `w-2 h-2` | 8 |
+| `sm` | `w-3 h-3` | 12 |
+| `md` | `w-4 h-4` | 16 |
+| `lg` | `w-5 h-5` | 20 |
+| `xl` | `w-6 h-6` | 24 |
+| `2xl` | `w-8 h-8` | 32 |
+
+When migrating a raw Lucide icon, pick the size that matches the **exact pixel
+value** of the original `w-N h-N` class. Do not pick the next-smaller tier.
+
+```tsx
+// Original                           // Migrated
+<X className="w-3 h-3"  />        →   <Icon as={X} size="sm" />
+<X className="w-4 h-4"  />        →   <Icon as={X} size="md" />
+<X className="w-5 h-5"  />        →   <Icon as={X} size="lg" />
+<X className="w-6 h-6"  />        →   <Icon as={X} size="xl" />
+<X className="w-8 h-8"  />        →   <Icon as={X} size="2xl" />
+```
+
+**Half-step originals (`w-3.5 h-3.5`, `w-2.5 h-2.5`, etc.) — round UP, not
+down.** Phase 2 Batch 1 had a systemic bug where every worker (and the
+integrator) picked the next-smaller tier on a half-step miss, shrinking icons
+by 25–33% across hundreds of sites. The recovery rule: when the original
+doesn't match an exact tier, pick the nearest tier that is **at least as
+large** as the original. So `w-3.5 h-3.5` (14px) → `sm` (12px) is **wrong**;
+the right choice is `md` (16px), or stay hand-rolled if exact pixel parity
+matters.
+
+If a sizing decision is genuinely ambiguous (legitimate `w-2.5 h-2.5` for
+chart-tooltip arrows, etc.), keep the raw Lucide element with a
+`// pr-check-disable-next-line -- justification` and document the reason.
+
 ### 6.5 Button gradient — use the primitive, not hand-rolled
 
 ```tsx
 // ✓ correct
-import { Button } from '@/components/ui';
+import { Button } from '../ui';
 <Button variant="primary" icon={Send} onClick={handleSend}>Send</Button>
 
 // ✗ wrong
@@ -365,7 +411,7 @@ import { Button } from '@/components/ui';
 
 ```tsx
 // ✓ correct
-import { scoreColor, scoreColorClass } from '@/components/ui/constants';
+import { scoreColor, scoreColorClass } from '../ui/constants';
 const color = scoreColor(score);             // hex for SVG fills
 const cls = scoreColorClass(score);          // Tailwind class for text
 
@@ -383,14 +429,83 @@ const color = score >= 80 ? '#34d399' : score >= 60 ? '#fbbf24' : '#f87171';
 Forbidden hues in consumers: `violet-`, `indigo-`, `rose-`, `pink-`, `text-green-400`
 for success. Enforced by pr-check.
 
-### 6.8 Token usage — prefer CSS vars over raw `zinc-*` where Phase 1 primitives use them
+### 6.8 Token usage — full migration of raw zinc/borderRadius/text-[Npx] in your domain
 
-**Note:** Phase 2 is a migration, not a full token rewrite. If a consumer file
-already uses `text-zinc-500` and the migration replaces a button with `<Button>`,
-you do NOT need to migrate the surrounding `text-zinc-500` to `var(--brand-text-muted)`
-in the same PR. That's Phase 3 work.
+A Phase 2 worker's domain must end with **zero** raw `text-zinc-*`, `bg-zinc-*`,
+`border-zinc-*`, `rounded-lg`, `text-[Npx]`, or inline `borderRadius:` in any
+file in the worker's scope. The parent plan's "Phase 2 Acceptance Checklist —
+Domain grep audit" enforces this; pr-check will fail any PR that lets one slip
+through.
 
-Do use `var(--*)` in any NEW code you write inside the migration (rare).
+> **Earlier draft of this section said the opposite.** It claimed Phase 2 was
+> "migration, not full token rewrite" and that surrounding zinc could stay.
+> That note conflicted with the parent plan's domain grep audit — workers
+> following it would fail acceptance. The parent plan's stricter rule wins.
+
+#### Token mapping (use these — do NOT invent `var(--zinc-*)`)
+
+The project does **not** define `--zinc-300`, `--zinc-400`, `--zinc-500`,
+`--zinc-600`, or `--zinc-700` as CSS custom properties. `var(--zinc-N)` resolves
+to empty string at runtime — text becomes the browser default and backgrounds
+become transparent. **This is a runtime regression and Playwright visual diff is
+the only gate that catches it.**
+
+The legitimate replacements:
+
+| Raw zinc class | Semantic CSS var (preferred) | Notes |
+|---|---|---|
+| `text-zinc-100`, `text-zinc-200`, `text-zinc-300` | `text-[var(--brand-text-bright)]` | Headings, primary emphasis |
+| `text-zinc-400` | `text-[var(--brand-text)]` | Body text |
+| `text-zinc-500` | `text-[var(--brand-text-muted)]` | Muted/secondary text |
+| `bg-zinc-800`, `bg-zinc-900` | `bg-[var(--surface-1)]` / `bg-[var(--surface-2)]` / `bg-[var(--surface-3)]` | Pick the surface tier that matches the visual layer |
+| `border-zinc-700`, `border-zinc-800` | `border-[var(--brand-border)]` | All non-accent borders |
+
+If a site has no semantic equivalent (e.g. a one-off zinc-700 used for a legend
+swatch where a colored accent would be wrong), keep the original Tailwind
+utility class — it's defined as a CSS override in `src/index.css`. Do NOT
+escape into `text-[var(--zinc-700)]`; the variable does not exist.
+
+#### Hover-state preservation — never collapse default and hover to the same token
+
+When a site has both a default text color and a `hover:text-...` brightening
+on the same element, the original was almost always two adjacent zinc shades
+(e.g. `text-zinc-300 hover:text-zinc-100`). Both shades map to the same
+semantic bucket per the table above (`--brand-text-bright`) — but if you
+migrate both to `--brand-text-bright`, the hover transition is a visual
+no-op. Preserve the contrast step:
+
+| Original | Migrated |
+|---|---|
+| `text-zinc-300 hover:text-zinc-100` | `text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]` |
+| `text-zinc-400 hover:text-zinc-200` | `text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]` |
+| `text-zinc-500 hover:text-zinc-300` | `text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]` |
+
+The general rule: the hover target should be **one tier brighter** than the
+default. If a bulk-replace tool would collapse both to the same token, the
+default needs to drop one tier (or skip the migration on that line).
+
+### 6.9 Typography utilities — `t-micro` is for ALREADY-uppercase labels only
+
+`t-micro` (`src/index.css`) applies `text-transform: uppercase`,
+`letter-spacing: 0.1em`, and a monospace font family. It exists for
+timestamps, metric IDs, section header labels (`NEW KEYWORDS`,
+`REMOVED KEYWORDS`, etc.), and similar already-uppercase short labels.
+
+**Do NOT use `t-micro` for natural-language text.** Phase 2 Batch 1 had a
+worker apply `t-micro` to AI-generated paragraphs and recommendation
+sentences, which Tailwind dutifully rendered as
+`"HOW TO FIX A LEAKY FAUCET"` in tracked monospace. The right utility for
+small natural-language text is `t-caption-sm` (11px, normal case).
+
+| Site type | Use |
+|---|---|
+| Section header label (`NEW KEYWORDS`, `RESOLVED GAPS`) — already uppercase | `t-micro` |
+| Timestamp / ID / metric label (`12.5K IMPR`, `15:22 EST`) — short, often uppercase | `t-micro` |
+| Hint paragraph, recommendation sentence, question keyword, full-sentence body copy | `t-caption-sm` |
+| Tooltip / inline explanatory text | `t-caption-sm` |
+
+When migrating from `text-[10px]` or `text-[11px]`, choose by sentence type,
+not by pixel count. `t-micro` ≈ 10px-uppercase; `t-caption-sm` = 11px-normal.
 
 ---
 

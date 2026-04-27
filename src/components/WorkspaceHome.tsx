@@ -6,7 +6,7 @@ import {
   Loader2, Bell, FileText, AlertTriangle, ChevronDown,
   Globe, Clipboard, Flag, Clock, RefreshCw, Layers, DollarSign, Target,
 } from 'lucide-react';
-import { StatCard, SectionCard, PageHeader, MetricRing, TabBar, OnboardingChecklist, WorkspaceHealthBar } from './ui';
+import { StatCard, SectionCard, PageHeader, MetricRing, TabBar, OnboardingChecklist, WorkspaceHealthBar, Icon, cn } from './ui';
 import { themeColor } from './ui/constants';
 import { WorkspaceHealthBadge } from './admin/WorkspaceHealthBadge';
 import { InsightsEngine } from './client/InsightsEngine';
@@ -120,7 +120,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Loader2 className="w-5 h-5 animate-spin text-teal-400" />
+        <Icon as={Loader2} size="lg" className="animate-spin text-teal-400" />
       </div>
     );
   }
@@ -138,7 +138,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
     : null;
 
   // Action items — priority: 1=critical, 2=important, 3=setup suggestions
-  type ActionItem = { label: string; sub: string; color: 'red' | 'amber' | 'teal' | 'green'; icon: typeof Bell; tab: string; priority: 1 | 2 | 3; queryString?: string };
+  type ActionItem = { label: string; sub: string; color: 'red' | 'amber' | 'teal' | 'emerald'; icon: typeof Bell; tab: string; priority: 1 | 2 | 3; queryString?: string };
   const actions: ActionItem[] = [];
   if (newRequests.length > 0) actions.push({ label: `${newRequests.length} new client request${newRequests.length > 1 ? 's' : ''}`, sub: 'Review and respond', color: 'red', icon: Bell, tab: 'requests', priority: 1 });
   const pendingOrders = workOrders.filter(o => o.status === 'pending' || o.status === 'in_progress');
@@ -267,27 +267,27 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       <PageHeader
         title={workspaceName}
         subtitle={webflowSiteName || 'Workspace Dashboard'}
-        icon={<Globe className="w-5 h-5 text-teal-400" />}
+        icon={<Icon as={Globe} size="lg" className="text-teal-400" />}
         actions={
           <div className="flex items-center gap-3">
             {lastFetched && (
-              <span className={`flex items-center gap-1 text-[11px] ${isStale ? 'text-amber-400' : 'text-zinc-500'}`} title={`Data loaded at ${lastFetched.toLocaleTimeString()}`}>
-                <Clock className="w-3 h-3" />
+              <span className={`flex items-center gap-1 t-caption-sm ${isStale ? 'text-amber-400' : 'text-[var(--brand-text-muted)]'}`} title={`Data loaded at ${lastFetched.toLocaleTimeString()}`}>
+                <Icon as={Clock} size="sm" />
                 {isStale ? 'Stale — ' : ''}{freshnessLabel}
               </span>
             )}
             <button
               onClick={handleRefresh}
               disabled={refreshing}
-              className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-teal-400 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-400 transition-colors disabled:opacity-50"
               title="Refresh all data"
             >
-              <RefreshCw className={`w-3 h-3 ${refreshing ? 'animate-spin' : ''}`} />
+              <Icon as={RefreshCw} size="sm" className={refreshing ? 'animate-spin' : ''} />
               Refresh
             </button>
             <button
               onClick={() => navigate(adminPath(workspaceId, 'workspace-settings'))}
-              className="text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
+              className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
             >
               Settings →
             </button>
@@ -298,7 +298,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       {intel?.clientSignals?.compositeHealthScore != null && (
         <div className="flex items-center gap-2">
           <WorkspaceHealthBadge score={intel.clientSignals.compositeHealthScore} />
-          <span className="text-xs text-zinc-500">Overall Health</span>
+          <span className="t-caption text-[var(--brand-text-muted)]">Overall Health</span>
         </div>
       )}
 
@@ -311,7 +311,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
 
       {activeTab === 'meeting-brief' ? (
         <ErrorBoundary label="Meeting Brief">
-          <Suspense fallback={<div className="flex items-center justify-center py-24"><Loader2 className="w-5 h-5 animate-spin text-teal-400" /></div>}>
+          <Suspense fallback={<div className="flex items-center justify-center py-24"><Icon as={Loader2} size="lg" className="animate-spin text-teal-400" /></div>}>
             <MeetingBriefPage workspaceId={workspaceId} />
           </Suspense>
         </ErrorBoundary>
@@ -324,42 +324,42 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       <div className={`grid grid-cols-2 ${contentPipeline && contentPipeline.totalCells > 0 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-3`}>
         {audit ? (
           <div
-            className="bg-zinc-900 border border-zinc-800 p-3 text-left cursor-pointer hover:border-zinc-700 transition-colors"
-            style={{ borderRadius: '6px 12px 6px 12px', animation: 'staggerFadeIn 0.4s cubic-bezier(0.22,0.61,0.36,1) both', animationDelay: '0ms' }}
+            className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-3 text-left cursor-pointer hover:border-[var(--brand-border-hover)] transition-colors"
+            style={{ borderRadius: 'var(--radius-signature)', animation: 'staggerFadeIn 0.4s cubic-bezier(0.22,0.61,0.36,1) both', animationDelay: '0ms' }}
             onClick={() => navigate(adminPath(workspaceId, 'seo-audit'))}
           >
             <div className="flex items-center gap-1.5 mb-2">
-              <Shield className="w-3.5 h-3.5 flex-shrink-0 text-zinc-500" />
-              <span className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium leading-none">Site Health</span>
+              <Icon as={Shield} size="sm" className="flex-shrink-0 text-[var(--brand-text-muted)]" />
+              <span className="t-caption-sm text-[var(--brand-text-muted)] uppercase tracking-wider font-medium leading-none">Site Health</span>
             </div>
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0">
                 <div className="flex items-baseline gap-1.5">
-                  <span className="text-2xl font-bold leading-none text-zinc-100">{audit.siteScore}</span>
+                  <span className="text-2xl font-bold leading-none text-[var(--brand-text-bright)]">{audit.siteScore}</span>
                   {scoreDelta != null && (
-                    <span className={`text-[11px] font-medium ${scoreDelta >= 0 ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
+                    <span className={`t-caption-sm font-medium ${scoreDelta >= 0 ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
                       {scoreDelta >= 0 ? '+' : ''}{scoreDelta} pts
                     </span>
                   )}
                 </div>
-                <div className="text-[11px] text-zinc-500 mt-1">{audit.errors} err · {audit.warnings} warn</div>
+                <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">{audit.errors} err · {audit.warnings} warn</div>
               </div>
               <MetricRing score={audit.siteScore} size={44} />
             </div>
           </div>
         ) : (
           <div
-            className="bg-zinc-900 border border-zinc-800 p-3 text-left"
-            style={{ borderRadius: '6px 12px 6px 12px', animation: 'staggerFadeIn 0.4s cubic-bezier(0.22,0.61,0.36,1) both', animationDelay: '0ms' }}
+            className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-3 text-left"
+            style={{ borderRadius: 'var(--radius-signature)', animation: 'staggerFadeIn 0.4s cubic-bezier(0.22,0.61,0.36,1) both', animationDelay: '0ms' }}
           >
             <div className="flex items-center gap-1.5 mb-2">
-              <Shield className="w-3.5 h-3.5 flex-shrink-0 text-zinc-500" />
-              <span className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium leading-none">Site Health</span>
+              <Icon as={Shield} size="sm" className="flex-shrink-0 text-[var(--brand-text-muted)]" />
+              <span className="t-caption-sm text-[var(--brand-text-muted)] uppercase tracking-wider font-medium leading-none">Site Health</span>
             </div>
             <div className="flex items-center justify-between gap-2">
               <div>
-                <div className="text-2xl font-bold leading-none text-zinc-600">—</div>
-                <div className="text-[11px] text-zinc-600 mt-1">No audit yet</div>
+                <div className="text-2xl font-bold leading-none text-[var(--brand-text-muted)]">—</div>
+                <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">No audit yet</div>
               </div>
               <MetricRing score={0} size={44} noAnimation />
             </div>
@@ -475,61 +475,61 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
 
       {/* ── Needs Attention ── */}
       {(urgentActions.length > 0 || setupActions.length > 0) && (() => {
-        const colorMap = { red: 'text-red-400', amber: 'text-amber-400', teal: 'text-teal-400', green: 'text-green-400' };
+        const colorMap = { red: 'text-red-400', amber: 'text-amber-400', teal: 'text-teal-400', emerald: 'text-emerald-400' };
         const visibleUrgent = showMoreActions ? urgentActions : urgentActions.slice(0, 5);
         const hiddenCount = urgentActions.length - visibleUrgent.length;
         return (
-          <SectionCard title="Needs Attention" titleIcon={<AlertTriangle className="w-4 h-4 text-amber-400" />} noPadding>
-            <div className="divide-y divide-zinc-800/50">
+          <SectionCard title="Needs Attention" titleIcon={<Icon as={AlertTriangle} size="md" className="text-amber-400" />} noPadding>
+            <div className="divide-y divide-[var(--brand-border)]">
               {visibleUrgent.map((item, i) => {
-                const Icon = item.icon;
+                const ItemIcon = item.icon;
                 return (
                   <button
                     key={i}
                     onClick={() => navigate(adminPath(workspaceId, item.tab as Page) + (item.queryString ? `?${item.queryString}` : ''))}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/30 transition-colors text-left"
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)] transition-colors text-left"
                   >
-                    <Icon className={`w-4 h-4 flex-shrink-0 ${colorMap[item.color]}`} />
+                    <ItemIcon className={cn('w-4 h-4 flex-shrink-0', colorMap[item.color])} />
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-medium text-zinc-200">{item.label}</div>
-                      <div className="text-[11px] text-zinc-500 mt-0.5">{item.sub}</div>
+                      <div className="t-caption font-medium text-[var(--brand-text-bright)]">{item.label}</div>
+                      <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{item.sub}</div>
                     </div>
-                    <ArrowUpRight className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" />
+                    <Icon as={ArrowUpRight} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
                   </button>
                 );
               })}
               {hiddenCount > 0 && (
                 <button
                   onClick={() => setShowMoreActions(true)}
-                  className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-zinc-800/30 transition-colors text-left"
+                  className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-[var(--surface-3)] transition-colors text-left"
                 >
-                  <ChevronDown className="w-3.5 h-3.5 text-zinc-600" />
-                  <span className="text-[11px] text-zinc-500">{hiddenCount} more item{hiddenCount > 1 ? 's' : ''}</span>
+                  <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text-muted)]" />
+                  <span className="t-caption-sm text-[var(--brand-text-muted)]">{hiddenCount} more item{hiddenCount > 1 ? 's' : ''}</span>
                 </button>
               )}
               {setupActions.length > 0 && !hasP1 && (
                 <>
                   <button
                     onClick={() => setShowSetupSuggestions(s => !s)}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-zinc-800/30 transition-colors text-left"
+                    className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-[var(--surface-3)] transition-colors text-left"
                   >
-                    <ChevronDown className={`w-3.5 h-3.5 text-zinc-600 transition-transform ${showSetupSuggestions ? 'rotate-180' : ''}`} />
-                    <span className="text-[11px] text-zinc-500">{setupActions.length} setup suggestion{setupActions.length > 1 ? 's' : ''}</span>
+                    <Icon as={ChevronDown} size="sm" className={cn('text-[var(--brand-text-muted)] transition-transform', showSetupSuggestions ? 'rotate-180' : '')} />
+                    <span className="t-caption-sm text-[var(--brand-text-muted)]">{setupActions.length} setup suggestion{setupActions.length > 1 ? 's' : ''}</span>
                   </button>
                   {showSetupSuggestions && setupActions.map((item, i) => {
-                    const Icon = item.icon;
+                    const ItemIcon = item.icon;
                     return (
                       <button
                         key={`setup-${i}`}
                         onClick={() => navigate(adminPath(workspaceId, item.tab as Page) + (item.queryString ? `?${item.queryString}` : ''))}
-                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/30 transition-colors text-left opacity-60"
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)] transition-colors text-left opacity-60"
                       >
-                        <Icon className={`w-4 h-4 flex-shrink-0 ${colorMap[item.color]}`} />
+                        <ItemIcon className={cn('w-4 h-4 flex-shrink-0', colorMap[item.color])} />
                         <div className="flex-1 min-w-0">
-                          <div className="text-xs font-medium text-zinc-200">{item.label}</div>
-                          <div className="text-[11px] text-zinc-500 mt-0.5">{item.sub}</div>
+                          <div className="t-caption font-medium text-[var(--brand-text-bright)]">{item.label}</div>
+                          <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{item.sub}</div>
                         </div>
-                        <ArrowUpRight className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" />
+                        <Icon as={ArrowUpRight} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
                       </button>
                     );
                   })}
@@ -545,7 +545,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
 
       {/* ── SEO Pipeline (Work Status + Change Tracker) ── */}
       {seoStatus.total > 0 ? (
-        <SectionCard title="SEO Pipeline" titleIcon={<Layers className="w-4 h-4 text-teal-400" />} noPadding>
+        <SectionCard title="SEO Pipeline" titleIcon={<Icon as={Layers} size="md" className="text-teal-400" />} noPadding>
           <SeoWorkStatus seoStatus={seoStatus} workspaceId={workspaceId} embedded />
           <SeoChangeImpact workspaceId={workspaceId} hasGsc={!!gscPropertyUrl} embedded />
         </SectionCard>

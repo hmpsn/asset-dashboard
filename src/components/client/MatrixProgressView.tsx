@@ -4,6 +4,7 @@ import {
   Clock, FileText, PenTool,
 } from 'lucide-react';
 import { SectionCard, Badge, PageHeader } from '../ui';
+import { Icon } from '../ui/Icon';
 import type { ContentMatrix, MatrixCell } from '../matrix/types';
 
 interface MatrixProgressViewProps {
@@ -14,56 +15,56 @@ interface MatrixProgressViewProps {
   onDownload: (format: 'docx' | 'pdf') => void;
 }
 
-const STATUS_DISPLAY: Record<MatrixCell['status'], { label: string; icon: typeof CheckCircle2; color: string; badgeColor: 'zinc' | 'blue' | 'amber' | 'teal' | 'orange' | 'green' }> = {
-  planned:           { label: 'Planned',       icon: Clock,        color: 'text-zinc-500',   badgeColor: 'zinc' },
+const STATUS_DISPLAY: Record<MatrixCell['status'], { label: string; icon: typeof CheckCircle2; color: string; badgeColor: 'zinc' | 'blue' | 'amber' | 'teal' | 'orange' | 'emerald' }> = {
+  planned:           { label: 'Planned',       icon: Clock,        color: 'text-[var(--brand-text-muted)]',   badgeColor: 'zinc' },
   keyword_validated:  { label: 'In Progress',   icon: Clock,        color: 'text-blue-400',   badgeColor: 'blue' },
   brief_generated:   { label: 'Brief Ready',   icon: FileText,     color: 'text-amber-400',  badgeColor: 'amber' },
   review:            { label: 'Your Review',   icon: Eye,          color: 'text-blue-400',   badgeColor: 'blue' },
   approved:          { label: 'Approved',       icon: CheckCircle2, color: 'text-teal-400',   badgeColor: 'teal' },
   draft:             { label: 'In Production',  icon: PenTool,      color: 'text-orange-400', badgeColor: 'orange' },
-  published:         { label: 'Published',      icon: CheckCircle2, color: 'text-green-400',  badgeColor: 'green' },
+  published:         { label: 'Published',      icon: CheckCircle2, color: 'text-emerald-400',  badgeColor: 'emerald' },
 };
 
 function CellPreviewModal({ cell, onClose, onFlag }: { cell: MatrixCell; onClose: () => void; onFlag: (comment: string) => void }) {
   const [flagComment, setFlagComment] = useState('');
   const [showFlagForm, setShowFlagForm] = useState(false);
   const cfg = STATUS_DISPLAY[cell.status];
-  const Icon = cfg.icon;
-  const title = Object.values(cell.variableValues).join(' \u2014 ');
+  const StatusIcon = cfg.icon;
+  const title = Object.values(cell.variableValues).join(' — ');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md">
-      <div className="bg-zinc-900 border border-zinc-700/50 rounded-2xl shadow-2xl max-w-md w-full mx-4 animate-[scaleIn_0.2s_ease-out]">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
-          <span className="text-sm font-semibold text-zinc-200">{title}</span>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors">
-            <X className="w-4 h-4" />
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-2xl shadow-2xl max-w-md w-full mx-4 animate-[scaleIn_0.2s_ease-out]">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--brand-border)]">
+          <span className="text-sm font-semibold text-[var(--brand-text-bright)]">{title}</span>
+          <button onClick={onClose} className="p-1 rounded-[var(--radius-md)] hover:bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
+            <Icon as={X} size="md" />
           </button>
         </div>
 
         <div className="px-5 py-4 space-y-3">
           <div className="flex items-center gap-2">
-            <Icon className={`w-4 h-4 ${cfg.color}`} />
+            <StatusIcon className={`w-4 h-4 ${cfg.color}`} />
             <Badge label={cfg.label} color={cfg.badgeColor} />
           </div>
 
           <div>
-            <span className="text-[11px] text-zinc-500">URL</span>
-            <p className="text-xs text-zinc-300 font-mono mt-0.5">{cell.plannedUrl}</p>
+            <span className="t-caption-sm text-[var(--brand-text-muted)]">URL</span>
+            <p className="t-caption text-[var(--brand-text-bright)] font-mono mt-0.5">{cell.plannedUrl}</p>
           </div>
 
           <div>
-            <span className="text-[11px] text-zinc-500">Target Keyword</span>
-            <p className="text-xs text-zinc-200 mt-0.5">{cell.customKeyword ?? cell.targetKeyword}</p>
+            <span className="t-caption-sm text-[var(--brand-text-muted)]">Target Keyword</span>
+            <p className="t-caption text-[var(--brand-text-bright)] mt-0.5">{cell.customKeyword ?? cell.targetKeyword}</p>
           </div>
 
           {cell.clientFlag && (
-            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-[var(--radius-md)] p-3">
               <div className="flex items-center gap-1.5 mb-1">
-                <Flag className="w-3 h-3 text-amber-400" />
-                <span className="text-[11px] text-amber-400 font-medium">Flagged</span>
+                <Icon as={Flag} size="sm" className="text-amber-400" />
+                <span className="t-caption text-amber-400 font-medium">Flagged</span>
               </div>
-              <p className="text-xs text-zinc-300">{cell.clientFlag}</p>
+              <p className="t-caption text-[var(--brand-text-bright)]">{cell.clientFlag}</p>
             </div>
           )}
 
@@ -74,19 +75,19 @@ function CellPreviewModal({ cell, onClose, onFlag }: { cell: MatrixCell; onClose
                 onChange={e => setFlagComment(e.target.value)}
                 placeholder="Describe what needs to change..."
                 rows={2}
-                className="w-full px-2.5 py-1.5 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 resize-none focus:border-amber-500/40 focus:outline-none transition-colors"
+                className="w-full px-2.5 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-md)] t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-dim)] resize-none focus:border-amber-500/40 focus:outline-none transition-colors"
               />
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => { if (flagComment.trim()) { onFlag(flagComment.trim()); setFlagComment(''); setShowFlagForm(false); } }}
                   disabled={!flagComment.trim()}
-                  className="px-3 py-1.5 rounded-lg bg-amber-600/20 border border-amber-500/30 text-[11px] text-amber-300 hover:bg-amber-600/30 transition-colors font-medium disabled:opacity-50"
+                  className="px-3 py-1.5 rounded-[var(--radius-md)] bg-amber-600/20 border border-amber-500/30 t-caption text-amber-300 hover:bg-amber-600/30 transition-colors font-medium disabled:opacity-50"
                 >
                   Submit Flag
                 </button>
                 <button
                   onClick={() => { setShowFlagForm(false); setFlagComment(''); }}
-                  className="px-3 py-1.5 rounded-lg text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
+                  className="px-3 py-1.5 rounded-[var(--radius-md)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
                 >
                   Cancel
                 </button>
@@ -95,9 +96,9 @@ function CellPreviewModal({ cell, onClose, onFlag }: { cell: MatrixCell; onClose
           ) : (
             <button
               onClick={() => setShowFlagForm(true)}
-              className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-amber-400 transition-colors"
+              className="flex items-center gap-1.5 t-caption text-[var(--brand-text)] hover:text-amber-400 transition-colors"
             >
-              <Flag className="w-3 h-3" /> Flag for changes
+              <Icon as={Flag} size="sm" /> Flag for changes
             </button>
           )}
         </div>
@@ -141,55 +142,55 @@ export function MatrixProgressView({ matrix, onCellPreview, onFlagCell, onDownlo
       <div className="flex items-center justify-between flex-wrap gap-3">
         <PageHeader
           title={matrix.name}
-          subtitle={`${matrix.stats.total} pages \u00b7 ${publishedCount} published`}
-          icon={<FileText className="w-5 h-5 text-teal-400" />}
+          subtitle={`${matrix.stats.total} pages · ${publishedCount} published`}
+          icon={<Icon as={FileText} size="lg" className="text-teal-400" />}
         />
         <div className="flex items-center gap-2">
           <button
             onClick={() => onDownload('docx')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-800 text-xs text-zinc-400 hover:text-zinc-200 hover:border-zinc-700 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] border border-[var(--brand-border)] t-caption text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)] transition-colors"
           >
-            <FileDown className="w-3 h-3" /> Word Doc
+            <Icon as={FileDown} size="sm" /> Word Doc
           </button>
           <button
             onClick={() => onDownload('pdf')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-800 text-xs text-zinc-400 hover:text-zinc-200 hover:border-zinc-700 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] border border-[var(--brand-border)] t-caption text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)] transition-colors"
           >
-            <Download className="w-3 h-3" /> PDF
+            <Icon as={Download} size="sm" /> PDF
           </button>
         </div>
       </div>
 
       {/* Progress bar */}
-      <div className="bg-zinc-900 border border-zinc-800 p-4" style={{ borderRadius: '6px 12px 6px 12px' }}>
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4" style={{ borderRadius: 'var(--radius-signature)' }}>
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-medium text-zinc-300">Overall Progress</span>
-          <span className="text-xs text-zinc-400">{progressPercent}%</span>
+          <span className="t-caption font-medium text-[var(--brand-text-bright)]">Overall Progress</span>
+          <span className="t-caption text-[var(--brand-text)]">{progressPercent}%</span>
         </div>
-        <div className="w-full h-3 bg-zinc-800 rounded-full overflow-hidden">
+        <div className="w-full h-3 bg-[var(--surface-3)] rounded-full overflow-hidden">
           <div
             className="h-full bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full transition-all"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
         <div className="flex items-center gap-4 mt-3 flex-wrap">
-          <span className="text-[11px] text-zinc-500">{matrix.stats.planned} planned</span>
-          <span className="text-[11px] text-amber-400">{matrix.stats.briefGenerated} briefs</span>
-          {reviewCount > 0 && <span className="text-[11px] text-blue-400">{reviewCount} awaiting review</span>}
-          <span className="text-[11px] text-orange-400">{matrix.stats.drafted} drafts</span>
-          <span className="text-[11px] text-green-400">{publishedCount} published</span>
+          <span className="t-caption-sm text-[var(--brand-text-muted)]">{matrix.stats.planned} planned</span>
+          <span className="t-caption-sm text-amber-400">{matrix.stats.briefGenerated} briefs</span>
+          {reviewCount > 0 && <span className="t-caption-sm text-blue-400">{reviewCount} awaiting review</span>}
+          <span className="t-caption-sm text-orange-400">{matrix.stats.drafted} drafts</span>
+          <span className="t-caption-sm text-emerald-400">{publishedCount} published</span>
         </div>
       </div>
 
       {/* Review alert */}
       {reviewCount > 0 && (
-        <div className="bg-gradient-to-r from-teal-600/15 to-teal-600/5 border border-teal-500/30 px-5 py-3 flex items-center gap-3" style={{ borderRadius: '6px 12px 6px 12px' }}>
-          <div className="w-8 h-8 rounded-lg bg-teal-500/20 flex items-center justify-center flex-shrink-0">
-            <Eye className="w-4 h-4 text-teal-400" />
+        <div className="bg-gradient-to-r from-teal-600/15 to-teal-600/5 border border-teal-500/30 px-5 py-3 flex items-center gap-3" style={{ borderRadius: 'var(--radius-signature)' }}>
+          <div className="w-8 h-8 rounded-[var(--radius-md)] bg-teal-500/20 flex items-center justify-center flex-shrink-0">
+            <Icon as={Eye} size="md" className="text-teal-400" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-teal-200">{reviewCount} page{reviewCount !== 1 ? 's' : ''} ready for your review</p>
-            <p className="text-[11px] text-teal-400/60 mt-0.5">Click on a cell below to preview and approve</p>
+            <p className="t-caption font-semibold text-teal-200">{reviewCount} page{reviewCount !== 1 ? 's' : ''} ready for your review</p>
+            <p className="t-caption-sm text-teal-400/60 mt-0.5">Click on a cell below to preview and approve</p>
           </div>
         </div>
       )}
@@ -201,11 +202,11 @@ export function MatrixProgressView({ matrix, onCellPreview, onFlagCell, onDownlo
             <table className="w-full border-collapse text-left">
               <thead>
                 <tr>
-                  <th className="px-3 py-2 text-[11px] font-semibold text-zinc-500 uppercase tracking-wider border-b border-zinc-800 bg-zinc-950 sticky left-0 z-10">
+                  <th className="px-3 py-2 t-caption font-semibold text-[var(--brand-text-muted)] uppercase tracking-wider border-b border-[var(--brand-border)] bg-[var(--surface-1)] sticky left-0 z-10">
                     {dim0.label ?? dim0.variableName}
                   </th>
                   {dim1.values.map(col => (
-                    <th key={col} className="px-3 py-2 text-[11px] font-semibold text-zinc-300 border-b border-zinc-800 bg-zinc-950 text-center min-w-[100px]">
+                    <th key={col} className="px-3 py-2 t-caption font-semibold text-[var(--brand-text-bright)] border-b border-[var(--brand-border)] bg-[var(--surface-1)] text-center min-w-[100px]">
                       {col}
                     </th>
                   ))}
@@ -214,25 +215,25 @@ export function MatrixProgressView({ matrix, onCellPreview, onFlagCell, onDownlo
               <tbody>
                 {dim0.values.map(row => (
                   <tr key={row}>
-                    <td className="px-3 py-2 text-xs font-medium text-zinc-300 border-b border-zinc-800 bg-zinc-950 sticky left-0 z-10 whitespace-nowrap">
+                    <td className="px-3 py-2 t-caption font-medium text-[var(--brand-text-bright)] border-b border-[var(--brand-border)] bg-[var(--surface-1)] sticky left-0 z-10 whitespace-nowrap">
                       {row}
                     </td>
                     {dim1.values.map(col => {
                       const cell = getCellForGrid(row, col);
-                      if (!cell) return <td key={col} className="p-2 border border-zinc-800"><div className="h-10" /></td>;
+                      if (!cell) return <td key={col} className="p-2 border border-[var(--brand-border)]"><div className="h-10" /></td>;
                       const cfg = STATUS_DISPLAY[cell.status];
-                      const Icon = cfg.icon;
-                      const pageName = Object.values(cell.variableValues).join(' \u2014 ');
+                      const CellIcon = cfg.icon;
+                      const pageName = Object.values(cell.variableValues).join(' — ');
                       return (
                         <td
                           key={cell.id}
-                          className={`p-0 border border-zinc-800 cursor-pointer hover:bg-zinc-800/40 transition-colors ${cell.clientFlag ? 'border-amber-500/30' : ''}`}
+                          className={`p-0 border border-[var(--brand-border)] cursor-pointer hover:bg-[var(--surface-3)]/40 transition-colors ${cell.clientFlag ? 'border-amber-500/30' : ''}`}
                           onClick={() => handleCellClick(cell)}
                         >
                           <div className="px-2.5 py-2 flex items-center gap-1.5">
-                            <Icon className={`w-3 h-3 flex-shrink-0 ${cfg.color}`} />
-                            <span className="text-[11px] text-zinc-300 truncate">{pageName}</span>
-                            {cell.clientFlag && <Flag className="w-2.5 h-2.5 text-amber-400 flex-shrink-0" />}
+                            <CellIcon className={`w-3 h-3 flex-shrink-0 ${cfg.color}`} />
+                            <span className="t-caption text-[var(--brand-text-bright)] truncate">{pageName}</span>
+                            {cell.clientFlag && <Icon as={Flag} size="xs" className="text-amber-400 flex-shrink-0" />}
                           </div>
                         </td>
                       );
@@ -245,21 +246,21 @@ export function MatrixProgressView({ matrix, onCellPreview, onFlagCell, onDownlo
         </SectionCard>
       ) : (
         <SectionCard noPadding>
-          <div className="divide-y divide-zinc-800">
+          <div className="divide-y divide-[var(--brand-border)]">
             {matrix.cells.map(cell => {
               const cfg = STATUS_DISPLAY[cell.status];
-              const Icon = cfg.icon;
-              const pageName = Object.values(cell.variableValues).join(' \u2014 ');
+              const RowIcon = cfg.icon;
+              const pageName = Object.values(cell.variableValues).join(' — ');
               return (
                 <div
                   key={cell.id}
-                  className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-zinc-800/40 transition-colors ${cell.clientFlag ? 'border-l-2 border-l-amber-500/50' : ''}`}
+                  className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[var(--surface-3)]/40 transition-colors ${cell.clientFlag ? 'border-l-2 border-l-amber-500/50' : ''}`}
                   onClick={() => handleCellClick(cell)}
                 >
-                  <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${cfg.color}`} />
-                  <span className="text-xs text-zinc-300 flex-1 truncate">{pageName}</span>
+                  <RowIcon className={`w-3.5 h-3.5 flex-shrink-0 ${cfg.color}`} />
+                  <span className="t-caption text-[var(--brand-text-bright)] flex-1 truncate">{pageName}</span>
                   <Badge label={cfg.label} color={cfg.badgeColor} />
-                  {cell.clientFlag && <Flag className="w-3 h-3 text-amber-400 flex-shrink-0" />}
+                  {cell.clientFlag && <Icon as={Flag} size="sm" className="text-amber-400 flex-shrink-0" />}
                 </div>
               );
             })}
@@ -270,15 +271,15 @@ export function MatrixProgressView({ matrix, onCellPreview, onFlagCell, onDownlo
       {/* Status legend */}
       <div className="flex items-center gap-4 flex-wrap">
         {Object.entries(STATUS_DISPLAY).map(([status, cfg]) => {
-          const Icon = cfg.icon;
+          const LegendIcon = cfg.icon;
           return (
-            <span key={status} className="flex items-center gap-1 text-[10px] text-zinc-500">
-              <Icon className={`w-2.5 h-2.5 ${cfg.color}`} /> {cfg.label}
+            <span key={status} className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
+              <LegendIcon className={`w-2.5 h-2.5 ${cfg.color}`} /> {cfg.label}
             </span>
           );
         })}
-        <span className="flex items-center gap-1 text-[10px] text-zinc-500">
-          <Flag className="w-2.5 h-2.5 text-amber-400" /> Flagged
+        <span className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
+          <Icon as={Flag} size="xs" className="text-amber-400" /> Flagged
         </span>
       </div>
 
