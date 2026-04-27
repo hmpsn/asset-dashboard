@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { getOptional } from '../api/client';
 import { Zap } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
-import { SectionCard } from './ui';
+import { SectionCard, Icon, cn } from './ui';
 import { chartAxisColor } from './ui/constants';
 
 interface DailyUsage {
@@ -90,14 +90,19 @@ export function AIUsageSection() {
   return (
     <SectionCard
       title="AI Usage"
-      titleIcon={<Zap className="w-4 h-4 text-amber-400" />}
+      titleIcon={<Icon as={Zap} size="md" className="text-amber-400" />}
       action={
         <div className="flex gap-1">
           {[7, 14, 30].map(d => (
             <button
               key={d}
               onClick={() => setDays(d)}
-              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${days === d ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'}`}
+              className={cn(
+                'px-2 py-0.5 rounded t-caption-sm font-medium transition-colors',
+                days === d
+                  ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)]'
+                  : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]',
+              )}
             >
               {d}d
             </button>
@@ -107,27 +112,27 @@ export function AIUsageSection() {
     >
       {/* Stat cards */}
       <div className={`grid grid-cols-2 ${hasSemrush ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-3 mb-4`}>
-        <div className="rounded-lg bg-zinc-800/50 border border-zinc-800 px-3 py-2.5">
-          <div className="text-[11px] text-zinc-500 mb-0.5">AI Cost</div>
-          <div className="text-sm font-semibold text-zinc-200">{fmtCost(totalCost)}</div>
+        <div className="rounded-[var(--radius-md)] bg-[var(--surface-3)]/50 border border-[var(--brand-border)] px-3 py-2.5">
+          <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">AI Cost</div>
+          <div className="text-sm font-semibold text-[var(--brand-text-bright)]">{fmtCost(totalCost)}</div>
         </div>
-        <div className="rounded-lg bg-zinc-800/50 border border-zinc-800 px-3 py-2.5">
-          <div className="text-[11px] text-zinc-500 mb-0.5">AI Calls</div>
-          <div className="text-sm font-semibold text-zinc-200">{totalCalls.toLocaleString()}</div>
+        <div className="rounded-[var(--radius-md)] bg-[var(--surface-3)]/50 border border-[var(--brand-border)] px-3 py-2.5">
+          <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">AI Calls</div>
+          <div className="text-sm font-semibold text-[var(--brand-text-bright)]">{totalCalls.toLocaleString()}</div>
         </div>
-        <div className="rounded-lg bg-zinc-800/50 border border-zinc-800 px-3 py-2.5">
-          <div className="text-[11px] text-zinc-500 mb-0.5">OpenAI</div>
+        <div className="rounded-[var(--radius-md)] bg-[var(--surface-3)]/50 border border-[var(--brand-border)] px-3 py-2.5">
+          <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">OpenAI</div>
           <div className="text-sm font-semibold text-emerald-400">{fmtCost(openaiCost)}</div>
         </div>
-        <div className="rounded-lg bg-zinc-800/50 border border-zinc-800 px-3 py-2.5">
-          <div className="text-[11px] text-zinc-500 mb-0.5">Anthropic</div>
+        <div className="rounded-[var(--radius-md)] bg-[var(--surface-3)]/50 border border-[var(--brand-border)] px-3 py-2.5">
+          <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Anthropic</div>
           <div className="text-sm font-semibold text-orange-400">{fmtCost(anthropicCost)}</div>
         </div>
         {hasSemrush && (
-          <div className="rounded-lg bg-zinc-800/50 border border-zinc-800 px-3 py-2.5">
-            <div className="text-[11px] text-zinc-500 mb-0.5">SEMRush Credits</div>
+          <div className="rounded-[var(--radius-md)] bg-[var(--surface-3)]/50 border border-[var(--brand-border)] px-3 py-2.5">
+            <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">SEMRush Credits</div>
             <div className="text-sm font-semibold text-blue-400">{data.semrush.totalCredits.toLocaleString()}</div>
-            <div className="text-[9px] text-zinc-600 mt-0.5">{data.semrush.totalCalls - data.semrush.cachedCalls} API / {data.semrush.cachedCalls} cached</div>
+            <div className="t-micro text-[var(--brand-text-dim)] mt-0.5">{data.semrush.totalCalls - data.semrush.cachedCalls} API / {data.semrush.cachedCalls} cached</div>
           </div>
         )}
       </div>
@@ -135,10 +140,10 @@ export function AIUsageSection() {
       {/* Stacked bar chart — daily cost by provider */}
       <div className="mb-1">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[11px] text-zinc-500">Daily Cost</span>
+          <span className="t-caption-sm text-[var(--brand-text-muted)]">Daily Cost</span>
           <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1 text-[11px] text-zinc-500"><span className="w-2 h-2 rounded-sm bg-emerald-500 inline-block" /> OpenAI</span>
-            <span className="flex items-center gap-1 text-[11px] text-zinc-500"><span className="w-2 h-2 rounded-sm bg-orange-500 inline-block" /> Anthropic</span>
+            <span className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]"><span className="w-2 h-2 rounded-sm bg-emerald-500 inline-block" /> OpenAI</span>
+            <span className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]"><span className="w-2 h-2 rounded-sm bg-orange-500 inline-block" /> Anthropic</span>
           </div>
         </div>
         <ResponsiveContainer width="100%" height={120}>
@@ -150,14 +155,14 @@ export function AIUsageSection() {
               const row = payload[0]?.payload as DailyUsage | undefined;
               if (!row) return null;
               return (
-                <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl shadow-black/40 min-w-[140px] overflow-hidden">
-                  <div className="px-3 py-1.5 border-b border-zinc-800 text-[11px] font-semibold text-zinc-200">{row.date}</div>
+                <div className="bg-[var(--surface-2)] border border-[var(--brand-border-hover)] rounded-[var(--radius-md)] shadow-xl shadow-black/40 min-w-[140px] overflow-hidden">
+                  <div className="px-3 py-1.5 border-b border-[var(--brand-border)] t-caption-sm font-semibold text-[var(--brand-text-bright)]">{row.date}</div>
                   <div className="px-3 py-1.5 space-y-1">
-                    <div className="flex justify-between text-[11px]"><span className="text-zinc-500">Total</span><span className="text-zinc-200 font-medium">{fmtCost(row.cost)}</span></div>
-                    <div className="flex justify-between text-[11px]"><span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-sm bg-emerald-500 inline-block" />OpenAI</span><span className="text-emerald-400">{fmtCost(row.openaiCost)}</span></div>
-                    <div className="flex justify-between text-[11px]"><span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-sm bg-orange-500 inline-block" />Anthropic</span><span className="text-orange-400">{fmtCost(row.anthropicCost)}</span></div>
-                    <div className="flex justify-between text-[11px]"><span className="text-zinc-500">Calls</span><span className="text-zinc-300">{row.calls}</span></div>
-                    <div className="flex justify-between text-[11px]"><span className="text-zinc-500">Tokens</span><span className="text-zinc-300">{fmtTokens(row.totalTokens)}</span></div>
+                    <div className="flex justify-between t-caption-sm"><span className="text-[var(--brand-text-muted)]">Total</span><span className="text-[var(--brand-text-bright)] font-medium">{fmtCost(row.cost)}</span></div>
+                    <div className="flex justify-between t-caption-sm"><span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-sm bg-emerald-500 inline-block" />OpenAI</span><span className="text-emerald-400">{fmtCost(row.openaiCost)}</span></div>
+                    <div className="flex justify-between t-caption-sm"><span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-sm bg-orange-500 inline-block" />Anthropic</span><span className="text-orange-400">{fmtCost(row.anthropicCost)}</span></div>
+                    <div className="flex justify-between t-caption-sm"><span className="text-[var(--brand-text-muted)]">Calls</span><span className="text-[var(--brand-text)]">{row.calls}</span></div>
+                    <div className="flex justify-between t-caption-sm"><span className="text-[var(--brand-text-muted)]">Tokens</span><span className="text-[var(--brand-text)]">{fmtTokens(row.totalTokens)}</span></div>
                   </div>
                 </div>
               );
@@ -171,21 +176,21 @@ export function AIUsageSection() {
       {/* Feature breakdown */}
       {data.byFeature.length > 0 && (
         <div className="mt-4">
-          <div className="text-[11px] text-zinc-500 mb-2">Cost by Feature</div>
+          <div className="t-caption-sm text-[var(--brand-text-muted)] mb-2">Cost by Feature</div>
           <div className="space-y-1">
             {data.byFeature.slice(0, 8).map((f, i) => {
               const pct = totalCost > 0 ? (f.cost / totalCost) * 100 : 0;
               return (
                 <div key={i} className="flex items-center gap-2">
-                  <span className="text-[11px] text-zinc-400 w-32 truncate">{FEATURE_LABELS[f.feature] || f.feature}</span>
-                  <div className="flex-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                  <span className="t-caption-sm text-[var(--brand-text)] w-32 truncate">{FEATURE_LABELS[f.feature] || f.feature}</span>
+                  <div className="flex-1 h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden">
                     <div
                       className={`h-full rounded-full ${f.provider === 'anthropic' ? 'bg-orange-500' : 'bg-emerald-500'}`}
                       style={{ width: `${Math.max(pct, 1)}%` }}
                     />
                   </div>
-                  <span className="text-[11px] text-zinc-500 w-12 text-right tabular-nums">{fmtCost(f.cost)}</span>
-                  <span className="text-[9px] text-zinc-600 w-10 text-right tabular-nums">{f.calls} calls</span>
+                  <span className="t-caption-sm text-[var(--brand-text-muted)] w-12 text-right tabular-nums">{fmtCost(f.cost)}</span>
+                  <span className="t-micro text-[var(--brand-text-dim)] w-10 text-right tabular-nums">{f.calls} calls</span>
                 </div>
               );
             })}

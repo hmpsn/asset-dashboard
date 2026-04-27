@@ -1,6 +1,5 @@
 import { Loader2, CheckCircle2, AlertCircle, Sparkles, Upload, Copy } from 'lucide-react';
-import { EmptyState } from './ui';
-import { cn } from '../lib/utils';
+import { EmptyState, Icon, cn } from './ui';
 
 export interface QueueItem {
   id: string;
@@ -43,26 +42,30 @@ export function ProcessingQueue({ items }: Props) {
     <div className="space-y-1">
       {sorted.map(item => {
         const config = statusConfig[item.status];
-        const Icon = config.icon;
+        const StatusIcon = config.icon;
 
         return (
           <div
             key={item.id}
             className={cn(
-              'flex items-center gap-3 px-4 py-3 rounded-xl transition-colors',
-              item.status === 'done' ? 'bg-zinc-800/30' : 'bg-zinc-800/60'
+              'flex items-center gap-3 px-4 py-3 rounded-[var(--radius-xl)] transition-colors',
+              item.status === 'done' ? 'bg-[var(--surface-3)]/30' : 'bg-[var(--surface-3)]/60',
             )}
           >
-            <Icon className={cn('w-4 h-4 shrink-0', config.color, config.spin && 'animate-spin')} />
+            <Icon
+              as={StatusIcon}
+              size="md"
+              className={cn('shrink-0', config.color, config.spin && 'animate-spin')}
+            />
 
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium truncate">{item.fileName}</span>
                 <span className={cn(
-                  'text-[11px] uppercase tracking-wider px-1.5 py-0.5 rounded font-medium',
+                  't-caption-sm uppercase tracking-wider px-1.5 py-0.5 rounded font-medium',
                   item.type === 'meta'
                     ? 'bg-amber-500/10 text-amber-400'
-                    : 'bg-blue-500/10 text-blue-400'
+                    : 'bg-blue-500/10 text-blue-400',
                 )}>
                   {item.type}
                 </span>
@@ -70,7 +73,7 @@ export function ProcessingQueue({ items }: Props) {
               <div className="flex items-center gap-2 mt-0.5">
                 <span className={cn('text-xs', config.color)}>{config.label}</span>
                 {item.altText && item.status === 'done' && (
-                  <span className="text-xs text-zinc-500 truncate max-w-[300px]">
+                  <span className="text-xs text-[var(--brand-text-muted)] truncate max-w-[300px]">
                     — {item.altText}
                   </span>
                 )}
@@ -85,10 +88,10 @@ export function ProcessingQueue({ items }: Props) {
             {item.status === 'done' && item.fileName && (
               <button
                 onClick={() => copyToClipboard(item.fileName)}
-                className="p-1.5 hover:bg-zinc-700 rounded-lg transition-colors shrink-0"
+                className="p-1.5 hover:bg-[var(--brand-border-hover)] rounded-[var(--radius-md)] transition-colors shrink-0"
                 title="Copy filename"
               >
-                <Copy className="w-3.5 h-3.5 text-zinc-500" />
+                <Icon as={Copy} size="sm" className="text-[var(--brand-text-muted)]" />
               </button>
             )}
           </div>
