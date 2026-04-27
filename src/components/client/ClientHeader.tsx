@@ -186,7 +186,9 @@ export function ClientHeader({
             const TabIcon = t.icon as import('lucide-react').LucideIcon;
             const active = tab === t.id;
             const tabHasData = hasData(t.id);
-            const pendingReviews = contentRequests.filter(r => r.status === 'client_review').length;
+            const pendingReviews = contentRequests.filter(
+              r => r.status === 'client_review' || r.status === 'post_review',
+            ).length;
             return (
               <button key={t.id} role="tab" aria-selected={active} tabIndex={active ? 0 : -1}
                 onClick={() => t.locked ? setShowUpgradeModal(true) : setTab(t.id)}
