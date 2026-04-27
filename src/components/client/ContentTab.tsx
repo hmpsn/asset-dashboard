@@ -13,6 +13,7 @@ import type { PricingModalState } from './StrategyTab';
 import { STUDIO_NAME } from '../../constants';
 import { useContentRequests } from '../../hooks/useContentRequests';
 import { contentPerformance } from '../../api';
+import { PostReviewCard } from './PostReviewCard';
 
 interface ContentPerfItem {
   requestId: string;
@@ -111,12 +112,29 @@ export function ContentTab({
       );
       return null;
     })()}
+    {(() => {
+      const needsPostReview = contentRequests.filter(r => r.status === 'post_review').length;
+      if (needsPostReview === 0) return null;
+      return (
+        <div className="bg-gradient-to-r from-teal-600/15 to-teal-600/5 border border-teal-500/30 px-5 py-3 flex items-center gap-3" style={{ borderRadius: '6px 12px 6px 12px' }}>
+          <div className="w-8 h-8 rounded-lg bg-teal-500/20 flex items-center justify-center flex-shrink-0">
+            <Icon as={Eye} size="md" className="text-teal-400" />
+          </div>
+          <div className="flex-1">
+            <div className="text-xs font-semibold text-teal-200">
+              {needsPostReview} post{needsPostReview > 1 ? 's' : ''} ready for your review
+            </div>
+            <div className="t-caption-sm text-teal-400/60 mt-0.5">{STUDIO_NAME} has updates waiting for you below</div>
+          </div>
+        </div>
+      );
+    })()}
 
     {/* Status summary cards */}
     {contentRequests.length > 0 && (() => {
       const active = contentRequests.filter(r => r.status !== 'declined');
       const awaitingReview = active.filter(r => r.status === 'client_review').length;
-      const inProgress = active.filter(r => ['pending_payment', 'requested', 'brief_generated', 'changes_requested', 'approved', 'in_progress'].includes(r.status)).length;
+      const inProgress = active.filter(r => ['pending_payment', 'requested', 'brief_generated', 'changes_requested', 'approved', 'in_progress', 'post_review'].includes(r.status)).length;
       const delivered = active.filter(r => r.status === 'delivered').length;
       const published = active.filter(r => r.status === 'published').length;
       const stats = [
@@ -196,7 +214,7 @@ export function ContentTab({
     {/* Pipeline items — review-needed first */}
     <div className="space-y-3">
       {contentRequests.filter(r => r.status !== 'declined').sort((a, b) => {
-        const priority = (s: string) => s === 'client_review' ? 0 : s === 'changes_requested' ? 1 : 2;
+        const priority = (s: string) => s === 'client_review' || s === 'post_review' ? 0 : s === 'changes_requested' ? 1 : 2;
         const diff = priority(a.status) - priority(b.status);
         return diff !== 0 ? diff : b.updatedAt.localeCompare(a.updatedAt);
       }).map(req => {
@@ -204,10 +222,10 @@ export function ContentTab({
         const isPending = req.status === 'pending_payment';
         const steps = isBriefOnly
           ? ['requested', 'brief_generated', 'client_review', 'approved', 'delivered', 'published'] as const
-          : ['requested', 'brief_generated', 'client_review', 'approved', 'in_progress', 'delivered', 'published'] as const;
+          : ['requested', 'brief_generated', 'client_review', 'approved', 'in_progress', 'post_review', 'delivered', 'published'] as const;
         const stepLabels = isBriefOnly
           ? [isPending ? 'Awaiting Payment' : 'Requested', 'Brief Ready', 'Your Review', 'Approved', 'Brief Delivered', 'Published']
-          : [isPending ? 'Awaiting Payment' : 'Requested', 'Brief Ready', 'Your Review', 'Approved', 'In Production', 'Delivered', 'Published'];
+          : [isPending ? 'Awaiting Payment' : 'Requested', 'Brief Ready', 'Your Review', 'Approved', 'In Production', 'Post Review', 'Delivered', 'Published'];
         // Map pending_payment and changes_requested back for timeline display
         const displayStatus = req.status === 'pending_payment' ? 'requested' : req.status === 'changes_requested' ? 'client_review' : req.status;
         const rawIdx = (steps as readonly string[]).indexOf(displayStatus);
@@ -249,6 +267,7 @@ export function ContentTab({
                   {req.status === 'pending_payment' && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse">Awaiting Payment</span>}
                   {req.status === 'changes_requested' && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20">Changes Requested</span>}
                   {req.status === 'client_review' && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 animate-pulse">Needs Your Review</span>}
+                  {req.status === 'post_review' && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20 animate-pulse">Needs Your Review</span>}
                   {isExpanded ? <Icon as={ChevronUp} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" />}
                 </div>
               </div>
@@ -516,6 +535,18 @@ export function ContentTab({
                     </button>
                   </div>
                   )
+                )}
+
+                {/* Post review card for full_post items awaiting client review of written content */}
+                {req.status === 'post_review' && (
+                  <PostReviewCard
+                    request={req}
+                    workspaceId={workspaceId}
+                    onUpdate={updated => {
+                      setContentRequests(prev => prev.map(r => r.id === updated.id ? { ...r, ...updated } : r));
+                    }}
+                    setToast={setToast}
+                  />
                 )}
 
                 {/* Delivery link */}
