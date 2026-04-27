@@ -942,6 +942,7 @@ export function useClientPostPreview(
 
 ```typescript
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Check, X, ChevronDown, ChevronUp, Edit3 } from 'lucide-react';
 import type { ClientContentRequest } from './types';
 import type { GeneratedPost } from '../../../shared/types/content';
@@ -957,6 +958,7 @@ interface PostReviewCardProps {
 
 export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: PostReviewCardProps) {
   // ALL hooks must be declared before any early returns (Rules of Hooks).
+  const queryClient = useQueryClient();
   // Self-fetches post data via React Query (no hand-rolled state/effect needed)
   const { data: fetchedPost, isLoading: postLoading } = useClientPostPreview(workspaceId, request.postId, true);
   const [post, setPost] = useState<GeneratedPost | undefined>(undefined);
@@ -997,6 +999,9 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
       }];
       const updated = await publicPostReview.clientEdit(workspaceId, post.id, { sections });
       setPost(updated);
+      // Invalidate React Query cache so remounts within staleTime don't serve pre-edit data.
+      // Without this, the `if (fetchedPost && !post)` sync guard would restore stale content.
+      queryClient.invalidateQueries({ queryKey: ['client', 'post-preview', workspaceId, request.postId] });
       setEditingSection(null);
       setToast({ message: 'Section saved', type: 'success' });
     } catch {
@@ -1008,6 +1013,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
     try {
       const updated = await publicPostReview.clientEdit(workspaceId, post.id, { introduction: content });
       setPost(updated);
+      queryClient.invalidateQueries({ queryKey: ['client', 'post-preview', workspaceId, request.postId] });
       setEditingIntro(false);
       setToast({ message: 'Introduction saved', type: 'success' });
     } catch {
@@ -1019,6 +1025,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
     try {
       const updated = await publicPostReview.clientEdit(workspaceId, post.id, { conclusion: content });
       setPost(updated);
+      queryClient.invalidateQueries({ queryKey: ['client', 'post-preview', workspaceId, request.postId] });
       setEditingConclusion(false);
       setToast({ message: 'Conclusion saved', type: 'success' });
     } catch {
@@ -1072,6 +1079,10 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
           <span className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Introduction</span>
           {!editingIntro && (
             <button
+              // v1 simplification: HTML tags are stripped for the textarea draft. Saving plain
+              // text back to an HTML field loses formatting (paragraphs, bold, links). A
+              // Markdown or WYSIWYG editor would be needed to preserve formatting in a future
+              // iteration. The strip is intentional — it avoids exposing raw HTML to clients.
               onClick={() => { setIntroDraft(post.introduction.replace(/<[^>]+>/g, '')); setEditingIntro(true); }}
               className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-teal-400 transition-colors"
             >
