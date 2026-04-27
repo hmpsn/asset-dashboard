@@ -43,10 +43,10 @@ export interface ChatMessage { role: 'user' | 'assistant'; content: string; }
 
 export interface ClientContentRequest {
   id: string; topic: string; targetKeyword: string; intent: string; priority: string;
-  status: 'pending_payment' | 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'delivered' | 'published' | 'declined';
-  source?: 'strategy' | 'client'; briefId?: string;
+  status: 'pending_payment' | 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'post_review' | 'delivered' | 'published' | 'declined';
+  source?: 'strategy' | 'client'; briefId?: string; postId?: string;
   serviceType?: 'brief_only' | 'full_post'; pageType?: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource'; upgradedAt?: string;
-  deliveryUrl?: string; deliveryNotes?: string;
+  deliveryUrl?: string; deliveryNotes?: string; clientFeedback?: string;
   comments?: { id: string; author: 'client' | 'team'; content: string; createdAt: string }[];
   requestedAt: string; updatedAt: string;
 }

@@ -39,7 +39,7 @@ import { loadDecayAnalysis } from '../content-decay.js';
 const log = createLogger('content-requests');
 
 const updateContentRequestSchema = z.object({
-  status: z.enum(['pending_payment', 'requested', 'brief_generated', 'client_review', 'approved', 'changes_requested', 'in_progress', 'delivered', 'published', 'declined']).optional(),
+  status: z.enum(['pending_payment', 'requested', 'brief_generated', 'client_review', 'approved', 'changes_requested', 'in_progress', 'post_review', 'delivered', 'published', 'declined']).optional(),
   internalNote: z.string().max(5000).optional(),
   deliveryUrl: z.string().url().optional().or(z.literal('')),
   deliveryNotes: z.string().max(5000).optional(),
