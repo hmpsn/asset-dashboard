@@ -1,4 +1,5 @@
-import { Loader2, X, FolderOpen } from 'lucide-react';
+import { X, FolderOpen } from 'lucide-react';
+import { Button, Icon } from '../ui';
 
 interface OrganizePlan {
   foldersToCreate: string[];
@@ -25,29 +26,29 @@ export function OrganizePreview({
   organizePreview, organizeExecuting, onExecute, onCancel,
 }: OrganizePreviewProps) {
   return (
-    <div className="p-4 bg-teal-950/40 border border-teal-800/50 rounded-lg space-y-3">
+    <div className="p-4 bg-teal-950/40 border border-teal-800/50 rounded-[var(--radius-md)] space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-teal-200 flex items-center gap-2">
-          <FolderOpen className="w-4 h-4" /> Organization Plan
+          <Icon as={FolderOpen} size="md" /> Organization Plan
         </h3>
-        <button onClick={onCancel} className="text-zinc-500 hover:text-zinc-300">
-          <X className="w-4 h-4" />
+        <button onClick={onCancel} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]">
+          <Icon as={X} size="md" />
         </button>
       </div>
 
       {/* Summary */}
       <div className="grid grid-cols-3 gap-3 text-center">
-        <div className="bg-zinc-900/60 rounded-lg p-2">
+        <div className="bg-[var(--surface-2)]/60 rounded-[var(--radius-md)] p-2">
           <div className="text-lg font-bold text-teal-300">{organizePreview.summary.assetsToMove}</div>
-          <div className="text-[11px] text-zinc-500">Assets to move</div>
+          <div className="t-caption-sm text-[var(--brand-text-muted)]">Assets to move</div>
         </div>
-        <div className="bg-zinc-900/60 rounded-lg p-2">
-          <div className="text-lg font-bold text-cyan-300">{organizePreview.summary.foldersToCreate}</div>
-          <div className="text-[11px] text-zinc-500">New folders</div>
+        <div className="bg-[var(--surface-2)]/60 rounded-[var(--radius-md)] p-2">
+          <div className="text-lg font-bold text-teal-300">{organizePreview.summary.foldersToCreate}</div>
+          <div className="t-caption-sm text-[var(--brand-text-muted)]">New folders</div>
         </div>
-        <div className="bg-zinc-900/60 rounded-lg p-2">
-          <div className="text-lg font-bold text-zinc-400">{organizePreview.summary.alreadyOrganized}</div>
-          <div className="text-[11px] text-zinc-500">Already organized</div>
+        <div className="bg-[var(--surface-2)]/60 rounded-[var(--radius-md)] p-2">
+          <div className="text-lg font-bold text-[var(--brand-text)]">{organizePreview.summary.alreadyOrganized}</div>
+          <div className="t-caption-sm text-[var(--brand-text-muted)]">Already organized</div>
         </div>
       </div>
 
@@ -62,16 +63,16 @@ export function OrganizePreview({
           }
           return [...byFolder.entries()].sort((a, b) => b[1].length - a[1].length).map(([folder, assetNames]) => (
             <details key={folder} className="group">
-              <summary className="cursor-pointer flex items-center gap-2 px-2 py-1.5 bg-zinc-900/40 rounded hover:bg-zinc-900/60 transition-colors">
-                <FolderOpen className="w-3 h-3 text-teal-400 shrink-0" />
-                <span className="text-zinc-200 font-medium truncate">{folder}</span>
-                <span className="ml-auto text-zinc-500 shrink-0">{assetNames.length} assets</span>
+              <summary className="cursor-pointer flex items-center gap-2 px-2 py-1.5 bg-[var(--surface-2)]/40 rounded hover:bg-[var(--surface-2)]/60 transition-colors">
+                <Icon as={FolderOpen} size="sm" className="text-teal-400 shrink-0" />
+                <span className="text-[var(--brand-text-bright)] font-medium truncate">{folder}</span>
+                <span className="ml-auto text-[var(--brand-text-muted)] shrink-0">{assetNames.length} assets</span>
               </summary>
-              <div className="ml-7 mt-1 space-y-0.5 text-zinc-500">
+              <div className="ml-7 mt-1 space-y-0.5 text-[var(--brand-text-muted)]">
                 {assetNames.slice(0, 10).map((name, i) => (
                   <div key={i} className="truncate">{name}</div>
                 ))}
-                {assetNames.length > 10 && <div className="text-zinc-500">...and {assetNames.length - 10} more</div>}
+                {assetNames.length > 10 && <div className="text-[var(--brand-text-muted)]">...and {assetNames.length - 10} more</div>}
               </div>
             </details>
           ));
@@ -80,21 +81,24 @@ export function OrganizePreview({
 
       {/* Actions */}
       <div className="flex items-center gap-2 pt-1">
-        <button
-          onClick={onExecute}
+        <Button
+          variant="primary"
+          size="sm"
+          icon={FolderOpen}
+          loading={organizeExecuting}
           disabled={organizeExecuting}
-          className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-lg text-xs font-semibold transition-colors"
+          onClick={onExecute}
         >
-          {organizeExecuting ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Organizing...</> : <><FolderOpen className="w-3.5 h-3.5" /> Apply Organization</>}
-        </button>
+          {organizeExecuting ? 'Organizing...' : 'Apply Organization'}
+        </Button>
         <button
           onClick={onCancel}
-          className="px-4 py-2 text-zinc-400 hover:text-zinc-200 text-xs transition-colors"
+          className="px-4 py-2 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] text-xs transition-colors"
         >
           Cancel
         </button>
         {(organizePreview.summary.unused > 0 || organizePreview.summary.ogImages > 0) && (
-          <span className="ml-auto text-[11px] text-zinc-500">
+          <span className="ml-auto t-caption-sm text-[var(--brand-text-muted)]">
             {organizePreview.summary.ogImages > 0 && <>{organizePreview.summary.ogImages} OG images &rarr; _Social / OG Images</>}
             {organizePreview.summary.ogImages > 0 && organizePreview.summary.unused > 0 && ' · '}
             {organizePreview.summary.unused > 0 && <>{organizePreview.summary.unused} unused &rarr; _Unused Assets</>}

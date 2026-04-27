@@ -8,7 +8,7 @@ import {
   Image, AlertTriangle, Trash2, Sparkles, X,
   Loader2, Minimize2, FolderOpen, Search, Database,
 } from 'lucide-react';
-import { EmptyState } from './ui';
+import { EmptyState, Icon } from './ui';
 import { ErrorBoundary } from './ErrorBoundary';
 import { queryKeys } from '../lib/queryKeys';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
@@ -479,8 +479,8 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20 text-zinc-500">
-        <Loader2 className="w-5 h-5 animate-spin text-teal-400 mr-2" />
+      <div className="flex items-center justify-center py-20 text-[var(--brand-text-muted)]">
+        <Icon as={Loader2} size="lg" className="animate-spin text-teal-400 mr-2" />
         Loading assets...
       </div>
     );
@@ -491,20 +491,20 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
     <div className="space-y-8">
       {/* Stats bar */}
       <div className="flex items-center gap-4 text-sm">
-        <span className="text-zinc-400">{assets.length} assets</span>
+        <span className="text-[var(--brand-text)]">{assets.length} assets</span>
         {missingAltCount > 0 && (
           <span className="text-amber-400/80 flex items-center gap-1">
-            <AlertTriangle className="w-3.5 h-3.5" /> {missingAltCount} missing alt
+            <Icon as={AlertTriangle} size="sm" /> {missingAltCount} missing alt
           </span>
         )}
         {oversizedCount > 0 && (
           <span className="text-orange-400 flex items-center gap-1">
-            <Image className="w-3.5 h-3.5" /> {oversizedCount} oversized
+            <Icon as={Image} size="sm" /> {oversizedCount} oversized
           </span>
         )}
         {unusedCount > 0 && (
           <span className="text-red-400/80 flex items-center gap-1">
-            <Trash2 className="w-3.5 h-3.5" /> {unusedCount} unused
+            <Icon as={Trash2} size="sm" /> {unusedCount} unused
           </span>
         )}
         {cmsImageCount > 0 && (
@@ -512,33 +512,33 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
             onClick={() => setFilter('cms-images')}
             className={`flex items-center gap-1 transition-colors ${filter === 'cms-images' || filter === 'cms-missing-alt' ? 'text-blue-300' : 'text-blue-500 hover:text-blue-300'}`}
           >
-            <Database className="w-3.5 h-3.5" />
+            <Icon as={Database} size="sm" />
             {cmsImageCount} CMS{cmsMissingAltCount > 0 ? `, ${cmsMissingAltCount} missing alt` : ''}
           </button>
         )}
         <button
           onClick={handleOrganizePreview}
           disabled={organizeLoading}
-          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-teal-600/20 hover:bg-teal-600/30 border border-teal-500/30 text-teal-300 disabled:opacity-50 rounded-lg text-xs font-medium transition-colors"
+          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-teal-600/20 hover:bg-teal-600/30 border border-teal-500/30 text-teal-300 disabled:opacity-50 rounded-[var(--radius-md)] text-xs font-medium transition-colors"
         >
-          {organizeLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <FolderOpen className="w-3 h-3" />}
+          <Icon as={organizeLoading ? Loader2 : FolderOpen} size="sm" className={organizeLoading ? 'animate-spin' : ''} />
           Organize into Folders
         </button>
       </div>
 
       {/* Alt text error banner */}
       {altError && (
-        <div className="flex items-center gap-2 px-4 py-2.5 bg-red-950/50 border border-red-800/50 rounded-lg text-sm text-red-300">
-          <AlertTriangle className="w-3.5 h-3.5 text-red-400/80 shrink-0" />
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-red-950/50 border border-red-800/50 rounded-[var(--radius-md)] text-sm text-red-300">
+          <Icon as={AlertTriangle} size="sm" className="text-red-400/80 shrink-0" />
           <span className="flex-1">{altError}</span>
-          <button onClick={() => setAltError(null)} className="text-red-400/80 hover:text-red-300"><X className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setAltError(null)} className="text-red-400/80 hover:text-red-300"><Icon as={X} size="sm" /></button>
         </div>
       )}
 
       {/* Progress banner */}
       {bulkProgress && (
-        <div className="flex items-center gap-3 px-4 py-3 bg-teal-950/50 border border-teal-800/50 rounded-lg">
-          <Loader2 className="w-4 h-4 animate-spin text-teal-400" />
+        <div className="flex items-center gap-3 px-4 py-3 bg-teal-950/50 border border-teal-800/50 rounded-[var(--radius-md)]">
+          <Icon as={Loader2} size="md" className="animate-spin text-teal-400" />
           <div className="flex-1">
             <div className="text-sm text-teal-200">
               Generating alt text... {bulkProgress.done}/{bulkProgress.total}
@@ -555,24 +555,24 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
 
       {/* Success toast */}
       {lastGenerated && !bulkProgress && (
-        <div className="flex items-center gap-2 px-4 py-2.5 bg-emerald-950/50 border border-emerald-800/50 rounded-lg text-sm text-emerald-300 animate-in fade-in">
-          <Sparkles className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-emerald-950/50 border border-emerald-800/50 rounded-[var(--radius-md)] text-sm text-emerald-300 animate-in fade-in">
+          <Icon as={Sparkles} size="sm" className="text-emerald-400 shrink-0" />
           <span className="truncate">{lastGenerated}</span>
         </div>
       )}
 
       {/* Compress result toast */}
       {compressResult && (
-        <div className="flex items-center gap-2 px-4 py-2.5 bg-blue-950/50 border border-blue-800/50 rounded-lg text-sm text-blue-300 animate-in fade-in">
-          <Minimize2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-blue-950/50 border border-blue-800/50 rounded-[var(--radius-md)] text-sm text-blue-300 animate-in fade-in">
+          <Icon as={Minimize2} size="sm" className="text-blue-400 shrink-0" />
           <span>{compressResult}</span>
         </div>
       )}
 
       {/* Bulk rename progress */}
       {bulkRenameProgress && (
-        <div className="flex items-center gap-3 px-4 py-3 bg-cyan-950/50 border border-cyan-800/50 rounded-lg">
-          <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
+        <div className="flex items-center gap-3 px-4 py-3 bg-cyan-950/50 border border-cyan-800/50 rounded-[var(--radius-md)]">
+          <Icon as={Loader2} size="md" className="animate-spin text-cyan-400" />
           <div className="flex-1">
             <div className="text-sm text-cyan-200">
               Renaming assets... {bulkRenameProgress.done}/{bulkRenameProgress.total}
@@ -589,8 +589,8 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
 
       {/* Bulk compress progress */}
       {bulkCompressProgress && (
-        <div className="flex items-center gap-3 px-4 py-3 bg-orange-950/50 border border-orange-800/50 rounded-lg">
-          <Loader2 className="w-4 h-4 animate-spin text-orange-400" />
+        <div className="flex items-center gap-3 px-4 py-3 bg-orange-950/50 border border-orange-800/50 rounded-[var(--radius-md)]">
+          <Icon as={Loader2} size="md" className="animate-spin text-orange-400" />
           <div className="flex-1">
             <div className="text-sm text-orange-200">
               Compressing assets... {bulkCompressProgress.done}/{bulkCompressProgress.total}
@@ -619,11 +619,11 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
 
       {/* Organize result */}
       {organizeResult && (
-        <div className="flex items-center gap-2 px-4 py-2.5 bg-teal-950/50 border border-teal-800/50 rounded-lg text-sm text-teal-300">
-          <FolderOpen className="w-4 h-4 text-teal-400 shrink-0" />
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-teal-950/50 border border-teal-800/50 rounded-[var(--radius-md)] text-sm text-teal-300">
+          <Icon as={FolderOpen} size="md" className="text-teal-400 shrink-0" />
           <span>Organized: {organizeResult.moved} moved{organizeResult.failed > 0 ? `, ${organizeResult.failed} failed` : ''} of {organizeResult.total} assets</span>
           <button onClick={() => { setOrganizeResult(null); setOrganizePreview(null); }} className="ml-auto text-teal-400 hover:text-teal-300">
-            <X className="w-3.5 h-3.5" />
+            <Icon as={X} size="sm" />
           </button>
         </div>
       )}
@@ -659,7 +659,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
       {/* Asset grid */}
       <div className="space-y-1">
         {/* Header */}
-        <div className="grid grid-cols-[32px_48px_1fr_200px_80px_100px] gap-3 px-3 py-2 text-xs text-zinc-500 font-medium">
+        <div className="grid grid-cols-[32px_48px_1fr_200px_80px_100px] gap-3 px-3 py-2 text-xs text-[var(--brand-text-muted)] font-medium">
           <div>
             <input
               type="checkbox"

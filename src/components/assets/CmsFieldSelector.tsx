@@ -8,6 +8,7 @@
  */
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, Database } from 'lucide-react';
+import { Icon, cn } from '../ui';
 import type { CmsCollectionImageInfo } from '../../../shared/types/cms-images';
 
 /** Patterns that indicate a meta/OG/preview image field (not a content field) */
@@ -87,16 +88,16 @@ export function CmsFieldSelector({ collections, selectedFields, onChange }: Prop
   ).length;
 
   return (
-    <div className="rounded-lg border border-blue-800/40 bg-blue-950/20 overflow-hidden">
+    <div className="rounded-[var(--radius-md)] border border-blue-800/40 bg-blue-950/20 overflow-hidden">
       {/* Header toggle */}
       <button
         onClick={() => setOpen(v => !v)}
         className="w-full flex items-center gap-2 px-3 py-2 text-sm text-blue-300 hover:text-blue-200 hover:bg-blue-950/30 transition-colors"
       >
-        <Database className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+        <Icon as={Database} size="sm" className="text-blue-400 shrink-0" />
         <span className="flex-1 text-left font-medium">CMS Field Selection</span>
         <span className="text-xs text-blue-500">{selectedCount}/{totalFields} fields</span>
-        {open ? <ChevronDown className="w-3.5 h-3.5 text-blue-500" /> : <ChevronRight className="w-3.5 h-3.5 text-blue-500" />}
+        <Icon as={open ? ChevronDown : ChevronRight} size="sm" className="text-blue-500" />
       </button>
 
       {open && (
@@ -124,13 +125,11 @@ export function CmsFieldSelector({ collections, selectedFields, onChange }: Prop
                   />
                   <button
                     onClick={() => toggleExpanded(coll.collectionId)}
-                    className="flex items-center gap-1 text-xs font-semibold text-zinc-300 hover:text-zinc-100 transition-colors"
+                    className="flex items-center gap-1 text-xs font-semibold text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
                   >
-                    {isExpanded
-                      ? <ChevronDown className="w-3 h-3 text-zinc-500" />
-                      : <ChevronRight className="w-3 h-3 text-zinc-500" />}
+                    <Icon as={isExpanded ? ChevronDown : ChevronRight} size="sm" className="text-[var(--brand-text-muted)]" />
                     {coll.collectionName}
-                    <span className="text-zinc-600 font-normal">({coll.imageFields.length})</span>
+                    <span className="text-[var(--brand-text-dim)] font-normal">({coll.imageFields.length})</span>
                   </button>
                 </div>
 
@@ -148,20 +147,24 @@ export function CmsFieldSelector({ collections, selectedFields, onChange }: Prop
                             onChange={() => toggleField(key)}
                             className="rounded accent-teal-500 shrink-0"
                           />
-                          <span className={`text-xs transition-colors ${selectedFields.has(key) ? 'text-zinc-300' : 'text-zinc-600'} group-hover:text-zinc-200`}>
+                          <span className={cn(
+                            'text-xs transition-colors group-hover:text-[var(--brand-text-bright)]',
+                            selectedFields.has(key) ? 'text-[var(--brand-text)]' : 'text-[var(--brand-text-dim)]',
+                          )}>
                             {field.displayName}
                           </span>
-                          <span className={`text-[10px] px-1 py-0.5 rounded leading-none font-medium ${
+                          <span className={cn(
+                            't-caption-sm px-1 py-0.5 rounded leading-none font-medium',
                             field.type === 'RichText'
                               ? 'bg-emerald-900/40 text-emerald-500'
                               : field.type === 'MultiImage'
                               ? 'bg-blue-900/40 text-blue-400'
-                              : 'bg-zinc-800 text-zinc-500'
-                          }`}>
+                              : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)]',
+                          )}>
                             {field.type}
                           </span>
                           {isMeta && (
-                            <span className="text-[10px] px-1 py-0.5 rounded leading-none bg-amber-900/30 text-amber-600">meta</span>
+                            <span className="t-caption-sm px-1 py-0.5 rounded leading-none bg-amber-900/30 text-amber-600">meta</span>
                           )}
                         </label>
                       );

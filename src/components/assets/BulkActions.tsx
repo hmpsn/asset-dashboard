@@ -3,6 +3,7 @@
  * Extracted from AssetBrowser.tsx bulk actions section.
  */
 import { Loader2, Sparkles, Trash2, Minimize2, Wand2 } from 'lucide-react';
+import { Icon } from '../ui';
 
 export interface BulkActionsProps {
   selectedCount: number;
@@ -22,17 +23,17 @@ export function BulkActions({
   onBulkGenerateAlt, onBulkRename, onBulkCompress, onBulkDelete, onClearSelection,
 }: BulkActionsProps) {
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-lg text-sm sticky top-0 z-20 shadow-lg shadow-black/30">
-      <span className="text-zinc-300 font-medium">{selectedCount} selected</span>
+    <div className="flex items-center gap-3 px-4 py-2.5 bg-[var(--surface-2)] border border-[var(--brand-border-hover)] rounded-[var(--radius-md)] text-sm sticky top-0 z-20 shadow-lg shadow-black/30">
+      <span className="text-[var(--brand-text-bright)] font-medium">{selectedCount} selected</span>
       <button
         onClick={onBulkGenerateAlt}
         disabled={!!bulkProgress}
         className="flex items-center gap-1.5 px-3 py-1 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs font-medium transition-colors"
       >
         {bulkProgress ? (
-          <><Loader2 className="w-3 h-3 animate-spin" /> {bulkProgress.done}/{bulkProgress.total}</>
+          <><Icon as={Loader2} size="sm" className="animate-spin" /> {bulkProgress.done}/{bulkProgress.total}</>
         ) : (
-          <><Sparkles className="w-3 h-3" /> Generate Alt Text</>
+          <><Icon as={Sparkles} size="sm" /> Generate Alt Text</>
         )}
       </button>
       <button
@@ -41,9 +42,9 @@ export function BulkActions({
         className="flex items-center gap-1.5 px-3 py-1 bg-cyan-700 hover:bg-cyan-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs font-medium transition-colors"
       >
         {bulkRenameProgress ? (
-          <><Loader2 className="w-3 h-3 animate-spin" /> {bulkRenameProgress.done}/{bulkRenameProgress.total}</>
+          <><Icon as={Loader2} size="sm" className="animate-spin" /> {bulkRenameProgress.done}/{bulkRenameProgress.total}</>
         ) : (
-          <><Wand2 className="w-3 h-3" /> Smart Rename</>
+          <><Icon as={Wand2} size="sm" /> Smart Rename</>
         )}
       </button>
       <button
@@ -52,9 +53,9 @@ export function BulkActions({
         className="flex items-center gap-1.5 px-3 py-1 bg-orange-700 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs font-medium transition-colors"
       >
         {bulkCompressProgress ? (
-          <><Loader2 className="w-3 h-3 animate-spin" /> {bulkCompressProgress.done}/{bulkCompressProgress.total}</>
+          <><Icon as={Loader2} size="sm" className="animate-spin" /> {bulkCompressProgress.done}/{bulkCompressProgress.total}</>
         ) : (
-          <><Minimize2 className="w-3 h-3" /> Compress</>
+          <><Icon as={Minimize2} size="sm" /> Compress</>
         )}
       </button>
       <button
@@ -62,11 +63,11 @@ export function BulkActions({
         disabled={deleting}
         className="flex items-center gap-1.5 px-3 py-1 bg-red-900/50 hover:bg-red-800 text-red-300 rounded text-xs font-medium transition-colors"
       >
-        <Trash2 className="w-3 h-3" /> {deleting ? 'Deleting...' : 'Delete'}
+        <Icon as={Trash2} size="sm" /> {deleting ? 'Deleting...' : 'Delete'}
       </button>
       <button
         onClick={onClearSelection}
-        className="ml-auto text-zinc-500 hover:text-zinc-300 text-xs"
+        className="ml-auto text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] text-xs"
       >
         Clear selection
       </button>
