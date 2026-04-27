@@ -5,6 +5,7 @@
 import {
   FileText, ExternalLink, Check, X, Loader2, Minimize2, Sparkles, Wand2, Database,
 } from 'lucide-react';
+import { Icon, cn } from '../ui';
 import type { CmsImageUsage } from '../../../shared/types/cms-images';
 
 interface Asset {
@@ -65,9 +66,10 @@ export function AssetCard({
     : null;
   return (
     <div
-      className={`grid grid-cols-[32px_48px_1fr_200px_80px_100px] gap-3 px-3 py-2 rounded-lg items-center text-sm transition-colors ${
-        selected ? 'bg-zinc-800/80' : 'hover:bg-zinc-900/50'
-      }`}
+      className={cn(
+        'grid grid-cols-[32px_48px_1fr_200px_80px_100px] gap-3 px-3 py-2 rounded-[var(--radius-md)] items-center text-sm transition-colors',
+        selected ? 'bg-[var(--surface-3)]/80' : 'hover:bg-[var(--surface-2)]/50',
+      )}
     >
       <div>
         <input
@@ -79,9 +81,9 @@ export function AssetCard({
       </div>
 
       {/* Thumbnail */}
-      <div className="w-10 h-10 rounded bg-zinc-800 overflow-hidden flex items-center justify-center">
+      <div className="w-10 h-10 rounded bg-[var(--surface-3)] overflow-hidden flex items-center justify-center">
         {asset.contentType?.includes('svg') ? (
-          <FileText className="w-4 h-4 text-zinc-500" />
+          <Icon as={FileText} size="md" className="text-[var(--brand-text-muted)]" />
         ) : (
           <img
             src={asset.hostedUrl || asset.url}
@@ -93,7 +95,7 @@ export function AssetCard({
       </div>
 
       {/* Name */}
-      <div className="truncate text-zinc-300 flex items-center gap-1 min-w-0">
+      <div className="truncate text-[var(--brand-text)] flex items-center gap-1 min-w-0">
         {renamingId ? (
           <div className="flex items-center gap-1 w-full">
             <input
@@ -101,14 +103,14 @@ export function AssetCard({
               value={renameDraft}
               onChange={e => onRenameDraftChange(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && onSaveRename(asset.id)}
-              className="flex-1 min-w-0 px-2 py-1 bg-zinc-800 border border-cyan-600 rounded text-xs focus:outline-none"
+              className="flex-1 min-w-0 px-2 py-1 bg-[var(--surface-3)] border border-teal-600 rounded text-xs focus:outline-none"
               autoFocus
             />
             <button onClick={() => onSaveRename(asset.id)} className="text-emerald-400/80 hover:text-emerald-300 shrink-0">
-              <Check className="w-3.5 h-3.5" />
+              <Icon as={Check} size="md" />
             </button>
-            <button onClick={onCancelRename} className="text-zinc-500 hover:text-zinc-300 shrink-0">
-              <X className="w-3.5 h-3.5" />
+            <button onClick={onCancelRename} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] shrink-0">
+              <Icon as={X} size="md" />
             </button>
           </div>
         ) : (
@@ -117,34 +119,30 @@ export function AssetCard({
               {asset.displayName || asset.originalFileName}
             </span>
             {(!asset.altText || asset.altText.trim() === '') && (
-              <span className="shrink-0 px-1 py-0.5 rounded text-[11px] font-semibold bg-amber-900/40 text-amber-400/80 leading-none">No Alt</span>
+              <span className="shrink-0 px-1 py-0.5 rounded t-caption-sm font-semibold bg-amber-900/40 text-amber-400/80 leading-none">No Alt</span>
             )}
             {asset.size > 500 * 1024 && (
-              <span className="shrink-0 px-1 py-0.5 rounded text-[11px] font-semibold bg-orange-900/40 text-orange-400 leading-none">Oversized</span>
+              <span className="shrink-0 px-1 py-0.5 rounded t-caption-sm font-semibold bg-orange-900/40 text-orange-400 leading-none">Oversized</span>
             )}
             {unusedFlag && (
-              <span className="shrink-0 px-1 py-0.5 rounded text-[11px] font-semibold bg-red-900/40 text-red-400/80 leading-none">Unused</span>
+              <span className="shrink-0 px-1 py-0.5 rounded t-caption-sm font-semibold bg-red-900/40 text-red-400/80 leading-none">Unused</span>
             )}
             {cmsLabel && (
               <span
-                className="shrink-0 flex items-center gap-0.5 px-1 py-0.5 rounded text-[11px] font-semibold bg-blue-900/40 text-blue-400 leading-none"
+                className="shrink-0 flex items-center gap-0.5 px-1 py-0.5 rounded t-caption-sm font-semibold bg-blue-900/40 text-blue-400 leading-none"
                 title={`Used in CMS: ${cmsUsages!.map(u => `${u.collectionName} → ${u.fieldDisplayName} (${u.fieldType})`).join(', ')}`}
               >
-                <Database className="w-2.5 h-2.5" />
+                <Icon as={Database} size="sm" />
                 {cmsLabel}
               </span>
             )}
             <button
               onClick={() => onSmartRename(asset)}
               disabled={renameLoading}
-              className="shrink-0 p-0.5 rounded text-zinc-500 hover:text-cyan-400 transition-colors"
+              className="shrink-0 p-0.5 rounded text-[var(--brand-text-muted)] hover:text-teal-400 transition-colors"
               title="Smart rename"
             >
-              {renameLoading ? (
-                <Loader2 className="w-3 h-3 animate-spin" />
-              ) : (
-                <Wand2 className="w-3 h-3" />
-              )}
+              <Icon as={renameLoading ? Loader2 : Wand2} size="sm" className={renameLoading ? 'animate-spin' : ''} />
             </button>
           </>
         )}
@@ -159,22 +157,23 @@ export function AssetCard({
               value={altDraft}
               onChange={e => onAltDraftChange(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && onSaveAlt(asset.id)}
-              className="flex-1 px-2 py-1 bg-zinc-800 border border-zinc-600 rounded text-xs focus:outline-none"
+              className="flex-1 px-2 py-1 bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded text-xs focus:outline-none"
               autoFocus
             />
             <button onClick={() => onSaveAlt(asset.id)} className="text-emerald-400/80 hover:text-emerald-300">
-              <Check className="w-3.5 h-3.5" />
+              <Icon as={Check} size="md" />
             </button>
-            <button onClick={onCancelEditAlt} className="text-zinc-500 hover:text-zinc-300">
-              <X className="w-3.5 h-3.5" />
+            <button onClick={onCancelEditAlt} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]">
+              <Icon as={X} size="md" />
             </button>
           </div>
         ) : (
           <button
             onClick={() => onEditAlt(asset.id, asset.altText || '')}
-            className={`truncate text-left text-xs w-full ${
-              asset.altText ? 'text-zinc-400' : 'text-amber-500/70 italic'
-            }`}
+            className={cn(
+              'truncate text-left text-xs w-full',
+              asset.altText ? 'text-[var(--brand-text)]' : 'text-amber-500/70 italic',
+            )}
             title={asset.altText || 'Click to add alt text'}
           >
             {asset.altText || 'No alt text'}
@@ -183,7 +182,7 @@ export function AssetCard({
       </div>
 
       {/* Size */}
-      <div className={`text-right text-xs ${asset.size > 500 * 1024 ? 'text-orange-400' : 'text-zinc-500'}`}>
+      <div className={cn('text-right text-xs', asset.size > 500 * 1024 ? 'text-orange-400' : 'text-[var(--brand-text-muted)]')}>
         {asset.size > 0 ? formatSize(asset.size) : '—'}
       </div>
 
@@ -192,37 +191,32 @@ export function AssetCard({
         <button
           onClick={() => onGenerateAlt(asset)}
           disabled={generatingAlt}
-          className="p-1.5 rounded text-zinc-500 hover:text-teal-400 hover:bg-zinc-800 transition-colors"
+          className="p-1.5 rounded text-[var(--brand-text-muted)] hover:text-teal-400 hover:bg-[var(--surface-3)] transition-colors"
           title="Generate alt text with AI"
         >
-          {generatingAlt ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <Sparkles className="w-3.5 h-3.5" />
-          )}
+          <Icon as={generatingAlt ? Loader2 : Sparkles} size="md" className={generatingAlt ? 'animate-spin' : ''} />
         </button>
         {asset.size > 0 && (
           <button
             onClick={() => !compressDisabled && onCompress(asset)}
             disabled={compressing || compressDisabled}
-            className={`p-1.5 rounded transition-colors ${compressDisabled ? 'text-zinc-700 cursor-not-allowed' : 'text-zinc-500 hover:text-blue-400 hover:bg-zinc-800'}`}
+            className={cn(
+              'p-1.5 rounded transition-colors',
+              compressDisabled ? 'text-[var(--brand-text-dim)] cursor-not-allowed' : 'text-[var(--brand-text-muted)] hover:text-blue-400 hover:bg-[var(--surface-3)]',
+            )}
             title={compressDisabled ? 'Compress unavailable for inline RichText images' : 'Compress image'}
           >
-            {compressing ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Minimize2 className="w-3.5 h-3.5" />
-            )}
+            <Icon as={compressing ? Loader2 : Minimize2} size="md" className={compressing ? 'animate-spin' : ''} />
           </button>
         )}
         <a
           href={asset.hostedUrl || asset.url}
           target="_blank"
           rel="noopener"
-          className="p-1.5 rounded text-zinc-500 hover:text-blue-400 hover:bg-zinc-800 transition-colors"
+          className="p-1.5 rounded text-[var(--brand-text-muted)] hover:text-blue-400 hover:bg-[var(--surface-3)] transition-colors"
           title="Open in new tab"
         >
-          <ExternalLink className="w-3.5 h-3.5" />
+          <Icon as={ExternalLink} size="md" />
         </a>
       </div>
     </div>

@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react';
 import {
   Loader2, Save, Sparkles, Globe, ChevronDown, Check, AlertTriangle,
 } from 'lucide-react';
-import { SectionCard } from './ui';
+import { SectionCard, Button, Icon } from './ui';
 import { get, post } from '../api/client';
 
 interface CollectionInfo {
@@ -156,8 +156,8 @@ export function PublishSettings({ workspaceId: _workspaceId, webflowSiteId, publ
     return (
       <SectionCard>
         <div className="text-center">
-          <AlertTriangle className="w-5 h-5 text-amber-400/80 mx-auto mb-2" />
-          <p className="text-sm text-zinc-400">Link a Webflow site in Connections to enable publishing.</p>
+          <Icon as={AlertTriangle} size="lg" className="text-amber-400/80 mx-auto mb-2" />
+          <p className="text-sm text-[var(--brand-text)]">Link a Webflow site in Connections to enable publishing.</p>
         </div>
       </SectionCard>
     );
@@ -166,78 +166,78 @@ export function PublishSettings({ workspaceId: _workspaceId, webflowSiteId, publ
   return (
     <SectionCard
       title="Webflow CMS Publish Target"
-      titleIcon={<Globe className="w-4 h-4 text-teal-400" />}
+      titleIcon={<Icon as={Globe} size="md" className="text-teal-400" />}
       action={publishTarget ? (
-        <span className="flex items-center gap-1 text-[11px] text-emerald-400/80 bg-emerald-500/8 border border-emerald-500/20 px-2 py-1 rounded-md">
-          <Check className="w-3 h-3" /> Configured
+        <span className="flex items-center gap-1 t-caption-sm text-emerald-400/80 bg-emerald-500/8 border border-emerald-500/20 px-2 py-1 rounded-[var(--radius-md)]">
+          <Icon as={Check} size="sm" /> Configured
         </span>
       ) : undefined}
     >
       <div className="space-y-4">
-        <p className="text-[11px] text-zinc-500">Choose which CMS collection to publish content posts to</p>
+        <p className="t-caption-sm text-[var(--brand-text-muted)]">Choose which CMS collection to publish content posts to</p>
         <div>
-          <label className="block text-[11px] font-medium text-zinc-400 mb-1.5">CMS Collection</label>
+          <label className="block t-caption-sm font-medium text-[var(--brand-text)] mb-1.5">CMS Collection</label>
           {loading ? (
-            <div className="flex items-center gap-2 text-zinc-500 text-xs">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading collections...
+            <div className="flex items-center gap-2 text-[var(--brand-text-muted)] text-xs">
+              <Icon as={Loader2} size="md" className="animate-spin" /> Loading collections...
             </div>
           ) : (
             <div className="relative">
               <select
                 value={selectedCollection}
                 onChange={e => handleCollectionChange(e.target.value)}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 appearance-none cursor-pointer focus:border-teal-500/50 focus:outline-none"
+                className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] appearance-none cursor-pointer focus:border-teal-500/50 focus:outline-none"
               >
                 <option value="">Select a collection...</option>
                 {collections.map(c => (
                   <option key={c.id} value={c.id}>{c.displayName} ({c.slug})</option>
                 ))}
               </select>
-              <ChevronDown className="w-3.5 h-3.5 text-zinc-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
           )}
         </div>
 
-        {/* AI suggest button */}
+        {/* AI suggest button — this is an admin AI feature, purple is correct here */}
         {selectedCollection && fields.length > 0 && (
           <button
             onClick={suggestMapping}
             disabled={suggesting}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-purple-600/20 border border-purple-500/30 text-purple-300 hover:bg-purple-600/30 transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium bg-purple-600/20 border border-purple-500/30 text-purple-300 hover:bg-purple-600/30 transition-colors disabled:opacity-50"
           >
-            {suggesting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+            {suggesting ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Sparkles} size="sm" />}
             {suggesting ? 'Suggesting...' : 'AI Suggest Mappings'}
           </button>
         )}
 
         {/* Field mapping */}
         {selectedCollection && (loadingFields ? (
-          <div className="flex items-center gap-2 text-zinc-500 text-xs py-2">
-            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading collection schema...
+          <div className="flex items-center gap-2 text-[var(--brand-text-muted)] text-xs py-2">
+            <Icon as={Loader2} size="md" className="animate-spin" /> Loading collection schema...
           </div>
         ) : fields.length > 0 && (
           <div className="space-y-3">
-            <p className="text-[11px] font-medium text-zinc-400">Field Mappings</p>
+            <p className="t-caption-sm font-medium text-[var(--brand-text)]">Field Mappings</p>
             {FIELD_MAP_KEYS.map(({ key, label, required, hint }) => (
               <div key={key} className="flex items-center gap-3">
                 <div className="w-36 flex-shrink-0">
-                  <span className="text-[11px] text-zinc-300">
+                  <span className="t-caption-sm text-[var(--brand-text-bright)]">
                     {label} {required && <span className="text-red-400/80">*</span>}
                   </span>
-                  <span className="block text-[10px] text-zinc-600">{hint}</span>
+                  <span className="block t-caption-sm text-[var(--brand-text-muted)]">{hint}</span>
                 </div>
                 <div className="relative flex-1">
                   <select
                     value={(fieldMap as unknown as Record<string, string | undefined>)[key] || ''}
                     onChange={e => updateField(key, e.target.value)}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-[11px] text-zinc-200 appearance-none cursor-pointer focus:border-teal-500/50 focus:outline-none"
+                    className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-2.5 py-1.5 t-caption-sm text-[var(--brand-text-bright)] appearance-none cursor-pointer focus:border-teal-500/50 focus:outline-none"
                   >
                     <option value="">{required ? 'Select field...' : '(none)'}</option>
                     {fields.map(f => (
                       <option key={f.slug} value={f.slug}>{f.displayName} ({f.type})</option>
                     ))}
                   </select>
-                  <ChevronDown className="w-3 h-3 text-zinc-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text-muted)] absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
               </div>
             ))}
@@ -247,14 +247,16 @@ export function PublishSettings({ workspaceId: _workspaceId, webflowSiteId, publ
         {/* Save */}
         {selectedCollection && fields.length > 0 && (
           <div className="flex justify-end pt-2">
-            <button
-              onClick={handleSave}
+            <Button
+              variant="primary"
+              size="md"
+              icon={Save}
+              loading={saving}
               disabled={saving || !fieldMap.title || !fieldMap.slug || !fieldMap.body}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium bg-teal-600 text-white hover:bg-teal-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleSave}
             >
-              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
               Save Publish Settings
-            </button>
+            </Button>
           </div>
         )}
       </div>

@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2, Download, RefreshCw, FileText, Copy, Check, Bot, Eye, EyeOff, Clock } from 'lucide-react';
-import { SectionCard, StatCard, EmptyState, PageHeader } from './ui';
+import { SectionCard, StatCard, EmptyState, PageHeader, Button, Icon, cn } from './ui';
 import { llmsTxt } from '../api/content';
 import { queryKeys } from '../lib/queryKeys';
 import { STALE_TIMES } from '../lib/queryClient';
@@ -18,7 +18,7 @@ interface LlmsTxtGeneratorProps {
 }
 
 function formatFreshness(ts: string | null | undefined): { label: string; color: string } {
-  if (!ts) return { label: 'Never generated', color: 'text-zinc-500' };
+  if (!ts) return { label: 'Never generated', color: 'text-[var(--brand-text-muted)]' };
   const ageMs = Date.now() - new Date(ts).getTime();
   const hours = ageMs / (1000 * 60 * 60);
   if (hours < 1) return { label: 'Generated just now', color: 'text-emerald-400' };
@@ -98,20 +98,16 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
         <PageHeader
           title="LLMs.txt Generator"
           subtitle="Generate an LLMs.txt file to help AI models understand your site"
-          icon={<Bot className="w-5 h-5 text-teal-400" />}
+          icon={<Icon as={Bot} size="lg" className="text-teal-400" />}
         />
         <EmptyState
           icon={Bot}
           title="Generate your LLMs.txt file"
           description="LLMs.txt is an emerging standard (like robots.txt) that helps AI models understand your site's structure, purpose, and content. Click generate to create one from your Webflow pages, keyword strategy, and content plans."
           action={
-            <button
-              onClick={generate}
-              className="flex items-center gap-1.5 text-xs px-4 py-2 rounded-lg bg-teal-500/10 text-teal-400 hover:bg-teal-500/15 transition-colors font-medium"
-            >
-              <Bot className="w-3.5 h-3.5" />
+            <Button variant="ghost" size="md" icon={Bot} onClick={generate}>
               Generate LLMs.txt
-            </button>
+            </Button>
           }
         />
       </div>
@@ -126,34 +122,34 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
           <span className="flex items-center gap-2">
             <span>{data ? `${data.pageCount} pages · Generated ${new Date(data.generatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}` : 'Generating…'}</span>
             <span className={`flex items-center gap-1 text-xs ${freshness.color}`}>
-              <Clock className="w-3 h-3" />{freshness.label}
+              <Icon as={Clock} size="sm" />{freshness.label}
             </span>
           </span>
         }
-        icon={<Bot className="w-5 h-5 text-teal-400" />}
+        icon={<Icon as={Bot} size="lg" className="text-teal-400" />}
         actions={
           <div className="flex items-center gap-2">
             {data && (
               <>
                 <button
                   onClick={handleCopy}
-                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors"
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--surface-3)] text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)] transition-colors"
                 >
-                  {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                  {copied ? <Icon as={Check} size="sm" className="text-emerald-400" /> : <Icon as={Copy} size="sm" />}
                   {copied ? 'Copied!' : 'Copy'}
                 </button>
                 <button
                   onClick={handleDownload}
-                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-teal-500/10 text-teal-400 hover:bg-teal-500/15 transition-colors"
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-[var(--radius-md)] bg-teal-500/10 text-teal-400 hover:bg-teal-500/15 transition-colors"
                 >
-                  <Download className="w-3 h-3" />
+                  <Icon as={Download} size="sm" />
                   llms.txt
                 </button>
                 <button
                   onClick={handleDownloadFull}
-                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-teal-500/10 text-teal-400 hover:bg-teal-500/15 transition-colors"
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-[var(--radius-md)] bg-teal-500/10 text-teal-400 hover:bg-teal-500/15 transition-colors"
                 >
-                  <Download className="w-3 h-3" />
+                  <Icon as={Download} size="sm" />
                   llms-full.txt
                 </button>
               </>
@@ -161,9 +157,9 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
             <button
               onClick={generate}
               disabled={loading}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--surface-3)] text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)] transition-colors disabled:opacity-50"
             >
-              <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+              <Icon as={RefreshCw} size="sm" className={loading ? 'animate-spin' : ''} />
               {loading ? 'Generating…' : 'Regenerate'}
             </button>
           </div>
@@ -172,13 +168,14 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
 
       {loading && !data && (
         <div className="flex items-center justify-center py-24 gap-3">
-          <Loader2 className="w-5 h-5 animate-spin text-teal-400" />
-          <span className="text-sm text-zinc-400">Generating LLMs.txt with AI summaries…</span>
+          <Icon as={Loader2} size="lg" className="animate-spin text-teal-400" />
+          <span className="text-sm text-[var(--brand-text)]">Generating LLMs.txt with AI summaries…</span>
         </div>
       )}
 
       {error && (
-        <div className="flex items-start gap-2 px-4 py-3 bg-red-500/5 border border-red-500/15" style={{ borderRadius: '10px 24px 10px 24px' }}>
+        // pr-check-disable-next-line -- brand signature radius intentional for featured error banner surface
+        <div className="flex items-start gap-2 px-4 py-3 bg-red-500/5 border border-red-500/15" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
           <span className="text-xs text-red-400">{error}</span>
         </div>
       )}
@@ -198,18 +195,24 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
           {/* Preview */}
           <SectionCard
             title="Preview"
-            titleIcon={<FileText className="w-4 h-4 text-teal-400" />}
+            titleIcon={<Icon as={FileText} size="md" className="text-teal-400" />}
             titleExtra={
               <div className="flex items-center gap-1 ml-2">
                 <button
                   onClick={() => setPreviewMode('index')}
-                  className={`text-[11px] px-2 py-0.5 rounded-full transition-colors ${previewMode === 'index' ? 'bg-teal-500/15 text-teal-400' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  className={cn(
+                    't-caption-sm px-2 py-0.5 rounded-full transition-colors',
+                    previewMode === 'index' ? 'bg-teal-500/15 text-teal-400' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]',
+                  )}
                 >
                   llms.txt
                 </button>
                 <button
                   onClick={() => setPreviewMode('full')}
-                  className={`text-[11px] px-2 py-0.5 rounded-full transition-colors ${previewMode === 'full' ? 'bg-teal-500/15 text-teal-400' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  className={cn(
+                    't-caption-sm px-2 py-0.5 rounded-full transition-colors',
+                    previewMode === 'full' ? 'bg-teal-500/15 text-teal-400' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]',
+                  )}
                 >
                   llms-full.txt
                 </button>
@@ -218,9 +221,9 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
             action={
               <button
                 onClick={() => setShowPreview(!showPreview)}
-                className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
+                className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
               >
-                {showPreview ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                {showPreview ? <Icon as={EyeOff} size="sm" /> : <Icon as={Eye} size="sm" />}
                 {showPreview ? 'Hide' : 'Show'}
               </button>
             }
@@ -228,32 +231,32 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
           >
             {showPreview && (
               <div className="max-h-[500px] overflow-y-auto">
-                <pre className="px-4 py-3 text-xs font-mono text-zinc-300 whitespace-pre-wrap leading-relaxed">
+                <pre className="px-4 py-3 text-xs font-mono text-[var(--brand-text)] whitespace-pre-wrap leading-relaxed">
                   {previewContent}
                 </pre>
               </div>
             )}
             {!showPreview && (
-              <p className="text-xs text-zinc-500">Preview hidden. Click Show to reveal the generated content.</p>
+              <p className="text-xs text-[var(--brand-text-muted)]">Preview hidden. Click Show to reveal the generated content.</p>
             )}
           </SectionCard>
 
           {/* What is LLMs.txt info card */}
           <SectionCard
             title="What is LLMs.txt?"
-            titleIcon={<Bot className="w-4 h-4 text-zinc-500" />}
+            titleIcon={<Icon as={Bot} size="md" className="text-[var(--brand-text-muted)]" />}
           >
-            <div className="space-y-2 text-xs text-zinc-400 leading-relaxed">
+            <div className="space-y-2 text-xs text-[var(--brand-text)] leading-relaxed">
               <p>
-                <strong className="text-zinc-300">LLMs.txt</strong> is an emerging standard that provides structured information about your website for AI language models.
-                Similar to how <code className="px-1 py-0.5 bg-zinc-800 rounded text-zinc-300">robots.txt</code> guides search engine crawlers, LLMs.txt helps AI systems understand your site&apos;s structure and content.
+                <strong className="text-[var(--brand-text-bright)]">LLMs.txt</strong> is an emerging standard that provides structured information about your website for AI language models.
+                Similar to how <code className="px-1 py-0.5 bg-[var(--surface-3)] rounded text-[var(--brand-text-bright)]">robots.txt</code> guides search engine crawlers, LLMs.txt helps AI systems understand your site&apos;s structure and content.
               </p>
               <p>
-                <strong className="text-zinc-300">Two files are generated:</strong> <code className="px-1 py-0.5 bg-zinc-800 rounded text-zinc-300">llms.txt</code> is a lightweight index with links and one-line descriptions for quick discovery.
-                <code className="px-1 py-0.5 bg-zinc-800 rounded text-zinc-300 ml-1">llms-full.txt</code> includes AI-generated summaries per page for deep understanding.
+                <strong className="text-[var(--brand-text-bright)]">Two files are generated:</strong> <code className="px-1 py-0.5 bg-[var(--surface-3)] rounded text-[var(--brand-text-bright)]">llms.txt</code> is a lightweight index with links and one-line descriptions for quick discovery.
+                <code className="px-1 py-0.5 bg-[var(--surface-3)] rounded text-[var(--brand-text-bright)] ml-1">llms-full.txt</code> includes AI-generated summaries per page for deep understanding.
               </p>
               <p>
-                <strong className="text-zinc-300">How to use:</strong> Download both files and place them at the root of your website (e.g., <code className="px-1 py-0.5 bg-zinc-800 rounded text-zinc-300">yoursite.com/llms.txt</code>).
+                <strong className="text-[var(--brand-text-bright)]">How to use:</strong> Download both files and place them at the root of your website (e.g., <code className="px-1 py-0.5 bg-[var(--surface-3)] rounded text-[var(--brand-text-bright)]">yoursite.com/llms.txt</code>).
                 This can be done via Webflow&apos;s custom code settings or by hosting on your CDN.
               </p>
             </div>

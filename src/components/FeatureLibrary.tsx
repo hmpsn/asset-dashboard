@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search, Layers, Eye } from 'lucide-react';
-import { PageHeader, EmptyState } from './ui';
+import { PageHeader, EmptyState, Icon, cn } from './ui';
 import { features as featuresApi } from '../api/misc';
 import { queryKeys } from '../lib/queryKeys';
 import type { Feature, FeatureCategory, PainPoint, FeatureTier } from '../../shared/types/features';
@@ -10,7 +10,7 @@ import { CATEGORY_LABELS as catLabels, PAIN_POINT_LABELS as ppLabels } from '../
 type ViewMode = 'painPoint' | 'category';
 
 const TIER_STYLES: Record<FeatureTier, string> = {
-  free: 'bg-zinc-500/15 text-zinc-400 border-zinc-500/20',
+  free: 'bg-[var(--brand-text-muted)]/15 text-[var(--brand-text)] border-[var(--brand-text-muted)]/20',
   growth: 'bg-teal-500/15 text-teal-400 border-teal-500/20',
   premium: 'bg-teal-500/15 text-teal-400 border-teal-500/20',
   admin: 'bg-purple-500/15 text-purple-400 border-purple-500/20',
@@ -30,22 +30,22 @@ const IMPACT_DOT: Record<string, string> = {
 
 function FeatureCard({ feature }: { feature: Feature }) {
   return (
-    <div className="bg-zinc-900 border border-zinc-800 p-4 hover:border-zinc-700 transition-colors" style={{ borderRadius: '6px 12px 6px 12px' }}>
+    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 hover:border-[var(--brand-border-hover)] transition-colors" style={{ borderRadius: 'var(--radius-signature)' }}>
       <div className="flex items-start justify-between gap-2 mb-2">
-        <h3 className="text-sm font-semibold text-zinc-100 leading-tight">{feature.title}</h3>
+        <h3 className="text-sm font-semibold text-[var(--brand-text-bright)] leading-tight">{feature.title}</h3>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {feature.impact !== 'low' && (
             <span className={`w-2 h-2 rounded-full ${IMPACT_DOT[feature.impact]}`} title={`${feature.impact} impact`} />
           )}
           {feature.clientFacing && (
             <span title="Client-facing" className="inline-flex">
-              <Eye className="w-3 h-3 text-zinc-500" aria-label="Client-facing" />
+              <Icon as={Eye} size="sm" className="text-[var(--brand-text-muted)]" aria-label="Client-facing" />
             </span>
           )}
         </div>
       </div>
-      <p className="text-xs text-zinc-400 leading-relaxed mb-3">{feature.oneLiner}</p>
-      <span className={`inline-flex px-2 py-0.5 text-[10px] font-medium rounded-md border ${TIER_STYLES[feature.tier]}`}>
+      <p className="text-xs text-[var(--brand-text)] leading-relaxed mb-3">{feature.oneLiner}</p>
+      <span className={cn('inline-flex px-2 py-0.5 t-caption-sm font-medium rounded-[var(--radius-md)] border', TIER_STYLES[feature.tier])}>
         {TIER_LABELS[feature.tier]}
       </span>
     </div>
@@ -108,7 +108,7 @@ export default function FeatureLibrary() {
   if (isLoading) {
     return (
       <div className="p-6">
-        <PageHeader title="Feature Library" subtitle="Loading..." icon={<Layers className="w-5 h-5 text-teal-400" />} />
+        <PageHeader title="Feature Library" subtitle="Loading..." icon={<Icon as={Layers} size="lg" className="text-teal-400" />} />
       </div>
     );
   }
@@ -118,34 +118,36 @@ export default function FeatureLibrary() {
       <PageHeader
         title="Feature Library"
         subtitle={`${allFeatures.length} curated features — internal sales reference`}
-        icon={<Layers className="w-5 h-5 text-teal-400" />}
+        icon={<Icon as={Layers} size="lg" className="text-teal-400" />}
       />
 
       <div className="flex items-center gap-4 flex-wrap">
         <div className="relative flex-1 min-w-[200px] max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+          <Icon as={Search} size="md" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
           <input
             type="text"
             placeholder="Search features..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-teal-500/50"
+            className="w-full pl-9 pr-3 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-md)] text-sm text-[var(--brand-text-bright)] placeholder:text-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500/50"
           />
         </div>
-        <div className="flex rounded-lg border border-zinc-800 overflow-hidden">
+        <div className="flex rounded-[var(--radius-md)] border border-[var(--brand-border)] overflow-hidden">
           <button
             onClick={() => setView('painPoint')}
-            className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-              view === 'painPoint' ? 'bg-teal-500/15 text-teal-400' : 'text-zinc-500 hover:text-zinc-300'
-            }`}
+            className={cn(
+              'px-3 py-1.5 text-xs font-medium transition-colors',
+              view === 'painPoint' ? 'bg-teal-500/15 text-teal-400' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]',
+            )}
           >
             By Pain Point
           </button>
           <button
             onClick={() => setView('category')}
-            className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-              view === 'category' ? 'bg-teal-500/15 text-teal-400' : 'text-zinc-500 hover:text-zinc-300'
-            }`}
+            className={cn(
+              'px-3 py-1.5 text-xs font-medium transition-colors',
+              view === 'category' ? 'bg-teal-500/15 text-teal-400' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]',
+            )}
           >
             By Platform Area
           </button>
@@ -162,10 +164,10 @@ export default function FeatureLibrary() {
         <div className="space-y-8">
           {grouped.map(group => (
             <div key={group.label}>
-              <h2 className="text-sm font-semibold text-zinc-300 mb-3 flex items-center gap-2">
+              <h2 className="text-sm font-semibold text-[var(--brand-text)] mb-3 flex items-center gap-2">
                 <span className="w-1 h-4 bg-teal-500 rounded-full" />
                 {group.label}
-                <span className="text-zinc-600 font-normal">({group.features.length})</span>
+                <span className="text-[var(--brand-text-dim)] font-normal">({group.features.length})</span>
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                 {group.features.map(f => (
