@@ -197,7 +197,7 @@ export function ChatPanel({
             <button
               key={i}
               onClick={() => onChipClick?.(chip)}
-              className="t-micro px-2.5 py-1 rounded-full bg-teal-500/10 text-teal-300 border border-teal-500/20 hover:bg-teal-500/20 transition-colors"
+              className="t-caption-sm px-2.5 py-1 rounded-full bg-teal-500/10 text-teal-300 border border-teal-500/20 hover:bg-teal-500/20 transition-colors"
             >
               {chip}
             </button>

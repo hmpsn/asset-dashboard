@@ -27,17 +27,17 @@ export function MetricBlock({ data }: { data: MetricBlockData | MetricBlockData[
     <div className={`grid ${items.length > 1 ? `grid-cols-${Math.min(items.length, 3)}` : ''} gap-2 my-1.5`}>
       {items.map((m, i) => (
         <div key={i} className="bg-[var(--surface-3)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">
-          <div className="t-micro text-[var(--brand-text-muted)]">{m.label}</div>
+          <div className="t-caption-sm text-[var(--brand-text-muted)]">{m.label}</div>
           <div className="flex items-baseline gap-1.5 mt-0.5">
             <span className="t-caption font-semibold text-[var(--brand-text-bright)]">{fmtValue(m.value, m.format)}{m.unit || ''}</span>
             {m.change != null && (
-              <span className={`flex items-center gap-0.5 t-micro font-medium ${m.change > 0 ? 'text-emerald-400/80' : m.change < 0 ? 'text-red-400/80' : 'text-[var(--brand-text-muted)]'}`}>
+              <span className={`flex items-center gap-0.5 t-caption-sm font-medium ${m.change > 0 ? 'text-emerald-400/80' : m.change < 0 ? 'text-red-400/80' : 'text-[var(--brand-text-muted)]'}`}>
                 {m.change > 0 ? <TrendingUp className="w-2.5 h-2.5" /> : m.change < 0 ? <TrendingDown className="w-2.5 h-2.5" /> : <Minus className="w-2.5 h-2.5" />}
                 {m.change > 0 ? '+' : ''}{typeof m.change === 'number' ? m.change.toFixed(1) : m.change}%
               </span>
             )}
           </div>
-          {m.changeLabel && <div className="t-micro text-[var(--brand-text-muted)] mt-0.5">{m.changeLabel}</div>}
+          {m.changeLabel && <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{m.changeLabel}</div>}
         </div>
       ))}
     </div>
@@ -65,11 +65,11 @@ export function ChartBlock({ data }: { data: ChartBlockData }) {
           const color = item.color || BAR_COLORS[i % BAR_COLORS.length];
           return (
             <div key={i} className="flex items-center gap-2">
-              <span className="t-micro text-[var(--brand-text-muted)] w-24 truncate flex-shrink-0" title={item.label}>{item.label}</span>
+              <span className="t-caption-sm text-[var(--brand-text-muted)] w-24 truncate flex-shrink-0" title={item.label}>{item.label}</span>
               <div className="flex-1 h-4 bg-[var(--surface-2)] rounded-sm overflow-hidden relative">
                 <div className="h-full rounded-sm transition-all" style={{ width: `${Math.max(pct, 2)}%`, backgroundColor: color, opacity: 0.7 }} />
               </div>
-              <span className="t-micro text-[var(--brand-text-bright)] font-medium w-12 text-right flex-shrink-0">
+              <span className="t-caption-sm text-[var(--brand-text-bright)] font-medium w-12 text-right flex-shrink-0">
                 {data.valueFormat === 'percent' ? `${item.value.toFixed(1)}%` : fmtValue(item.value)}
               </span>
             </div>
@@ -153,7 +153,7 @@ export function DataTableBlock({ data }: { data: DataTableBlockData }) {
           </tbody>
         </table>
       </div>
-      {data.footer && <div className="px-2.5 py-1 t-micro text-[var(--brand-text-muted)] border-t border-[var(--brand-border)]">{data.footer}</div>}
+      {data.footer && <div className="px-2.5 py-1 t-caption-sm text-[var(--brand-text-muted)] border-t border-[var(--brand-border)]">{data.footer}</div>}
     </div>
   );
 }
@@ -174,7 +174,7 @@ export function SparklineBlock({ data }: { data: SparklineBlockData }) {
   const color = data.color || '#2dd4bf';
   return (
     <span className="inline-flex items-center gap-1.5 align-middle">
-      {data.label && <span className="t-micro text-[var(--brand-text-muted)]">{data.label}</span>}
+      {data.label && <span className="t-caption-sm text-[var(--brand-text-muted)]">{data.label}</span>}
       <svg width={w} height={h} className="inline-block">
         <polyline fill="none" stroke={color} strokeWidth="1.5" points={points} strokeLinejoin="round" />
       </svg>

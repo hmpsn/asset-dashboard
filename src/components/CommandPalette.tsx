@@ -300,10 +300,10 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
         <Icon as={ItemIcon} size="md" className={`flex-shrink-0 ${isSelected ? 'text-teal-400' : 'text-[var(--brand-text-muted)]'}`} />
         <div className="flex-1 min-w-0">
           <div className="t-caption font-medium truncate">{item.label}</div>
-          {item.sub && <div className="t-micro text-[var(--brand-text-muted)] truncate">{item.sub}</div>}
+          {item.sub && <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{item.sub}</div>}
         </div>
-        {item.type === 'workspace' && <span className="t-micro text-zinc-600 flex-shrink-0">workspace</span>}
-        {item.type === 'action' && <span className="t-micro text-zinc-600 flex-shrink-0">action</span>}
+        {item.type === 'workspace' && <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">workspace</span>}
+        {item.type === 'action' && <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">action</span>}
       </button>
     );
   };
@@ -312,7 +312,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
     if (groupItems.length === 0) return null;
     return (
       <div key={label}>
-        <div className="px-3 py-1.5 t-micro font-semibold text-zinc-600">{label}</div>
+        <div className="px-3 py-1.5 t-caption-sm font-semibold uppercase tracking-wider text-[var(--brand-text-muted)]">{label}</div>
         {groupItems.map(renderItem)}
       </div>
     );
@@ -337,7 +337,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
             placeholder="Search tools, workspaces, actions..."
             className="flex-1 bg-transparent text-sm text-[var(--brand-text-bright)] placeholder-zinc-600 outline-none"
           />
-          <kbd className="flex-shrink-0 t-micro font-medium text-zinc-600 bg-[var(--surface-3)] px-1.5 py-0.5 rounded border border-[var(--brand-border-hover)]">
+          <kbd className="flex-shrink-0 t-caption-sm font-medium text-[var(--brand-text-muted)] bg-[var(--surface-3)] px-1.5 py-0.5 rounded border border-[var(--brand-border-hover)]">
             ESC
           </kbd>
         </div>
@@ -364,13 +364,13 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
 
         {/* Footer hints */}
         <div className="flex items-center gap-4 px-4 py-2 border-t border-[var(--brand-border)] bg-[var(--surface-2)]">
-          <div className="flex items-center gap-1 t-micro text-zinc-600">
+          <div className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
             <Icon as={ArrowUp} size="sm" /><Icon as={ArrowDown} size="sm" /> navigate
           </div>
-          <div className="flex items-center gap-1 t-micro text-zinc-600">
+          <div className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
             <Icon as={CornerDownLeft} size="sm" /> select
           </div>
-          <div className="flex items-center gap-1 t-micro text-zinc-600">
+          <div className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
             <Icon as={Command} size="sm" />K toggle
           </div>
         </div>
