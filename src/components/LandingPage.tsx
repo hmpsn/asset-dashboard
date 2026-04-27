@@ -142,7 +142,7 @@ function Problem() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {problems.map((p, i) => (
-            <div key={i} className="border border-[var(--brand-border)] bg-[var(--surface-2)]/50 p-6 hover:border-[var(--brand-border)] transition-colors" style={{ borderRadius: '6px 12px 6px 12px' /* asymmetric-radius-ok */ }}>
+            <div key={i} className="border border-[var(--brand-border)] bg-[var(--surface-2)]/50 p-6 hover:border-[var(--brand-border-hover)] transition-colors" style={{ borderRadius: '6px 12px 6px 12px' /* asymmetric-radius-ok */ }}>
               <div className="w-10 h-10 rounded-[var(--radius-xl)] bg-red-500/8 border border-red-500/20 flex items-center justify-center mb-4">
                 <p.icon className="w-5 h-5 text-red-400/80" />
               </div>
@@ -375,7 +375,7 @@ function Pricing() {
                   {plan.features.map((f, i) => (
                     <div key={i} className="flex items-center gap-2.5">
                       <CheckCircle2 className={`w-3.5 h-3.5 flex-shrink-0 ${plan.highlighted ? 'text-teal-400' : 'text-[var(--brand-text-dim)]'}`} />
-                      <span className={`text-xs ${plan.highlighted ? 'text-[var(--brand-text)]' : 'text-[var(--brand-text)]'}`}>{f}</span>
+                      <span className={`text-xs ${plan.highlighted ? 'text-[var(--brand-text-bright)]' : 'text-[var(--brand-text)]'}`}>{f}</span>
                     </div>
                   ))}
                 </div>
@@ -424,7 +424,7 @@ function FAQItem({ q, a }: { q: string; a: string }) {
   return (
     <div className="border-b border-[var(--brand-border)]">
       <button onClick={() => setOpen(!open)} className="w-full py-5 flex items-center justify-between text-left group">
-        <span className="text-sm font-medium text-[var(--brand-text-bright)] group-hover:text-[var(--brand-text-bright)] pr-4">{q}</span>
+        <span className="text-sm font-medium text-[var(--brand-text)] group-hover:text-[var(--brand-text-bright)] pr-4">{q}</span>
         <ChevronDown className={`w-4 h-4 text-[var(--brand-text-muted)] flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
