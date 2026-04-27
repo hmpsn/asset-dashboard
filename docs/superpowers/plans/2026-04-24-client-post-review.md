@@ -41,12 +41,25 @@ Task 10 (integration tests)  ← needs 4, 5, 6, 9
 
 ---
 
-## Task 1: State Machine + Shared Types
+## Task 1: State Machine + Shared Types (Model: haiku)
 
 **Files:**
+- Create: `server/db/migrations/073-content-request-post-id.sql`
 - Modify: `server/state-machines.ts`
 - Modify: `shared/types/content.ts`
+- Modify: `server/content-requests.ts`
 - Modify: `src/components/client/types.ts`
+
+- [ ] **Step 1.0: Create migration to add `post_id` column to `content_topic_requests`**
+
+Create `server/db/migrations/073-content-request-post-id.sql`:
+
+```sql
+-- Migration 073: add post_id to content_topic_requests
+-- Links a request to the GeneratedPost produced from its brief.
+-- Nullable because post_id is only set when the post exists.
+ALTER TABLE content_topic_requests ADD COLUMN post_id TEXT;
+```
 
 - [ ] **Step 1.1: Add `post_review` to `CONTENT_REQUEST_TRANSITIONS` in `server/state-machines.ts`**
 
@@ -64,12 +77,21 @@ Also update `ContentRequestStatus` type on line 37:
 export type ContentRequestStatus = 'pending_payment' | 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'post_review' | 'delivered' | 'published' | 'declined';
 ```
 
-- [ ] **Step 1.2: Update `ContentTopicRequest.status` union in `shared/types/content.ts`**
+- [ ] **Step 1.2: Update `ContentTopicRequest` in `shared/types/content.ts`**
 
-Find the `status` field on `ContentTopicRequest` (line ~134) and add `'post_review'`:
+Two changes in the same interface:
+
+(a) Find the `status` field on `ContentTopicRequest` (line ~134) and add `'post_review'`:
 
 ```typescript
 status: 'pending_payment' | 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'post_review' | 'delivered' | 'published' | 'declined';
+```
+
+(b) After the `briefId?: string` field, add `postId`:
+
+```typescript
+briefId?: string;
+postId?: string;   // ← ADD: links request to its GeneratedPost; set when admin sends post to client
 ```
 
 - [ ] **Step 1.3: Update `ClientContentRequest.status` union in `src/components/client/types.ts`**
@@ -88,6 +110,92 @@ export interface ClientContentRequest {
   comments?: { id: string; author: 'client' | 'team'; content: string; createdAt: string }[];
   requestedAt: string; updatedAt: string;
 }
+```
+
+- [ ] **Step 1.3b: Update `server/content-requests.ts` — DB module changes for `postId`**
+
+Four changes inside `server/content-requests.ts`. Make them in order:
+
+**(a) Add `post_id` to `RequestRow` interface** (around line 20, after `brief_id`):
+
+```typescript
+interface RequestRow {
+  // ... existing fields ...
+  brief_id: string | null;
+  post_id: string | null;   // ← ADD
+  // ... rest of fields ...
+}
+```
+
+**(b) Update `stmts().insert` SQL** to include `post_id` in both the column list and VALUES list:
+
+```sql
+INSERT INTO content_topic_requests
+  (id, workspace_id, topic, target_keyword, intent, priority, rationale, status,
+   brief_id, post_id, client_note, internal_note, decline_reason, client_feedback,
+   source, service_type, page_type, upgraded_at, delivery_url, delivery_notes,
+   target_page_id, target_page_slug, comments, requested_at, updated_at)
+VALUES
+  (@id, @workspace_id, @topic, @target_keyword, @intent, @priority, @rationale, @status,
+   @brief_id, @post_id, @client_note, @internal_note, @decline_reason, @client_feedback,
+   @source, @service_type, @page_type, @upgraded_at, @delivery_url, @delivery_notes,
+   @target_page_id, @target_page_slug, @comments, @requested_at, @updated_at)
+```
+
+**(c) Update `stmts().update` SQL** to include `post_id = @post_id` in the SET clause:
+
+```sql
+UPDATE content_topic_requests SET
+  status = @status, brief_id = @brief_id, post_id = @post_id, client_note = @client_note,
+  internal_note = @internal_note, decline_reason = @decline_reason,
+  client_feedback = @client_feedback, service_type = @service_type,
+  upgraded_at = @upgraded_at, delivery_url = @delivery_url,
+  delivery_notes = @delivery_notes, comments = @comments, updated_at = @updated_at
+WHERE id = @id AND workspace_id = @workspace_id
+```
+
+**(d) Update `rowToRequest` mapper** to read the new column (after `briefId: row.brief_id ?? undefined`):
+
+```typescript
+briefId: row.brief_id ?? undefined,
+postId: row.post_id ?? undefined,   // ← ADD
+```
+
+**(e) Update `updateContentRequest` function** — add `postId` to the picks and to the `.run()` call:
+
+Update the function signature's `Pick` type (around line 174):
+```typescript
+updates: Partial<Pick<ContentTopicRequest, 'status' | 'briefId' | 'postId' | 'internalNote' | 'declineReason' | 'clientFeedback' | 'serviceType' | 'upgradedAt' | 'deliveryUrl' | 'deliveryNotes'>>
+```
+
+And in the `.run()` call, add `post_id: existing.postId ?? null`:
+```typescript
+stmts().update.run({
+  id: existing.id,
+  workspace_id: workspaceId,
+  status: existing.status,
+  brief_id: existing.briefId ?? null,
+  post_id: existing.postId ?? null,   // ← ADD
+  client_note: existing.clientNote ?? null,
+  // ... rest unchanged ...
+});
+```
+
+Also update the `addComment` function's `.run()` call the same way (it also calls `stmts().update`):
+```typescript
+// In addComment, find stmts().update.run and add:
+post_id: existing.postId ?? null,   // ← ADD
+```
+
+**(f) Update `createContentRequest` insert call** to pass `post_id: null` (new requests never have a post yet):
+
+```typescript
+stmts().insert.run({
+  // ... existing fields ...
+  brief_id: request.briefId ?? null,
+  post_id: null,   // ← ADD (posts are linked later via updateContentRequest)
+  // ... rest unchanged ...
+});
 ```
 
 - [ ] **Step 1.4: Update the Zod status enum in `server/routes/content-requests.ts`**
@@ -109,13 +217,18 @@ Expected: zero errors related to `post_review`.
 - [ ] **Step 1.6: Commit**
 
 ```bash
-git add server/state-machines.ts shared/types/content.ts src/components/client/types.ts server/routes/content-requests.ts
-git commit -m "feat(content): add post_review status to ContentTopicRequest state machine"
+git add server/db/migrations/073-content-request-post-id.sql \
+        server/state-machines.ts \
+        shared/types/content.ts \
+        server/content-requests.ts \
+        src/components/client/types.ts \
+        server/routes/content-requests.ts
+git commit -m "feat(content): add post_review status and postId column to ContentTopicRequest"
 ```
 
 ---
 
-## Task 2: Add `notifyClientPostReady` Email Function
+## Task 2: Add `notifyClientPostReady` Email Function (Model: haiku)
 
 **Files:**
 - Modify: `server/email.ts`
@@ -159,7 +272,7 @@ git commit -m "feat(email): add notifyClientPostReady notification"
 
 ---
 
-## Task 3: Add Zod Schemas for Post-Review Public Routes
+## Task 3: Add Zod Schemas for Post-Review Public Routes (Model: haiku)
 
 **Files:**
 - Modify: `server/schemas/public-content.ts`
@@ -214,7 +327,7 @@ git commit -m "feat(schemas): add approve-post, request-post-changes, client-edi
 
 ---
 
-## Task 4: Add Public API Routes for Post Review
+## Task 4: Add Public API Routes for Post Review (Model: sonnet)
 
 **Files:**
 - Modify: `server/routes/public-content.ts`
@@ -400,7 +513,7 @@ git commit -m "feat(api): add public post-review routes (read, approve, request-
 
 ---
 
-## Task 5: Admin Notification Hook for `post_review` Status
+## Task 5: Admin Notification Hook for `post_review` Status (Model: haiku)
 
 **Files:**
 - Modify: `server/routes/content-requests.ts`
@@ -471,7 +584,7 @@ git commit -m "feat(content): notify client and log activity when post sent for 
 
 ---
 
-## Task 6: Admin "Send Post to Client" Button in RequestList
+## Task 6: Admin "Send Post to Client" Button in RequestList (Model: sonnet)
 
 **Files:**
 - Modify: `src/components/briefs/RequestList.tsx`
@@ -569,7 +682,7 @@ git commit -m "feat(admin): add Send Post to Client button and post_review statu
 
 ---
 
-## Task 7: Client-Facing API Methods
+## Task 7: Client-Facing API Methods (Model: haiku)
 
 **Files:**
 - Modify: `src/api/content.ts`
@@ -620,12 +733,41 @@ git commit -m "feat(api-client): add publicPostReview methods for client post-re
 
 ---
 
-## Task 8: PostReviewCard Client Component
+## Task 8: PostReviewCard Client Component (Model: sonnet)
 
 **Files:**
+- Create: `src/hooks/client/useClientPostPreview.ts`
 - Create: `src/components/client/PostReviewCard.tsx`
 
 Do NOT modify any other file in this task. Depends on Tasks 1 and 7 being committed.
+
+- [ ] **Step 8.0: Create `src/hooks/client/useClientPostPreview.ts`**
+
+This hook is needed so PostReviewCard can fetch its own data via React Query, avoiding a hand-rolled `useState`+fetch pattern. Keeping post loading inside PostReviewCard means ContentTab needs no new state.
+
+```typescript
+import { useQuery } from '@tanstack/react-query';
+import { publicPostReview } from '../../api/content';
+import type { GeneratedPost } from '../../../shared/types/content';
+
+/**
+ * Fetches a GeneratedPost for client review.
+ * Only fires when `enabled` is true (i.e., the card is expanded and status is post_review).
+ */
+export function useClientPostPreview(
+  workspaceId: string,
+  postId: string | undefined,
+  enabled: boolean,
+) {
+  return useQuery<GeneratedPost>({
+    queryKey: ['client', 'post-preview', workspaceId, postId],
+    queryFn: () => publicPostReview.getPost(workspaceId, postId!),
+    enabled: !!postId && enabled,
+    staleTime: 1000 * 60 * 5, // 5 min — post content rarely changes mid-session
+    retry: false,
+  });
+}
+```
 
 - [ ] **Step 8.1: Create `src/components/client/PostReviewCard.tsx`**
 
@@ -635,17 +777,25 @@ import { Check, X, ChevronDown, ChevronUp, Edit3 } from 'lucide-react';
 import type { ClientContentRequest } from './types';
 import type { GeneratedPost } from '../../../shared/types/content';
 import { publicPostReview } from '../../api/content';
+import { useClientPostPreview } from '../../hooks/client/useClientPostPreview';
 
 interface PostReviewCardProps {
   request: ClientContentRequest;
-  post: GeneratedPost;
   workspaceId: string;
   onUpdate: (updated: ClientContentRequest) => void;
   setToast: (t: { message: string; type: 'success' | 'error' } | null) => void;
 }
 
-export function PostReviewCard({ request, post: initialPost, workspaceId, onUpdate, setToast }: PostReviewCardProps) {
-  const [post, setPost] = useState<GeneratedPost>(initialPost);
+export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: PostReviewCardProps) {
+  // Self-fetches post data via React Query (no hand-rolled state/effect needed)
+  const { data: fetchedPost, isLoading: postLoading } = useClientPostPreview(workspaceId, request.postId, true);
+  const [post, setPost] = useState<GeneratedPost | undefined>(undefined);
+
+  // Sync fetched post into local state once (so edits can update it without refetching)
+  if (fetchedPost && !post) setPost(fetchedPost);
+
+  if (postLoading) return <p className="text-xs text-zinc-500 mt-3 animate-pulse">Loading post…</p>;
+  if (!post) return <p className="text-xs text-zinc-500 mt-3">Post not available.</p>;
   const [editingSection, setEditingSection] = useState<number | null>(null);
   const [sectionDraft, setSectionDraft] = useState('');
   const [editingIntro, setEditingIntro] = useState(false);
@@ -898,98 +1048,93 @@ Expected: zero errors.
 - [ ] **Step 8.3: Commit**
 
 ```bash
-git add src/components/client/PostReviewCard.tsx
-git commit -m "feat(client): add PostReviewCard component with inline editing and approve/reject"
+git add src/hooks/client/useClientPostPreview.ts src/components/client/PostReviewCard.tsx
+git commit -m "feat(client): add self-fetching PostReviewCard with inline editing and approve/reject"
 ```
 
 ---
 
-## Task 9: Wire PostReviewCard into ContentTab
+## Task 9: Wire PostReviewCard into ContentTab (Model: sonnet)
 
 **Files:**
 - Modify: `src/components/client/ContentTab.tsx`
 
 Do NOT modify any other file in this task. Depends on Task 8 being committed.
 
-- [ ] **Step 9.1: Import `PostReviewCard` and `publicPostReview` in `ContentTab.tsx`**
+- [ ] **Step 9.0: Fix `ContentTab` summary card and alert banner to include `post_review`**
+
+Two places in `ContentTab.tsx` need updating:
+
+**(a) `inProgress` bucket in the summary stats cards** (look for the array near the top of the component where statuses are grouped):
+
+Find the `inProgress` bucket definition (it should contain `['pending_payment', 'requested', 'brief_generated', 'changes_requested', 'approved', 'in_progress']`). Add `'post_review'`:
+
+```typescript
+const inProgress = requests.filter(r =>
+  ['pending_payment', 'requested', 'brief_generated', 'changes_requested', 'approved', 'in_progress', 'post_review'].includes(r.status)
+);
+```
+
+**(b) Alert banner for client action needed** (look around line 95, where `client_review` count is computed for the "briefs ready for review" banner):
+
+The banner currently reads something like:
+```typescript
+const needsReview = requests.filter(r => r.status === 'client_review').length;
+```
+
+Add a separate count for posts needing review and show both notifications:
+```typescript
+const needsBriefReview = requests.filter(r => r.status === 'client_review').length;
+const needsPostReview = requests.filter(r => r.status === 'post_review').length;
+```
+
+Then in the banner JSX, show a post review alert alongside the existing brief alert:
+```tsx
+{needsPostReview > 0 && (
+  <div className="...alert-banner-classes...">
+    <Eye className="w-4 h-4 text-cyan-400" />
+    <span>{needsPostReview} post{needsPostReview > 1 ? 's' : ''} ready for your review</span>
+  </div>
+)}
+```
+
+Match the existing banner's styling exactly. Add `Eye` to the lucide-react import if not already present.
+
+- [ ] **Step 9.1: Import `PostReviewCard` in `ContentTab.tsx`**
 
 At the top of the file, add with the other local imports:
 
 ```typescript
 import { PostReviewCard } from './PostReviewCard';
-import { publicPostReview } from '../../api/content';
-import type { GeneratedPost } from '../../../shared/types/content';
 ```
 
-- [ ] **Step 9.2: Add state for loaded post data in `ContentTab`**
+No additional imports needed — `PostReviewCard` is self-fetching (uses its own React Query hook internally). No hand-rolled state is needed in ContentTab.
 
-Inside the `ContentTab` function, after the existing state declarations, add:
+- [ ] **Step 9.2: (No longer needed — PostReviewCard self-fetches via React Query)**
 
-```typescript
-const [postPreviews, setPostPreviews] = useState<Record<string, GeneratedPost>>({});
-const [loadingPost, setLoadingPost] = useState<Record<string, boolean>>({});
-```
+PostReviewCard uses `useClientPostPreview` internally (created in Task 8). Do NOT add `postPreviews`/`loadingPost` state to ContentTab — this would violate CLAUDE.md's prohibition on hand-rolled `useState`+fetch patterns.
 
-- [ ] **Step 9.3: Add `loadPostPreview` helper**
+- [ ] **Step 9.3: (No longer needed — see Step 9.2)**
 
-After the `loadBriefPreview` function, add:
+- [ ] **Step 9.4: No change needed to the expand trigger**
 
-```typescript
-async function loadPostPreview(postId: string) {
-  if (postPreviews[postId] || loadingPost[postId]) return;
-  setLoadingPost(prev => ({ ...prev, [postId]: true }));
-  try {
-    const p = await publicPostReview.getPost(workspaceId, postId);
-    setPostPreviews(prev => ({ ...prev, [postId]: p as GeneratedPost }));
-  } catch {
-    // Post not available or not in review status — silently skip
-  } finally {
-    setLoadingPost(prev => ({ ...prev, [postId]: false }));
-  }
-}
-```
-
-- [ ] **Step 9.4: Add `postId` to the expanded request trigger**
-
-Find the `button onClick` that expands a content request card (calls `setExpandedContentReq` and `loadBriefPreview`). Add `loadPostPreview` for `post_review` requests:
-
-```typescript
-onClick={() => {
-  const next = isExpanded ? null : req.id;
-  setExpandedContentReq(next);
-  if (next && req.briefId) loadBriefPreview(req.briefId);
-  // Load post when request is in post_review
-  if (next && req.status === 'post_review' && req.postId) loadPostPreview(req.postId);
-}}
-```
-
-Note: `req.postId` is added in Task 1. If the public content requests endpoint doesn't yet return `postId`, you can query it by briefId from the loaded brief instead. Look at how `briefPreviews` is loaded in `ContentTab` as the model.
+`PostReviewCard` fetches its own data when rendered, so nothing needs to be triggered on expand. The existing expand logic (calls `setExpandedContentReq` and `loadBriefPreview`) stays untouched.
 
 - [ ] **Step 9.5: Render `PostReviewCard` inside the expanded request for `post_review` status**
 
 Find where the brief preview is rendered for `client_review` status (look for where `brief &&` and the brief outline are rendered, around lines 390–500). After the brief block, add a new block for `post_review`:
 
 ```typescript
-{req.status === 'post_review' && (() => {
-  const postId = req.postId;
-  if (!postId) return <p className="text-xs text-zinc-500 mt-3">Post loading…</p>;
-  const post = postPreviews[postId];
-  if (loadingPost[postId]) {
-    return <p className="text-xs text-zinc-500 mt-3 animate-pulse">Loading post…</p>;
-  }
-  if (!post) return <p className="text-xs text-zinc-500 mt-3">Post not available.</p>;
-  return (
-    <PostReviewCard
-      request={req}
-      post={post}
-      workspaceId={workspaceId}
-      onUpdate={updated => {
-        setContentRequests(prev => prev.map(r => r.id === updated.id ? { ...r, ...updated } : r));
-      }}
-      setToast={setToast}
-    />
-  );
-})()}
+{req.status === 'post_review' && (
+  <PostReviewCard
+    request={req}
+    workspaceId={workspaceId}
+    onUpdate={updated => {
+      setContentRequests(prev => prev.map(r => r.id === updated.id ? { ...r, ...updated } : r));
+    }}
+    setToast={setToast}
+  />
+)}
 ```
 
 - [ ] **Step 9.6: Add `post_review` to the progress stepper step list in `ContentTab`**
@@ -1029,7 +1174,7 @@ git commit -m "feat(client): render PostReviewCard for post_review requests in C
 
 ---
 
-## Task 10: Integration Tests
+## Task 10: Integration Tests (Model: sonnet)
 
 **Files:**
 - Create: `tests/integration/client-post-review.test.ts`
@@ -1041,136 +1186,141 @@ Depends on Tasks 4, 5, 6, and 9 being committed. Uses port **13328** (check exis
 Create `tests/integration/client-post-review.test.ts`:
 
 ```typescript
+/**
+ * Integration tests for client post review flow.
+ *
+ * Tests the public API endpoints added in Task 4:
+ * - POST /api/public/content-request/:wsId/:id/approve-post
+ * - POST /api/public/content-request/:wsId/:id/request-post-changes
+ *
+ * And the state machine guard (via admin PATCH) for post_review transitions.
+ *
+ * Pattern follows tests/integration/content-requests-routes.test.ts.
+ */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestContext } from './helpers';
-import { seedWorkspace } from '../mocks/workspace-seed';
+import { createTestContext } from './helpers.js';
+import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const PORT = 13328;
-let ctx: Awaited<ReturnType<typeof createTestContext>>;
-let wsId: string;
+const ctx = createTestContext(13328);
+const { api, postJson, patchJson } = ctx;
+
+let testWsId = '';
 
 beforeAll(async () => {
-  ctx = await createTestContext(PORT);
-  const ws = await seedWorkspace(ctx);
-  wsId = ws.id;
+  await ctx.startServer();
+  const ws = createWorkspace('Post Review Test Workspace');
+  testWsId = ws.id;
+}, 25_000);
+
+afterAll(() => {
+  deleteWorkspace(testWsId);
+  ctx.stopServer();
 });
 
-afterAll(async () => {
-  await ctx.cleanup();
-});
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+async function createRequest(topic: string, kw: string): Promise<{ id: string; status: string }> {
+  const res = await postJson(`/api/content-requests/${testWsId}`, {
+    topic, targetKeyword: kw, intent: 'informational',
+    priority: 'medium', rationale: '', serviceType: 'full_post',
+  });
+  expect(res.status).toBe(200);
+  return res.json() as Promise<{ id: string; status: string }>;
+}
+
+async function setStatus(reqId: string, status: string): Promise<Response> {
+  return patchJson(`/api/content-requests/${testWsId}/${reqId}`, { status });
+}
+
+// ── tests ─────────────────────────────────────────────────────────────────────
 
 describe('POST /api/public/content-request/:wsId/:id/approve-post', () => {
   it('transitions post_review → delivered', async () => {
-    // Create a request, advance to post_review via admin route
-    const createRes = await ctx.adminFetch(`/api/content-requests/${wsId}`, {
-      method: 'POST',
-      body: JSON.stringify({ topic: 'Test', targetKeyword: 'test', intent: 'informational', priority: 'medium', rationale: '', serviceType: 'full_post' }),
-    });
-    expect(createRes.status).toBe(200);
-    const req = await createRes.json();
+    const req = await createRequest('Approve Test', `approve-test-${Date.now()}`);
 
-    // Advance to in_progress
-    const toInProgress = await ctx.adminFetch(`/api/content-requests/${wsId}/${req.id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status: 'in_progress' }),
-    });
-    expect(toInProgress.status).toBe(200);
-
-    // Advance to post_review
-    const toPostReview = await ctx.adminFetch(`/api/content-requests/${wsId}/${req.id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status: 'post_review' }),
-    });
+    // Walk to in_progress → post_review
+    await setStatus(req.id, 'in_progress');
+    const toPostReview = await setStatus(req.id, 'post_review');
     expect(toPostReview.status).toBe(200);
-    const postReviewReq = await toPostReview.json();
-    expect(postReviewReq.status).toBe('post_review');
 
-    // Client approves
-    const approveRes = await ctx.publicFetch(`/api/public/content-request/${wsId}/${req.id}/approve-post`, {
-      method: 'POST',
-      body: JSON.stringify({}),
-    });
-    expect(approveRes.status).toBe(200);
-    const approved = await approveRes.json();
-    expect(approved.status).toBe('delivered');
+    // Client approves via public route (no auth required)
+    const res = await postJson(`/api/public/content-request/${testWsId}/${req.id}/approve-post`, {});
+    expect(res.status).toBe(200);
+    const body = await res.json() as { status: string };
+    expect(body.status).toBe('delivered');
+  });
+
+  it('rejects approve-post from a non-post_review status (e.g. in_progress)', async () => {
+    const req = await createRequest('Bad Approve Test', `bad-approve-${Date.now()}`);
+    await setStatus(req.id, 'in_progress');
+    // Do NOT advance to post_review
+
+    const res = await postJson(`/api/public/content-request/${testWsId}/${req.id}/approve-post`, {});
+    expect(res.status).toBe(400);
   });
 });
 
 describe('POST /api/public/content-request/:wsId/:id/request-post-changes', () => {
-  it('transitions post_review → changes_requested with feedback', async () => {
-    const createRes = await ctx.adminFetch(`/api/content-requests/${wsId}`, {
-      method: 'POST',
-      body: JSON.stringify({ topic: 'Feedback Test', targetKeyword: 'feedback test', intent: 'informational', priority: 'medium', rationale: '', serviceType: 'full_post' }),
-    });
-    const req = await createRes.json();
+  it('transitions post_review → changes_requested and stores clientFeedback', async () => {
+    const req = await createRequest('Changes Test', `changes-test-${Date.now()}`);
 
-    await ctx.adminFetch(`/api/content-requests/${wsId}/${req.id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status: 'in_progress' }),
-    });
-    await ctx.adminFetch(`/api/content-requests/${wsId}/${req.id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status: 'post_review' }),
-    });
+    await setStatus(req.id, 'in_progress');
+    await setStatus(req.id, 'post_review');
 
-    const changeRes = await ctx.publicFetch(`/api/public/content-request/${wsId}/${req.id}/request-post-changes`, {
-      method: 'POST',
-      body: JSON.stringify({ feedback: 'Please make section 2 more detailed.' }),
-    });
-    expect(changeRes.status).toBe(200);
-    const changed = await changeRes.json();
-    expect(changed.status).toBe('changes_requested');
-    expect(changed.clientFeedback).toBe('Please make section 2 more detailed.');
+    const res = await postJson(
+      `/api/public/content-request/${testWsId}/${req.id}/request-post-changes`,
+      { feedback: 'Please make section 2 more detailed.' },
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as { status: string; clientFeedback: string };
+    expect(body.status).toBe('changes_requested');
+    expect(body.clientFeedback).toBe('Please make section 2 more detailed.');
   });
 
   it('rejects request-post-changes from non-post_review status', async () => {
-    const createRes = await ctx.adminFetch(`/api/content-requests/${wsId}`, {
-      method: 'POST',
-      body: JSON.stringify({ topic: 'Guard Test', targetKeyword: 'guard test', intent: 'informational', priority: 'medium', rationale: '', serviceType: 'full_post' }),
-    });
-    const req = await createRes.json();
-    // Do NOT advance to post_review — stays at 'requested'
+    const req = await createRequest('Guard Test', `guard-test-${Date.now()}`);
+    // Stays at 'requested' — does NOT advance to post_review
 
-    const changeRes = await ctx.publicFetch(`/api/public/content-request/${wsId}/${req.id}/request-post-changes`, {
-      method: 'POST',
-      body: JSON.stringify({ feedback: 'Should be rejected.' }),
-    });
-    expect(changeRes.status).toBe(400); // InvalidTransitionError
+    const res = await postJson(
+      `/api/public/content-request/${testWsId}/${req.id}/request-post-changes`,
+      { feedback: 'Should be rejected.' },
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects request-post-changes with empty feedback', async () => {
+    const req = await createRequest('Empty Feedback Test', `empty-fb-${Date.now()}`);
+    await setStatus(req.id, 'in_progress');
+    await setStatus(req.id, 'post_review');
+
+    const res = await postJson(
+      `/api/public/content-request/${testWsId}/${req.id}/request-post-changes`,
+      { feedback: '' },
+    );
+    expect(res.status).toBe(400); // Zod min(1) validation
   });
 });
 
-describe('state machine guard: in_progress → post_review', () => {
+describe('State machine guard: in_progress → post_review', () => {
   it('allows in_progress → post_review', async () => {
-    const createRes = await ctx.adminFetch(`/api/content-requests/${wsId}`, {
-      method: 'POST',
-      body: JSON.stringify({ topic: 'SM Test', targetKeyword: 'sm test', intent: 'informational', priority: 'medium', rationale: '', serviceType: 'full_post' }),
-    });
-    const req = await createRes.json();
-    await ctx.adminFetch(`/api/content-requests/${wsId}/${req.id}`, {
-      method: 'PATCH', body: JSON.stringify({ status: 'in_progress' }),
-    });
-    const res = await ctx.adminFetch(`/api/content-requests/${wsId}/${req.id}`, {
-      method: 'PATCH', body: JSON.stringify({ status: 'post_review' }),
-    });
+    const req = await createRequest('SM Allow Test', `sm-allow-${Date.now()}`);
+    await setStatus(req.id, 'in_progress');
+    const res = await setStatus(req.id, 'post_review');
     expect(res.status).toBe(200);
+    const body = await res.json() as { status: string };
+    expect(body.status).toBe('post_review');
   });
 
-  it('blocks approved → post_review (must go through in_progress)', async () => {
-    const createRes = await ctx.adminFetch(`/api/content-requests/${wsId}`, {
-      method: 'POST',
-      body: JSON.stringify({ topic: 'Guard2 Test', targetKeyword: 'guard2 test', intent: 'informational', priority: 'medium', rationale: '', serviceType: 'full_post' }),
-    });
-    const req = await createRes.json();
-    await ctx.adminFetch(`/api/content-requests/${wsId}/${req.id}`, {
-      method: 'PATCH', body: JSON.stringify({ status: 'approved' }),
-    });
-    const res = await ctx.adminFetch(`/api/content-requests/${wsId}/${req.id}`, {
-      method: 'PATCH', body: JSON.stringify({ status: 'post_review' }),
-    });
-    expect(res.status).toBe(400); // InvalidTransitionError
+  it('blocks requested → post_review directly (must go through in_progress)', async () => {
+    const req = await createRequest('SM Block Test', `sm-block-${Date.now()}`);
+    // 'requested' cannot jump to 'post_review' — must walk through in_progress
+    const res = await setStatus(req.id, 'post_review');
+    expect(res.status).toBe(400);
   });
 });
 ```
+
+> **PLAN_WRITING_GUIDE update needed:** Port 13328 is the next free port (verified against codebase — current max is 13327). After this task, update `docs/PLAN_WRITING_GUIDE.md` line ~197 to show the new range as 13201–13328.
 
 - [ ] **Step 10.2: Run tests — confirm they fail correctly before implementation**
 
@@ -1223,10 +1373,43 @@ git commit -m "test(integration): add client-post-review flow tests"
 
 ---
 
+## Systemic Improvements
+
+These are improvements that should accompany (or follow immediately after) the feature implementation.
+
+### 1. Shared utilities extracted by this feature
+- **`useClientPostPreview` hook** (`src/hooks/client/useClientPostPreview.ts`) — created in Task 8. Pattern: `useQuery` for client-portal data fetching. Any future client-portal post reads should reuse this hook.
+
+### 2. pr-check rules to consider adding
+
+**(a) Public mutation routes missing `post_review` in status badge maps**
+After implementation, run `grep -r "post_review" src/components/client/ContentTab.tsx` and confirm the summary-card status arrays were updated. A pr-check rule could enforce that any `status === 'post_review'` string in a route file has a corresponding entry in the client status badge map — but this is complex to automate. At minimum, add a manual checklist item: "New status values added to state machine must appear in ContentTab status config and summary buckets."
+
+**(b) Public mutation activity logging**
+The existing pr-check rule `Public-portal mutation without addActivity` (see `docs/rules/automated-rules.md`) already covers `approve-post` and `request-post-changes`. Verify both new routes call `addActivity` — this is already in the plan (Task 4) but the pr-check will catch it if missed.
+
+### 3. Test coverage additions
+
+**Required as part of this plan (Task 10):**
+- `approve-post` happy path and guard (non-`post_review` status blocked)
+- `request-post-changes` happy path, guard, and empty-feedback validation
+- `in_progress → post_review` allowed; `requested → post_review` blocked
+
+**Recommended follow-up tests (not in this plan — add after merge):**
+- `content-lifecycle.test.ts`: Add `post_review` to the happy-path walkthrough (`in_progress → post_review → delivered`) so the lifecycle suite covers the new state
+- `PATCH /api/public/content-posts/:wsId/:postId/client-edit`: Unit test that `snapshotPostVersion` is called before the edit, and the updated sections are persisted correctly
+
+### 4. Intelligence engine wiring (deferred)
+Post feedback (`clientFeedback`, `voiceScore`, `voiceFeedback`, `reviewChecklist`) is stored in the DB but not in `ClientSignalsSlice` (`shared/types/intelligence.ts`). Adding `contentFeedbackSignals` to that slice would let AdminChat and the strategy engine learn from client post reactions. Tracked separately — not in scope for this plan.
+
+---
+
 ## Self-Review Notes
 
 **Spec coverage verified:**
 - ✅ `post_review` state machine transitions (Task 1)
+- ✅ `postId` DB column, migration, mapper, write path (Task 1: Steps 1.0 + 1.2 + 1.3b)
+- ✅ `postId` public serialization (Task 4, Step 4.0)
 - ✅ Admin "Send Post to Client" button (Task 6)
 - ✅ Email notification to client (Tasks 2 + 5)
 - ✅ Public post read endpoint (Task 4.2)
@@ -1235,6 +1418,22 @@ git commit -m "test(integration): add client-post-review flow tests"
 - ✅ Client approve action → `delivered` (Tasks 4.3 + 8)
 - ✅ Client request-changes action → `changes_requested` (Tasks 4.4 + 8)
 - ✅ Admin sees client-edited version via post versioning (Task 4.5 calls `snapshotPostVersion`)
-- ✅ Integration tests for all happy paths and state-machine guards (Task 10)
+- ✅ Integration tests — all use correct test infrastructure (`createWorkspace`/`deleteWorkspace`, `postJson`/`patchJson`/`api`, `ctx.stopServer()`) (Task 10)
+- ✅ Model assignments on all 10 tasks
+- ✅ Systemic improvements section present
+- ✅ `ContentTab` summary cards and alert banner updated for `post_review` (Task 9, Step 9.0)
+- ✅ PostReviewCard uses React Query (`useClientPostPreview`) — no hand-rolled `useState`+fetch (Tasks 8 + 9)
 
-**Previously-flagged gap — now resolved:** `req.postId` gap is fixed in **Step 4.0** (new step added to Task 4). The public `GET /api/public/content-requests/:workspaceId` does explicit field selection (confirmed in source) and was missing `postId`. Step 4.0 adds it with the same status-gating pattern as `briefId`, plus instructions for the case where `postId` isn't yet a column on the request row.
+**Audit findings resolved (April 2026 review):**
+1. Model assignments — added to all task headings ✅
+2. Systemic improvements section — added ✅
+3. `postId` missing from data model — migration 073 + DB module changes added to Task 1 ✅
+4. Hand-rolled `useState`+fetch in Task 9 — replaced with self-fetching PostReviewCard + `useClientPostPreview` hook ✅
+5. Task 10 test infrastructure incompatibilities — rewritten with correct imports, signatures, and API surface ✅
+6. `ContentTab` summary cards/banner missing `post_review` — added Step 9.0 ✅
+7. PLAN_WRITING_GUIDE port range stale — note added in Task 10 to update docs ✅
+
+**Conscious design decisions (not bugs):**
+- `changes_requested → post_review` shortcut NOT added to state machine — admin must re-enter `in_progress` to re-send; this is intentional (forces an explicit re-queue step)
+- `briefId` gate in Step 4.0 does NOT include `post_review` — client's focus during post_review is the post, not the brief; intentional
+- `dangerouslySetInnerHTML` in PostReviewCard — follows existing codebase pattern for AI-generated HTML; content is AI-generated (not user-submitted), low XSS risk
