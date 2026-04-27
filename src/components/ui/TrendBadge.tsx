@@ -1,4 +1,5 @@
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { cn } from '../../lib/utils';
 
 export interface TrendBadgeProps {
   value: number;
@@ -36,7 +37,7 @@ export function TrendBadge({
 
   if (value === 0) {
     return (
-      <span className={`inline-flex items-center gap-0.5 ${textSize} font-medium text-[var(--brand-text)] ${className ?? ''}`}>
+      <span className={cn(`inline-flex items-center gap-0.5 ${textSize} font-medium text-[var(--brand-text)]`, className)}>
         <Minus className={iconSize} />
         0{suffix}
         {label ? ` ${label}` : null}
@@ -50,7 +51,7 @@ export function TrendBadge({
   const displayValue = showSign ? value : Math.abs(value);
 
   return (
-    <span className={`inline-flex items-center gap-0.5 ${textSize} font-medium ${color} ${className ?? ''}`}>
+    <span className={cn(`inline-flex items-center gap-0.5 ${textSize} font-medium ${color}`, className)}>
       {positive ? <TrendingUp className={iconSize} /> : <TrendingDown className={iconSize} />}
       {!iconOnly && <>{sign}{displayValue}{suffix}</>}
       {label ? ` ${label}` : null}
