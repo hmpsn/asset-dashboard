@@ -49,7 +49,7 @@ export function ConfirmDialog({
         <div className="flex gap-3 justify-end">
           <button
             onClick={onCancel}
-            className="px-4 py-2 rounded-[var(--radius-md)] t-ui font-medium text-[var(--brand-text)] border border-[var(--brand-border)] hover:bg-[var(--surface-3)] transition-colors"
+            className="px-4 py-2 rounded-[var(--radius-md)] t-body font-medium text-[var(--brand-text)] border border-[var(--brand-border)] hover:bg-[var(--surface-3)] transition-colors"
           >
             {cancelLabel}
           </button>
@@ -57,8 +57,8 @@ export function ConfirmDialog({
             onClick={onConfirm}
             className={
               variant === 'destructive'
-                ? 'px-4 py-2 rounded-[var(--radius-md)] t-ui font-semibold bg-red-600 hover:bg-red-500 text-white transition-colors'
-                : 'px-4 py-2 rounded-[var(--radius-md)] t-ui font-semibold bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white transition-all'
+                ? 'px-4 py-2 rounded-[var(--radius-md)] t-body font-semibold bg-red-600 hover:bg-red-500 text-white transition-colors'
+                : 'px-4 py-2 rounded-[var(--radius-md)] t-body font-semibold bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white transition-all'
             }
           >
             {confirmLabel}

@@ -64,7 +64,7 @@ export function SectionCard({ title, titleIcon, titleExtra, action, children, cl
         <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--brand-border)]" style={headerStyle}>
           <div className="flex items-center gap-2 min-w-0">
             {titleIcon}
-            <span className="t-ui font-semibold text-[var(--brand-text-bright)]">{title}</span>
+            <span className="t-body font-semibold text-[var(--brand-text-bright)]">{title}</span>
             {titleExtra}
           </div>
           {action}

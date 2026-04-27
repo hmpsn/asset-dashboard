@@ -82,7 +82,7 @@ export function TierGate({ tier, required, feature, teaser, children, className,
 
           {/* Copy */}
           <div>
-            <div className="t-ui font-semibold text-[var(--brand-text-bright)] mb-1">{feature}</div>
+            <div className="t-body font-semibold text-[var(--brand-text-bright)] mb-1">{feature}</div>
             <div className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">
               {teaser || `Upgrade to ${TIER_LABELS[required]} to unlock this feature`}
             </div>
