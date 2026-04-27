@@ -132,7 +132,7 @@ export function AssetCard({
                 className="shrink-0 flex items-center gap-0.5 px-1 py-0.5 rounded t-caption-sm font-semibold bg-blue-900/40 text-blue-400 leading-none"
                 title={`Used in CMS: ${cmsUsages!.map(u => `${u.collectionName} → ${u.fieldDisplayName} (${u.fieldType})`).join(', ')}`}
               >
-                <Icon as={Database} size="xs" />
+                <Icon as={Database} size="sm" />
                 {cmsLabel}
               </span>
             )}
@@ -142,7 +142,7 @@ export function AssetCard({
               className="shrink-0 p-0.5 rounded text-[var(--brand-text-muted)] hover:text-teal-400 transition-colors"
               title="Smart rename"
             >
-              <Icon as={renameLoading ? Loader2 : Wand2} size="md" className={renameLoading ? 'animate-spin' : ''} />
+              <Icon as={renameLoading ? Loader2 : Wand2} size="sm" className={renameLoading ? 'animate-spin' : ''} />
             </button>
           </>
         )}
