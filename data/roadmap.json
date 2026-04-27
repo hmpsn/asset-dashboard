@@ -630,6 +630,15 @@
           "priority": "P1",
           "notes": "Phase 2 codemod batches touched ~225 components but the original staging smoke test on 2026-04-25 only exercised desktop breakpoints — the resize_window MCP call didn't take effect on the Chrome instance. Tailwind responsive utilities are unchanged at the codemod level (only color tokens swapped, not breakpoint prefixes), but token swaps at breakpoint-conditional className boundaries could have edge cases. Test at 375 (mobile), 640 (sm), 768 (md), 1024 (lg) breakpoints across: WorkspaceOverview (admin home), ClientDashboard (overview/strategy/content tabs), SeoAudit (audit results table), Settings (Workspace + Client tabs). Look for: stacked vs grid layouts, button sizes, table overflow, sidebar collapse. Risk if skipped: medium — a regression at one breakpoint is invisible on desktop testing.",
           "status": "pending"
+        },
+        {
+          "id": 626,
+          "title": "Harden flaky brand-engine + brand-identity integration tests",
+          "source": "CI flakiness — recurring on staging push runs",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Two recurring failure modes in parallel-run integration tests, same root cause (test server not ready when first request fires, or server crash mid-suite under parallel load):\n\n1. tests/integration/brand-engine-routes.test.ts (port 13317) — DELETE voice samples test fails with `SyntaxError: Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON`. The Express server's startServer() promise resolves but the route registry isn't ready, so the POST /api/voice/.../samples returns Vite's SPA fallback HTML. Hit on 2026-04-27 staging push (PR #322 merge).\n\n2. tests/integration/brand-identity-hardening.test.ts (port unknown) — 4 tests fail with `TypeError: fetch failed / SocketError: other side closed`. Server connection drops mid-test. Hit on 2026-04-27 PR #319 round-3 commit CI run.\n\nBoth have unique ports (no collision per pr-check rule). Both pass on rerun, blocking confirmation that they aren't real bugs. Fixes to investigate:\n- Add explicit await for server.listen() callback before resolving startServer()\n- Add retry-on-HTML-response in postJson/del helpers (quick guard)\n- Consider --threads=1 for integration tests in CI (slower but eliminates parallelism)\n- Add a health-check ping in beforeAll() to wait for server readiness\n\nGoal: zero false-failure CI runs from these test files over 2 weeks of normal merge cadence. Stretch: extract a shared `waitForServer(port)` helper to tests/integration/helpers.ts so all integration suites benefit.",
+          "status": "pending"
         }
       ]
     },
