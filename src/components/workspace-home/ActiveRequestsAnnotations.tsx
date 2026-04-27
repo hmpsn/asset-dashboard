@@ -1,6 +1,6 @@
 import { Clipboard, Flag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { SectionCard, Badge } from '../ui';
+import { SectionCard, Badge, Icon } from '../ui';
 import { adminPath } from '../../routes';
 import { timeAgo } from '../../lib/timeAgo';
 
@@ -34,18 +34,18 @@ export function ActiveRequestsAnnotations({ requests, annotations, workspaceId }
       {requests.length > 0 && (
         <SectionCard
           title="Active Requests"
-          titleIcon={<Clipboard className="w-4 h-4 text-amber-400/80" />}
-          action={<button onClick={() => navigate(adminPath(workspaceId, 'requests'))} className="text-[11px] text-teal-400 hover:text-teal-300 transition-colors">View All →</button>}
+          titleIcon={<Icon as={Clipboard} size="md" className="text-amber-400/80" />}
+          action={<button onClick={() => navigate(adminPath(workspaceId, 'requests'))} className="t-caption-sm text-teal-400 hover:text-teal-300 transition-colors">View All →</button>}
           noPadding
         >
-          <div className="divide-y divide-zinc-800/50">
+          <div className="divide-y divide-[var(--brand-border)]">
             {requests.slice(0, 5).map(req => {
               const statusColor = req.status === 'new' || req.status === 'open' ? 'red' : req.status === 'in_progress' ? 'teal' : 'zinc';
               return (
                 <div key={req.id} className="flex items-center gap-3 px-4 py-2.5">
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs text-zinc-200 truncate">{req.title}</div>
-                    <div className="text-[11px] text-zinc-500 mt-0.5">{req.category} · {timeAgo(req.createdAt)}</div>
+                    <div className="t-caption text-[var(--brand-text-bright)] truncate">{req.title}</div>
+                    <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{req.category} · {timeAgo(req.createdAt)}</div>
                   </div>
                   <Badge label={req.status} color={statusColor} />
                 </div>
@@ -58,18 +58,18 @@ export function ActiveRequestsAnnotations({ requests, annotations, workspaceId }
       {annotations.length > 0 && (
         <SectionCard
           title="Recent Annotations"
-          titleIcon={<Flag className="w-4 h-4 text-zinc-500" />}
-          action={<button onClick={() => navigate(adminPath(workspaceId, 'analytics-hub'))} className="text-[11px] text-teal-400 hover:text-teal-300 transition-colors">View All →</button>}
+          titleIcon={<Icon as={Flag} size="md" className="text-[var(--brand-text-muted)]" />}
+          action={<button onClick={() => navigate(adminPath(workspaceId, 'analytics-hub'))} className="t-caption-sm text-teal-400 hover:text-teal-300 transition-colors">View All →</button>}
           noPadding
         >
-          <div className="divide-y divide-zinc-800/50">
+          <div className="divide-y divide-[var(--brand-border)]">
             {annotations.map(ann => (
               <div key={ann.id} className="flex items-center gap-3 px-4 py-2.5">
                 <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: ann.color || '#2dd4bf' }} />
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs text-zinc-200 truncate">{ann.label}</div>
+                  <div className="t-caption text-[var(--brand-text-bright)] truncate">{ann.label}</div>
                 </div>
-                <span className="text-[11px] text-zinc-500 flex-shrink-0">{ann.date}</span>
+                <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">{ann.date}</span>
               </div>
             ))}
           </div>

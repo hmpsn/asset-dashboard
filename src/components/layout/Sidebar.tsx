@@ -5,6 +5,7 @@ import { type Page, adminPath, GLOBAL_TABS } from '../../routes';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { WorkspaceSelector, type Workspace } from '../WorkspaceSelector';
 import { NotificationBell } from '../NotificationBell';
+import { Icon, cn } from '../ui';
 import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, Search,
   Pencil, Target, Code2, LogOut, TrendingUp, Link2, MessageSquare,
@@ -60,14 +61,14 @@ function buildNavGroups(copyEngineEnabled: boolean, diagnosticsEnabled: boolean)
       { id: 'home', label: 'Home', icon: LayoutDashboard, desc: 'Workspace overview and quick actions' },
     ]},
     { label: 'MONITORING', groupIcon: Activity, groupColor: 'text-blue-400',
-      activeBg: 'bg-blue-500/10', activeText: 'text-blue-300', activeIcon: 'text-blue-400', inactiveIcon: 'text-zinc-500', hoverBg: 'hover:bg-blue-500/5', hoverText: 'hover:text-blue-300',
+      activeBg: 'bg-blue-500/10', activeText: 'text-blue-300', activeIcon: 'text-blue-400', inactiveIcon: 'text-[var(--brand-text-muted)]', hoverBg: 'hover:bg-blue-500/5', hoverText: 'hover:text-blue-300',
       items: [
       { id: 'analytics-hub', label: 'Search & Traffic', icon: BarChart3, needsSite: true, desc: 'Unified analytics: search performance, traffic, insights, and annotations' },
       { id: 'seo-ranks', label: 'Rank Tracker', icon: TrendingUp, needsSite: true, desc: 'Track keyword rankings over time' },
       { id: 'outcomes', label: 'Action Results', icon: Trophy, desc: 'Track what\'s working across all your SEO actions' },
     ]},
     { label: 'SITE HEALTH', groupIcon: Shield, groupColor: 'text-emerald-400',
-      activeBg: 'bg-emerald-500/10', activeText: 'text-emerald-300', activeIcon: 'text-emerald-400', inactiveIcon: 'text-zinc-500', hoverBg: 'hover:bg-emerald-500/5', hoverText: 'hover:text-emerald-300',
+      activeBg: 'bg-emerald-500/10', activeText: 'text-emerald-300', activeIcon: 'text-emerald-400', inactiveIcon: 'text-[var(--brand-text-muted)]', hoverBg: 'hover:bg-emerald-500/5', hoverText: 'hover:text-emerald-300',
       items: [
       { id: 'seo-audit', label: 'Site Audit', icon: Globe, needsSite: true, desc: 'Comprehensive SEO audit with AI recommendations' },
       { id: 'performance', label: 'Performance', icon: Gauge, needsSite: true, desc: 'PageSpeed scores, Core Web Vitals, and load times' },
@@ -75,13 +76,13 @@ function buildNavGroups(copyEngineEnabled: boolean, diagnosticsEnabled: boolean)
       { id: 'media', label: 'Assets', icon: Image, desc: 'Images, alt text, and media optimization' },
     ]},
     { label: 'SEO STRATEGY', groupIcon: Target, groupColor: 'text-teal-400',
-      activeBg: 'bg-teal-500/10', activeText: 'text-teal-300', activeIcon: 'text-teal-400', inactiveIcon: 'text-zinc-500', hoverBg: 'hover:bg-teal-500/5', hoverText: 'hover:text-teal-300',
+      activeBg: 'bg-teal-500/10', activeText: 'text-teal-300', activeIcon: 'text-teal-400', inactiveIcon: 'text-[var(--brand-text-muted)]', hoverBg: 'hover:bg-teal-500/5', hoverText: 'hover:text-teal-300',
       items: [
       { id: 'seo-strategy', label: 'Strategy', icon: Target, needsSite: true, desc: 'Keyword strategy with page-keyword mapping' },
       { id: 'page-intelligence', label: 'Page Intelligence', icon: Search, needsSite: true, desc: 'Per-page keyword analysis, metrics, and optimization' },
     ]},
     { label: 'OPTIMIZATION', groupIcon: Sparkles, groupColor: 'text-teal-400',
-      activeBg: 'bg-teal-500/10', activeText: 'text-teal-300', activeIcon: 'text-teal-400', inactiveIcon: 'text-zinc-500', hoverBg: 'hover:bg-teal-500/5', hoverText: 'hover:text-teal-300',
+      activeBg: 'bg-teal-500/10', activeText: 'text-teal-300', activeIcon: 'text-teal-400', inactiveIcon: 'text-[var(--brand-text-muted)]', hoverBg: 'hover:bg-teal-500/5', hoverText: 'hover:text-teal-300',
       items: [
       { id: 'seo-editor', label: 'SEO Editor', icon: Pencil, needsSite: true, desc: 'Edit titles, descriptions, and meta tags' },
       { id: 'seo-schema', label: 'Schema', icon: Code2, needsSite: true, desc: 'Structured data and schema markup' },
@@ -90,14 +91,14 @@ function buildNavGroups(copyEngineEnabled: boolean, diagnosticsEnabled: boolean)
       { id: 'rewrite', label: 'Page Rewriter', icon: Pencil, needsSite: true, desc: 'AI-assisted page rewriting with playbook instructions' },
     ]},
     { label: 'CONTENT', groupIcon: BookOpen, groupColor: 'text-amber-400',
-      activeBg: 'bg-amber-500/10', activeText: 'text-amber-300', activeIcon: 'text-amber-400', inactiveIcon: 'text-zinc-500', hoverBg: 'hover:bg-amber-500/5', hoverText: 'hover:text-amber-300',
+      activeBg: 'bg-amber-500/10', activeText: 'text-amber-300', activeIcon: 'text-amber-400', inactiveIcon: 'text-[var(--brand-text-muted)]', hoverBg: 'hover:bg-amber-500/5', hoverText: 'hover:text-amber-300',
       items: [
       { id: 'content-pipeline', label: 'Pipeline', icon: Clipboard, needsSite: true, desc: 'Briefs, posts, and subscriptions in one view' },
       { id: 'requests', label: 'Requests', icon: MessageSquare, needsSite: true, desc: 'Client content requests and feedback' },
       { id: 'content-perf', label: 'Content Perf', icon: BarChart3, needsSite: true, desc: 'Post-publish content performance metrics' },
     ]},
-    { label: 'ADMIN', groupIcon: Settings, groupColor: 'text-zinc-400',
-      activeBg: 'bg-zinc-500/10', activeText: 'text-zinc-300', activeIcon: 'text-zinc-400', inactiveIcon: 'text-zinc-600', hoverBg: 'hover:bg-zinc-500/5', hoverText: 'hover:text-zinc-300',
+    { label: 'ADMIN', groupIcon: Settings, groupColor: 'text-[var(--brand-text)]',
+      activeBg: 'bg-zinc-500/10', activeText: 'text-[var(--brand-text-bright)]', activeIcon: 'text-[var(--brand-text)]', inactiveIcon: 'text-zinc-600', hoverBg: 'hover:bg-zinc-500/5', hoverText: 'hover:text-[var(--brand-text-bright)]',
       items: [
       { id: 'outcomes-overview', label: 'Team Outcomes', icon: Trophy, desc: 'Cross-workspace outcomes overview' },
       { id: 'prospect', label: 'Prospect', icon: FileSearch, desc: 'Sales prospect research' },
@@ -137,7 +138,7 @@ export function Sidebar({
   const navGroups = buildNavGroups(copyEngineEnabled, diagnosticsEnabled);
 
   // Auto-expand sidebar group containing active tab (#160)
-  useEffect(() => {
+  useEffect(() => { // effect-layout-ok — intentional post-render tab-group expansion
     const activeGroup = navGroups.find(g => g.label && g.items.some(i => i.id === tab));
     if (activeGroup && collapsedGroups.has(activeGroup.label)) {
       setCollapsedGroups(prev => {
@@ -157,18 +158,18 @@ export function Sidebar({
         role="button"
         tabIndex={0}
         aria-label="Exit focus mode"
-        className="w-[14px] flex-shrink-0 border-r border-zinc-800 bg-[#0d0f1a] flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-800/40 transition-colors"
+        className="w-[14px] flex-shrink-0 border-r border-[var(--brand-border)] bg-[var(--surface-1)] flex flex-col items-center justify-center cursor-pointer hover:bg-[var(--surface-3)] transition-colors"
         onClick={onExitHidden}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onExitHidden?.(); }}
         title="Exit focus mode"
       >
-        <span className="[writing-mode:vertical-rl] rotate-180 text-zinc-600 text-[9px] tracking-widest select-none">◀</span>
+        <span className="[writing-mode:vertical-rl] rotate-180 text-zinc-600 t-micro select-none">◀</span>
       </aside>
     );
   }
 
   return (
-    <aside className="w-[200px] flex-shrink-0 flex flex-col border-r border-zinc-800">
+    <aside className="w-[200px] flex-shrink-0 flex flex-col border-r border-[var(--brand-border)]">
       {/* Logo → Command Center */}
       <button
         onClick={() => navigate('/')}
@@ -179,7 +180,7 @@ export function Sidebar({
       </button>
 
       {/* Workspace selector */}
-      <div className="px-3 pb-2 border-b border-zinc-800">
+      <div className="px-3 pb-2 border-b border-[var(--brand-border)]">
         <WorkspaceSelector
           workspaces={workspaces}
           selected={selected}
@@ -203,23 +204,23 @@ export function Sidebar({
               {group.label ? (
                 <button
                   onClick={() => toggleGroup(group.label)}
-                  className="w-full flex items-center gap-1.5 px-2 py-1.5 mb-0.5 rounded-md hover:bg-zinc-800/30 transition-colors group/hdr"
+                  className="w-full flex items-center gap-1.5 px-2 py-1.5 mb-0.5 rounded-[var(--radius-md)] hover:bg-[var(--surface-3)] transition-colors group/hdr"
                 >
                   {group.groupIcon && (() => {
                     const GIcon = group.groupIcon;
-                    return <GIcon className={`w-3.5 h-3.5 ${group.groupColor || 'text-zinc-500'} opacity-70 group-hover/hdr:opacity-100 transition-opacity`} />;
+                    return <GIcon className={cn('w-3.5 h-3.5', group.groupColor || 'text-[var(--brand-text-muted)]', 'opacity-70 group-hover/hdr:opacity-100 transition-opacity')} />;
                   })()}
-                  <span className="text-[11px] text-zinc-500 font-semibold tracking-widest flex-1 text-left">{group.label}</span>
+                  <span className="t-caption-sm text-[var(--brand-text-muted)] font-semibold tracking-widest uppercase flex-1 text-left">{group.label}</span>
                   <ChevronRight className={`w-3 h-3 text-zinc-600 transition-transform duration-150 ${!isCollapsed ? 'rotate-90' : ''}`} />
                   {isCollapsed && groupBadgeCount > 0 && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 tabular-nums min-w-[18px] text-center leading-tight">
+                    <span className="t-caption-sm font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 tabular-nums min-w-[18px] text-center leading-tight">
                       {groupBadgeCount}
                     </span>
                   )}
                 </button>
               ) : null}
               {!isCollapsed && group.items.filter(item => !item.hidden).map(item => {
-                const Icon = item.icon;
+                const NavIcon = item.icon;
                 const active = tab === item.id;
                 const isGlobal = GLOBAL_TABS.has(item.id);
                 const disabled = isGlobal ? false : (!selected || (item.needsSite && !selected.webflowSiteId));
@@ -228,18 +229,23 @@ export function Sidebar({
                     key={item.id}
                     onClick={() => !disabled && (isGlobal ? navigate('/' + item.id) : selected && navigate(adminPath(selected.id, item.id)))}
                     title={item.desc}
-                    className={`w-full flex items-center gap-2.5 px-2.5 py-[5px] rounded-lg text-[12px] font-medium transition-all ${
+                    className={cn(
+                      'w-full flex items-center gap-2.5 px-2.5 py-[5px] rounded-[var(--radius-lg)] t-caption font-medium transition-all',
                       active
                         ? `${group.activeBg || 'bg-teal-500/10'} ${group.activeText || 'text-teal-300'}`
                         : disabled
                           ? 'text-zinc-700 cursor-not-allowed'
-                          : `text-zinc-300 ${group.hoverText || 'hover:text-zinc-100'} ${group.hoverBg || 'hover:bg-zinc-800/50'}`
-                    }`}
+                          : `text-[var(--brand-text)] ${group.hoverText || 'hover:text-[var(--brand-text-bright)]'} ${group.hoverBg || 'hover:bg-[var(--surface-3)]'}`
+                    )}
                   >
-                    <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${active ? (group.activeIcon || 'text-teal-400') : (group.inactiveIcon || '')}`} />
+                    <Icon
+                      as={NavIcon}
+                      size="sm"
+                      className={cn('flex-shrink-0', active ? (group.activeIcon || 'text-teal-400') : (group.inactiveIcon || 'text-[var(--brand-text-muted)]'))}
+                    />
                     <span className="truncate">{item.label}</span>
                     {item.id === 'content-pipeline' && pendingContentRequests > 0 && (
-                      <span className="ml-auto text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 tabular-nums flex-shrink-0 min-w-[20px] text-center leading-tight">
+                      <span className="ml-auto t-caption-sm font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 tabular-nums flex-shrink-0 min-w-[20px] text-center leading-tight">
                         {pendingContentRequests}
                       </span>
                     )}
@@ -252,36 +258,49 @@ export function Sidebar({
       </nav>
 
       {/* Bottom: icon-only utility bar */}
-      <div className="px-3 py-2.5 border-t border-zinc-800 flex items-center justify-center gap-1">
+      <div className="px-3 py-2.5 border-t border-[var(--brand-border)] flex items-center justify-center gap-1">
         <NotificationBell onSelectWorkspace={(workspaceId) => navigate(adminPath(workspaceId))} />
         <button
           onClick={() => navigate('/revenue')}
           title="Revenue"
-          className={`p-2 rounded-lg transition-all ${tab === 'revenue' ? 'text-teal-400 bg-teal-500/10' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'}`}
+          className={cn(
+            'p-2 rounded-[var(--radius-lg)] transition-all',
+            tab === 'revenue'
+              ? 'text-teal-400 bg-teal-500/10'
+              : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]'
+          )}
         >
-          <DollarSign className="w-4 h-4" />
+          <Icon as={DollarSign} size="md" />
         </button>
         <button
           onClick={() => navigate('/settings')}
           title="Settings"
-          className={`p-2 rounded-lg transition-all ${tab === 'settings' ? 'text-teal-400 bg-teal-500/10' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'}`}
+          className={cn(
+            'p-2 rounded-[var(--radius-lg)] transition-all',
+            tab === 'settings'
+              ? 'text-teal-400 bg-teal-500/10'
+              : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]'
+          )}
         >
-          <Settings className="w-4 h-4" />
+          <Icon as={Settings} size="md" />
         </button>
         <button
           onClick={toggleTheme}
           title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          className="p-2 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 transition-all"
+          className="p-2 rounded-[var(--radius-lg)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)] transition-all"
         >
-          {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          {theme === 'dark'
+            ? <Icon as={Sun} size="md" />
+            : <Icon as={Moon} size="md" />
+          }
         </button>
         {onLogout && (
           <button
             onClick={() => { auth.logout(); onLogout(); }}
             title="Log out"
-            className="p-2 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/5 transition-all"
+            className="p-2 rounded-[var(--radius-lg)] text-[var(--brand-text-muted)] hover:text-red-400 hover:bg-red-500/5 transition-all"
           >
-            <LogOut className="w-4 h-4" />
+            <Icon as={LogOut} size="md" />
           </button>
         )}
       </div>

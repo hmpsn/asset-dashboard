@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Loader2, CheckCircle2, AlertTriangle, X, ChevronDown, ChevronUp, Activity, StopCircle, Ban } from 'lucide-react';
+import { Icon } from './ui';
 import { useBackgroundTasks, type BackgroundJob } from '../hooks/useBackgroundTasks';
 
 const TYPE_LABELS: Record<string, string> = {
@@ -20,29 +21,29 @@ function JobRow({ job, onDismiss, onCancel }: { job: BackgroundJob; onDismiss: (
   const pct = job.total && job.progress != null ? Math.round((job.progress / job.total) * 100) : null;
 
   return (
-    <div className="px-3 py-2.5 border-b border-zinc-800/50 last:border-0 group">
+    <div className="px-3 py-2.5 border-b border-[var(--brand-border)] last:border-0 group">
       <div className="flex items-center gap-2">
         {isActive && <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400 flex-shrink-0" />}
-        {job.status === 'done' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />}
-        {job.status === 'error' && <AlertTriangle className="w-3.5 h-3.5 text-red-400/80 flex-shrink-0" />}
-        {job.status === 'cancelled' && <Ban className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />}
+        {job.status === 'done' && <Icon as={CheckCircle2} size="sm" className="text-emerald-400 flex-shrink-0" />}
+        {job.status === 'error' && <Icon as={AlertTriangle} size="sm" className="text-red-400/80 flex-shrink-0" />}
+        {job.status === 'cancelled' && <Icon as={Ban} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />}
         <div className="flex-1 min-w-0">
-          <div className="text-xs font-medium text-zinc-200 truncate">{label}</div>
-          <div className="text-[11px] text-zinc-500 truncate">{job.message}</div>
+          <div className="t-caption font-medium text-[var(--brand-text-bright)] truncate">{label}</div>
+          <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">{job.message}</div>
         </div>
         {isActive && (
-          <button onClick={onCancel} className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 transition-all" title="Stop">
-            <StopCircle className="w-3.5 h-3.5" />
+          <button onClick={onCancel} className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-muted)] hover:text-red-400 transition-all" title="Stop">
+            <Icon as={StopCircle} size="sm" />
           </button>
         )}
         {!isActive && (
-          <button onClick={onDismiss} className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-zinc-400 transition-all">
-            <X className="w-3 h-3" />
+          <button onClick={onDismiss} className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-all">
+            <Icon as={X} size="sm" />
           </button>
         )}
       </div>
       {isActive && pct != null && (
-        <div className="mt-1.5 h-1 bg-zinc-800 rounded-full overflow-hidden">
+        <div className="mt-1.5 h-1 bg-[var(--surface-3)] rounded-full overflow-hidden">
           <div
             className="h-full bg-teal-500 rounded-full transition-all duration-300"
             style={{ width: `${pct}%` }}
@@ -67,15 +68,15 @@ export function TaskPanel() {
       {/* Header pill */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-2 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-t-xl hover:border-zinc-700 transition-colors"
-        style={!expanded ? { borderRadius: '12px' } : undefined}
+        className="w-full flex items-center gap-2 px-3 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-t-[var(--radius-xl)] hover:border-[var(--brand-border-hover)] transition-colors"
+        style={!expanded ? { borderRadius: 'var(--radius-xl)' } : undefined}
       >
         {activeJobs.length > 0 ? (
           <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400" />
         ) : (
-          <Activity className="w-3.5 h-3.5 text-zinc-500" />
+          <Icon as={Activity} size="sm" className="text-[var(--brand-text-muted)]" />
         )}
-        <span className="text-xs font-medium text-zinc-300 flex-1 text-left">
+        <span className="t-caption font-medium text-[var(--brand-text)] flex-1 text-left">
           {activeJobs.length > 0
             ? `${activeJobs.length} task${activeJobs.length > 1 ? 's' : ''} running`
             : `${doneCount} task${doneCount > 1 ? 's' : ''} completed`
@@ -84,23 +85,26 @@ export function TaskPanel() {
         {doneCount > 0 && !expanded && (
           <button
             onClick={(e) => { e.stopPropagation(); clearDone(); }}
-            className="text-[11px] text-zinc-500 hover:text-zinc-400 px-1"
+            className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] px-1"
           >
             Clear
           </button>
         )}
-        {expanded ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronUp className="w-3.5 h-3.5 text-zinc-500" />}
+        {expanded
+          ? <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text-muted)]" />
+          : <Icon as={ChevronUp} size="sm" className="text-[var(--brand-text-muted)]" />
+        }
       </button>
 
       {/* Expandable list */}
       {expanded && (
-        <div className="bg-zinc-900 border border-t-0 border-zinc-800 rounded-b-xl max-h-[300px] overflow-y-auto">
+        <div className="bg-[var(--surface-2)] border border-t-0 border-[var(--brand-border)] rounded-b-[var(--radius-xl)] max-h-[300px] overflow-y-auto">
           {recentJobs.map(job => (
             <JobRow key={job.id} job={job} onDismiss={() => dismissJob(job.id)} onCancel={() => cancelJob(job.id)} />
           ))}
           {doneCount > 0 && (
             <div className="px-3 py-2 text-center">
-              <button onClick={clearDone} className="text-[11px] text-zinc-500 hover:text-zinc-400 transition-colors">
+              <button onClick={clearDone} className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">
                 Clear completed
               </button>
             </div>

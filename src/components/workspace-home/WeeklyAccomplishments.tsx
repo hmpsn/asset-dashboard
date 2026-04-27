@@ -22,8 +22,8 @@ export function WeeklyAccomplishments({ summary }: WeeklyAccomplishmentsProps) {
   if (items.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-2 flex-wrap text-[11px] text-zinc-500">
-      <span className="text-zinc-400 font-medium">This week:</span>
+    <div className="flex items-center gap-2 flex-wrap t-caption-sm text-[var(--brand-text-muted)]">
+      <span className="text-[var(--brand-text)] font-medium">This week:</span>
       {items.map((item, i) => (
         <span key={item.label} className="flex items-center gap-1">
           {i > 0 && <span className="text-zinc-700">·</span>}

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Bell, AlertTriangle, X } from 'lucide-react';
 import { adminPath, type Page } from '../routes';
 import { useNotifications } from '../hooks/admin/useNotifications';
-import { EmptyState } from './ui/EmptyState';
+import { EmptyState, Icon } from './ui';
 
 interface NotificationBellProps {
   onSelectWorkspace: (workspaceId: string) => void;
@@ -40,13 +40,13 @@ export function NotificationBell({ onSelectWorkspace }: NotificationBellProps) {
       <button
         onClick={() => setOpen(prev => !prev)}
         title="Notifications"
-        className={`p-2 rounded-lg transition-all relative ${
-          open ? 'text-teal-400 bg-teal-500/10' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
+        className={`p-2 rounded-[var(--radius-lg)] transition-all relative ${
+          open ? 'text-teal-400 bg-teal-500/10' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]'
         }`}
       >
-        <Bell className="w-4 h-4" />
+        <Icon as={Bell} size="md" />
         {hasItems && (
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500 ring-2 ring-[#0f1219]" />
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500 ring-2 ring-[var(--surface-1)]" />
         )}
       </button>
 
@@ -63,23 +63,23 @@ export function NotificationBell({ onSelectWorkspace }: NotificationBellProps) {
       {open && (
         <div
           data-testid="notification-drawer"
-          className="fixed top-0 left-0 h-screen w-[360px] bg-zinc-900 border-r border-zinc-800 shadow-2xl shadow-black/40 z-50 flex flex-col"
+          className="fixed top-0 left-0 h-screen w-[360px] bg-[var(--surface-2)] border-r border-[var(--brand-border)] shadow-2xl shadow-black/40 z-50 flex flex-col"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 flex-shrink-0">
-            <span className="text-xs font-semibold text-zinc-200">Notifications</span>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--brand-border)] flex-shrink-0">
+            <span className="t-caption font-semibold text-[var(--brand-text-bright)]">Notifications</span>
             <div className="flex items-center gap-2">
               {hasItems && (
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400/80 tabular-nums">
+                <span className="t-micro font-bold px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400/80 tabular-nums">
                   {items.length}
                 </span>
               )}
               <button
                 onClick={() => setOpen(false)}
-                className="text-zinc-500 hover:text-zinc-300 transition-colors"
+                className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
                 aria-label="Close notifications"
               >
-                <X className="w-3.5 h-3.5" />
+                <Icon as={X} size="sm" />
               </button>
             </div>
           </div>
@@ -87,9 +87,9 @@ export function NotificationBell({ onSelectWorkspace }: NotificationBellProps) {
           {/* Scrollable content */}
           <div className="flex-1 overflow-y-auto">
             {hasItems ? (
-              <div className="divide-y divide-zinc-800/50">
+              <div className="divide-y divide-[var(--brand-border)]">
                 {items.map(item => {
-                  const Icon = item.icon;
+                  const ItemIcon = item.icon;
                   return (
                     <button
                       key={item.id}
@@ -100,14 +100,14 @@ export function NotificationBell({ onSelectWorkspace }: NotificationBellProps) {
                         }
                         setOpen(false);
                       }}
-                      className="w-full flex items-center gap-2.5 px-4 py-3 hover:bg-zinc-800/30 transition-colors text-left"
+                      className="w-full flex items-center gap-2.5 px-4 py-3 hover:bg-[var(--surface-3)] transition-colors text-left"
                     >
-                      <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${item.color}`} />
+                      <Icon as={ItemIcon} size="sm" className={`flex-shrink-0 ${item.color}`} />
                       <div className="flex-1 min-w-0">
-                        <div className="text-[11px] font-medium text-zinc-200 truncate">{item.label}</div>
-                        <div className="text-[10px] text-zinc-500 truncate">{item.sub}</div>
+                        <div className="t-caption font-medium text-[var(--brand-text-bright)] truncate">{item.label}</div>
+                        <div className="t-micro text-[var(--brand-text-muted)] truncate">{item.sub}</div>
                       </div>
-                      <AlertTriangle className="w-3 h-3 text-zinc-700 flex-shrink-0" />
+                      <Icon as={AlertTriangle} size="sm" className="text-zinc-700 flex-shrink-0" />
                     </button>
                   );
                 })}

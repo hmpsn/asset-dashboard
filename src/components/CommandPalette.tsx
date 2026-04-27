@@ -10,6 +10,7 @@ import {
 import { type Workspace } from './WorkspaceSelector';
 import { type Page, adminPath, GLOBAL_TABS } from '../routes';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
+import { Icon } from './ui';
 
 interface PaletteItem {
   id: string;
@@ -285,7 +286,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
   const renderItem = (item: PaletteItem) => {
     globalIdx++;
     const idx = globalIdx;
-    const Icon = item.icon;
+    const ItemIcon = item.icon;
     const isSelected = idx === selectedIndex;
     return (
       <button
@@ -293,16 +294,16 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
         onClick={() => { item.action(); setOpen(false); }}
         onMouseEnter={() => setSelectedIndex(idx)}
         className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors ${
-          isSelected ? 'bg-teal-500/10 text-teal-300' : 'text-zinc-300 hover:bg-zinc-800/50'
+          isSelected ? 'bg-teal-500/10 text-teal-300' : 'text-[var(--brand-text)] hover:bg-[var(--surface-3)]'
         }`}
       >
-        <Icon className={`w-4 h-4 flex-shrink-0 ${isSelected ? 'text-teal-400' : 'text-zinc-500'}`} />
+        <Icon as={ItemIcon} size="md" className={`flex-shrink-0 ${isSelected ? 'text-teal-400' : 'text-[var(--brand-text-muted)]'}`} />
         <div className="flex-1 min-w-0">
-          <div className="text-xs font-medium truncate">{item.label}</div>
-          {item.sub && <div className="text-[10px] text-zinc-500 truncate">{item.sub}</div>}
+          <div className="t-caption font-medium truncate">{item.label}</div>
+          {item.sub && <div className="t-micro text-[var(--brand-text-muted)] truncate">{item.sub}</div>}
         </div>
-        {item.type === 'workspace' && <span className="text-[10px] text-zinc-600 flex-shrink-0">workspace</span>}
-        {item.type === 'action' && <span className="text-[10px] text-zinc-600 flex-shrink-0">action</span>}
+        {item.type === 'workspace' && <span className="t-micro text-zinc-600 flex-shrink-0">workspace</span>}
+        {item.type === 'action' && <span className="t-micro text-zinc-600 flex-shrink-0">action</span>}
       </button>
     );
   };
@@ -311,7 +312,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
     if (groupItems.length === 0) return null;
     return (
       <div key={label}>
-        <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">{label}</div>
+        <div className="px-3 py-1.5 t-micro font-semibold text-zinc-600">{label}</div>
         {groupItems.map(renderItem)}
       </div>
     );
@@ -322,21 +323,21 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       {/* pr-check-disable-next-line -- modal container */}
       <div
-        className="relative w-full max-w-lg bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl overflow-hidden"
+        className="relative w-full max-w-lg bg-[var(--surface-2)] border border-[var(--brand-border-hover)] rounded-[var(--radius-xl)] shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search input */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800">
-          <Search className="w-4 h-4 text-zinc-500 flex-shrink-0" />
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--brand-border)]">
+          <Icon as={Search} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
           <input
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Search tools, workspaces, actions..."
-            className="flex-1 bg-transparent text-sm text-zinc-200 placeholder-zinc-600 outline-none"
+            className="flex-1 bg-transparent text-sm text-[var(--brand-text-bright)] placeholder-zinc-600 outline-none"
           />
-          <kbd className="flex-shrink-0 text-[10px] font-medium text-zinc-600 bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-700">
+          <kbd className="flex-shrink-0 t-micro font-medium text-zinc-600 bg-[var(--surface-3)] px-1.5 py-0.5 rounded border border-[var(--brand-border-hover)]">
             ESC
           </kbd>
         </div>
@@ -344,7 +345,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
         {/* Results */}
         <div ref={listRef} className="max-h-80 overflow-y-auto py-1">
           {filtered.length === 0 ? (
-            <div className="px-4 py-8 text-center text-xs text-zinc-500">
+            <div className="px-4 py-8 text-center t-caption text-[var(--brand-text-muted)]">
               No results for "{query}"
             </div>
           ) : query.trim() ? (
@@ -362,15 +363,15 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
         </div>
 
         {/* Footer hints */}
-        <div className="flex items-center gap-4 px-4 py-2 border-t border-zinc-800 bg-zinc-900/80">
-          <div className="flex items-center gap-1 text-[10px] text-zinc-600">
-            <ArrowUp className="w-3 h-3" /><ArrowDown className="w-3 h-3" /> navigate
+        <div className="flex items-center gap-4 px-4 py-2 border-t border-[var(--brand-border)] bg-[var(--surface-2)]">
+          <div className="flex items-center gap-1 t-micro text-zinc-600">
+            <Icon as={ArrowUp} size="sm" /><Icon as={ArrowDown} size="sm" /> navigate
           </div>
-          <div className="flex items-center gap-1 text-[10px] text-zinc-600">
-            <CornerDownLeft className="w-3 h-3" /> select
+          <div className="flex items-center gap-1 t-micro text-zinc-600">
+            <Icon as={CornerDownLeft} size="sm" /> select
           </div>
-          <div className="flex items-center gap-1 text-[10px] text-zinc-600">
-            <Command className="w-3 h-3" />K toggle
+          <div className="flex items-center gap-1 t-micro text-zinc-600">
+            <Icon as={Command} size="sm" />K toggle
           </div>
         </div>
       </div>

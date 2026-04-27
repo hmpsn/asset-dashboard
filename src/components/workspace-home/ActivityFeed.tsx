@@ -2,7 +2,7 @@ import {
   Activity, Globe, FileText, ClipboardCheck, MessageSquare,
   Pencil, Code2, CornerDownRight, Target, TrendingUp, TrendingDown, AlertTriangle,
 } from 'lucide-react';
-import { SectionCard, EmptyState } from '../ui';
+import { SectionCard, EmptyState, Icon } from '../ui';
 import { timeAgo } from '../../lib/timeAgo';
 
 interface ActivityEntry {
@@ -38,22 +38,22 @@ export function ActivityFeed({ activity, className }: ActivityFeedProps) {
   return (
     <SectionCard
       title="Recent Activity"
-      titleIcon={<Activity className="w-4 h-4 text-zinc-500" />}
+      titleIcon={<Icon as={Activity} size="md" className="text-[var(--brand-text-muted)]" />}
       className={className}
       noPadding
     >
       {activity.length > 0 ? (
-        <div className="divide-y divide-zinc-800/50">
+        <div className="divide-y divide-[var(--brand-border)]">
           {activity.map(entry => {
-            const Icon = ICON_MAP[entry.type] || Activity;
+            const EntryIcon = ICON_MAP[entry.type] || Activity;
             return (
               <div key={entry.id} className="flex items-start gap-3 px-4 py-2.5">
-                <Icon className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-teal-400" />
+                <Icon as={EntryIcon} size="sm" className="mt-0.5 flex-shrink-0 text-teal-400" />
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs text-zinc-200">{entry.title}</div>
-                  {entry.description && <div className="text-[11px] text-zinc-500 mt-0.5">{entry.description}</div>}
+                  <div className="t-caption text-[var(--brand-text-bright)]">{entry.title}</div>
+                  {entry.description && <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{entry.description}</div>}
                 </div>
-                <span className="text-[11px] text-zinc-500 flex-shrink-0">{timeAgo(entry.createdAt)}</span>
+                <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">{timeAgo(entry.createdAt)}</span>
               </div>
             );
           })}

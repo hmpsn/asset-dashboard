@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Icon } from './ui';
 import { Monitor, X } from 'lucide-react';
 
 /**
@@ -29,8 +30,8 @@ export function MobileGuard({ children }: { children: React.ReactNode }) {
         <div className="fixed top-0 left-0 right-0 z-[9999] bg-amber-500/8 border-b border-amber-500/20 px-4 py-3">
           <div className="flex items-center justify-between max-w-screen-xl mx-auto">
             <div className="flex items-center gap-2">
-              <Monitor className="w-4 h-4 text-amber-400/80 flex-shrink-0" />
-              <p className="text-xs text-amber-300">
+              <Icon as={Monitor} size="md" className="text-amber-400/80 flex-shrink-0" />
+              <p className="t-caption text-amber-300">
                 <span className="font-medium">Best on desktop.</span>{' '}
                 <span className="text-amber-400/80">Editing tools are limited on mobile.</span>
               </p>
@@ -40,7 +41,7 @@ export function MobileGuard({ children }: { children: React.ReactNode }) {
               className="p-1 rounded text-amber-400/60 hover:text-amber-300 hover:bg-amber-500/10 transition-colors flex-shrink-0"
               aria-label="Dismiss mobile warning"
             >
-              <X className="w-4 h-4" />
+              <Icon as={X} size="md" />
             </button>
           </div>
         </div>

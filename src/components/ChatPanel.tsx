@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Sparkles, Send, Loader2, MessageSquare } from 'lucide-react';
+import { Icon } from './ui';
 import { RenderMarkdown } from './client/helpers';
 import { pickPhrase } from '../lib/loadingPhrases';
 import { ServiceInterestCTA } from './client/ServiceInterestCTA';
@@ -115,15 +116,15 @@ export function ChatPanel({
         {/* Quick questions (empty state) */}
         {messages.length === 0 && quickQuestions && quickQuestions.length > 0 && (
           <div className="p-4 space-y-3">
-            <p className="text-xs text-zinc-500">Ask anything about your data:</p>
+            <p className="t-caption-sm text-[var(--brand-text-muted)]">Ask anything about your data:</p>
             <div className="grid grid-cols-1 gap-2">
               {quickQuestions.map((q, i) => (
                 <button
                   key={i}
                   onClick={() => onSend(q)}
-                  className="text-left px-3 py-2.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-800 text-[11px] text-zinc-300 transition-colors"
+                  className="text-left px-3 py-2.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)] hover:bg-[var(--surface-3)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] t-caption-sm text-[var(--brand-text)] transition-colors"
                 >
-                  <MessageSquare className={`w-3 h-3 ${a.iconText} mb-1`} />
+                  <Icon as={MessageSquare} size="sm" className={`${a.iconText} mb-1`} />
                   {q}
                 </button>
               ))}
@@ -138,14 +139,14 @@ export function ChatPanel({
             {messages.map((msg, i) => (
               <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}>
                 {msg.role === 'assistant' && (
-                  <div className={`w-6 h-6 rounded-lg ${a.icon} flex items-center justify-center flex-shrink-0 mt-0.5`}>
-                    <Sparkles className={`w-3 h-3 ${a.iconText}`} />
+                  <div className={`w-6 h-6 rounded-[var(--radius-lg)] ${a.icon} flex items-center justify-center flex-shrink-0 mt-0.5`}>
+                    <Icon as={Sparkles} size="sm" className={a.iconText} />
                   </div>
                 )}
-                <div className={`max-w-[85%] rounded-xl px-3.5 py-2.5 ${
+                <div className={`max-w-[85%] rounded-[var(--radius-xl)] px-3.5 py-2.5 ${
                   msg.role === 'user'
-                    ? `${a.userBubble} text-xs text-zinc-200`
-                    : 'bg-zinc-800/50 border border-zinc-800'
+                    ? `${a.userBubble} t-caption-sm text-[var(--brand-text-bright)]`
+                    : 'bg-[var(--surface-3)] border border-[var(--brand-border)]'
                 }`}>
                   {msg.role === 'assistant' ? <RenderMarkdown text={msg.content} /> : msg.content}
                 </div>
@@ -155,17 +156,17 @@ export function ChatPanel({
             {/* Loading indicator — bouncing dots for first 4s, Western phrase thereafter */}
             {loading && (
               <div className="flex gap-3">
-                <div className={`w-6 h-6 rounded-lg ${a.icon} flex items-center justify-center`}>
-                  <Loader2 className={`w-3 h-3 ${a.iconText} animate-spin`} />
+                <div className={`w-6 h-6 rounded-[var(--radius-lg)] ${a.icon} flex items-center justify-center`}>
+                  <Icon as={Loader2} size="sm" className={`${a.iconText} animate-spin`} />
                 </div>
-                <div className="bg-zinc-800/50 border border-zinc-800 rounded-xl px-3.5 py-2.5 min-w-[56px]">
+                <div className="bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] px-3.5 py-2.5 min-w-[56px]">
                   {phrase ? (
-                    <span className="text-[11px] text-zinc-400 animate-pulse">{phrase}</span>
+                    <span className="t-caption-sm text-[var(--brand-text-muted)] animate-pulse">{phrase}</span>
                   ) : (
                     <div className="flex gap-1">
-                      <div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" />
-                      <div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+                      <div className="w-1.5 h-1.5 rounded-full bg-[var(--brand-text-muted)] animate-bounce" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-[var(--brand-text-muted)] animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <div className="w-1.5 h-1.5 rounded-full bg-[var(--brand-text-muted)] animate-bounce" style={{ animationDelay: '300ms' }} />
                     </div>
                   )}
                 </div>
@@ -196,7 +197,7 @@ export function ChatPanel({
             <button
               key={i}
               onClick={() => onChipClick?.(chip)}
-              className="text-[10px] px-2.5 py-1 rounded-full bg-teal-500/10 text-teal-300 border border-teal-500/20 hover:bg-teal-500/20 transition-colors"
+              className="t-micro px-2.5 py-1 rounded-full bg-teal-500/10 text-teal-300 border border-teal-500/20 hover:bg-teal-500/20 transition-colors"
             >
               {chip}
             </button>
@@ -205,22 +206,22 @@ export function ChatPanel({
       )}
 
       {/* Input bar — pinned at bottom */}
-      <div className="px-4 py-3 border-t border-zinc-800 flex gap-2 flex-shrink-0">
+      <div className="px-4 py-3 border-t border-[var(--brand-border)] flex gap-2 flex-shrink-0">
         <input
           type="text"
           value={input}
           onChange={e => onInputChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className={`flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none ${a.focusBorder}`}
+          className={`flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 t-caption-sm text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:outline-none ${a.focusBorder}`}
           disabled={disabled || loading}
         />
         <button
           onClick={() => onSend(input)}
           disabled={disabled || loading || !input.trim()}
-          className={`px-3 py-2 ${a.btn} disabled:opacity-50 rounded-lg transition-colors`}
+          className={`px-3 py-2 ${a.btn} disabled:opacity-50 rounded-[var(--radius-lg)] transition-colors`}
         >
-          <Send className="w-3.5 h-3.5" />
+          <Icon as={Send} size="sm" />
         </button>
       </div>
     </>
