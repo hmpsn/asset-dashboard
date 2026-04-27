@@ -100,7 +100,7 @@ router.get('/api/workspace-overview', (_req, res) => {
     // Content requests (from client portal)
     const contentReqs = listContentRequests(ws.id);
     const pendingContentReqs = contentReqs.filter(r => r.status === 'requested').length;
-    const inProgressContentReqs = contentReqs.filter(r => ['brief_generated', 'client_review', 'approved', 'in_progress'].includes(r.status)).length;
+    const inProgressContentReqs = contentReqs.filter(r => ['brief_generated', 'client_review', 'approved', 'in_progress', 'post_review'].includes(r.status)).length;
     const deliveredContentReqs = contentReqs.filter(r => r.status === 'delivered' || r.status === 'published').length;
 
     // Work orders

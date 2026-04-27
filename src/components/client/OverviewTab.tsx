@@ -174,8 +174,10 @@ export function OverviewTab({
     {(() => {
       const actions: { label: string; count: number; tab: ClientTab; color: string; icon: string }[] = [];
       if (pendingApprovals > 0) actions.push({ label: `${pendingApprovals} SEO change${pendingApprovals > 1 ? 's' : ''} to review`, count: pendingApprovals, tab: 'inbox', color: 'text-amber-400', icon: 'approval' });
-      const contentReviews = contentRequests.filter(r => r.status === 'client_review').length;
-      if (!betaMode && contentReviews > 0) actions.push({ label: `${contentReviews} content brief${contentReviews > 1 ? 's' : ''} ready for review`, count: contentReviews, tab: 'inbox', color: 'text-blue-400', icon: 'content' });
+      const briefReviews = contentRequests.filter(r => r.status === 'client_review').length;
+      const postReviews = contentRequests.filter(r => r.status === 'post_review').length;
+      if (!betaMode && briefReviews > 0) actions.push({ label: `${briefReviews} content brief${briefReviews > 1 ? 's' : ''} ready for review`, count: briefReviews, tab: 'inbox', color: 'text-blue-400', icon: 'content' });
+      if (!betaMode && postReviews > 0) actions.push({ label: `${postReviews} post${postReviews > 1 ? 's' : ''} ready for review`, count: postReviews, tab: 'inbox', color: 'text-blue-400', icon: 'content' });
       if (unreadTeamNotes > 0) actions.push({ label: `${unreadTeamNotes} request${unreadTeamNotes > 1 ? 's' : ''} with new team replies`, count: unreadTeamNotes, tab: 'inbox', color: 'text-teal-400', icon: 'reply' });
       if (contentPlanSummary && contentPlanSummary.reviewCells > 0) actions.push({ label: `${contentPlanSummary.reviewCells} content plan page${contentPlanSummary.reviewCells > 1 ? 's' : ''} to review`, count: contentPlanSummary.reviewCells, tab: 'content-plan', color: 'text-blue-400', icon: 'content-plan' });
       if (actions.length === 0) return null;
@@ -201,7 +203,9 @@ export function OverviewTab({
     {/* Primary CTA Banner - contextual next action */}
     {(() => {
       // Determine the most valuable next action
-      if (strategyData && contentRequests.filter(r => r.status === 'client_review').length === 0) {
+      const briefReviews = contentRequests.filter(r => r.status === 'client_review').length;
+      const postReviews = contentRequests.filter(r => r.status === 'post_review').length;
+      if (strategyData && briefReviews + postReviews === 0) {
         return (
           <div className="bg-gradient-to-r from-teal-600/10 via-zinc-900 to-emerald-600/10 border border-teal-500/20 px-4 py-3" style={{ borderRadius: '6px 12px 6px 12px' }}>
             <div className="flex items-center justify-between">
