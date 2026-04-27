@@ -12,6 +12,9 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { createContentRequest, updateContentRequest } from '../../server/content-requests.js';
+import { savePost, getPost } from '../../server/content-posts-db.js';
+import type { GeneratedPost } from '../../shared/types/content.js';
 
 const ctx = createTestContext(13328); // port-ok: 13201-13327 fully allocated; extending range
 const { api, postJson, patchJson } = ctx;
@@ -29,12 +32,7 @@ afterAll(() => {
   ctx.stopServer();
 });
 
-// ── in-process imports for client-edit test setup ────────────────────────────
-// These run in the same process as the server (vitest), so direct DB calls work.
-import { createContentRequest, updateContentRequest } from '../../server/content-requests.js';
-import { savePost, getPost } from '../../server/content-posts-db.js';
-import type { GeneratedPost } from '../../shared/types/content.js';
-
+// makeStubPost runs in the same process as the server (vitest), so direct DB calls work.
 function makeStubPost(workspaceId: string, briefId: string): GeneratedPost {
   const now = new Date().toISOString();
   return {
