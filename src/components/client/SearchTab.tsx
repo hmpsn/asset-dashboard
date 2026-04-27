@@ -183,7 +183,7 @@ export function SearchTab({
           <div className="flex items-center gap-1 px-4 pb-1 border-t border-[var(--brand-border)]">
             {(['queries', 'pages'] as const).map(st => (
               <button key={st} onClick={() => setSearchSubTab(st)}
-                className={`px-3 py-1.5 rounded-md t-caption font-medium transition-colors ${searchSubTab === st ? 'bg-[var(--surface-3)] text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}
+                className={`px-3 py-1.5 rounded-md t-caption font-medium transition-colors ${searchSubTab === st ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}
               >{st === 'queries' ? 'Queries' : 'Pages'}</button>
             ))}
           </div>

@@ -999,7 +999,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                                     onContentRequested?.();
                                   }).catch(() => setToast?.('Failed to add to agenda'));
                                 }}
-                                className="px-2.5 py-1 rounded t-caption-sm font-medium text-[var(--brand-text)] bg-[var(--surface-3)] hover:bg-[var(--surface-3)] border border-[var(--brand-border-strong)] transition-colors flex items-center gap-1"
+                                className="px-2.5 py-1 rounded t-caption-sm font-medium text-[var(--brand-text)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-strong)] transition-colors flex items-center gap-1"
                               >
                                 <Icon as={MessageCircle} size="sm" />
                                 Discuss

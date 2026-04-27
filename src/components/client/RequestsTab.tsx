@@ -316,7 +316,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
                             className="flex-1 px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500" disabled={sendingNote} />
                           <input type="file" ref={noteFileRef} className="hidden" multiple accept="image/*,.pdf,.doc,.docx,.txt,.csv"
                             onChange={e => { if (e.target.files) setNoteFiles(prev => [...prev, ...Array.from(e.target.files!)]); e.target.value = ''; }} />
-                          <button onClick={() => noteFileRef.current?.click()} className="px-2 py-2 bg-[var(--surface-3)] hover:bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] transition-colors" title="Attach file">
+                          <button onClick={() => noteFileRef.current?.click()} className="px-2 py-2 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] transition-colors" title="Attach file">
                             <Icon as={Paperclip} size="md" className="text-[var(--brand-text-muted)]" />
                           </button>
                           <button onClick={() => sendReqNote(req.id)} disabled={sendingNote || (!reqNoteInput.trim() && noteFiles.length === 0)}

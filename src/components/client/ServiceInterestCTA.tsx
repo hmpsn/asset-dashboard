@@ -84,7 +84,7 @@ export function ServiceInterestCTA({ type, workspaceId, onAction, bookingUrl }: 
         </div>
         <button
           onClick={() => mutation.reset()}
-          className="flex items-center gap-1 text-[10px] /* arbitrary-text-ok */ /* arbitrary-text-ok */ text-amber-400 hover:text-amber-300 transition-colors"
+          className="flex items-center gap-1 text-[10px] /* arbitrary-text-ok */ text-amber-400 hover:text-amber-300 transition-colors"
           aria-label="Retry"
         >
           <RefreshCw className="w-3 h-3" />
@@ -121,7 +121,7 @@ export function ServiceInterestCTA({ type, workspaceId, onAction, bookingUrl }: 
       >
         <div className="text-left">
           <div className="t-caption font-medium text-teal-300">{label}</div>
-          <div className="text-[10px] /* arbitrary-text-ok */ /* arbitrary-text-ok */ text-teal-400/60 mt-0.5">{subtext}</div>
+          <div className="text-[10px] /* arbitrary-text-ok */ text-teal-400/60 mt-0.5">{subtext}</div>
         </div>
         {mutation.isPending ? (
           <Loader2 className="w-3.5 h-3.5 text-teal-400 animate-spin flex-shrink-0" />

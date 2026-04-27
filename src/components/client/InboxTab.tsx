@@ -259,7 +259,7 @@ export function InboxTab({
                       {!isFlagged && !isFlagging && (
                         <button
                           onClick={() => setFlaggingCell(cell.cellId)}
-                          className="flex items-center gap-1 px-2.5 py-1.5 bg-[var(--surface-3)] hover:bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text)] transition-colors"
+                          className="flex items-center gap-1 px-2.5 py-1.5 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text)] transition-colors"
                         >
                           <Icon as={Flag} size="sm" /> Request Changes
                         </button>

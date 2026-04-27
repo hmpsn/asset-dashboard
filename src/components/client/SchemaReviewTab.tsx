@@ -300,7 +300,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
                   </button>
                   <button
                     onClick={() => setShowFeedback(true)}
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-[var(--radius-lg)] t-body font-medium bg-[var(--surface-3)] hover:bg-[var(--surface-3)] text-[var(--brand-text)] border border-[var(--brand-border-strong)] transition-colors"
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-[var(--radius-lg)] t-body font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text)] border border-[var(--brand-border-strong)] transition-colors"
                   >
                     <Icon as={MessageSquare} size="md" /> Request Changes
                   </button>

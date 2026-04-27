@@ -172,7 +172,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
         </div>
         <div className="relative" ref={shareRef}>
           <button onClick={() => setShareOpen(!shareOpen)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption font-medium bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] hover:bg-[var(--surface-3)] hover:text-[var(--brand-text)] transition-colors">
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption font-medium bg-[var(--surface-3)] border border-[var(--brand-border-strong)] text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)] hover:text-[var(--brand-text)] transition-colors">
             <Icon as={Share2} size="md" />
             Share Report
           </button>
@@ -587,11 +587,11 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
             {/* View mode toggle */}
             <div className="flex items-center gap-1 bg-[var(--surface-3)] rounded-[var(--radius-lg)] p-0.5">
               <button onClick={() => setViewMode('by-page')}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md t-caption-sm font-medium transition-colors ${viewMode === 'by-page' ? 'bg-[var(--surface-3)] text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}>
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md t-caption-sm font-medium transition-colors ${viewMode === 'by-page' ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}>
                 <Icon as={LayoutList} size="sm" /> By Page
               </button>
               <button onClick={() => setViewMode('by-fix-type')}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md t-caption-sm font-medium transition-colors ${viewMode === 'by-fix-type' ? 'bg-[var(--surface-3)] text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}>
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md t-caption-sm font-medium transition-colors ${viewMode === 'by-fix-type' ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}>
                 <Icon as={Layers} size="sm" /> By Fix Type
               </button>
             </div>
@@ -600,7 +600,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
               {(['all', 'error', 'warning'] as const).map(s => (
                 <button key={s} onClick={() => setSeverityFilter(s)}
                   className={`px-3 py-2 min-h-[44px] rounded-md t-caption-sm font-medium transition-colors ${
-                    severityFilter === s ? (s === 'all' ? 'bg-[var(--surface-3)] text-[var(--brand-text)]' : `${SEV[s].bg} ${SEV[s].text}`) : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'
+                    severityFilter === s ? (s === 'all' ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)]' : `${SEV[s].bg} ${SEV[s].text}`) : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'
                   }`}>{s === 'all' ? 'Issues' : s.charAt(0).toUpperCase() + s.slice(1)}</button>
               ))}
             </div>
@@ -609,7 +609,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                 onClick={() => setShowInfoItems(!showInfoItems)}
                 className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm transition-colors border ${
                   showInfoItems
-                    ? 'bg-[var(--surface-3)] text-[var(--brand-text)] border-[var(--brand-border-strong)]'
+                    ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)] border-[var(--brand-border-strong)]'
                     : 'bg-transparent text-[var(--brand-text-muted)] border-[var(--brand-border-strong)] hover:text-[var(--brand-text)]'
                 }`}
               >

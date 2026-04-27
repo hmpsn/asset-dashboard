@@ -406,7 +406,7 @@ export function ApprovalsTab({
                                             >Save Edit</button>
                                             <button
                                               onClick={() => { setEditingApproval(null); setEditDraft(''); }}
-                                              className="px-2.5 py-1 bg-[var(--surface-3)] hover:bg-[var(--surface-3)] rounded t-caption-sm text-[var(--brand-text-muted)] transition-colors"
+                                              className="px-2.5 py-1 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] rounded t-caption-sm text-[var(--brand-text-muted)] transition-colors"
                                             >Cancel</button>
                                           </div>
                                         </div>
@@ -439,14 +439,14 @@ export function ApprovalsTab({
                                     {!isSchema && (
                                       <button
                                         onClick={() => { setEditingApproval(item.id); setEditDraft(displayValue); }}
-                                        className="flex items-center gap-1 px-3 py-1.5 bg-[var(--surface-3)] hover:bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text)] transition-colors"
+                                        className="flex items-center gap-1 px-3 py-1.5 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text)] transition-colors"
                                       >
                                         <Icon as={Edit3} size="sm" /> Edit
                                       </button>
                                     )}
                                     <button
                                       onClick={() => { setRejectingItem(item.id); setRejectDraft(''); }}
-                                      className="flex items-center gap-1 px-3 py-1.5 bg-[var(--surface-3)] hover:bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption-sm font-medium text-red-400 transition-colors"
+                                      className="flex items-center gap-1 px-3 py-1.5 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption-sm font-medium text-red-400 transition-colors"
                                     >
                                       <Icon as={X} size="sm" /> Reject
                                     </button>
@@ -477,7 +477,7 @@ export function ApprovalsTab({
                                       </button>
                                       <button
                                         onClick={() => { setRejectingItem(null); setRejectDraft(''); }}
-                                        className="px-2.5 py-1 bg-[var(--surface-3)] hover:bg-[var(--surface-3)] rounded t-caption-sm text-[var(--brand-text-muted)] transition-colors"
+                                        className="px-2.5 py-1 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] rounded t-caption-sm text-[var(--brand-text-muted)] transition-colors"
                                       >Cancel</button>
                                     </div>
                                   </div>
@@ -487,7 +487,7 @@ export function ApprovalsTab({
                                     <Icon as={Check} size="sm" /> Approved — will be applied when you push changes live
                                     <button
                                       onClick={() => updateApprovalItem(batch.id, item.id, { status: 'pending' })}
-                                      className="ml-2 px-2 py-0.5 bg-[var(--surface-3)] hover:bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded t-caption-sm text-[var(--brand-text-muted)] transition-colors"
+                                      className="ml-2 px-2 py-0.5 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-strong)] rounded t-caption-sm text-[var(--brand-text-muted)] transition-colors"
                                     >Undo</button>
                                   </div>
                                 )}
@@ -497,7 +497,7 @@ export function ApprovalsTab({
                                       <Icon as={X} size="sm" /> Rejected
                                       <button
                                         onClick={() => updateApprovalItem(batch.id, item.id, { status: 'pending', clientNote: '' })}
-                                        className="ml-2 px-2 py-0.5 bg-[var(--surface-3)] hover:bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded t-caption-sm text-[var(--brand-text-muted)] transition-colors"
+                                        className="ml-2 px-2 py-0.5 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-strong)] rounded t-caption-sm text-[var(--brand-text-muted)] transition-colors"
                                       >Undo</button>
                                     </div>
                                     {item.clientNote && (

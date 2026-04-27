@@ -311,7 +311,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
           {!subData.subscription && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {subData.plans.map(plan => (
-                <div key={plan.plan} className="p-4 rounded-[var(--radius-xl)] bg-[var(--surface-3)]/50 border border-[var(--brand-border-strong)] hover:border-[var(--brand-border-strong)] transition-colors">
+                <div key={plan.plan} className="p-4 rounded-[var(--radius-xl)] bg-[var(--surface-3)]/50 border border-[var(--brand-border-strong)] hover:border-[var(--brand-border-hover)] transition-colors">
                   <h4 className="t-body font-semibold text-[var(--brand-text)]">{plan.displayName}</h4>
                   <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">{plan.description}</p>
                   <div className="flex items-baseline gap-1 mt-3">
@@ -370,7 +370,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
       <div className="text-center py-6 bg-[var(--surface-2)]/50 rounded-[var(--radius-xl)] border border-[var(--brand-border)]">
         <p className="t-body text-[var(--brand-text-muted)] mb-3">Have questions about which plan is right for you?</p>
         <button onClick={onOpenChat}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)] hover:bg-[var(--surface-3)] border border-[var(--brand-border-strong)] t-body text-[var(--brand-text)] font-medium transition-colors">
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-strong)] t-body text-[var(--brand-text)] font-medium transition-colors">
           <Icon as={MessageSquare} size="md" /> Ask Your AI Advisor
         </button>
       </div>
