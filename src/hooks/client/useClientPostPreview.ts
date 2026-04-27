@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { publicPostReview } from '../../api/content';
+import { queryKeys } from '../../lib/queryKeys';
 import type { GeneratedPost } from '../../../shared/types/content';
 
 /**
@@ -12,7 +13,7 @@ export function useClientPostPreview(
   enabled: boolean,
 ) {
   return useQuery<GeneratedPost>({
-    queryKey: ['client', 'post-preview', workspaceId, postId],
+    queryKey: queryKeys.client.postPreview(workspaceId, postId),
     queryFn: () => publicPostReview.getPost(workspaceId, postId!),
     enabled: !!postId && enabled,
     staleTime: 1000 * 60 * 5, // 5 min — post content rarely changes mid-session

@@ -4,6 +4,7 @@ import { Check, X, ChevronDown, ChevronUp, Edit3 } from 'lucide-react';
 import type { ClientContentRequest } from './types';
 import type { GeneratedPost } from '../../../shared/types/content';
 import { publicPostReview } from '../../api/content';
+import { queryKeys } from '../../lib/queryKeys';
 import { useClientPostPreview } from '../../hooks/client/useClientPostPreview';
 
 interface PostReviewCardProps {
@@ -58,7 +59,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
       setPost(updated);
       // Invalidate React Query cache so remounts within staleTime don't serve pre-edit data.
       // Without this, the `if (fetchedPost && !post)` sync guard would restore stale content.
-      queryClient.invalidateQueries({ queryKey: ['client', 'post-preview', workspaceId, request.postId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.client.postPreview(workspaceId, request.postId) });
       setEditingSection(null);
       setToast({ message: 'Section saved', type: 'success' });
     } catch {
@@ -70,7 +71,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
     try {
       const updated = await publicPostReview.clientEdit(workspaceId, post!.id, { introduction: content });
       setPost(updated);
-      queryClient.invalidateQueries({ queryKey: ['client', 'post-preview', workspaceId, request.postId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.client.postPreview(workspaceId, request.postId) });
       setEditingIntro(false);
       setToast({ message: 'Introduction saved', type: 'success' });
     } catch {
@@ -82,7 +83,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
     try {
       const updated = await publicPostReview.clientEdit(workspaceId, post!.id, { conclusion: content });
       setPost(updated);
-      queryClient.invalidateQueries({ queryKey: ['client', 'post-preview', workspaceId, request.postId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.client.postPreview(workspaceId, request.postId) });
       setEditingConclusion(false);
       setToast({ message: 'Conclusion saved', type: 'success' });
     } catch {
