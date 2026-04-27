@@ -63,7 +63,7 @@ function PaymentFormInner({ amount, productName, onSuccess, onCancel }: PaymentF
     }
   }, [stripe, elements, onSuccess]);
 
-  // Success state
+  // Success state — always-dark per Stripe modal constraint (see line 178 + 316 warnings)
   if (succeeded) {
     return (
       <div className="flex flex-col items-center justify-center py-10 gap-4 animate-[scaleIn_0.3s_ease-out]">
@@ -71,8 +71,8 @@ function PaymentFormInner({ amount, productName, onSuccess, onCancel }: PaymentF
           <Icon as={CheckCircle2} size="2xl" className="text-teal-400" />
         </div>
         <div className="text-center">
-          <div className="text-sm font-semibold text-[var(--brand-text-bright)]">Payment Successful</div>
-          <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">{fmt(amount)} paid for {productName}</div>
+          <div className="text-sm font-semibold text-zinc-100">Payment Successful</div>
+          <div className="text-xs text-zinc-500 mt-1">{fmt(amount)} paid for {productName}</div>
         </div>
       </div>
     );
@@ -109,27 +109,27 @@ function PaymentFormInner({ amount, productName, onSuccess, onCancel }: PaymentF
         {processing ? 'Processing…' : `Pay ${fmt(amount)}`}
       </Button>
 
-      {/* Cancel */}
+      {/* Cancel — always-dark per Stripe modal constraint */}
       <button
         type="button"
         onClick={onCancel}
         disabled={processing}
-        className="w-full px-4 py-2 rounded-[var(--radius-xl)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]/50 transition-all flex items-center justify-center gap-1.5"
+        className="w-full px-4 py-2 rounded-[var(--radius-xl)] text-xs text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 transition-all flex items-center justify-center gap-1.5"
       >
         <Icon as={ArrowLeft} size="md" />
         Back
       </button>
 
-      {/* Trust footer */}
+      {/* Trust footer — always-dark per Stripe modal constraint */}
       <div className="flex items-center justify-center gap-4 pt-1">
         <div className="flex items-center gap-1.5">
-          <Icon as={Shield} size="sm" className="text-[var(--brand-text-muted)]" />
-          <span className="t-caption-sm text-[var(--brand-text-muted)]">SSL Encrypted</span>
+          <Icon as={Shield} size="sm" className="text-zinc-500" />
+          <span className="text-xs text-zinc-500">SSL Encrypted</span>
         </div>
-        <div className="w-px h-3 bg-[var(--brand-border)]" />
+        <div className="w-px h-3 bg-zinc-700" />
         <div className="flex items-center gap-1.5">
-          <svg className="w-3 h-3 text-[var(--brand-border-hover)]" viewBox="0 0 24 24" fill="currentColor"><path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z"/></svg>
-          <span className="t-caption-sm text-[var(--brand-text-muted)]">Powered by Stripe</span>
+          <svg className="w-3 h-3 text-zinc-500" viewBox="0 0 24 24" fill="currentColor"><path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z"/></svg>
+          <span className="text-xs text-zinc-500">Powered by Stripe</span>
         </div>
       </div>
     </form>
@@ -165,7 +165,7 @@ export function StripePaymentForm({
   if (!stripePromise || !clientSecret) {
     return (
       <div className="flex items-center justify-center py-10">
-        <Icon as={Loader2} size="lg" className="animate-spin text-[var(--brand-text-muted)]" />
+        <Icon as={Loader2} size="lg" className="animate-spin text-zinc-500" />
       </div>
     );
   }
@@ -321,7 +321,7 @@ export function StripePaymentModal({
           replace these zinc-* values with `--surface-*` / `--brand-text-*`
           tokens. See the same warning at line 178. */}
       <div
-        className="relative bg-zinc-900 border border-zinc-800/50 rounded-2xl shadow-2xl shadow-black/50 w-full max-w-md overflow-hidden animate-[scaleIn_0.2s_ease-out]"
+        className="relative bg-zinc-900 border border-zinc-700/50 rounded-2xl shadow-2xl shadow-black/50 w-full max-w-md overflow-hidden animate-[scaleIn_0.2s_ease-out]"
         onClick={e => e.stopPropagation()}
       >
         {/* Close button — always-dark per modal constraint */}
