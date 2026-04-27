@@ -376,11 +376,12 @@ At the top of the file, alongside existing imports, add:
 ```typescript
 import { approvePostSchema, requestPostChangesSchema, clientPostEditSchema } from '../schemas/public-content.js';
 import { getPost, updatePostField, snapshotPostVersion, listPosts } from '../content-posts.js';
+import { getContentRequest, listContentRequests } from '../content-requests.js';
 import { notifyClientPostReady } from '../email.js';
 import { WS_EVENTS } from '../ws-events.js';
 ```
 
-(Check if any of these are already imported before adding duplicates.)
+(Check if any of these are already imported before adding duplicates. `getContentRequest` is needed for the explicit `post_review` status guards in Steps 4.3 and 4.4.)
 
 - [ ] **Step 4.2: Add `GET /api/public/content-posts/:workspaceId/:postId`**
 
@@ -410,6 +411,13 @@ router.get('/api/public/content-posts/:workspaceId/:postId', (req, res) => {
 ```typescript
 // Client approves a post — transitions request to 'delivered'
 router.post('/api/public/content-request/:workspaceId/:id/approve-post', validate(approvePostSchema), (req, res, next) => {
+  // Explicit status guard: the state machine allows in_progress → delivered, so we must
+  // enforce post_review here to prevent an unauthenticated caller from bypassing review.
+  const existing = getContentRequest(req.params.workspaceId, req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Request not found' });
+  if (existing.status !== 'post_review') {
+    return res.status(400).json({ error: 'Request must be in post_review status to approve the post' });
+  }
   let updated;
   try {
     updated = updateContentRequest(req.params.workspaceId, req.params.id, { status: 'delivered' });
@@ -427,11 +435,21 @@ router.post('/api/public/content-request/:workspaceId/:id/approve-post', validat
 });
 ```
 
+> **Note:** `getContentRequest` must be imported in Task 4.1 alongside the other imports. Add it to the import from `'../content-requests.js'`.
+
 - [ ] **Step 4.4: Add `POST /api/public/content-request/:workspaceId/:id/request-post-changes`**
 
 ```typescript
 // Client requests changes on a post
 router.post('/api/public/content-request/:workspaceId/:id/request-post-changes', validate(requestPostChangesSchema), (req, res, next) => {
+  // Explicit status guard: client_review → changes_requested is a valid state machine
+  // transition (brief review phase), so we must enforce post_review here to prevent
+  // post-changes feedback being applied to a brief-review request.
+  const existing = getContentRequest(req.params.workspaceId, req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Request not found' });
+  if (existing.status !== 'post_review') {
+    return res.status(400).json({ error: 'Request must be in post_review status to request post changes' });
+  }
   const feedback = sanitizeString(req.body.feedback, 2000);
   let updated;
   try {
@@ -787,15 +805,11 @@ interface PostReviewCardProps {
 }
 
 export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: PostReviewCardProps) {
+  // ALL hooks must be declared before any early returns (Rules of Hooks).
   // Self-fetches post data via React Query (no hand-rolled state/effect needed)
   const { data: fetchedPost, isLoading: postLoading } = useClientPostPreview(workspaceId, request.postId, true);
   const [post, setPost] = useState<GeneratedPost | undefined>(undefined);
-
-  // Sync fetched post into local state once (so edits can update it without refetching)
-  if (fetchedPost && !post) setPost(fetchedPost);
-
-  if (postLoading) return <p className="text-xs text-zinc-500 mt-3 animate-pulse">Loading post…</p>;
-  if (!post) return <p className="text-xs text-zinc-500 mt-3">Post not available.</p>;
+  // Editor state — unconditional, even though they're only used when post is loaded
   const [editingSection, setEditingSection] = useState<number | null>(null);
   const [sectionDraft, setSectionDraft] = useState('');
   const [editingIntro, setEditingIntro] = useState(false);
@@ -806,6 +820,15 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
   const [showFeedback, setShowFeedback] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [approving, setApproving] = useState(false);
+
+  // Sync fetched post into local state once (so edits can update it without refetching).
+  // This runs on every render but is guarded by `!post` so it only fires on the first
+  // render where fetchedPost arrives. Safe to do during render (no side effects).
+  if (fetchedPost && !post) setPost(fetchedPost);
+
+  // Early returns AFTER all hooks — this is the correct order per Rules of Hooks
+  if (postLoading) return <p className="text-xs text-zinc-500 mt-3 animate-pulse">Loading post…</p>;
+  if (!post) return <p className="text-xs text-zinc-500 mt-3">Post not available.</p>;
 
   async function saveSection(index: number, content: string) {
     try {
@@ -1424,7 +1447,7 @@ Post feedback (`clientFeedback`, `voiceScore`, `voiceFeedback`, `reviewChecklist
 - ✅ `ContentTab` summary cards and alert banner updated for `post_review` (Task 9, Step 9.0)
 - ✅ PostReviewCard uses React Query (`useClientPostPreview`) — no hand-rolled `useState`+fetch (Tasks 8 + 9)
 
-**Audit findings resolved (April 2026 review):**
+**Audit findings resolved (April 2026 review — round 1):**
 1. Model assignments — added to all task headings ✅
 2. Systemic improvements section — added ✅
 3. `postId` missing from data model — migration 073 + DB module changes added to Task 1 ✅
@@ -1432,6 +1455,12 @@ Post feedback (`clientFeedback`, `voiceScore`, `voiceFeedback`, `reviewChecklist
 5. Task 10 test infrastructure incompatibilities — rewritten with correct imports, signatures, and API surface ✅
 6. `ContentTab` summary cards/banner missing `post_review` — added Step 9.0 ✅
 7. PLAN_WRITING_GUIDE port range stale — note added in Task 10 to update docs ✅
+
+**Audit findings resolved (April 2026 review — round 2):**
+8. Rules of Hooks violation in PostReviewCard — all 10 `useState` calls moved above early returns; early returns (loading/no post) pushed to after all hooks ✅
+9. `approve-post` lacks status guard — explicit `existing.status !== 'post_review'` check added before `updateContentRequest`; prevents unauthenticated delivery bypass ✅
+10. `request-post-changes` lacks status guard — same explicit guard added; prevents post feedback on brief-review requests (blocks the valid `client_review → changes_requested` path from this public route) ✅
+11. `getContentRequest` import added to Task 4.1 step to support the new guards ✅
 
 **Conscious design decisions (not bugs):**
 - `changes_requested → post_review` shortcut NOT added to state machine — admin must re-enter `in_progress` to re-send; this is intentional (forces an explicit re-queue step)
