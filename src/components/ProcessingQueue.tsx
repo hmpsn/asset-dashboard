@@ -91,7 +91,7 @@ export function ProcessingQueue({ items }: Props) {
                 className="p-1.5 hover:bg-[var(--brand-border-hover)] rounded-[var(--radius-md)] transition-colors shrink-0"
                 title="Copy filename"
               >
-                <Icon as={Copy} size="sm" className="text-[var(--brand-text-muted)]" />
+                <Icon as={Copy} size="md" className="text-[var(--brand-text-muted)]" />
               </button>
             )}
           </div>

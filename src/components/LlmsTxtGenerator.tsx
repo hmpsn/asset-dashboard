@@ -105,7 +105,7 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
           title="Generate your LLMs.txt file"
           description="LLMs.txt is an emerging standard (like robots.txt) that helps AI models understand your site's structure, purpose, and content. Click generate to create one from your Webflow pages, keyword strategy, and content plans."
           action={
-            <Button variant="ghost" size="sm" icon={Bot} onClick={generate}>
+            <Button variant="ghost" size="md" icon={Bot} onClick={generate}>
               Generate LLMs.txt
             </Button>
           }

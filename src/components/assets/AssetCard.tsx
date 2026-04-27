@@ -107,10 +107,10 @@ export function AssetCard({
               autoFocus
             />
             <button onClick={() => onSaveRename(asset.id)} className="text-emerald-400/80 hover:text-emerald-300 shrink-0">
-              <Icon as={Check} size="sm" />
+              <Icon as={Check} size="md" />
             </button>
             <button onClick={onCancelRename} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] shrink-0">
-              <Icon as={X} size="sm" />
+              <Icon as={X} size="md" />
             </button>
           </div>
         ) : (
@@ -142,7 +142,7 @@ export function AssetCard({
               className="shrink-0 p-0.5 rounded text-[var(--brand-text-muted)] hover:text-teal-400 transition-colors"
               title="Smart rename"
             >
-              <Icon as={renameLoading ? Loader2 : Wand2} size="sm" className={renameLoading ? 'animate-spin' : ''} />
+              <Icon as={renameLoading ? Loader2 : Wand2} size="md" className={renameLoading ? 'animate-spin' : ''} />
             </button>
           </>
         )}
@@ -161,10 +161,10 @@ export function AssetCard({
               autoFocus
             />
             <button onClick={() => onSaveAlt(asset.id)} className="text-emerald-400/80 hover:text-emerald-300">
-              <Icon as={Check} size="sm" />
+              <Icon as={Check} size="md" />
             </button>
             <button onClick={onCancelEditAlt} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]">
-              <Icon as={X} size="sm" />
+              <Icon as={X} size="md" />
             </button>
           </div>
         ) : (
@@ -194,7 +194,7 @@ export function AssetCard({
           className="p-1.5 rounded text-[var(--brand-text-muted)] hover:text-teal-400 hover:bg-[var(--surface-3)] transition-colors"
           title="Generate alt text with AI"
         >
-          <Icon as={generatingAlt ? Loader2 : Sparkles} size="sm" className={generatingAlt ? 'animate-spin' : ''} />
+          <Icon as={generatingAlt ? Loader2 : Sparkles} size="md" className={generatingAlt ? 'animate-spin' : ''} />
         </button>
         {asset.size > 0 && (
           <button
@@ -206,7 +206,7 @@ export function AssetCard({
             )}
             title={compressDisabled ? 'Compress unavailable for inline RichText images' : 'Compress image'}
           >
-            <Icon as={compressing ? Loader2 : Minimize2} size="sm" className={compressing ? 'animate-spin' : ''} />
+            <Icon as={compressing ? Loader2 : Minimize2} size="md" className={compressing ? 'animate-spin' : ''} />
           </button>
         )}
         <a
@@ -216,7 +216,7 @@ export function AssetCard({
           className="p-1.5 rounded text-[var(--brand-text-muted)] hover:text-blue-400 hover:bg-[var(--surface-3)] transition-colors"
           title="Open in new tab"
         >
-          <Icon as={ExternalLink} size="sm" />
+          <Icon as={ExternalLink} size="md" />
         </a>
       </div>
     </div>

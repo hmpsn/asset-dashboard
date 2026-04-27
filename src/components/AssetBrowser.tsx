@@ -494,17 +494,17 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
         <span className="text-[var(--brand-text)]">{assets.length} assets</span>
         {missingAltCount > 0 && (
           <span className="text-amber-400/80 flex items-center gap-1">
-            <Icon as={AlertTriangle} size="sm" /> {missingAltCount} missing alt
+            <Icon as={AlertTriangle} size="md" /> {missingAltCount} missing alt
           </span>
         )}
         {oversizedCount > 0 && (
           <span className="text-orange-400 flex items-center gap-1">
-            <Icon as={Image} size="sm" /> {oversizedCount} oversized
+            <Icon as={Image} size="md" /> {oversizedCount} oversized
           </span>
         )}
         {unusedCount > 0 && (
           <span className="text-red-400/80 flex items-center gap-1">
-            <Icon as={Trash2} size="sm" /> {unusedCount} unused
+            <Icon as={Trash2} size="md" /> {unusedCount} unused
           </span>
         )}
         {cmsImageCount > 0 && (
@@ -512,7 +512,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
             onClick={() => setFilter('cms-images')}
             className={`flex items-center gap-1 transition-colors ${filter === 'cms-images' || filter === 'cms-missing-alt' ? 'text-blue-300' : 'text-blue-500 hover:text-blue-300'}`}
           >
-            <Icon as={Database} size="sm" />
+            <Icon as={Database} size="md" />
             {cmsImageCount} CMS{cmsMissingAltCount > 0 ? `, ${cmsMissingAltCount} missing alt` : ''}
           </button>
         )}
@@ -521,7 +521,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
           disabled={organizeLoading}
           className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-teal-600/20 hover:bg-teal-600/30 border border-teal-500/30 text-teal-300 disabled:opacity-50 rounded-[var(--radius-md)] text-xs font-medium transition-colors"
         >
-          <Icon as={organizeLoading ? Loader2 : FolderOpen} size="sm" className={organizeLoading ? 'animate-spin' : ''} />
+          <Icon as={organizeLoading ? Loader2 : FolderOpen} size="md" className={organizeLoading ? 'animate-spin' : ''} />
           Organize into Folders
         </button>
       </div>
@@ -529,9 +529,9 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
       {/* Alt text error banner */}
       {altError && (
         <div className="flex items-center gap-2 px-4 py-2.5 bg-red-950/50 border border-red-800/50 rounded-[var(--radius-md)] text-sm text-red-300">
-          <Icon as={AlertTriangle} size="sm" className="text-red-400/80 shrink-0" />
+          <Icon as={AlertTriangle} size="md" className="text-red-400/80 shrink-0" />
           <span className="flex-1">{altError}</span>
-          <button onClick={() => setAltError(null)} className="text-red-400/80 hover:text-red-300"><Icon as={X} size="sm" /></button>
+          <button onClick={() => setAltError(null)} className="text-red-400/80 hover:text-red-300"><Icon as={X} size="md" /></button>
         </div>
       )}
 
@@ -556,7 +556,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
       {/* Success toast */}
       {lastGenerated && !bulkProgress && (
         <div className="flex items-center gap-2 px-4 py-2.5 bg-emerald-950/50 border border-emerald-800/50 rounded-[var(--radius-md)] text-sm text-emerald-300 animate-in fade-in">
-          <Icon as={Sparkles} size="sm" className="text-emerald-400 shrink-0" />
+          <Icon as={Sparkles} size="md" className="text-emerald-400 shrink-0" />
           <span className="truncate">{lastGenerated}</span>
         </div>
       )}
@@ -564,7 +564,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
       {/* Compress result toast */}
       {compressResult && (
         <div className="flex items-center gap-2 px-4 py-2.5 bg-blue-950/50 border border-blue-800/50 rounded-[var(--radius-md)] text-sm text-blue-300 animate-in fade-in">
-          <Icon as={Minimize2} size="sm" className="text-blue-400 shrink-0" />
+          <Icon as={Minimize2} size="md" className="text-blue-400 shrink-0" />
           <span>{compressResult}</span>
         </div>
       )}
@@ -623,7 +623,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
           <Icon as={FolderOpen} size="md" className="text-teal-400 shrink-0" />
           <span>Organized: {organizeResult.moved} moved{organizeResult.failed > 0 ? `, ${organizeResult.failed} failed` : ''} of {organizeResult.total} assets</span>
           <button onClick={() => { setOrganizeResult(null); setOrganizePreview(null); }} className="ml-auto text-teal-400 hover:text-teal-300">
-            <Icon as={X} size="sm" />
+            <Icon as={X} size="md" />
           </button>
         </div>
       )}

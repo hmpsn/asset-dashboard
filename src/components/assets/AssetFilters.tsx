@@ -51,7 +51,7 @@ export function AssetFilters({
           {hasCmsData && <option value="cms-images">CMS Images</option>}
           {hasCmsData && <option value="cms-missing-alt">CMS Missing Alt</option>}
         </select>
-        <Icon as={ChevronDown} size="sm" className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)] pointer-events-none" />
+        <Icon as={ChevronDown} size="md" className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)] pointer-events-none" />
       </div>
 
       <div className="relative">
@@ -64,7 +64,7 @@ export function AssetFilters({
           <option value="fileName">Name</option>
           <option value="fileSize">Size</option>
         </select>
-        <Icon as={ChevronDown} size="sm" className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)] pointer-events-none" />
+        <Icon as={ChevronDown} size="md" className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)] pointer-events-none" />
       </div>
     </div>
   );

@@ -83,7 +83,7 @@ export function OrganizePreview({
       <div className="flex items-center gap-2 pt-1">
         <Button
           variant="primary"
-          size="sm"
+          size="md"
           icon={FolderOpen}
           loading={organizeExecuting}
           disabled={organizeExecuting}

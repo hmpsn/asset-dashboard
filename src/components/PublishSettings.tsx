@@ -179,7 +179,7 @@ export function PublishSettings({ workspaceId: _workspaceId, webflowSiteId, publ
           <label className="block t-caption-sm font-medium text-[var(--brand-text)] mb-1.5">CMS Collection</label>
           {loading ? (
             <div className="flex items-center gap-2 text-[var(--brand-text-muted)] text-xs">
-              <Icon as={Loader2} size="sm" className="animate-spin" /> Loading collections...
+              <Icon as={Loader2} size="md" className="animate-spin" /> Loading collections...
             </div>
           ) : (
             <div className="relative">
@@ -193,7 +193,7 @@ export function PublishSettings({ workspaceId: _workspaceId, webflowSiteId, publ
                   <option key={c.id} value={c.id}>{c.displayName} ({c.slug})</option>
                 ))}
               </select>
-              <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text-muted)] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
           )}
         </div>
@@ -213,7 +213,7 @@ export function PublishSettings({ workspaceId: _workspaceId, webflowSiteId, publ
         {/* Field mapping */}
         {selectedCollection && (loadingFields ? (
           <div className="flex items-center gap-2 text-[var(--brand-text-muted)] text-xs py-2">
-            <Icon as={Loader2} size="sm" className="animate-spin" /> Loading collection schema...
+            <Icon as={Loader2} size="md" className="animate-spin" /> Loading collection schema...
           </div>
         ) : fields.length > 0 && (
           <div className="space-y-3">
@@ -224,7 +224,7 @@ export function PublishSettings({ workspaceId: _workspaceId, webflowSiteId, publ
                   <span className="t-caption-sm text-[var(--brand-text-bright)]">
                     {label} {required && <span className="text-red-400/80">*</span>}
                   </span>
-                  <span className="block t-micro text-[var(--brand-text-dim)]">{hint}</span>
+                  <span className="block t-caption-sm text-[var(--brand-text-muted)]">{hint}</span>
                 </div>
                 <div className="relative flex-1">
                   <select
@@ -249,7 +249,7 @@ export function PublishSettings({ workspaceId: _workspaceId, webflowSiteId, publ
           <div className="flex justify-end pt-2">
             <Button
               variant="primary"
-              size="sm"
+              size="md"
               icon={Save}
               loading={saving}
               disabled={saving || !fieldMap.title || !fieldMap.slug || !fieldMap.body}

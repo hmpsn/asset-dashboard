@@ -94,10 +94,10 @@ export function CmsFieldSelector({ collections, selectedFields, onChange }: Prop
         onClick={() => setOpen(v => !v)}
         className="w-full flex items-center gap-2 px-3 py-2 text-sm text-blue-300 hover:text-blue-200 hover:bg-blue-950/30 transition-colors"
       >
-        <Icon as={Database} size="sm" className="text-blue-400 shrink-0" />
+        <Icon as={Database} size="md" className="text-blue-400 shrink-0" />
         <span className="flex-1 text-left font-medium">CMS Field Selection</span>
         <span className="text-xs text-blue-500">{selectedCount}/{totalFields} fields</span>
-        <Icon as={open ? ChevronDown : ChevronRight} size="sm" className="text-blue-500" />
+        <Icon as={open ? ChevronDown : ChevronRight} size="md" className="text-blue-500" />
       </button>
 
       {open && (

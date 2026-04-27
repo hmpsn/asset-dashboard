@@ -190,7 +190,7 @@ export function AIUsageSection() {
                     />
                   </div>
                   <span className="t-caption-sm text-[var(--brand-text-muted)] w-12 text-right tabular-nums">{fmtCost(f.cost)}</span>
-                  <span className="t-micro text-[var(--brand-text-dim)] w-10 text-right tabular-nums">{f.calls} calls</span>
+                  <span className="t-caption-sm text-[var(--brand-text-muted)] w-10 text-right tabular-nums">{f.calls} calls</span>
                 </div>
               );
             })}
