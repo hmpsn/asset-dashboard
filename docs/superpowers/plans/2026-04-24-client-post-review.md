@@ -421,19 +421,60 @@ res.json(requests.map(r => ({
 
 > **Note:** `r.postId` is not on `ContentTopicRequest` today — that field comes from finding the associated `GeneratedPost` in the DB. Check `server/content-requests.ts` or `server/content-posts.ts` to see how the post is linked to the request (likely via `briefId → post.briefId` join, or a `postId` column on the request row). If a `postId` column doesn't exist on the `content_requests` table, use `listPosts(workspaceId).find(p => p.briefId === r.briefId)?.id` as a fallback lookup. Prefer adding a `postId` column if it doesn't exist (add it to Task 1's migration if needed).
 
-- [ ] **Step 4.1: Add imports to `server/routes/public-content.ts`**
+- [ ] **Step 4.1: Update imports in `server/routes/public-content.ts`**
 
-At the top of the file, alongside existing imports, add:
+Three targeted changes — do NOT re-add symbols that are already imported or TypeScript will error on duplicate identifiers.
+
+**(a) Extend the existing `schemas/public-content.js` import block** (currently lines 31–42) to include the three new schemas. Change it from:
 
 ```typescript
-import { approvePostSchema, requestPostChangesSchema, clientPostEditSchema } from '../schemas/public-content.js';
-import { getPost, updatePostField, snapshotPostVersion, listPosts } from '../content-posts.js';
-import { getContentRequest, listContentRequests } from '../content-requests.js';
-import { notifyClientPostReady } from '../email.js';
-import { WS_EVENTS } from '../ws-events.js';
+import {
+  createContentRequestSchema,
+  submitContentRequestSchema,
+  declineContentRequestSchema,
+  requestChangesSchema,
+  approveContentRequestSchema,
+  upgradeContentRequestSchema,
+  addCommentSchema,
+  fromAuditSchema,
+  addTrackedKeywordSchema,
+  removeTrackedKeywordSchema,
+} from '../schemas/public-content.js';
 ```
 
-(Check if any of these are already imported before adding duplicates. `getContentRequest` is needed for the explicit `post_review` status guards in Steps 4.3 and 4.4.)
+To:
+
+```typescript
+import {
+  createContentRequestSchema,
+  submitContentRequestSchema,
+  declineContentRequestSchema,
+  requestChangesSchema,
+  approveContentRequestSchema,
+  upgradeContentRequestSchema,
+  addCommentSchema,
+  fromAuditSchema,
+  addTrackedKeywordSchema,
+  removeTrackedKeywordSchema,
+  approvePostSchema,
+  requestPostChangesSchema,
+  clientPostEditSchema,
+} from '../schemas/public-content.js';
+```
+
+**(b) Add a new import line for `content-posts.js`** after the `'../content-requests.js'` import block (around line 18):
+
+```typescript
+import { getPost, updatePostField, snapshotPostVersion, listPosts } from '../content-posts.js';
+```
+
+**(c) Extend the existing email import** (currently line 19: `import { notifyTeamContentRequest } from '../email.js'`) to also include `notifyClientPostReady`:
+
+```typescript
+import { notifyTeamContentRequest, notifyClientPostReady } from '../email.js';
+```
+
+> **Already present — do NOT add again:** `getContentRequest`, `listContentRequests`, `updateContentRequest`, `addComment` (from `content-requests.js`), `WS_EVENTS` (from `ws-events.js`), `validate` (from `middleware/validate.js`). Adding these again will cause TypeScript duplicate identifier errors.
 
 - [ ] **Step 4.2: Add `GET /api/public/content-posts/:workspaceId/:postId`**
 
@@ -486,8 +527,6 @@ router.post('/api/public/content-request/:workspaceId/:id/approve-post', validat
   res.json(updated);
 });
 ```
-
-> **Note:** `getContentRequest` must be imported in Task 4.1 alongside the other imports. Add it to the import from `'../content-requests.js'`.
 
 - [ ] **Step 4.4: Add `POST /api/public/content-request/:workspaceId/:id/request-post-changes`**
 
@@ -627,11 +666,13 @@ Replace with:
 import { notifyClientBriefReady, notifyClientContentPublished, notifyClientPostReady } from '../email.js';
 ```
 
-Also find the import from `content-posts-db.js` (or add it if not present):
+Also add a new import for `listPosts` (not yet present in this file):
 
 ```typescript
-import { listPosts } from '../content-posts-db.js';
+import { listPosts } from '../content-posts.js';
 ```
+
+> Note: All admin routes use `'../content-posts.js'` (the re-export barrel), never `'../content-posts-db.js'`.
 
 - [ ] **Step 5.1b: Auto-populate `postId` when transitioning to `post_review`**
 
@@ -660,13 +701,6 @@ try {
     ...(postIdToSet ? { postId: postIdToSet } : {}),
   });
 } catch (err) { /* ... existing error handling ... */ }
-```
-
-> **Note:** `getContentRequest` is already imported (it's used throughout this routes file). Confirm the import is present before adding the `listPosts` import.
-
-Also add `getContentRequest` to the import from `'../content-requests.js'` if it's not already there:
-```typescript
-import { createContentRequest, getContentRequest, updateContentRequest, deleteContentRequest, addComment, listContentRequests } from '../content-requests.js';
 ```
 
 - [ ] **Step 5.2: Add `post_review` email notification after the `client_review` block**
