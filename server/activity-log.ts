@@ -45,6 +45,7 @@ export type ActivityType =
   | 'anomaly_positive'
   | 'post_generated'
   | 'post_reverted'
+  | 'post_sent_for_review'
   | 'content_published'
   | 'aeo_review'
   | 'content_subscription'
@@ -156,7 +157,7 @@ const CLIENT_VISIBLE_TYPES: Set<ActivityType> = new Set([
   'images_optimized', 'links_fixed', 'content_updated', 'content_requested',
   'brief_generated', 'brief_approved', 'content_upgraded', 'fix_completed',
   'content_published', 'copy_sent_to_client', 'post_approved', 'post_changes_requested',
-  'post_client_edit',
+  'post_client_edit', 'post_sent_for_review',
 ]);
 
 // --- Prepared statements (lazily initialized after migrations run) ---

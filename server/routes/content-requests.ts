@@ -17,7 +17,8 @@ import {
   updateContentRequest,
   deleteContentRequest,
 } from '../content-requests.js';
-import { notifyClientBriefReady, notifyClientContentPublished } from '../email.js';
+import { listPosts } from '../content-posts.js';
+import { notifyClientBriefReady, notifyClientContentPublished, notifyClientPostReady } from '../email.js';
 import { getGA4LandingPages } from '../google-analytics.js';
 import { getQueryPageData, getAllGscPages, getPageTrend } from '../search-console.js';
 import { getConfiguredProvider, getProviderDisplayName } from '../seo-data-provider.js';
@@ -68,9 +69,22 @@ router.get('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('wor
 
 router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('workspaceId'), validate(updateContentRequestSchema), (req, res, next) => {
   const { status, internalNote, deliveryUrl, deliveryNotes } = req.body;
+  // Auto-populate postId when sending to post_review.
+  // The state machine has already validated the transition by this point.
+  let postIdToSet: string | undefined;
+  if (status === 'post_review') {
+    const existing = getContentRequest(req.params.workspaceId, req.params.id);
+    if (existing?.briefId) {
+      const post = listPosts(req.params.workspaceId).find(p => p.briefId === existing.briefId);
+      postIdToSet = post?.id;
+    }
+  }
   let updated;
   try {
-    updated = updateContentRequest(req.params.workspaceId, req.params.id, { status, internalNote, deliveryUrl, deliveryNotes });
+    updated = updateContentRequest(req.params.workspaceId, req.params.id, {
+      status, internalNote, deliveryUrl, deliveryNotes,
+      ...(postIdToSet ? { postId: postIdToSet } : {}),
+    });
   } catch (err: unknown) {
     if (err instanceof Error && err.name === 'InvalidTransitionError') {
       return res.status(400).json({ error: err.message });
@@ -85,6 +99,22 @@ router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('w
       const origin = req.get('origin') || req.get('referer')?.replace(/\/[^/]*$/, '') || '';
       const dashUrl = origin ? `${origin}/dashboard/${req.params.workspaceId}?tab=content` : undefined;
       notifyClientBriefReady({ clientEmail: wsInfo.clientEmail, workspaceName: wsInfo.name, workspaceId: req.params.workspaceId, topic: updated.topic, targetKeyword: updated.targetKeyword, dashboardUrl: dashUrl });
+    }
+  }
+  // Notify client when post is sent for their review
+  if (status === 'post_review') {
+    const wsInfo = getWorkspace(req.params.workspaceId);
+    if (wsInfo?.clientEmail) {
+      const origin = req.get('origin') || req.get('referer')?.replace(/\/[^/]*$/, '') || '';
+      const dashUrl = origin ? `${origin}/dashboard/${req.params.workspaceId}?tab=content` : undefined;
+      notifyClientPostReady({
+        clientEmail: wsInfo.clientEmail,
+        workspaceName: wsInfo.name,
+        workspaceId: req.params.workspaceId,
+        topic: updated.topic,
+        targetKeyword: updated.targetKeyword,
+        dashboardUrl: dashUrl,
+      });
     }
   }
   // When content is delivered and has a target page, update page state to live
@@ -111,6 +141,10 @@ router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('w
       const dashUrl = origin ? `${origin}/dashboard/${req.params.workspaceId}?tab=content` : undefined;
       notifyClientContentPublished({ clientEmail: wsInfo.clientEmail, workspaceName: wsInfo.name, workspaceId: req.params.workspaceId, topic: updated.topic, targetKeyword: updated.targetKeyword, dashboardUrl: dashUrl });
     }
+  }
+  // Activity log entry for post_review transition
+  if (status === 'post_review') {
+    addActivity(req.params.workspaceId, 'post_sent_for_review', `Post sent to client for review: "${updated.topic}"`, '', { requestId: updated.id });
   }
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
   res.json(updated);
