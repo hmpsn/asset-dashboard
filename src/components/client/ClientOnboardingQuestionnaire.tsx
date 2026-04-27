@@ -455,7 +455,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
             </>
           ) : step === 'review' ? (
             <>
-              <button onClick={prev} className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-xl)] bg-[var(--surface-3)] border border-[var(--brand-border)] text-xs text-[var(--brand-text)] hover:bg-[var(--surface-3)]/80 transition-colors">
+              <button onClick={prev} className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-xl)] bg-[var(--surface-3)] border border-[var(--brand-border)] text-xs text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)] transition-colors">
                 <ChevronLeft className="w-3.5 h-3.5" /> Back
               </button>
               <Button variant="primary" onClick={handleSubmit} disabled={saving} loading={saving} className="flex items-center gap-2 px-5 py-2.5">
@@ -465,7 +465,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
             </>
           ) : (
             <>
-              <button onClick={prev} className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-xl)] bg-[var(--surface-3)] border border-[var(--brand-border)] text-xs text-[var(--brand-text)] hover:bg-[var(--surface-3)]/80 transition-colors">
+              <button onClick={prev} className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-xl)] bg-[var(--surface-3)] border border-[var(--brand-border)] text-xs text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)] transition-colors">
                 <ChevronLeft className="w-3.5 h-3.5" /> Back
               </button>
               <Button variant="primary" onClick={next} className="flex items-center gap-1.5 px-5 py-2.5">

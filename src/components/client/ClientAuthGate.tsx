@@ -195,7 +195,7 @@ export function ClientAuthGate({
                         setForgotEmail('');
                         setAuthError('');
                       }}
-                      className="w-full py-3 rounded-[var(--radius-xl)] bg-[var(--surface-3)] hover:bg-[var(--surface-3)]/80 text-[var(--brand-text)] text-sm font-medium transition-all"
+                      className="w-full py-3 rounded-[var(--radius-xl)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text)] text-sm font-medium transition-all"
                     >
                       Back to Sign In
                     </button>

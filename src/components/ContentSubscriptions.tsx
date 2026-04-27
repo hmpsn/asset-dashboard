@@ -249,7 +249,7 @@ export function ContentSubscriptions({ workspaceId }: Props) {
           {activeSub.postsDeliveredThisPeriod < activeSub.postsPerMonth && (
             <button
               onClick={() => handleMarkDelivered(activeSub.id)}
-              className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--surface-3)] hover:bg-[var(--surface-3)]/80 text-[var(--brand-text-bright)] transition-colors"
+              className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)] transition-colors"
             >
               <Icon as={FileText} size="md" /> Mark Post Delivered
             </button>

@@ -353,7 +353,7 @@ export function BriefDetail({
                 </button>
                 <button
                   onClick={() => { setShowOutlineRegen(false); setOutlineRegenFeedback(''); }}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--surface-3)] hover:bg-[var(--surface-3)]/80 text-[var(--brand-text)] transition-colors"
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text)] transition-colors"
                 >
                   Cancel
                 </button>

@@ -383,7 +383,7 @@ export function PageEditRow({
                 onClick={() => onSaveDraft(page.id)}
                 disabled={!edit.dirty || isDraftSaving}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  isDraftSaved ? 'bg-blue-600 text-white' : 'bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)]/80 disabled:opacity-50 disabled:cursor-not-allowed'
+                  isDraftSaved ? 'bg-blue-600 text-white' : 'bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--brand-border-hover)] disabled:opacity-50 disabled:cursor-not-allowed'
                 }`}
               >
                 <Icon as={isDraftSaving ? Loader2 : isDraftSaved ? Check : Save} size="sm" className={isDraftSaving ? 'animate-spin' : ''} />

@@ -60,7 +60,7 @@ export function BulkOperations({
         {approvalSelected.size > 0 && bulkMode === 'idle' && (
           <>
             <span className="text-[var(--brand-border)]">|</span>
-            <button onClick={() => { onSetBulkField('title'); onSetBulkMode('pattern'); }} className="flex items-center gap-1 px-2 py-1 rounded bg-[var(--surface-3)] hover:bg-[var(--surface-3)]/80 text-xs text-[var(--brand-text-bright)] transition-colors">
+            <button onClick={() => { onSetBulkField('title'); onSetBulkMode('pattern'); }} className="flex items-center gap-1 px-2 py-1 rounded bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-xs text-[var(--brand-text-bright)] transition-colors">
               <Icon as={Type} size="sm" /> Pattern Apply
             </button>
             <button onClick={() => onBulkAiRewrite('both')} className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600 hover:bg-teal-500 text-xs text-white font-medium transition-colors">
@@ -137,7 +137,7 @@ export function BulkOperations({
               <button onClick={bulkSource === 'ai' ? onApplyBulkRewrite : onApplyPattern} className="flex items-center gap-1 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded text-xs font-medium text-white transition-colors">
                 <Icon as={Check} size="sm" /> Apply All
               </button>
-              <button onClick={onClearPreview} className="flex items-center gap-1 px-3 py-1.5 bg-[var(--surface-3)] hover:bg-[var(--surface-3)]/80 rounded text-xs text-[var(--brand-text-bright)] transition-colors">
+              <button onClick={onClearPreview} className="flex items-center gap-1 px-3 py-1.5 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] rounded text-xs text-[var(--brand-text-bright)] transition-colors">
                 <Icon as={X} size="sm" /> Cancel
               </button>
             </div>

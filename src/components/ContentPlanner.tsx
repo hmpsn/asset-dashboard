@@ -214,7 +214,7 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setView({ mode: 'template-editor' })}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)]/80 transition-colors"
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--brand-border-hover)] transition-colors"
             >
               <Icon as={FileText} size="sm" />
               New Template

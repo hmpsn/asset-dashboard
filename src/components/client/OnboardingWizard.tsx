@@ -177,7 +177,7 @@ export function OnboardingWizard({
         {/* Navigation */}
         <div className="px-6 pb-6 flex items-center justify-between gap-3">
           {stepIdx > 0 ? (
-            <button onClick={prev} className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-xl)] bg-[var(--surface-3)] border border-[var(--brand-border)] text-xs text-[var(--brand-text)] hover:bg-[var(--surface-3)]/80 transition-colors">
+            <button onClick={prev} className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-xl)] bg-[var(--surface-3)] border border-[var(--brand-border)] text-xs text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)] transition-colors">
               <ChevronLeft className="w-3.5 h-3.5" /> Back
             </button>
           ) : (
