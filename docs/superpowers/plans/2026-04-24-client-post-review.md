@@ -983,9 +983,18 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
 
   async function saveSection(index: number, content: string) {
     try {
-      const sections = post.sections.map(s =>
-        s.index === index ? { ...s, content, wordCount: content.split(/\s+/).filter(Boolean).length } : s
-      );
+      // Send only the single changed section — NOT post.sections.map() over the full array.
+      // The server-side merge (Step 4.5) iterates the DB sections and replaces only the
+      // matching index, leaving all others untouched. Rebuilding and sending the full array
+      // from the stale `post` closure would corrupt concurrent saves: save B would overwrite
+      // save A's changes because it captured the pre-A `post.sections` snapshot.
+      const existing = post.sections.find(s => s.index === index);
+      const sections = [{
+        index,
+        heading: existing?.heading ?? '',
+        content,
+        wordCount: content.split(/\s+/).filter(Boolean).length,
+      }];
       const updated = await publicPostReview.clientEdit(workspaceId, post.id, { sections });
       setPost(updated);
       setEditingSection(null);
