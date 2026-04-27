@@ -71,6 +71,22 @@ async function createRequest(topic: string, kw: string): Promise<{ id: string; s
   return res.json() as Promise<{ id: string; status: string }>;
 }
 
+/**
+ * Create a request with a linked stub post so the server guard
+ * (Fix 2: "No generated post found") allows the in_progress → post_review transition.
+ */
+async function createRequestWithPost(topic: string, kw: string): Promise<{ id: string; status: string; postId: string }> {
+  const req = createContentRequest(testWsId, {
+    topic, targetKeyword: kw, intent: 'informational', priority: 'medium',
+    rationale: '', serviceType: 'full_post',
+  });
+  const briefId = `brief_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  updateContentRequest(testWsId, req.id, { briefId });
+  const post = makeStubPost(testWsId, briefId);
+  savePost(testWsId, post);
+  return { id: req.id, status: req.status, postId: post.id };
+}
+
 async function setStatus(reqId: string, status: string): Promise<Response> {
   return patchJson(`/api/content-requests/${testWsId}/${reqId}`, { status });
 }
@@ -79,7 +95,8 @@ async function setStatus(reqId: string, status: string): Promise<Response> {
 
 describe('POST /api/public/content-request/:wsId/:id/approve-post', () => {
   it('transitions post_review → delivered', async () => {
-    const req = await createRequest('Approve Test', `approve-test-${Date.now()}`);
+    // createRequestWithPost links a stub post so the server guard allows the transition.
+    const req = await createRequestWithPost('Approve Test', `approve-test-${Date.now()}`);
 
     // Walk to in_progress → post_review
     await setStatus(req.id, 'in_progress');
@@ -105,7 +122,7 @@ describe('POST /api/public/content-request/:wsId/:id/approve-post', () => {
 
 describe('POST /api/public/content-request/:wsId/:id/request-post-changes', () => {
   it('transitions post_review → changes_requested and stores clientFeedback', async () => {
-    const req = await createRequest('Changes Test', `changes-test-${Date.now()}`);
+    const req = await createRequestWithPost('Changes Test', `changes-test-${Date.now()}`);
 
     await setStatus(req.id, 'in_progress');
     await setStatus(req.id, 'post_review');
@@ -132,7 +149,7 @@ describe('POST /api/public/content-request/:wsId/:id/request-post-changes', () =
   });
 
   it('rejects request-post-changes with empty feedback', async () => {
-    const req = await createRequest('Empty Feedback Test', `empty-fb-${Date.now()}`);
+    const req = await createRequestWithPost('Empty Feedback Test', `empty-fb-${Date.now()}`);
     await setStatus(req.id, 'in_progress');
     await setStatus(req.id, 'post_review');
 
@@ -146,7 +163,8 @@ describe('POST /api/public/content-request/:wsId/:id/request-post-changes', () =
 
 describe('State machine guard: in_progress → post_review', () => {
   it('allows in_progress → post_review', async () => {
-    const req = await createRequest('SM Allow Test', `sm-allow-${Date.now()}`);
+    // createRequestWithPost links a stub post so the server guard allows the transition.
+    const req = await createRequestWithPost('SM Allow Test', `sm-allow-${Date.now()}`);
     await setStatus(req.id, 'in_progress');
     const res = await setStatus(req.id, 'post_review');
     expect(res.status).toBe(200);
@@ -159,6 +177,40 @@ describe('State machine guard: in_progress → post_review', () => {
     // 'requested' cannot jump to 'post_review' — must walk through in_progress
     const res = await setStatus(req.id, 'post_review');
     expect(res.status).toBe(400);
+  });
+});
+
+describe('GET /api/public/content-requests/:wsId — postId serialization', () => {
+  it('exposes postId for post_review status, omits it for earlier statuses', async () => {
+    // Setup: post_review request with linked post
+    const briefId = `brief_get_test_${Date.now()}`;
+    const ready = createContentRequest(testWsId, {
+      topic: 'GET Test Ready', targetKeyword: `get-ready-${Date.now()}`,
+      intent: 'informational', priority: 'medium', rationale: '', serviceType: 'full_post',
+    });
+    updateContentRequest(testWsId, ready.id, { briefId });
+    const post = makeStubPost(testWsId, briefId);
+    savePost(testWsId, post);
+    await patchJson(`/api/content-requests/${testWsId}/${ready.id}`, { status: 'in_progress' });
+    await patchJson(`/api/content-requests/${testWsId}/${ready.id}`, { status: 'post_review' });
+
+    // Setup: requested-status request with no post
+    const earlyReq = await createRequest('GET Test Early', `get-early-${Date.now()}`);
+
+    // List via public endpoint
+    const res = await api(`/api/public/content-requests/${testWsId}`);
+    expect(res.status).toBe(200);
+    const list = await res.json() as Array<{ id: string; status: string; postId?: string; clientFeedback?: string }>;
+
+    const readyEntry = list.find(r => r.id === ready.id);
+    expect(readyEntry).toBeDefined();
+    expect(readyEntry!.postId).toBe(post.id);
+    expect(readyEntry!.status).toBe('post_review');
+    expect(readyEntry!.clientFeedback).toBeUndefined();
+
+    const earlyEntry = list.find(r => r.id === earlyReq.id);
+    expect(earlyEntry).toBeDefined();
+    expect(earlyEntry!.postId).toBeUndefined();
   });
 });
 
@@ -184,7 +236,7 @@ describe('PATCH /api/public/content-posts/:wsId/:postId/client-edit', () => {
     const toReview = await patchJson(`/api/content-requests/${testWsId}/${req.id}`, { status: 'post_review' });
     expect(toReview.status).toBe(200);
 
-    // Client edits via public route
+    // Client edits via public route (server strips HTML tags per Fix 5b)
     const editRes = await api(`/api/public/content-posts/${testWsId}/${post.id}/client-edit`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -196,11 +248,12 @@ describe('PATCH /api/public/content-posts/:wsId/:postId/client-edit', () => {
     });
     expect(editRes.status).toBe(200);
     const updated = await editRes.json() as { sections: { content: string }[] };
-    expect(updated.sections[0].content).toBe('<p>Updated section content by client.</p>');
+    // Server strips HTML tags — content is stored as plain text
+    expect(updated.sections[0].content).toBe('Updated section content by client.');
 
     // Verify post is actually persisted (in-process check)
     const persisted = getPost(testWsId, post.id);
-    expect(persisted?.sections[0].content).toBe('<p>Updated section content by client.</p>');
+    expect(persisted?.sections[0].content).toBe('Updated section content by client.');
   });
 
   it('rejects edit when request is not in post_review', async () => {

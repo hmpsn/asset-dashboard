@@ -186,6 +186,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     'content-request:created': () => refetchClient('content', `/api/public/content-requests/${workspaceId}`),
     'content-request:update': () => refetchClient('content', `/api/public/content-requests/${workspaceId}`),
     'copy:section_updated': () => refetchClient('copy', `/api/public/copy/${workspaceId}/entries`),
+    'post:updated': () => refetchClient('post-preview', ''),
     'audit:complete': () => {
       refetchClient('audit', '');
       refetchClient('activity', '');
