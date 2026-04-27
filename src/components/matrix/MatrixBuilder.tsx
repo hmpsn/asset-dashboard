@@ -3,7 +3,7 @@ import {
   ArrowLeft, ArrowRight, Check, FileText, Layers, Tag,
   Eye, Sparkles, X,
 } from 'lucide-react';
-import { SectionCard, Badge, PageHeader, EmptyState } from '../ui';
+import { SectionCard, Badge, PageHeader, EmptyState, Button } from '../ui';
 import type { ContentTemplate, ContentMatrix, MatrixDimension, MatrixCell } from './types';
 
 interface MatrixBuilderProps {
@@ -50,7 +50,7 @@ function TemplateCard({ template, isSelected, onSelect }: { template: ContentTem
   return (
     <button
       onClick={onSelect}
-      className={`w-full text-left p-4 rounded-xl border transition-all ${
+      className={`w-full text-left p-4 rounded-[var(--radius-xl)] border transition-all ${
         isSelected
           ? 'bg-teal-500/10 border-teal-500/30 ring-2 ring-teal-400'
           : 'bg-[var(--surface-1)] border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]'
@@ -96,7 +96,7 @@ function TagInput({ values, onChange, placeholder }: { values: string[]; onChang
   };
 
   return (
-    <div className="flex flex-wrap gap-1.5 p-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg min-h-[42px] focus-within:border-teal-500/40 transition-colors">
+    <div className="flex flex-wrap gap-1.5 p-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] min-h-[42px] focus-within:border-teal-500/40 transition-colors">
       {values.map(val => (
         <span key={val} className="flex items-center gap-1 px-2 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-xs text-teal-300">
           {val}
@@ -285,7 +285,7 @@ export function MatrixBuilder({ workspaceId, templates, onComplete, onCancel }: 
             ))}
 
             {totalPages > 0 && (
-              <div className="bg-teal-500/5 border border-teal-500/20 rounded-lg p-3">
+              <div className="bg-teal-500/5 border border-teal-500/20 rounded-[var(--radius-lg)] p-3">
                 <p className="text-xs text-teal-300">
                   <Sparkles className="w-3 h-3 inline mr-1" />
                   This will generate <strong>{dimensionSummary} = {totalPages} pages</strong>
@@ -304,7 +304,7 @@ export function MatrixBuilder({ workspaceId, templates, onComplete, onCancel }: 
               {previewCells.map(cell => {
                 const varLabel = Object.values(cell.variableValues).join(' \u00d7 ');
                 return (
-                  <div key={cell.id} className="flex items-center gap-3 px-3 py-2 bg-[var(--surface-1)] rounded-lg border border-[var(--brand-border)]">
+                  <div key={cell.id} className="flex items-center gap-3 px-3 py-2 bg-[var(--surface-1)] rounded-[var(--radius-lg)] border border-[var(--brand-border)]">
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-[var(--brand-text-bright)] truncate">{varLabel}</p>
                       <p className="t-caption-sm font-mono text-[var(--brand-text-muted)] truncate">{cell.plannedUrl}</p>
@@ -313,7 +313,7 @@ export function MatrixBuilder({ workspaceId, templates, onComplete, onCancel }: 
                       type="text"
                       value={cellKeywordOverrides[cell.id] ?? cell.targetKeyword}
                       onChange={e => setCellKeywordOverrides(prev => ({ ...prev, [cell.id]: e.target.value }))}
-                      className="w-48 px-2 py-1 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg t-caption text-[var(--brand-text-bright)] font-mono focus:border-teal-500/40 focus:outline-none transition-colors"
+                      className="w-48 px-2 py-1 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] font-mono focus:border-teal-500/40 focus:outline-none transition-colors"
                     />
                   </div>
                 );
@@ -333,12 +333,12 @@ export function MatrixBuilder({ workspaceId, templates, onComplete, onCancel }: 
                 value={matrixName}
                 onChange={e => setMatrixName(e.target.value)}
                 placeholder="e.g. Houston Area Service Pages"
-                className="w-full mt-1 px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
+                className="w-full mt-1 px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
               />
             </div>
 
             {/* pr-check-disable-next-line -- stats grid summary panel; pending Phase 4 SectionCard migration */}
-            <div className="bg-[var(--surface-1)] rounded-xl border border-[var(--brand-border)] p-4 space-y-3">
+            <div className="bg-[var(--surface-1)] rounded-[var(--radius-xl)] border border-[var(--brand-border)] p-4 space-y-3">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="text-center">
                   <p className="text-lg font-bold text-[var(--brand-text-bright)] tabular-nums">{totalPages}</p>
@@ -371,27 +371,32 @@ export function MatrixBuilder({ workspaceId, templates, onComplete, onCancel }: 
       <div className="flex items-center justify-between pt-2">
         <button
           onClick={() => step > 1 ? setStep((step - 1) as Step) : onCancel()}
-          className="flex items-center gap-1 px-4 py-2 rounded-lg text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
+          className="flex items-center gap-1 px-4 py-2 rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" /> {step > 1 ? 'Back' : 'Cancel'}
         </button>
 
         {step < 4 ? (
-          <button
+          <Button
+            variant="primary"
+            size="lg"
+            icon={ArrowRight}
+            iconPosition="right"
             onClick={() => setStep((step + 1) as Step)}
             disabled={!canProceed()}
-            className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 text-xs text-white font-medium hover:from-teal-500 hover:to-emerald-500 transition-colors disabled:opacity-50"
           >
-            Next <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+            Next
+          </Button>
         ) : (
-          <button
+          <Button
+            variant="primary"
+            size="lg"
+            icon={Sparkles}
             onClick={handleComplete}
             disabled={!canProceed()}
-            className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 text-xs text-white font-medium hover:from-teal-500 hover:to-emerald-500 transition-colors disabled:opacity-50"
           >
-            <Sparkles className="w-3.5 h-3.5" /> Create Matrix
-          </button>
+            Create Matrix
+          </Button>
         )}
       </div>
     </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, ChevronDown, Link, Link2Off, Trash2, Globe, Eye, EyeOff, ExternalLink, MoreHorizontal, AlertTriangle } from 'lucide-react';
-import { cn, Icon } from './ui';
+import { Plus, ChevronDown, Link, Link2Off, Trash2, Globe, Eye, EyeOff, ExternalLink, MoreHorizontal } from 'lucide-react';
+import { cn, Icon, ConfirmDialog } from './ui';
 import { webflow } from '../api';
 
 export interface Workspace {
@@ -271,32 +271,16 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
           </div>
         </div>
       )}
-      {/* Delete confirmation modal */}
-      {confirmDelete && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100]" onClick={() => setConfirmDelete(null)}>
-          <div className="w-80 rounded-[var(--radius-xl)] p-5 shadow-2xl bg-[var(--surface-2)] border border-[var(--brand-border-hover)]" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-9 h-9 rounded-[var(--radius-lg)] bg-red-500/8 flex items-center justify-center shrink-0">
-                <Icon as={AlertTriangle} size="md" className="text-red-400/80" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Delete workspace?</h3>
-                <p className="t-caption mt-0.5 text-[var(--brand-text-muted)]">
-                  This will permanently remove <strong>{workspaces.find(w => w.id === confirmDelete)?.name}</strong> and all its data.
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-2 mt-4">
-              <button onClick={() => setConfirmDelete(null)} className="flex-1 px-3 py-2 rounded-[var(--radius-lg)] t-caption font-medium transition-colors bg-[var(--surface-2)] text-[var(--brand-text-muted)] border border-[var(--brand-border)]">
-                Cancel
-              </button>
-              <button onClick={() => { onDelete(confirmDelete); setConfirmDelete(null); setOpen(false); }} className="flex-1 px-3 py-2 rounded-[var(--radius-lg)] t-caption font-medium bg-red-600 hover:bg-red-500 text-white transition-colors">
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Delete workspace?"
+        message={`This will permanently remove ${workspaces.find(w => w.id === confirmDelete)?.name ?? 'this workspace'} and all its data.`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="destructive"
+        onConfirm={() => { if (confirmDelete) { onDelete(confirmDelete); setConfirmDelete(null); setOpen(false); } }}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 }

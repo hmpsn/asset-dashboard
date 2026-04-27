@@ -46,13 +46,13 @@ function SignalCard({ signal, workspaceId }: { signal: ClientSignal; workspaceId
   };
 
   return (
-    <div className="border border-[var(--brand-border)] rounded-xl overflow-hidden">
+    <div className="border border-[var(--brand-border)] rounded-[var(--radius-lg)] overflow-hidden">
       {/* Header row */}
       <button
         className="w-full flex items-start gap-3 px-4 py-3 hover:bg-[var(--surface-3)] transition-colors text-left"
         onClick={() => setExpanded(p => !p)}
       >
-        <div className="w-6 h-6 rounded-lg bg-teal-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+        <div className="w-6 h-6 rounded-[var(--radius-lg)] bg-teal-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
           <Icon as={MessageSquare} size="sm" className="text-teal-400" />
         </div>
         <div className="flex-1 min-w-0">
@@ -90,7 +90,7 @@ function SignalCard({ signal, workspaceId }: { signal: ClientSignal; workspaceId
                 {signal.chatContext.map((msg, i) => (
                   <div key={i} className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : ''}`}>
                     <div className={cn(
-                      'max-w-[80%] rounded-lg px-2.5 py-1.5 t-caption-sm',
+                      'max-w-[80%] rounded-[var(--radius-lg)] px-2.5 py-1.5 t-caption-sm',
                       msg.role === 'user'
                         ? 'bg-teal-600/15 border border-teal-500/20 text-[var(--brand-text-bright)]'
                         : 'bg-[var(--surface-1)] border border-[var(--brand-border)] text-[var(--brand-text)]'
@@ -171,7 +171,7 @@ export function AdminInbox({ workspaceId }: AdminInboxProps) {
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={cn(
-              'px-3 py-1 rounded-lg t-caption font-medium transition-colors',
+              'px-3 py-1 rounded-[var(--radius-lg)] t-caption font-medium transition-colors',
               activeTab === tab
                 ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20'
                 : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] border border-transparent'

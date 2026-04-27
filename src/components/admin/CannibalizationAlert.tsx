@@ -44,7 +44,7 @@ export function CannibalizationAlert({ warnings, tier }: Props) {
           {warnings.map((w) => (
             <div
               key={w.keyword}
-              className={`border rounded-lg p-3 ${SEVERITY_CLASSES[w.severity]}`}
+              className={`border rounded-[var(--radius-lg)] p-3 ${SEVERITY_CLASSES[w.severity]}`}
             >
               <div className="flex items-center gap-2 text-sm font-medium">
                 <AlertTriangle className={`w-4 h-4 flex-shrink-0 ${SEVERITY_ICON_COLOR[w.severity]}`} />
@@ -54,7 +54,7 @@ export function CannibalizationAlert({ warnings, tier }: Props) {
               </div>
               <div className="mt-2 ml-6 space-y-0.5">
                 {w.pages.map((page) => (
-                  <div key={page} className="text-xs text-zinc-400 truncate">
+                  <div key={page} className="text-xs text-[var(--brand-text)] truncate">
                     {toPath(page)}
                   </div>
                 ))}
