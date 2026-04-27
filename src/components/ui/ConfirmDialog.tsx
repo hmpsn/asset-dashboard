@@ -45,7 +45,7 @@ export function ConfirmDialog({
         onClick={e => e.stopPropagation()}
       >
         <h3 className="text-[var(--brand-text-bright)] font-semibold text-base mb-2">{title}</h3>
-        <p className="text-[var(--brand-text)] t-ui leading-relaxed mb-6">{message}</p>
+        <p className="text-[var(--brand-text)] t-body leading-relaxed mb-6">{message}</p>
         <div className="flex gap-3 justify-end">
           <button
             onClick={onCancel}

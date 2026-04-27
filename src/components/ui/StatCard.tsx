@@ -44,7 +44,7 @@ export function StatCard({
     >
       <div className="flex items-center gap-1.5 mb-2">
         {Icon && <Icon className="w-3.5 h-3.5 flex-shrink-0" style={iconColor ? { color: iconColor } : undefined} />}
-        <span className="inline-flex items-center gap-0.5 t-label leading-none">{label}</span>
+        <span className="inline-flex items-center gap-0.5 t-label text-[var(--brand-text-muted)] leading-none">{label}</span>
       </div>
       <div className="flex items-baseline gap-1.5">
         <div
@@ -81,7 +81,7 @@ export function CompactStatBar({ items, className }: { items: CompactStatProps[]
     >
       {items.map(m => (
         <div key={m.label} className="flex items-center gap-2">
-          <span className="t-label">{m.label}</span>
+          <span className="t-label text-[var(--brand-text-muted)]">{m.label}</span>
           <span className={`text-base font-bold ${m.valueColor ?? 'text-[var(--brand-text-bright)]'}`}>{m.value}</span>
           {m.sub && <span className={`t-caption-sm font-medium ${m.subColor ?? 'text-[var(--brand-text-muted)]'}`}>{m.sub}</span>}
         </div>
