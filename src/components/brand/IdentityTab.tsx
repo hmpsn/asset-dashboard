@@ -216,7 +216,7 @@ function DeliverableCard({ workspaceId, deliverableType, deliverable, onChanged 
                 size="sm"
                 icon={Check}
                 loading={approving}
-                className={isApproved ? 'text-teal-400' : ''}
+                className={isApproved ? 'bg-teal-500/10 hover:bg-teal-500/20 text-teal-400' : ''}
               >
                 {isApproved ? 'Approved' : 'Approve'}
               </Button>

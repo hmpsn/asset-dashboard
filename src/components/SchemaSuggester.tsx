@@ -609,7 +609,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
         )}
         <div className="flex flex-col items-center justify-center py-8 gap-4">
           <div className="w-14 h-14 rounded-2xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center">
-            <Icon as={Sparkles} size="xl" className="text-teal-400" />
+            <Icon as={Sparkles} size="2xl" className="text-teal-400" />
           </div>
           <div className="text-center space-y-1.5">
             <p className="text-sm font-medium text-[var(--brand-text-bright)]">Schema Generator</p>
