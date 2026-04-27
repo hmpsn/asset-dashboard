@@ -80,7 +80,9 @@ export function InboxTab({
   const betaMode = useBetaMode();
 
   const pendingRequests = requests.filter(r => r.status !== 'completed' && r.status !== 'closed').length;
-  const contentReviews = contentRequests.filter(r => r.status === 'client_review').length;
+  const contentReviews = contentRequests.filter(
+    r => r.status === 'client_review' || r.status === 'post_review',
+  ).length;
   const planReviewCount = contentPlanReviewCells.length;
 
   const filters: { id: InboxFilter; label: string; icon: typeof Inbox; count?: number }[] = [

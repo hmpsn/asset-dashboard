@@ -224,6 +224,9 @@ export function useClientData(workspaceId: string) {
       audit: queryKeys.client.auditSummary(workspaceId),
       'audit-detail': queryKeys.client.auditDetail(workspaceId),
       recommendations: queryKeys.shared.recommendations(workspaceId),
+      // Prefix key: invalidates ALL client.postPreview queries for the workspace
+      // regardless of postId (we don't know postId from the WS event payload).
+      'post-preview': ['client', 'post-preview', workspaceId],
     };
     const qk = keyFns[key];
     if (qk) queryClient.invalidateQueries({ queryKey: qk });

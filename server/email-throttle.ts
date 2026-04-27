@@ -39,6 +39,7 @@ const CATEGORY_MAP: Record<EmailEventType, ThrottleCategory> = {
   // Action — requires client action, max 3/day
   approval_ready: 'action',
   content_brief_ready: 'action',
+  content_post_ready: 'action',
   content_published: 'action',
   fixes_applied: 'action',
 

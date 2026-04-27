@@ -26,15 +26,16 @@ export const CONTENT_REQUEST_TRANSITIONS: Record<string, readonly string[]> = {
   requested:         ['brief_generated', 'client_review', 'approved', 'in_progress', 'delivered', 'published', 'declined'],
   brief_generated:   ['client_review', 'approved', 'in_progress', 'delivered', 'published', 'declined'],
   client_review:     ['approved', 'changes_requested', 'in_progress', 'delivered', 'published', 'declined'],
-  changes_requested: ['client_review', 'brief_generated', 'approved', 'in_progress', 'delivered', 'published', 'declined'],
+  changes_requested: ['client_review', 'brief_generated', 'approved', 'in_progress', 'post_review', 'delivered', 'published', 'declined'],
   approved:          ['in_progress', 'delivered', 'published', 'declined'],
-  in_progress:       ['delivered', 'published', 'declined'],
+  in_progress:       ['post_review', 'delivered', 'published', 'declined'],
+  post_review:       ['changes_requested', 'delivered', 'published', 'declined'],
   delivered:         ['published'],
   published:         [],  // terminal
   declined:          [],  // terminal
 };
 
-export type ContentRequestStatus = 'pending_payment' | 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'delivered' | 'published' | 'declined';
+export type ContentRequestStatus = 'pending_payment' | 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'post_review' | 'delivered' | 'published' | 'declined';
 
 // ── Generated Post ──
 export const POST_STATUS_TRANSITIONS: Record<string, readonly string[]> = {

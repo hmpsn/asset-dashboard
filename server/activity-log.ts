@@ -45,6 +45,7 @@ export type ActivityType =
   | 'anomaly_positive'
   | 'post_generated'
   | 'post_reverted'
+  | 'post_sent_for_review'
   | 'content_published'
   | 'aeo_review'
   | 'content_subscription'
@@ -103,7 +104,10 @@ export type ActivityType =
   | 'copy_pattern_removed'
   | 'diagnostic_completed'
   | 'portal_session'
-  | 'action_backlog_alert';
+  | 'action_backlog_alert'
+  | 'post_approved'
+  | 'post_changes_requested'
+  | 'post_client_edit';
 
 export interface ActivityEntry {
   id: string;
@@ -152,7 +156,8 @@ const CLIENT_VISIBLE_TYPES: Set<ActivityType> = new Set([
   'audit_completed', 'request_resolved', 'approval_applied', 'seo_updated',
   'images_optimized', 'links_fixed', 'content_updated', 'content_requested',
   'brief_generated', 'brief_approved', 'content_upgraded', 'fix_completed',
-  'content_published', 'copy_sent_to_client',
+  'content_published', 'copy_sent_to_client', 'post_approved', 'post_changes_requested',
+  'post_client_edit', 'post_sent_for_review',
 ]);
 
 // --- Prepared statements (lazily initialized after migrations run) ---

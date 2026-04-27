@@ -170,6 +170,20 @@ export function notifyClientBriefReady(opts: {
   }));
 }
 
+export function notifyClientPostReady(opts: {
+  clientEmail: string;
+  workspaceName: string;
+  workspaceId?: string;
+  topic: string;
+  targetKeyword: string;
+  dashboardUrl?: string;
+}): void {
+  if (!isEmailConfigured()) return;
+  queueEmail(makeEvent('content_post_ready', opts.clientEmail, opts.workspaceId || '', opts.workspaceName, opts.dashboardUrl, {
+    topic: opts.topic, targetKeyword: opts.targetKeyword,
+  }));
+}
+
 export function notifyApprovalReady(opts: {
   clientEmail: string;
   workspaceName: string;

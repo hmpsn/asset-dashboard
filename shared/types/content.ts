@@ -131,8 +131,9 @@ export interface ContentTopicRequest {
   intent: string;
   priority: string;
   rationale: string;
-  status: 'pending_payment' | 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'delivered' | 'published' | 'declined';
+  status: 'pending_payment' | 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'post_review' | 'delivered' | 'published' | 'declined';
   briefId?: string;
+  postId?: string;
   clientNote?: string;
   internalNote?: string;
   declineReason?: string;

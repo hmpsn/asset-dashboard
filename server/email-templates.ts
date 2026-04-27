@@ -165,6 +165,7 @@ export type EmailEventType =
   | 'request_response'
   | 'content_request'
   | 'content_brief_ready'
+  | 'content_post_ready'
   | 'audit_alert'
   | 'client_welcome'
   | 'trial_expiry_warning'
@@ -224,6 +225,8 @@ export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subj
       result = renderContentRequest(events, count, ws, dashUrl, logoUrl); break;
     case 'content_brief_ready':
       result = renderContentBriefReady(events, count, ws, dashUrl, logoUrl); break;
+    case 'content_post_ready':
+      result = renderContentPostReady(events, count, ws, dashUrl, logoUrl); break;
     case 'audit_alert':
       result = renderAuditAlert(events, count, ws, dashUrl, logoUrl); break;
     case 'client_welcome':
@@ -426,6 +429,28 @@ function renderContentBriefReady(events: EmailEvent[], count: number, ws: string
       subtitle: ws,
       body: (count > 1 ? countPill(count, 'brief ready') : '') + items,
       cta: dashUrl ? { label: 'Review Briefs', url: dashUrl } : undefined,
+      logoUrl,
+    }),
+  };
+}
+
+function renderContentPostReady(events: EmailEvent[], count: number, ws: string, dashUrl?: string, logoUrl?: string) {
+  const items = events.map((e, i) => itemRow({
+    title: (e.data.topic as string) || 'Content Post',
+    detail: e.data.targetKeyword ? `Keyword: "${e.data.targetKeyword as string}"` : undefined,
+    isLast: i === events.length - 1,
+  })).join('');
+
+  return {
+    subject: count === 1
+      ? `Post ready for review: "${(events[0].data.topic as string) || 'Topic'}" — ${ws}`
+      : `${count} posts ready for your review — ${ws}`,
+    html: layout({
+      preheader: `${count} post${count !== 1 ? 's' : ''} ready for your review`,
+      headline: count === 1 ? 'Your Post is Ready' : `${count} Posts Ready for Review`,
+      subtitle: ws,
+      body: (count > 1 ? countPill(count, 'post ready') : '') + items,
+      cta: dashUrl ? { label: 'Review Post', url: dashUrl } : undefined,
       logoUrl,
     }),
   };
