@@ -13,7 +13,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
-const ctx = createTestContext(13328);
+const ctx = createTestContext(13328); // port-ok: 13201-13327 fully allocated; extending range
 const { api, postJson, patchJson } = ctx;
 
 let testWsId = '';
