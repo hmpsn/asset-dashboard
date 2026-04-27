@@ -314,6 +314,7 @@ function PromotableSection({ workspaceId }: PromotableSectionProps) {
                   <span className="t-caption text-[var(--brand-text-muted)]">×{p.frequency}</span>
                 </div>
               </div>
+              {/* pr-check-disable-next-line -- preview/coming-soon button uses a deliberately muted /40 gradient that the Button primitive's primary variant does not support; preview is locked at disabled state */}
               <button
                 disabled
                 title="Coming soon — Tier 2 feature"

@@ -602,6 +602,16 @@
           "notes": "Shipped — Phase 0 of the Total Unification Sweep. src/tokens.css created as canonical single source for all --* CSS custom properties (113 tokens). @import chain established in src/index.css. Vite copyTokensPlugin emits public/tokens.css at build. 14 .t-* typography utility classes added to src/index.css. scoreColorClass fixed to return text-emerald-400 (was text-green-400) for score >=80, matching scoreColor() hex #34d399. Bulk text-green-400 → text-emerald-400 across 70 component files. Badge.tsx purple variant removed (Law 03). statusConfig.ts in-review → blue tokens. All rose/pink hues removed from src/components/ (14 hits). styleguide-token-parity customCheck rule added to pr-check with 4 fixture tests. Barrel skeleton committed: 30 placeholder files for Phase 1 primitives (typography, Icon, Button, IconButton, ActionPill, SegmentedControl, forms/, layout/, overlay/). 11 audit output files frozen in docs/superpowers/audits/2026-04-24-phase5/. FEATURE_AUDIT.md updated. CLAUDE.md + design-system-enforcement.md updated with Phase 5 guardrails.",
           "status": "done",
           "shippedAt": "2026-04-24"
+        },
+        {
+          "id": 623,
+          "title": "Design System Phase 5 — Phase 3 Enforcement Hardening (pr-check rules)",
+          "source": "docs/superpowers/plans/2026-04-24-design-system-phase5-sweep.md",
+          "est": "2-3h",
+          "priority": "P0",
+          "notes": "Shipped — Phase 3 enforcement hardening that locks in Phase 2 codemod gains. Added 8 new pr-check rules: Forbidden hues (rose/pink) [error, 0 hits], text-green-{N} for success/score [error, 0 hits after migrating RequestList.tsx Deliver Brief button to emerald], Hand-rolled gradient CTA button [warn, ~10 backlog], Arbitrary pixel text-size [warn, ~318 backlog], Raw text-zinc-N / bg-zinc-N / border-zinc-N [warn, ~514 combined backlog], Inline asymmetric border-radius [warn, ~114 backlog]. Promoted 2 rules warn→error after backlog reached zero: Hand-rolled trend badge, Non-standard transition duration. 5 hand-rolled gradient CTAs migrated to <Button variant=\"primary\"> in same PR (TemplateEditor×2, ClientDashboardTab×2, AiSuggested, BlueprintDetail); 1 preview-disabled gradient hatched. 28 fixture tests added in tests/pr-check.test.ts. verified-clean-rules.md count 72→74. automated-rules.md regenerated (83→91 rules; 49 error / 42 warn). BRAND_DESIGN_LANGUAGE.md changelog updated. CLAUDE.md Forbidden list and Three Laws Law #3 (text-green ban) now mechanized rather than prose-only. Hardcoded card radius (rounded-xl outside ui/) stays at warn pending dedicated rounded-literal cleanup PR (26 hits remaining).",
+          "status": "done",
+          "shippedAt": "2026-04-25"
         }
       ]
     },

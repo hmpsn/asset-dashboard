@@ -3,7 +3,7 @@ import {
   ArrowLeft, Plus, X, GripVertical, ChevronDown, ChevronUp,
   Eye, Save, FileText, Variable, Link2, Search, Type,
 } from 'lucide-react';
-import { SectionCard, Badge } from '../ui';
+import { SectionCard, Badge, Button } from '../ui';
 import type { ContentTemplate, TemplateVariable, TemplateSection } from './types';
 import { MOCK_TEMPLATE } from './mockData';
 
@@ -158,7 +158,7 @@ function SectionItem({
             </div>
           </div>
           <div className="flex justify-end pt-1">
-            <button onClick={onRemove} className="text-[11px] text-red-400 hover:text-red-300 transition-colors">
+            <button onClick={onRemove} className="t-caption-sm text-red-400 hover:text-red-300 transition-colors">
               Remove section
             </button>
           </div>
@@ -384,12 +384,12 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
                   className="w-full px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
                 />
                 <div className="flex items-center gap-2">
-                  <button onClick={handleAddVariable} className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 t-caption text-white font-medium hover:from-teal-500 hover:to-emerald-500 transition-colors">
+                  <Button variant="primary" size="sm" onClick={handleAddVariable}>
                     Add
-                  </button>
-                  <button onClick={() => setShowAddVar(false)} className="px-3 py-1.5 rounded-lg t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setShowAddVar(false)}>
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               </div>
             ) : (
@@ -523,17 +523,19 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
 
       {/* Actions */}
       <div className="flex items-center justify-between pt-2">
-        <button onClick={onCancel} className="px-4 py-2 rounded-lg text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
+        <Button variant="ghost" size="lg" onClick={onCancel}>
           Cancel
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="primary"
+          size="lg"
+          icon={Save}
           onClick={handleSave}
           disabled={!name.trim() || loading}
-          className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 text-xs text-white font-medium hover:from-teal-500 hover:to-emerald-500 transition-colors disabled:opacity-50"
+          loading={loading}
         >
-          <Save className="w-3.5 h-3.5" />
           {loading ? 'Saving...' : 'Save Template'}
-        </button>
+        </Button>
       </div>
     </div>
   );

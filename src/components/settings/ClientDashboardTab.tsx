@@ -7,7 +7,7 @@ import {
 import SearchableSelect from '../SearchableSelect';
 import { get, post, patch, del, getSafe } from '../../api/client';
 import { themeColor } from '../ui/constants';
-import { SectionCard, Icon } from '../ui';
+import { SectionCard, Icon, Button } from '../ui';
 
 import type { SafeClientUser as ClientUserSafe } from '../../../shared/types/users.ts';
 import type { EventGroup, EventDisplayConfig } from '../../../shared/types/workspace.ts';
@@ -338,10 +338,9 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
               <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Client Users</h3>
               <p className="t-caption text-[var(--brand-text-muted)]">Individual login accounts for your clients. Each user gets their own credentials.</p>
             </div>
-            <button onClick={() => { setShowAddUser(!showAddUser); setNewUserName(''); setNewUserEmail(''); setNewUserPassword(''); }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption font-medium transition-colors bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white">
-              <Icon as={Plus} size="xs" /> Add User
-            </button>
+            <Button variant="primary" size="sm" icon={Plus} onClick={() => { setShowAddUser(!showAddUser); setNewUserName(''); setNewUserEmail(''); setNewUserPassword(''); }}>
+              Add User
+            </Button>
           </div>
         </div>
 
@@ -376,10 +375,16 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
                 </div>
               </div>
               <div className="flex items-center gap-2 pt-1">
-                <button onClick={addClientUser} disabled={addingUser || !newUserName.trim() || !newUserEmail.trim() || !newUserPassword.trim()}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-lg)] bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white t-caption font-medium transition-all disabled:opacity-50">
-                  {addingUser ? <Icon as={Loader2} size="xs" className="animate-spin" /> : <Icon as={Plus} size="xs" />} Add User
-                </button>
+                <Button
+                  variant="primary"
+                  size="md"
+                  icon={Plus}
+                  loading={addingUser}
+                  disabled={addingUser || !newUserName.trim() || !newUserEmail.trim() || !newUserPassword.trim()}
+                  onClick={addClientUser}
+                >
+                  Add User
+                </Button>
                 <button onClick={() => setShowAddUser(false)}
                   className="px-3 py-2 rounded-[var(--radius-lg)] t-caption font-medium text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)] transition-colors">
                   Cancel
