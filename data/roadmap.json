@@ -612,6 +612,33 @@
           "notes": "Shipped — Phase 3 enforcement hardening that locks in Phase 2 codemod gains. Added 8 new pr-check rules: Forbidden hues (rose/pink) [error, 0 hits], text-green-{N} for success/score [error, 0 hits after migrating RequestList.tsx Deliver Brief button to emerald], Hand-rolled gradient CTA button [warn, ~10 backlog], Arbitrary pixel text-size [warn, ~318 backlog], Raw text-zinc-N / bg-zinc-N / border-zinc-N [warn, ~514 combined backlog], Inline asymmetric border-radius [warn, ~114 backlog]. Promoted 2 rules warn→error after backlog reached zero: Hand-rolled trend badge, Non-standard transition duration. 5 hand-rolled gradient CTAs migrated to <Button variant=\"primary\"> in same PR (TemplateEditor×2, ClientDashboardTab×2, AiSuggested, BlueprintDetail); 1 preview-disabled gradient hatched. 28 fixture tests added in tests/pr-check.test.ts. verified-clean-rules.md count 72→74. automated-rules.md regenerated (83→91 rules; 49 error / 42 warn). BRAND_DESIGN_LANGUAGE.md changelog updated. CLAUDE.md Forbidden list and Three Laws Law #3 (text-green ban) now mechanized rather than prose-only. Hardcoded card radius (rounded-xl outside ui/) stays at warn pending dedicated rounded-literal cleanup PR (26 hits remaining).",
           "status": "done",
           "shippedAt": "2026-04-25"
+        },
+        {
+          "id": 624,
+          "title": "Stripe payment modal — visual QA in test mode (light + dark)",
+          "source": "Phase 5 Phase 2 follow-up — PR #314",
+          "est": "10-15m",
+          "priority": "P1",
+          "notes": "Phase 2 token sweep PR #314 touched StripePaymentForm.tsx + StripePaymentModal.tsx + inner PaymentFormInner. Devin caught the always-dark constraint (Stripe Elements is hardcoded to theme: 'night') and the changes were reverted to hardcoded zinc shades with a comment block warning future migrations. Reverts are clean on main, but a real test-mode checkout flow visually confirming no regressions (light mode + dark mode side-by-side) was deferred from the original ship cycle. Use Stripe test card 4242 4242 4242 4242 — confirm modal renders correctly, payment intent succeeds, success state matches prior look. Risk if skipped: low (code-level diff confirms no theme-token references remain).",
+          "status": "pending"
+        },
+        {
+          "id": 625,
+          "title": "Mobile breakpoint visual smoke — Phase 5 token migration",
+          "source": "Phase 5 Phase 2 follow-up — staging smoke gap",
+          "est": "15-20m",
+          "priority": "P1",
+          "notes": "Phase 2 codemod batches touched ~225 components but the original staging smoke test on 2026-04-25 only exercised desktop breakpoints — the resize_window MCP call didn't take effect on the Chrome instance. Tailwind responsive utilities are unchanged at the codemod level (only color tokens swapped, not breakpoint prefixes), but token swaps at breakpoint-conditional className boundaries could have edge cases. Test at 375 (mobile), 640 (sm), 768 (md), 1024 (lg) breakpoints across: WorkspaceOverview (admin home), ClientDashboard (overview/strategy/content tabs), SeoAudit (audit results table), Settings (Workspace + Client tabs). Look for: stacked vs grid layouts, button sizes, table overflow, sidebar collapse. Risk if skipped: medium — a regression at one breakpoint is invisible on desktop testing.",
+          "status": "pending"
+        },
+        {
+          "id": 626,
+          "title": "Harden flaky brand-engine + brand-identity integration tests",
+          "source": "CI flakiness — recurring on staging push runs",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Two recurring failure modes in parallel-run integration tests, same root cause (test server not ready when first request fires, or server crash mid-suite under parallel load):\n\n1. tests/integration/brand-engine-routes.test.ts (port 13317) — DELETE voice samples test fails with `SyntaxError: Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON`. The Express server's startServer() promise resolves but the route registry isn't ready, so the POST /api/voice/.../samples returns Vite's SPA fallback HTML. Hit on 2026-04-27 staging push (PR #322 merge).\n\n2. tests/integration/brand-identity-hardening.test.ts (port unknown) — 4 tests fail with `TypeError: fetch failed / SocketError: other side closed`. Server connection drops mid-test. Hit on 2026-04-27 PR #319 round-3 commit CI run.\n\nBoth have unique ports (no collision per pr-check rule). Both pass on rerun, blocking confirmation that they aren't real bugs. Fixes to investigate:\n- Add explicit await for server.listen() callback before resolving startServer()\n- Add retry-on-HTML-response in postJson/del helpers (quick guard)\n- Consider --threads=1 for integration tests in CI (slower but eliminates parallelism)\n- Add a health-check ping in beforeAll() to wait for server readiness\n\nGoal: zero false-failure CI runs from these test files over 2 weeks of normal merge cadence. Stretch: extract a shared `waitForServer(port)` helper to tests/integration/helpers.ts so all integration suites benefit.",
+          "status": "pending"
         }
       ]
     },

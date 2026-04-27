@@ -923,20 +923,20 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                                 <div>
                                   <div className="text-xs font-medium text-[var(--brand-text)] mb-2">Google Search</div>
                                   <SerpPreview
-                                    title={edits[item.id]?.['name'] || itemName}
-                                    description={titleField ? (edits[item.id]?.[titleField.slug] || '') : ''}
+                                    title={edits[item.id]?.[titleField?.slug ?? 'name'] || (titleField ? '' : itemName)}
+                                    description={descField ? (edits[item.id]?.[descField.slug] || '') : ''}
                                     url={`/${coll.collectionSlug}/${itemSlug}`}
                                     siteName="Your Site"
                                     size="sm"
                                   />
                                 </div>
-                                
+
                                 {/* Social Media Preview */}
                                 <div>
                                   <div className="text-xs font-medium text-[var(--brand-text)] mb-2">Facebook</div>
                                   <SocialPreview
-                                    title={edits[item.id]?.['name'] || itemName}
-                                    description={titleField ? (edits[item.id]?.[titleField.slug] || '') : ''}
+                                    title={edits[item.id]?.[titleField?.slug ?? 'name'] || (titleField ? '' : itemName)}
+                                    description={descField ? (edits[item.id]?.[descField.slug] || '') : ''}
                                     siteName="Your Site"
                                     platform="facebook"
                                     size="sm"
