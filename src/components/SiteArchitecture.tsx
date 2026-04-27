@@ -143,7 +143,7 @@ function TreeNode({ node, defaultExpanded, coverageMap }: { node: SiteNode; defa
 
         {cov && (
           cov.hasSchema ? (
-            <span className="flex items-center gap-0.5 text-[10px] text-emerald-400" title={`Schema: ${cov.schemaTypes.join(', ')}`}>
+            <span className="flex items-center gap-0.5 text-[10px] text-emerald-400" /* arbitrary-text-ok */ title={`Schema: ${cov.schemaTypes.join(', ')}`}>
               <Icon as={CheckCircle2} size="sm" />
               <span className="hidden lg:inline">{cov.schemaTypes.length}</span>
             </span>
@@ -361,7 +361,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
                 <Badge label={gap.priority} color={PRIORITY_COLOR[gap.priority] || 'zinc'} className="mt-0.5" />
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-medium text-[var(--brand-text-bright)] font-mono">{gap.suggestedPath}</div>
-                  <div className="text-[11px] text-[var(--brand-text-muted)] mt-0.5">{gap.reason}</div>
+                  <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{gap.reason}</div>
                 </div>
                 <Icon as={ArrowUpRight} size="md" className="text-[var(--brand-text-dim)] flex-shrink-0 mt-0.5" />
               </div>
@@ -382,7 +382,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
               <div key={p} className="text-xs font-mono text-[var(--brand-text)] px-2 py-1 rounded bg-[var(--surface-3)]/50">{p}</div>
             ))}
           </div>
-          <p className="text-[11px] text-[var(--brand-text-muted)] mt-3">
+          <p className="t-caption-sm text-[var(--brand-text-muted)] mt-3">
             Orphan pages have content but their parent directory has no hub/landing page, making them harder for search engines to discover.
           </p>
         </SectionCard>
@@ -410,7 +410,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
-                  className={`text-[11px] px-2 py-1 rounded-md font-medium transition-colors ${
+                  className={`t-caption-sm px-2 py-1 rounded-[var(--radius-md)] font-medium transition-colors ${
                     filter === f
                       ? 'bg-teal-500/15 text-teal-300 border border-teal-500/30'
                       : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] border border-transparent'
@@ -462,7 +462,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
                     <span className="text-xs text-[var(--brand-text-bright)] truncate flex-1" title={p.path}>{p.name}</span>
                     <Badge label={pb.label} color={pb.color} />
                     {p.isOrphan && (
-                      <span className="text-[10px] text-red-400" title="Orphan page — no inbound links">orphan</span>
+                      <span className="text-[10px] text-red-400" /* arbitrary-text-ok */ title="Orphan page — no inbound links">orphan</span>
                     )}
                     {p.inboundLinks !== null && !p.isOrphan && (
                       <span className="text-[10px] text-[var(--brand-text-dim)]" title={`${p.inboundLinks} inbound links`}>
@@ -474,7 +474,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
               })}
             </div>
             {coverage.hasLinkData && (
-              <div className="px-4 py-2 border-t border-[var(--brand-border)] text-[11px] text-[var(--brand-text-muted)]">
+              <div className="px-4 py-2 border-t border-[var(--brand-border)] t-caption-sm text-[var(--brand-text-muted)]">
                 Priority based on schema coverage + internal link health. Critical = orphan + no schema.
               </div>
             )}
@@ -486,13 +486,13 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
           titleIcon={<Layers className="w-4 h-4 text-teal-400" />}
         >
           <DepthChart distribution={data.depthDistribution} />
-          <p className="text-[11px] text-[var(--brand-text-muted)] mt-4">
+          <p className="t-caption-sm text-[var(--brand-text-muted)] mt-4">
             Ideal site architecture keeps most pages within 3 clicks of the homepage (depth ≤ 3).
           </p>
           {Object.keys(data.depthDistribution).some(d => Number(d) > 3) && (
             <div className="mt-3 flex items-start gap-2 px-3 py-2 rounded-[var(--radius-lg)] bg-amber-500/5 border border-amber-500/15">
               <Icon as={AlertTriangle} size="sm" className="text-amber-400 flex-shrink-0 mt-0.5" />
-              <span className="text-[11px] text-amber-300">
+              <span className="t-caption-sm text-amber-300">
                 Some pages are deeper than 3 levels. Consider adding hub pages to flatten the hierarchy.
               </span>
             </div>

@@ -489,7 +489,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
             <button
               onClick={sendForApproval}
               disabled={sendingApproval || approvalSelected.size === 0}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium transition-colors ${
                 approvalSent ? 'bg-emerald-600 text-white' : 'bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white'
               }`}
             >
@@ -502,7 +502,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
 
       {/* Bulk rewrite results */}
       {bulkResults && (
-        <div className="bg-teal-500/10 border border-teal-500/30 rounded-lg px-3 py-2 text-xs text-teal-300 flex items-center gap-2">
+        <div className="bg-teal-500/10 border border-teal-500/30 rounded-[var(--radius-lg)] px-3 py-2 text-xs text-teal-300 flex items-center gap-2">
           <Icon as={Sparkles} size="md" className="flex-shrink-0" />
           {bulkResults}
         </div>
@@ -547,7 +547,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search items..."
-          className="w-full pl-9 pr-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
+          className="w-full pl-9 pr-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
         />
       </div>
 
@@ -725,7 +725,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                               type="text"
                               value={edits[item.id]?.['name'] || ''}
                               onChange={e => updateField(item.id, 'name', e.target.value)}
-                              className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text-bright)] focus:outline-none focus:border-[var(--brand-border-hover)]"
+                              className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] focus:outline-none focus:border-[var(--brand-border-hover)]"
                             />
                             {variations[item.id]?.fieldSlug === 'name' && variations[item.id].options.length > 1 && (
                               <div className="mt-1.5 space-y-1">
@@ -734,7 +734,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                                   <button
                                     key={vi}
                                     onClick={() => { updateField(item.id, 'name', v); setVariations(prev => { const n = { ...prev }; delete n[item.id]; return n; }); }}
-                                    className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs border transition-colors ${
+                                    className={`w-full text-left px-2.5 py-1.5 rounded-[var(--radius-lg)] text-xs border transition-colors ${
                                       (edits[item.id]?.['name'] || '') === v
                                         ? 'bg-teal-600/20 border-teal-500/40 text-teal-300'
                                         : 'bg-[var(--surface-3)]/60 border-[var(--brand-border)]/50 text-[var(--brand-text-bright)] hover:border-teal-500/30 hover:bg-teal-600/10'
@@ -755,7 +755,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                               type="text"
                               value={edits[item.id]?.['slug'] || ''}
                               onChange={e => updateField(item.id, 'slug', e.target.value)}
-                              className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text-bright)] font-mono focus:outline-none focus:border-[var(--brand-border-hover)]"
+                              className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] font-mono focus:outline-none focus:border-[var(--brand-border-hover)]"
                             />
                           </div>
 
@@ -789,14 +789,14 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                                     type="text"
                                     value={val}
                                     onChange={e => updateField(item.id, field.slug, e.target.value)}
-                                    className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text-bright)] focus:outline-none focus:border-[var(--brand-border-hover)]"
+                                    className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] focus:outline-none focus:border-[var(--brand-border-hover)]"
                                   />
                                 ) : (
                                   <textarea
                                     value={val}
                                     onChange={e => updateField(item.id, field.slug, e.target.value)}
                                     rows={3}
-                                    className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text-bright)] focus:outline-none focus:border-[var(--brand-border-hover)] resize-none"
+                                    className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] focus:outline-none focus:border-[var(--brand-border-hover)] resize-none"
                                   />
                                 )}
                                 {variations[item.id]?.fieldSlug === field.slug && variations[item.id].options.length > 1 && (
@@ -808,7 +808,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                                         <button
                                           key={vi}
                                           onClick={() => { updateField(item.id, field.slug, v); setVariations(prev => { const n = { ...prev }; delete n[item.id]; return n; }); }}
-                                          className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs border transition-colors ${
+                                          className={`w-full text-left px-2.5 py-1.5 rounded-[var(--radius-lg)] text-xs border transition-colors ${
                                             val === v
                                               ? 'bg-teal-600/20 border-teal-500/40 text-teal-300'
                                               : 'bg-[var(--surface-3)]/60 border-[var(--brand-border)]/50 text-[var(--brand-text-bright)] hover:border-teal-500/30 hover:bg-teal-600/10'
@@ -834,7 +834,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                             <button
                               onClick={() => saveItem(coll.collectionId, item.id)}
                               disabled={!isDirty || isSaving}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-xs font-medium transition-colors"
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-xs font-medium transition-colors"
                             >
                               <Icon as={isSaving ? Loader2 : Save} size="sm" className={isSaving ? 'animate-spin' : ''} />
                               Save
@@ -855,7 +855,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                             return (
                               <div className="mt-3 space-y-2">
                                 {/* Inline: latest approval context */}
-                                <div className="px-3 py-2 rounded-lg bg-[var(--surface-3)]/40 border border-[var(--brand-border)]/50">
+                                <div className="px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/40 border border-[var(--brand-border)]/50">
                                   <div className="flex items-center gap-2 mb-1.5">
                                     <Icon as={Clock} size="sm" className="text-[var(--brand-text-muted)]" />
                                     <span className="t-caption-sm font-medium text-[var(--brand-text)]">Latest: {latest.batchName}</span>
@@ -957,7 +957,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
       })}
 
       {/* Tip */}
-      <div className="bg-[var(--surface-3)]/30 rounded-lg border border-[var(--brand-border)] px-4 py-3">
+      <div className="bg-[var(--surface-3)]/30 rounded-[var(--radius-lg)] border border-[var(--brand-border)] px-4 py-3">
         <div className="flex items-start gap-2">
           <Icon as={Sparkles} size="md" className="text-teal-400 mt-0.5 flex-shrink-0" />
           <div className="t-caption-sm text-[var(--brand-text-muted)]">

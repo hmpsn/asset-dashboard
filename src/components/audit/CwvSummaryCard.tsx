@@ -35,7 +35,7 @@ const renderStrategy = (label: string, s: CwvStrategyResult) => {
         ].map(m => {
           const metric = s.metrics[m.key];
           return (
-            <div key={m.key} className={cn('flex items-center justify-between px-3 py-2 rounded-lg border', ratingBg(metric.rating))}>
+            <div key={m.key} className={cn('flex items-center justify-between px-3 py-2 rounded-[var(--radius-lg)] border', ratingBg(metric.rating))}>
               <div>
                 <span className="t-caption font-medium text-[var(--brand-text-bright)]">{m.label}</span>
                 <span className="t-caption-sm text-[var(--brand-text-muted)] ml-1.5">{m.desc}</span>
@@ -48,7 +48,7 @@ const renderStrategy = (label: string, s: CwvStrategyResult) => {
         })}
       </div>
       {/* Lighthouse lab score — secondary */}
-      <div className="mt-2 flex items-center justify-between px-3 py-1.5 rounded-lg bg-zinc-950/50 border border-[var(--brand-border)]">
+      <div className="mt-2 flex items-center justify-between px-3 py-1.5 rounded-[var(--radius-lg)] bg-[var(--surface-1)]/50 border border-[var(--brand-border)]">
         <span className="t-caption-sm text-[var(--brand-text-muted)]">Lighthouse Lab Score</span>
         <span className={cn('t-mono font-medium', s.lighthouseScore >= 90 ? 'text-emerald-400' : s.lighthouseScore >= 50 ? 'text-amber-400' : 'text-red-400')}>
           {s.lighthouseScore}/100

@@ -168,7 +168,7 @@ export function AeoReview({ workspaceId }: Props) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
         {/* pr-check-disable-next-line -- intentional decorative shape: hero icon container, not card chrome; no --radius-2xl token defined */}
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500/20 to-teal-500/20 border border-purple-500/30 flex items-center justify-center">
+        <div className="w-16 h-16 rounded-[var(--radius-xl)] bg-gradient-to-br from-purple-500/20 to-teal-500/20 border border-purple-500/30 flex items-center justify-center">
           <UIIcon as={Sparkles} size="2xl" className="text-purple-400" />
         </div>
         <div className="text-center max-w-md">
@@ -177,7 +177,7 @@ export function AeoReview({ workspaceId }: Props) {
             AI-powered analysis of your existing pages with specific copy rewrites, section additions,
             citation recommendations, and structural changes to maximize AI citation likelihood.
           </p>
-          <p className="text-[11px] text-[var(--brand-text-dim)] mt-2">
+          <p className="t-caption-sm text-[var(--brand-text-dim)] mt-2">
             Requires a completed SEO audit. Reviews pages with AEO issues first, prioritized by traffic.
           </p>
         </div>
@@ -228,27 +228,27 @@ export function AeoReview({ workspaceId }: Props) {
       {/* Summary bar */}
       <div className="grid grid-cols-5 gap-3">
         <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
-          <div className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider font-medium mb-1">Avg AEO Score</div>
+          <div className="t-caption-sm text-[var(--brand-text-muted)] uppercase tracking-wider font-medium mb-1">Avg AEO Score</div>
           <div className={`text-3xl font-bold ${aeoScoreColorClass(avgScore)}`}>{avgScore}</div>
           <div className="mt-2 h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden">
             <div className={`h-full rounded-full ${aeoScoreBgBarClass(avgScore)}`} style={{ width: `${avgScore}%` }} />
           </div>
         </div>
         <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
-          <div className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider font-medium mb-1">Pages Reviewed</div>
+          <div className="t-caption-sm text-[var(--brand-text-muted)] uppercase tracking-wider font-medium mb-1">Pages Reviewed</div>
           <div className="text-2xl font-bold text-[var(--brand-text-bright)]">{review.pages.length}</div>
         </div>
         <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
-          <div className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider font-medium mb-1">Total Changes</div>
+          <div className="t-caption-sm text-[var(--brand-text-muted)] uppercase tracking-wider font-medium mb-1">Total Changes</div>
           {/* purple is valid: admin AI surface (AEO review total) */}
           <div className="text-2xl font-bold text-purple-400">{review.totalChanges}</div>
         </div>
         <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
-          <div className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider font-medium mb-1">Quick Wins</div>
+          <div className="t-caption-sm text-[var(--brand-text-muted)] uppercase tracking-wider font-medium mb-1">Quick Wins</div>
           <div className="text-2xl font-bold text-emerald-400">{review.quickWins}</div>
         </div>
         <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
-          <div className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider font-medium mb-1">Est. Time</div>
+          <div className="t-caption-sm text-[var(--brand-text-muted)] uppercase tracking-wider font-medium mb-1">Est. Time</div>
           <div className="text-2xl font-bold text-[var(--brand-text-bright)]">
             {(() => {
               const mins = review.pages.reduce((s, p) => s + p.estimatedTimeMinutes, 0);
@@ -263,7 +263,7 @@ export function AeoReview({ workspaceId }: Props) {
       {/* pr-check-disable-next-line -- brand asymmetric signature on AEO summary stats block; intentional non-SectionCard chrome */}
       <div className="bg-purple-500/5 border border-purple-500/20 px-4 py-3 rounded-[var(--radius-signature-lg)]">
         <div className="text-xs text-purple-300">{review.sitewideSummary}</div>
-        <div className="text-[11px] text-[var(--brand-text-muted)] mt-1">
+        <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">
           Last reviewed: {new Date(review.generatedAt).toLocaleString()}
         </div>
       </div>
@@ -272,12 +272,12 @@ export function AeoReview({ workspaceId }: Props) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1">
-            <span className="text-[11px] text-[var(--brand-text-muted)] mr-1">Effort:</span>
+            <span className="t-caption-sm text-[var(--brand-text-muted)] mr-1">Effort:</span>
             {(['all', 'quick', 'moderate', 'significant'] as const).map(e => (
               <button
                 key={e}
                 onClick={() => setFilterEffort(e)}
-                className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors border ${
+                className={`px-2 py-0.5 rounded t-caption-sm font-medium transition-colors border ${
                   filterEffort === e
                     ? 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--brand-text-bright)]'
                     : 'border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:border-[var(--brand-border-hover)] hover:text-[var(--brand-text)]'
@@ -288,12 +288,12 @@ export function AeoReview({ workspaceId }: Props) {
             ))}
           </div>
           <div className="flex items-center gap-1">
-            <span className="text-[11px] text-[var(--brand-text-muted)] mr-1">Priority:</span>
+            <span className="t-caption-sm text-[var(--brand-text-muted)] mr-1">Priority:</span>
             {(['all', 'high', 'medium', 'low'] as const).map(p => (
               <button
                 key={p}
                 onClick={() => setFilterPriority(p)}
-                className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors border ${
+                className={`px-2 py-0.5 rounded t-caption-sm font-medium transition-colors border ${
                   filterPriority === p
                     ? 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--brand-text-bright)]'
                     : 'border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:border-[var(--brand-border-hover)] hover:text-[var(--brand-text)]'
@@ -303,7 +303,7 @@ export function AeoReview({ workspaceId }: Props) {
               </button>
             ))}
           </div>
-          <span className="text-[11px] text-[var(--brand-text-muted)]">{totalFilteredChanges} changes</span>
+          <span className="t-caption-sm text-[var(--brand-text-muted)]">{totalFilteredChanges} changes</span>
         </div>
         <Button
           variant="secondary"
@@ -345,15 +345,15 @@ export function AeoReview({ workspaceId }: Props) {
                   <div className="text-xs text-[var(--brand-text-muted)] truncate">{page.pageUrl}</div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className={`text-[11px] px-1.5 py-0.5 rounded border ${EFFORT_CONFIG.quick.bg} ${EFFORT_CONFIG.quick.color}`}>
+                  <span className={`t-caption-sm px-1.5 py-0.5 rounded border ${EFFORT_CONFIG.quick.bg} ${EFFORT_CONFIG.quick.color}`}>
                     {quickCount} quick
                   </span>
                   {highCount > 0 && (
-                    <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-red-400">
+                    <span className="t-caption-sm px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-red-400">
                       {highCount} high priority
                     </span>
                   )}
-                  <span className="text-[11px] text-[var(--brand-text-muted)]">{page.changes.length} changes</span>
+                  <span className="t-caption-sm text-[var(--brand-text-muted)]">{page.changes.length} changes</span>
                   <span className={`text-sm font-bold tabular-nums ${aeoScoreColorClass(page.overallScore)}`}>
                     {page.overallScore}
                   </span>
@@ -368,7 +368,7 @@ export function AeoReview({ workspaceId }: Props) {
                     <UIIcon as={Sparkles} size="sm" className="text-purple-400 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
                       <div className="text-xs text-[var(--brand-text-bright)] leading-relaxed">{page.summary}</div>
-                      <div className="flex items-center gap-3 mt-1.5 text-[11px] text-[var(--brand-text-muted)]">
+                      <div className="flex items-center gap-3 mt-1.5 t-caption-sm text-[var(--brand-text-muted)]">
                         <span className="flex items-center gap-1"><UIIcon as={Clock} size="sm" /> ~{page.estimatedTimeMinutes} min total</span>
                         <span className="flex items-center gap-1"><UIIcon as={Zap} size="sm" className="text-emerald-400" /> {page.quickWinCount} quick wins</span>
                         <button
@@ -404,15 +404,15 @@ export function AeoReview({ workspaceId }: Props) {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="text-xs font-medium text-[var(--brand-text-bright)]">{typeCfg.label}</span>
-                                <span className="text-[11px] text-[var(--brand-text-muted)]">· {change.location}</span>
+                                <span className="t-caption-sm text-[var(--brand-text-muted)]">· {change.location}</span>
                               </div>
-                              <div className="text-[11px] text-[var(--brand-text)] mt-0.5 line-clamp-1">{change.rationale}</div>
+                              <div className="t-caption-sm text-[var(--brand-text)] mt-0.5 line-clamp-1">{change.rationale}</div>
                             </div>
                             <div className="flex items-center gap-1.5 flex-shrink-0">
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded border ${prioCfg.bg} ${prioCfg.color}`}>
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded border ${prioCfg.bg} ${prioCfg.color}`} /* arbitrary-text-ok */>
                                 {change.priority}
                               </span>
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded border ${effortCfg.bg} ${effortCfg.color}`}>
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded border ${effortCfg.bg} ${effortCfg.color}`} /* arbitrary-text-ok */>
                                 {effortCfg.label}
                               </span>
                               {isChangeExpanded
@@ -426,24 +426,24 @@ export function AeoReview({ workspaceId }: Props) {
                               {/* Current content (if applicable) */}
                               {change.currentContent && (
                                 <div className="rounded-[var(--radius-lg)] bg-red-500/5 border border-red-500/15 px-3 py-2">
-                                  <div className="text-[10px] text-red-400 font-semibold uppercase tracking-wider mb-1">Current</div>
-                                  <div className="text-[11px] text-[var(--brand-text)] italic leading-relaxed">"{change.currentContent}"</div>
+                                  <div className="text-[10px] text-red-400 font-semibold uppercase tracking-wider mb-1" /* arbitrary-text-ok */>Current</div>
+                                  <div className="t-caption-sm text-[var(--brand-text)] italic leading-relaxed">"{change.currentContent}"</div>
                                 </div>
                               )}
 
                               {/* Suggested change */}
                               <div className="rounded-[var(--radius-lg)] bg-emerald-500/5 border border-emerald-500/15 px-3 py-2">
-                                <div className="text-[10px] text-emerald-400 font-semibold uppercase tracking-wider mb-1">Recommended Change</div>
-                                <div className="text-[11px] text-[var(--brand-text-bright)] leading-relaxed whitespace-pre-wrap">{change.suggestedChange}</div>
+                                <div className="text-[10px] text-emerald-400 font-semibold uppercase tracking-wider mb-1" /* arbitrary-text-ok */>Recommended Change</div>
+                                <div className="t-caption-sm text-[var(--brand-text-bright)] leading-relaxed whitespace-pre-wrap">{change.suggestedChange}</div>
                               </div>
 
                               {/* Rationale */}
-                              <div className="text-[11px] text-[var(--brand-text-muted)] leading-relaxed">
+                              <div className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">
                                 <span className="font-medium text-[var(--brand-text)]">Why:</span> {change.rationale}
                               </div>
 
                               {/* AEO Impact — purple is valid: admin AI surface */}
-                              <div className="flex items-start gap-1.5 text-[11px]">
+                              <div className="flex items-start gap-1.5 t-caption-sm">
                                 <UIIcon as={Sparkles} size="sm" className="text-purple-400 flex-shrink-0 mt-0.5" />
                                 <span className="text-purple-300">{change.aeoImpact}</span>
                               </div>

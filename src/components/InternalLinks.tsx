@@ -122,7 +122,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
         <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] px-6 py-12 text-center rounded-[var(--radius-signature-lg)]">
           <Icon as={Link} size="2xl" className="text-[var(--brand-text-muted)] mx-auto mb-3" />
           <p className="text-sm text-[var(--brand-text)] mb-1">Internal Linking Suggestions</p>
-          <p className="text-[11px] text-[var(--brand-text-muted)] max-w-md mx-auto mb-4">
+          <p className="t-caption-sm text-[var(--brand-text-muted)] max-w-md mx-auto mb-4">
             Analyze your site's content and discover missing internal links.
             AI finds topically related pages that should link to each other to boost SEO and user navigation.
           </p>
@@ -144,7 +144,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
       <div className="flex flex-col items-center justify-center py-20 gap-2">
         <Loader2 className="w-6 h-6 animate-spin text-teal-400" />
         <span className="text-sm text-[var(--brand-text)]">Analyzing page content &amp; finding link opportunities...</span>
-        <span className="text-[11px] text-[var(--brand-text-muted)]">This fetches and reads every page — may take 30-60 seconds</span>
+        <span className="t-caption-sm text-[var(--brand-text-muted)]">This fetches and reads every page — may take 30-60 seconds</span>
       </div>
     );
   }
@@ -184,7 +184,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
             {showOrphans ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)]" />}
             <Icon as={AlertTriangle} size="md" className="text-orange-400" />
             <span className="text-sm font-medium text-orange-300 flex-1 text-left">{data.orphanCount} Orphan Pages</span>
-            <span className="text-[11px] text-[var(--brand-text-muted)]">No internal links point to these pages</span>
+            <span className="t-caption-sm text-[var(--brand-text-muted)]">No internal links point to these pages</span>
           </button>
           {showOrphans && data.pageHealth && (
             <div className="px-4 pb-3 border-t border-[var(--brand-border)] pt-2 space-y-1 max-h-[250px] overflow-y-auto">
@@ -213,7 +213,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
             <button
               key={f.id}
               onClick={() => setFilter(f.id)}
-              className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
+              className={`px-2.5 py-1 rounded t-caption-sm font-medium transition-colors ${
                 filter === f.id
                   ? 'bg-teal-500/10 text-teal-400'
                   : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
@@ -265,8 +265,8 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
                   <div className="flex items-center gap-2">
                     <Icon as={Link} size="md" className="text-teal-400" />
                     <span className="text-xs font-medium text-[var(--brand-text-bright)]">{suggestions[0].fromTitle}</span>
-                    <span className="text-[11px] text-[var(--brand-text-muted)] font-mono">{fromPage}</span>
-                    <span className="text-[11px] text-[var(--brand-text-muted)] ml-auto">{suggestions.length} links to add</span>
+                    <span className="t-caption-sm text-[var(--brand-text-muted)] font-mono">{fromPage}</span>
+                    <span className="t-caption-sm text-[var(--brand-text-muted)] ml-auto">{suggestions.length} links to add</span>
                   </div>
                 </div>
                 {suggestions.map((s, i) => {
@@ -275,8 +275,8 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
                     <div key={i} className="flex items-center gap-3 px-4 py-2 pl-10 hover:bg-[var(--surface-3)]/20 transition-colors">
                       <Icon as={ArrowRight} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
                       <span className="text-xs text-[var(--brand-text-bright)] font-mono truncate max-w-[160px]">{s.toPage}</span>
-                      <span className="text-[11px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded truncate max-w-[180px]">"{s.anchorText}"</span>
-                      <span className={`text-[11px] px-1.5 py-0.5 rounded border ${cfg.bg} ${cfg.color}`}>{cfg.label}</span>
+                      <span className="t-caption-sm text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded truncate max-w-[180px]">"{s.anchorText}"</span>
+                      <span className={`t-caption-sm px-1.5 py-0.5 rounded border ${cfg.bg} ${cfg.color}`}>{cfg.label}</span>
                       <button
                         onClick={() => { navigator.clipboard.writeText(`<a href="${s.toPage}">${s.anchorText}</a>`); setCopied(i); setTimeout(() => setCopied(null), 2000); }}
                         className="ml-auto text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"
@@ -308,10 +308,10 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
                     <span className="text-xs text-[var(--brand-text-bright)] font-mono truncate max-w-[140px]">{s.toPage}</span>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-[11px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded truncate max-w-[160px]">
+                    <span className="t-caption-sm text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded truncate max-w-[160px]">
                       "{s.anchorText}"
                     </span>
-                    <span className={`text-[11px] px-1.5 py-0.5 rounded border ${cfg.bg} ${cfg.color}`}>
+                    <span className={`t-caption-sm px-1.5 py-0.5 rounded border ${cfg.bg} ${cfg.color}`}>
                       {cfg.label}
                     </span>
                     <button
@@ -327,25 +327,25 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
                   <div className="px-4 pb-3 pl-10 space-y-2">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <span className="text-[11px] text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">From Page</span>
+                        <span className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">From Page</span>
                         <p className="text-xs text-[var(--brand-text-bright)] mt-0.5">{s.fromTitle}</p>
-                        <p className="text-[11px] text-[var(--brand-text-muted)] font-mono">{s.fromPage}</p>
+                        <p className="t-caption-sm text-[var(--brand-text-muted)] font-mono">{s.fromPage}</p>
                       </div>
                       <div>
-                        <span className="text-[11px] text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Link To</span>
+                        <span className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Link To</span>
                         <p className="text-xs text-[var(--brand-text-bright)] mt-0.5">{s.toTitle}</p>
-                        <p className="text-[11px] text-[var(--brand-text-muted)] font-mono">{s.toPage}</p>
+                        <p className="t-caption-sm text-[var(--brand-text-muted)] font-mono">{s.toPage}</p>
                       </div>
                     </div>
                     <div>
-                      <span className="text-[11px] text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Suggested Anchor Text</span>
+                      <span className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Suggested Anchor Text</span>
                       <p className="text-xs text-teal-300 mt-0.5 bg-teal-500/5 border border-teal-500/10 rounded px-2 py-1 inline-block">
                         {s.anchorText}
                       </p>
                     </div>
                     <div>
-                      <span className="text-[11px] text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Why This Link</span>
-                      <p className="text-[11px] text-[var(--brand-text)] mt-0.5">{s.reason}</p>
+                      <span className="t-caption-sm text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Why This Link</span>
+                      <p className="t-caption-sm text-[var(--brand-text)] mt-0.5">{s.reason}</p>
                     </div>
                   </div>
                 )}
@@ -360,7 +360,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
         <div className="bg-[var(--surface-3)]/30 rounded-[var(--radius-lg)] border border-[var(--brand-border)] px-4 py-3">
           <div className="flex items-start gap-2">
             <Icon as={AlertCircle} size="md" className="text-teal-400 mt-0.5 flex-shrink-0" />
-            <div className="text-[11px] text-[var(--brand-text-muted)] space-y-1">
+            <div className="t-caption-sm text-[var(--brand-text-muted)] space-y-1">
               <p><strong className="text-[var(--brand-text)]">How to implement:</strong> Open each page in the Webflow Designer and add links using the suggested anchor text. Place links naturally within the page's body content where they make contextual sense.</p>
               <p><strong className="text-[var(--brand-text)]">SEO impact:</strong> Internal links help search engines discover and understand page relationships. They also distribute page authority (PageRank) across your site, which can improve rankings for linked pages.</p>
               <p><strong className="text-teal-400">Tip:</strong> Use the <strong className="text-teal-400">SEO Editor</strong> from the sidebar to update page content directly, or run a <strong className="text-teal-400">Site Audit</strong> to validate the changes.</p>

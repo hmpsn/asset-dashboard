@@ -74,7 +74,7 @@ export function AuditIssueRow({
   const menuOpen = actionMenuKey === taskKey;
 
   return (
-    <div key={idx} className="flex items-start gap-3 px-4 py-2 rounded-lg hover:bg-[var(--surface-2)]/30 transition-colors group/issue">
+    <div key={idx} className="flex items-start gap-3 px-4 py-2 rounded-[var(--radius-lg)] hover:bg-[var(--surface-2)]/30 transition-colors group/issue">
       <Icon as={SeverityIcon} size="md" className={cn('mt-0.5 flex-shrink-0', cfg.color)} />
       <div className="flex-1 min-w-0">
         {/* Issue title + inline badges */}
@@ -295,7 +295,7 @@ function OverflowMenu({ menuOpen, isCreating, onToggle, onFlagForClient, onCreat
         <MoreVertical className="w-3 h-3" />
       </button>
       {menuOpen && (
-        <div className="absolute right-0 top-full mt-1 w-44 rounded-lg shadow-xl z-50 py-1 bg-[var(--surface-2)] border border-[var(--brand-border)]">
+        <div className="absolute right-0 top-full mt-1 w-44 rounded-[var(--radius-lg)] shadow-xl z-50 py-1 bg-[var(--surface-2)] border border-[var(--brand-border)]">
           {onFlagForClient && (
             <button
               onMouseDown={e => { e.stopPropagation(); onFlagForClient(); }}
