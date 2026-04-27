@@ -232,6 +232,7 @@ git commit -m "feat(content): add post_review status and postId column to Conten
 
 **Files:**
 - Modify: `server/email.ts`
+- Modify: `server/email-templates.ts`
 
 Do NOT modify any other file in this task.
 
@@ -255,7 +256,56 @@ export function notifyClientPostReady(opts: {
 }
 ```
 
-- [ ] **Step 2.2: Verify compile**
+- [ ] **Step 2.2: Register `'content_post_ready'` in `server/email-templates.ts`**
+
+Without this step, `makeEvent('content_post_ready', ...)` in `notifyClientPostReady` hits the `default` case in `renderDigest`, sending a blank email with subject "Notification".
+
+**(a) Add to `EmailEventType` union** (around line 181, after `'client_signal'`):
+
+```typescript
+export type EmailEventType =
+  | 'approval_ready'
+  | /* ... existing values ... */
+  | 'client_signal'
+  | 'content_post_ready';   // ← ADD
+```
+
+**(b) Add `renderContentPostReady` function** at the bottom of the template renderers section (after `renderContentBriefReady` is a good spot for proximity):
+
+```typescript
+function renderContentPostReady(events: EmailEvent[], count: number, ws: string, dashUrl?: string, logoUrl?: string) {
+  const items = events.map((e, i) => itemRow({
+    title: (e.data.topic as string) || 'Content Post',
+    detail: e.data.targetKeyword ? `Keyword: "${e.data.targetKeyword as string}"` : undefined,
+    isLast: i === events.length - 1,
+  })).join('');
+
+  return {
+    subject: count === 1
+      ? `Post ready for review: "${(events[0].data.topic as string) || 'Topic'}" — ${ws}`
+      : `${count} posts ready for your review — ${ws}`,
+    html: layout({
+      preheader: `${count} post${count !== 1 ? 's' : ''} ready for your review`,
+      headline: count === 1 ? 'Your Post is Ready' : `${count} Posts Ready for Review`,
+      subtitle: ws,
+      body: (count > 1 ? countPill(count, 'post ready') : '') + items,
+      cta: dashUrl ? { label: 'Review Post', url: dashUrl } : undefined,
+      logoUrl,
+    }),
+  };
+}
+```
+
+**(c) Add the `case` to the `renderDigest` switch** (after the `'content_brief_ready'` case):
+
+```typescript
+case 'content_brief_ready':
+  result = renderContentBriefReady(events, count, ws, dashUrl, logoUrl); break;
+case 'content_post_ready':
+  result = renderContentPostReady(events, count, ws, dashUrl, logoUrl); break;  // ← ADD
+```
+
+- [ ] **Step 2.3: Verify compile**
 
 ```bash
 npm run typecheck
@@ -263,11 +313,11 @@ npm run typecheck
 
 Expected: zero errors.
 
-- [ ] **Step 2.3: Commit**
+- [ ] **Step 2.4: Commit**
 
 ```bash
-git add server/email.ts
-git commit -m "feat(email): add notifyClientPostReady notification"
+git add server/email.ts server/email-templates.ts
+git commit -m "feat(email): add notifyClientPostReady with content_post_ready template"
 ```
 
 ---
@@ -510,6 +560,12 @@ router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', valid
   const actor = getClientActor(req, req.params.workspaceId);
   addActivity(req.params.workspaceId, 'post_client_edit', `${actor?.name || 'Client'} edited post content for "${post.targetKeyword}"`, '', { postId: post.id }, actor);
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { id: updated.id, status: updated.status });
+  // NOTE: `updated` is the full GeneratedPost. This follows the same pattern as existing
+  // brief/approve/decline routes which also return full objects. The fields
+  // `unificationStatus`, `voiceScore`, `webflowItemId`, etc. are exposed to the
+  // unauthenticated client. This is a conscious decision consistent with existing
+  // public-content routes. If admin-only fields need stripping in future, introduce
+  // a `toClientPost(post: GeneratedPost)` mapper here.
   res.json(updated);
 });
 ```
@@ -538,7 +594,7 @@ git commit -m "feat(api): add public post-review routes (read, approve, request-
 
 Do NOT modify any other file in this task. Depends on Tasks 1 and 2 being committed.
 
-- [ ] **Step 5.1: Import `notifyClientPostReady` in `server/routes/content-requests.ts`**
+- [ ] **Step 5.1: Import `notifyClientPostReady` and `listPosts` in `server/routes/content-requests.ts`**
 
 Find the existing import line (around line 20):
 
@@ -550,6 +606,48 @@ Replace with:
 
 ```typescript
 import { notifyClientBriefReady, notifyClientContentPublished, notifyClientPostReady } from '../email.js';
+```
+
+Also find the import from `content-posts-db.js` (or add it if not present):
+
+```typescript
+import { listPosts } from '../content-posts-db.js';
+```
+
+- [ ] **Step 5.1b: Auto-populate `postId` when transitioning to `post_review`**
+
+This is the critical step that makes the entire client review flow functional. Without it, `postId` stays null and `PostReviewCard` can never load the post.
+
+In the `PATCH /api/content-requests/:workspaceId/:id` handler, find where `updateContentRequest` is called (around line 70). The handler currently destructures `{ status, internalNote, deliveryUrl, deliveryNotes }` from `req.body` and passes them through. You need to add auto-population of `postId` when the transition is to `post_review`.
+
+Find the handler block and update it to:
+
+```typescript
+const { status, internalNote, deliveryUrl, deliveryNotes } = req.body;
+// Auto-populate postId when sending to post_review.
+// The state machine has already validated the transition by this point.
+let postIdToSet: string | undefined;
+if (status === 'post_review') {
+  const existing = getContentRequest(req.params.workspaceId, req.params.id);
+  if (existing?.briefId) {
+    const post = listPosts(req.params.workspaceId).find(p => p.briefId === existing.briefId);
+    postIdToSet = post?.id;
+  }
+}
+let updated;
+try {
+  updated = updateContentRequest(req.params.workspaceId, req.params.id, {
+    status, internalNote, deliveryUrl, deliveryNotes,
+    ...(postIdToSet ? { postId: postIdToSet } : {}),
+  });
+} catch (err) { /* ... existing error handling ... */ }
+```
+
+> **Note:** `getContentRequest` is already imported (it's used throughout this routes file). Confirm the import is present before adding the `listPosts` import.
+
+Also add `getContentRequest` to the import from `'../content-requests.js'` if it's not already there:
+```typescript
+import { createContentRequest, getContentRequest, updateContentRequest, deleteContentRequest, addComment, listContentRequests } from '../content-requests.js';
 ```
 
 - [ ] **Step 5.2: Add `post_review` email notification after the `client_review` block**
@@ -1240,6 +1338,37 @@ afterAll(() => {
   ctx.stopServer();
 });
 
+// ── in-process imports for client-edit test setup ────────────────────────────
+// These run in the same process as the server (vitest), so direct DB calls work.
+import { createContentRequest, updateContentRequest } from '../../server/content-requests.js';
+import { savePost, getPost } from '../../server/content-posts-db.js';
+import type { GeneratedPost } from '../../shared/types/content.js';
+
+function makeStubPost(workspaceId: string, briefId: string): GeneratedPost {
+  const now = new Date().toISOString();
+  return {
+    id: `post_test_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    workspaceId,
+    briefId,
+    targetKeyword: 'test-keyword',
+    title: 'Test Post Title',
+    metaDescription: 'Test meta description',
+    introduction: '<p>Test introduction.</p>',
+    sections: [
+      {
+        index: 0, heading: 'Section One', content: '<p>Original section content.</p>',
+        wordCount: 3, targetWordCount: 200, keywords: [], status: 'done',
+      },
+    ],
+    conclusion: '<p>Test conclusion.</p>',
+    totalWordCount: 50,
+    targetWordCount: 1500,
+    status: 'review',
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 async function createRequest(topic: string, kw: string): Promise<{ id: string; status: string }> {
@@ -1339,6 +1468,67 @@ describe('State machine guard: in_progress → post_review', () => {
     // 'requested' cannot jump to 'post_review' — must walk through in_progress
     const res = await setStatus(req.id, 'post_review');
     expect(res.status).toBe(400);
+  });
+});
+```
+
+describe('PATCH /api/public/content-posts/:wsId/:postId/client-edit', () => {
+  it('updates sections and snapshots the post version', async () => {
+    // Set up in-process: create request, save a post, link them
+    const briefId = `brief_test_${Date.now()}`;
+    const req = createContentRequest(testWsId, {
+      topic: 'Edit Test', targetKeyword: `edit-test-${Date.now()}`,
+      intent: 'informational', priority: 'medium', rationale: '',
+      serviceType: 'full_post',
+    });
+    // Set briefId so the post can be associated
+    updateContentRequest(testWsId, req.id, { briefId } as Parameters<typeof updateContentRequest>[2]);
+
+    const post = makeStubPost(testWsId, briefId);
+    savePost(testWsId, post);
+
+    // Advance request to post_review (server auto-populates postId via Step 5.1b)
+    const toPostReview = await patchJson(`/api/content-requests/${testWsId}/${req.id}`, { status: 'in_progress' });
+    expect(toPostReview.status).toBe(200);
+    const toReview = await patchJson(`/api/content-requests/${testWsId}/${req.id}`, { status: 'post_review' });
+    expect(toReview.status).toBe(200);
+
+    // Client edits via public route
+    const editRes = await api(`/api/public/content-posts/${testWsId}/${post.id}/client-edit`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sections: [
+          { index: 0, heading: 'Section One', content: '<p>Updated section content by client.</p>', wordCount: 5 },
+        ],
+      }),
+    });
+    expect(editRes.status).toBe(200);
+    const updated = await editRes.json() as { sections: { content: string }[] };
+    expect(updated.sections[0].content).toBe('<p>Updated section content by client.</p>');
+
+    // Verify post is actually persisted (in-process check)
+    const persisted = getPost(testWsId, post.id);
+    expect(persisted?.sections[0].content).toBe('<p>Updated section content by client.</p>');
+  });
+
+  it('rejects edit when request is not in post_review', async () => {
+    const briefId = `brief_guard_${Date.now()}`;
+    const req = createContentRequest(testWsId, {
+      topic: 'Guard Edit', targetKeyword: `guard-edit-${Date.now()}`,
+      intent: 'informational', priority: 'medium', rationale: '', serviceType: 'full_post',
+    });
+    updateContentRequest(testWsId, req.id, { briefId } as Parameters<typeof updateContentRequest>[2]);
+    const post = makeStubPost(testWsId, briefId);
+    savePost(testWsId, post);
+    // Request stays at 'requested' — not in post_review
+
+    const editRes = await api(`/api/public/content-posts/${testWsId}/${post.id}/client-edit`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sections: [{ index: 0, heading: 'H', content: '<p>No.</p>', wordCount: 1 }] }),
+    });
+    expect(editRes.status).toBe(403);
   });
 });
 ```
@@ -1461,6 +1651,12 @@ Post feedback (`clientFeedback`, `voiceScore`, `voiceFeedback`, `reviewChecklist
 9. `approve-post` lacks status guard — explicit `existing.status !== 'post_review'` check added before `updateContentRequest`; prevents unauthenticated delivery bypass ✅
 10. `request-post-changes` lacks status guard — same explicit guard added; prevents post feedback on brief-review requests (blocks the valid `client_review → changes_requested` path from this public route) ✅
 11. `getContentRequest` import added to Task 4.1 step to support the new guards ✅
+
+**Audit findings resolved (April 2026 review — round 3):**
+12. `postId` never set on request — Step 5.1b added: server auto-populates `postId` from `listPosts().find(p => p.briefId === existing.briefId)` when transitioning to `post_review`; no frontend change needed ✅
+13. `content_post_ready` email event unregistered — Task 2 expanded to also modify `server/email-templates.ts`: `'content_post_ready'` added to `EmailEventType` union, `renderContentPostReady` function added, `case` added to `renderDigest` switch ✅
+14. Public post routes expose internal fields — documented as conscious design decision consistent with existing public routes; `toClientPost()` mapper noted as future improvement path ✅
+15. Client-edit PATCH endpoint untested — integration test added to Task 10: happy path (sections updated + in-process verification) and guard test (403 when request not in `post_review`) ✅
 
 **Conscious design decisions (not bugs):**
 - `changes_requested → post_review` shortcut NOT added to state machine — admin must re-enter `in_progress` to re-send; this is intentional (forces an explicit re-queue step)
