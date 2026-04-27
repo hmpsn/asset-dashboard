@@ -988,7 +988,7 @@ export const CHECKS: Check[] = [
     // Promoted warn → error in Phase 5 Phase 3 (2026-04-25) after backlog reached zero.
     severity: 'error',
     rationale: 'Hand-rolled trend badges drift in color (text-green-400 vs text-emerald-400), sign handling, and zero-state across 7+ callsites. <TrendBadge> consolidates the canonical form.',
-    claudeMdRef: '#design-system--the-three-laws-of-color',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
   },
   {
     name: 'z.array(z.unknown()) on server',
@@ -3758,7 +3758,7 @@ export const CHECKS: Check[] = [
     message: 'Use var(--surface-1/2/3) instead of var(--brand-bg-*). The --brand-bg-* names are legacy aliases — see DESIGN_SYSTEM.md.',
     severity: 'error',
     rationale: 'Prevents new code from using deprecated token names that bypass the 3-tier surface system.',
-    claudeMdRef: '#design-system--the-three-laws-of-color',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
   },
   {
     name: 'Hand-rolled card div (use SectionCard)',
@@ -4007,7 +4007,7 @@ export const CHECKS: Check[] = [
     message: 'Use rounded-[var(--radius-lg)] instead of rounded-xl so the radius is themeable. Add a // pr-check-disable-next-line comment with justification for modals or non-card elements.',
     severity: 'warn',
     rationale: 'Prevents hardcoded Tailwind radius classes that bypass the --radius-* token system.',
-    claudeMdRef: '#design-system--the-three-laws-of-color',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
   },
   {
     name: 'radius-signature-lg used outside SectionCard',
@@ -4029,7 +4029,7 @@ export const CHECKS: Check[] = [
     message: '--radius-signature-lg outside SectionCard is the brand asymmetric radius (10px 24px 10px 24px). Either use SectionCard, or add a // pr-check-disable-next-line -- <reason> comment justifying why this surface needs the brand signature.',
     severity: 'error',
     rationale: 'The asymmetric corner is the brand visual signature. SectionCard.tsx owns the canonical implementation; consumer files MAY use --radius-signature-lg directly when the asymmetric look is intentional, but they must justify the choice with a hatch comment per site so design-system stewards can audit drift.',
-    claudeMdRef: '#design-system--the-three-laws-of-color',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
       for (const file of files) {
@@ -4074,7 +4074,7 @@ export const CHECKS: Check[] = [
     // Promoted warn → error in Phase 5 Phase 3 (2026-04-25) after backlog reached zero.
     severity: 'error',
     rationale: 'Enforces the three-speed motion system: 120ms (micro), 180ms (standard), 400ms (entrance).',
-    claudeMdRef: '#design-system--the-three-laws-of-color',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
     customCheck: (files) => {
       const ALLOWED = new Set(['120ms', '180ms', '400ms']);
       const violations: Array<{ file: string; line: number; text: string }> = [];
@@ -4149,9 +4149,16 @@ export const CHECKS: Check[] = [
       // Match an inline gradient that uses teal/emerald hue stops. Multi-line
       // JSX is normalized by joining each <button> open-tag to its className.
       // Simpler: scan each line for the gradient signature, then look up to
-      // 4 lines back for `<button` to confirm it is a CTA (not a div banner
+      // 8 lines back for `<button` to confirm it is a CTA (not a div banner
       // or a chart fill).
-      const gradRe = /bg-gradient-to-[rl][^"'\s]*\s+from-(teal|emerald)-\d{3}[^"'\s]*\s+(?:[^"]*\s+)?to-(teal|emerald)-\d{3}/;
+      //
+      // Direction class `[tlbr]{1,2}` covers all 8 Tailwind gradient
+      // directions: t, tr, r, br, b, bl, l, tl. Devin Review on the PR #319
+      // fixup commit flagged the original `[rl]` as a silent-bypass class —
+      // `bg-gradient-to-br from-teal-600 to-emerald-600` would slip through.
+      // `\b` after the direction prevents matches on `bg-gradient-to-tableau`
+      // and similar non-Tailwind suffixes.
+      const gradRe = /bg-gradient-to-[tlbr]{1,2}\b[^"'\s]*\s+from-(teal|emerald)-\d{3}[^"'\s]*\s+(?:[^"]*\s+)?to-(teal|emerald)-\d{3}/;
       // Hatch lookback covers up to 8 lines because multi-line JSX commonly
       // places className= 4-6 lines below the opening tag (and the hatch
       // comment sits above the opening tag). The same pattern is used by

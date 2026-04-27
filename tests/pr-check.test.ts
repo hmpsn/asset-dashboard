@@ -5528,6 +5528,40 @@ describe('Rule: Hand-rolled gradient CTA button', () => {
     const hits = runRule(RULE, [probe]);
     expect(hits.length).toBe(0);
   });
+
+  // Phase 3 fixup (Devin Review on PR #319): the regex was originally
+  // `bg-gradient-to-[rl]` and silently missed all diagonal/vertical variants.
+  // Cover the full set of 8 Tailwind directions to lock in the fix.
+  const ALL_DIRECTIONS = ['t', 'tr', 'r', 'br', 'b', 'bl', 'l', 'tl'] as const;
+  for (const dir of ALL_DIRECTIONS) {
+    it(`flags bg-gradient-to-${dir} on a <button>`, () => {
+      const probe = write(
+        uniqPath(`grad-${dir}`, 'probe.tsx'),
+        `<button className="bg-gradient-to-${dir} from-teal-600 to-emerald-600">x</button>\n`
+      );
+      const hits = runRule(RULE, [probe]);
+      expect(hits.length).toBeGreaterThanOrEqual(1);
+    });
+  }
+
+  it('respects pr-check-disable-next-line hatch on a multi-line <button> 5+ lines above the className', () => {
+    const probe = write(
+      uniqPath('grad-multiline-hatch', 'probe.tsx'),
+      [
+        '{/* pr-check-disable-next-line -- toggle CTA conditionally applies gradient based on review state */}',
+        '<button',
+        '  onClick={x}',
+        '  disabled={y}',
+        '  aria-label="..."',
+        '  title="..."',
+        '  className="bg-gradient-to-r from-teal-600 to-emerald-600 text-white"',
+        '>Action</button>',
+        '',
+      ].join('\n')
+    );
+    const hits = runRule(RULE, [probe]);
+    expect(hits.length).toBe(0);
+  });
 });
 
 describe('Rule: text-green-{N} for success/score (use emerald)', () => {
