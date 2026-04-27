@@ -395,7 +395,7 @@ export function PageEditRow({
               disabled={!edit.dirty || isSaving || !onSave}
               title={!onSave && isCmsPage ? 'CMS pages must be updated directly in Webflow' : undefined}
               className={`flex items-center gap-1.5 px-4 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium transition-colors ${
-                isSaved ? 'bg-emerald-600 text-white' : 'bg-white text-black hover:bg-[var(--surface-3)] disabled:opacity-50 disabled:cursor-not-allowed'
+                isSaved ? 'bg-emerald-600 text-white' : 'bg-white text-black hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed' /* raw-zinc-ok: light button on dark UI */
               }`}
             >
               <Icon as={isSaving ? Loader2 : isSaved ? Check : Save} size="sm" className={isSaving ? 'animate-spin' : ''} />

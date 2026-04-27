@@ -849,7 +849,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
           onClick={handlePublish}
           disabled={publishing}
           className={`flex items-center gap-1.5 px-4 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium transition-colors ${
-            published ? 'bg-emerald-600 text-white' : 'bg-white text-black hover:bg-[var(--surface-3)]'
+            published ? 'bg-emerald-600 text-white' : 'bg-white text-black hover:bg-zinc-200' /* raw-zinc-ok: light button on dark UI */
           }`}
         >
           <Icon as={publishing ? Loader2 : published ? Check : Upload} size="sm" className={publishing ? 'animate-spin' : ''} />
