@@ -103,6 +103,10 @@ const vStmts = createStmtCache(() => ({
   deleteByPost: db.prepare(
     `DELETE FROM content_post_versions WHERE post_id = ? AND workspace_id = ?`,
   ),
+  /** Most recent version row for a post — used for snapshot coalescing. */
+  mostRecent: db.prepare(
+    `SELECT trigger, trigger_detail, created_at FROM content_post_versions WHERE post_id = ? AND workspace_id = ? ORDER BY version_number DESC LIMIT 1`,
+  ),
 }));
 
 function rowToVersion(row: VersionRow): PostVersion {
@@ -324,6 +328,22 @@ export function snapshotPostVersion(
 export function listPostVersions(workspaceId: string, postId: string): PostVersion[] {
   const rows = vStmts().listByPost.all(postId, workspaceId) as VersionRow[];
   return rows.map(rowToVersion);
+}
+
+/**
+ * Return the most recent version's trigger metadata for a post.
+ * Used by the client-edit route to coalesce rapid edits into one snapshot per minute:
+ * if the newest version is already a client_edit from <60 s ago, skip snapshotting.
+ */
+export function getMostRecentPostVersion(
+  workspaceId: string,
+  postId: string,
+): { trigger: string; triggerDetail: string | null; createdAt: string } | undefined {
+  const row = vStmts().mostRecent.get(postId, workspaceId) as
+    | { trigger: string; trigger_detail: string | null; created_at: string }
+    | undefined;
+  if (!row) return undefined;
+  return { trigger: row.trigger, triggerDetail: row.trigger_detail, createdAt: row.created_at };
 }
 
 /** Get a specific version by ID. */

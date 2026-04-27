@@ -13,7 +13,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createContentRequest, updateContentRequest } from '../../server/content-requests.js';
-import { savePost, getPost } from '../../server/content-posts-db.js';
+import { savePost, getPost, listPostVersions } from '../../server/content-posts-db.js';
 import type { GeneratedPost } from '../../shared/types/content.js';
 
 const ctx = createTestContext(13328); // port-ok: 13201-13327 fully allocated; extending range
@@ -261,6 +261,45 @@ describe('PATCH /api/public/content-posts/:wsId/:postId/client-edit', () => {
     // conclusion: "Test conclusion" = 2 words
     // Total: 2 + 5 + 2 = 9 words
     expect(persisted?.totalWordCount).toBe(9);
+  });
+
+  it('coalesces rapid client edits into a single snapshot within 60 s', async () => {
+    // Set up: create request + post, advance to post_review
+    const briefId = `brief_coalesce_${Date.now()}`;
+    const req = createContentRequest(testWsId, {
+      topic: 'Coalesce Test', targetKeyword: `coalesce-${Date.now()}`,
+      intent: 'informational', priority: 'medium', rationale: '', serviceType: 'full_post',
+    });
+    updateContentRequest(testWsId, req.id, { briefId });
+    const post = makeStubPost(testWsId, briefId);
+    savePost(testWsId, post);
+
+    await patchJson(`/api/content-requests/${testWsId}/${req.id}`, { status: 'in_progress' });
+    await patchJson(`/api/content-requests/${testWsId}/${req.id}`, { status: 'post_review' });
+
+    const edit = async (content: string) =>
+      api(`/api/public/content-posts/${testWsId}/${post.id}/client-edit`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sections: [{ index: 0, heading: 'Section One', content, wordCount: 4 }],
+        }),
+      });
+
+    // First edit — should create a snapshot
+    const r1 = await edit('First edit by client.');
+    expect(r1.status).toBe(200);
+
+    // Second edit within the same second — should be coalesced (no new snapshot)
+    const r2 = await edit('Second rapid edit by client.');
+    expect(r2.status).toBe(200);
+
+    // Only one client_edit snapshot should exist
+    const versions = listPostVersions(testWsId, post.id);
+    const clientEditVersions = versions.filter(
+      v => v.trigger === 'manual_edit' && v.triggerDetail === 'client_edit',
+    );
+    expect(clientEditVersions).toHaveLength(1);
   });
 
   it('rejects edit when request is not in post_review', async () => {

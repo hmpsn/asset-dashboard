@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { TierGate, type Tier, Icon, Button } from '../ui';
 import type { ClientContentRequest } from './types';
+import { getDisplayStatus } from './types';
 import { clientPath } from '../../routes';
 import { useBetaMode } from './BetaContext';
 import type { PricingModalState } from './StrategyTab';
@@ -133,8 +134,10 @@ export function ContentTab({
     {/* Status summary cards */}
     {contentRequests.length > 0 && (() => {
       const active = contentRequests.filter(r => r.status !== 'declined');
-      const awaitingReview = active.filter(r => r.status === 'client_review').length;
-      const inProgress = active.filter(r => ['pending_payment', 'requested', 'brief_generated', 'changes_requested', 'approved', 'in_progress', 'post_review'].includes(r.status)).length;
+      // post_review is "awaiting client action" — move it out of inProgress.
+      // changes_requested stays in inProgress for both flows (admin is acting).
+      const awaitingReview = active.filter(r => r.status === 'client_review' || r.status === 'post_review').length;
+      const inProgress = active.filter(r => ['pending_payment', 'requested', 'brief_generated', 'changes_requested', 'approved', 'in_progress'].includes(r.status)).length;
       const delivered = active.filter(r => r.status === 'delivered').length;
       const published = active.filter(r => r.status === 'published').length;
       const stats = [
@@ -226,8 +229,12 @@ export function ContentTab({
         const stepLabels = isBriefOnly
           ? [isPending ? 'Awaiting Payment' : 'Requested', 'Brief Ready', 'Your Review', 'Approved', 'Brief Delivered', 'Published']
           : [isPending ? 'Awaiting Payment' : 'Requested', 'Brief Ready', 'Your Review', 'Approved', 'In Production', 'Post Review', 'Delivered', 'Published'];
-        // Map pending_payment and changes_requested back for timeline display
-        const displayStatus = req.status === 'pending_payment' ? 'requested' : req.status === 'changes_requested' ? 'client_review' : req.status;
+        // Map pending_payment back for timeline display; use getDisplayStatus to
+        // disambiguate changes_requested (brief-flow → client_review phase,
+        // post-flow with postId set → post_review phase) so progress bar
+        // never regresses from index 5 back to index 2.
+        const resolvedStatus = getDisplayStatus(req);
+        const displayStatus = resolvedStatus === 'pending_payment' ? 'requested' : resolvedStatus === 'changes_requested' ? 'client_review' : resolvedStatus;
         const rawIdx = (steps as readonly string[]).indexOf(displayStatus);
         // Fallback: brief_only records that reached in_progress (before the admin UI guard
         // was added) aren't in the brief_only steps array. Pin to approved so the bar

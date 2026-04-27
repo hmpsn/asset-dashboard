@@ -51,6 +51,28 @@ export interface ClientContentRequest {
   requestedAt: string; updatedAt: string;
 }
 
+/**
+ * Disambiguates the dual-purpose `changes_requested` status for progress-bar display.
+ *
+ * `changes_requested` can mean "client wants brief revisions" (came from client_review)
+ * OR "client wants post revisions" (came from post_review). The state machine merged
+ * these into one terminal label, but the progress bar needs them separated so it
+ * correctly reflects the user's actual phase on the timeline.
+ *
+ * `postId` is the disambiguator — it's only populated when admin transitioned to
+ * post_review (Task 5 auto-populates from listPosts via briefId match). For brief-flow
+ * `changes_requested`, postId is undefined.
+ *
+ * Returns the status the progress bar should treat the request as. For non-changes_requested
+ * statuses, returns `req.status` unchanged.
+ */
+export function getDisplayStatus(req: ClientContentRequest): ClientContentRequest['status'] {
+  if (req.status === 'changes_requested' && req.postId) {
+    return 'post_review';
+  }
+  return req.status;
+}
+
 export interface ClientBriefPreview {
   id: string; targetKeyword: string; suggestedTitle: string; suggestedMetaDesc: string;
   wordCountTarget: number; intent: string; audience: string; contentFormat?: string;

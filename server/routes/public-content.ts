@@ -17,7 +17,7 @@ import {
   addComment,
 } from '../content-requests.js';
 import { notifyTeamContentRequest } from '../email.js';
-import { getPost, updatePostField, snapshotPostVersion } from '../content-posts.js';
+import { getPost, updatePostField, snapshotPostVersion, getMostRecentPostVersion } from '../content-posts.js';
 import { sanitizeString, validateEnum } from '../helpers.js';
 import { getPageKeyword, listPageKeywords } from '../page-keywords.js';
 import { getClientActor } from '../middleware.js';
@@ -513,8 +513,20 @@ router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', valid
     return res.status(403).json({ error: 'Post is not open for editing' });
   }
 
+  // Coalesce rapid client edits: if the newest snapshot is already a client_edit
+  // from less than 60 s ago, the new edit extends the same editing session —
+  // skip creating a fresh snapshot to avoid 20+ versions per rapid-edit session.
+  const COALESCE_WINDOW_MS = 60_000;
+  const recentVersion = getMostRecentPostVersion(req.params.workspaceId, req.params.postId);
+  const shouldSnapshot = !recentVersion
+    || recentVersion.trigger !== 'manual_edit'
+    || recentVersion.triggerDetail !== 'client_edit'
+    || (Date.now() - new Date(recentVersion.createdAt).getTime()) >= COALESCE_WINDOW_MS;
+
   // Snapshot before client edits so admin can see the diff
-  snapshotPostVersion(post, 'manual_edit', 'client_edit');
+  if (shouldSnapshot) {
+    snapshotPostVersion(post, 'manual_edit', 'client_edit');
+  }
 
   const { title, metaDescription, introduction, sections, conclusion } = req.body;
   const updates: Record<string, unknown> = {};
