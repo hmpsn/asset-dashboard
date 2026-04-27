@@ -56,7 +56,7 @@ interface ContentTopicRequest {
   intent: string;
   priority: string;
   rationale: string;
-  status: 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'delivered' | 'published' | 'declined';
+  status: 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'post_review' | 'delivered' | 'published' | 'declined';
   briefId?: string;
   clientNote?: string;
   internalNote?: string;

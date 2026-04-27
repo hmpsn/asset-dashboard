@@ -2,7 +2,7 @@ import {
   Loader2, Trash2, Sparkles, FileText,
   Inbox, CheckCircle2, XCircle, Clock, Zap,
   Copy, Download, Search, Target, MessageSquare, BarChart3,
-  BookOpen, Users, TrendingUp, Check, ExternalLink, Link2, PenLine,
+  BookOpen, Users, TrendingUp, Check, ExternalLink, Link2, PenLine, Eye, Send,
 } from 'lucide-react';
 import { SectionCard, Icon } from '../ui';
 import type { PostSummary } from '../../../shared/types/content';
@@ -47,7 +47,7 @@ interface ContentTopicRequest {
   intent: string;
   priority: string;
   rationale: string;
-  status: 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'delivered' | 'published' | 'declined';
+  status: 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'post_review' | 'delivered' | 'published' | 'declined';
   briefId?: string;
   clientNote?: string;
   internalNote?: string;
@@ -149,6 +149,7 @@ export function RequestList({
             approved: { icon: CheckCircle2, color: 'text-emerald-400', label: 'Approved' },
             changes_requested: { icon: Clock, color: 'text-orange-400', label: 'Changes Requested' },
             in_progress: { icon: Zap, color: 'text-teal-400', label: 'In Progress' },
+            post_review: { icon: Eye, color: 'text-cyan-400', label: 'Client Review' },
             delivered: { icon: CheckCircle2, color: 'text-emerald-400', label: 'Delivered' },
             published: { icon: CheckCircle2, color: 'text-teal-400', label: 'Published' },
             declined: { icon: XCircle, color: 'text-zinc-500', label: 'Declined' },
@@ -199,6 +200,9 @@ export function RequestList({
                       {req.status === 'client_review' && (
                         <span className="t-caption-sm text-cyan-400/60 italic">Awaiting client feedback</span>
                       )}
+                      {req.status === 'post_review' && (
+                        <span className="t-caption-sm text-cyan-400/60 italic">Post sent — awaiting client approval</span>
+                      )}
                       {req.status === 'approved' && (req.serviceType || 'brief_only') === 'full_post' && req.briefId && (() => {
                         const existingPost = posts.find(p => p.briefId === req.briefId);
                         if (existingPost) {
@@ -240,14 +244,26 @@ export function RequestList({
                       {req.status === 'in_progress' && req.briefId && (() => {
                         const existingPost = posts.find(p => p.briefId === req.briefId);
                         if (!existingPost) return null;
+                        const canSendToClient = existingPost.status === 'review' || existingPost.status === 'approved';
                         return (
-                          <button
-                            onClick={() => onOpenPost?.(existingPost.id)}
-                            className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors"
-                            title="Open post in editor"
-                          >
-                            <Icon as={PenLine} size="sm" /> Open Post
-                          </button>
+                          <>
+                            <button
+                              onClick={() => onOpenPost?.(existingPost.id)}
+                              className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors"
+                              title="Open post in editor"
+                            >
+                              <Icon as={PenLine} size="sm" /> Open Post
+                            </button>
+                            {canSendToClient && (
+                              <button
+                                onClick={() => onUpdateRequestStatus(req.id, 'post_review')}
+                                className="flex items-center gap-1 px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 t-caption-sm text-cyan-300 hover:bg-cyan-600/30 transition-colors"
+                                title="Send post to client for review and approval"
+                              >
+                                <Icon as={Send} size="sm" /> Send Post to Client
+                              </button>
+                            )}
+                          </>
                         );
                       })()}
                       {req.status === 'in_progress' && deliveringReqId !== req.id && (
