@@ -4299,7 +4299,12 @@ export const CHECKS: Check[] = [
     // exact pixel pairing (10/24 vs 8/20 vs 12/28) and bypass the SectionCard
     // ownership audit. Backlog ~114 sites.
     name: 'Inline asymmetric border-radius (use --radius-signature token)',
-    pattern: 'borderRadius:\\s*[\'"][0-9]+[a-z%]+[[:space:]][0-9]',
+    // POSIX `[[:space:]]` instead of `\s` because BSD grep -E (macOS) treats
+    // `\s` as literal `s` per the codebase note at the top of the Map rule
+    // (line ~905). Mixing the two in a single pattern silently bypasses on
+    // BSD — Devin Review on PR #319 round 2 caught this. Both BSD and GNU
+    // grep accept `[[:space:]]`.
+    pattern: 'borderRadius:[[:space:]]*[\'"][0-9]+[a-z%]+[[:space:]][0-9]',
     fileGlobs: ['*.ts', '*.tsx'],
     pathFilter: 'src/',
     exclude: [
