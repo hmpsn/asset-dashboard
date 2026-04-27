@@ -778,6 +778,8 @@ Find the `statusConfig` object (around line 148 where `in_progress` is defined) 
 post_review: { icon: Eye, color: 'text-cyan-400', label: 'Client Review' },
 ```
 
+> **Color note:** `cyan` is the established color for client-review states in this file. `client_review` already uses `text-cyan-400` at line 145. `post_review` is semantically identical (client reviewing content, just a post instead of a brief) so it must match — using teal or blue here would create an inconsistency within the same status config map. This is NOT a new hue introduction; it follows an existing established pattern.
+
 Add `Eye` to the lucide-react import at the top of the file if not already imported.
 
 - [ ] **Step 6.3: Add "Send Post to Client" button for `in_progress` requests**
@@ -803,7 +805,9 @@ Find the `in_progress` block in the action buttons section (around line 237–26
       {canSendToClient && (
         <button
           onClick={() => onUpdateRequestStatus(req.id, 'post_review')}
-          className="flex items-center gap-1 px-2 py-1 rounded bg-gradient-to-r from-cyan-600/30 to-teal-600/30 border border-cyan-500/40 text-[11px] text-cyan-200 font-medium hover:from-cyan-600/50 hover:to-teal-600/50 transition-all"
+          // Match the existing "Send to Client" button pattern at lines 194 and 235 exactly.
+          // Do NOT use a gradient — the existing buttons use flat bg-cyan-600/20.
+          className="flex items-center gap-1 px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 text-[11px] text-cyan-300 hover:bg-cyan-600/30 transition-colors"
           title="Send post to client for review and approval"
         >
           <Send className="w-3 h-3" /> Send Post to Client
@@ -823,6 +827,8 @@ In the status badge section of the request card, find where statuses like `clien
 ```typescript
 post_review: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
 ```
+
+> **Color note:** `bg-cyan-500/10 border-cyan-500/20 text-cyan-400` already exists in this file at line 544 (schema type badges). `post_review` maps to the same semantic family as `client_review` — keep it cyan for consistency.
 
 - [ ] **Step 6.5: Add informational text for `post_review` status**
 
