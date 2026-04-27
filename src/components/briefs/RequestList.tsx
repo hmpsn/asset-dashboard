@@ -238,9 +238,32 @@ export function RequestList({
                       {req.status === 'approved' && (req.serviceType || 'brief_only') === 'brief_only' && !req.upgradedAt && deliveringReqId !== req.id && (
                         <button onClick={() => { onSetDeliveringReqId(req.id); onSetDeliveryUrl(req.deliveryUrl || ''); onSetDeliveryNotes(req.deliveryNotes || ''); }} className="px-2 py-1 rounded bg-emerald-600/20 border border-emerald-500/30 t-caption-sm text-emerald-300 hover:bg-emerald-600/30 transition-colors flex items-center gap-1"><Icon as={Link2} size="sm" /> Deliver Brief</button>
                       )}
-                      {req.status === 'changes_requested' && (
-                        <button onClick={() => onUpdateRequestStatus(req.id, 'client_review')} className="px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 t-caption-sm text-cyan-300 hover:bg-cyan-600/30 transition-colors">Resubmit to Client</button>
-                      )}
+                      {req.status === 'changes_requested' && (() => {
+                        const existingPost = req.briefId
+                          ? posts.find(p => p.briefId === req.briefId)
+                          : undefined;
+                        const isPostFlow = !!existingPost && req.serviceType === 'full_post';
+                        if (isPostFlow) {
+                          return (
+                            <button
+                              onClick={() => onUpdateRequestStatus(req.id, 'post_review')}
+                              className="flex items-center gap-1 px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 t-caption-sm text-cyan-300 hover:bg-cyan-600/30 transition-colors"
+                              title="Send the revised post back to client for review"
+                            >
+                              <Icon as={Send} size="sm" /> Resend Post to Client
+                            </button>
+                          );
+                        }
+                        return (
+                          <button
+                            onClick={() => onUpdateRequestStatus(req.id, 'client_review')}
+                            className="flex items-center gap-1 px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 t-caption-sm text-cyan-300 hover:bg-cyan-600/30 transition-colors"
+                            title="Send the revised brief back to client for review"
+                          >
+                            <Icon as={Send} size="sm" /> Resubmit to Client
+                          </button>
+                        );
+                      })()}
                       {req.status === 'in_progress' && req.briefId && (() => {
                         const existingPost = posts.find(p => p.briefId === req.briefId);
                         if (!existingPost) return null;
