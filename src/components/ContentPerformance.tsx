@@ -67,8 +67,8 @@ function TrendChart({ trend }: { trend: TrendPoint[] }) {
   return (
     <div className="mt-3">
       <div className="flex items-center gap-4 mb-2">
-        <span className="flex items-center gap-1 text-[10px] /* arbitrary-text-ok */ text-[var(--brand-text)]"><span className="w-3 h-0.5 bg-blue-400 inline-block" /> Clicks</span>
-        <span className="flex items-center gap-1 text-[10px] /* arbitrary-text-ok */ text-[var(--brand-text)]"><span className="w-3 h-0.5 bg-cyan-400 inline-block" /> Impressions</span>
+        <span className="flex items-center gap-1 text-[10px] text-[var(--brand-text)]"><span className="w-3 h-0.5 bg-blue-400 inline-block" /> Clicks</span> // arbitrary-text-ok
+        <span className="flex items-center gap-1 text-[10px] text-[var(--brand-text)]"><span className="w-3 h-0.5 bg-cyan-400 inline-block" /> Impressions</span> // arbitrary-text-ok
       </div>
       <ResponsiveContainer width="100%" height={120}>
         <LineChart data={trend} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
@@ -93,7 +93,7 @@ function TrendChart({ trend }: { trend: TrendPoint[] }) {
           <Line yAxisId="clicks" type="monotone" dataKey="clicks" stroke="#60a5fa" strokeWidth={2} dot={false} />
         </LineChart>
       </ResponsiveContainer>
-      <div className="flex justify-between text-[10px] /* arbitrary-text-ok */ text-[var(--brand-text-dim)] mt-1">
+      <div className="flex justify-between text-[10px] text-[var(--brand-text-dim)] mt-1"> // arbitrary-text-ok
         <span>{trend[0].date}</span>
         <span>{trend[trend.length - 1].date}</span>
       </div>
@@ -266,13 +266,13 @@ export function ContentPerformance({ workspaceId }: Props) {
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-[var(--brand-text-bright)] truncate">{item.topic}</span>
                         {ptColor && (
-                          <span className={`text-[10px] /* arbitrary-text-ok */ px-1.5 py-0.5 rounded border ${ptColor}`}>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded border ${ptColor}`}> // arbitrary-text-ok
                             {item.pageType}
                           </span>
                         )}
                         <Badge label={item.status} color={item.status === 'published' ? 'emerald' : 'blue'} />
                         {item.source === 'matrix' && (
-                          <span className="flex items-center gap-0.5 text-[10px] /* arbitrary-text-ok */ px-1.5 py-0.5 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/20">
+                          <span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/20"> // arbitrary-text-ok
                             <Icon as={Layers} size="sm" /> Content Plan
                           </span>
                         )}
@@ -291,17 +291,17 @@ export function ContentPerformance({ workspaceId }: Props) {
                         <>
                           <div className="text-right">
                             <p className="text-xs font-medium text-[var(--brand-text-bright)]">{item.gsc.clicks.toLocaleString()}</p>
-                            <p className="text-[10px] /* arbitrary-text-ok */ text-[var(--brand-text-muted)]">clicks</p>
+                            <p className="text-[10px] text-[var(--brand-text-muted)]">clicks</p> // arbitrary-text-ok
                           </div>
                           <div className="text-right">
                             <p className="text-xs font-medium text-[var(--brand-text-bright)]">{item.gsc.impressions.toLocaleString()}</p>
-                            <p className="text-[10px] /* arbitrary-text-ok */ text-[var(--brand-text-muted)]">impressions</p>
+                            <p className="text-[10px] text-[var(--brand-text-muted)]">impressions</p> // arbitrary-text-ok
                           </div>
                           <div className="text-right">
                             <p className={`text-xs font-medium ${item.gsc.position <= 10 ? 'text-emerald-400' : item.gsc.position <= 20 ? 'text-amber-400' : 'text-[var(--brand-text)]'}`}>
                               #{item.gsc.position.toFixed(1)}
                             </p>
-                            <p className="text-[10px] /* arbitrary-text-ok */ text-[var(--brand-text-muted)]">position</p>
+                            <p className="text-[10px] text-[var(--brand-text-muted)]">position</p> // arbitrary-text-ok
                           </div>
                         </>
                       ) : (
@@ -339,21 +339,21 @@ export function ContentPerformance({ workspaceId }: Props) {
                             <div className="grid grid-cols-2 gap-3">
                               <div>
                                 <p className="text-lg font-semibold text-[var(--brand-text-bright)]">{item.gsc.clicks.toLocaleString()}</p>
-                                <p className="text-[10px] /* arbitrary-text-ok */ text-[var(--brand-text-muted)]">Clicks</p>
+                                <p className="text-[10px] text-[var(--brand-text-muted)]">Clicks</p> // arbitrary-text-ok
                               </div>
                               <div>
                                 <p className="text-lg font-semibold text-[var(--brand-text-bright)]">{item.gsc.impressions.toLocaleString()}</p>
-                                <p className="text-[10px] /* arbitrary-text-ok */ text-[var(--brand-text-muted)]">Impressions</p>
+                                <p className="text-[10px] text-[var(--brand-text-muted)]">Impressions</p> // arbitrary-text-ok
                               </div>
                               <div>
                                 <p className="text-lg font-semibold text-[var(--brand-text-bright)]">{item.gsc.ctr}%</p>
-                                <p className="text-[10px] /* arbitrary-text-ok */ text-[var(--brand-text-muted)]">CTR</p>
+                                <p className="text-[10px] text-[var(--brand-text-muted)]">CTR</p> // arbitrary-text-ok
                               </div>
                               <div>
                                 <p className={`text-lg font-semibold ${item.gsc.position <= 10 ? 'text-emerald-400' : item.gsc.position <= 20 ? 'text-amber-400' : 'text-[var(--brand-text-bright)]'}`}>
                                   #{item.gsc.position.toFixed(1)}
                                 </p>
-                                <p className="text-[10px] /* arbitrary-text-ok */ text-[var(--brand-text-muted)]">Avg Position</p>
+                                <p className="text-[10px] text-[var(--brand-text-muted)]">Avg Position</p> // arbitrary-text-ok
                               </div>
                             </div>
                           ) : (
@@ -370,19 +370,19 @@ export function ContentPerformance({ workspaceId }: Props) {
                             <div className="grid grid-cols-2 gap-3">
                               <div>
                                 <p className="text-lg font-semibold text-[var(--brand-text-bright)]">{item.ga4.sessions.toLocaleString()}</p>
-                                <p className="text-[10px] /* arbitrary-text-ok */ text-[var(--brand-text-muted)]">Sessions</p>
+                                <p className="text-[10px] text-[var(--brand-text-muted)]">Sessions</p> // arbitrary-text-ok
                               </div>
                               <div>
                                 <p className="text-lg font-semibold text-[var(--brand-text-bright)]">{item.ga4.users.toLocaleString()}</p>
-                                <p className="text-[10px] /* arbitrary-text-ok */ text-[var(--brand-text-muted)]">Users</p>
+                                <p className="text-[10px] text-[var(--brand-text-muted)]">Users</p> // arbitrary-text-ok
                               </div>
                               <div>
                                 <p className="text-lg font-semibold text-[var(--brand-text-bright)]">{item.ga4.bounceRate.toFixed(1)}%</p>
-                                <p className="text-[10px] /* arbitrary-text-ok */ text-[var(--brand-text-muted)]">Bounce Rate</p>
+                                <p className="text-[10px] text-[var(--brand-text-muted)]">Bounce Rate</p> // arbitrary-text-ok
                               </div>
                               <div>
                                 <p className="text-lg font-semibold text-[var(--brand-text-bright)]">{formatEngagement(item.ga4.avgEngagementTime)}</p>
-                                <p className="text-[10px] /* arbitrary-text-ok */ text-[var(--brand-text-muted)]">Avg Engagement</p>
+                                <p className="text-[10px] text-[var(--brand-text-muted)]">Avg Engagement</p> // arbitrary-text-ok
                               </div>
                             </div>
                           ) : (

@@ -37,7 +37,7 @@ export function SummaryPills({ counts, activeFilter, onFilter, loading }: Summar
             key={pill.filterKey}
             onClick={() => onFilter(isActive ? null : pill.filterKey)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-xs transition-all border ${
-              isActive ? colors.activeBg : 'bg-[var(--surface-3)]/50 border-[var(--brand-border)] hover:border-[var(--brand-border)]'
+              isActive ? colors.activeBg : 'bg-[var(--surface-3)]/50 border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]'
             }`}
           >
             <span className={`w-2 h-2 rounded-full ${colors.dot}`} />

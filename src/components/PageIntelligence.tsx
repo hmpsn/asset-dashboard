@@ -601,7 +601,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
           <div className="flex items-center gap-2 mb-2">
             <Icon as={Zap} size="md" className="text-amber-400" />
             <span className="text-xs font-semibold text-amber-300">Fix These First</span>
-            <span className="text-[10px] /* arbitrary-text-ok */ text-[var(--brand-text-muted)] ml-auto">ranked by traffic × optimization gap</span>
+            <span className="text-[10px] text-[var(--brand-text-muted)] ml-auto">ranked by traffic × optimization gap</span> // arbitrary-text-ok
           </div>
           <div className="space-y-1.5">
             {fixQueue.map((item, i) => (
@@ -610,19 +610,19 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                 onClick={() => setExpanded(expanded === item.page.id ? null : item.page.id)}
                 className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-[var(--surface-3)]/50 transition-colors text-left"
               >
-                <span className="text-[10px] /* arbitrary-text-ok */ font-mono text-[var(--brand-text-muted)] w-4">{i + 1}.</span>
+                <span className="text-[10px] font-mono text-[var(--brand-text-muted)] w-4">{i + 1}.</span> // arbitrary-text-ok
                 <span className="t-caption-sm text-[var(--brand-text-bright)] truncate flex-1">{item.page.title || item.page.path}</span>
                 {item.impressions > 0 && (
-                  <span className="text-[10px] /* arbitrary-text-ok */ text-[var(--brand-text-muted)]">{item.impressions.toLocaleString()} imp</span>
+                  <span className="text-[10px] text-[var(--brand-text-muted)]">{item.impressions.toLocaleString()} imp</span> // arbitrary-text-ok
                 )}
-                <span className={`text-[10px] /* arbitrary-text-ok */ font-medium px-1.5 py-0.5 rounded ${
+                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${ // arbitrary-text-ok
                   item.score < 40 ? 'text-red-400 bg-red-500/10' :
                   item.score < 60 ? 'text-amber-400 bg-amber-500/10' :
                   'text-yellow-400 bg-yellow-500/10'
                 }`}>
                   {item.score}/100
                 </span>
-                <span className="text-[10px] /* arbitrary-text-ok */ text-amber-400/70 font-mono w-12 text-right">↑{item.impact}</span>
+                <span className="text-[10px] text-amber-400/70 font-mono w-12 text-right">↑{item.impact}</span> // arbitrary-text-ok
               </button>
             ))}
           </div>
@@ -689,7 +689,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs text-[var(--brand-text-bright)] truncate">{page.title}</span>
                       {page.source === 'cms' && (
-                        <span className="text-[9px] /* arbitrary-text-ok */ px-1 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0">CMS</span>
+                        <span className="text-[9px] px-1 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0">CMS</span> // arbitrary-text-ok
                       )}
                     </div>
                     <span className="t-caption-sm text-[var(--brand-text-muted)] font-mono">{page.path}</span>
@@ -714,7 +714,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                     </span>
                   )}
                   {sp?.validated === false && (
-                    <span className="text-[10px] /* arbitrary-text-ok */ text-amber-400 bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/20" title="Keyword not validated in SEMRush">
+                    <span className="text-[10px] text-amber-400 bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/20" title="Keyword not validated in SEMRush"> // arbitrary-text-ok
                       Unvalidated
                     </span>
                   )}
@@ -750,7 +750,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                             <button
                               onClick={() => trackKeyword(sp.primaryKeyword)}
                               title={trackedKeywords.has(sp.primaryKeyword) ? 'Tracking' : 'Track in Rank Tracker'}
-                              className={`flex items-center gap-1 text-[10px] /* arbitrary-text-ok */ px-1.5 py-0.5 rounded border transition-colors ${trackedKeywords.has(sp.primaryKeyword) ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-teal-500/30 bg-teal-500/10 text-teal-400 hover:bg-teal-500/20'}`}
+                              className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border transition-colors ${trackedKeywords.has(sp.primaryKeyword) ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-teal-500/30 bg-teal-500/10 text-teal-400 hover:bg-teal-500/20'}`} // arbitrary-text-ok
                             >
                               {trackedKeywords.has(sp.primaryKeyword) ? <><Check className="w-2.5 h-2.5" /> Tracking</> : <><Plus className="w-2.5 h-2.5" /> Track</>}
                             </button>
@@ -913,7 +913,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                           <button
                             onClick={() => trackKeyword(kw.primaryKeyword)}
                             title={trackedKeywords.has(kw.primaryKeyword) ? 'Tracking' : 'Track in Rank Tracker'}
-                            className={`flex items-center gap-1 text-[10px] /* arbitrary-text-ok */ px-1.5 py-0.5 rounded border transition-colors ${trackedKeywords.has(kw.primaryKeyword) ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-teal-500/30 bg-teal-500/10 text-teal-400 hover:bg-teal-500/20'}`}
+                            className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border transition-colors ${trackedKeywords.has(kw.primaryKeyword) ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-teal-500/30 bg-teal-500/10 text-teal-400 hover:bg-teal-500/20'}`} // arbitrary-text-ok
                           >
                             {trackedKeywords.has(kw.primaryKeyword) ? <><Check className="w-2.5 h-2.5" /> Tracking</> : <><Plus className="w-2.5 h-2.5" /> Track</>}
                           </button>

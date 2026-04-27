@@ -275,7 +275,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                   <div className="flex items-center gap-1.5">
                     <span className="text-sm font-medium text-[var(--brand-text-bright)] truncate">{page.title}</span>
                     {page.source === 'cms' && (
-                      <span className="text-[9px] /* arbitrary-text-ok */ px-1 py-0.5 rounded bg-teal-500/15 text-teal-400 border border-teal-500/20 shrink-0">CMS</span>
+                      <span className="text-[9px] px-1 py-0.5 rounded bg-teal-500/15 text-teal-400 border border-teal-500/20 shrink-0">CMS</span> // arbitrary-text-ok
                     )}
                   </div>
                   <div className="text-xs text-[var(--brand-text-muted)] truncate">/{page.slug}</div>
