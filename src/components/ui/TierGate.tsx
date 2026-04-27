@@ -87,7 +87,7 @@ export function TierGate({ tier, required, feature, teaser, children, className,
               {teaser || `Upgrade to ${TIER_LABELS[required]} to unlock this feature`}
             </div>
             {roiValue && roiValue > 0 && (
-              <div className="t-caption-sm text-emerald-400/80 mt-1 font-medium">
+              <div className="text-[10px] text-emerald-400/80 mt-1 font-medium"> {/* arbitrary-text-ok — 10px ROI callout, t-micro would add unwanted uppercase+monospace */}
                 Your site generates ${Math.round(roiValue).toLocaleString()}/mo in organic value
               </div>
             )}
