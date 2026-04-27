@@ -313,35 +313,42 @@ export function StripePaymentModal({
       className="fixed inset-0 bg-black/70 backdrop-blur-md z-[70] flex items-center justify-center p-4"
       onClick={onClose}
     >
+      {/* Stripe payment modal must be ALWAYS DARK regardless of dashboard theme.
+          Stripe Elements is hardcoded to theme: 'night' (line ~180); using
+          theme-responsive `--surface-*` / `--brand-*` tokens here would create
+          a white-modal + dark-form mismatch when client uses light mode.
+          Same constraint applies to all child color classes below. Do NOT
+          replace these zinc-* values with `--surface-*` / `--brand-text-*`
+          tokens. See the same warning at line 178. */}
       <div
-        className="relative bg-[var(--surface-2)] border border-[var(--brand-border)]/50 rounded-2xl shadow-2xl shadow-black/50 w-full max-w-md overflow-hidden animate-[scaleIn_0.2s_ease-out]"
+        className="relative bg-zinc-900 border border-zinc-800/50 rounded-2xl shadow-2xl shadow-black/50 w-full max-w-md overflow-hidden animate-[scaleIn_0.2s_ease-out]"
         onClick={e => e.stopPropagation()}
       >
-        {/* Close button */}
+        {/* Close button — always-dark per modal constraint */}
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 w-7 h-7 rounded-[var(--radius-lg)] flex items-center justify-center bg-[var(--surface-3)]/80 hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors z-10"
+          className="absolute top-3 right-3 w-7 h-7 rounded-[var(--radius-lg)] flex items-center justify-center bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors z-10"
         >
           <Icon as={X} size="md" />
         </button>
 
-        {/* Header */}
+        {/* Header — always-dark per modal constraint */}
         <div className="relative px-6 pt-6 pb-4 overflow-hidden bg-gradient-to-br from-teal-600/15 via-emerald-600/10 to-transparent">
           <div className="absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl opacity-20 bg-teal-500" />
           <div className="relative">
-            <div className="text-sm font-semibold text-[var(--brand-text-bright)] mb-1">{productName}</div>
-            <div className="t-caption-sm text-[var(--brand-text-muted)]">{topic}</div>
-            <div className="t-caption-sm mt-0.5 text-teal-400/80">
+            <div className="text-sm font-semibold text-zinc-100 mb-1">{productName}</div>
+            <div className="text-xs text-zinc-500">{topic}</div>
+            <div className="text-xs mt-0.5 text-teal-400/80">
               Keyword: &ldquo;{targetKeyword}&rdquo;
             </div>
           </div>
 
-          {/* Price badge */}
+          {/* Price badge — always-dark per modal constraint */}
           <div className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-[var(--radius-lg)] border bg-teal-500/5 border-teal-500/20">
             <span className="text-lg font-bold tracking-tight text-teal-300">
               {fmt(amount)}
             </span>
-            <span className="t-caption-sm text-[var(--brand-text-muted)]">one-time</span>
+            <span className="text-xs text-zinc-500">one-time</span>
           </div>
         </div>
 
