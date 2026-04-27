@@ -507,7 +507,7 @@ export function InsightsDigest(props: InsightsDigestProps) {
         <div className="w-5 h-5 rounded-md bg-teal-500/15 flex items-center justify-center">
           <Icon as={Sparkles} size="sm" className="text-teal-400" />
         </div>
-        <span className="text-sm font-semibold text-[var(--brand-text-bright)]">Insights</span>
+        <span className="t-body font-semibold text-[var(--brand-text-bright)]">Insights</span>
         <span className="t-caption text-[var(--brand-text-muted)]">{all.length} things to know</span>
       </div>
 
@@ -530,7 +530,7 @@ export function InsightsDigest(props: InsightsDigestProps) {
                   {SENTIMENT_LABELS[insight.sentiment]}
                 </span>
               </div>
-              <h3 className="text-sm font-medium text-[var(--brand-text-bright)] leading-snug mb-1.5">{insight.headline}</h3>
+              <h3 className="t-body font-medium text-[var(--brand-text-bright)] leading-snug mb-1.5">{insight.headline}</h3>
 
               {/* Body */}
               <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed mb-2">
@@ -652,7 +652,7 @@ export function PerformancePulse({ overview, searchComparison, ga4Overview, ga4C
         <div key={i} className="flex items-center gap-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2">
           <div>
             <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)]">{m.label}</div>
-            <span className={`text-sm font-bold ${m.color}`}>{m.value}</span>
+            <span className={`t-body font-bold ${m.color}`}>{m.value}</span>
           </div>
           {m.change != null && m.change !== 0 && (
             <span className={`t-caption font-medium px-1.5 py-0.5 rounded ${

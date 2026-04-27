@@ -76,19 +76,19 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
           <Icon as={MessageSquare} size="lg" className="text-teal-400" />
           <div>
             <h2 className="text-xl font-semibold text-[var(--brand-text)]">Requests</h2>
-            <p className="text-sm text-[var(--brand-text-muted)] mt-1">Submit requests for {STUDIO_NAME} to action on.</p>
+            <p className="t-body text-[var(--brand-text-muted)] mt-1">Submit requests for {STUDIO_NAME} to action on.</p>
           </div>
         </div>
         <button onClick={() => setShowNewRequest(!showNewRequest)}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-lg text-xs font-medium transition-colors">
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-[var(--radius-lg)] t-caption font-medium transition-colors">
           <Icon as={Plus} size="md" /> New Request
         </button>
       </div>
 
       {/* New request form */}
-      {showNewRequest && (
-        <div className="bg-[var(--surface-2)] border border-teal-500/20 p-5 space-y-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
-          <h3 className="text-xs font-semibold text-[var(--brand-text)]">Submit a Request</h3>
+      {showNewRequest && ( // pr-check-disable-next-line -- Brand signature radius intentional
+        <div className="bg-[var(--surface-2)] border border-teal-500/20 p-5 space-y-4" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+          <h3 className="t-caption font-semibold text-[var(--brand-text)]">Submit a Request</h3>
           <div>
             <label className="t-caption-sm text-[var(--brand-text-muted)] mb-1.5 block">Quick Templates</label>
             <div className="flex flex-wrap gap-2">
@@ -100,7 +100,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
                 { label: 'SEO Update', cat: 'seo' as RequestCategory, title: 'SEO update request', desc: 'Pages affected:\n\nKeywords to target:\n\nDetails:' },
               ].map(t => (
                 <button key={t.label} onClick={() => { setNewReqCategory(t.cat); setNewReqTitle(t.title); setNewReqDesc(t.desc); }}
-                  className="px-2.5 py-1.5 rounded-lg t-caption-sm font-medium border border-[var(--brand-border-strong)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:border-zinc-600 bg-zinc-800/50 transition-colors">
+                  className="px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium border border-[var(--brand-border-strong)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:border-[var(--brand-border-strong)] bg-[var(--surface-3)]/50 transition-colors">
                   {t.label}
                 </button>
               ))}
@@ -111,26 +111,26 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
             <label className="t-caption-sm text-[var(--brand-text-muted)] mb-1 block">Your Name</label>
             <input value={newReqName} onChange={e => setNewReqName(e.target.value)}
               placeholder="So we know who to follow up with..."
-              className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-lg text-xs text-[var(--brand-text)] placeholder-zinc-500 focus:outline-none focus:border-teal-500" />
+              className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500" />
           </div>
           )}
           <div>
             <label className="t-caption-sm text-[var(--brand-text-muted)] mb-1 block">Title</label>
             <input value={newReqTitle} onChange={e => setNewReqTitle(e.target.value)}
               placeholder="Brief summary of your request..."
-              className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-lg text-xs text-[var(--brand-text)] placeholder-zinc-500 focus:outline-none focus:border-teal-500" />
+              className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500" />
           </div>
           <div>
             <label className="t-caption-sm text-[var(--brand-text-muted)] mb-1 block">Description</label>
             <textarea value={newReqDesc} onChange={e => setNewReqDesc(e.target.value)} rows={3}
               placeholder="Describe what you need in detail..."
-              className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-lg text-xs text-[var(--brand-text)] placeholder-zinc-500 focus:outline-none focus:border-teal-500 resize-none" />
+              className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500 resize-none" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="t-caption-sm text-[var(--brand-text-muted)] mb-1 block">Category</label>
               <select value={newReqCategory} onChange={e => setNewReqCategory(e.target.value as RequestCategory)}
-                className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-lg text-xs text-[var(--brand-text)] focus:outline-none focus:border-teal-500">
+                className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:outline-none focus:border-teal-500">
                 <option value="content">Content Update</option>
                 <option value="design">Design Change</option>
                 <option value="bug">Bug Report</option>
@@ -143,7 +143,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
               <label className="t-caption-sm text-[var(--brand-text-muted)] mb-1 block">Related Page URL <span className="text-[var(--brand-text-muted)]">(optional)</span></label>
               <input value={newReqPage} onChange={e => setNewReqPage(e.target.value)}
                 placeholder="/about or full URL..."
-                className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-lg text-xs text-[var(--brand-text)] placeholder-zinc-500 focus:outline-none focus:border-teal-500" />
+                className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500" />
             </div>
           </div>
           <div>
@@ -151,7 +151,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
             <input type="file" ref={newReqFileRef} className="hidden" multiple accept="image/*,.pdf,.doc,.docx,.txt,.csv"
               onChange={e => { if (e.target.files) setNewReqFiles(prev => [...prev, ...Array.from(e.target.files!)]); e.target.value = ''; }} />
             <button onClick={() => newReqFileRef.current?.click()} type="button"
-              className="flex items-center gap-1.5 px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-lg text-xs text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:border-zinc-600 transition-colors">
+              className="flex items-center gap-1.5 px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:border-[var(--brand-border-strong)] transition-colors">
               <Icon as={Paperclip} size="md" /> Attach Files
             </button>
             {newReqFiles.length > 0 && (
@@ -167,12 +167,12 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
           </div>
           <div className="flex items-center gap-2 pt-1">
             <button onClick={submitRequest} disabled={submittingReq || !newReqTitle.trim() || !newReqDesc.trim()}
-              className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-lg text-xs font-medium transition-colors">
+              className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-[var(--radius-lg)] t-caption font-medium transition-colors">
               {submittingReq ? <Icon as={Loader2} size="md" className="animate-spin" /> : <Icon as={Send} size="md" />}
               {submittingReq ? 'Submitting...' : 'Submit Request'}
             </button>
             <button onClick={() => setShowNewRequest(false)}
-              className="px-3 py-2 text-xs text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">Cancel</button>
+              className="px-3 py-2 t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">Cancel</button>
           </div>
         </div>
       )}
@@ -185,13 +185,14 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
       {/* Empty state */}
       {!requestsLoading && requests.length === 0 && !showNewRequest && (
         <div className="text-center py-16">
-          <div className="w-16 h-16 bg-[var(--surface-2)] border border-[var(--brand-border)] flex items-center justify-center mx-auto mb-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
+          {/* pr-check-disable-next-line -- Brand signature radius intentional */}
+          <div className="w-16 h-16 bg-[var(--surface-2)] border border-[var(--brand-border)] flex items-center justify-center mx-auto mb-4" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
             <Icon as={MessageSquare} size="2xl" className="text-[var(--brand-text-faint)]" />
           </div>
-          <h3 className="text-sm font-medium text-[var(--brand-text-muted)] mb-1">Need something? We're here to help</h3>
+          <h3 className="t-body font-medium text-[var(--brand-text-muted)] mb-1">Need something? We're here to help</h3>
           <p className="t-caption-sm text-[var(--brand-text-muted)] mb-4">Report a bug, request a design change, or suggest an improvement — {STUDIO_NAME} will get right on it.</p>
           <button onClick={() => setShowNewRequest(true)}
-            className="px-4 py-2 bg-teal-600 hover:bg-teal-500 rounded-lg text-xs font-medium transition-colors">
+            className="px-4 py-2 bg-teal-600 hover:bg-teal-500 rounded-[var(--radius-lg)] t-caption font-medium transition-colors">
             <Icon as={Plus} size="md" className="inline mr-1" /> Create Your First Request
           </button>
         </div>
@@ -206,9 +207,9 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
               new: 'bg-blue-500/10 border-blue-500/30 text-blue-400',
               in_review: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
               in_progress: 'bg-teal-500/10 border-teal-500/30 text-teal-400',
-              on_hold: 'bg-zinc-500/10 border-zinc-600 text-[var(--brand-text-muted)]',
+              on_hold: 'bg-[var(--surface-3)]/10 border-[var(--brand-border-strong)] text-[var(--brand-text-muted)]',
               completed: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400',
-              closed: 'bg-zinc-500/10 border-zinc-600 text-[var(--brand-text-muted)]',
+              closed: 'bg-[var(--surface-3)]/10 border-[var(--brand-border-strong)] text-[var(--brand-text-muted)]',
             };
             const statusLabels: Record<string, string> = {
               new: 'New', in_review: 'In Review', in_progress: 'In Progress',
@@ -219,14 +220,14 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
               seo: 'SEO', feature: 'Feature', other: 'Other',
             };
             const teamNotes = req.notes.filter(n => n.author === 'team').length;
-            return (
-              <div key={req.id} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
+            return ( // pr-check-disable-next-line -- Brand signature radius intentional
+              <div key={req.id} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
                 <button onClick={() => { setExpandedRequest(isExpanded ? null : req.id); setReqNoteInput(''); }}
-                  className="w-full px-5 py-4 text-left hover:bg-zinc-800/30 transition-colors">
+                  className="w-full px-5 py-4 text-left hover:bg-[var(--surface-3)]/30 transition-colors">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-medium text-[var(--brand-text)] truncate">{req.title}</span>
+                        <span className="t-caption font-medium text-[var(--brand-text)] truncate">{req.title}</span>
                         <span className={`t-caption-sm px-1.5 py-0.5 rounded border shrink-0 ${statusColors[req.status] || statusColors.new}`}>
                           {statusLabels[req.status] || req.status}
                         </span>
@@ -258,10 +259,10 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
                         <div className="space-y-2">
                           {req.notes.map(note => (
                             <div key={note.id} className={`flex gap-2 ${note.author === 'client' ? 'justify-end' : ''}`}>
-                              <div className={`max-w-[80%] rounded-lg px-3 py-2 ${
+                              <div className={`max-w-[80%] rounded-[var(--radius-lg)] px-3 py-2 ${
                                 note.author === 'team'
                                   ? 'bg-teal-500/10 border border-teal-500/20'
-                                  : 'bg-zinc-800/50 border border-[var(--brand-border-strong)]'
+                                  : 'bg-[var(--surface-3)]/50 border border-[var(--brand-border-strong)]'
                               }`}>
                                 <div className="flex items-center gap-1.5 mb-0.5">
                                   <span className={`t-caption-sm font-medium ${note.author === 'team' ? 'text-teal-400' : 'text-[var(--brand-text-muted)]'}`}>
@@ -297,7 +298,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
 
                     {/* Reply input */}
                     {req.status !== 'closed' && req.status !== 'completed' && (
-                      <div className="px-5 py-3 border-t border-zinc-800/50 space-y-2">
+                      <div className="px-5 py-3 border-t border-[var(--brand-border)]/50 space-y-2">
                         {noteFiles.length > 0 && expandedRequest === req.id && (
                           <div className="flex flex-wrap gap-1.5">
                             {noteFiles.map((f, i) => (
@@ -312,21 +313,21 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
                           <input value={expandedRequest === req.id ? reqNoteInput : ''} onChange={e => setReqNoteInput(e.target.value)}
                             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendReqNote(req.id)}
                             placeholder="Add a note or reply..."
-                            className="flex-1 px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-lg text-xs text-[var(--brand-text)] placeholder-zinc-500 focus:outline-none focus:border-teal-500" disabled={sendingNote} />
+                            className="flex-1 px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500" disabled={sendingNote} />
                           <input type="file" ref={noteFileRef} className="hidden" multiple accept="image/*,.pdf,.doc,.docx,.txt,.csv"
                             onChange={e => { if (e.target.files) setNoteFiles(prev => [...prev, ...Array.from(e.target.files!)]); e.target.value = ''; }} />
-                          <button onClick={() => noteFileRef.current?.click()} className="px-2 py-2 bg-[var(--surface-3)] hover:bg-zinc-700 border border-[var(--brand-border-strong)] rounded-lg transition-colors" title="Attach file">
+                          <button onClick={() => noteFileRef.current?.click()} className="px-2 py-2 bg-[var(--surface-3)] hover:bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] transition-colors" title="Attach file">
                             <Icon as={Paperclip} size="md" className="text-[var(--brand-text-muted)]" />
                           </button>
                           <button onClick={() => sendReqNote(req.id)} disabled={sendingNote || (!reqNoteInput.trim() && noteFiles.length === 0)}
-                            className="px-3 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-lg transition-colors">
+                            className="px-3 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-[var(--radius-lg)] transition-colors">
                             <Icon as={Send} size="md" />
                           </button>
                         </div>
                       </div>
                     )}
                     {(req.status === 'completed' || req.status === 'closed') && (
-                      <div className="px-5 py-3 border-t border-zinc-800/50">
+                      <div className="px-5 py-3 border-t border-[var(--brand-border)]/50">
                         <div className="flex items-center gap-1.5 t-caption-sm text-emerald-400">
                           <Icon as={CheckCircle2} size="sm" /> This request has been {req.status}
                         </div>

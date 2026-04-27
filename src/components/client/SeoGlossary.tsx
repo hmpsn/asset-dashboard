@@ -169,7 +169,7 @@ export function Explainer({ term }: { term: string }) {
       </button>
       {open && (
         // pr-check-disable-next-line -- Glossary term tooltip/popover; absolutely positioned floating element, not a content card
-        <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-xl shadow-xl p-3 text-left animate-in fade-in slide-in-from-bottom-1 duration-150">
+        <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] shadow-xl p-3 text-left animate-in fade-in slide-in-from-bottom-1 duration-150">
           <div className="t-caption-sm font-semibold text-teal-400 mb-1">{entry.term}</div>
           <p className="t-caption-sm text-[var(--brand-text)] leading-relaxed mb-2">{entry.definition}</p>
           <p className="t-micro text-[var(--brand-text)] leading-relaxed">

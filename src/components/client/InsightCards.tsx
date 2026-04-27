@@ -32,7 +32,7 @@ function TrafficMomentumCard({ insights, loading }: { insights: AnalyticsInsight
           <Skeleton className="h-4 w-1/2" />
         </div>
       ) : (
-        <div className="space-y-2 text-sm">
+        <div className="space-y-2 t-body">
           {improvingCount > 0 ? (
             <p className="text-[var(--brand-text-bright)]">
               <span className="text-teal-400 font-medium">{improvingCount} page{improvingCount !== 1 ? 's' : ''}</span>
@@ -86,7 +86,7 @@ function QuickWinsCard({
         </div>
       ) : tier === 'free' ? (
         <div className="space-y-2">
-          <p className="text-sm text-[var(--brand-text)]">
+          <p className="t-body text-[var(--brand-text)]">
             {quickWins.length > 0
               ? `${quickWins.length} page${quickWins.length !== 1 ? 's' : ''} close to page 1`
               : 'Quick wins analysis available'}
@@ -96,13 +96,13 @@ function QuickWinsCard({
           </p>
         </div>
       ) : quickWins.length === 0 ? (
-        <p className="text-sm text-[var(--brand-text)]">No quick wins identified yet</p>
+        <p className="t-body text-[var(--brand-text)]">No quick wins identified yet</p>
       ) : (
         <ul className="space-y-2">
           {quickWins.slice(0, 3).map(insight => {
             const d = insight.data as unknown as QuickWinData;
             return (
-              <li key={insight.id} className="flex items-start justify-between gap-2 text-sm">
+              <li key={insight.id} className="flex items-start justify-between gap-2 t-body">
                 <span className="text-[var(--brand-text-bright)] truncate">{d.pageUrl || insight.pageId}</span>
                 <span className="text-[var(--brand-text-muted)] shrink-0">pos {d.currentPosition}</span>
               </li>
@@ -153,7 +153,7 @@ function TopPerformersCard({
           <Skeleton className="h-4 w-1/2" />
         </div>
       ) : (
-        <div className="space-y-2 text-sm">
+        <div className="space-y-2 t-body">
           {totalConversions > 0 && (
             <p className="text-[var(--brand-text-bright)]">
               Your best content drove{' '}
@@ -218,7 +218,7 @@ export function SchemaOpportunitiesCard({
         </div>
       ) : tier === 'free' ? (
         <div className="space-y-2">
-          <p className="text-sm text-[var(--brand-text)]">
+          <p className="t-body text-[var(--brand-text)]">
             {highTrafficPages.length > 0
               ? `${highTrafficPages.length} page${highTrafficPages.length !== 1 ? 's' : ''} could qualify for rich results`
               : 'Schema analysis available'}
@@ -228,9 +228,9 @@ export function SchemaOpportunitiesCard({
           </p>
         </div>
       ) : highTrafficPages.length === 0 ? (
-        <p className="text-sm text-[var(--brand-text)]">No schema opportunity data yet</p>
+        <p className="t-body text-[var(--brand-text)]">No schema opportunity data yet</p>
       ) : (
-        <div className="space-y-2 text-sm">
+        <div className="space-y-2 t-body">
           <p className="text-[var(--brand-text-bright)]">
             <span className="text-teal-400 font-medium">{highTrafficPages.length} page{highTrafficPages.length !== 1 ? 's' : ''}</span>
             {' '}could qualify for rich results
@@ -296,7 +296,7 @@ export function ContentHealthCard({
         </div>
       ) : tier === 'free' ? (
         <div className="space-y-2">
-          <p className="text-sm text-[var(--brand-text)]">
+          <p className="t-body text-[var(--brand-text)]">
             {decayInsights.length > 0
               ? `${decayInsights.length} post${decayInsights.length !== 1 ? 's' : ''} showing decay`
               : 'Content health analysis available'}
@@ -306,9 +306,9 @@ export function ContentHealthCard({
           </p>
         </div>
       ) : decayInsights.length === 0 ? (
-        <p className="text-sm text-[var(--brand-text)]">No content decay data yet</p>
+        <p className="t-body text-[var(--brand-text)]">No content decay data yet</p>
       ) : (
-        <div className="space-y-2 text-sm">
+        <div className="space-y-2 t-body">
           <p className="text-[var(--brand-text-bright)]">
             <span className="text-teal-400 font-medium">{decayInsights.length}</span>
             {' '}post{decayInsights.length !== 1 ? 's' : ''} showing decay
@@ -363,9 +363,9 @@ export function SiteHealthCard({
           <Skeleton className="h-4 w-1/2" />
         </div>
       ) : !data ? (
-        <p className="text-sm text-[var(--brand-text)]">No site health data yet — run an audit to get started</p>
+        <p className="t-body text-[var(--brand-text)]">No site health data yet — run an audit to get started</p>
       ) : (
-        <div className="space-y-2 text-sm">
+        <div className="space-y-2 t-body">
           <div className="flex items-baseline gap-2">
             <span className="text-2xl font-semibold text-[var(--brand-text-bright)]">{data.siteScore}</span>
             <span className="text-[var(--brand-text-muted)] t-caption">/ 100</span>
@@ -429,7 +429,7 @@ function CompetitorAlertCard({ insights, tier, loading }: { insights: AnalyticsI
             <Skeleton className="h-4 w-1/2" />
           </div>
         ) : data ? (
-          <div className="space-y-2 text-sm">
+          <div className="space-y-2 t-body">
             <p className="text-[var(--brand-text-bright)]">
               <span className="text-blue-400 font-medium">{data.competitorDomain}</span>
               {data.keyword ? ` — "${data.keyword}"` : ''}
@@ -445,7 +445,7 @@ function CompetitorAlertCard({ insights, tier, loading }: { insights: AnalyticsI
             )}
           </div>
         ) : (
-          <p className="text-sm text-[var(--brand-text)]">No competitor movements detected yet</p>
+          <p className="t-body text-[var(--brand-text)]">No competitor movements detected yet</p>
         )}
       </TierGate>
     </SectionCard>
@@ -477,7 +477,7 @@ function EmergingKeywordCard({ insights, tier, loading }: { insights: AnalyticsI
             <Skeleton className="h-4 w-1/2" />
           </div>
         ) : data ? (
-          <div className="space-y-2 text-sm">
+          <div className="space-y-2 t-body">
             <p className="text-[var(--brand-text-bright)] font-medium">"{data.keyword}"</p>
             <div className="flex items-center gap-2">
               {data.volume != null && (
@@ -499,7 +499,7 @@ function EmergingKeywordCard({ insights, tier, loading }: { insights: AnalyticsI
             )}
           </div>
         ) : (
-          <p className="text-sm text-[var(--brand-text)]">No rising trends detected yet</p>
+          <p className="t-body text-[var(--brand-text)]">No rising trends detected yet</p>
         )}
       </TierGate>
     </SectionCard>
@@ -531,7 +531,7 @@ function FreshnessAlertCard({ insights, tier, loading }: { insights: AnalyticsIn
             <Skeleton className="h-4 w-1/2" />
           </div>
         ) : data ? (
-          <div className="space-y-2 text-sm">
+          <div className="space-y-2 t-body">
             <p className="text-[var(--brand-text-bright)] t-caption font-mono truncate">{data.pagePath}</p>
             <p className="text-amber-400 t-caption font-medium">
               {data.daysSinceLastAnalysis} days since last analysis
@@ -546,7 +546,7 @@ function FreshnessAlertCard({ insights, tier, loading }: { insights: AnalyticsIn
             )}
           </div>
         ) : (
-          <p className="text-sm text-[var(--brand-text)]">All analyzed pages are up to date</p>
+          <p className="t-body text-[var(--brand-text)]">All analyzed pages are up to date</p>
         )}
       </TierGate>
     </SectionCard>

@@ -84,18 +84,18 @@ export function OrderStatus({ workspaceId }: OrderStatusProps) {
           return (
             <div key={order.id} className="px-4 py-3">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-[var(--surface-3)] flex items-center justify-center flex-shrink-0">
+                <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-[var(--surface-3)] flex items-center justify-center flex-shrink-0">
                   <Icon className="w-4 h-4 text-[var(--brand-text)]" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-[var(--brand-text-bright)]">{product.label}</div>
+                  <div className="t-body font-medium text-[var(--brand-text-bright)]">{product.label}</div>
                   <div className="t-caption-sm text-[var(--brand-text-muted)]">
                     {new Date(order.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     {order.pageIds.length > 0 && ` · ${order.pageIds.length} page${order.pageIds.length !== 1 ? 's' : ''}`}
                     {order.completedAt && ` · Done ${new Date(order.completedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
                   </div>
                 </div>
-                <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-medium ${badge.bg} ${badge.border} border ${badge.color}`}>
+                <div className={`flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-lg)] text-[11px] font-medium ${badge.bg} ${badge.border} border ${badge.color}`}>
                   <BadgeIcon className={`w-3 h-3 ${order.status === 'in_progress' ? 'animate-spin' : ''}`} />
                   {badge.label}
                 </div>

@@ -17,11 +17,11 @@ export function SeoCartButton() {
   return (
     <button
       onClick={toggleCart}
-      className="relative flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-lg text-xs font-medium transition-colors"
+      className="relative flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
     >
       <ShoppingCart className="w-3.5 h-3.5" />
       <span>Cart</span>
-      <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-white text-zinc-900 rounded-full text-[10px] font-bold flex items-center justify-center">
+      <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-white text-[var(--surface-1)] rounded-full text-[10px] /* arbitrary-text-ok */ /* arbitrary-text-ok */ font-bold flex items-center justify-center">
         {totalItems}
       </span>
     </button>
@@ -66,10 +66,10 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--brand-border)]">
           <div className="flex items-center gap-2">
             <ShoppingCart className="w-4 h-4 text-teal-400" />
-            <span className="text-sm font-semibold text-[var(--brand-text-bright)]">SEO Fix Cart</span>
+            <span className="t-body font-semibold text-[var(--brand-text-bright)]">SEO Fix Cart</span>
             <span className="t-caption-sm text-[var(--brand-text-muted)]">({items.length} item{items.length !== 1 ? 's' : ''})</span>
           </div>
-          <button onClick={closeCart} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
+          <button onClick={closeCart} className="w-7 h-7 rounded-[var(--radius-lg)] flex items-center justify-center hover:bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -79,20 +79,20 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
           {items.length === 0 ? (
             <div className="text-center py-12">
               <ShoppingCart className="w-8 h-8 text-[var(--brand-border)] mx-auto mb-3" />
-              <p className="text-sm text-[var(--brand-text-muted)]">Your cart is empty</p>
+              <p className="t-body text-[var(--brand-text-muted)]">Your cart is empty</p>
               <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">Add fixes from the Site Health tab</p>
             </div>
           ) : (
             items.map(item => (
-              <div key={item.productType} className="bg-[var(--surface-3)]/50 border border-[var(--brand-border)]/50 rounded-xl p-4">
+              <div key={item.productType} className="bg-[var(--surface-3)]/50 border border-[var(--brand-border)]/50 rounded-[var(--radius-xl)] p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-[var(--brand-text-bright)]">{item.displayName}</div>
+                    <div className="t-body font-medium text-[var(--brand-text-bright)]">{item.displayName}</div>
                     <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
                       {item.isFlat ? 'Full site' : `${fmt(item.priceUsd)}/page`}
                     </div>
                   </div>
-                  <div className="text-sm font-semibold text-teal-400">
+                  <div className="t-body font-semibold text-teal-400">
                     {fmt(item.priceUsd * item.quantity)}
                   </div>
                 </div>
@@ -108,7 +108,7 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
                       >
                         <Minus className="w-3 h-3" />
                       </button>
-                      <span className="w-8 text-center text-xs font-medium text-[var(--brand-text)]">{item.quantity}</span>
+                      <span className="w-8 text-center t-caption font-medium text-[var(--brand-text)]">{item.quantity}</span>
                       <button
                         onClick={() => updateQuantity(item.productType, item.quantity + 1)}
                         className="w-6 h-6 rounded flex items-center justify-center bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text)] transition-colors"
@@ -128,10 +128,10 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
 
                 {/* Pack upsell for per-page items */}
                 {!item.isFlat && item.quantity >= 7 && item.quantity < 10 && (
-                  <div className="mt-2 px-2.5 py-2 rounded-lg bg-teal-500/5 border border-teal-500/20">
+                  <div className="mt-2 px-2.5 py-2 rounded-[var(--radius-lg)] bg-teal-500/5 border border-teal-500/20">
                     <div className="flex items-center gap-1.5">
                       <Sparkles className="w-3 h-3 text-teal-400" />
-                      <span className="text-[11px] text-teal-400">
+                      <span className="t-caption-sm text-teal-400">
                         {item.productType === 'fix_meta'
                           ? 'Get the 10-page pack for $179 (save $' + (item.quantity * 20 - 179) + ' more)'
                           : item.productType === 'schema_page'
@@ -151,7 +151,7 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
           <div className="border-t border-[var(--brand-border)] px-5 py-4 space-y-3">
             {/* Premium upgrade nudge */}
             {showPremiumNudge && (
-              <div className="px-3 py-2.5 rounded-xl bg-gradient-to-r from-amber-500/5 to-orange-500/5 border border-amber-500/20">
+              <div className="px-3 py-2.5 rounded-[var(--radius-xl)] bg-gradient-to-r from-amber-500/5 to-orange-500/5 border border-amber-500/20">
                 <div className="flex items-start gap-2">
                   <Crown className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
                   <div>
@@ -166,13 +166,13 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
 
             {/* Total */}
             <div className="flex items-center justify-between">
-              <span className="text-sm text-[var(--brand-text)]">Total</span>
+              <span className="t-body text-[var(--brand-text)]">Total</span>
               <span className="text-lg font-bold text-[var(--brand-text-bright)]">{fmt(totalPrice)}</span>
             </div>
 
             {/* Error */}
             {error && (
-              <div className="text-[11px] text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+              <div className="t-caption-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-[var(--radius-lg)] px-3 py-2">
                 {error}
               </div>
             )}
@@ -181,7 +181,7 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
             <button
               onClick={handleCheckout}
               disabled={checkingOut}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 bg-gradient-to-r from-teal-600 to-emerald-600 text-white hover:from-teal-500 hover:to-emerald-500 shadow-lg shadow-teal-900/30 active:scale-[0.98]"
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-[var(--radius-xl)] t-body font-semibold transition-all disabled:opacity-50 bg-gradient-to-r from-teal-600 to-emerald-600 text-white hover:from-teal-500 hover:to-emerald-500 shadow-lg shadow-teal-900/30 active:scale-[0.98]"
             >
               {checkingOut ? (
                 <>

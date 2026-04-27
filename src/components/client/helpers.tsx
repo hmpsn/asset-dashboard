@@ -9,7 +9,7 @@ function DarkTooltip({ active, payload, label, metrics }: { active?: boolean; pa
   const row = payload[0]?.payload;
   if (!row) return null;
   return (
-    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg shadow-xl shadow-black/40 min-w-[140px] overflow-hidden">
+    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl shadow-black/40 min-w-[140px] overflow-hidden">
       <div className="px-3 py-1.5 border-b border-[var(--brand-border)] t-caption-sm font-semibold text-[var(--brand-text-bright)]">{label || row.date}</div>
       <div className="px-3 py-1.5 space-y-1">
         {metrics.map(m => (
@@ -53,8 +53,8 @@ export function DualTrendChart({ data, annotations: anns }: { data: PerformanceT
   return (
     <div>
       <div className="flex items-center gap-4 mb-2">
-        <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded bg-blue-400" /><span className="text-[11px] text-blue-400">Clicks</span></div>
-        <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded bg-teal-400" /><span className="text-[11px] text-teal-400">Impressions</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded bg-blue-400" /><span className="t-caption-sm text-blue-400">Clicks</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded bg-teal-400" /><span className="t-caption-sm text-teal-400">Impressions</span></div>
       </div>
       <ResponsiveContainer width="100%" height={120}>
         <AreaChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
@@ -116,7 +116,7 @@ export function ScoreHistoryChart({ history }: { history: Array<{ id: string; cr
             const score = row.siteScore as number;
             const scoreColor = score >= 80 ? '#34d399' : score >= 60 ? '#fbbf24' : '#f87171';
             return (
-              <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg shadow-xl shadow-black/40 min-w-[120px] overflow-hidden">
+              <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl shadow-black/40 min-w-[120px] overflow-hidden">
                 <div className="px-3 py-1.5 border-b border-[var(--brand-border)] t-caption-sm font-semibold text-[var(--brand-text-bright)]">{row.dateFull}</div>
                 <div className="px-3 py-1.5">
                   <div className="flex justify-between t-caption-sm">
@@ -146,7 +146,7 @@ export function RenderMarkdown({ text }: { text: string }) {
      .replace(/https?:\/\/\S+/g, '')
      .replace(/\*\*(.+?)\*\*/g, '<b class="text-[var(--brand-text-bright)]">$1</b>')
      .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em class="text-[var(--brand-text)]">$1</em>')
-     .replace(/`([^`]+)`/g, '<code class="bg-[var(--surface-3)] px-1 py-0.5 rounded text-[var(--brand-text)] text-[11px]">$1</code>');
+     .replace(/`([^`]+)`/g, '<code class="bg-[var(--surface-3)] px-1 py-0.5 rounded text-[var(--brand-text)] t-caption-sm">$1</code>');
   const stripBold = (s: string) => s.replace(/\*\*/g, '').trim();
   const lines = text.split('\n');
   const elements: React.ReactElement[] = [];
@@ -181,7 +181,7 @@ export function RenderMarkdown({ text }: { text: string }) {
           else if (lang === 'sparkline') elements.push(<SparklineBlock key={elements.length} data={parsed as Parameters<typeof SparklineBlock>[0]['data']} />);
         } else {
           elements.push(
-            <pre key={elements.length} className="t-caption-sm bg-[var(--surface-3)]/60 border border-[var(--brand-border)]/50 rounded-lg p-2 overflow-x-auto text-[var(--brand-text)] my-1">
+            <pre key={elements.length} className="t-caption-sm bg-[var(--surface-3)]/60 border border-[var(--brand-border)]/50 rounded-[var(--radius-lg)] p-2 overflow-x-auto text-[var(--brand-text)] my-1">
               <code>{blockContent}</code>
             </pre>
           );
@@ -191,7 +191,7 @@ export function RenderMarkdown({ text }: { text: string }) {
 
       // Regular code block
       elements.push(
-        <pre key={elements.length} className="t-caption-sm bg-[var(--surface-3)]/60 border border-[var(--brand-border)]/50 rounded-lg p-2 overflow-x-auto text-[var(--brand-text)] my-1">
+        <pre key={elements.length} className="t-caption-sm bg-[var(--surface-3)]/60 border border-[var(--brand-border)]/50 rounded-[var(--radius-lg)] p-2 overflow-x-auto text-[var(--brand-text)] my-1">
           <code>{blockContent}</code>
         </pre>
       );
@@ -214,7 +214,7 @@ export function RenderMarkdown({ text }: { text: string }) {
         const dataStart = tableLines.length > 1 && isSep(tableLines[1]) ? 2 : 1;
         const rows = tableLines.slice(dataStart).filter(r => !isSep(r)).map(parseRow);
         elements.push(
-          <div key={elements.length} className="overflow-x-auto my-1.5 rounded-lg border border-[var(--brand-border)]">
+          <div key={elements.length} className="overflow-x-auto my-1.5 rounded-[var(--radius-lg)] border border-[var(--brand-border)]">
             <table className="t-caption-sm w-full border-collapse">
               <thead>
                 <tr className="bg-[var(--surface-3)]/50">
@@ -243,15 +243,15 @@ export function RenderMarkdown({ text }: { text: string }) {
 
     // Headings — strip bold markers inside (GPT sends ## **Overview**)
     if (trimmed.startsWith('### ')) {
-      elements.push(<h4 key={elements.length} className="text-xs font-semibold text-[var(--brand-text-bright)] mt-3 mb-0.5">{stripBold(trimmed.slice(4))}</h4>);
+      elements.push(<h4 key={elements.length} className="t-caption font-semibold text-[var(--brand-text-bright)] mt-3 mb-0.5">{stripBold(trimmed.slice(4))}</h4>);
       idx++; continue;
     }
     if (trimmed.startsWith('## ')) {
-      elements.push(<h3 key={elements.length} className="text-sm font-semibold text-[var(--brand-text-bright)] mt-3 mb-0.5">{stripBold(trimmed.slice(3))}</h3>);
+      elements.push(<h3 key={elements.length} className="t-body font-semibold text-[var(--brand-text-bright)] mt-3 mb-0.5">{stripBold(trimmed.slice(3))}</h3>);
       idx++; continue;
     }
     if (trimmed.startsWith('# ')) {
-      elements.push(<h3 key={elements.length} className="text-sm font-bold text-[var(--brand-text-bright)] mt-3 mb-0.5">{stripBold(trimmed.slice(2))}</h3>);
+      elements.push(<h3 key={elements.length} className="t-body font-bold text-[var(--brand-text-bright)] mt-3 mb-0.5">{stripBold(trimmed.slice(2))}</h3>);
       idx++; continue;
     }
 
@@ -309,7 +309,7 @@ export function InsightCard({ icon: Icon, color, title, count, desc, items }: {
     <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
       <div className="flex items-center gap-1.5 mb-3">
         <Icon className={`w-4 h-4 ${c.text}`} />
-        <span className={`text-xs font-medium ${c.text}`}>{title}</span>
+        <span className={`t-caption font-medium ${c.text}`}>{title}</span>
         <span className="t-caption-sm text-[var(--brand-text-muted)] ml-auto">{count} queries</span>
       </div>
       <p className="t-caption-sm text-[var(--brand-text-muted)] mb-2">{desc}</p>

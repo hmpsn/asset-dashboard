@@ -70,11 +70,11 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
     return (
       // pr-check-disable-next-line -- ROIDashboard tier-gate is a top-level container intentionally using brand signature shape
       <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-8 text-center" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-        <div className="w-12 h-12 rounded-2xl bg-[var(--surface-3)] flex items-center justify-center mx-auto mb-4">
+        <div className="w-12 h-12 rounded-[var(--radius-xl)] bg-[var(--surface-3)] flex items-center justify-center mx-auto mb-4">
           <Icon as={Lock} size="xl" className="text-[var(--brand-text-dim)]" />
         </div>
         <h3 className="text-lg font-semibold text-[var(--brand-text-bright)] mb-2">ROI Dashboard</h3>
-        <p className="text-sm text-[var(--brand-text-muted)] max-w-sm mx-auto">
+        <p className="t-body text-[var(--brand-text-muted)] max-w-sm mx-auto">
           See the dollar value of your organic traffic and how much you&apos;d pay for it in Google Ads.
           Available on Growth and Premium plans.
         </p>

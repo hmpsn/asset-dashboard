@@ -3,6 +3,7 @@ import { Lock, Sun, Moon, Calendar } from 'lucide-react';
 import { SeoCartButton } from './SeoCart';
 import { STUDIO_NAME } from '../../constants';
 import { Icon } from '../ui';
+import { Modal } from '../ui/overlay/Modal';
 import type { WorkspaceInfo, ClientTab, ClientContentRequest } from './types';
 
 // Module-level date defaults — computed once at import time (not during render)
@@ -81,7 +82,7 @@ export function ClientHeader({
                 </span>
               )}
             </div>
-            <p className="text-xs text-[var(--brand-text-muted)] mt-0.5">Insights Engine{hasAnyData && <span className="ml-2 text-[var(--brand-text-muted)]">· Updated {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}</p>
+            <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">Insights Engine{hasAnyData && <span className="ml-2 text-[var(--brand-text-muted)]">· Updated {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -91,7 +92,7 @@ export function ClientHeader({
               <div className="w-7 h-7 rounded-full bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center text-white t-caption-sm font-bold">
                 {clientUser.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
               </div>
-              <span className="text-xs text-[var(--brand-text-muted)] hidden sm:block">{clientUser.name}</span>
+              <span className="t-caption text-[var(--brand-text-muted)] hidden sm:block">{clientUser.name}</span>
               <button onClick={handleClientLogout} title="Sign out"
                 className="p-1.5 rounded-md text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)] transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -100,22 +101,22 @@ export function ClientHeader({
           )}
           {!betaMode && <SeoCartButton />}
           <button onClick={toggleTheme} title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            className="p-2 rounded-lg border border-[var(--brand-border)] hover:border-[var(--brand-border-strong)] transition-colors">
+            className="p-2 rounded-[var(--radius-lg)] border border-[var(--brand-border)] hover:border-[var(--brand-border-strong)] transition-colors">
             {theme === 'dark' ? <Icon as={Sun} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={Moon} size="md" className="text-[var(--brand-text-muted)]" />}
           </button>
           {hasAnalytics && (
             // pr-check-disable-next-line -- Date-range segmented control toolbar; interactive control, not a content card
-            <div className="relative flex items-center gap-1 bg-[var(--surface-2)] rounded-lg border border-[var(--brand-border)] p-0.5">
+            <div className="relative flex items-center gap-1 bg-[var(--surface-2)] rounded-[var(--radius-lg)] border border-[var(--brand-border)] p-0.5">
               {[7, 28, 90, 180, 365].map(d => (
                 <button key={d} onClick={() => changeDays(d, ws)}
-                  className={`px-3 py-2 min-h-[44px] rounded-md text-xs font-medium transition-colors ${!customDateRange && days === d ? 'bg-[var(--surface-3)] text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}
+                  className={`px-3 py-2 min-h-[44px] rounded-md t-caption font-medium transition-colors ${!customDateRange && days === d ? 'bg-[var(--surface-3)] text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}
                 >
                   {d >= 365 ? '1y' : d >= 180 ? '6mo' : `${d}d`}
                   {!customDateRange && days === d && <span className="block text-[9px] text-[var(--brand-text-muted)] font-normal">vs prev {d >= 365 ? '1y' : d >= 180 ? '6mo' : `${d}d`}</span>}
                 </button>
               ))}
               <button onClick={() => effectiveTier !== 'free' && setShowDatePicker(p => !p)}
-                className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${effectiveTier === 'free' ? 'text-[var(--brand-text-faint)] cursor-not-allowed' : customDateRange ? 'bg-teal-600/20 text-teal-300 border border-teal-500/30' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}
+                className={`px-2.5 py-1.5 rounded-md t-caption font-medium transition-colors flex items-center gap-1.5 ${effectiveTier === 'free' ? 'text-[var(--brand-text-faint)] cursor-not-allowed' : customDateRange ? 'bg-teal-600/20 text-teal-300 border border-teal-500/30' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}
                 title={effectiveTier === 'free' ? 'Upgrade to Growth for custom date ranges' : 'Custom date range'}
               >
                 <Icon as={Calendar} size="md" />
@@ -129,20 +130,16 @@ export function ClientHeader({
                   <span className="hidden sm:inline">Custom</span>
                 )}
               </button>
-              {showDatePicker && (<>
-                <div className="fixed inset-0 z-40 sm:bg-transparent bg-black/50" onClick={() => setShowDatePicker(false)} />
-                {/* pr-check-disable-next-line -- Custom date picker popover/bottom-sheet; fixed/absolute positioned floating element, not a content card */}
-                <div className="fixed sm:absolute inset-x-0 bottom-0 sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:mt-2 z-50 bg-[var(--surface-2)] border-t sm:border border-[var(--brand-border-strong)] rounded-t-2xl sm:rounded-[var(--radius-xl)] shadow-2xl p-4 sm:w-72"
-                  onClick={e => e.stopPropagation()}>
-                  <div className="sm:hidden w-10 h-1 bg-[var(--brand-border-strong)] rounded-full mx-auto mb-3" />
-                  <p className="text-xs font-medium text-[var(--brand-text-muted)] mb-3">Custom date range</p>
+              <Modal open={showDatePicker} onClose={() => setShowDatePicker(false)} size="sm">
+                <Modal.Header title="Custom date range" onClose={() => setShowDatePicker(false)} />
+                <Modal.Body>
                   <div className="space-y-2">
                     <label className="block">
                       <span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)]">Start date</span>
                       <input type="date" ref={customStartRef}
                         defaultValue={customDateRange?.startDate || MODULE_DEFAULT_START}
                         max={MODULE_TODAY}
-                        className="mt-1 w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-lg px-3 py-2.5 text-sm sm:text-xs text-[var(--brand-text)] focus:outline-none focus:border-teal-500"
+                        className="mt-1 w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2.5 t-caption text-[var(--brand-text)] focus:outline-none focus:border-teal-500"
                       />
                     </label>
                     <label className="block">
@@ -150,13 +147,15 @@ export function ClientHeader({
                       <input type="date" ref={customEndRef}
                         defaultValue={customDateRange?.endDate || MODULE_TODAY}
                         max={MODULE_TODAY}
-                        className="mt-1 w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-lg px-3 py-2.5 text-sm sm:text-xs text-[var(--brand-text)] focus:outline-none focus:border-teal-500"
+                        className="mt-1 w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2.5 t-caption text-[var(--brand-text)] focus:outline-none focus:border-teal-500"
                       />
                     </label>
                   </div>
-                  <div className="flex items-center gap-2 mt-3">
+                </Modal.Body>
+                <Modal.Footer>
+                  <div className="flex items-center gap-2 w-full">
                     <button onClick={() => setShowDatePicker(false)}
-                      className="flex-1 px-3 py-2.5 sm:py-1.5 text-sm sm:text-xs rounded-lg border border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">
+                      className="flex-1 px-3 py-1.5 t-caption rounded-[var(--radius-lg)] border border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">
                       Cancel
                     </button>
                     <button onClick={() => {
@@ -164,12 +163,12 @@ export function ClientHeader({
                       const e = customEndRef.current?.value;
                       if (s && e && s <= e) applyCustomRange(s, e, ws);
                     }}
-                      className="flex-1 px-3 py-2.5 sm:py-1.5 text-sm sm:text-xs rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-medium transition-colors">
+                      className="flex-1 px-3 py-1.5 t-caption rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 text-white font-medium transition-colors">
                       Apply
                     </button>
                   </div>
-                </div>
-              </>)}
+                </Modal.Footer>
+              </Modal>
             </div>
           )}
         </div>
@@ -192,7 +191,7 @@ export function ClientHeader({
             return (
               <button key={t.id} role="tab" aria-selected={active} tabIndex={active ? 0 : -1}
                 onClick={() => t.locked ? setShowUpgradeModal(true) : setTab(t.id)}
-                className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
+                className={`flex items-center gap-1.5 px-4 py-3 t-caption font-medium border-b-2 transition-colors whitespace-nowrap ${
                   t.locked ? 'border-transparent text-[var(--brand-text-muted)] cursor-default' :
                   active ? 'border-teal-500 text-teal-300' :
                   'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:border-[var(--brand-border-strong)]'

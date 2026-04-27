@@ -81,18 +81,18 @@ export function ClientChatWidget({
       {!chatOpen && (
         <button
           onClick={() => setChatOpen(true)}
-          className="fixed bottom-6 right-6 flex items-center gap-2 px-4 py-3 rounded-full bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-sm font-medium shadow-lg shadow-teal-900/30 transition-all z-50"
+          className="fixed bottom-6 right-6 flex items-center gap-2 px-4 py-3 rounded-full bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white t-body font-medium shadow-lg shadow-teal-900/30 transition-all z-50"
         >
           <Icon as={Sparkles} size="md" className="text-white" /> Insights Engine
         </button>
       )}
       {chatOpen && (
-        <div className={cn('fixed bg-[var(--surface-2)] border-[var(--brand-border)] shadow-2xl shadow-black/40 overflow-hidden z-50 flex flex-col transition-all duration-200', chatExpanded ? 'inset-y-0 right-0 w-full sm:w-[480px] border-l rounded-none' : 'bottom-6 right-6 w-96 max-h-[500px] rounded-2xl border')}>
+        <div className={cn('fixed bg-[var(--surface-2)] border-[var(--brand-border)] shadow-2xl shadow-black/40 overflow-hidden z-50 flex flex-col transition-all duration-200', chatExpanded ? 'inset-y-0 right-0 w-full sm:w-[480px] border-l rounded-none' : 'bottom-6 right-6 w-96 max-h-[500px] rounded-[var(--radius-xl)] border')}>
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--brand-border)] flex-shrink-0">
             <div className="flex items-center gap-2">
               <Icon as={Sparkles} size="md" className="text-teal-400" />
-              <span className="text-sm font-medium text-[var(--brand-text-bright)]">Insights Engine</span>
+              <span className="t-body font-medium text-[var(--brand-text-bright)]">Insights Engine</span>
               {!betaMode && chatUsage && chatUsage.tier === 'free' ? (
                 <span className={cn('t-caption-sm px-1.5 py-0.5 rounded font-medium', chatUsage.remaining > 0 ? 'text-[var(--brand-text)] bg-[var(--surface-3)]' : 'text-amber-400/80 bg-amber-500/8 border border-amber-500/20')}>
                   {chatUsage.remaining}/{chatUsage.limit} left
@@ -180,7 +180,7 @@ export function ClientChatWidget({
                         }).catch((err) => { console.error('ClientChatWidget operation failed:', err); });
                       }
                     }}
-                    className={cn('w-full text-left px-3 py-2 rounded-lg border transition-colors', s.id === chatSessionId ? 'bg-teal-500/10 border-teal-500/30 text-teal-300' : 'bg-[var(--surface-3)]/50 border-[var(--brand-border)] text-[var(--brand-text)] hover:bg-[var(--surface-3)]')}
+                    className={cn('w-full text-left px-3 py-2 rounded-[var(--radius-lg)] border transition-colors', s.id === chatSessionId ? 'bg-teal-500/10 border-teal-500/30 text-teal-300' : 'bg-[var(--surface-3)]/50 border-[var(--brand-border)] text-[var(--brand-text)] hover:bg-[var(--surface-3)]')}
                   >
                     <div className="t-caption-sm font-medium truncate">{s.title}</div>
                     <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
@@ -199,7 +199,7 @@ export function ClientChatWidget({
                         <button
                           key={i}
                           onClick={() => askAi(q)}
-                          className="text-left px-3.5 py-3 min-h-[44px] rounded-lg bg-[var(--surface-3)]/50 hover:bg-[var(--surface-3)] border border-[var(--brand-border)] t-caption-sm text-[var(--brand-text)] transition-colors"
+                          className="text-left px-3.5 py-3 min-h-[44px] rounded-[var(--radius-lg)] bg-[var(--surface-3)]/50 hover:bg-[var(--surface-3)] border border-[var(--brand-border)] t-caption-sm text-[var(--brand-text)] transition-colors"
                         >
                           <Icon as={MessageSquare} size="sm" className="text-teal-400 mb-1" />{q}
                         </button>
@@ -211,7 +211,7 @@ export function ClientChatWidget({
                         <button
                           key={`learn-${i}`}
                           onClick={() => askAi(q)}
-                          className="w-full text-left px-3.5 py-2.5 min-h-[44px] rounded-lg hover:bg-emerald-500/5 border border-transparent hover:border-emerald-500/15 transition-colors t-caption-sm text-emerald-400/70 hover:text-emerald-400"
+                          className="w-full text-left px-3.5 py-2.5 min-h-[44px] rounded-[var(--radius-lg)] hover:bg-emerald-500/5 border border-transparent hover:border-emerald-500/15 transition-colors t-caption-sm text-emerald-400/70 hover:text-emerald-400"
                         >
                           💡 {q}
                         </button>
@@ -224,21 +224,21 @@ export function ClientChatWidget({
                     {chatMessages.map((msg, i) => (
                       <div key={i} className={cn('flex gap-3', msg.role === 'user' ? 'justify-end' : '')}>
                         {msg.role === 'assistant' && (
-                          <div className="w-6 h-6 rounded-lg bg-teal-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <div className="w-6 h-6 rounded-[var(--radius-lg)] bg-teal-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
                             <Icon as={Sparkles} size="sm" className="text-teal-400" />
                           </div>
                         )}
-                        <div className={cn('max-w-[85%] rounded-xl px-3.5 py-2.5', msg.role === 'user' ? 'bg-teal-600/20 border border-teal-500/20 text-xs text-[var(--brand-text-bright)]' : 'bg-[var(--surface-3)]/50 border border-[var(--brand-border)]')}>
+                        <div className={cn('max-w-[85%] rounded-[var(--radius-xl)] px-3.5 py-2.5', msg.role === 'user' ? 'bg-teal-600/20 border border-teal-500/20 t-caption text-[var(--brand-text-bright)]' : 'bg-[var(--surface-3)]/50 border border-[var(--brand-border)]')}>
                           {msg.role === 'assistant' ? <RenderMarkdown text={msg.content} /> : msg.content}
                         </div>
                       </div>
                     ))}
                     {chatLoading && (
                       <div className="flex gap-3">
-                        <div className="w-6 h-6 rounded-lg bg-teal-500/10 flex items-center justify-center">
+                        <div className="w-6 h-6 rounded-[var(--radius-lg)] bg-teal-500/10 flex items-center justify-center">
                           <Icon as={Loader2} size="sm" className="text-teal-400 animate-spin" />
                         </div>
-                        <div className="bg-[var(--surface-3)]/50 border border-[var(--brand-border)] rounded-xl px-3.5 py-2.5">
+                        <div className="bg-[var(--surface-3)]/50 border border-[var(--brand-border)] rounded-[var(--radius-xl)] px-3.5 py-2.5">
                           <div className="flex gap-1">
                             <div className="w-1.5 h-1.5 rounded-full bg-[var(--brand-text-muted)] animate-bounce" />
                             <div className="w-1.5 h-1.5 rounded-full bg-[var(--brand-text-muted)] animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -267,7 +267,7 @@ export function ClientChatWidget({
                           <button
                             key={i}
                             onClick={() => askAi(q)}
-                            className="w-full text-left px-3.5 py-2.5 min-h-[44px] rounded-lg bg-[var(--surface-3)]/30 hover:bg-[var(--surface-3)]/60 border border-[var(--brand-border)]/50 t-caption-sm text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
+                            className="w-full text-left px-3.5 py-2.5 min-h-[44px] rounded-[var(--radius-lg)] bg-[var(--surface-3)]/30 hover:bg-[var(--surface-3)]/60 border border-[var(--brand-border)]/50 t-caption-sm text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
                           >
                             {q}
                           </button>
@@ -277,7 +277,7 @@ export function ClientChatWidget({
                           <button
                             key={`learn-${i}`}
                             onClick={() => askAi(q)}
-                            className="w-full text-left px-3.5 py-2.5 min-h-[44px] rounded-lg hover:bg-emerald-500/5 border border-transparent hover:border-emerald-500/15 transition-colors t-caption-sm text-emerald-400/70 hover:text-emerald-400"
+                            className="w-full text-left px-3.5 py-2.5 min-h-[44px] rounded-[var(--radius-lg)] hover:bg-emerald-500/5 border border-transparent hover:border-emerald-500/15 transition-colors t-caption-sm text-emerald-400/70 hover:text-emerald-400"
                           >
                             💡 {q}
                           </button>
@@ -294,7 +294,7 @@ export function ClientChatWidget({
           {/* Footer: free-tier lock OR input */}
           {!betaMode && chatUsage && chatUsage.tier === 'free' && !chatUsage.allowed ? (
             <div className="px-4 py-3 border-t border-[var(--brand-border)] flex-shrink-0">
-              <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-amber-500/5 border border-amber-500/20">
+              <div className="flex items-center gap-2 px-3 py-2.5 rounded-[var(--radius-lg)] bg-amber-500/5 border border-amber-500/20">
                 <Icon as={Lock} size="sm" className="text-amber-400/80 flex-shrink-0" />
                 <p className="t-caption-sm text-amber-300/80 flex-1">
                   {roiValue && roiValue > 0
@@ -311,13 +311,13 @@ export function ClientChatWidget({
                 onChange={e => setChatInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && askAi(chatInput)}
                 placeholder="Ask about your site data..."
-                className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-lg px-3 py-2 text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
+                className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
                 disabled={chatLoading}
               />
               <button
                 onClick={() => askAi(chatInput)}
                 disabled={chatLoading || !chatInput.trim()}
-                className="px-3 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-lg transition-colors"
+                className="px-3 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-[var(--radius-lg)] transition-colors"
               >
                 <Icon as={Send} size="sm" />
               </button>
