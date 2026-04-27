@@ -11,12 +11,12 @@ const BADGE_COLORS: Record<string, string> = {
   amber: 'bg-amber-500/8 text-amber-400/80',
   red: 'bg-red-500/8 text-red-400/80',
   orange: 'bg-orange-500/10 text-orange-400',
-  zinc: 'bg-zinc-800 text-zinc-500',
+  zinc: 'bg-zinc-800 text-zinc-500', // raw-zinc-ok — Badge zinc variant is intentional
 };
 
 export function Badge({ label, color = 'zinc', className }: BadgeProps) {
   return (
-    <span className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${BADGE_COLORS[color] ?? BADGE_COLORS.zinc} ${className ?? ''}`}>
+    <span className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${BADGE_COLORS[color] ?? BADGE_COLORS.zinc} ${className ?? ''}`}>{/* arbitrary-text-ok — Badge owns this size */}
       {label}
     </span>
   );

@@ -238,7 +238,7 @@ function ModalInner({
         aria-labelledby={titleId}
         tabIndex={-1}
         style={{ zIndex: 'var(--z-modal)' }}
-        className={`relative bg-zinc-900 border border-zinc-800 rounded-lg shadow-2xl w-full ${SIZE_MAX_WIDTH[size]} outline-none ${motionClass}`}
+        className={`relative bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-2xl w-full ${SIZE_MAX_WIDTH[size]} outline-none ${motionClass}`}
       >
         {injectTitleId(children, titleId, Boolean(labelledById))}
       </div>
@@ -290,8 +290,8 @@ interface ModalHeaderProps {
 
 function ModalHeader({ title, onClose, __titleId }: ModalHeaderProps): React.ReactElement {
   return (
-    <div className="flex items-start justify-between px-6 pt-5 pb-3 border-b border-zinc-800">
-      <h2 id={__titleId} className="text-zinc-100 font-semibold text-base leading-snug">
+    <div className="flex items-start justify-between px-6 pt-5 pb-3 border-b border-[var(--brand-border)]">
+      <h2 id={__titleId} className="text-[var(--brand-text-bright)] font-semibold text-base leading-snug">
         {title}
       </h2>
       {onClose ? (
@@ -299,7 +299,7 @@ function ModalHeader({ title, onClose, __titleId }: ModalHeaderProps): React.Rea
           type="button"
           aria-label="Close"
           onClick={onClose}
-          className="text-zinc-400 hover:text-zinc-200 transition-colors -mr-2 -mt-1 p-2 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+          className="text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors -mr-2 -mt-1 p-2 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
         >
           <svg
             viewBox="0 0 24 24"
@@ -327,7 +327,7 @@ function ModalBody({
   ...rest
 }: HTMLAttributes<HTMLDivElement> & { children: ReactNode }): React.ReactElement {
   return (
-    <div className={cn('px-6 py-4 text-zinc-300 text-sm leading-relaxed', className)} {...rest}>
+    <div className={cn('px-6 py-4 text-[var(--brand-text)] t-body', className)} {...rest}>
       {children}
     </div>
   );
@@ -340,7 +340,7 @@ function ModalFooter({
 }: HTMLAttributes<HTMLDivElement> & { children: ReactNode }): React.ReactElement {
   return (
     <div
-      className={cn('flex items-center justify-end gap-3 px-6 pt-3 pb-5 border-t border-zinc-800', className)}
+      className={cn('flex items-center justify-end gap-3 px-6 pt-3 pb-5 border-t border-[var(--brand-border)]', className)}
       {...rest}
     >
       {children}

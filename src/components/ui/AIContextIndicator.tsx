@@ -102,7 +102,7 @@ export function AIContextIndicator({ workspaceId, feature = 'all', compact = fal
 
   if (compact) {
     return (
-      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${pillColor}`} title={`AI Context: ${connected}/${total} sources connected`}>
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full t-caption-sm font-medium ${pillColor}`} title={`AI Context: ${connected}/${total} sources connected`}>
         <Brain className="w-3 h-3" />
         {connected}/{total}
       </span>
@@ -110,7 +110,7 @@ export function AIContextIndicator({ workspaceId, feature = 'all', compact = fal
   }
 
   return (
-    <div className={`rounded-lg border ${colorClass} transition-all`}>
+    <div className={`rounded-[var(--radius-lg)] border ${colorClass} transition-all`}>
       {/* Header bar */}
       <button
         onClick={() => setExpanded(!expanded)}
@@ -118,22 +118,22 @@ export function AIContextIndicator({ workspaceId, feature = 'all', compact = fal
       >
         <div className="flex items-center gap-2 min-w-0">
           <Brain className="w-3.5 h-3.5 flex-shrink-0" />
-          <span className="text-[12px] font-medium">
+          <span className="t-caption font-medium">
             AI Context: {connected}/{total} sources
           </span>
           {!allConnected && (
-            <span className="text-[11px] opacity-70">
+            <span className="t-caption-sm opacity-70">
               — {missing.length === 1
                 ? `${missing[0].label} missing`
                 : `${missing.length} sources missing`}
             </span>
           )}
           {allConnected && (
-            <span className="text-[11px] opacity-70">— all connected</span>
+            <span className="t-caption-sm opacity-70">— all connected</span>
           )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded ${pillColor}`}>
+          <span className={`t-caption-sm font-semibold px-1.5 py-0.5 rounded ${pillColor}`}>
             {score}%
           </span>
           {expanded
@@ -145,7 +145,7 @@ export function AIContextIndicator({ workspaceId, feature = 'all', compact = fal
 
       {/* Expanded detail */}
       {expanded && (
-        <div className="px-3 pb-3 pt-0 space-y-1.5 border-t border-zinc-800/50">
+        <div className="px-3 pb-3 pt-0 space-y-1.5 border-t border-[var(--brand-border)]/50">
           {sources.map(source => {
             const Icon = ICON_MAP[source.key] || BookOpen;
             const isConnected = source.status === 'connected';
@@ -161,14 +161,14 @@ export function AIContextIndicator({ workspaceId, feature = 'all', compact = fal
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <Icon className="w-3 h-3 flex-shrink-0" />
-                    <span className="text-[12px] font-medium text-zinc-200">{source.label}</span>
+                    <span className="t-caption font-medium text-[var(--brand-text-bright)]">{source.label}</span>
                   </div>
-                  <p className="text-[11px] text-zinc-500 mt-0.5">{source.detail}</p>
+                  <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{source.detail}</p>
                 </div>
                 {!isConnected && source.fixAction && (
                   <button
                     onClick={(e) => { e.stopPropagation(); navigate(adminPath(workspaceId, source.fixAction! as import('../../routes').Page)); }}
-                    className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 transition-colors flex-shrink-0"
+                    className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--brand-border-hover)] transition-colors flex-shrink-0" /* arbitrary-text-ok — 10px action button, t-micro would add unwanted uppercase+monospace */
                   >
                     Set up <ExternalLink className="w-2.5 h-2.5" />
                   </button>

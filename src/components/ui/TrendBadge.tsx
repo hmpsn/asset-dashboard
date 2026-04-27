@@ -28,12 +28,12 @@ export function TrendBadge({
 }: TrendBadgeProps) {
   if (value === 0 && hideOnZero) return null;
 
-  const textSize = size === 'sm' ? 'text-[11px]' : 'text-xs';
+  const textSize = size === 'sm' ? 'text-[11px]' : 'text-xs'; // arbitrary-text-ok — TrendBadge owns this size scale
   const iconSize = size === 'sm' ? 'w-3 h-3' : 'w-3.5 h-3.5';
 
   if (value === 0) {
     return (
-      <span className={`inline-flex items-center gap-0.5 ${textSize} font-medium text-zinc-400 ${className ?? ''}`}>
+      <span className={`inline-flex items-center gap-0.5 ${textSize} font-medium text-[var(--brand-text)] ${className ?? ''}`}>
         <Minus className={iconSize} />
         0{suffix}
         {label ? ` ${label}` : null}

@@ -30,7 +30,7 @@ interface SectionCardProps {
    * Visual variant.
    * - `'default'` — solid `bg-[var(--surface-2)]` with the brand asymmetric `10px 24px 10px 24px` border-radius.
    *   Use for top-level page sections (the canonical look).
-   * - `'subtle'` — semi-transparent `bg-[var(--surface-2)]/40` with standard symmetric `rounded-lg`.
+   * - `'subtle'` — semi-transparent `bg-[var(--surface-2)]/40` with standard symmetric `rounded-[var(--radius-lg)]`.
    *   Use as a wrapper around dense tables / row lists where the asymmetric corners would clash
    *   with internal rows or where the card sits inside another section. Adds `overflow-hidden`
    *   so child tables clip cleanly against the rounded corners.
@@ -47,9 +47,9 @@ export function SectionCard({ title, titleIcon, titleExtra, action, children, cl
 
   const isSubtle = variant === 'subtle';
   const containerClasses = isSubtle
-    ? 'bg-[var(--surface-2)]/40 border border-zinc-800 rounded-lg overflow-hidden transition-colors duration-200'
-    : 'bg-[var(--surface-2)] border border-zinc-800 transition-colors duration-200';
-  const interactiveClasses = interactive ? 'hover:border-zinc-700 hover:border-l-teal-500/40 cursor-pointer' : '';
+    ? 'bg-[var(--surface-2)]/40 border border-[var(--brand-border)] rounded-[var(--radius-lg)] overflow-hidden transition-colors duration-200'
+    : 'bg-[var(--surface-2)] border border-[var(--brand-border)] transition-colors duration-200';
+  const interactiveClasses = interactive ? 'hover:border-[var(--brand-border-hover)] hover:border-l-teal-500/40 cursor-pointer' : '';
   const containerStyle = isSubtle
     ? staggerStyle
     : { borderRadius: '10px 24px 10px 24px', ...staggerStyle };
@@ -61,10 +61,10 @@ export function SectionCard({ title, titleIcon, titleExtra, action, children, cl
       style={containerStyle}
     >
       {hasHeader && (
-        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800" style={headerStyle}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--brand-border)]" style={headerStyle}>
           <div className="flex items-center gap-2 min-w-0">
             {titleIcon}
-            <span className="text-sm font-semibold text-zinc-200">{title}</span>
+            <span className="t-body font-semibold text-[var(--brand-text-bright)]">{title}</span>
             {titleExtra}
           </div>
           {action}

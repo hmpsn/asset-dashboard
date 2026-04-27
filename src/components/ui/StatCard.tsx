@@ -39,27 +39,27 @@ export function StatCard({
   return (
     <Tag
       onClick={onClick}
-      className={`bg-[var(--surface-2)] ${isHero ? 'p-4' : 'p-3'} border border-zinc-800 text-left ${onClick ? 'hover:border-zinc-700 transition-colors cursor-pointer group' : ''} ${className ?? ''}`}
+      className={`bg-[var(--surface-2)] ${isHero ? 'p-4' : 'p-3'} border border-[var(--brand-border)] text-left ${onClick ? 'hover:border-[var(--brand-border-hover)] transition-colors cursor-pointer group' : ''} ${className ?? ''}`}
       style={baseStyle}
     >
       <div className="flex items-center gap-1.5 mb-2">
         {Icon && <Icon className="w-3.5 h-3.5 flex-shrink-0" style={iconColor ? { color: iconColor } : undefined} />}
-        <span className="inline-flex items-center gap-0.5 text-[11px] text-zinc-500 uppercase tracking-wider font-medium leading-none">{label}</span>
+        <span className="inline-flex items-center gap-0.5 t-label text-[var(--brand-text-muted)]">{label}</span>
       </div>
       <div className="flex items-baseline gap-1.5">
         <div
-          className={`${isHero ? 'text-4xl' : 'text-2xl'} font-bold leading-none ${valueColor ?? 'text-zinc-100'}`}
+          className={`${isHero ? 'text-4xl' : 'text-2xl'} font-bold leading-none ${valueColor ?? 'text-[var(--brand-text-bright)]'}`}
           style={valueColor?.startsWith('#') ? { color: valueColor } : undefined}
         >
           {value}
         </div>
         {delta !== undefined && delta !== 0 && (
-          <span className={`text-[11px] font-medium ${(invertDelta ? delta < 0 : delta > 0) ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
+          <span className={`t-caption-sm font-medium ${(invertDelta ? delta < 0 : delta > 0) ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
             {delta > 0 ? '+' : ''}{delta}{deltaLabel ?? ''}
           </span>
         )}
       </div>
-      {sub && <div className="text-[11px] text-zinc-500 mt-1">{sub}</div>}
+      {sub && <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">{sub}</div>}
     </Tag>
   );
 }
@@ -76,14 +76,14 @@ interface CompactStatProps {
 export function CompactStatBar({ items, className }: { items: CompactStatProps[]; className?: string }) {
   return (
     <div
-      className={`bg-[var(--surface-2)] border border-zinc-800 px-5 py-3 flex items-center justify-between flex-wrap gap-3 ${className ?? ''}`}
+      className={`bg-[var(--surface-2)] border border-[var(--brand-border)] px-5 py-3 flex items-center justify-between flex-wrap gap-3 ${className ?? ''}`}
       style={{ borderRadius: '6px 12px 6px 12px' }}
     >
       {items.map(m => (
         <div key={m.label} className="flex items-center gap-2">
-          <span className="text-xs text-zinc-500 uppercase tracking-wider">{m.label}</span>
-          <span className={`text-base font-bold ${m.valueColor ?? 'text-zinc-200'}`}>{m.value}</span>
-          {m.sub && <span className={`text-[11px] font-medium ${m.subColor ?? 'text-zinc-500'}`}>{m.sub}</span>}
+          <span className="t-label text-[var(--brand-text-muted)]">{m.label}</span>
+          <span className={`text-base font-bold ${m.valueColor ?? 'text-[var(--brand-text-bright)]'}`}>{m.value}</span>
+          {m.sub && <span className={`t-caption-sm font-medium ${m.subColor ?? 'text-[var(--brand-text-muted)]'}`}>{m.sub}</span>}
         </div>
       ))}
     </div>
