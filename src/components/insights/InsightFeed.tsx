@@ -57,8 +57,8 @@ export function InsightFeed({ feed, summary, loading, domain, limit, showPills, 
             <button
               key={chip.key ?? 'all'}
               onClick={() => setActiveFilter(chip.key)}
-              className={`px-3 py-1 rounded-md text-[11px] font-medium transition-colors ${
-                activeFilter === chip.key ? 'bg-teal-600 text-white' : 'bg-zinc-800/50 text-zinc-400 hover:text-zinc-200'
+              className={`px-3 py-1 rounded-md t-caption-sm font-medium transition-colors ${
+                activeFilter === chip.key ? 'bg-teal-600 text-white' : 'bg-[var(--surface-3)]/50 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]'
               }`}
             >
               {chip.label}
@@ -75,27 +75,27 @@ export function InsightFeed({ feed, summary, loading, domain, limit, showPills, 
           ))}
         </div>
       ) : (
-        <div className="text-center py-8 text-xs text-zinc-500">
+        <div className="text-center py-8 text-xs text-[var(--brand-text-muted)]">
           {activeFilter ? 'No insights match this filter' : 'No insights available yet — check back after analytics sync'}
         </div>
       )}
       {onViewAll && totalFiltered > (limit ?? Infinity) && !expanded && (
         <div className="text-center pt-1">
-          <button onClick={onViewAll} className="text-[11px] text-teal-400 hover:text-teal-300 transition-colors">
+          <button onClick={onViewAll} className="t-caption-sm text-teal-400 hover:text-teal-300 transition-colors">
             View all {totalFiltered} insights →
           </button>
         </div>
       )}
       {!onViewAll && hasMore && (
         <div className="text-center pt-1">
-          <button onClick={() => setExpanded(true)} className="text-[11px] text-teal-400 hover:text-teal-300 transition-colors">
+          <button onClick={() => setExpanded(true)} className="t-caption-sm text-teal-400 hover:text-teal-300 transition-colors">
             Show all {totalFiltered} insights →
           </button>
         </div>
       )}
       {expanded && limit && totalFiltered > limit && (
         <div className="text-center pt-1">
-          <button onClick={() => setExpanded(false)} className="text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors">
+          <button onClick={() => setExpanded(false)} className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">
             Show less
           </button>
         </div>

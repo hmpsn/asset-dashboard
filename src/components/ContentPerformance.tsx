@@ -67,8 +67,8 @@ function TrendChart({ trend }: { trend: TrendPoint[] }) {
   return (
     <div className="mt-3">
       <div className="flex items-center gap-4 mb-2">
-        <span className="flex items-center gap-1 text-[10px] text-[var(--brand-text)]"><span className="w-3 h-0.5 bg-blue-400 inline-block" /> Clicks</span>
-        <span className="flex items-center gap-1 text-[10px] text-[var(--brand-text)]"><span className="w-3 h-0.5 bg-cyan-400 inline-block" /> Impressions</span>
+        <span className="flex items-center gap-1 text-[10px] /* arbitrary-text-ok */ text-[var(--brand-text)]"><span className="w-3 h-0.5 bg-blue-400 inline-block" /> Clicks</span>
+        <span className="flex items-center gap-1 text-[10px] /* arbitrary-text-ok */ text-[var(--brand-text)]"><span className="w-3 h-0.5 bg-cyan-400 inline-block" /> Impressions</span>
       </div>
       <ResponsiveContainer width="100%" height={120}>
         <LineChart data={trend} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
@@ -81,10 +81,10 @@ function TrendChart({ trend }: { trend: TrendPoint[] }) {
             if (!row) return null;
             return (
               <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl shadow-black/40 min-w-[120px] overflow-hidden">
-                <div className="px-3 py-1.5 border-b border-[var(--brand-border)] text-[11px] font-semibold text-[var(--brand-text-bright)]">{row.date}</div>
+                <div className="px-3 py-1.5 border-b border-[var(--brand-border)] t-caption-sm font-semibold text-[var(--brand-text-bright)]">{row.date}</div>
                 <div className="px-3 py-1.5 space-y-1">
-                  <div className="flex justify-between text-[11px]"><span className="text-blue-400">Clicks</span><span className="text-[var(--brand-text-bright)] font-medium">{row.clicks.toLocaleString()}</span></div>
-                  <div className="flex justify-between text-[11px]"><span className="text-cyan-400">Impressions</span><span className="text-[var(--brand-text-bright)] font-medium">{row.impressions.toLocaleString()}</span></div>
+                  <div className="flex justify-between t-caption-sm"><span className="text-blue-400">Clicks</span><span className="text-[var(--brand-text-bright)] font-medium">{row.clicks.toLocaleString()}</span></div>
+                  <div className="flex justify-between t-caption-sm"><span className="text-cyan-400">Impressions</span><span className="text-[var(--brand-text-bright)] font-medium">{row.impressions.toLocaleString()}</span></div>
                 </div>
               </div>
             );
@@ -93,7 +93,7 @@ function TrendChart({ trend }: { trend: TrendPoint[] }) {
           <Line yAxisId="clicks" type="monotone" dataKey="clicks" stroke="#60a5fa" strokeWidth={2} dot={false} />
         </LineChart>
       </ResponsiveContainer>
-      <div className="flex justify-between text-[10px] text-[var(--brand-text-dim)] mt-1">
+      <div className="flex justify-between text-[10px] /* arbitrary-text-ok */ text-[var(--brand-text-dim)] mt-1">
         <span>{trend[0].date}</span>
         <span>{trend[trend.length - 1].date}</span>
       </div>
@@ -198,28 +198,28 @@ export function ContentPerformance({ workspaceId }: Props) {
             <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] px-4 py-3 rounded-[var(--radius-signature)]">
               <div className="flex items-center gap-2 mb-1">
                 <Icon as={MousePointer} size="md" className="text-blue-400" />
-                <span className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider">Total Clicks</span>
+                <span className="t-label text-[var(--brand-text-muted)]">Total Clicks</span>
               </div>
               <p className="text-xl font-semibold text-[var(--brand-text-bright)]">{totalClicks.toLocaleString()}</p>
             </div>
             <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] px-4 py-3 rounded-[var(--radius-signature)]">
               <div className="flex items-center gap-2 mb-1">
                 <Icon as={Eye} size="md" className="text-cyan-400" />
-                <span className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider">Impressions</span>
+                <span className="t-label text-[var(--brand-text-muted)]">Impressions</span>
               </div>
               <p className="text-xl font-semibold text-[var(--brand-text-bright)]">{totalImpressions.toLocaleString()}</p>
             </div>
             <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] px-4 py-3 rounded-[var(--radius-signature)]">
               <div className="flex items-center gap-2 mb-1">
                 <Icon as={Users} size="md" className="text-teal-400" />
-                <span className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider">Sessions</span>
+                <span className="t-label text-[var(--brand-text-muted)]">Sessions</span>
               </div>
               <p className="text-xl font-semibold text-[var(--brand-text-bright)]">{totalSessions.toLocaleString()}</p>
             </div>
             <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] px-4 py-3 rounded-[var(--radius-signature)]">
               <div className="flex items-center gap-2 mb-1">
                 <Icon as={Target} size="md" className="text-amber-400" />
-                <span className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider">Avg Position</span>
+                <span className="t-label text-[var(--brand-text-muted)]">Avg Position</span>
               </div>
               <p className="text-xl font-semibold text-[var(--brand-text-bright)]">{avgPosition > 0 ? avgPosition.toFixed(1) : '—'}</p>
             </div>
@@ -227,12 +227,12 @@ export function ContentPerformance({ workspaceId }: Props) {
 
           {/* Sort controls */}
           <div className="flex items-center gap-2">
-            <span className="text-[11px] text-[var(--brand-text-muted)]">Sort by:</span>
+            <span className="t-caption-sm text-[var(--brand-text-muted)]">Sort by:</span>
             {(['clicks', 'impressions', 'sessions', 'days'] as const).map(key => (
               <button
                 key={key}
                 onClick={() => setSortKey(key)}
-                className={`px-2.5 py-1 rounded text-[11px] transition-colors ${
+                className={`px-2.5 py-1 rounded t-caption-sm transition-colors ${
                   sortKey === key
                     ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]'
                     : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
@@ -266,21 +266,21 @@ export function ContentPerformance({ workspaceId }: Props) {
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-[var(--brand-text-bright)] truncate">{item.topic}</span>
                         {ptColor && (
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded border ${ptColor}`}>
+                          <span className={`text-[10px] /* arbitrary-text-ok */ px-1.5 py-0.5 rounded border ${ptColor}`}>
                             {item.pageType}
                           </span>
                         )}
                         <Badge label={item.status} color={item.status === 'published' ? 'emerald' : 'blue'} />
                         {item.source === 'matrix' && (
-                          <span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/20">
+                          <span className="flex items-center gap-0.5 text-[10px] /* arbitrary-text-ok */ px-1.5 py-0.5 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/20">
                             <Icon as={Layers} size="sm" /> Content Plan
                           </span>
                         )}
                       </div>
                       <div className="flex items-center gap-3 mt-0.5">
-                        <span className="text-[11px] text-[var(--brand-text-muted)]">{item.targetKeyword}</span>
+                        <span className="t-caption-sm text-[var(--brand-text-muted)]">{item.targetKeyword}</span>
                         {item.targetPageSlug && (
-                          <span className="text-[11px] text-[var(--brand-text-dim)]">{item.targetPageSlug}</span>
+                          <span className="t-caption-sm text-[var(--brand-text-dim)]">{item.targetPageSlug}</span>
                         )}
                       </div>
                     </div>
@@ -291,25 +291,25 @@ export function ContentPerformance({ workspaceId }: Props) {
                         <>
                           <div className="text-right">
                             <p className="text-xs font-medium text-[var(--brand-text-bright)]">{item.gsc.clicks.toLocaleString()}</p>
-                            <p className="text-[10px] text-[var(--brand-text-muted)]">clicks</p>
+                            <p className="text-[10px] /* arbitrary-text-ok */ text-[var(--brand-text-muted)]">clicks</p>
                           </div>
                           <div className="text-right">
                             <p className="text-xs font-medium text-[var(--brand-text-bright)]">{item.gsc.impressions.toLocaleString()}</p>
-                            <p className="text-[10px] text-[var(--brand-text-muted)]">impressions</p>
+                            <p className="text-[10px] /* arbitrary-text-ok */ text-[var(--brand-text-muted)]">impressions</p>
                           </div>
                           <div className="text-right">
                             <p className={`text-xs font-medium ${item.gsc.position <= 10 ? 'text-emerald-400' : item.gsc.position <= 20 ? 'text-amber-400' : 'text-[var(--brand-text)]'}`}>
                               #{item.gsc.position.toFixed(1)}
                             </p>
-                            <p className="text-[10px] text-[var(--brand-text-muted)]">position</p>
+                            <p className="text-[10px] /* arbitrary-text-ok */ text-[var(--brand-text-muted)]">position</p>
                           </div>
                         </>
                       ) : (
-                        <span className="text-[11px] text-[var(--brand-text-dim)]">No GSC data</span>
+                        <span className="t-caption-sm text-[var(--brand-text-dim)]">No GSC data</span>
                       )}
 
                       <div className="text-right pl-3 border-l border-[var(--brand-border)]">
-                        <div className="flex items-center gap-1 text-[11px] text-[var(--brand-text-muted)]">
+                        <div className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
                           <Icon as={Clock} size="sm" />
                           {item.daysSincePublish}d
                         </div>
@@ -332,28 +332,28 @@ export function ContentPerformance({ workspaceId }: Props) {
                       <div className="grid grid-cols-2 gap-4 mt-3">
                         {/* GSC detail */}
                         <div className="bg-[var(--surface-3)]/30 rounded-[var(--radius-lg)] p-3">
-                          <h4 className="text-[11px] text-[var(--brand-text)] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                          <h4 className="t-label text-[var(--brand-text)] mb-2 flex items-center gap-1.5">
                             <Icon as={MousePointer} size="sm" /> Search Performance (90d)
                           </h4>
                           {item.gsc ? (
                             <div className="grid grid-cols-2 gap-3">
                               <div>
                                 <p className="text-lg font-semibold text-[var(--brand-text-bright)]">{item.gsc.clicks.toLocaleString()}</p>
-                                <p className="text-[10px] text-[var(--brand-text-muted)]">Clicks</p>
+                                <p className="text-[10px] /* arbitrary-text-ok */ text-[var(--brand-text-muted)]">Clicks</p>
                               </div>
                               <div>
                                 <p className="text-lg font-semibold text-[var(--brand-text-bright)]">{item.gsc.impressions.toLocaleString()}</p>
-                                <p className="text-[10px] text-[var(--brand-text-muted)]">Impressions</p>
+                                <p className="text-[10px] /* arbitrary-text-ok */ text-[var(--brand-text-muted)]">Impressions</p>
                               </div>
                               <div>
                                 <p className="text-lg font-semibold text-[var(--brand-text-bright)]">{item.gsc.ctr}%</p>
-                                <p className="text-[10px] text-[var(--brand-text-muted)]">CTR</p>
+                                <p className="text-[10px] /* arbitrary-text-ok */ text-[var(--brand-text-muted)]">CTR</p>
                               </div>
                               <div>
                                 <p className={`text-lg font-semibold ${item.gsc.position <= 10 ? 'text-emerald-400' : item.gsc.position <= 20 ? 'text-amber-400' : 'text-[var(--brand-text-bright)]'}`}>
                                   #{item.gsc.position.toFixed(1)}
                                 </p>
-                                <p className="text-[10px] text-[var(--brand-text-muted)]">Avg Position</p>
+                                <p className="text-[10px] /* arbitrary-text-ok */ text-[var(--brand-text-muted)]">Avg Position</p>
                               </div>
                             </div>
                           ) : (
@@ -363,26 +363,26 @@ export function ContentPerformance({ workspaceId }: Props) {
 
                         {/* GA4 detail */}
                         <div className="bg-[var(--surface-3)]/30 rounded-[var(--radius-lg)] p-3">
-                          <h4 className="text-[11px] text-[var(--brand-text)] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                          <h4 className="t-label text-[var(--brand-text)] mb-2 flex items-center gap-1.5">
                             <Icon as={Users} size="sm" /> Site Analytics (90d)
                           </h4>
                           {item.ga4 ? (
                             <div className="grid grid-cols-2 gap-3">
                               <div>
                                 <p className="text-lg font-semibold text-[var(--brand-text-bright)]">{item.ga4.sessions.toLocaleString()}</p>
-                                <p className="text-[10px] text-[var(--brand-text-muted)]">Sessions</p>
+                                <p className="text-[10px] /* arbitrary-text-ok */ text-[var(--brand-text-muted)]">Sessions</p>
                               </div>
                               <div>
                                 <p className="text-lg font-semibold text-[var(--brand-text-bright)]">{item.ga4.users.toLocaleString()}</p>
-                                <p className="text-[10px] text-[var(--brand-text-muted)]">Users</p>
+                                <p className="text-[10px] /* arbitrary-text-ok */ text-[var(--brand-text-muted)]">Users</p>
                               </div>
                               <div>
                                 <p className="text-lg font-semibold text-[var(--brand-text-bright)]">{item.ga4.bounceRate.toFixed(1)}%</p>
-                                <p className="text-[10px] text-[var(--brand-text-muted)]">Bounce Rate</p>
+                                <p className="text-[10px] /* arbitrary-text-ok */ text-[var(--brand-text-muted)]">Bounce Rate</p>
                               </div>
                               <div>
                                 <p className="text-lg font-semibold text-[var(--brand-text-bright)]">{formatEngagement(item.ga4.avgEngagementTime)}</p>
-                                <p className="text-[10px] text-[var(--brand-text-muted)]">Avg Engagement</p>
+                                <p className="text-[10px] /* arbitrary-text-ok */ text-[var(--brand-text-muted)]">Avg Engagement</p>
                               </div>
                             </div>
                           ) : (

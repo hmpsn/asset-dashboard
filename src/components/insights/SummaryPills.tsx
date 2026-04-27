@@ -22,7 +22,7 @@ export function SummaryPills({ counts, activeFilter, onFilter, loading }: Summar
     return (
       <div className="flex gap-2">
         {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-8 w-28 rounded-lg" />
+          <Skeleton key={i} className="h-8 w-28 rounded-[var(--radius-lg)]" />
         ))}
       </div>
     );
@@ -36,13 +36,13 @@ export function SummaryPills({ counts, activeFilter, onFilter, loading }: Summar
           <button
             key={pill.filterKey}
             onClick={() => onFilter(isActive ? null : pill.filterKey)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all border ${
-              isActive ? colors.activeBg : 'bg-zinc-800/50 border-zinc-800 hover:border-zinc-700'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-xs transition-all border ${
+              isActive ? colors.activeBg : 'bg-[var(--surface-3)]/50 border-[var(--brand-border)] hover:border-[var(--brand-border)]'
             }`}
           >
             <span className={`w-2 h-2 rounded-full ${colors.dot}`} />
-            <span className="text-zinc-200 font-semibold tabular-nums">{pill.count}</span>
-            <span className="text-zinc-500">{pill.label}</span>
+            <span className="text-[var(--brand-text-bright)] font-semibold tabular-nums">{pill.count}</span>
+            <span className="text-[var(--brand-text-muted)]">{pill.label}</span>
           </button>
         );
       })}
