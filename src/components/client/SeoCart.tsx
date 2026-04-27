@@ -104,14 +104,14 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => updateQuantity(item.productType, item.quantity - 1)}
-                        className="w-6 h-6 rounded flex items-center justify-center bg-[var(--surface-3)] hover:bg-[var(--surface-3)]/80 text-[var(--brand-text)] transition-colors"
+                        className="w-6 h-6 rounded flex items-center justify-center bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text)] transition-colors"
                       >
                         <Minus className="w-3 h-3" />
                       </button>
                       <span className="w-8 text-center text-xs font-medium text-[var(--brand-text)]">{item.quantity}</span>
                       <button
                         onClick={() => updateQuantity(item.productType, item.quantity + 1)}
-                        className="w-6 h-6 rounded flex items-center justify-center bg-[var(--surface-3)] hover:bg-[var(--surface-3)]/80 text-[var(--brand-text)] transition-colors"
+                        className="w-6 h-6 rounded flex items-center justify-center bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text)] transition-colors"
                       >
                         <Plus className="w-3 h-3" />
                       </button>
