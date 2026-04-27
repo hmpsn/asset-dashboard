@@ -343,6 +343,10 @@ export const requestPostChangesSchema = z.object({
 }).strict();
 
 // PATCH /api/public/content-posts/:workspaceId/:postId/client-edit
+// IMPORTANT: only include client-editable fields. Do NOT include targetWordCount,
+// keywords, or status — those are admin/AI fields. The route merges these client
+// updates with the existing section data (preserving required DB fields) so that
+// parseJsonSafeArray(postSectionSchema) does not silently drop sections on read-back.
 export const clientPostEditSchema = z.object({
   title: z.string().max(500).optional(),
   metaDescription: z.string().max(500).optional(),
@@ -352,9 +356,7 @@ export const clientPostEditSchema = z.object({
     heading: z.string(),
     content: z.string(),
     wordCount: z.number(),
-    targetWordCount: z.number().optional(),
-    keywords: z.array(z.string()).optional(),
-    status: z.enum(['pending', 'generating', 'done', 'error']).optional(),
+    // targetWordCount, keywords, status intentionally omitted — merged from DB by route
   })).optional(),
   conclusion: z.string().optional(),
 }).strict();
@@ -546,8 +548,25 @@ router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', valid
   if (title !== undefined) updates.title = title;
   if (metaDescription !== undefined) updates.metaDescription = metaDescription;
   if (introduction !== undefined) updates.introduction = introduction;
-  if (sections !== undefined) updates.sections = sections;
   if (conclusion !== undefined) updates.conclusion = conclusion;
+  if (sections !== undefined) {
+    // CRITICAL: merge client edits with existing section data by index.
+    // The client only sends { index, heading, content, wordCount } — the editable fields.
+    // The DB read schema (postSectionSchema) requires targetWordCount, keywords, and status.
+    // If we stored the client-provided sections as-is, parseJsonSafeArray would silently
+    // drop every section on the next read, destroying all post content.
+    const clientSections = sections as { index: number; heading: string; content: string; wordCount: number }[];
+    updates.sections = post.sections.map(existing => {
+      const edit = clientSections.find(s => s.index === existing.index);
+      if (!edit) return existing; // unedited section — keep as-is
+      return {
+        ...existing,           // preserves: targetWordCount, keywords, status, error
+        heading: edit.heading,
+        content: edit.content,
+        wordCount: edit.wordCount,
+      };
+    });
+  }
 
   let updated;
   try {
@@ -1470,7 +1489,6 @@ describe('State machine guard: in_progress → post_review', () => {
     expect(res.status).toBe(400);
   });
 });
-```
 
 describe('PATCH /api/public/content-posts/:wsId/:postId/client-edit', () => {
   it('updates sections and snapshots the post version', async () => {
@@ -1657,6 +1675,10 @@ Post feedback (`clientFeedback`, `voiceScore`, `voiceFeedback`, `reviewChecklist
 13. `content_post_ready` email event unregistered — Task 2 expanded to also modify `server/email-templates.ts`: `'content_post_ready'` added to `EmailEventType` union, `renderContentPostReady` function added, `case` added to `renderDigest` switch ✅
 14. Public post routes expose internal fields — documented as conscious design decision consistent with existing public routes; `toClientPost()` mapper noted as future improvement path ✅
 15. Client-edit PATCH endpoint untested — integration test added to Task 10: happy path (sections updated + in-process verification) and guard test (403 when request not in `post_review`) ✅
+
+**Audit findings resolved (April 2026 review — round 4):**
+16. `clientPostEditSchema` section shape mismatch with `postSectionSchema` — `targetWordCount`, `keywords`, `status` removed from the client-facing schema (clients shouldn't control these); Step 4.5 now merges client section edits with existing section data by index, preserving required DB fields so `parseJsonSafeArray` never silently drops sections on read-back ✅
+17. Client-edit tests outside code fence — spurious closing fence removed; entire test file (all describe blocks including client-edit) is now in one `typescript` code fence from Step 10.1 ✅
 
 **Conscious design decisions (not bugs):**
 - `changes_requested → post_review` shortcut NOT added to state machine — admin must re-enter `in_progress` to re-send; this is intentional (forces an explicit re-queue step)
