@@ -45,7 +45,7 @@ export function CmsTemplatePanel({
     <>
       {/* CMS Template Panel */}
       {showCmsPanel && (
-        <div className="w-full max-w-lg bg-[var(--surface-2)] border border-amber-500/20 overflow-hidden mt-2" style={{ borderRadius: '10px 24px 10px 24px' }}>
+        <div className="w-full max-w-lg bg-[var(--surface-2)] border border-amber-500/20 overflow-hidden mt-2" style={{ borderRadius: '10px 24px 10px 24px' /* asymmetric-radius-ok */ }}>
           <div className="px-4 py-2.5 border-b border-[var(--brand-border)] flex items-center justify-between">
             <span className="t-caption font-medium text-amber-300">CMS Collection Templates</span>
             <button onClick={onClose} className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]">Close</button>
@@ -75,7 +75,7 @@ export function CmsTemplatePanel({
 
       {/* CMS Template Result */}
       {cmsTemplateResult && (
-        <div className="w-full max-w-2xl bg-[var(--surface-2)] border border-amber-500/20 overflow-hidden mt-2" style={{ borderRadius: '10px 24px 10px 24px' }}>
+        <div className="w-full max-w-2xl bg-[var(--surface-2)] border border-amber-500/20 overflow-hidden mt-2" style={{ borderRadius: '10px 24px 10px 24px' /* asymmetric-radius-ok */ }}>
           <div className="px-4 py-2.5 border-b border-[var(--brand-border)]">
             <div className="flex items-center justify-between">
               <div>

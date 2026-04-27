@@ -137,7 +137,7 @@ export function SchemaWorkflowGuide() {
         {STEPS.map(step => {
           const StepIcon = step.icon;
           return (
-            <div key={step.number} className={`border p-5 ${step.bg}`} style={{ borderRadius: '6px 12px 6px 12px' }}>
+            <div key={step.number} className={`border p-5 ${step.bg}`} style={{ borderRadius: '6px 12px 6px 12px' /* asymmetric-radius-ok */ }}>
               <div className="flex items-start gap-3">
                 <div className={`flex items-center justify-center w-8 h-8 rounded-[var(--radius-md)] bg-[var(--surface-2)]/60 flex-shrink-0 ${step.color}`}>
                   <Icon as={StepIcon} size="md" />
@@ -168,7 +168,7 @@ export function SchemaWorkflowGuide() {
       </div>
 
       {/* What happens automatically */}
-      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' /* asymmetric-radius-ok */ }}>
         <div className="flex items-center gap-2">
           <Icon as={Layers} size="md" className="text-teal-400" />
           <h3 className="text-sm font-medium text-[var(--brand-text-bright)]">What Happens Automatically</h3>
@@ -190,7 +190,7 @@ export function SchemaWorkflowGuide() {
       </div>
 
       {/* Content Pipeline integration */}
-      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' /* asymmetric-radius-ok */ }}>
         <div className="flex items-center gap-2">
           <Icon as={FileText} size="md" className="text-amber-400" />
           <h3 className="text-sm font-medium text-[var(--brand-text-bright)]">Content Pipeline Integration</h3>
@@ -219,7 +219,7 @@ export function SchemaWorkflowGuide() {
       </div>
 
       {/* Typical engagement */}
-      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' /* asymmetric-radius-ok */ }}>
         <div className="flex items-center gap-2">
           <Icon as={BarChart3} size="md" className="text-purple-400" />
           <h3 className="text-sm font-medium text-[var(--brand-text-bright)]">Typical Client Engagement</h3>

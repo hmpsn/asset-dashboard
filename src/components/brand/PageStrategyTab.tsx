@@ -6,7 +6,7 @@ import type { SiteBlueprint, BlueprintGenerationInput } from '../../../shared/ty
 import { useToast } from '../Toast';
 import { useBlueprints } from '../../hooks/admin/useBlueprints';
 import { queryKeys } from '../../lib/queryKeys';
-import { EmptyState, SectionCard, Icon, Button } from '../ui';
+import { EmptyState, SectionCard, Icon, Button, ConfirmDialog } from '../ui';
 
 interface Props {
   workspaceId: string;
@@ -20,6 +20,7 @@ export function PageStrategyTab({ workspaceId, onSelectBlueprint }: Props) {
   const [name, setName] = useState('');
   const [industryType, setIndustryType] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteBp, setConfirmDeleteBp] = useState<SiteBlueprint | null>(null);
 
   const { data: blueprintList, isLoading } = useBlueprints(workspaceId);
 
@@ -81,7 +82,7 @@ export function PageStrategyTab({ workspaceId, onSelectBlueprint }: Props) {
   const isGenerating = generateMutation.isPending;
   const isCreating = createMutation.isPending;
 
-  return (
+  return (<>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -206,9 +207,7 @@ export function PageStrategyTab({ workspaceId, onSelectBlueprint }: Props) {
               <button
                 onClick={e => {
                   e.stopPropagation();
-                  if (!window.confirm(`Delete "${bp.name}"? This cannot be undone.`)) return;
-                  setDeletingId(bp.id);
-                  deleteMutation.mutate(bp.id);
+                  setConfirmDeleteBp(bp);
                 }}
                 disabled={deletingId === bp.id}
                 className="opacity-0 group-hover:opacity-100 p-1 text-[var(--brand-text-muted)] hover:text-red-400 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
@@ -226,5 +225,22 @@ export function PageStrategyTab({ workspaceId, onSelectBlueprint }: Props) {
         </div>
       )}
     </div>
+
+    <ConfirmDialog
+      open={!!confirmDeleteBp}
+      title="Delete Blueprint"
+      message={confirmDeleteBp ? `Delete "${confirmDeleteBp.name}"? This cannot be undone.` : ''}
+      variant="destructive"
+      confirmLabel="Delete"
+      onConfirm={() => {
+        if (confirmDeleteBp) {
+          setDeletingId(confirmDeleteBp.id);
+          deleteMutation.mutate(confirmDeleteBp.id);
+        }
+        setConfirmDeleteBp(null);
+      }}
+      onCancel={() => setConfirmDeleteBp(null)}
+    />
+  </>
   );
 }
