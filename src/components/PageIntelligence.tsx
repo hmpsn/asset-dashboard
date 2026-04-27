@@ -523,7 +523,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Page Intelligence</h3>
-          <p className="text-[11px] text-[var(--brand-text-muted)] mt-0.5">
+          <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
             {unifiedPages.length} pages
             {cmsCount > 0 && <span className="text-blue-400"> · {cmsCount} CMS</span>}
             {withStrategy > 0 && <span> · {withStrategy} with strategy</span>}
@@ -611,18 +611,18 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                 className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-[var(--surface-3)]/50 transition-colors text-left"
               >
                 <span className="text-[10px] font-mono text-[var(--brand-text-muted)] w-4">{i + 1}.</span>
-                <span className="text-[11px] text-[var(--brand-text-bright)] truncate flex-1">{item.page.title || item.page.path}</span>
+                <span className="t-caption-sm text-[var(--brand-text-bright)] truncate flex-1">{item.page.title || item.page.path}</span>
                 {item.impressions > 0 && (
                   <span className="text-[10px] text-[var(--brand-text-muted)]">{item.impressions.toLocaleString()} imp</span>
                 )}
-                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${ // arbitrary-text-ok
                   item.score < 40 ? 'text-red-400 bg-red-500/10' :
                   item.score < 60 ? 'text-amber-400 bg-amber-500/10' :
                   'text-yellow-400 bg-yellow-500/10'
                 }`}>
                   {item.score}/100
                 </span>
-                <span className="text-[10px] text-amber-400/70 font-mono w-12 text-right">↑{item.impact}</span>
+                <span className="text-[10px] text-amber-400/70 font-mono w-12 text-right">↑{item.impact}</span>{/* arbitrary-text-ok */}
               </button>
             ))}
           </div>
@@ -638,7 +638,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search pages, keywords..."
-            className="w-full pl-8 pr-3 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-[11px] text-[var(--brand-text-bright)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
+            className="w-full pl-8 pr-3 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-bright)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
           />
         </div>
         <div className="flex items-center gap-1">
@@ -646,7 +646,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
             <button
               key={s}
               onClick={() => { if (sortBy === s) setSortDir(d => d === 'desc' ? 'asc' : 'desc'); else { setSortBy(s); setSortDir('desc'); } }}
-              className={`px-2 py-1 rounded text-[11px] font-medium transition-colors flex items-center gap-0.5 ${
+              className={`px-2 py-1 rounded t-caption-sm font-medium transition-colors flex items-center gap-0.5 ${
                 sortBy === s ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)] hover:text-[var(--brand-text-bright)]'
               }`}
             >
@@ -689,20 +689,20 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs text-[var(--brand-text-bright)] truncate">{page.title}</span>
                       {page.source === 'cms' && (
-                        <span className="text-[9px] px-1 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0">CMS</span>
+                        <span className="text-[9px] px-1 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0" /* arbitrary-text-ok */>CMS</span>
                       )}
                     </div>
-                    <span className="text-[11px] text-[var(--brand-text-muted)] font-mono">{page.path}</span>
+                    <span className="t-caption-sm text-[var(--brand-text-muted)] font-mono">{page.path}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                   {sp?.searchIntent && (
-                    <span className={`text-[11px] px-1.5 py-0.5 rounded-full border font-medium ${intentColor(sp.searchIntent)}`}>
+                    <span className={`t-caption-sm px-1.5 py-0.5 rounded-full border font-medium ${intentColor(sp.searchIntent)}`}>
                       {sp.searchIntent}
                     </span>
                   )}
                   {sp?.primaryKeyword && (
-                    <span className="inline-flex items-center gap-1 text-[11px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded max-w-[200px]">
+                    <span className="inline-flex items-center gap-1 t-caption-sm text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded max-w-[200px]">
                       <span className="truncate">{sp.primaryKeyword}</span>
                       <button
                         onClick={e => { e.stopPropagation(); trackKeyword(sp.primaryKeyword); }}
@@ -714,18 +714,18 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                     </span>
                   )}
                   {sp?.validated === false && (
-                    <span className="text-[10px] text-amber-400 bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/20" title="Keyword not validated in SEMRush">
+                    <span className="text-[10px] text-amber-400 bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/20" title="Keyword not validated in SEMRush">{/* arbitrary-text-ok */}
                       Unvalidated
                     </span>
                   )}
                   {sp?.volume !== undefined && sp.volume > 0 && (
-                    <span className="text-[11px] text-[var(--brand-text-muted)] bg-[var(--surface-3)] px-1.5 py-0.5 rounded font-mono">{sp.volume.toLocaleString()}/mo</span>
+                    <span className="t-caption-sm text-[var(--brand-text-muted)] bg-[var(--surface-3)] px-1.5 py-0.5 rounded font-mono">{sp.volume.toLocaleString()}/mo</span>
                   )}
                   {sp?.difficulty !== undefined && sp.difficulty > 0 && (
-                    <span className={`text-[11px] ${kdColor(sp.difficulty)} bg-[var(--surface-3)] px-1.5 py-0.5 rounded font-mono`}>KD {sp.difficulty}%</span>
+                    <span className={`t-caption-sm ${kdColor(sp.difficulty)} bg-[var(--surface-3)] px-1.5 py-0.5 rounded font-mono`}>KD {sp.difficulty}%</span>
                   )}
                   {sp?.currentPosition ? (
-                    <span className={`text-[11px] ${positionColor(sp.currentPosition)} font-mono font-medium bg-[var(--surface-3)] px-1.5 py-0.5 rounded`}>
+                    <span className={`t-caption-sm ${positionColor(sp.currentPosition)} font-mono font-medium bg-[var(--surface-3)] px-1.5 py-0.5 rounded`}>
                       #{sp.currentPosition.toFixed(0)}
                     </span>
                   ) : null}
@@ -744,13 +744,14 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <div>
-                          <span className="text-[11px] text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Primary Keyword</span>
+                          <span className="t-label text-[var(--brand-text-muted)]">Primary Keyword</span>
                           <div className="flex items-center gap-2 mt-0.5">
                             <p className="text-xs text-[var(--brand-text-bright)]">{sp.primaryKeyword}</p>
                             <button
                               onClick={() => trackKeyword(sp.primaryKeyword)}
                               title={trackedKeywords.has(sp.primaryKeyword) ? 'Tracking' : 'Track in Rank Tracker'}
-                              className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border transition-colors ${trackedKeywords.has(sp.primaryKeyword) ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-teal-500/30 bg-teal-500/10 text-teal-400 hover:bg-teal-500/20'}`}
+                              className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border transition-colors ${ // arbitrary-text-ok
+                                                                                                                               trackedKeywords.has(sp.primaryKeyword) ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-teal-500/30 bg-teal-500/10 text-teal-400 hover:bg-teal-500/20'}`}
                             >
                               {trackedKeywords.has(sp.primaryKeyword) ? <><Check className="w-2.5 h-2.5" /> Tracking</> : <><Plus className="w-2.5 h-2.5" /> Track</>}
                             </button>
@@ -761,51 +762,51 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                         </button>
                       </div>
                       <div>
-                        <span className="text-[11px] text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Secondary Keywords</span>
+                        <span className="t-label text-[var(--brand-text-muted)]">Secondary Keywords</span>
                         <div className="flex flex-wrap gap-1 mt-1">
                           {sp.secondaryKeywords.map((kw, i) => (
-                            <span key={i} className="px-1.5 py-0.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded text-[11px] text-[var(--brand-text)]">{kw}</span>
+                            <span key={i} className="px-1.5 py-0.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption-sm text-[var(--brand-text)]">{kw}</span>
                           ))}
                         </div>
                       </div>
                       {/* Metrics row */}
                       <div className="flex flex-wrap gap-3 mt-1">
                         {sp.volume != null && sp.volume > 0 && (
-                          <div className="text-[11px] text-[var(--brand-text-muted)] flex items-center gap-1">
+                          <div className="t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-1">
                             <Icon as={BarChart3} size="sm" className="text-orange-400" />
                             <span className="text-[var(--brand-text-bright)] font-medium">{sp.volume.toLocaleString()}</span>/mo
                           </div>
                         )}
                         {sp.difficulty != null && sp.difficulty > 0 && (
-                          <div className="text-[11px] text-[var(--brand-text-muted)] flex items-center gap-1">
+                          <div className="t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-1">
                             <Icon as={Shield} size="sm" />
                             KD: <span className={`font-medium ${kdColor(sp.difficulty)}`}>{sp.difficulty}%</span>
                             <span className={kdColor(sp.difficulty)}>({kdLabel(sp.difficulty)})</span>
                           </div>
                         )}
                         {sp.cpc !== undefined && sp.cpc > 0 && (
-                          <div className="text-[11px] text-[var(--brand-text-muted)] flex items-center gap-1">
+                          <div className="t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-1">
                             <Icon as={DollarSign} size="sm" className="text-emerald-400" />
                             CPC: <span className="text-emerald-400 font-medium">${sp.cpc.toFixed(2)}</span>
                           </div>
                         )}
                         {sp.impressions !== undefined && (
-                          <span className="text-[11px] text-[var(--brand-text-muted)]"><span className="text-[var(--brand-text)] font-medium">{sp.impressions.toLocaleString()}</span> impressions</span>
+                          <span className="t-caption-sm text-[var(--brand-text-muted)]"><span className="text-[var(--brand-text)] font-medium">{sp.impressions.toLocaleString()}</span> impressions</span>
                         )}
                         {sp.clicks !== undefined && (
-                          <span className="text-[11px] text-[var(--brand-text-muted)]"><span className="text-[var(--brand-text)] font-medium">{sp.clicks.toLocaleString()}</span> clicks</span>
+                          <span className="t-caption-sm text-[var(--brand-text-muted)]"><span className="text-[var(--brand-text)] font-medium">{sp.clicks.toLocaleString()}</span> clicks</span>
                         )}
                         {sp.currentPosition && (
-                          <span className="text-[11px] text-[var(--brand-text-muted)]">Avg position: <span className={`font-medium ${positionColor(sp.currentPosition)}`}>#{sp.currentPosition.toFixed(1)}</span></span>
+                          <span className="t-caption-sm text-[var(--brand-text-muted)]">Avg position: <span className={`font-medium ${positionColor(sp.currentPosition)}`}>#{sp.currentPosition.toFixed(1)}</span></span>
                         )}
                       </div>
                       {/* Secondary keyword metrics */}
                       {sp.secondaryMetrics && sp.secondaryMetrics.length > 0 && (
                         <div className="mt-1">
-                          <span className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider">Secondary keyword data</span>
+                          <span className="t-label text-[var(--brand-text-muted)]">Secondary keyword data</span>
                           <div className="flex flex-wrap gap-1 mt-0.5">
                             {sp.secondaryMetrics.filter(sm => sm.volume > 0 || sm.difficulty > 0).map((sm, si) => (
-                              <span key={si} className="text-[11px] px-1.5 py-0.5 bg-[var(--surface-3)]/80 border border-[var(--brand-border)]/50 rounded text-[var(--brand-text-muted)]">
+                              <span key={si} className="t-caption-sm px-1.5 py-0.5 bg-[var(--surface-3)]/80 border border-[var(--brand-border)]/50 rounded text-[var(--brand-text-muted)]">
                                 {sm.keyword} {sm.volume > 0 && <span className="text-[var(--brand-text)]">{sm.volume}/mo</span>} {sm.difficulty > 0 && <span className={kdColor(sm.difficulty)}>KD {sm.difficulty}%</span>}
                               </span>
                             ))}
@@ -828,12 +829,12 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                   {sp && isEditing && (
                     <div className="space-y-2">
                       <div>
-                        <label className="text-[11px] text-[var(--brand-text-muted)] font-medium uppercase tracking-wider block mb-1">Primary Keyword</label>
+                        <label className="t-label text-[var(--brand-text-muted)] block mb-1">Primary Keyword</label>
                         <input type="text" value={editDraft.primary} onChange={e => setEditDraft(prev => ({ ...prev, primary: e.target.value }))}
                           className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500" />
                       </div>
                       <div>
-                        <label className="text-[11px] text-[var(--brand-text-muted)] font-medium uppercase tracking-wider block mb-1">Secondary Keywords (comma-separated)</label>
+                        <label className="t-label text-[var(--brand-text-muted)] block mb-1">Secondary Keywords (comma-separated)</label>
                         <input type="text" value={editDraft.secondary} onChange={e => setEditDraft(prev => ({ ...prev, secondary: e.target.value }))}
                           className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500" />
                       </div>
@@ -870,9 +871,9 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                   {kw && (
                     <div className="space-y-3 pt-2 border-t border-[var(--brand-border)]">
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">AI Analysis</span>
+                        <span className="t-label text-[var(--brand-text-muted)]">AI Analysis</span>
                         <button onClick={() => analyzePage(page)} disabled={isAnalyzing}
-                          className="text-[11px] text-[var(--brand-text-muted)] hover:text-teal-400 flex items-center gap-1 transition-colors disabled:opacity-50">
+                          className="t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-400 flex items-center gap-1 transition-colors disabled:opacity-50">
                           {isAnalyzing ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Sparkles className="w-2.5 h-2.5" />} Re-analyze
                         </button>
                       </div>
@@ -880,7 +881,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                       {/* Score + Intent + Difficulty */}
                       <div className="grid grid-cols-3 gap-3">
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
-                          <div className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider mb-1">Optimization</div>
+                          <div className="t-label text-[var(--brand-text-muted)] mb-1">Optimization</div>
                           <div className={`text-2xl font-bold ${scoreColorClass(kw.optimizationScore)}`}>
                             {kw.optimizationScore}<span className="text-xs font-normal text-[var(--brand-text-muted)]">/100</span>
                           </div>
@@ -889,19 +890,19 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                           </div>
                         </div>
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
-                          <div className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider mb-1">Search Intent</div>
+                          <div className="t-label text-[var(--brand-text-muted)] mb-1">Search Intent</div>
                           <div className="flex items-center gap-2">
                             <span className="w-6 h-6 rounded-full bg-teal-500/20 text-teal-400 flex items-center justify-center text-xs font-bold">{intentIcon(kw.searchIntent)}</span>
                             <div>
                               <div className="text-sm font-medium text-[var(--brand-text-bright)] capitalize">{kw.searchIntent}</div>
-                              <div className="text-[11px] text-[var(--brand-text-muted)]">{Math.round(kw.searchIntentConfidence * 100)}% confidence</div>
+                              <div className="t-caption-sm text-[var(--brand-text-muted)]">{Math.round(kw.searchIntentConfidence * 100)}% confidence</div>
                             </div>
                           </div>
                         </div>
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
-                          <div className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider mb-1">Difficulty</div>
+                          <div className="t-label text-[var(--brand-text-muted)] mb-1">Difficulty</div>
                           <div className={`text-lg font-bold capitalize ${difficultyTextColor(kw.estimatedDifficulty)}`}>{kw.estimatedDifficulty}</div>
-                          <div className="text-[11px] text-[var(--brand-text-muted)] mt-0.5">Cluster: {kw.topicCluster}</div>
+                          <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">Cluster: {kw.topicCluster}</div>
                         </div>
                       </div>
 
@@ -913,7 +914,8 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                           <button
                             onClick={() => trackKeyword(kw.primaryKeyword)}
                             title={trackedKeywords.has(kw.primaryKeyword) ? 'Tracking' : 'Track in Rank Tracker'}
-                            className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border transition-colors ${trackedKeywords.has(kw.primaryKeyword) ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-teal-500/30 bg-teal-500/10 text-teal-400 hover:bg-teal-500/20'}`}
+                            className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border transition-colors ${ // arbitrary-text-ok
+                                                                                                                             trackedKeywords.has(kw.primaryKeyword) ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-teal-500/30 bg-teal-500/10 text-teal-400 hover:bg-teal-500/20'}`}
                           >
                             {trackedKeywords.has(kw.primaryKeyword) ? <><Check className="w-2.5 h-2.5" /> Tracking</> : <><Plus className="w-2.5 h-2.5" /> Track</>}
                           </button>
@@ -925,7 +927,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                             return (
                               <div key={key} className="flex items-center gap-1">
                                 {present ? <Icon as={CheckCircle} size="sm" className="text-emerald-400" /> : <Icon as={AlertCircle} size="sm" className="text-red-400" />}
-                                <span className={`text-[11px] ${present ? 'text-emerald-400' : 'text-red-400'}`}>{labels[key]}</span>
+                                <span className={`t-caption-sm ${present ? 'text-emerald-400' : 'text-red-400'}`}>{labels[key]}</span>
                               </div>
                             );
                           })}
@@ -941,7 +943,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {kw.secondaryKeywords.map((k, i) => (
-                              <span key={i} className="text-[11px] px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400">{k}</span>
+                              <span key={i} className="t-caption-sm px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400">{k}</span>
                             ))}
                           </div>
                         </div>
@@ -952,7 +954,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {kw.longTailKeywords.map((k, i) => (
-                              <span key={i} className="text-[11px] px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">{k}</span>
+                              <span key={i} className="t-caption-sm px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">{k}</span>
                             ))}
                           </div>
                         </div>
@@ -967,7 +969,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {kw.competitorKeywords.map((k, i) => (
-                              <span key={i} className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400">{k}</span>
+                              <span key={i} className="t-caption-sm px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400">{k}</span>
                             ))}
                           </div>
                         </div>
@@ -976,7 +978,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                       {/* ── Section 3: Issues & Recommendations (admin secret sauce) ── */}
                       {(kw.contentGaps.length > 0 || kw.optimizationIssues.length > 0 || kw.recommendations.length > 0) && (
                         <div className="space-y-3 pt-2 border-t border-[var(--brand-border)]">
-                          <span className="text-[11px] text-[var(--brand-text-muted)] font-medium uppercase tracking-wider">Issues & Recommendations</span>
+                          <span className="t-label text-[var(--brand-text-muted)]">Issues & Recommendations</span>
 
                           {kw.contentGaps.length > 0 && (
                             <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
@@ -1003,7 +1005,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                                 </div>
                                 <ul className="space-y-1">
                                   {kw.optimizationIssues.map((issue, i) => (
-                                    <li key={i} className="text-[11px] text-[var(--brand-text)]">{issue}</li>
+                                    <li key={i} className="t-caption-sm text-[var(--brand-text)]">{issue}</li>
                                   ))}
                                 </ul>
                               </div>
@@ -1016,7 +1018,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                                 </div>
                                 <ul className="space-y-1">
                                   {kw.recommendations.map((rec, i) => (
-                                    <li key={i} className="text-[11px] text-[var(--brand-text)]">{rec}</li>
+                                    <li key={i} className="t-caption-sm text-[var(--brand-text)]">{rec}</li>
                                   ))}
                                 </ul>
                               </div>
@@ -1035,7 +1037,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                           <div className="grid grid-cols-4 gap-3 mb-3">
                             <div>
                               <div className="text-lg font-bold text-[var(--brand-text-bright)]">{cs.wordCount}</div>
-                              <div className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider font-medium">Words</div>
+                              <div className="t-label text-[var(--brand-text-muted)]">Words</div>
                             </div>
                             <div>
                               <div className="flex items-center gap-3">
@@ -1044,25 +1046,25 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                                   <div className={`text-lg font-bold ${cs.readabilityScore >= 60 ? 'text-emerald-400' : cs.readabilityScore >= 30 ? 'text-amber-400' : 'text-red-400'}`}>
                                     {cs.readabilityScore}
                                   </div>
-                                  <div className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider font-medium">Readability</div>
+                                  <div className="t-label text-[var(--brand-text-muted)]">Readability</div>
                                 </div>
                               </div>
                             </div>
                             <div>
                               <div className="text-lg font-bold text-[var(--brand-text-bright)]">{cs.headings.total}</div>
-                              <div className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider font-medium">Headings</div>
+                              <div className="t-label text-[var(--brand-text-muted)]">Headings</div>
                             </div>
                             <div>
                               <div className="text-lg font-bold text-[var(--brand-text-bright)]">{cs.avgWordsPerSentence}</div>
-                              <div className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider font-medium">Words/Sent</div>
+                              <div className="t-label text-[var(--brand-text-muted)]">Words/Sent</div>
                             </div>
                           </div>
                           {cs.topKeywords.length > 0 && (
                             <div>
-                              <div className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider mb-1.5">Top Words in Content</div>
+                              <div className="t-label text-[var(--brand-text-muted)] mb-1.5">Top Words in Content</div>
                               <div className="flex flex-wrap gap-1">
                                 {cs.topKeywords.slice(0, 10).map((tk, i) => (
-                                  <span key={i} className="text-[11px] px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
+                                  <span key={i} className="t-caption-sm px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
                                     {tk.word} <span className="text-cyan-600">({tk.density}%)</span>
                                   </span>
                                 ))}
@@ -1072,15 +1074,15 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                           <div className="flex items-center gap-4 mt-3">
                             <div className="flex items-center gap-1.5">
                               {cs.titleOk ? <Icon as={CheckCircle} size="sm" className="text-emerald-400" /> : <Icon as={AlertCircle} size="sm" className="text-amber-400" />}
-                              <span className="text-[11px] text-[var(--brand-text)]">Title: {cs.titleLength} chars</span>
+                              <span className="t-caption-sm text-[var(--brand-text)]">Title: {cs.titleLength} chars</span>
                             </div>
                             <div className="flex items-center gap-1.5">
                               {cs.descOk ? <Icon as={CheckCircle} size="sm" className="text-emerald-400" /> : <Icon as={AlertCircle} size="sm" className="text-amber-400" />}
-                              <span className="text-[11px] text-[var(--brand-text)]">Desc: {cs.descLength} chars</span>
+                              <span className="t-caption-sm text-[var(--brand-text)]">Desc: {cs.descLength} chars</span>
                             </div>
                             <div className="flex items-center gap-1.5">
                               <Icon as={BookOpen} size="sm" className="text-[var(--brand-text-muted)]" />
-                              <span className="text-[11px] text-[var(--brand-text)]">{cs.readabilityGrade} ({cs.readabilityScore})</span>
+                              <span className="t-caption-sm text-[var(--brand-text)]">{cs.readabilityGrade} ({cs.readabilityScore})</span>
                             </div>
                           </div>
                         </div>
@@ -1092,9 +1094,9 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                   {!kw && hasPersistedAnalysis && !isAnalyzing && (
                     <div className="pt-2 border-t border-[var(--brand-border)]">
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] text-emerald-400">Analysis on file (run {new Date(sp!.analysisGeneratedAt!).toLocaleDateString()})</span>
+                        <span className="t-caption-sm text-emerald-400">Analysis on file (run {new Date(sp!.analysisGeneratedAt!).toLocaleDateString()})</span>
                         <button onClick={() => analyzePage(page)}
-                          className="text-[11px] text-[var(--brand-text-muted)] hover:text-teal-400 flex items-center gap-1 transition-colors">
+                          className="t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-400 flex items-center gap-1 transition-colors">
                           <Sparkles className="w-2.5 h-2.5" /> Run fresh analysis
                         </button>
                       </div>
@@ -1103,12 +1105,12 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                         <div className="mt-2 space-y-2">
                           {sp!.optimizationScore !== undefined && (
                             <div className="flex items-center gap-2">
-                              <span className="text-[11px] text-[var(--brand-text-muted)]">Score:</span>
+                              <span className="t-caption-sm text-[var(--brand-text-muted)]">Score:</span>
                               <span className={`text-sm font-bold ${scoreColorClass(sp!.optimizationScore!)}`}>{sp!.optimizationScore}</span>
                             </div>
                           )}
                           {sp!.optimizationIssues && sp!.optimizationIssues.length > 0 && (
-                            <div className="text-[11px] text-[var(--brand-text)]">
+                            <div className="t-caption-sm text-[var(--brand-text)]">
                               <span className="text-red-400 font-medium">{sp!.optimizationIssues.length} issues</span> · {sp!.optimizationIssues.slice(0, 2).join(' · ')}
                               {sp!.optimizationIssues.length > 2 && ` +${sp!.optimizationIssues.length - 2} more`}
                             </div>
@@ -1122,7 +1124,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                   <div className="flex items-center gap-2 pt-3 mt-1 border-t border-[var(--brand-border)]/60 flex-wrap">
                     <button
                       onClick={() => navigate(adminPath(workspaceId, 'seo-editor'), { state: { fixContext: { targetRoute: 'seo-editor', pageSlug: page.slug, pageName: page.title } } })}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-[11px] font-medium text-teal-400 bg-teal-500/10 hover:bg-teal-500/15 border border-teal-500/20 transition-all"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-teal-400 bg-teal-500/10 hover:bg-teal-500/15 border border-teal-500/20 transition-all"
                     >
                       <Icon as={Pencil} size="sm" /> Fix in SEO Editor
                     </button>
@@ -1145,14 +1147,14 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                           },
                         });
                       }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-[11px] font-medium text-teal-400 bg-teal-500/10 hover:bg-teal-500/15 border border-teal-500/20 transition-all"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-teal-400 bg-teal-500/10 hover:bg-teal-500/15 border border-teal-500/20 transition-all"
                     >
                       <Icon as={BookOpen} size="sm" /> Create Brief
                     </button>
                     {(kw?.optimizationIssues?.some(i => /schema|structured data/i.test(i)) || sp?.optimizationIssues?.some(i => /schema|structured data/i.test(i))) && (
                       <button
                         onClick={() => navigate(adminPath(workspaceId, 'seo-schema'), { state: { fixContext: { targetRoute: 'seo-schema', pageSlug: page.slug, pageName: page.title } } })}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-[11px] font-medium text-teal-400 bg-teal-500/10 hover:bg-teal-500/15 border border-teal-500/20 transition-all"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-teal-400 bg-teal-500/10 hover:bg-teal-500/15 border border-teal-500/20 transition-all"
                       >
                         <Icon as={Code2} size="sm" /> Add Schema
                       </button>
@@ -1160,7 +1162,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                     <div className="flex-1" />
                     <button
                       onClick={() => navigate(adminPath(workspaceId, 'page-intelligence'))}
-                      className="flex items-center gap-1 text-[11px] text-[var(--brand-text-dim)] hover:text-[var(--brand-text)] transition-colors"
+                      className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-dim)] hover:text-[var(--brand-text)] transition-colors"
                     >
                       View full analysis <Icon as={ArrowUpRight} size="sm" />
                     </button>
