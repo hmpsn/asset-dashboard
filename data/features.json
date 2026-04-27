@@ -639,6 +639,16 @@
       "tier": "growth",
       "impact": "high",
       "clientFacing": false
+    },
+    {
+      "id": 65,
+      "title": "Client Post Review",
+      "oneLiner": "Clients review generated blog posts in-platform — inline section editing with auto-save, steering feedback, and one-click approve/request-changes, with full version history and audit trail",
+      "category": "content",
+      "painPoints": ["client-collaboration", "approval-workflow", "content-quality"],
+      "tier": "growth",
+      "impact": "high",
+      "clientFacing": true
     }
   ]
 }
