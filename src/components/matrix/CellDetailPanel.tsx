@@ -138,7 +138,7 @@ export function CellDetailPanel({
           {cell.recommendedKeyword && cell.recommendedKeyword !== keyword && (
             <div className="bg-teal-500/5 border border-teal-500/20 rounded-[var(--radius-lg)] p-3 space-y-2">
               <div className="flex items-center gap-1.5">
-                <TrendBadge value={1} suffix="" hideOnZero={false} size="sm" className="text-teal-400" />
+                <TrendBadge value={1} iconOnly hideOnZero={false} size="sm" className="text-teal-400" />
                 <span className="t-caption text-teal-400 font-medium">Recommended</span>
               </div>
               <p className="text-xs text-[var(--brand-text-bright)]">&ldquo;{cell.recommendedKeyword}&rdquo;</p>

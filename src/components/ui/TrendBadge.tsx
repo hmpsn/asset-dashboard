@@ -13,6 +13,8 @@ export interface TrendBadgeProps {
   size?: 'sm' | 'md';
   /** Hide entirely when value is 0. Default true. Set false to render a neutral Minus icon. */
   hideOnZero?: boolean;
+  /** Render only the directional icon, suppressing the numeric value and suffix. */
+  iconOnly?: boolean;
   className?: string;
 }
 
@@ -24,6 +26,7 @@ export function TrendBadge({
   label,
   size = 'sm',
   hideOnZero = true,
+  iconOnly = false,
   className,
 }: TrendBadgeProps) {
   if (value === 0 && hideOnZero) return null;
@@ -49,7 +52,7 @@ export function TrendBadge({
   return (
     <span className={`inline-flex items-center gap-0.5 ${textSize} font-medium ${color} ${className ?? ''}`}>
       {positive ? <TrendingUp className={iconSize} /> : <TrendingDown className={iconSize} />}
-      {sign}{displayValue}{suffix}
+      {!iconOnly && <>{sign}{displayValue}{suffix}</>}
       {label ? ` ${label}` : null}
     </span>
   );

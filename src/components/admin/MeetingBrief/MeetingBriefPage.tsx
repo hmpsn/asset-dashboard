@@ -54,7 +54,7 @@ export function MeetingBriefPage({ workspaceId }: Props) {
           action={
             <button
               onClick={() => refetch()}
-              className="mt-4 px-4 py-2 text-sm font-medium rounded-[var(--radius-lg)] bg-[var(--surface-3)] text-[var(--brand-text)] hover:bg-[var(--surface-3)] transition-colors"
+              className="mt-4 px-4 py-2 text-sm font-medium rounded-[var(--radius-lg)] bg-[var(--surface-3)] text-[var(--brand-text)] hover:bg-[var(--brand-border)] transition-colors"
             >
               Retry
             </button>

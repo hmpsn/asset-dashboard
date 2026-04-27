@@ -313,7 +313,7 @@ export default function OutcomeLearningsPanel({ workspaceId }: Props) {
         }
         action={
           <div className="flex items-center gap-1.5">
-            <TrendBadge value={1} suffix="" hideOnZero={false} size="sm" className="text-[var(--brand-text-muted)]" />
+            <TrendBadge value={1} iconOnly hideOnZero={false} size="sm" className="text-[var(--brand-text-muted)]" />
             <span className={`text-xs font-medium ${
               overall.recentTrend === 'improving'
                 ? 'text-emerald-400'

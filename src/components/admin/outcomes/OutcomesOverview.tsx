@@ -14,8 +14,8 @@ import type { WorkspaceOutcomeOverview, LearningsTrend } from '../../../../share
 // --- Helpers -----------------------------------------------------------
 
 function trendIcon(trend: LearningsTrend) {
-  if (trend === 'improving') return <TrendBadge value={1} suffix="" hideOnZero={false} size="sm" />;
-  if (trend === 'declining') return <TrendBadge value={-1} suffix="" hideOnZero={false} size="sm" />;
+  if (trend === 'improving') return <TrendBadge value={1} iconOnly hideOnZero={false} size="sm" />;
+  if (trend === 'declining') return <TrendBadge value={-1} iconOnly hideOnZero={false} size="sm" />;
   return <Minus className="w-3.5 h-3.5 text-[var(--brand-text)]" />;
 }
 

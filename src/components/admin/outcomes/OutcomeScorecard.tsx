@@ -20,8 +20,8 @@ interface Props {
 }
 
 function TrendIcon({ trend }: { trend: 'improving' | 'stable' | 'declining' }) {
-  if (trend === 'improving') return <TrendBadge value={1} suffix="" hideOnZero={false} size="md" />;
-  if (trend === 'declining') return <TrendBadge value={-1} suffix="" hideOnZero={false} size="md" />;
+  if (trend === 'improving') return <TrendBadge value={1} iconOnly hideOnZero={false} size="md" />;
+  if (trend === 'declining') return <TrendBadge value={-1} iconOnly hideOnZero={false} size="md" />;
   return <Minus className="w-4 h-4 text-[var(--brand-text)]" />;
 }
 
