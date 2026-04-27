@@ -2,7 +2,8 @@
 // Cross-workspace outcomes summary — admin only.
 
 import { useMemo } from 'react';
-import { TrendingUp, TrendingDown, Minus, AlertTriangle, BarChart3, Activity } from 'lucide-react';
+import { Minus, AlertTriangle, BarChart3, Activity } from 'lucide-react';
+import { TrendBadge } from '../../ui/TrendBadge';
 import { PageHeader, SectionCard, StatCard, EmptyState, Skeleton, Badge } from '../../ui';
 import { FeatureFlag } from '../../ui/FeatureFlag';
 import { ErrorBoundary } from '../../ErrorBoundary';
@@ -13,8 +14,8 @@ import type { WorkspaceOutcomeOverview, LearningsTrend } from '../../../../share
 // --- Helpers -----------------------------------------------------------
 
 function trendIcon(trend: LearningsTrend) {
-  if (trend === 'improving') return <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />;
-  if (trend === 'declining') return <TrendingDown className="w-3.5 h-3.5 text-red-400" />;
+  if (trend === 'improving') return <TrendBadge value={1} suffix="" hideOnZero={false} size="sm" />;
+  if (trend === 'declining') return <TrendBadge value={-1} suffix="" hideOnZero={false} size="sm" />;
   return <Minus className="w-3.5 h-3.5 text-[var(--brand-text)]" />;
 }
 

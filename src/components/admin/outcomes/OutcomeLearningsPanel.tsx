@@ -1,4 +1,5 @@
-import { Brain, FileText, Target, Wrench, TrendingUp } from 'lucide-react';
+import { Brain, FileText, Target, Wrench } from 'lucide-react';
+import { TrendBadge } from '../../ui/TrendBadge';
 import { SectionCard, Badge, EmptyState, Skeleton, SectionCardSkeleton } from '../../ui';
 import { useOutcomeLearnings } from '../../../hooks/admin/useOutcomes';
 import { pct } from './outcomeConstants';
@@ -260,7 +261,7 @@ export default function OutcomeLearningsPanel({ workspaceId }: Props) {
         {/* Confidence header skeleton */}
         {/* pr-check-disable-next-line -- learnings confidence header uses brand signature radius intentionally */}
         <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] px-4 py-3 flex items-center gap-3" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-          <Skeleton className="w-5 h-5 rounded-lg" />
+          <Skeleton className="w-5 h-5 rounded-[var(--radius-lg)]" />
           <Skeleton className="w-32 h-3" />
           <div className="ml-auto">
             <Skeleton className="w-28 h-5 rounded" />
@@ -312,7 +313,7 @@ export default function OutcomeLearningsPanel({ workspaceId }: Props) {
         }
         action={
           <div className="flex items-center gap-1.5">
-            <TrendingUp className="w-3.5 h-3.5 text-[var(--brand-text-muted)]" />
+            <TrendBadge value={1} suffix="" hideOnZero={false} size="sm" className="text-[var(--brand-text-muted)]" />
             <span className={`text-xs font-medium ${
               overall.recentTrend === 'improving'
                 ? 'text-emerald-400'

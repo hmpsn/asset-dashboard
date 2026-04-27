@@ -22,7 +22,7 @@ function BriefSkeleton() {
       <Skeleton className="h-4 w-5/6" />
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mt-6">
         {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-16 rounded-lg" />
+          <Skeleton key={i} className="h-16 rounded-[var(--radius-lg)]" />
         ))}
       </div>
       <Skeleton className="h-3 w-1/4 mt-6" />
@@ -54,7 +54,7 @@ export function MeetingBriefPage({ workspaceId }: Props) {
           action={
             <button
               onClick={() => refetch()}
-              className="mt-4 px-4 py-2 text-sm font-medium rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors"
+              className="mt-4 px-4 py-2 text-sm font-medium rounded-[var(--radius-lg)] bg-[var(--surface-3)] text-[var(--brand-text)] hover:bg-[var(--surface-3)] transition-colors"
             >
               Retry
             </button>
@@ -75,7 +75,7 @@ export function MeetingBriefPage({ workspaceId }: Props) {
             <button
               onClick={() => generate()}
               disabled={isGenerating}
-              className="mt-4 px-4 py-2 text-sm font-medium rounded-lg bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="mt-4 px-4 py-2 text-sm font-medium rounded-[var(--radius-lg)] bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isGenerating ? 'Generating\u2026' : 'Generate First Brief'}
             </button>
@@ -88,7 +88,7 @@ export function MeetingBriefPage({ workspaceId }: Props) {
         )}
         {isGenerating && (
           <div className="mt-6">
-            <p className="text-xs text-zinc-500 text-center mb-4">Analyzing site performance\u2026</p>
+            <p className="text-xs text-[var(--brand-text-muted)] text-center mb-4">Analyzing site performance\u2026</p>
             <BriefSkeleton />
           </div>
         )}
@@ -112,7 +112,7 @@ export function MeetingBriefPage({ workspaceId }: Props) {
 
       {isGenerating && (
         <SectionCard className="mb-6">
-          <p className="text-xs text-zinc-500 text-center mb-4">Analyzing site performance\u2026</p>
+          <p className="text-xs text-[var(--brand-text-muted)] text-center mb-4">Analyzing site performance\u2026</p>
           <BriefSkeleton />
         </SectionCard>
       )}
@@ -121,7 +121,7 @@ export function MeetingBriefPage({ workspaceId }: Props) {
         <ErrorBoundary>
           <SectionCard>
             <div className="mb-6">
-              <p className="text-sm text-zinc-200 leading-relaxed">{brief.situationSummary}</p>
+              <p className="text-sm text-[var(--brand-text-bright)] leading-relaxed">{brief.situationSummary}</p>
             </div>
             <AtAGlanceStrip metrics={brief.metrics} />
             <BriefSection title="Wins Since Last Review" items={brief.wins} />

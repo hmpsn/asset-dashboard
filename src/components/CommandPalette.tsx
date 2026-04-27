@@ -335,7 +335,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Search tools, workspaces, actions..."
-            className="flex-1 bg-transparent text-sm text-[var(--brand-text-bright)] placeholder-zinc-600 outline-none"
+            className="flex-1 bg-transparent text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-dim)] outline-none"
           />
           <kbd className="flex-shrink-0 t-caption-sm font-medium text-[var(--brand-text-muted)] bg-[var(--surface-3)] px-1.5 py-0.5 rounded border border-[var(--brand-border-hover)]">
             ESC

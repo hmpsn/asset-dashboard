@@ -70,10 +70,10 @@ export function ActionQueue({ workspaceId }: Props) {
           const note = noteInputs[item.id] ?? '';
 
           return (
-            <div key={item.id} className="rounded-lg border border-[var(--brand-border)] bg-[var(--surface-2)]">
+            <div key={item.id} className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)]">
               {/* Header row */}
               <button
-                className="w-full flex items-center gap-3 p-3 text-left hover:bg-[var(--surface-3)] rounded-lg transition-colors"
+                className="w-full flex items-center gap-3 p-3 text-left hover:bg-[var(--surface-3)] rounded-[var(--radius-lg)] transition-colors"
                 onClick={() => setExpandedId(isExpanded ? null : item.id)}
               >
                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full t-caption-sm font-semibold uppercase border ${badgeClass} shrink-0`}>
@@ -115,7 +115,7 @@ export function ActionQueue({ workspaceId }: Props) {
                     <button
                       onClick={() => resolveMutation.mutate({ insightId: item.id, status: 'in_progress', note: note || undefined })}
                       disabled={resolveMutation.isPending}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-hover)] transition-colors disabled:opacity-50"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-hover)] transition-colors disabled:opacity-50"
                     >
                       <Clock className="w-3 h-3" />
                       In Progress
@@ -123,7 +123,7 @@ export function ActionQueue({ workspaceId }: Props) {
                     <button
                       onClick={() => resolveMutation.mutate({ insightId: item.id, status: 'resolved', note: note || undefined })}
                       disabled={resolveMutation.isPending}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-teal-600/20 text-teal-300 hover:bg-teal-600/30 border border-teal-500/30 transition-colors disabled:opacity-50"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium bg-teal-600/20 text-teal-300 hover:bg-teal-600/30 border border-teal-500/30 transition-colors disabled:opacity-50"
                     >
                       <CheckCircle className="w-3 h-3" />
                       Mark Resolved
