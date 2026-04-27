@@ -13,7 +13,7 @@ const TIER_LABELS: Record<Tier, string> = {
 };
 
 const TIER_COLORS: Record<Tier, { bg: string; border: string; text: string; badge: string }> = {
-  free: { bg: 'bg-zinc-500/5', border: 'border-zinc-500/20', text: 'text-zinc-400', badge: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20' },
+  free: { bg: 'bg-zinc-500/5', border: 'border-zinc-500/20', text: 'text-zinc-400', badge: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20' }, // raw-zinc-ok — free-tier muted palette is intentional
   growth: { bg: 'bg-teal-500/5', border: 'border-teal-500/20', text: 'text-teal-400', badge: 'bg-teal-500/10 text-teal-400 border-teal-500/20' },
   premium: { bg: 'bg-amber-500/5', border: 'border-amber-500/20', text: 'text-amber-400', badge: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
 };
@@ -53,7 +53,7 @@ export function TierGate({ tier, required, feature, teaser, children, className,
       <div className={`relative border ${colors.border} ${colors.bg} p-3 ${className ?? ''}`} style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="flex items-center gap-2">
           <Lock className={`w-3.5 h-3.5 ${colors.text} flex-shrink-0`} />
-          <span className="text-xs text-zinc-400">
+          <span className="t-caption text-[var(--brand-text)]">
             <span className={`font-medium ${colors.text}`}>{feature}</span>
             {' '}requires the{' '}
             <span className={`font-semibold ${colors.text}`}>{TIER_LABELS[required]}</span> plan
@@ -82,19 +82,19 @@ export function TierGate({ tier, required, feature, teaser, children, className,
 
           {/* Copy */}
           <div>
-            <div className="text-sm font-semibold text-zinc-100 mb-1">{feature}</div>
-            <div className="text-[11px] text-zinc-500 leading-relaxed">
+            <div className="t-ui font-semibold text-[var(--brand-text-bright)] mb-1">{feature}</div>
+            <div className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">
               {teaser || `Upgrade to ${TIER_LABELS[required]} to unlock this feature`}
             </div>
             {roiValue && roiValue > 0 && (
-              <div className="text-[10px] text-emerald-400/80 mt-1 font-medium">
+              <div className="t-micro text-emerald-400/80 mt-1 font-medium">
                 Your site generates ${Math.round(roiValue).toLocaleString()}/mo in organic value
               </div>
             )}
           </div>
 
           {/* Badge */}
-          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider border ${colors.badge}`}>
+          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full t-micro font-semibold border ${colors.badge}`}>
             <Lock className="w-2.5 h-2.5" />
             {TIER_LABELS[required]} Plan
           </span>
@@ -105,7 +105,7 @@ export function TierGate({ tier, required, feature, teaser, children, className,
               // Dispatch a custom event so the parent can handle upgrade navigation
               window.dispatchEvent(new CustomEvent('tier-upgrade', { detail: { required, feature } }));
             }}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all ${
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-lg)] t-caption font-medium transition-all ${
               required === 'premium'
                 ? 'bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 border border-amber-500/25'
                 : 'bg-teal-500/15 text-teal-300 hover:bg-teal-500/25 border border-teal-500/25'
@@ -122,7 +122,7 @@ export function TierGate({ tier, required, feature, teaser, children, className,
 export function TierBadge({ tier }: { tier: Tier }) {
   const colors = TIER_COLORS[tier];
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider border ${colors.badge}`}>
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full t-micro font-semibold border ${colors.badge}`}>
       {tier === 'premium' && <Sparkles className="w-2.5 h-2.5" />}
       {TIER_LABELS[tier]}
     </span>
