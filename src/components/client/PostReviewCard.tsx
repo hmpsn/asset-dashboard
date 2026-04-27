@@ -2,10 +2,22 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Check, X, ChevronDown, ChevronUp, Edit3 } from 'lucide-react';
 import type { ClientContentRequest } from './types';
-import type { GeneratedPost } from '../../../shared/types/content';
+import type { GeneratedPost, ContentTopicRequest } from '../../../shared/types/content';
 import { publicPostReview } from '../../api/content';
 import { queryKeys } from '../../lib/queryKeys';
 import { useClientPostPreview } from '../../hooks/client/useClientPostPreview';
+
+// Adapter: server returns the full ContentTopicRequest; the client portal
+// only consumes the ClientContentRequest projection. We merge the few changed
+// fields into the existing client view.
+function toClientRequest(updated: ContentTopicRequest, current: ClientContentRequest): ClientContentRequest {
+  return {
+    ...current,
+    status: updated.status,
+    clientFeedback: updated.clientFeedback ?? current.clientFeedback,
+    updatedAt: updated.updatedAt,
+  };
+}
 
 interface PostReviewCardProps {
   request: ClientContentRequest;
@@ -95,7 +107,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
     setApproving(true);
     try {
       const updated = await publicPostReview.approvePost(workspaceId, request.id);
-      onUpdate(updated as unknown as ClientContentRequest);
+      onUpdate(toClientRequest(updated, request));
       setToast({ message: 'Post approved! Your team has been notified.', type: 'success' });
     } catch {
       setToast({ message: 'Failed to approve post', type: 'error' });
@@ -112,7 +124,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
     setSubmitting(true);
     try {
       const updated = await publicPostReview.requestPostChanges(workspaceId, request.id, feedback.trim());
-      onUpdate(updated as unknown as ClientContentRequest);
+      onUpdate(toClientRequest(updated, request));
       setToast({ message: 'Feedback sent to your team.', type: 'success' });
     } catch {
       setToast({ message: 'Failed to send feedback', type: 'error' });
