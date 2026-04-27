@@ -117,6 +117,28 @@ export const publicContent = {
     getOptional<unknown>(`/api/public/content-brief/${wsId}/${briefId}`),
 };
 
+// ── Public post-review actions (client portal) ────────────────
+
+export const publicPostReview = {
+  getPost: (wsId: string, postId: string) =>
+    get<GeneratedPost>(`/api/public/content-posts/${wsId}/${postId}`),
+
+  clientEdit: (wsId: string, postId: string, updates: {
+    title?: string;
+    metaDescription?: string;
+    introduction?: string;
+    sections?: GeneratedPost['sections'];
+    conclusion?: string;
+  }) =>
+    patch<GeneratedPost>(`/api/public/content-posts/${wsId}/${postId}/client-edit`, updates),
+
+  approvePost: (wsId: string, reqId: string) =>
+    post<ContentTopicRequest>(`/api/public/content-request/${wsId}/${reqId}/approve-post`, {}),
+
+  requestPostChanges: (wsId: string, reqId: string, feedback: string) =>
+    post<ContentTopicRequest>(`/api/public/content-request/${wsId}/${reqId}/request-post-changes`, { feedback }),
+};
+
 // ── Content Templates (scalable content planning) ──────────────
 
 export const contentTemplates = {
