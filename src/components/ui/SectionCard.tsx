@@ -30,7 +30,7 @@ interface SectionCardProps {
    * Visual variant.
    * - `'default'` — solid `bg-[var(--surface-2)]` with the brand asymmetric `10px 24px 10px 24px` border-radius.
    *   Use for top-level page sections (the canonical look).
-   * - `'subtle'` — semi-transparent `bg-[var(--surface-2)]/40` with standard symmetric `rounded-lg`.
+   * - `'subtle'` — semi-transparent `bg-[var(--surface-2)]/40` with standard symmetric `rounded-[var(--radius-lg)]`.
    *   Use as a wrapper around dense tables / row lists where the asymmetric corners would clash
    *   with internal rows or where the card sits inside another section. Adds `overflow-hidden`
    *   so child tables clip cleanly against the rounded corners.
