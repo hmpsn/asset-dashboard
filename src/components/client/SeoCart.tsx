@@ -21,7 +21,7 @@ export function SeoCartButton() {
     >
       <ShoppingCart className="w-3.5 h-3.5" />
       <span>Cart</span>
-      <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-white text-[var(--surface-1)] rounded-full text-[10px] /* arbitrary-text-ok */ font-bold flex items-center justify-center">
+      <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-white text-zinc-900 /* raw-zinc-ok */ rounded-full text-[10px] /* arbitrary-text-ok */ font-bold flex items-center justify-center">
         {totalItems}
       </span>
     </button>
