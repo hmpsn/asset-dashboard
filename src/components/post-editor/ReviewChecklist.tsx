@@ -90,8 +90,8 @@ export function ReviewChecklist({
           >
             <div className="flex items-center gap-2">
               <Icon as={ClipboardCheck} size="md" className={allChecked ? 'text-emerald-400/80' : 'text-[var(--brand-text-muted)]'} />
-              <span className="text-xs font-medium text-zinc-300">Review Checklist</span>
-              <span className={`text-[11px] px-1.5 py-0.5 rounded border ${allChecked ? 'text-emerald-400/80 bg-emerald-500/8 border-emerald-500/20' : 'text-[var(--brand-text-muted)] bg-[var(--surface-3)] border-[var(--brand-border-hover)]'}`}>
+              <span className="text-xs font-medium text-[var(--brand-text)]">Review Checklist</span>
+              <span className={`t-caption-sm px-1.5 py-0.5 rounded border ${allChecked ? 'text-emerald-400/80 bg-emerald-500/8 border-emerald-500/20' : 'text-[var(--brand-text-muted)] bg-[var(--surface-3)] border-[var(--brand-border-hover)]'}`}>
                 {checkedCount}/{CHECKLIST_ITEMS.length}
               </span>
             </div>
@@ -103,7 +103,7 @@ export function ReviewChecklist({
                 <button
                   onClick={handleAIReview}
                   disabled={aiRunning}
-                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2 mb-2 rounded-lg text-[11px] font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2 mb-2 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50"
                 >
                   <Icon as={aiRunning ? Loader2 : Sparkles} size="sm" className={aiRunning ? 'animate-spin' : ''} />
                   {aiRunning ? 'Running AI Review...' : 'AI Pre-Check'}
@@ -113,16 +113,16 @@ export function ReviewChecklist({
                 <div key={item.key}>
                   <button
                     onClick={() => onToggleItem(item.key)}
-                    className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left hover:bg-[var(--surface-3)]/50 transition-colors group"
+                    className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-[var(--radius-lg)] text-left hover:bg-[var(--surface-3)]/50 transition-colors group"
                   >
                     {checklist[item.key]
                       ? <Icon as={CheckSquare} size="md" className="text-emerald-400/80 flex-shrink-0" />
                       : <Icon as={Square} size="md" className="text-[var(--brand-text-muted)] group-hover:text-[var(--brand-text)] flex-shrink-0" />}
-                    <span className={`text-[11px] ${checklist[item.key] ? 'text-[var(--brand-text-bright)] line-through decoration-[var(--brand-border-hover)]' : 'text-[var(--brand-text)]'}`}>
+                    <span className={`t-caption-sm ${checklist[item.key] ? 'text-[var(--brand-text-bright)] line-through decoration-[var(--brand-border-hover)]' : 'text-[var(--brand-text)]'}`}>
                       {item.label}
                     </span>
                     {aiResults?.[item.key] && (
-                      <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded ${aiResults[item.key].pass ? 'bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20' : 'bg-amber-500/8 text-amber-400/80 border border-amber-500/20'}`}>
+                      <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded ${aiResults[item.key].pass ? 'bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20' : 'bg-amber-500/8 text-amber-400/80 border border-amber-500/20'}`} /* arbitrary-text-ok */>
                         {aiResults[item.key].pass ? 'AI: Pass' : 'AI: Review'}
                       </span>
                     )}
@@ -145,7 +145,7 @@ export function ReviewChecklist({
             onClick={() => onChangeStatus('review')}
             disabled={!allChecked}
             title={allChecked ? 'Send to review' : `Complete all ${CHECKLIST_ITEMS.length} checklist items before sending to review`}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg t-caption-sm font-medium border transition-colors ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium border transition-colors ${
               allChecked
                 ? 'bg-cyan-600/20 border-cyan-500/30 text-cyan-300 hover:bg-cyan-600/30'
                 : 'bg-[var(--surface-3)]/50 border-[var(--brand-border)]/50 text-[var(--brand-text-muted)] cursor-not-allowed'
@@ -156,10 +156,10 @@ export function ReviewChecklist({
         )}
         {postStatus === 'review' && (
           <>
-            <button onClick={() => onChangeStatus('approved')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg t-caption-sm font-medium bg-emerald-600/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-600/30 transition-colors">
+            <button onClick={() => onChangeStatus('approved')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-emerald-600/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-600/30 transition-colors">
               <Icon as={Check} size="sm" /> Approve
             </button>
-            <button onClick={() => onChangeStatus('draft')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg t-caption-sm font-medium bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
+            <button onClick={() => onChangeStatus('draft')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
               Back to Draft
             </button>
           </>

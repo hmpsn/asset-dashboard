@@ -123,7 +123,7 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
 
       {/* Health summary bar */}
       {summary && (summary.briefs > 0 || summary.matrices > 0) && (
-        <div className="flex items-center gap-3 px-4 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] t-caption-sm text-[var(--brand-text)]" style={{ borderRadius: '10px 24px 10px 24px' }}>
+        <div className="flex items-center gap-3 px-4 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] t-caption-sm text-[var(--brand-text)]" style={{ borderRadius: '10px 24px 10px 24px' /* asymmetric-radius-ok */ }}>
           {summary.briefs > 0 && <span className="flex items-center gap-1"><Icon as={Clipboard} size="sm" className="text-teal-400" /><span className="font-medium text-[var(--brand-text-bright)]">{summary.briefs}</span> brief{summary.briefs !== 1 ? 's' : ''}</span>}
           {summary.posts > 0 && <><span className="text-[var(--brand-border)]">&middot;</span><span className="flex items-center gap-1"><Icon as={FileText} size="sm" className="text-amber-400" /><span className="font-medium text-[var(--brand-text-bright)]">{summary.posts}</span> post{summary.posts !== 1 ? 's' : ''}</span></>}
           {summary.matrices > 0 && <><span className="text-[var(--brand-border)]">&middot;</span><span className="flex items-center gap-1"><Icon as={Layers} size="sm" className="text-teal-400" /><span className="font-medium text-[var(--brand-text-bright)]">{summary.matrices}</span> matri{summary.matrices !== 1 ? 'ces' : 'x'}</span></>}
@@ -133,7 +133,7 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
 
       {/* Content decay alert */}
       {decay && !decayDismissed && (decay.critical > 0 || decay.warning > 0) && (
-        <div className={cn('flex items-center gap-3 px-4 py-2.5 border text-xs', decay.critical > 0 ? 'bg-red-500/5 border-red-500/20' : 'bg-amber-500/5 border-amber-500/20')} style={{ borderRadius: '10px 24px 10px 24px' }}>
+        <div className={cn('flex items-center gap-3 px-4 py-2.5 border text-xs', decay.critical > 0 ? 'bg-red-500/5 border-red-500/20' : 'bg-amber-500/5 border-amber-500/20')} style={{ borderRadius: '10px 24px 10px 24px' /* asymmetric-radius-ok */ }}>
           <Icon as={TrendingDown} size="md" className={cn('flex-shrink-0', decay.critical > 0 ? 'text-red-400' : 'text-amber-400')} />
           <div className="flex-1">
             <span className="font-medium text-[var(--brand-text-bright)]">
@@ -185,7 +185,7 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
         <div className="ml-auto relative" ref={exportRef}>
           <button
             onClick={() => setExportOpen(!exportOpen)}
-            className="flex items-center gap-1 px-2.5 py-1.5 t-caption-sm font-medium text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors rounded-md hover:bg-[var(--surface-3)]"
+            className="flex items-center gap-1 px-2.5 py-1.5 t-caption-sm font-medium text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors rounded-[var(--radius-md)] hover:bg-[var(--surface-3)]"
           >
             <Icon as={Download} size="sm" />
             Export
@@ -244,7 +244,7 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
           <div className="relative w-full max-w-md bg-[var(--surface-1)] border-l border-[var(--brand-border)] shadow-2xl overflow-y-auto animate-in slide-in-from-right">
             <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-3.5 bg-[var(--surface-1)]/95 backdrop-blur border-b border-[var(--brand-border)]">
               <span className="text-sm font-semibold text-[var(--brand-text-bright)]">Content Pipeline Guide</span>
-              <button onClick={() => setGuideOpen(false)} className="p-1 rounded-md hover:bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
+              <button onClick={() => setGuideOpen(false)} className="p-1 rounded-[var(--radius-md)] hover:bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
                 <Icon as={X} size="md" />
               </button>
             </div>

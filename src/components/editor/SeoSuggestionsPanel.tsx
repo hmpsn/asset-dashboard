@@ -93,7 +93,7 @@ export function SeoSuggestionsPanel({ workspaceId, suggestions, counts, onRefres
             <button
               onClick={(e) => { e.stopPropagation(); handleApply(); }}
               disabled={applying}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-teal-600 hover:bg-teal-500 text-white rounded-lg transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-teal-600 hover:bg-teal-500 text-white rounded-[var(--radius-lg)] transition-colors disabled:opacity-50"
             >
               <Icon as={applying ? Loader2 : Check} size="sm" className={applying ? 'animate-spin' : ''} />
               Apply {readyToApply} to Webflow
@@ -171,7 +171,7 @@ function SuggestionRow({ suggestion: s, isSelecting, onSelect }: {
               key={i}
               onClick={() => onSelect(i)}
               disabled={isSelecting}
-              className={`flex items-start gap-2 px-3 py-2 rounded-lg text-left text-xs transition-all ${
+              className={`flex items-start gap-2 px-3 py-2 rounded-[var(--radius-lg)] text-left text-xs transition-all ${
                 isSelected
                   ? 'bg-teal-500/15 border border-teal-500/40 text-[var(--brand-text-bright)]'
                   : 'bg-[var(--surface-2)]/50 border border-[var(--brand-border)] text-[var(--brand-text)] hover:border-[var(--brand-border-hover)] hover:text-[var(--brand-text-bright)]'

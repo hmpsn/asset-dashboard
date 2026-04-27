@@ -166,14 +166,14 @@ export function BulkOperations({
 
       {/* Bulk operation progress */}
       {bulkMode === 'rewriting' && (
-        <div className="flex items-center gap-3 px-4 py-3 bg-teal-500/10 border border-teal-500/30 rounded-lg">
+        <div className="flex items-center gap-3 px-4 py-3 bg-teal-500/10 border border-teal-500/30 rounded-[var(--radius-lg)]">
           <Icon as={Loader2} size="md" className="animate-spin text-teal-400" />
           <div className="flex-1">
             <div className="text-sm text-teal-300">
               {bulkProgress.total > 0 ? `Processing ${bulkProgress.done}/${bulkProgress.total} pages...` : 'Generating AI rewrites...'}
             </div>
             {bulkProgress.total > 0 && (
-              <div className="mt-1.5 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+              <div className="mt-1.5 h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden">
                 <div className="h-full bg-teal-500 rounded-full transition-all" style={{ width: `${(bulkProgress.done / bulkProgress.total) * 100}%` }} />
               </div>
             )}

@@ -57,7 +57,7 @@ export function VersionHistory({
                 : ` — ${v.triggerDetail}`
                 : '';
               return (
-                <div key={v.id} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-[var(--surface-3)]/50 hover:bg-[var(--surface-3)] transition-colors group">
+                <div key={v.id} className="flex items-center justify-between gap-3 px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/50 hover:bg-[var(--surface-3)] transition-colors group">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="flex-shrink-0 w-6 h-6 rounded-full bg-teal-500/10 border border-teal-500/20 flex items-center justify-center">
                       <span className="t-caption-sm font-semibold text-teal-400">v{v.versionNumber}</span>

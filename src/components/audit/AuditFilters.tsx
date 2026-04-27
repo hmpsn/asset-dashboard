@@ -46,19 +46,19 @@ export function AuditToolbar({
             value={search}
             onChange={e => onSearchChange(e.target.value)}
             placeholder="Search pages or issues..."
-            className="w-full pl-10 pr-4 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg t-body focus:outline-none focus:border-[var(--brand-border-hover)]"
+            className="w-full pl-10 pr-4 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-body focus:outline-none focus:border-[var(--brand-border-hover)]"
           />
         </div>
         <button
           onClick={onSaveAndShare}
           disabled={saving}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg t-caption font-medium transition-colors bg-teal-400 text-[#0f1219]"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-[var(--radius-lg)] t-caption font-medium transition-colors bg-teal-400 text-[var(--surface-1)]"
         >
           <Icon as={Share2} size="md" /> {saving ? 'Saving...' : 'Save & Share'}
         </button>
         <button
           onClick={onOpenExportModal}
-          className="flex items-center gap-1.5 px-3 py-2 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] rounded-lg t-caption font-medium transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
         >
           <Icon as={FileText} size="md" /> Export
         </button>
@@ -67,7 +67,7 @@ export function AuditToolbar({
             <button
               onClick={onAcceptAllSuggestions}
               disabled={bulkApplying}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg t-caption font-medium transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-[var(--radius-lg)] t-caption font-medium transition-colors disabled:opacity-50"
               style={{ backgroundColor: 'rgba(16,185,129,0.15)', color: '#6ee7b7', border: '1px solid rgba(16,185,129,0.3)' }}
             >
               <Icon as={CheckCircle} size="md" />
@@ -78,7 +78,7 @@ export function AuditToolbar({
             {bulkApplying && onCancelBulkApply && (
               <button
                 onClick={onCancelBulkApply}
-                className="flex items-center gap-1.5 px-2 py-2 rounded-lg t-caption font-medium transition-colors bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20"
+                className="flex items-center gap-1.5 px-2 py-2 rounded-[var(--radius-lg)] t-caption font-medium transition-colors bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20"
               >
                 <Icon as={XCircle} size="md" /> Cancel
               </button>
@@ -87,7 +87,7 @@ export function AuditToolbar({
         )}
         <button
           onClick={onRunAudit}
-          className="flex items-center gap-1.5 px-3 py-2 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] rounded-lg t-caption font-medium transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
         >
           <Icon as={RefreshCw} size="md" /> Re-scan
         </button>
@@ -114,7 +114,7 @@ export function AuditCategoryFilter({ categoryFilter, onSetCategoryFilter }: Cat
           <button
             key={cat}
             onClick={() => onSetCategoryFilter(active ? 'all' : cat)}
-            className={cn('px-2 py-0.5 rounded t-caption-sm font-medium transition-colors border', active ? 'border-[var(--brand-border)] bg-[var(--surface-2)] text-[var(--brand-text-bright)]' : 'border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:border-zinc-700 hover:text-[var(--brand-text)]')}
+            className={cn('px-2 py-0.5 rounded t-caption-sm font-medium transition-colors border', active ? 'border-[var(--brand-border)] bg-[var(--surface-2)] text-[var(--brand-text-bright)]' : 'border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:border-[var(--brand-border)] hover:text-[var(--brand-text)]')}
           >
             {cat === 'all' ? 'All' : cfg?.label}
           </button>

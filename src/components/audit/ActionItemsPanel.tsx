@@ -97,7 +97,7 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
         </div>
         <button
           onClick={() => setAdding(!adding)}
-          className="flex items-center gap-1 px-2 py-1 rounded-md t-caption font-medium hover:bg-[var(--surface-3)] transition-colors text-teal-400"
+          className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption font-medium hover:bg-[var(--surface-3)] transition-colors text-teal-400"
         >
           <Icon as={Plus} size="sm" /> Add
         </button>
@@ -120,7 +120,7 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
             value={newTitle}
             onChange={e => setNewTitle(e.target.value)}
             placeholder="What needs to be done?"
-            className="w-full px-3 py-2 rounded-lg bg-[var(--surface-2)] border border-[var(--brand-border)] t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
+            className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-2)] border border-[var(--brand-border)] t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
             onKeyDown={e => e.key === 'Enter' && addItem()}
             autoFocus
           />
@@ -128,7 +128,7 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
             value={newDesc}
             onChange={e => setNewDesc(e.target.value)}
             placeholder="Description (optional)"
-            className="w-full px-3 py-2 rounded-lg bg-[var(--surface-2)] border border-[var(--brand-border)] t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
+            className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-2)] border border-[var(--brand-border)] t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
           />
           <div className="flex items-center justify-between">
             <div className="flex gap-1">
@@ -144,8 +144,8 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
               ))}
             </div>
             <div className="flex gap-2">
-              <button onClick={() => setAdding(false)} className="px-3 py-1.5 rounded-md t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]">Cancel</button>
-              <button onClick={addItem} className="px-3 py-1.5 rounded-md t-caption font-medium bg-teal-400 text-[#0f1219]">Add</button>
+              <button onClick={() => setAdding(false)} className="px-3 py-1.5 rounded-[var(--radius-md)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]">Cancel</button>
+              <button onClick={addItem} className="px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-teal-400 text-[var(--surface-1)]">Add</button>
             </div>
           </div>
         </div>
@@ -190,7 +190,7 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
             action={
               <button
                 onClick={() => setAdding(true)}
-                className="flex items-center gap-1.5 t-caption px-3 py-1.5 rounded-lg bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 transition-colors"
+                className="flex items-center gap-1.5 t-caption px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 transition-colors"
               >
                 <Icon as={Plus} size="sm" />
                 Add Item

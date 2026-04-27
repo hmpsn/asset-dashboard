@@ -120,7 +120,7 @@ export function PageEditRow({
           {(primaryKeyword || (secondaryKeywords?.length ?? 0) > 0) && (
             <div className="flex items-center gap-1 flex-wrap mt-0.5">
               {primaryKeyword && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400 font-medium" title={primaryKeyword}>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400 font-medium" /* arbitrary-text-ok */ title={primaryKeyword}>
                   {primaryKeyword}
                 </span>
               )}
@@ -167,7 +167,7 @@ export function PageEditRow({
         <div className="px-4 pb-4 space-y-3 bg-[var(--surface-2)]/30">
           {/* Recommendation banners */}
           {metaRecs.map(rec => (
-            <div key={rec.id} className="flex items-start gap-2.5 px-3 py-2 rounded-lg bg-amber-500/5 border border-amber-500/20">
+            <div key={rec.id} className="flex items-start gap-2.5 px-3 py-2 rounded-[var(--radius-lg)] bg-amber-500/5 border border-amber-500/20">
               <Icon as={AlertTriangle} size="md" className="text-amber-400 flex-shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
@@ -188,7 +188,7 @@ export function PageEditRow({
               <span className={`flex-shrink-0 t-caption-sm px-1.5 py-0.5 rounded font-medium ${
                 rec.priority === 'fix_now' ? 'bg-red-500/15 text-red-400' :
                 rec.priority === 'fix_soon' ? 'bg-amber-500/15 text-amber-400' :
-                'bg-zinc-500/15 text-zinc-400'
+                'bg-[var(--brand-text-muted)]/15 text-[var(--brand-text)]'
               }`}>
                 {rec.priority === 'fix_now' ? 'Now' : rec.priority === 'fix_soon' ? 'Soon' : 'Later'}
               </span>
@@ -196,7 +196,7 @@ export function PageEditRow({
           ))}
           {/* Error State */}
           {errorState && (
-            <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-lg bg-red-500/5 border border-red-500/20">
+            <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-[var(--radius-lg)] bg-red-500/5 border border-red-500/20">
               <Icon as={AlertTriangle} size="md" className="text-red-400 flex-shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
                 <div className="text-xs font-medium text-red-300">{errorState.type === 'network' ? 'Connection Error' : errorState.type === 'permission' ? 'Permission Error' : 'Error'}</div>
@@ -212,7 +212,7 @@ export function PageEditRow({
                 <button
                   onClick={() => onAnalyzePage(page.id)}
                   disabled={isAnalyzing}
-                  className="flex items-center gap-1 px-2 py-1 text-[11px] bg-purple-600/80 hover:bg-purple-500/80 text-white font-medium rounded transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1 px-2 py-1 t-caption-sm bg-purple-600/80 hover:bg-purple-500/80 text-white font-medium rounded transition-colors disabled:opacity-50"
                   title={hasAnalysis ? 'Re-analyze page (update recommendations)' : 'Run page analysis to generate optimization recommendations'}
                 >
                   <Icon as={isAnalyzing ? Loader2 : Search} size="sm" className={isAnalyzing ? 'animate-spin' : ''} />
@@ -238,7 +238,7 @@ export function PageEditRow({
 
           {/* Paired variation picker (when both were generated together) */}
           {variations?.field === 'both' && variations.options.length > 1 && variations.descOptions && (
-            <div className="space-y-1.5 border border-teal-500/20 bg-teal-500/5 rounded-lg p-3">
+            <div className="space-y-1.5 border border-teal-500/20 bg-teal-500/5 rounded-[var(--radius-lg)] p-3">
               <div className="t-caption-sm text-teal-400 font-medium">Pick a paired title + description:</div>
               {variations.options.map((titleV, i) => {
                 const descV = variations.descOptions![i] || '';
@@ -251,7 +251,7 @@ export function PageEditRow({
                       onSelectVariation(page.id, 'seoDescription', descV);
                       onClearVariations(page.id);
                     }}
-                    className={`w-full text-left px-3 py-2 rounded-lg text-xs border transition-colors ${
+                    className={`w-full text-left px-3 py-2 rounded-[var(--radius-lg)] text-xs border transition-colors ${
                       isSelected
                         ? 'bg-teal-600/20 border-teal-500/40 text-teal-300'
                         : 'bg-[var(--surface-3)]/60 border-[var(--brand-border)]/50 text-[var(--brand-text-bright)] hover:border-teal-500/30 hover:bg-teal-600/10'
@@ -370,7 +370,7 @@ export function PageEditRow({
               <button
                 onClick={() => onSendToClient(page.id)}
                 disabled={!hasChanges || isSendingToClient}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium transition-colors ${
                   isSentToClient ? 'bg-emerald-600 text-white' : 'bg-cyan-600/20 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-600/30 disabled:opacity-50 disabled:cursor-not-allowed'
                 }`}
               >
@@ -382,7 +382,7 @@ export function PageEditRow({
               <button
                 onClick={() => onSaveDraft(page.id)}
                 disabled={!edit.dirty || isDraftSaving}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium transition-colors ${
                   isDraftSaved ? 'bg-blue-600 text-white' : 'bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--brand-border-hover)] disabled:opacity-50 disabled:cursor-not-allowed'
                 }`}
               >
@@ -394,8 +394,8 @@ export function PageEditRow({
               onClick={() => onSave?.(page.id)}
               disabled={!edit.dirty || isSaving || !onSave}
               title={!onSave && isCmsPage ? 'CMS pages must be updated directly in Webflow' : undefined}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                isSaved ? 'bg-emerald-600 text-white' : 'bg-white text-black hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed'
+              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium transition-colors ${
+                isSaved ? 'bg-emerald-600 text-white' : 'bg-white text-black hover:bg-[var(--surface-3)] disabled:opacity-50 disabled:cursor-not-allowed'
               }`}
             >
               <Icon as={isSaving ? Loader2 : isSaved ? Check : Save} size="sm" className={isSaving ? 'animate-spin' : ''} />
