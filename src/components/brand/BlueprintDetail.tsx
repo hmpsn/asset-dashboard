@@ -25,7 +25,7 @@ import { useToast } from '../Toast';
 import { useBlueprint } from '../../hooks/admin/useBlueprints';
 import { queryKeys } from '../../lib/queryKeys';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
-import { TabBar, Icon, Button, cn } from '../ui/index';
+import { TabBar, Icon, Button, cn, ConfirmDialog } from '../ui/index';
 import { useCopyStatus, useGenerateCopy } from '../../hooks/admin/useCopyPipeline';
 import { CopyReviewPanel } from './CopyReviewPanel';
 import { BatchGenerationPanel } from './BatchGenerationPanel';
@@ -359,6 +359,7 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
   // Ids currently being mutated (to show per-entry loading states)
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [confirmRemoveEntry, setConfirmRemoveEntry] = useState<BlueprintEntry | null>(null);
 
   // ── Copy Pipeline state ──────────────────────────────────────────────────
   const copyEnabled = useFeatureFlag('copy-engine-pipeline');
@@ -462,7 +463,10 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
   }
 
   function handleRemove(entry: BlueprintEntry) {
-    if (!window.confirm(`Remove "${entry.name}" from this blueprint? This cannot be undone.`)) return;
+    setConfirmRemoveEntry(entry);
+  }
+
+  function executeRemove(entry: BlueprintEntry) {
     setRemovingId(entry.id);
     removeEntryMutation.mutate(entry.id);
   }
@@ -497,7 +501,7 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
     );
   }
 
-  return (
+  return (<>
     <div className="space-y-6">
       {/* Top bar */}
       <div className="flex items-start justify-between gap-4">
@@ -705,5 +709,19 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
         </div>
       )}
     </div>
+
+    <ConfirmDialog
+      open={!!confirmRemoveEntry}
+      title="Remove Page"
+      message={confirmRemoveEntry ? `Remove "${confirmRemoveEntry.name}" from this blueprint? This cannot be undone.` : ''}
+      variant="destructive"
+      confirmLabel="Remove"
+      onConfirm={() => {
+        if (confirmRemoveEntry) executeRemove(confirmRemoveEntry);
+        setConfirmRemoveEntry(null);
+      }}
+      onCancel={() => setConfirmRemoveEntry(null)}
+    />
+  </>
   );
 }

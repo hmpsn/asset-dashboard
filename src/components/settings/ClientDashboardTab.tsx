@@ -6,7 +6,6 @@ import {
 } from 'lucide-react';
 import SearchableSelect from '../SearchableSelect';
 import { get, post, patch, del, getSafe } from '../../api/client';
-import { themeColor } from '../ui/constants';
 import { SectionCard, Icon, Button } from '../ui';
 
 import type { SafeClientUser as ClientUserSafe } from '../../../shared/types/users.ts';
@@ -260,7 +259,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
             <button onClick={copyClientLink}
               className="flex items-center gap-1.5 px-3 py-2 rounded-[var(--radius-lg)] t-caption font-medium transition-all"
               style={copiedLink ? { backgroundColor: 'rgba(52,211,153,0.1)', color: '#34d399', border: '1px solid rgba(52,211,153,0.2)' }
-                : { backgroundColor: themeColor('#18181b', '#ffffff'), color: themeColor('#a1a1aa', '#64748b'), border: `1px solid ${themeColor('#27272a', '#e2e8f0')}` }}>
+                : { backgroundColor: 'var(--surface-2)', color: 'var(--brand-text)', border: '1px solid var(--brand-border)' }}>
               {copiedLink
                 ? <><Icon as={CheckCircle} size="md" /> Copied!</>
                 : <><Icon as={Copy} size="md" /> Copy</>}
@@ -517,7 +516,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
               setShowPricingConfig(!showPricingConfig);
             }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
-            style={{ backgroundColor: themeColor('#27272a', '#e2e8f0'), color: themeColor('#a1a1aa', '#64748b') }}>
+            style={{ backgroundColor: 'var(--surface-3)', color: 'var(--brand-text)' }}>
             {showPricingConfig ? 'Close' : <><Icon as={Pencil} size="xs" /> Configure</>}
           </button>
         </div>
@@ -638,7 +637,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
               )}
               <button onClick={() => showEventConfig ? setShowEventConfig(false) : loadEvents()}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
-                style={{ backgroundColor: themeColor('#27272a', '#e2e8f0'), color: themeColor('#a1a1aa', '#64748b') }}>
+                style={{ backgroundColor: 'var(--surface-3)', color: 'var(--brand-text)' }}>
                 {showEventConfig ? 'Close' : <><Icon as={RefreshCw} size="xs" /> Configure</>}
               </button>
             </div>

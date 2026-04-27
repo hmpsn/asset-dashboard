@@ -49,7 +49,7 @@ export function LoginScreen({ onLogin }: Props) {
           <button
             type="submit"
             disabled={loading || !password}
-            className="w-full py-2.5 rounded-[var(--radius-lg)] text-sm font-medium transition-colors disabled:opacity-50 bg-teal-400 text-[#0f1219]"
+            className="w-full py-2.5 rounded-[var(--radius-lg)] text-sm font-medium transition-colors disabled:opacity-50 bg-teal-400 text-[var(--surface-1)]"
           >
             {loading ? 'Signing in...' : 'Sign in'}
           </button>

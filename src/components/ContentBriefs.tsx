@@ -423,8 +423,8 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
               <span className="text-[var(--brand-text-bright)] font-medium">&ldquo;{deleteConfirm.label}&rdquo;</span> will be permanently removed.
             </div>
             <div className="flex items-center justify-end gap-2">
-              <button onClick={() => setDeleteConfirm(null)} className="px-4 py-2 rounded-lg text-xs font-medium bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--brand-border-hover)] transition-colors">Cancel</button>
-              <button onClick={executeDelete} className="px-4 py-2 rounded-lg text-xs font-medium bg-red-600 text-white hover:bg-red-500 transition-colors flex items-center gap-1.5">
+              <button onClick={() => setDeleteConfirm(null)} className="px-4 py-2 rounded-[var(--radius-lg)] text-xs font-medium bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--brand-border-hover)] transition-colors">Cancel</button>
+              <button onClick={executeDelete} className="px-4 py-2 rounded-[var(--radius-lg)] text-xs font-medium bg-red-600 text-white hover:bg-red-500 transition-colors flex items-center gap-1.5">
                 <Icon as={Trash2} size="md" /> Delete
               </button>
             </div>
@@ -434,7 +434,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
 
       {/* Active Post Editor */}
       {activePostId && (
-        <div className="bg-[var(--surface-2)] border border-blue-500/20 p-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
+        <div className="bg-[var(--surface-2)] border border-blue-500/20 p-4" style={{ borderRadius: '10px 24px 10px 24px' /* asymmetric-radius-ok */ }}>
           <PostEditor
             workspaceId={workspaceId}
             postId={activePostId}
@@ -446,7 +446,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
 
       {/* Generated Posts list */}
       {posts.length > 0 && !activePostId && (
-        <div className="bg-[var(--surface-2)] border border-blue-500/20 p-4 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
+        <div className="bg-[var(--surface-2)] border border-blue-500/20 p-4 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' /* asymmetric-radius-ok */ }}>
           <div className="flex items-center gap-2 mb-1">
             <Icon as={PenLine} size="md" className="text-blue-400" />
             <span className="text-xs font-medium text-[var(--brand-text-bright)]">Generated Posts</span>
@@ -464,7 +464,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
                 <button
                   key={post.id}
                   onClick={() => setActivePostId(post.id)}
-                  className="w-full text-left rounded-lg bg-[var(--surface-1)] border border-[var(--brand-border)] px-3 py-2.5 hover:border-blue-500/30 transition-colors"
+                  className="w-full text-left rounded-[var(--radius-lg)] bg-[var(--surface-1)] border border-[var(--brand-border)] px-3 py-2.5 hover:border-blue-500/30 transition-colors"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0">
@@ -529,7 +529,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
                 value={briefSearch}
                 onChange={e => setBriefSearch(e.target.value)}
                 placeholder="Search briefs..."
-                className="w-48 pl-8 pr-7 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-[var(--brand-border-hover)] focus:outline-none"
+                className="w-48 pl-8 pr-7 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-[var(--brand-border-hover)] focus:outline-none"
               />
               {briefSearch && (
                 <button onClick={() => setBriefSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]">

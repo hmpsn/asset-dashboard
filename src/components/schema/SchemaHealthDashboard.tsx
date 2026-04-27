@@ -62,7 +62,7 @@ function ValidationRow({ record, onRevalidate }: { record: ValidationRecord; onR
   const hasDetails = record.errors.length > 0 || record.warnings.length > 0 || record.richResults.length > 0;
 
   return (
-    <div className="border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: '6px 12px 6px 12px' }}>
+    <div className="border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: '6px 12px 6px 12px' /* asymmetric-radius-ok */ }}>
       <div className="flex items-center gap-3 px-3 py-2.5 bg-[var(--surface-2)]">
         {hasDetails && (
           <button

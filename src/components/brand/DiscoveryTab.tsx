@@ -10,7 +10,7 @@ import type {
   DiscoverySource, DiscoveryExtraction,
   SourceType, ExtractionStatus,
 } from '../../../shared/types/brand-engine';
-import { SectionCard, EmptyState, Skeleton, Icon, Button, cn } from '../ui';
+import { SectionCard, EmptyState, Skeleton, Icon, Button, cn, ConfirmDialog } from '../ui';
 import { useToast } from '../Toast';
 
 interface Props {
@@ -77,6 +77,7 @@ interface ExtractionCardProps {
 
 function ExtractionCard({ extraction, onUpdate }: ExtractionCardProps) {
   const [acting, setActing] = useState<'accept' | 'dismiss' | null>(null);
+  const [confirmDismiss, setConfirmDismiss] = useState(false);
 
   const handleAccept = async () => {
     setActing('accept');
@@ -87,8 +88,7 @@ function ExtractionCard({ extraction, onUpdate }: ExtractionCardProps) {
     }
   };
 
-  const handleDismiss = async () => {
-    if (!window.confirm('Dismiss this extraction? It will be hidden from the pending queue.')) return;
+  const executeDismiss = async () => {
     setActing('dismiss');
     try {
       await onUpdate(extraction.id, { status: 'dismissed' });
@@ -97,7 +97,11 @@ function ExtractionCard({ extraction, onUpdate }: ExtractionCardProps) {
     }
   };
 
-  return (
+  const handleDismiss = () => {
+    setConfirmDismiss(true);
+  };
+
+  return (<>
     <SectionCard>
       <div className="space-y-3">
         {/* Header row */}
@@ -170,6 +174,20 @@ function ExtractionCard({ extraction, onUpdate }: ExtractionCardProps) {
         )}
       </div>
     </SectionCard>
+
+    <ConfirmDialog
+      open={confirmDismiss}
+      title="Dismiss Extraction"
+      message="Dismiss this extraction? It will be hidden from the pending queue."
+      variant="destructive"
+      confirmLabel="Dismiss"
+      onConfirm={() => {
+        setConfirmDismiss(false);
+        executeDismiss();
+      }}
+      onCancel={() => setConfirmDismiss(false)}
+    />
+  </>
   );
 }
 
@@ -533,7 +551,7 @@ function UploadZone({ workspaceId, onUploaded, onCancel }: UploadZoneProps) {
 interface SourceRowProps {
   source: DiscoverySource;
   onProcess: (source: DiscoverySource) => Promise<void>;
-  onDelete: (source: DiscoverySource) => Promise<void>;
+  onDelete: (source: DiscoverySource) => void;
   onViewExtractions: (source: DiscoverySource) => void;
   processing: boolean;
   anyProcessing: boolean;
@@ -679,6 +697,7 @@ function SourcesList({ workspaceId, sources, onViewExtractions }: SourcesListPro
   const [showUpload, setShowUpload] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteSource, setConfirmDeleteSource] = useState<DiscoverySource | null>(null);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: queryKeys.admin.discoverySources(workspaceId) });
@@ -708,7 +727,6 @@ function SourcesList({ workspaceId, sources, onViewExtractions }: SourcesListPro
   };
 
   const handleDelete = async (source: DiscoverySource) => {
-    if (!window.confirm(`Delete "${source.filename}"? This will also remove all extractions from this source.`)) return;
     setDeletingId(source.id);
     try {
       await discovery.deleteSource(workspaceId, source.id);
@@ -744,7 +762,7 @@ function SourcesList({ workspaceId, sources, onViewExtractions }: SourcesListPro
     );
   }
 
-  return (
+  return (<>
     <div className="space-y-5">
       {/* Toolbar */}
       {!showUpload && (
@@ -777,7 +795,7 @@ function SourcesList({ workspaceId, sources, onViewExtractions }: SourcesListPro
               key={source.id}
               source={source}
               onProcess={handleProcess}
-              onDelete={handleDelete}
+              onDelete={(s: DiscoverySource) => setConfirmDeleteSource(s)}
               onViewExtractions={onViewExtractions}
               processing={processingId === source.id}
               anyProcessing={processingId !== null}
@@ -787,6 +805,20 @@ function SourcesList({ workspaceId, sources, onViewExtractions }: SourcesListPro
         </div>
       )}
     </div>
+
+    <ConfirmDialog
+      open={!!confirmDeleteSource}
+      title="Delete Source"
+      message={confirmDeleteSource ? `Delete "${confirmDeleteSource.filename}"? This will also remove all extractions from this source.` : ''}
+      variant="destructive"
+      confirmLabel="Delete"
+      onConfirm={() => {
+        if (confirmDeleteSource) handleDelete(confirmDeleteSource);
+        setConfirmDeleteSource(null);
+      }}
+      onCancel={() => setConfirmDeleteSource(null)}
+    />
+  </>
   );
 }
 
