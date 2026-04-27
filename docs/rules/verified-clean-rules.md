@@ -142,7 +142,7 @@ explicit justification.
 **Count: 74 verified-clean rules.**
 
 > Note: `Hand-rolled gradient CTA button` (added in Phase 5 Phase 3) ships at
-> warn severity because a full-repo `--all` scan finds ~10 remaining
+> warn severity because a full-repo `--all` scan finds ~11 remaining
 > hand-rolled gradient CTAs across older surfaces. Promote to error in a
 > follow-up PR after the dedicated migration sweep clears the backlog.
 

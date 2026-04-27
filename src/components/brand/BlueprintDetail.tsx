@@ -305,6 +305,7 @@ function CopyActionButtons({
   return (
     <>
       {hasCopy ? (
+        // pr-check-disable-next-line -- toggle CTA conditionally applies the gradient only when !isReviewing; Button primitive's primary variant does not support a two-state conditional gradient
         <button
           onClick={isReviewing ? onCloseReview : onReviewCopy}
           className={cn(

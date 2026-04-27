@@ -4134,11 +4134,13 @@ export const CHECKS: Check[] = [
     pathFilter: 'src/',
     exclude: ['src/components/ui/Button.tsx'],
     message: 'Use <Button variant="primary"> from src/components/ui/ instead of inlining bg-gradient-to-r from-teal-600 to-emerald-600. The primitive owns the canonical gradient, hover, disabled, and focus states.',
-    // Ships at warn — TemplateEditor migration in this PR cleared the staging
-    // worktree but a full-repo --all scan finds ~10 remaining hand-rolled
-    // gradient CTAs across older surfaces (ClientChatWidget, PricingConfirmationModal,
-    // SchemaPageCard, ContentSubscriptions, etc). Promote to error in a follow-up
-    // PR after a focused migration sweep.
+    // Ships at warn — TemplateEditor + ClientDashboardTab + AiSuggested +
+    // BlueprintDetail migrations in this PR cleared the most-touched surfaces,
+    // but a full-repo --all scan still finds ~11 remaining hand-rolled gradient
+    // CTAs across older areas (ConfirmDialog, ClientChatWidget,
+    // PricingConfirmationModal, SchemaPageCard, ContentSubscriptions,
+    // FeatureFlagSettings, etc). Promote to error in a follow-up PR after a
+    // focused migration sweep.
     severity: 'warn',
     rationale: 'Prevents primary-CTA drift across hand-rolled gradient buttons. Future gradients must extend Button rather than reinvent its gradient inline.',
     claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
@@ -4168,8 +4170,13 @@ export const CHECKS: Check[] = [
         for (let i = 0; i < lines.length; i++) {
           if (!gradRe.test(lines[i])) continue;
           if (hasHatchInRange(lines, i)) continue;
+          // 8-line proximity window matches the hatch-lookback span. Multi-line
+          // <button> JSX with many props commonly puts className 5-7 lines below
+          // the opening tag — Devin Review on PR #319 flagged that the original
+          // 4-line window silently missed BlueprintDetail Review Copy where
+          // <button is 6 lines above the gradient class.
           let isButton = false;
-          for (let j = Math.max(0, i - 4); j <= i; j++) {
+          for (let j = Math.max(0, i - 8); j <= i; j++) {
             if (/<button\b/.test(lines[j])) { isButton = true; break; }
           }
           if (!isButton) continue;
@@ -4209,6 +4216,13 @@ export const CHECKS: Check[] = [
     pattern: 'text-\\[[0-9]+px\\]',
     fileGlobs: ['*.ts', '*.tsx'],
     pathFilter: 'src/',
+    exclude: [
+      // Button primitive owns the canonical sm-size text scale (text-[11px])
+      // — it is the source-of-truth this rule routes other code TOWARD, so
+      // excluded for symmetry with the raw-zinc rules below. Devin Review on
+      // PR #319 flagged the asymmetric exclusion handling.
+      'src/components/ui/Button.tsx',
+    ],
     excludeLines: ['// arbitrary-text-ok'],
     message: 'Use a .t-* typography utility (.t-caption, .t-caption-sm, .t-stat-sm, etc.) instead of text-[Npx]. The .t-* classes pair font-size with the correct line-height and family. See src/index.css for the 14 utilities. Add // arbitrary-text-ok inline if the size is genuinely outside the type scale (rare).',
     severity: 'warn',
