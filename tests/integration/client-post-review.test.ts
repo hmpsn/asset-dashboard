@@ -254,6 +254,13 @@ describe('PATCH /api/public/content-posts/:wsId/:postId/client-edit', () => {
     // Verify post is actually persisted (in-process check)
     const persisted = getPost(testWsId, post.id);
     expect(persisted?.sections[0].content).toBe('Updated section content by client.');
+
+    // Verify totalWordCount was recomputed (Fix 1):
+    // intro: "Test introduction" = 2 words
+    // section: 5 words (edited from 3)
+    // conclusion: "Test conclusion" = 2 words
+    // Total: 2 + 5 + 2 = 9 words
+    expect(persisted?.totalWordCount).toBe(9);
   });
 
   it('rejects edit when request is not in post_review', async () => {
