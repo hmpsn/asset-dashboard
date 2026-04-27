@@ -488,7 +488,7 @@ export function ContentTab({
                     {brief.contentChecklist && brief.contentChecklist.length > 0 && (
                       <div className="space-y-3">
                         <div className="t-caption-sm text-[var(--brand-text-muted)] font-medium tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-[var(--surface-3)]">Content Checklist</div>
-                        <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] border border-[var(--brand-border)] divide-y divide-zinc-800/50">
+                        <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] border border-[var(--brand-border)] divide-y divide-[var(--brand-border)]/50">
                           {brief.contentChecklist.map((item: string, i: number) => (
                             <div key={i} className="flex items-start gap-2.5 px-4 py-2.5">
                               <div className="w-4 h-4 mt-0.5 rounded border border-[var(--brand-border-strong)] flex-shrink-0" />
