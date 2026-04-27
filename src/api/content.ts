@@ -127,13 +127,13 @@ export const publicPostReview = {
     title?: string;
     metaDescription?: string;
     introduction?: string;
-    sections?: GeneratedPost['sections'];
+    sections?: Array<{ index: number; heading: string; content: string; wordCount: number }>;
     conclusion?: string;
   }) =>
     patch<GeneratedPost>(`/api/public/content-posts/${wsId}/${postId}/client-edit`, updates),
 
   approvePost: (wsId: string, reqId: string) =>
-    post<ContentTopicRequest>(`/api/public/content-request/${wsId}/${reqId}/approve-post`, {}),
+    post<ContentTopicRequest>(`/api/public/content-request/${wsId}/${reqId}/approve-post`),
 
   requestPostChanges: (wsId: string, reqId: string, feedback: string) =>
     post<ContentTopicRequest>(`/api/public/content-request/${wsId}/${reqId}/request-post-changes`, { feedback }),
