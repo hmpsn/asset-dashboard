@@ -79,6 +79,11 @@ router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('w
       postIdToSet = post?.id;
     }
   }
+  if (status === 'post_review' && !postIdToSet) {
+    return res.status(400).json({
+      error: 'No generated post found for this request. Generate a post before sending to client.',
+    });
+  }
   let updated;
   try {
     updated = updateContentRequest(req.params.workspaceId, req.params.id, {
@@ -97,7 +102,7 @@ router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('w
     const wsInfo = getWorkspace(req.params.workspaceId);
     if (wsInfo?.clientEmail) {
       const origin = req.get('origin') || req.get('referer')?.replace(/\/[^/]*$/, '') || '';
-      const dashUrl = origin ? `${origin}/dashboard/${req.params.workspaceId}?tab=content` : undefined;
+      const dashUrl = origin ? `${origin}/client/${req.params.workspaceId}/content` : undefined;
       notifyClientBriefReady({ clientEmail: wsInfo.clientEmail, workspaceName: wsInfo.name, workspaceId: req.params.workspaceId, topic: updated.topic, targetKeyword: updated.targetKeyword, dashboardUrl: dashUrl });
     }
   }
@@ -106,7 +111,7 @@ router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('w
     const wsInfo = getWorkspace(req.params.workspaceId);
     if (wsInfo?.clientEmail) {
       const origin = req.get('origin') || req.get('referer')?.replace(/\/[^/]*$/, '') || '';
-      const dashUrl = origin ? `${origin}/dashboard/${req.params.workspaceId}?tab=content` : undefined;
+      const dashUrl = origin ? `${origin}/client/${req.params.workspaceId}/content` : undefined;
       notifyClientPostReady({
         clientEmail: wsInfo.clientEmail,
         workspaceName: wsInfo.name,
@@ -138,7 +143,7 @@ router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('w
     const wsInfo = getWorkspace(req.params.workspaceId);
     if (wsInfo?.clientEmail) {
       const origin = req.get('origin') || req.get('referer')?.replace(/\/[^/]*$/, '') || '';
-      const dashUrl = origin ? `${origin}/dashboard/${req.params.workspaceId}?tab=content` : undefined;
+      const dashUrl = origin ? `${origin}/client/${req.params.workspaceId}/content` : undefined;
       notifyClientContentPublished({ clientEmail: wsInfo.clientEmail, workspaceName: wsInfo.name, workspaceId: req.params.workspaceId, topic: updated.topic, targetKeyword: updated.targetKeyword, dashboardUrl: dashUrl });
     }
   }

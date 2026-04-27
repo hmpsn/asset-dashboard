@@ -492,6 +492,12 @@ router.post('/api/public/content-request/:workspaceId/:id/request-post-changes',
   res.json(updated);
 });
 
+// Strip HTML tags. The client-edit UI uses plain-text textareas (it strips tags
+// on edit-entry), so valid public callers send plain text. Server-side strip
+// prevents malicious callers from injecting HTML that would later render via
+// dangerouslySetInnerHTML in admin/client post views.
+const stripHtmlTags = (s: string) => s.replace(/<[^>]+>/g, '');
+
 // Client edits post content (sections, title, meta — NOT status or admin fields)
 router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', validate(clientPostEditSchema), (req, res, next) => {
   const ws = getWorkspace(req.params.workspaceId);
@@ -514,8 +520,8 @@ router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', valid
   const updates: Record<string, unknown> = {};
   if (title !== undefined) updates.title = title;
   if (metaDescription !== undefined) updates.metaDescription = metaDescription;
-  if (introduction !== undefined) updates.introduction = introduction;
-  if (conclusion !== undefined) updates.conclusion = conclusion;
+  if (introduction !== undefined) updates.introduction = stripHtmlTags(introduction);
+  if (conclusion !== undefined) updates.conclusion = stripHtmlTags(conclusion);
   if (sections !== undefined) {
     // CRITICAL: merge client edits with existing section data by index.
     // The client only sends { index, heading, content, wordCount } — the editable fields.
@@ -527,9 +533,9 @@ router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', valid
       const edit = clientSections.find(s => s.index === existing.index);
       if (!edit) return existing; // unedited section — keep as-is
       return {
-        ...existing,           // preserves: targetWordCount, keywords, status, error
-        heading: edit.heading,
-        content: edit.content,
+        ...existing,                           // preserves: targetWordCount, keywords, status, error
+        heading: stripHtmlTags(edit.heading),
+        content: stripHtmlTags(edit.content),
         wordCount: edit.wordCount,
       };
     });

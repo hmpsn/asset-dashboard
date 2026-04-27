@@ -93,13 +93,13 @@ export const requestPostChangesSchema = z.object({
 export const clientPostEditSchema = z.object({
   title: z.string().max(500).optional(),
   metaDescription: z.string().max(500).optional(),
-  introduction: z.string().optional(),
+  introduction: z.string().max(20000).optional(),
   sections: z.array(z.object({
     index: z.number(),
-    heading: z.string(),
-    content: z.string(),
+    heading: z.string().max(500),
+    content: z.string().max(100000),
     wordCount: z.number(),
     // targetWordCount, keywords, status intentionally omitted — merged from DB by route
   })).optional(),
-  conclusion: z.string().optional(),
+  conclusion: z.string().max(20000).optional(),
 }).strict();
