@@ -103,7 +103,10 @@ export type ActivityType =
   | 'copy_pattern_removed'
   | 'diagnostic_completed'
   | 'portal_session'
-  | 'action_backlog_alert';
+  | 'action_backlog_alert'
+  | 'post_approved'
+  | 'post_changes_requested'
+  | 'post_client_edit';
 
 export interface ActivityEntry {
   id: string;
