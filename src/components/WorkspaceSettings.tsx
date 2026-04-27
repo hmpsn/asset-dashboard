@@ -7,7 +7,7 @@ import { ClientDashboardTab } from './settings/ClientDashboardTab';
 import { BusinessProfileTab } from './settings/BusinessProfileTab';
 import { IntelligenceProfileTab } from './settings/IntelligenceProfileTab';
 import { PublishSettings } from './PublishSettings';
-import { SectionCard } from './ui';
+import { SectionCard, Icon } from './ui';
 import { get, patch, post } from '../api/client';
 import { themeColor } from './ui/constants';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
@@ -145,7 +145,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                 }
                 if (e.key === 'Escape') { setNameDraft(workspaceName); setEditingName(false); }
               }}
-              className="text-lg font-semibold text-zinc-200 bg-zinc-800 border border-zinc-600 rounded px-2 py-0.5 focus:outline-none focus:border-teal-500"
+              className="text-lg font-semibold text-[var(--brand-text-bright)] bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded px-2 py-0.5 focus:outline-none focus:border-teal-500"
             />
             <button
               disabled={savingName || !nameDraft.trim()}
@@ -161,30 +161,30 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
               }}
               className="p-1 rounded hover:bg-teal-600/20 text-teal-400 transition-colors"
             >
-              <Check className="w-4 h-4" />
+              <Icon as={Check} size="md" />
             </button>
-            <button onClick={() => { setNameDraft(workspaceName); setEditingName(false); }} className="p-1 rounded hover:bg-zinc-700 text-zinc-400 transition-colors">
-              <X className="w-4 h-4" />
+            <button onClick={() => { setNameDraft(workspaceName); setEditingName(false); }} className="p-1 rounded hover:bg-[var(--surface-3)] text-[var(--brand-text-muted)] transition-colors">
+              <Icon as={X} size="md" />
             </button>
           </div>
         ) : (
           <div className="flex items-center gap-2 group">
-            <h2 className="text-lg font-semibold text-zinc-200">{workspaceName}</h2>
-            <button onClick={() => { setNameDraft(workspaceName); setEditingName(true); }} className="p-1 rounded hover:bg-zinc-700 text-zinc-500 opacity-0 group-hover:opacity-100 transition-all" title="Rename workspace">
-              <Pencil className="w-3.5 h-3.5" />
+            <h2 className="text-lg font-semibold text-[var(--brand-text-bright)]">{workspaceName}</h2>
+            <button onClick={() => { setNameDraft(workspaceName); setEditingName(true); }} className="p-1 rounded hover:bg-[var(--surface-3)] text-[var(--brand-text-muted)] opacity-0 group-hover:opacity-100 transition-all" title="Rename workspace">
+              <Icon as={Pencil} size="sm" />
             </button>
           </div>
         )}
-        <p className="text-xs text-zinc-500 mt-0.5">
+        <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">
           {webflowSiteName ? `Connected to ${webflowSiteName}` : 'No Webflow site linked'}
         </p>
       </div>
 
       {/* Tab nav */}
-      <nav className="flex items-center gap-1 border-b border-zinc-800">
+      <nav className="flex items-center gap-1 border-b border-[var(--brand-border)]">
         {([['connections', 'Connections'], ['features', 'Features'], ['publishing', 'Publishing'], ['business-profile', 'Business Profile'], ['intelligence-profile', 'Intelligence Profile'], ['dashboard', 'Client Dashboard'], ['export', 'Data Export'], ['llms-txt', 'LLMs.txt']] as [SectionTab, string][]).map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
-            className="px-4 py-2.5 text-xs font-medium border-b-2 transition-colors -mb-px"
+            className="px-4 py-2.5 t-caption font-medium border-b-2 transition-colors -mb-px"
             style={tab === id ? { borderColor: '#2dd4bf', color: '#2dd4bf' } : { borderColor: 'transparent', color: themeColor('#71717a', '#94a3b8') }}>
             {label}
           </button>
@@ -260,7 +260,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
 
       {tab === 'llms-txt' && (
         <SectionCard title="LLMs.txt Configuration">
-          <Suspense fallback={<div className="flex items-center justify-center py-12"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>}>
+          <Suspense fallback={<div className="flex items-center justify-center py-12"><div className="w-5 h-5 border-2 rounded-full animate-spin border-[var(--surface-3)] border-t-teal-400" /></div>}>
             <LlmsTxtGenerator key={`llms-${workspaceId}`} workspaceId={workspaceId} />
           </Suspense>
         </SectionCard>
@@ -269,8 +269,8 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
       {tab === 'export' && (
         <div className="space-y-4">
           <div>
-            <h3 className="text-sm font-semibold text-zinc-200">Data Export</h3>
-            <p className="text-xs text-zinc-500 mt-0.5">Download workspace data as CSV or JSON files.</p>
+            <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Data Export</h3>
+            <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">Download workspace data as CSV or JSON files.</p>
           </div>
           {[
             { key: 'briefs', label: 'Content Briefs', desc: 'All generated content briefs with keywords, titles, and metrics' },
@@ -279,17 +279,17 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
             { key: 'activity', label: 'Activity Log', desc: 'Recent workspace activity (up to 500 entries)' },
             { key: 'payments', label: 'Payments', desc: 'Payment records with amounts, status, and dates' },
           ].map(item => (
-            <div key={item.key} className="bg-zinc-900 border border-zinc-800 px-4 py-3 flex items-center justify-between" style={{ borderRadius: '6px 12px 6px 12px' }}>
+            <div key={item.key} className="bg-[var(--surface-2)] border border-[var(--brand-border)] px-4 py-3 flex items-center justify-between" style={{ borderRadius: 'var(--radius-signature)' }}>
               <div>
-                <div className="text-xs font-medium text-zinc-200">{item.label}</div>
-                <div className="text-[11px] text-zinc-500 mt-0.5">{item.desc}</div>
+                <div className="t-caption font-medium text-[var(--brand-text-bright)]">{item.label}</div>
+                <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{item.desc}</div>
               </div>
               <div className="flex items-center gap-2">
-                <a href={`/api/export/${workspaceId}/${item.key}?format=csv`} download className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
-                  <Download className="w-3 h-3" /> CSV
+                <a href={`/api/export/${workspaceId}/${item.key}?format=csv`} download className="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
+                  <Icon as={Download} size="sm" /> CSV
                 </a>
-                <a href={`/api/export/${workspaceId}/${item.key}?format=json`} download className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-zinc-100 transition-colors">
-                  <Download className="w-3 h-3" /> JSON
+                <a href={`/api/export/${workspaceId}/${item.key}?format=json`} download className="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
+                  <Icon as={Download} size="sm" /> JSON
                 </a>
               </div>
             </div>

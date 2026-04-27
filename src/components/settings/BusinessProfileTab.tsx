@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Building2, Phone, Mail, MapPin, Link2, Clock, Save, Loader2 } from 'lucide-react';
+import { Building2, Phone, Mail, MapPin, Link2, Clock, Save } from 'lucide-react';
 import { put } from '../../api/client';
-import { SectionCard } from '../ui';
+import { SectionCard, Icon, Button } from '../ui';
 
 interface BusinessProfile {
   phone?: string;
@@ -115,20 +115,20 @@ export function BusinessProfileTab({ workspaceId, businessProfile, toast, onSave
     }
   };
 
-  const fieldClass = 'w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors';
-  const labelClass = 'block text-[11px] font-medium text-zinc-400 mb-1';
+  const fieldClass = 'w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors';
+  const labelClass = 'block t-caption-sm font-medium text-[var(--brand-text)] mb-1';
 
   return (
     <div className="space-y-8">
       {/* Header */}
       <SectionCard noPadding>
-        <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
-          <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
-            <Building2 className="w-4 h-4 text-teal-400" />
+        <div className="px-5 py-4 flex items-center gap-3 border-b border-[var(--brand-border)]">
+          <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-teal-500/10 flex items-center justify-center">
+            <Icon as={Building2} size="md" className="text-teal-400" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-zinc-200">Business Profile</h3>
-            <p className="text-xs text-zinc-500">
+            <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Business Profile</h3>
+            <p className="t-caption text-[var(--brand-text-muted)]">
               Verified contact details — used directly in schema without requiring them to appear on each page
             </p>
           </div>
@@ -137,11 +137,11 @@ export function BusinessProfileTab({ workspaceId, businessProfile, toast, onSave
         <div className="px-5 py-5 space-y-5">
           {/* Contact */}
           <div>
-            <h4 className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-3">Contact</h4>
+            <h4 className="t-caption-sm font-semibold text-[var(--brand-text)] uppercase tracking-wider mb-3">Contact</h4>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={labelClass}>
-                  <span className="inline-flex items-center gap-1"><Phone className="w-3 h-3" /> Phone</span>
+                  <span className="inline-flex items-center gap-1"><Icon as={Phone} size="sm" /> Phone</span>
                 </label>
                 <input
                   type="tel"
@@ -153,7 +153,7 @@ export function BusinessProfileTab({ workspaceId, businessProfile, toast, onSave
               </div>
               <div>
                 <label className={labelClass}>
-                  <span className="inline-flex items-center gap-1"><Mail className="w-3 h-3" /> Email</span>
+                  <span className="inline-flex items-center gap-1"><Icon as={Mail} size="sm" /> Email</span>
                 </label>
                 <input
                   type="email"
@@ -168,8 +168,8 @@ export function BusinessProfileTab({ workspaceId, businessProfile, toast, onSave
 
           {/* Address */}
           <div>
-            <h4 className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-3">
-              <span className="inline-flex items-center gap-1"><MapPin className="w-3 h-3" /> Address</span>
+            <h4 className="t-caption-sm font-semibold text-[var(--brand-text)] uppercase tracking-wider mb-3">
+              <span className="inline-flex items-center gap-1"><Icon as={MapPin} size="sm" /> Address</span>
             </h4>
             <div className="space-y-2">
               <div>
@@ -224,10 +224,10 @@ export function BusinessProfileTab({ workspaceId, businessProfile, toast, onSave
 
           {/* Social Profiles */}
           <div>
-            <h4 className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-3">
-              <span className="inline-flex items-center gap-1"><Link2 className="w-3 h-3" /> Social / External Profiles</span>
+            <h4 className="t-caption-sm font-semibold text-[var(--brand-text)] uppercase tracking-wider mb-3">
+              <span className="inline-flex items-center gap-1"><Icon as={Link2} size="sm" /> Social / External Profiles</span>
             </h4>
-            <p className="text-[11px] text-zinc-500 mb-2">Used for Organization sameAs links in schema (Google Business, LinkedIn, Facebook, etc.)</p>
+            <p className="t-caption-sm text-[var(--brand-text-muted)] mb-2">Used for Organization sameAs links in schema (Google Business, LinkedIn, Facebook, etc.)</p>
             <div className="flex gap-2 mb-2">
               <input
                 className={`${fieldClass} flex-1`}
@@ -238,7 +238,7 @@ export function BusinessProfileTab({ workspaceId, businessProfile, toast, onSave
               />
               <button
                 onClick={addSocial}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors whitespace-nowrap"
+                className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors whitespace-nowrap"
               >
                 Add
               </button>
@@ -246,11 +246,11 @@ export function BusinessProfileTab({ workspaceId, businessProfile, toast, onSave
             {(form.socialProfiles || []).length > 0 && (
               <div className="space-y-1">
                 {(form.socialProfiles || []).map(url => (
-                  <div key={url} className="flex items-center justify-between bg-zinc-800 rounded-lg px-3 py-1.5">
-                    <span className="text-[11px] text-zinc-300 truncate">{url}</span>
+                  <div key={url} className="flex items-center justify-between bg-[var(--surface-3)] rounded-[var(--radius-lg)] px-3 py-1.5">
+                    <span className="t-caption-sm text-[var(--brand-text)] truncate">{url}</span>
                     <button
                       onClick={() => removeSocial(url)}
-                      className="ml-2 text-zinc-500 hover:text-red-400 transition-colors shrink-0"
+                      className="ml-2 text-[var(--brand-text-muted)] hover:text-red-400 transition-colors shrink-0"
                       title="Remove"
                     >
                       ×
@@ -263,8 +263,8 @@ export function BusinessProfileTab({ workspaceId, businessProfile, toast, onSave
 
           {/* Hours + Business Info */}
           <div>
-            <h4 className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-3">
-              <span className="inline-flex items-center gap-1"><Clock className="w-3 h-3" /> Business Details</span>
+            <h4 className="t-caption-sm font-semibold text-[var(--brand-text)] uppercase tracking-wider mb-3">
+              <span className="inline-flex items-center gap-1"><Icon as={Clock} size="sm" /> Business Details</span>
             </h4>
             <div className="space-y-3">
               <div>
@@ -300,23 +300,24 @@ export function BusinessProfileTab({ workspaceId, businessProfile, toast, onSave
           </div>
 
           {/* Save */}
-          <div className="flex justify-end pt-2 border-t border-zinc-800">
-            <button
+          <div className="flex justify-end pt-2 border-t border-[var(--brand-border)]">
+            <Button
+              variant="primary"
               onClick={handleSave}
               disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium bg-gradient-to-r from-teal-600 to-emerald-600 text-white hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              loading={saving}
+              icon={saving ? undefined : Save}
             >
-              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
               {saving ? 'Saving…' : 'Save Business Profile'}
-            </button>
+            </Button>
           </div>
         </div>
       </SectionCard>
 
       {/* Context note */}
       <SectionCard variant="subtle">
-        <p className="font-medium text-zinc-400 text-[11px]">How this is used</p>
-        <p className="text-[11px] text-zinc-500 mt-1">Schema generation will inject these values directly into LocalBusiness, Organization, and related schema types — even if they don't appear on the page being analyzed. Contact details verified here also bypass the content-verification step that normally strips data not found in page HTML.</p>
+        <p className="font-medium text-[var(--brand-text)] t-caption-sm">How this is used</p>
+        <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">Schema generation will inject these values directly into LocalBusiness, Organization, and related schema types — even if they don't appear on the page being analyzed. Contact details verified here also bypass the content-verification step that normally strips data not found in page HTML.</p>
       </SectionCard>
     </div>
   );

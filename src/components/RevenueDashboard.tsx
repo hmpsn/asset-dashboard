@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { DollarSign, BarChart3, Users, Package, Trash2, AlertTriangle } from 'lucide-react';
 import { get, del } from '../api/client';
-import { SectionCard, EmptyState, TrendBadge } from './ui';
+import { SectionCard, EmptyState, TrendBadge, Icon, cn } from './ui';
 
 interface RevenueSummary {
   totalRevenue: number;
@@ -28,14 +28,14 @@ function RevenueChart({ months }: { months: RevenueSummary['months'] }) {
     <div className="flex items-end gap-1.5 h-32">
       {months.map((m, i) => (
         <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative">
-          <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+          <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded px-2 py-1 t-caption-sm whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
             {m.month}: {fmtCents(m.revenue)} ({m.count})
           </div>
           <div
             className="w-full rounded-t bg-teal-500/60 hover:bg-teal-400/70 transition-colors min-h-[2px]"
             style={{ height: `${Math.max((m.revenue / maxRevenue) * 100, 2)}%` }}
           />
-          <span className="text-[9px] text-zinc-600 truncate w-full text-center">{m.month.split(' ')[0]}</span>
+          <span className="t-caption-sm text-[var(--brand-text-muted)] truncate w-full text-center">{m.month.split(' ')[0]}</span>
         </div>
       ))}
     </div>
@@ -77,10 +77,10 @@ export function RevenueDashboard() {
   if (loading) {
     return (
       <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
-        <div className="h-8 w-48 bg-zinc-800 rounded animate-pulse" />
+        <div className="h-8 w-48 bg-[var(--surface-3)] rounded animate-pulse" />
         <div className="grid grid-cols-4 gap-4">
           {/* pr-check-disable-next-line -- loading skeleton animation row; not a content card */}
-          {[1, 2, 3, 4].map(i => <div key={i} className="h-24 bg-zinc-900 rounded-xl animate-pulse" />)}
+          {[1, 2, 3, 4].map(i => <div key={i} className="h-24 bg-[var(--surface-2)] rounded-[var(--radius-xl)] animate-pulse" />)}
         </div>
       </div>
     );
@@ -101,19 +101,19 @@ export function RevenueDashboard() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-zinc-200">Revenue Analytics</h2>
+        <h2 className="text-lg font-semibold text-[var(--brand-text-bright)]">Revenue Analytics</h2>
         {!confirmPurge ? (
           <button
             onClick={() => setConfirmPurge(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-red-400/70 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20 transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-red-400/70 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20 transition-all"
           >
-            <Trash2 className="w-3 h-3" /> Purge All
+            <Icon as={Trash2} size="sm" /> Purge All
           </button>
         ) : (
           <div className="flex items-center gap-2">
-            <span className="text-[11px] text-red-400/80 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Delete all {data.totalTransactions} records?</span>
-            <button onClick={handlePurgeAll} className="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-red-300 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 transition-all">Yes, purge</button>
-            <button onClick={() => setConfirmPurge(false)} className="px-2.5 py-1 rounded-lg text-[11px] text-zinc-400 hover:text-zinc-200 bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-800 transition-all">Cancel</button>
+            <span className="t-caption-sm text-red-400/80 flex items-center gap-1"><Icon as={AlertTriangle} size="sm" /> Delete all {data.totalTransactions} records?</span>
+            <button onClick={handlePurgeAll} className="px-2.5 py-1 rounded-[var(--radius-lg)] t-caption-sm font-semibold text-red-300 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 transition-all">Yes, purge</button>
+            <button onClick={() => setConfirmPurge(false)} className="px-2.5 py-1 rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)]/50 hover:bg-[var(--surface-3)] border border-[var(--surface-3)] transition-all">Cancel</button>
           </div>
         )}
       </div>
@@ -122,30 +122,30 @@ export function RevenueDashboard() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <SectionCard noPadding>
           <div className="px-4 py-3">
-            <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 mb-1"><DollarSign className="w-3 h-3" /> Total Revenue</div>
+            <div className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)] mb-1"><Icon as={DollarSign} size="sm" /> Total Revenue</div>
             <div className="text-xl font-bold text-teal-400">{fmtCents(data.totalRevenue)}</div>
-            <div className="text-[11px] text-zinc-500 mt-0.5">{data.totalTransactions} transactions</div>
+            <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{data.totalTransactions} transactions</div>
           </div>
         </SectionCard>
         <SectionCard noPadding>
           <div className="px-4 py-3">
-            <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 mb-1"><BarChart3 className="w-3 h-3" /> This Month</div>
-            <div className="text-xl font-bold text-zinc-200">{fmtCents(data.currentMonthRevenue)}</div>
+            <div className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)] mb-1"><Icon as={BarChart3} size="sm" /> This Month</div>
+            <div className="text-xl font-bold text-[var(--brand-text-bright)]">{fmtCents(data.currentMonthRevenue)}</div>
             <TrendBadge value={Math.round(monthDelta)} showSign hideOnZero={false} label="vs last month" className="mt-0.5" />
           </div>
         </SectionCard>
         <SectionCard noPadding>
           <div className="px-4 py-3">
-            <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 mb-1"><Users className="w-3 h-3" /> Active Clients</div>
-            <div className="text-xl font-bold text-zinc-200">{data.byWorkspace.length}</div>
-            <div className="text-[11px] text-zinc-500 mt-0.5">with paid transactions</div>
+            <div className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)] mb-1"><Icon as={Users} size="sm" /> Active Clients</div>
+            <div className="text-xl font-bold text-[var(--brand-text-bright)]">{data.byWorkspace.length}</div>
+            <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">with paid transactions</div>
           </div>
         </SectionCard>
         <SectionCard noPadding>
           <div className="px-4 py-3">
-            <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 mb-1"><Package className="w-3 h-3" /> Avg Transaction</div>
-            <div className="text-xl font-bold text-zinc-200">{fmtCents(Math.round(data.totalRevenue / data.totalTransactions))}</div>
-            <div className="text-[11px] text-zinc-500 mt-0.5">{data.byProduct.length} product types</div>
+            <div className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)] mb-1"><Icon as={Package} size="sm" /> Avg Transaction</div>
+            <div className="text-xl font-bold text-[var(--brand-text-bright)]">{fmtCents(Math.round(data.totalRevenue / data.totalTransactions))}</div>
+            <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{data.byProduct.length} product types</div>
           </div>
         </SectionCard>
       </div>
@@ -153,7 +153,7 @@ export function RevenueDashboard() {
       {/* Monthly revenue chart */}
       <SectionCard noPadding>
         <div className="px-4 py-3">
-          <div className="text-xs font-medium text-zinc-200 mb-3">Monthly Revenue (Last 12 Months)</div>
+          <div className="t-caption font-medium text-[var(--brand-text-bright)] mb-3">Monthly Revenue (Last 12 Months)</div>
           <RevenueChart months={data.months} />
         </div>
       </SectionCard>
@@ -162,15 +162,15 @@ export function RevenueDashboard() {
         {/* Revenue by workspace */}
         <SectionCard noPadding>
           <div className="px-4 py-3">
-            <div className="text-xs font-medium text-zinc-200 mb-3">Revenue by Client</div>
+            <div className="t-caption font-medium text-[var(--brand-text-bright)] mb-3">Revenue by Client</div>
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {data.byWorkspace.map(ws => (
                 <div key={ws.workspaceId} className="flex items-center justify-between">
                   <div>
-                    <div className="text-xs text-zinc-300">{ws.name}</div>
-                    <div className="text-[11px] text-zinc-600">{ws.count} transactions</div>
+                    <div className="t-caption text-[var(--brand-text)]">{ws.name}</div>
+                    <div className="t-caption-sm text-[var(--brand-text-muted)]">{ws.count} transactions</div>
                   </div>
-                  <div className="text-xs font-semibold text-teal-400">{fmtCents(ws.revenue)}</div>
+                  <div className="t-caption font-semibold text-teal-400">{fmtCents(ws.revenue)}</div>
                 </div>
               ))}
             </div>
@@ -180,15 +180,15 @@ export function RevenueDashboard() {
         {/* Revenue by product */}
         <SectionCard noPadding>
           <div className="px-4 py-3">
-            <div className="text-xs font-medium text-zinc-200 mb-3">Revenue by Product</div>
+            <div className="t-caption font-medium text-[var(--brand-text-bright)] mb-3">Revenue by Product</div>
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {data.byProduct.map(prod => (
                 <div key={prod.productType} className="flex items-center justify-between">
                   <div>
-                    <div className="text-xs text-zinc-300">{fmtProductType(prod.productType)}</div>
-                    <div className="text-[11px] text-zinc-600">{prod.count} sold</div>
+                    <div className="t-caption text-[var(--brand-text)]">{fmtProductType(prod.productType)}</div>
+                    <div className="t-caption-sm text-[var(--brand-text-muted)]">{prod.count} sold</div>
                   </div>
-                  <div className="text-xs font-semibold text-teal-400">{fmtCents(prod.revenue)}</div>
+                  <div className="t-caption font-semibold text-teal-400">{fmtCents(prod.revenue)}</div>
                 </div>
               ))}
             </div>
@@ -199,11 +199,11 @@ export function RevenueDashboard() {
       {/* Recent transactions */}
       <SectionCard noPadding>
         <div className="px-4 py-3">
-          <div className="text-xs font-medium text-zinc-200 mb-3">Recent Transactions</div>
+          <div className="t-caption font-medium text-[var(--brand-text-bright)] mb-3">Recent Transactions</div>
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="w-full t-caption">
               <thead>
-                <tr className="text-zinc-500 text-left">
+                <tr className="text-[var(--brand-text-muted)] text-left">
                   <th className="pb-2 font-medium">Client</th>
                   <th className="pb-2 font-medium">Product</th>
                   <th className="pb-2 font-medium text-right">Amount</th>
@@ -211,21 +211,21 @@ export function RevenueDashboard() {
                   <th className="pb-2 w-8" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800">
+              <tbody className={cn('divide-y divide-[var(--brand-border)]')}>
                 {data.recent.map(tx => (
                   <tr key={tx.id} className="group">
-                    <td className="py-2 text-zinc-300">{tx.workspaceName}</td>
-                    <td className="py-2 text-zinc-400">{fmtProductType(tx.productType)}</td>
+                    <td className="py-2 text-[var(--brand-text)]">{tx.workspaceName}</td>
+                    <td className="py-2 text-[var(--brand-text-muted)]">{fmtProductType(tx.productType)}</td>
                     <td className="py-2 text-teal-400 font-medium text-right">{fmtCents(tx.amount)}</td>
-                    <td className="py-2 text-zinc-500 text-right">{new Date(tx.paidAt).toLocaleDateString()}</td>
+                    <td className="py-2 text-[var(--brand-text-muted)] text-right">{new Date(tx.paidAt).toLocaleDateString()}</td>
                     <td className="py-2 text-right">
                       <button
                         onClick={() => handleDelete(tx.id)}
                         disabled={deleting === tx.id}
-                        className="p-1 rounded opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50"
+                        className="p-1 rounded opacity-0 group-hover:opacity-100 text-[var(--brand-border-hover)] hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50"
                         title="Delete this transaction"
                       >
-                        <Trash2 className="w-3 h-3" />
+                        <Icon as={Trash2} size="sm" />
                       </button>
                     </td>
                   </tr>
