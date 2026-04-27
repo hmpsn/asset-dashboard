@@ -985,7 +985,8 @@ export const CHECKS: Check[] = [
     exclude: ['src/components/ui/TrendBadge.tsx'],
     excludeLines: ['// trend-badge-ok'],
     message: 'Use <TrendBadge value={delta} /> from src/components/ui/ instead of hand-rolled TrendingUp/TrendingDown ternaries. Props: value, suffix, invert, showSign, label, size, hideOnZero.',
-    severity: 'warn',
+    // Promoted warn → error in Phase 5 Phase 3 (2026-04-25) after backlog reached zero.
+    severity: 'error',
     rationale: 'Hand-rolled trend badges drift in color (text-green-400 vs text-emerald-400), sign handling, and zero-state across 7+ callsites. <TrendBadge> consolidates the canonical form.',
     claudeMdRef: '#design-system--the-three-laws-of-color',
   },
@@ -4070,7 +4071,8 @@ export const CHECKS: Check[] = [
       'public/styleguide.css',
     ],
     message: 'Use transition-duration-[120ms], transition-duration-[180ms], or transition-duration-[400ms]. Non-standard durations break motion consistency.',
-    severity: 'warn',
+    // Promoted warn → error in Phase 5 Phase 3 (2026-04-25) after backlog reached zero.
+    severity: 'error',
     rationale: 'Enforces the three-speed motion system: 120ms (micro), 180ms (standard), 400ms (entrance).',
     claudeMdRef: '#design-system--the-three-laws-of-color',
     customCheck: (files) => {
@@ -4092,6 +4094,210 @@ export const CHECKS: Check[] = [
       return violations;
     },
   },
+
+  // ─── Phase 5 Phase 3 — Design system enforcement hardening ───────────────────
+  // Locks in the Phase 2 codemod gains. Error-severity rules below have a
+  // verified zero-hit precondition (the one TemplateEditor gradient was migrated
+  // in the same PR that introduced this rule). Warn-severity rules ratchet the
+  // long-tail backlogs identified during Phase 3 audit (text-[Npx], raw zinc
+  // utilities, hardcoded radii) — promote to error once each backlog reaches
+  // zero. See docs/superpowers/plans/2026-04-24-design-system-phase5-sweep.md.
+  {
+    // The rose- and pink- hue families are not in the Three Laws of Color
+    // palette. Forbidden alongside violet/indigo. Ships at error because the
+    // backlog is genuinely zero (verified 2026-04-25). Word-boundary anchor
+    // prevents `prose-` (Tailwind typography plugin) false positives.
+    name: 'Forbidden hues (rose/pink) in components',
+    pattern: '\\b(rose|pink)-[0-9]',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    message: 'rose- and pink- are forbidden. Use teal (actions), blue (data), emerald (success), amber (warning), or red (error) per the Three Laws of Color.',
+    severity: 'error',
+    rationale: 'Prevents the Three Laws palette from drifting via new rose/pink imports — the same class of bug that violet/indigo represented before they were banned.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+  },
+  {
+    // Hand-rolled gradient CTA: <button> with `bg-gradient-to-{r,l} from-(teal|emerald) ... to-(teal|emerald)`.
+    // The Button primitive (src/components/ui/Button.tsx variant="primary") owns the
+    // canonical teal→emerald gradient. Inline gradients drift in: shadow handling,
+    // disabled opacity, focus ring, icon-size mapping, and gap. Verified zero-hit
+    // after migrating the two TemplateEditor sites in the same PR.
+    //
+    // We match the gradient classes directly (one line) rather than scanning
+    // multi-line `<button>` JSX — gradients in <a>, <Link>, or div elements
+    // are caught by `Forbidden hues` only if they use violet/indigo/rose/pink,
+    // so this rule narrows to gradient-CTA buttons. False positives possible
+    // for legit non-CTA gradients (loading bars, charts) — those use `<div>`,
+    // not `<button>`, so the `<button` proximity scan filters them out.
+    name: 'Hand-rolled gradient CTA button',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/',
+    exclude: ['src/components/ui/Button.tsx'],
+    message: 'Use <Button variant="primary"> from src/components/ui/ instead of inlining bg-gradient-to-r from-teal-600 to-emerald-600. The primitive owns the canonical gradient, hover, disabled, and focus states.',
+    // Ships at warn — TemplateEditor migration in this PR cleared the staging
+    // worktree but a full-repo --all scan finds ~10 remaining hand-rolled
+    // gradient CTAs across older surfaces (ClientChatWidget, PricingConfirmationModal,
+    // SchemaPageCard, ContentSubscriptions, etc). Promote to error in a follow-up
+    // PR after a focused migration sweep.
+    severity: 'warn',
+    rationale: 'Prevents primary-CTA drift across hand-rolled gradient buttons. Future gradients must extend Button rather than reinvent its gradient inline.',
+    claudeMdRef: '#ui-primitives--always-check-before-hand-rolling',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Match an inline gradient that uses teal/emerald hue stops. Multi-line
+      // JSX is normalized by joining each <button> open-tag to its className.
+      // Simpler: scan each line for the gradient signature, then look up to
+      // 4 lines back for `<button` to confirm it is a CTA (not a div banner
+      // or a chart fill).
+      const gradRe = /bg-gradient-to-[rl][^"'\s]*\s+from-(teal|emerald)-\d{3}[^"'\s]*\s+(?:[^"]*\s+)?to-(teal|emerald)-\d{3}/;
+      // Hatch lookback covers up to 8 lines because multi-line JSX commonly
+      // places className= 4-6 lines below the opening tag (and the hatch
+      // comment sits above the opening tag). The same pattern is used by
+      // Hand-rolled card div / SectionCard rules.
+      const hasHatchInRange = (lines: string[], i: number, span = 8): boolean => {
+        for (let j = Math.max(0, i - span); j <= i; j++) {
+          if (lines[j].includes('pr-check-disable-next-line')) return true;
+        }
+        return false;
+      };
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!gradRe.test(lines[i])) continue;
+          if (hasHatchInRange(lines, i)) continue;
+          let isButton = false;
+          for (let j = Math.max(0, i - 4); j <= i; j++) {
+            if (/<button\b/.test(lines[j])) { isButton = true; break; }
+          }
+          if (!isButton) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // Three Laws of Color, Law #3: success/score uses emerald, never green.
+    // CLAUDE.md explicitly forbids `text-green-400` for success/score indicators —
+    // emerald and green are distinct hues and emerald is canonical. Verified zero
+    // backlog (2026-04-25). The rule covers the full text-green-{N} family
+    // because the rationale (emerald canonicality) applies to every shade.
+    name: 'text-green-{N} for success/score (use emerald)',
+    pattern: 'text-green-[0-9]',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    excludeLines: ['// green-ok'],
+    message: 'Use text-emerald-400 (or scoreColorClass() for scores). Per the Three Laws of Color, emerald is the canonical success hue — green-* drifts the palette. If green is genuinely intended (non-success indicator like an unrelated brand or chart series), add // green-ok inline.',
+    severity: 'error',
+    rationale: 'Mechanizes the Three Laws Law #3 emerald-vs-green distinction. The CLAUDE.md warning is otherwise unenforced, and the bug recurs every codemod batch as workers default to "green = success" from training data.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+  },
+  {
+    // Long-tail warn rules (ship at warn, ratchet to error per backlog clear):
+
+    // Arbitrary text sizes (`text-[Npx]`) bypass the .t-* typography utility
+    // system. The 14 .t-* classes (t-hero, t-h1, t-h2, t-stat, t-stat-sm,
+    // t-page, t-body, t-ui, t-label, t-caption, t-caption-sm, t-mono, t-micro)
+    // own the canonical font-size + line-height + family + weight pairing.
+    // Inlining `text-[Npx]` drifts line-height (defaults to Tailwind's
+    // `text-base` line-height of 1.5) and never picks up font-family
+    // overrides. Backlog: ~318 sites at audit.
+    name: 'Arbitrary pixel text-size (use .t-* utility)',
+    pattern: 'text-\\[[0-9]+px\\]',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    excludeLines: ['// arbitrary-text-ok'],
+    message: 'Use a .t-* typography utility (.t-caption, .t-caption-sm, .t-stat-sm, etc.) instead of text-[Npx]. The .t-* classes pair font-size with the correct line-height and family. See src/index.css for the 14 utilities. Add // arbitrary-text-ok inline if the size is genuinely outside the type scale (rare).',
+    severity: 'warn',
+    rationale: 'Inline pixel text-sizes drift line-height and font-family because Tailwind only sets the size — the matching leading and font-family come from the .t-* utility wrapper.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+  },
+  {
+    // Raw `text-zinc-N` utilities bypass the --brand-text-{bright,muted,dim}
+    // token semantics. Light theme exists (Phase 5 Phase 4 work) but
+    // theme-responsive switching only kicks in for tokens, not for hardcoded
+    // zinc shades. Ships at warn — backlog ~210 sites.
+    name: 'Raw text-zinc-N (use --brand-text-* token)',
+    pattern: 'text-zinc-[0-9]+',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    exclude: [
+      'src/components/ui/Button.tsx',                  // Button primitive owns its own zinc shades for variants
+      'src/components/StripePaymentForm.tsx',           // Stripe Elements is theme:'night' — must stay dark regardless of theme
+      'src/components/StripePaymentModal.tsx',          // Stripe modal must be ALWAYS DARK
+    ],
+    excludeLines: ['// raw-zinc-ok'],
+    message: 'Use text-[var(--brand-text)], text-[var(--brand-text-bright)], or text-[var(--brand-text-muted)] instead of text-zinc-N. Raw zinc shades do not theme-switch in light mode. Add // raw-zinc-ok inline if dark-only is intentional (e.g. always-dark surfaces like Stripe Elements).',
+    severity: 'warn',
+    rationale: 'Light-theme parity requires every text color to flow through the --brand-text-* token system. Raw text-zinc-N is dark-only and produces invisible-on-light bugs.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+  },
+  {
+    // Same rationale as text-zinc, applied to backgrounds. Use --surface-{1,2,3}
+    // for the three-tier elevation. Backlog ~185 sites.
+    name: 'Raw bg-zinc-N (use --surface-* token)',
+    pattern: 'bg-zinc-[0-9]+',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    exclude: [
+      'src/components/ui/Button.tsx',
+      'src/components/StripePaymentForm.tsx',
+      'src/components/StripePaymentModal.tsx',
+    ],
+    excludeLines: ['// raw-zinc-ok'],
+    message: 'Use bg-[var(--surface-1)], bg-[var(--surface-2)], or bg-[var(--surface-3)] instead of bg-zinc-N. Raw zinc backgrounds do not theme-switch. Add // raw-zinc-ok inline if dark-only is intentional.',
+    severity: 'warn',
+    rationale: 'Light-theme parity requires the three-tier --surface system. Raw bg-zinc-N produces dark-on-light invisible-element bugs.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+  },
+  {
+    // Same rationale, applied to borders. Use --brand-border / --brand-border-hover.
+    // Backlog ~119 sites.
+    name: 'Raw border-zinc-N (use --brand-border token)',
+    pattern: 'border-zinc-[0-9]+',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    exclude: [
+      'src/components/ui/Button.tsx',
+      'src/components/StripePaymentForm.tsx',
+      'src/components/StripePaymentModal.tsx',
+    ],
+    excludeLines: ['// raw-zinc-ok'],
+    message: 'Use border-[var(--brand-border)] or border-[var(--brand-border-hover)] instead of border-zinc-N. Raw zinc borders do not theme-switch. Add // raw-zinc-ok inline if dark-only is intentional.',
+    severity: 'warn',
+    rationale: 'Light-theme parity requires the --brand-border token system. Raw border-zinc-N produces wrong-contrast borders in light mode.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+  },
+  {
+    // Inline asymmetric border-radius via style={{ borderRadius: '10px 24px 10px 24px' }}.
+    // The brand asymmetric corner is the --radius-signature / --radius-signature-lg
+    // token, which SectionCard already applies. Hand-rolled values drift the
+    // exact pixel pairing (10/24 vs 8/20 vs 12/28) and bypass the SectionCard
+    // ownership audit. Backlog ~114 sites.
+    name: 'Inline asymmetric border-radius (use --radius-signature token)',
+    pattern: 'borderRadius:\\s*[\'"][0-9]+[a-z%]+[[:space:]][0-9]',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    exclude: [
+      'src/components/ui/SectionCard.tsx',
+    ],
+    excludeLines: ['// asymmetric-radius-ok'],
+    message: 'Use SectionCard (which applies --radius-signature-lg automatically) or var(--radius-signature) / var(--radius-signature-lg) tokens instead of inline asymmetric borderRadius values. The brand corner is centrally owned. Add // asymmetric-radius-ok inline if the surface genuinely needs a one-off corner.',
+    severity: 'warn',
+    rationale: 'Hand-rolled asymmetric corners drift from the brand 10/24 pairing and bypass the SectionCard ownership audit. Centralizing through tokens keeps every brand-signature surface in lockstep.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+  },
+
+  // ─── Phase 5 Phase 3 — Promotions: warn → error ──────────────────────────────
+  // Rules whose backlog reached zero are upgraded to error so they cannot
+  // regress. Verified zero-hit at promotion time (2026-04-25):
+  //   - Hand-rolled trend badge: 0
+  //   - Non-standard transition duration: 0
+  // Hardcoded card radius (`rounded-xl` outside ui/) still has 26 hits — stays
+  // at warn until the rounded-literal cleanup PR drives it to zero.
 
   // ─── Phase 5 — Token authority ───────────────────────────────────────────────
   {

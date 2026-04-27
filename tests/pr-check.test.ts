@@ -4420,6 +4420,10 @@ describe('Meta: customCheck rule name registry', () => {
     // space-y-* on outer never reaches children, and p[xy]?-* doubles unless
     // noPadding is set. Memorialized in feedback_sectioncard_classname_double_wrap.md.
     'SectionCard className double-wrap trap (space-y-* always wrong; p[xy]?-* needs noPadding)',
+    // Phase 5 Phase 3 enforcement hardening (2026-04-25) — gradient CTA buttons
+    // must use <Button variant="primary">. Locked in after migrating the two
+    // TemplateEditor sites that were the last hand-rolled gradient CTAs.
+    'Hand-rolled gradient CTA button',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -4960,10 +4964,12 @@ describe('Rule: SVG with hardcoded dark fill/stroke', () => {
 describe('Pattern rule: Hand-rolled trend badge', () => {
   const RULE = CHECKS.find(c => c.name === 'Hand-rolled trend badge')!;
 
-  it('rule exists with warn severity', () => {
+  // Severity promoted from warn → error in Phase 5 Phase 3 (2026-04-25) after
+  // backlog reached zero. See scripts/pr-check.ts comment on the rule.
+  it('rule exists with error severity', () => {
     expect(RULE).toBeDefined();
     expect(RULE.pattern).toBeTruthy();
-    expect(RULE.severity).toBe('warn');
+    expect(RULE.severity).toBe('error');
     expect(RULE.pathFilter).toBe('src/components/');
   });
 
@@ -5408,6 +5414,329 @@ describe('Rule: SectionCard className double-wrap trap (space-y-* always wrong; 
       'type X = SectionCardProps; const y: SectionCardProps = { className: "space-y-2" };\n'
     );
     const hits = runRule(RULE, [probe]);
+    expect(hits.length).toBe(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Phase 5 Phase 3 — Design system enforcement hardening
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Six new rules added to lock in the Phase 2 codemod gains. Tests verify that
+// each rule (a) flags the canonical violation pattern and (b) does not flag
+// the canonical correct pattern.
+
+describe('Rule: Forbidden hues (rose/pink) in components', () => {
+  function makeRule(): Check {
+    const rule = CHECKS.find((c) => c.name === 'Forbidden hues (rose/pink) in components');
+    if (!rule) throw new Error('rule not found in CHECKS');
+    return rule;
+  }
+
+  it('flags rose-{N} usage', () => {
+    const probe = write(
+      uniqPath('rose', 'probe.tsx'),
+      '<div className="text-rose-400 bg-rose-500/10">x</div>\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('flags pink-{N} usage', () => {
+    const probe = write(
+      uniqPath('pink', 'probe.tsx'),
+      '<div className="border-pink-300">y</div>\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('does NOT flag prose- (Tailwind typography plugin substring)', () => {
+    const probe = write(
+      uniqPath('prose-no-match', 'probe.tsx'),
+      '<div className="prose prose-invert prose-sm">z</div>\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBe(0);
+  });
+
+  it('does NOT flag teal/emerald/blue (allowed hues)', () => {
+    const probe = write(
+      uniqPath('allowed-hues', 'probe.tsx'),
+      '<div className="text-teal-400 bg-blue-500 border-emerald-300">w</div>\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBe(0);
+  });
+});
+
+describe('Rule: Hand-rolled gradient CTA button', () => {
+  const RULE = 'Hand-rolled gradient CTA button';
+
+  it('flags <button> with from-teal to-emerald gradient', () => {
+    const probe = write(
+      uniqPath('grad-cta', 'probe.tsx'),
+      '<button className="px-3 py-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white">Save</button>\n'
+    );
+    const hits = runRule(RULE, [probe]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('flags multi-line <button> with gradient on a later line', () => {
+    const probe = write(
+      uniqPath('grad-cta-multiline', 'probe.tsx'),
+      [
+        '<button',
+        '  onClick={x}',
+        '  disabled={y}',
+        '  className="px-5 py-2 bg-gradient-to-r from-teal-600 to-emerald-600"',
+        '>Action</button>',
+        '',
+      ].join('\n')
+    );
+    const hits = runRule(RULE, [probe]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('does NOT flag gradient on a non-button element', () => {
+    const probe = write(
+      uniqPath('grad-div', 'probe.tsx'),
+      '<div className="h-2 bg-gradient-to-r from-teal-600 to-emerald-600">progress</div>\n'
+    );
+    const hits = runRule(RULE, [probe]);
+    expect(hits.length).toBe(0);
+  });
+
+  it('does NOT flag <Button variant="primary"> primitive usage', () => {
+    const probe = write(
+      uniqPath('grad-primitive', 'probe.tsx'),
+      '<Button variant="primary" size="lg">Save</Button>\n'
+    );
+    const hits = runRule(RULE, [probe]);
+    expect(hits.length).toBe(0);
+  });
+
+  it('respects pr-check-disable-next-line hatch on the line above', () => {
+    const probe = write(
+      uniqPath('grad-disabled', 'probe.tsx'),
+      [
+        '{/* pr-check-disable-next-line -- legacy onboarding banner, replaced in PR #999 */}',
+        '<button className="bg-gradient-to-r from-teal-600 to-emerald-600">x</button>',
+        '',
+      ].join('\n')
+    );
+    const hits = runRule(RULE, [probe]);
+    expect(hits.length).toBe(0);
+  });
+});
+
+describe('Rule: text-green-{N} for success/score (use emerald)', () => {
+  function makeRule(): Check {
+    const rule = CHECKS.find((c) => c.name === 'text-green-{N} for success/score (use emerald)');
+    if (!rule) throw new Error('rule not found in CHECKS');
+    return rule;
+  }
+
+  it('flags text-green-400', () => {
+    const probe = write(
+      uniqPath('green-400', 'probe.tsx'),
+      '<div className="text-green-400">success</div>\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('flags text-green-500', () => {
+    const probe = write(
+      uniqPath('green-500', 'probe.tsx'),
+      '<span className="text-green-500">ok</span>\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('does NOT flag text-emerald-400 (canonical)', () => {
+    const probe = write(
+      uniqPath('emerald-canonical', 'probe.tsx'),
+      '<div className="text-emerald-400">success</div>\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBe(0);
+  });
+
+  it('does NOT flag text-green-{N} on lines hatched with // green-ok', () => {
+    const probe = write(
+      uniqPath('green-hatched', 'probe.tsx'),
+      '<div className="text-green-300">brand chart series</div> // green-ok\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBe(0);
+  });
+});
+
+describe('Rule: Arbitrary pixel text-size (use .t-* utility)', () => {
+  function makeRule(): Check {
+    const rule = CHECKS.find((c) => c.name === 'Arbitrary pixel text-size (use .t-* utility)');
+    if (!rule) throw new Error('rule not found in CHECKS');
+    return rule;
+  }
+
+  it('flags text-[11px]', () => {
+    const probe = write(
+      uniqPath('text-11px', 'probe.tsx'),
+      '<span className="text-[11px] text-zinc-400">caption</span>\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('flags text-[14px]', () => {
+    const probe = write(
+      uniqPath('text-14px', 'probe.tsx'),
+      '<p className="text-[14px]">body</p>\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('does NOT flag .t-caption-sm (the canonical replacement)', () => {
+    const probe = write(
+      uniqPath('t-utility', 'probe.tsx'),
+      '<span className="t-caption-sm text-emerald-400">caption</span>\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBe(0);
+  });
+
+  it('does NOT flag named text sizes like text-xs', () => {
+    const probe = write(
+      uniqPath('named-text-size', 'probe.tsx'),
+      '<span className="text-xs text-zinc-400">caption</span>\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBe(0);
+  });
+});
+
+describe('Rule: Raw text-zinc-N / bg-zinc-N / border-zinc-N (use --brand-*/--surface-* token)', () => {
+  it('text-zinc rule flags text-zinc-400', () => {
+    const rule = CHECKS.find((c) => c.name === 'Raw text-zinc-N (use --brand-text-* token)');
+    if (!rule) throw new Error('rule not found');
+    const probe = write(
+      uniqPath('text-zinc', 'probe.tsx'),
+      '<div className="text-zinc-400">muted</div>\n'
+    );
+    const hits = checkFile(probe, rule);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('text-zinc rule does NOT flag text-[var(--brand-text-muted)]', () => {
+    const rule = CHECKS.find((c) => c.name === 'Raw text-zinc-N (use --brand-text-* token)');
+    if (!rule) throw new Error('rule not found');
+    const probe = write(
+      uniqPath('text-zinc-token', 'probe.tsx'),
+      '<div className="text-[var(--brand-text-muted)]">muted</div>\n'
+    );
+    const hits = checkFile(probe, rule);
+    expect(hits.length).toBe(0);
+  });
+
+  it('bg-zinc rule flags bg-zinc-900', () => {
+    const rule = CHECKS.find((c) => c.name === 'Raw bg-zinc-N (use --surface-* token)');
+    if (!rule) throw new Error('rule not found');
+    const probe = write(
+      uniqPath('bg-zinc', 'probe.tsx'),
+      '<div className="bg-zinc-900 p-4">card</div>\n'
+    );
+    const hits = checkFile(probe, rule);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('bg-zinc rule does NOT flag bg-[var(--surface-2)]', () => {
+    const rule = CHECKS.find((c) => c.name === 'Raw bg-zinc-N (use --surface-* token)');
+    if (!rule) throw new Error('rule not found');
+    const probe = write(
+      uniqPath('bg-surface-token', 'probe.tsx'),
+      '<div className="bg-[var(--surface-2)] p-4">card</div>\n'
+    );
+    const hits = checkFile(probe, rule);
+    expect(hits.length).toBe(0);
+  });
+
+  it('border-zinc rule flags border-zinc-800', () => {
+    const rule = CHECKS.find((c) => c.name === 'Raw border-zinc-N (use --brand-border token)');
+    if (!rule) throw new Error('rule not found');
+    const probe = write(
+      uniqPath('border-zinc', 'probe.tsx'),
+      '<div className="border border-zinc-800">x</div>\n'
+    );
+    const hits = checkFile(probe, rule);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('border-zinc rule does NOT flag border-[var(--brand-border)]', () => {
+    const rule = CHECKS.find((c) => c.name === 'Raw border-zinc-N (use --brand-border token)');
+    if (!rule) throw new Error('rule not found');
+    const probe = write(
+      uniqPath('border-token', 'probe.tsx'),
+      '<div className="border border-[var(--brand-border)]">x</div>\n'
+    );
+    const hits = checkFile(probe, rule);
+    expect(hits.length).toBe(0);
+  });
+
+  it('zinc rules respect // raw-zinc-ok hatch', () => {
+    const rule = CHECKS.find((c) => c.name === 'Raw bg-zinc-N (use --surface-* token)');
+    if (!rule) throw new Error('rule not found');
+    const probe = write(
+      uniqPath('bg-zinc-hatched', 'probe.tsx'),
+      '<div className="bg-zinc-900">stripe modal</div> // raw-zinc-ok\n'
+    );
+    const hits = checkFile(probe, rule);
+    expect(hits.length).toBe(0);
+  });
+});
+
+describe('Rule: Inline asymmetric border-radius (use --radius-signature token)', () => {
+  function makeRule(): Check {
+    const rule = CHECKS.find((c) => c.name === 'Inline asymmetric border-radius (use --radius-signature token)');
+    if (!rule) throw new Error('rule not found in CHECKS');
+    return rule;
+  }
+
+  it('flags inline borderRadius with multi-value pixel pair', () => {
+    const probe = write(
+      uniqPath('asym-radius', 'probe.tsx'),
+      '<div style={{ borderRadius: \'10px 24px 10px 24px\' }}>card</div>\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('does NOT flag inline borderRadius single value', () => {
+    const probe = write(
+      uniqPath('sym-radius', 'probe.tsx'),
+      '<div style={{ borderRadius: \'12px\' }}>card</div>\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBe(0);
+  });
+
+  it('does NOT flag var(--radius-signature-lg) token usage', () => {
+    const probe = write(
+      uniqPath('radius-token', 'probe.tsx'),
+      '<div style={{ borderRadius: \'var(--radius-signature-lg)\' }}>card</div>\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBe(0);
+  });
+
+  it('respects // asymmetric-radius-ok hatch', () => {
+    const probe = write(
+      uniqPath('asym-hatched', 'probe.tsx'),
+      '<div style={{ borderRadius: \'8px 20px 8px 20px\' }}>x</div> // asymmetric-radius-ok\n'
+    );
+    const hits = checkFile(probe, makeRule());
     expect(hits.length).toBe(0);
   });
 });

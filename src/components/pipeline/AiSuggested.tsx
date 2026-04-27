@@ -3,6 +3,7 @@ import { SectionCard } from '../ui/SectionCard.js';
 import { EmptyState } from '../ui/EmptyState.js';
 import { Badge } from '../ui/Badge.js';
 import { Icon } from '../ui/Icon.js';
+import { Button } from '../ui/Button.js';
 import { Sparkles, FileText, RefreshCw } from 'lucide-react';
 
 interface Props {
@@ -77,12 +78,14 @@ export function AiSuggested({ workspaceId, onCreateBrief }: Props) {
                 <p className="text-xs text-[var(--brand-text)] mt-0.5">{signal.detail}</p>
               </div>
               {onCreateBrief && signal.type === 'suggested_brief' && (
-                <button
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="shrink-0"
                   onClick={() => onCreateBrief(signal.keyword ?? '', signal.pageUrl)}
-                  className="text-xs px-2 py-1 rounded bg-gradient-to-r from-teal-600 to-emerald-600 text-white hover:from-teal-500 hover:to-emerald-500 transition-colors shrink-0"
                 >
                   Create Brief
-                </button>
+                </Button>
               )}
             </div>
           );

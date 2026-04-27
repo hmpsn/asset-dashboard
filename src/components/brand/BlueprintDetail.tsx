@@ -327,23 +327,16 @@ function CopyActionButtons({
           )}
         </button>
       ) : (
-        <button
-          onClick={onGenerateCopy}
+        <Button
+          variant="primary"
+          size="sm"
+          icon={Sparkles}
+          loading={isGenerating}
           disabled={isGenerating}
-          className="flex items-center gap-1.5 px-2.5 py-1 t-caption rounded-[var(--radius-md)] font-medium bg-gradient-to-r from-teal-600 to-emerald-600 text-white hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+          onClick={onGenerateCopy}
         >
-          {isGenerating ? (
-            <>
-              <Icon as={Loader2} size="sm" className="animate-spin" />
-              Generating...
-            </>
-          ) : (
-            <>
-              <Icon as={Sparkles} size="sm" />
-              Generate Copy
-            </>
-          )}
-        </button>
+          {isGenerating ? 'Generating...' : 'Generate Copy'}
+        </Button>
       )}
     </>
   );

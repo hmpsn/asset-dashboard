@@ -232,7 +232,7 @@ export function RequestList({
                         );
                       })()}
                       {req.status === 'approved' && (req.serviceType || 'brief_only') === 'brief_only' && !req.upgradedAt && deliveringReqId !== req.id && (
-                        <button onClick={() => { onSetDeliveringReqId(req.id); onSetDeliveryUrl(req.deliveryUrl || ''); onSetDeliveryNotes(req.deliveryNotes || ''); }} className="px-2 py-1 rounded bg-green-600/20 border border-green-500/30 t-caption-sm text-green-300 hover:bg-green-600/30 transition-colors flex items-center gap-1"><Icon as={Link2} size="sm" /> Deliver Brief</button>
+                        <button onClick={() => { onSetDeliveringReqId(req.id); onSetDeliveryUrl(req.deliveryUrl || ''); onSetDeliveryNotes(req.deliveryNotes || ''); }} className="px-2 py-1 rounded bg-emerald-600/20 border border-emerald-500/30 t-caption-sm text-emerald-300 hover:bg-emerald-600/30 transition-colors flex items-center gap-1"><Icon as={Link2} size="sm" /> Deliver Brief</button>
                       )}
                       {req.status === 'changes_requested' && (
                         <button onClick={() => onUpdateRequestStatus(req.id, 'client_review')} className="px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 t-caption-sm text-cyan-300 hover:bg-cyan-600/30 transition-colors">Resubmit to Client</button>
