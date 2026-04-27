@@ -122,7 +122,7 @@ export function ChatPanel({
                 <button
                   key={i}
                   onClick={() => onSend(q)}
-                  className="text-left px-3 py-2.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)] hover:bg-[var(--surface-3)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] t-caption-sm text-[var(--brand-text)] transition-colors"
+                  className="text-left px-3 py-2.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] t-caption-sm text-[var(--brand-text)] transition-colors"
                 >
                   <Icon as={MessageSquare} size="sm" className={`${a.iconText} mb-1`} />
                   {q}

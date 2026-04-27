@@ -286,7 +286,7 @@ function Pricing() {
       period: '',
       tagline: 'Your site at a glance',
       cta: 'Start Free',
-      ctaStyle: 'bg-[var(--surface-3)] hover:bg-[var(--surface-3)] text-[var(--brand-text-bright)] border border-[var(--brand-border-hover)]',
+      ctaStyle: 'bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)] border border-[var(--brand-border-hover)]',
       features: [
         'AI-powered site insights',
         'Site health audits',
@@ -324,7 +324,7 @@ function Pricing() {
       period: '/mo',
       tagline: 'Managed SEO partnership',
       cta: 'Contact Us',
-      ctaStyle: 'bg-[var(--surface-3)] hover:bg-[var(--surface-3)] text-[var(--brand-text-bright)] border border-[var(--brand-border-hover)]',
+      ctaStyle: 'bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)] border border-[var(--brand-border-hover)]',
       features: [
         'Everything in Growth',
         'Competitor keyword analysis',

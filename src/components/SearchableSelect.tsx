@@ -66,7 +66,7 @@ export default function SearchableSelect({
         }`}
       >
         <span className="flex-1 truncate">{selectedLabel}</span>
-        <Icon as={ChevronDown} size={isSm ? 'sm' : 'sm'} className="shrink-0 text-[var(--brand-text-muted)]" />
+        <Icon as={ChevronDown} size={isSm ? 'sm' : 'md'} className="shrink-0 text-[var(--brand-text-muted)]" />
       </button>
 
       {open && (

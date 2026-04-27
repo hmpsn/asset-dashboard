@@ -102,10 +102,10 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
         icon={<Icon as={Rocket} size="lg" className="text-teal-400" />}
         actions={
           <div className="flex items-center gap-2">
-            <button onClick={() => navigate('/prospect')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--surface-3)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] transition-all">
+            <button onClick={() => navigate('/prospect')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] transition-all">
               <Icon as={FileSearch} size="sm" /> Prospect
             </button>
-            <button onClick={() => navigate('/roadmap')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--surface-3)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] transition-all">
+            <button onClick={() => navigate('/roadmap')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] transition-all">
               <Icon as={Map} size="sm" /> Roadmap
             </button>
             <button onClick={() => navigate('/ai-usage')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-amber-400/80 hover:text-amber-300 bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20 transition-all">
@@ -448,7 +448,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                             <button onClick={() => handleStatusChange(item.workspaceId, item.id, 'fixed')} className="t-micro px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors">Resolve</button>
                           )}
                           {item.status !== 'wontfix' && item.status !== 'fixed' && (
-                            <button onClick={() => handleStatusChange(item.workspaceId, item.id, 'wontfix')} className="t-micro px-2 py-1 rounded bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:bg-[var(--surface-3)] hover:border-[var(--brand-border-hover)] border border-[var(--brand-border)] transition-colors">Won't Fix</button>
+                            <button onClick={() => handleStatusChange(item.workspaceId, item.id, 'wontfix')} className="t-micro px-2 py-1 rounded bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:bg-[var(--brand-border-hover)] hover:border-[var(--brand-border-hover)] border border-[var(--brand-border)] transition-colors">Won't Fix</button>
                           )}
                         </div>
 
