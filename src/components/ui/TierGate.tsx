@@ -94,7 +94,7 @@ export function TierGate({ tier, required, feature, teaser, children, className,
           </div>
 
           {/* Badge */}
-          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full t-micro font-semibold border ${colors.badge}`}>
+          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider border ${colors.badge}`} /* arbitrary-text-ok — plan name is a UI label, not mono content */>
             <Lock className="w-2.5 h-2.5" />
             {TIER_LABELS[required]} Plan
           </span>
@@ -122,7 +122,7 @@ export function TierGate({ tier, required, feature, teaser, children, className,
 export function TierBadge({ tier }: { tier: Tier }) {
   const colors = TIER_COLORS[tier];
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full t-micro font-semibold border ${colors.badge}`}>
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider border ${colors.badge}`} /* arbitrary-text-ok — tier name is a UI label, not mono content */>
       {tier === 'premium' && <Sparkles className="w-2.5 h-2.5" />}
       {TIER_LABELS[tier]}
     </span>

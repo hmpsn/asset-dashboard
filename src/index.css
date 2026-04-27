@@ -110,6 +110,13 @@ input::placeholder, textarea::placeholder {
 .hover\:text-zinc-300:hover { color: #f4f4f5 !important; }
 .hover\:text-zinc-200:hover { color: #ffffff !important; }
 
+/* ─── Type scale: bump small sizes for readability ───
+   TEMPORARY: these !important overrides keep ~195 unconverted files at their
+   boosted sizes while Phase B domain sweeps migrate them to .t-* classes.
+   Remove this block once all Phase B PRs have merged. */
+.text-\[11px\] { font-size: 13.5px !important; line-height: 1.5 !important; }
+.text-xs { font-size: 13.5px !important; line-height: 1.5 !important; }
+.text-sm { font-size: 15.5px !important; line-height: 1.5 !important; }
 
 /* ─── Visual depth & premium interactions ─── */
 
