@@ -334,7 +334,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
         </div>
         {isPremium ? (
           <p className="t-caption text-[var(--brand-text)] mt-1.5 leading-relaxed">
-            <Icon as={Crown} size="sm" className="text-amber-400 inline mr-1" />
+            <Icon as={Crown} size="sm" className="text-amber-400 mr-1" />
             {STUDIO_NAME} is actively working through these recommendations. Items are prioritized by traffic impact.
           </p>
         ) : (

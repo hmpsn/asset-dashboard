@@ -97,7 +97,7 @@ export function BriefGenerator({
         <div className="space-y-2 pl-1 border-l-2 border-[var(--brand-border)] ml-1">
           <div>
             <label className="t-caption-sm text-[var(--brand-text-muted)] block mb-0.5">
-              <Icon as={ExternalLink} size="sm" className="inline mr-1" />
+              <Icon as={ExternalLink} size="sm" className="mr-1" />
               Reference URLs (competitor/inspiration pages — one per line)
             </label>
             <textarea

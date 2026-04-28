@@ -206,7 +206,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
               }`}
             >
               {f.charAt(0).toUpperCase() + f.slice(1)}
-              {sortField === f && <Icon as={ArrowUpDown} size="sm" className="inline ml-0.5" />}
+              {sortField === f && <Icon as={ArrowUpDown} size="sm" className="ml-0.5" />}
             </button>
           ))}
         </div>
@@ -409,7 +409,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                       disabled={scoringVoice === post.id}
                       className="ml-auto t-caption-sm px-2 py-1 rounded-md text-[var(--brand-text-muted)] hover:text-blue-400 hover:bg-blue-500/10 transition-colors disabled:opacity-50"
                     >
-                      {scoringVoice === post.id ? <Icon as={Loader2} size="sm" className="animate-spin inline mr-1" /> : null}
+                      {scoringVoice === post.id ? <Icon as={Loader2} size="sm" className="animate-spin mr-1" /> : null}
                       Re-score
                     </button>
                   </div>
