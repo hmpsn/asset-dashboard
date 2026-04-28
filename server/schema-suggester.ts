@@ -1744,12 +1744,26 @@ REQUIREMENTS:
 1. Return ONE JSON-LD object with "@context": "https://schema.org" and an "@graph" array
 2. The @graph MUST include a WebPage node on every page
 3. On the HOMEPAGE: include a FULL Organization node (name, url, description, logo, knowsAbout, sameAs) and a WebSite node. These will be saved as the site-wide template.
+3b. HEALTHCARE / DENTAL / MEDICAL SITES — MANDATORY TYPE SELECTION: If businessContext or page content mentions "dental", "dentist", "orthodontic", "physician", "clinic", "hospital", "therapy", "optician", or "chiropractic":
+    - You MUST use the most specific Schema.org subtype. Do NOT use generic "Organization" or "LocalBusiness":
+      dental / dentist / orthodontic → "Dentist"
+      physician / doctor / family medicine → "Physician"
+      clinic / urgent care / medical center → "MedicalClinic"
+      hospital → "Hospital"
+      therapist / counseling → "MedicalBusiness"
+      optician / optometrist → "Optician"
+      chiropractor → "Chiropractor"
+    - Generating "Organization" on a dental or medical homepage is a VALIDATION FAILURE, not a suggestion.
+    - For treatment/procedure pages, use "MedicalProcedure" with procedureType and howPerformed fields when the page describes a specific procedure.
 4. On SUBPAGES: include only a MINIMAL Organization stub with @id, name, url — no description, logo, knowsAbout, or sameAs. Do NOT include a WebSite node. Focus your tokens on the page-specific entities (Service, Article, FAQPage, etc.).
 5. NEVER include a SearchAction unless the site has a real, confirmed search endpoint. Do NOT use "?s={search_term_string}" — that is a WordPress convention.
 6. Add page-specific types based on content (Article, FAQPage, Service, Product, BreadcrumbList, HowTo, Event, LocalBusiness, Dataset, etc.)
 7. Use "@id" cross-references between nodes (e.g. Organization "@id": "${siteUrl}/#organization")
 8. Fill ALL values from actual page content — ZERO placeholders, ZERO fabricated data
 9. CRITICAL: NEVER invent or fabricate addresses, phone numbers, email addresses, opening hours, geo coordinates, or any contact information. Only include these fields if the EXACT data appears in the page content above. If a LocalBusiness is appropriate but the page lacks an address, include the LocalBusiness with only the fields you can confirm from the content (name, url, description). Omit address/telephone/openingHours/geo entirely if not found.
+9b. NEVER use a Product node for a service business, healthcare provider, or professional practice. Dental care, legal services, consulting, therapy, and financial advice are SERVICES. Use "Service", the specific healthcare subtype ("Dentist", "MedicalBusiness"), or "LocalBusiness" instead.
+    NEVER create an Offer with "price": "0.00" or "price": "0" — this tells Google your service is free, which is incorrect and misleading.
+    The only valid use of Product is for physical goods (e-commerce) or software (SoftwareApplication is preferred for SaaS).
 10. For images, use full absolute URLs (prefix with ${siteUrl} if relative). Only use image URLs found in the page content.
 11. FAQPage: ONLY use FAQPage schema if the page has a DEDICATED FAQ section with clearly labeled questions and answers (e.g. an accordion, a "Frequently Asked Questions" heading, or a visible Q&A list). Section headings like "What's under the hood?" or "How it works" followed by feature descriptions are NOT FAQs — they are rhetorical headings. When in doubt, do NOT include FAQPage. Never fabricate Q&A pairs.
 12. Article/BlogPosting: use real author name, real dates, real headline from the content. ALWAYS include "author" with "@type": "Person" and real credentials if found. If a medical/health reviewer is mentioned, add "reviewedBy" with "@type": "Person" and their credentials.
@@ -1760,11 +1774,6 @@ REQUIREMENTS:
 16b. LEAD-GEN / CONVERSION PAGES (slugs like /demo, /contact, /request-demo, /get-started, /pricing, /signup, /book): Do NOT create a Service or SoftwareApplication node as mainEntity. These pages are about taking an action, not describing a product. Use only WebPage + Organization stub + BreadcrumbList.
 16c. EVERY Service and SoftwareApplication MUST include a "url" field pointing to the canonical product page (e.g. "${siteUrl}/platform"), NOT to the current page if the current page is a comparison, demo, or landing page.
 16d. If multiple pages describe the SAME product, use a CONSISTENT @id for the Service/SoftwareApplication across all of them (e.g. "${siteUrl}/platform/#service" or "${siteUrl}/#software"). Do NOT create page-specific @ids like "${siteUrl}/faros-vs-dx/#service" for the same product.
-17. HEALTHCARE / MEDICAL SITES: If the business context or page content indicates a healthcare provider (dental, medical, clinic, hospital, therapy, etc.):
-    - Use "MedicalBusiness" or more specific subtypes ("Dentist", "Physician", "Optician", etc.) instead of generic "LocalBusiness"
-    - For treatment/procedure pages, use "MedicalProcedure" with procedureType, howPerformed, preparation, followup if found in content
-    - For provider/doctor profile pages, use "Physician" with medicalSpecialty, credentials, and hospitalAffiliation from content
-    - For procedural how-to content, use "HowTo" with step-by-step instructions extracted from the page
 18. DATASET PAGES: If the page presents data tables, rankings, indexes, or structured data collections, include "Dataset" schema with name, description, distribution (if downloadable), dateModified, and creator referencing the Organization
 19. ENTITY LINKING (sameAs): On the Organization node, include a "sameAs" array with links to the business's verified external profiles (Google Business, LinkedIn, Facebook, Yelp, industry association pages) — but ONLY if these URLs actually appear in the page content or site footer. Never fabricate profile URLs
 20. SAAS / PLATFORM HOMEPAGES: If the homepage presents a software product or platform:
