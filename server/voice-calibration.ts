@@ -140,7 +140,7 @@ export function createVoiceProfile(workspaceId: string): VoiceProfile & { sample
     });
   });
 
-  doCreate();
+  doCreate.immediate();
 
   log.info({ workspaceId, profileId: id }, 'created voice profile');
   return { id, workspaceId, status: 'draft', contextModifiers: defaultModifiers, samples: [], createdAt: now, updatedAt: now };
@@ -233,7 +233,7 @@ export function addVoiceSample(
     return { voiceProfileId: profile.id, sortOrder };
   });
 
-  const { voiceProfileId, sortOrder } = doAdd();
+  const { voiceProfileId, sortOrder } = doAdd.immediate();
   return { id, voiceProfileId, content, contextTag, source: effectiveSource, sortOrder, createdAt: now };
 }
 
@@ -397,7 +397,7 @@ Return valid JSON: { "refined": "the refined text" }`;
     return { ...freshSession, steeringNotes: newNotes };
   });
 
-  return doRefine();
+  return doRefine.immediate();
 }
 
 /**
@@ -425,5 +425,5 @@ export function saveVariationFeedback(
     existing.push({ variationIndex, feedback, createdAt: new Date().toISOString() });
     stmts().updateSessionFeedback.run(JSON.stringify(existing), sessionId, workspaceId);
   });
-  doSave();
+  doSave.immediate();
 }

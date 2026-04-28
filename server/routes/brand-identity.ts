@@ -86,10 +86,12 @@ router.post('/api/brand-identity/:workspaceId/generate', requireWorkspaceAccess(
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const tier = ws.tier || 'free';
-  if (!incrementIfAllowed(ws.id, tier, 'brandscript_generations')) {
-    return res.status(429).json({ error: 'Monthly limit reached for your tier', code: 'usage_limit' });
-  }
+  let incremented = false;
   try {
+    if (!incrementIfAllowed(ws.id, tier, 'brandscript_generations')) {
+      return res.status(429).json({ error: 'Monthly limit reached for your tier', code: 'usage_limit' });
+    }
+    incremented = true;
     const result = await generateDeliverable(req.params.workspaceId, deliverableType);
     addActivity(req.params.workspaceId, 'brand_deliverable_generated', `Generated ${deliverableType.replace(/_/g, ' ')} deliverable`);
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, { deliverableType });
@@ -97,7 +99,7 @@ router.post('/api/brand-identity/:workspaceId/generate', requireWorkspaceAccess(
     invalidateIntelligenceCache(req.params.workspaceId);
     res.json(result);
   } catch (err) {
-    decrementUsage(ws.id, 'brandscript_generations');
+    if (incremented) { try { decrementUsage(ws.id, 'brandscript_generations'); } catch { /* best-effort */ } }
     res.status(500).json({ error: sanitizeErrorMessage(err, 'Generation failed') });
   }
 });
@@ -108,13 +110,15 @@ router.post('/api/brand-identity/:workspaceId/:id/refine', requireWorkspaceAcces
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const tier = ws.tier || 'free';
-  if (!incrementIfAllowed(ws.id, tier, 'brandscript_generations')) {
-    return res.status(429).json({ error: 'Monthly limit reached for your tier', code: 'usage_limit' });
-  }
+  let incremented = false;
   try {
+    if (!incrementIfAllowed(ws.id, tier, 'brandscript_generations')) {
+      return res.status(429).json({ error: 'Monthly limit reached for your tier', code: 'usage_limit' });
+    }
+    incremented = true;
     const result = await refineDeliverable(req.params.workspaceId, req.params.id, direction);
     if (!result) {
-      decrementUsage(ws.id, 'brandscript_generations');
+      try { decrementUsage(ws.id, 'brandscript_generations'); } catch { /* best-effort */ }
       return res.status(404).json({ error: 'Not found' });
     }
     addActivity(req.params.workspaceId, 'brand_deliverable_refined', `Refined ${result.deliverableType.replace(/_/g, ' ')} deliverable`);
@@ -123,7 +127,7 @@ router.post('/api/brand-identity/:workspaceId/:id/refine', requireWorkspaceAcces
     invalidateIntelligenceCache(req.params.workspaceId);
     res.json(result);
   } catch (err) {
-    decrementUsage(ws.id, 'brandscript_generations');
+    if (incremented) { try { decrementUsage(ws.id, 'brandscript_generations'); } catch { /* best-effort */ } }
     res.status(500).json({ error: sanitizeErrorMessage(err, 'Refinement failed') });
   }
 });
