@@ -213,8 +213,7 @@ export interface SchemaContext {
 const QUESTION_PREFIXES = /^(how|what|why|when|where|which|can|do|does|is|are|should|will|would)\b/i;
 
 /** Slug pattern for utility/error pages that should never receive schema or appear in nav/hasPart. */
-const _UTILITY_SLUGS = /^\/(401|403|404|500|password|robots(\.txt)?|sitemap(\.xml)?|privacy(-policy)?|terms(-of[- ]?(service|use))?|legal|cookie(-policy)?|maintenance)\b/i;
-export { _UTILITY_SLUGS as UTILITY_SLUGS };
+export const UTILITY_SLUGS = /^\/(401|403|404|500|password|robots(\.txt)?|sitemap(\.xml)?|privacy(-policy)?|terms(-of[- ]?(service|use))?|legal|cookie(-policy)?|maintenance)\b/i;
 
 /**
  * Extract question-type queries from GSC data that target a specific page.
