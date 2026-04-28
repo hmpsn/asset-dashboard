@@ -4402,9 +4402,9 @@ export const CHECKS: Check[] = [
     claudeMdRef: '#design-system--the-four-laws-of-color',
   },
   {
-    // Catches direct imports of TrendingUp/TrendingDown/ArrowUp/ArrowDown from
-    // lucide-react outside TrendBadge.tsx and its tests. Consumers should use
-    // <TrendBadge> instead of composing raw directional icons.
+    // Catches direct imports of TrendingUp/TrendingDown from lucide-react
+    // outside TrendBadge.tsx and its tests. Consumers should use <TrendBadge>
+    // instead of composing raw directional icons.
     name: 'Trend icon import outside TrendBadge',
     pattern: 'import.*\\b(TrendingUp|TrendingDown)\\b.*from.*lucide-react',
     fileGlobs: ['*.ts', '*.tsx'],
