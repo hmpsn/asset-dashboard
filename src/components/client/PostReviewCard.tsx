@@ -281,7 +281,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
           onClick={handleApprove}
           disabled={approving || submitting}
           icon={Check}
-          className="rounded-[var(--radius-lg)]"
+          className="rounded-[var(--radius-lg)] t-caption"
         >
           {approving ? 'Approving…' : 'Approve Post'}
         </Button>
