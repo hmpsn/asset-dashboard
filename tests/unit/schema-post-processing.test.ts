@@ -115,6 +115,30 @@ describe('upgradeHealthcareType', () => {
     upgradeHealthcareType(schema, { businessContext: 'Dermatology clinic specializing in skin care.' } as any);
     expect((schema['@graph'][0] as any)['@type']).toBe('MedicalBusiness');
   });
+
+  it('matches partial stem orthodontic → Dentist', () => {
+    const schema = { '@context': 'https://schema.org', '@graph': [{ '@type': 'Organization', 'name': 'Smith Orthodontics' }] };
+    upgradeHealthcareType(schema, { businessContext: 'Orthodontic practice offering braces and aligners.' } as any);
+    expect((schema['@graph'][0] as any)['@type']).toBe('Dentist');
+  });
+
+  it('matches partial stem chiropractor → Chiropractor', () => {
+    const schema = { '@context': 'https://schema.org', '@graph': [{ '@type': 'Organization', 'name': 'Back & Spine' }] };
+    upgradeHealthcareType(schema, { businessContext: 'Chiropractic care and sports injury treatment.' } as any);
+    expect((schema['@graph'][0] as any)['@type']).toBe('Chiropractor');
+  });
+
+  it('matches partial stem ophthalmology → Optician', () => {
+    const schema = { '@context': 'https://schema.org', '@graph': [{ '@type': 'Organization', 'name': 'Clear Vision Center' }] };
+    upgradeHealthcareType(schema, { businessContext: 'Ophthalmology practice providing comprehensive eye care.' } as any);
+    expect((schema['@graph'][0] as any)['@type']).toBe('Optician');
+  });
+
+  it('matches partial stem psychiatrist → MedicalBusiness', () => {
+    const schema = { '@context': 'https://schema.org', '@graph': [{ '@type': 'Organization', 'name': 'Mindful Health' }] };
+    upgradeHealthcareType(schema, { businessContext: 'Psychiatrist and mental health services.' } as any);
+    expect((schema['@graph'][0] as any)['@type']).toBe('MedicalBusiness');
+  });
 });
 
 describe('generation queue — utility page pre-filter', () => {

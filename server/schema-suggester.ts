@@ -483,14 +483,17 @@ function validateUnifiedSchema(schema: Record<string, unknown>): string[] {
 }
 
 /** Maps healthcare keyword fragments to their correct Schema.org @type. */
+// NOTE: partial stems (orthodont, chiropract, ophthalmolog, psychiatr, dermatolog) intentionally
+// omit the trailing \b — these stems always have more word characters in real words
+// (e.g. "orthodontic", "chiropractor") so a trailing \b would never match.
 const HEALTHCARE_TYPE_MAP: Array<[RegExp, string]> = [
-  [/\b(dental|dentist|orthodont|periodont|endodont)\b/i, 'Dentist'],
-  [/\b(physician|doctor|md\b|family medicine|general practitioner|gp\b)\b/i, 'Physician'],
-  [/\b(optician|optometrist|ophthalmolog)\b/i, 'Optician'],
-  [/\b(chiropract)\b/i, 'Chiropractor'],
+  [/\b(dental|dentist|orthodont|periodont|endodont)/i, 'Dentist'],
+  [/\b(physician|doctor|\bmd\b|family medicine|general practitioner|\bgp\b)/i, 'Physician'],
+  [/\b(optician|optometrist|ophthalmolog)/i, 'Optician'],
+  [/\b(chiropract)/i, 'Chiropractor'],
   [/\bdermatolog/i, 'MedicalBusiness'],
   [/\b(pediatric|pediatrician)\b/i, 'MedicalBusiness'],
-  [/\b(therapist|therapy|counseling|psychiatr)\b/i, 'MedicalBusiness'],
+  [/\b(therapist|therapy|counseling|psychiatr)/i, 'MedicalBusiness'],
   [/\b(hospital)\b/i, 'Hospital'],
   [/\b(clinic|urgent care|medical center)\b/i, 'MedicalClinic'],
   // NOTE: no generic "medical"/"healthcare" catch-all — these match SaaS/tech companies that
