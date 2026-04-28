@@ -201,7 +201,7 @@ async function runScheduledAudit(schedule: AuditSchedule) {
         // and applies stored deltas on top. Mirror: Bridge #15. If the delta math changes,
         // replicate in both bridges. upsertInsight replaces `data` on conflict, so we
         // must read-before-write to avoid clobbering cross-bridge adjustments.
-        const existing = getInsight(ws.id, page.pageId, 'audit_finding');
+        const existing = getInsight(ws.id, toAuditFindingPageId(page), 'audit_finding');
         const prevAdj = existing?.data._scoreAdjustments as Record<string, number> | undefined;
         const totalDelta = prevAdj
           ? Object.values(prevAdj).reduce((s, d) => s + (Number.isFinite(d) ? d : 0), 0)
