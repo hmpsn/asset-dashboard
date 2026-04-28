@@ -483,7 +483,7 @@ ${originalText}`;
       if (field === 'meta') {
         try {
           parseAIJson<{ seoTitle: string; seoMetaDescription: string }>(suggestedText);
-        } catch {
+        } catch { // catch-ok: SyntaxError from malformed AI JSON — expected failure path
           return res.status(500).json({ error: 'Failed to parse AI meta response' });
         }
       }

@@ -24,7 +24,11 @@ export function FixDiffModal({ issueLabel, result, loading, applying, onApply, o
 
   useEffect(() => {
     if (!loading && !result) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onDismiss(); };
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || target.isContentEditable) return;
+      if (e.key === 'Escape') onDismiss();
+    };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, [loading, result, onDismiss]);
