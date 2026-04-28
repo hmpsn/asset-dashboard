@@ -144,7 +144,7 @@ Phase 3 adds client-facing insight views. The framing rules are strict:
 |---|---|---|
 | Language | Action-oriented, technical | Narrative, outcome-oriented |
 | Example | "Dropped to page 2 — position 4→11, lost ~2,400 clicks/mo" | "We detected a ranking change and are working on a recovery plan" |
-| Color | Any per Three Laws | No purple. Never. |
+| Color | Any per Four Laws | No purple. Never. |
 | Premium features | Direct | Wrapped in `<TierGate>` |
 | Raw metrics | OK | Translate to business impact |
 

@@ -307,7 +307,7 @@ and the cross-cutting `insights/**` directory.
 
 > **Constraint:** zero `purple-`, zero `rose-`, zero `pink-` in any file in this task.
 > Worker must run `grep -rE '\b(purple|rose|pink)-' <task-files>` and assert zero
-> hits before opening the PR (Three Laws — Law 04).
+> hits before opening the PR (Four Laws — Law 04).
 
 ### Task 2.4c — Client onboarding, auth gates, upgrades, helpers
 
@@ -524,7 +524,7 @@ While workers run (kickoff §3, "During dispatch"):
 Post-dispatch, pre-PR (kickoff §3, "Post-dispatch"):
 
 - Cross-PR consistency grep across all 12 branches:
-  - `cn(` usage (Three Laws-of-className-merge — playbook §6.1) — every dynamic className must use `cn()`, never template literal or `[].filter().join()`
+  - `cn(` usage (Four Laws-of-className-merge — playbook §6.1) — every dynamic className must use `cn()`, never template literal or `[].filter().join()`
   - Raw hex colors in JSX (`grep -rE "#[0-9a-fA-F]{3,6}" <branch-files>`)
   - `text-zinc-/bg-zinc-/border-zinc-` raw uses against the residue threshold (post-codemod sites only — pre-existing zinc is Phase 3 scope)
 - Run Playwright visual diff per branch — only zero-diff branches open PRs
@@ -535,7 +535,7 @@ Post-dispatch, pre-PR (kickoff §3, "Post-dispatch"):
 
 - [Phase 2 kickoff doc](./superpowers/plans/2026-04-24-phase-2-kickoff.md) — gates, conventions, DO NOT TOUCH list
 - [Parent Phase 5 sweep plan](./superpowers/plans/2026-04-24-design-system-phase5-sweep.md) — Phase 2 acceptance checklist (lines 423–496)
-- [`CLAUDE.md`](../CLAUDE.md) — Three Laws of Color, project conventions
+- [`CLAUDE.md`](../CLAUDE.md) — Four Laws of Color, project conventions
 - [`docs/rules/design-system-enforcement.md`](./rules/design-system-enforcement.md) — pr-check Phase 5 migration rules
 - [`docs/rules/multi-agent-coordination.md`](./rules/multi-agent-coordination.md) — parallel agent protocol
 - [`scripts/phase2-guard.ts`](../scripts/phase2-guard.ts) — frozen-paths pre-push enforcement
