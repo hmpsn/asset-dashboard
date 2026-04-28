@@ -65,6 +65,16 @@ export function useAutoSave(
       isMounted.current = false;
       if (timer.current) clearTimeout(timer.current);
       if (savedTimer.current) clearTimeout(savedTimer.current);
+      // Flush pending content on unmount so navigating away mid-edit doesn't
+      // silently lose the user's work. We can't await this from the cleanup
+      // (cleanup is sync), but firing the save preserves the keystrokes.
+      // The latest saveFn closure is already in saveFnRef.current.
+      if (pendingHtml.current !== null) {
+        const html = pendingHtml.current;
+        pendingHtml.current = null;
+        // Best-effort fire-and-forget — errors are routed through onError.
+        Promise.resolve(saveFnRef.current(html)).catch(err => onErrorRef.current?.(err));
+      }
     };
   }, []);
 

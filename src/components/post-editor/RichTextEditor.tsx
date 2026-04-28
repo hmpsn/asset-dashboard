@@ -27,15 +27,25 @@ export function RichTextEditor({ initialValue, onChange, className }: RichTextEd
     },
   });
 
+  // Sync external content into the editor only when:
+  //   (a) the editor isn't currently focused (user isn't typing), AND
+  //   (b) the incoming initialValue actually changed since the last sync.
+  // The focus guard prevents a race where an in-flight auto-save resolves,
+  // the parent re-renders with the saved HTML, and setContent() clobbers
+  // the user's keystrokes that arrived during the save round-trip.
+  // Tracking the last-synced value via a ref (instead of comparing against
+  // editor.getHTML()) sidesteps subtle HTML normalization differences
+  // between TipTap output and the server's sanitizer.
+  const lastSyncedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (editor && initialValue !== editor.getHTML()) {
-      editor.commands.setContent(initialValue, { emitUpdate: false });
-    }
+    if (!editor) return;
+    if (editor.isFocused) return;
+    if (lastSyncedRef.current === initialValue) return;
+    lastSyncedRef.current = initialValue;
+    editor.commands.setContent(initialValue, { emitUpdate: false });
   }, [editor, initialValue]);
 
-  useEffect(() => {
-    return () => { editor?.destroy(); };
-  }, [editor]);
+  // useEditor() handles editor.destroy() on unmount automatically — no manual cleanup needed.
 
   useEffect(() => {
     if (showLinkInput) {

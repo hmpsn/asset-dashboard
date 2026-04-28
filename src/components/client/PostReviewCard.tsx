@@ -6,6 +6,7 @@ import type { ClientContentRequest } from './types';
 import type { GeneratedPost, ContentTopicRequest } from '../../../shared/types/content';
 import { publicPostReview } from '../../api/content';
 import { queryKeys } from '../../lib/queryKeys';
+import { countWordsFromHtml } from '../../lib/utils';
 import { useClientPostPreview } from '../../hooks/client/useClientPostPreview';
 import { RichTextEditor } from '../post-editor/RichTextEditor';
 import { useAutoSave } from '../../hooks/useAutoSave';
@@ -61,7 +62,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
       index: editingSection,
       heading: existing?.heading ?? '',
       content: html,
-      wordCount: html.split(/\s+/).filter(Boolean).length,
+      wordCount: countWordsFromHtml(html),
     }];
     const updated = await publicPostReview.clientEdit(workspaceId, post!.id, { sections });
     setPost(updated);
@@ -183,7 +184,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
             <span className="t-caption font-semibold text-[var(--brand-text-bright)]">{section.heading}</span>
             {editingSection !== section.index && (
               <button
-                onClick={() => setEditingSection(section.index)}
+                onClick={async () => { await flushSection(); setEditingSection(section.index); }}
                 className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-400 transition-colors"
               >
                 <Icon as={Edit3} size="sm" /> Edit

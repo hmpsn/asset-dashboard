@@ -18,6 +18,7 @@ import { ReviewChecklist, CHECKLIST_ITEMS } from './post-editor/ReviewChecklist'
 import { FixDiffModal } from './post-editor/FixDiffModal';
 import type { AiFixResult, IssueKey } from '../../shared/types/content';
 import { queryKeys } from '../lib/queryKeys';
+import { countWordsFromHtml } from '../lib/utils';
 
 interface PostSection {
   index: number;
@@ -122,7 +123,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
     const sections = [...post.sections];
     const idx = sections.findIndex(s => s.index === editingSection);
     if (idx === -1) return;
-    sections[idx] = { ...sections[idx], content: html, wordCount: html.split(/\s+/).filter(w => w.length > 0).length };
+    sections[idx] = { ...sections[idx], content: html, wordCount: countWordsFromHtml(html) };
     await saveField({ sections });
   };
   const { scheduleAutoSave: scheduleSectionSave, flush: flushSection, saveStatus: sectionSaveStatus } = useAutoSave(sectionAutoSaveFn);
@@ -268,7 +269,11 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
           console.warn('PostEditor: AI fix section index no longer present', result.sectionIndex);
         } else {
           const sections = [...post.sections];
-          sections[idx] = { ...sections[idx], content: result.suggestedText };
+          sections[idx] = {
+            ...sections[idx],
+            content: result.suggestedText,
+            wordCount: countWordsFromHtml(result.suggestedText),
+          };
           await saveField({ sections });
         }
       } else if (result.field === 'conclusion') {
@@ -527,7 +532,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
               isGenerating={isGenerating}
               saveStatus={sectionSaveStatus}
               onToggleExpand={toggleSection}
-              onStartEdit={(index) => setEditingSection(index)}
+              onStartEdit={async (index) => { await flushSection(); setEditingSection(index); }}
               onChange={scheduleSectionSave}
               onDone={async () => { await flushSection(); setEditingSection(null); }}
               onRegenerate={handleRegenerate}

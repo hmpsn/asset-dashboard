@@ -23,6 +23,7 @@ import {
   listPostVersions,
   getPostVersion,
   revertToVersion,
+  getMostRecentPostVersion,
 } from '../content-posts.js';
 import { scoreVoiceMatch } from '../content-posts-ai.js';
 import { renderPostHTML } from '../post-export-html.js';
@@ -173,12 +174,25 @@ const updatePostSchema = z.object({
 router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('workspaceId'), validate(updatePostSchema), (req, res, next) => {
   const previous = getPost(req.params.workspaceId, req.params.postId);
 
-  // Snapshot before content-changing edits (not status-only changes)
+  // Snapshot before content-changing edits (not status-only changes).
+  //
+  // Coalesce window: with auto-save firing every ~2s, a single editing session
+  // would otherwise create dozens of `manual_edit` snapshots and `content_updated`
+  // activity entries. Skip both if the newest snapshot is already a `manual_edit`
+  // from <60 s ago — same pattern as the public `client-edit` route.
+  const ADMIN_EDIT_COALESCE_WINDOW_MS = 60_000;
   const contentFields = ['title', 'metaDescription', 'introduction', 'sections', 'conclusion', 'seoTitle', 'seoMetaDescription'];
   const editedContentFields = contentFields.filter(f => f in req.body);
   const isContentEdit = editedContentFields.length > 0;
+  let withinEditCoalesceWindow = false;
   if (previous && isContentEdit) {
-    snapshotPostVersion(previous, 'manual_edit', `field:${editedContentFields.join(',')}`);
+    const recentVersion = getMostRecentPostVersion(req.params.workspaceId, req.params.postId);
+    withinEditCoalesceWindow = !!recentVersion
+      && recentVersion.trigger === 'manual_edit'
+      && (Date.now() - new Date(recentVersion.createdAt).getTime()) < ADMIN_EDIT_COALESCE_WINDOW_MS;
+    if (!withinEditCoalesceWindow) {
+      snapshotPostVersion(previous, 'manual_edit', `field:${editedContentFields.join(',')}`);
+    }
   }
 
   let updated;
@@ -257,7 +271,10 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
     }
   }
 
-  if (isContentEdit) {
+  // Activity entry coalesced on the same 60s window as the snapshot above —
+  // we only want one `content_updated` entry per editing session, not one per
+  // 2s auto-save tick.
+  if (isContentEdit && !withinEditCoalesceWindow) {
     addActivity(
       req.params.workspaceId,
       'content_updated',
@@ -491,15 +508,21 @@ ${originalText}`;
       let suggestedText: string;
 
       if (field === 'meta') {
-        let parsed: { seoTitle: string; seoMetaDescription: string };
+        let parsed: { seoTitle?: unknown; seoMetaDescription?: unknown } | null;
         try {
-          parsed = parseAIJson<{ seoTitle: string; seoMetaDescription: string }>(rawSuggested);
+          parsed = parseAIJson<{ seoTitle?: unknown; seoMetaDescription?: unknown }>(rawSuggested);
         } catch { // catch-ok: SyntaxError from malformed AI JSON — expected failure path
           return res.status(500).json({ error: 'Failed to parse AI meta response' });
         }
+        // Guard against AI returning literal `null` or a non-object (`'"a string"'`,
+        // `'42'`) — JSON.parse accepts both but destructuring would throw a TypeError
+        // that the outer catch turns into an opaque 500. Surface the real failure here.
+        if (!parsed || typeof parsed !== 'object') {
+          return res.status(500).json({ error: 'Failed to parse AI meta response' });
+        }
         suggestedText = JSON.stringify({
-          seoTitle: sanitizePlainText(parsed.seoTitle ?? ''),
-          seoMetaDescription: sanitizePlainText(parsed.seoMetaDescription ?? ''),
+          seoTitle: sanitizePlainText(typeof parsed.seoTitle === 'string' ? parsed.seoTitle : ''),
+          seoMetaDescription: sanitizePlainText(typeof parsed.seoMetaDescription === 'string' ? parsed.seoMetaDescription : ''),
         });
       } else {
         suggestedText = sanitizeRichText(rawSuggested);
