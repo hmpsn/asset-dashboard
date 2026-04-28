@@ -524,7 +524,7 @@ While workers run (kickoff §3, "During dispatch"):
 Post-dispatch, pre-PR (kickoff §3, "Post-dispatch"):
 
 - Cross-PR consistency grep across all 12 branches:
-  - `cn(` usage (Four Laws-of-className-merge — playbook §6.1) — every dynamic className must use `cn()`, never template literal or `[].filter().join()`
+  - `cn(` usage (Three Laws-of-className-merge — playbook §6.1) — every dynamic className must use `cn()`, never template literal or `[].filter().join()`
   - Raw hex colors in JSX (`grep -rE "#[0-9a-fA-F]{3,6}" <branch-files>`)
   - `text-zinc-/bg-zinc-/border-zinc-` raw uses against the residue threshold (post-codemod sites only — pre-existing zinc is Phase 3 scope)
 - Run Playwright visual diff per branch — only zero-diff branches open PRs
