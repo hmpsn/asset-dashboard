@@ -106,4 +106,13 @@ describe('upgradeHealthcareType', () => {
     upgradeHealthcareType(schema, { businessContext: 'City urgent care clinic serving patients in downtown.' } as any);
     expect((schema['@graph'][0] as any)['@type']).toBe('MedicalClinic');
   });
+
+  it('maps dermatology context to MedicalBusiness, not invalid Dermatology type', () => {
+    const schema = {
+      '@context': 'https://schema.org',
+      '@graph': [{ '@type': 'Organization', 'name': 'Clear Skin Dermatology' }],
+    };
+    upgradeHealthcareType(schema, { businessContext: 'Dermatology clinic specializing in skin care.' } as any);
+    expect((schema['@graph'][0] as any)['@type']).toBe('MedicalBusiness');
+  });
 });

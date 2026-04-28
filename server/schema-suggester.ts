@@ -487,8 +487,8 @@ const HEALTHCARE_TYPE_MAP: Array<[RegExp, string]> = [
   [/\b(physician|doctor|md\b|family medicine)\b/i, 'Physician'],
   [/\b(optician|optometrist|ophthalmolog)\b/i, 'Optician'],
   [/\b(chiropract)\b/i, 'Chiropractor'],
-  [/\b(dermatolog)\b/i, 'Dermatology'],
-  [/\b(pediatric|pediatrician)\b/i, 'Pediatric'],
+  [/\bdermatolog/i, 'MedicalBusiness'],
+  [/\b(pediatric|pediatrician)\b/i, 'MedicalBusiness'],
   [/\b(clinic|urgent care|medical center)\b/i, 'MedicalClinic'],
   [/\b(hospital)\b/i, 'Hospital'],
   [/\b(therapist|therapy|counseling|psychiatr)\b/i, 'MedicalBusiness'],
@@ -584,7 +584,7 @@ export function autoFixSchema(schema: Record<string, unknown>): void {
       const isZeroPrice = (o: unknown): boolean => {
         if (!o || typeof o !== 'object') return false;
         const p = (o as Record<string, unknown>)['price'];
-        return p === '0' || p === '0.00' || p === 0;
+        return p === 0 || (typeof p === 'string' && p.trim() !== '' && parseFloat(p) === 0);
       };
       if (!Array.isArray(rawOffers) && isZeroPrice(rawOffers)) {
         log.info('Auto-fix: removed zero-price Offer from Product (service business hallucination)');
@@ -1593,6 +1593,7 @@ RULES:
 
         // Re-run auto-fix and cross-references on the fixed version
         autoFixSchema(fixedSchema);
+        upgradeHealthcareType(fixedSchema, ctx);
         injectCrossReferences(fixedSchema, siteUrl, ctx.companyName, ctx);
 
         // Re-validate
