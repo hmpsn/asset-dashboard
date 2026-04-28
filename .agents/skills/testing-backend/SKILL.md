@@ -22,6 +22,61 @@ cd ~/repos/asset-dashboard && npx vitest run
 - Expected: ~58 test files pass, ~645+ tests pass (count grows over time)
 - Run specific test file: `npx vitest run tests/unit/your-test.test.ts`
 
+## Testing Auth & Role-Based Access
+
+### Dual Auth Systems
+The app has two auth systems — be careful not to mix them:
+- **HMAC password auth**: Admin panel login, token in `x-auth-token` header, validated by global `APP_PASSWORD` gate in `app.ts`
+- **JWT user auth**: Multi-user accounts, token in `Authorization: Bearer` header or `token` cookie, validated by `requireAuth` middleware
+
+Without `APP_PASSWORD` set, the global HMAC gate is inactive, so requests go straight to route-level middleware. This is ideal for testing `requireAuth` + `requireRole` behavior in isolation.
+
+### Creating Test Users for JWT Auth Testing
+```bash
+# 1. Create owner user (first user via setup endpoint)
+SETUP_RESP=$(curl -s -X POST http://localhost:3001/api/auth/setup \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"owner@test.local","password":"testpassword123","name":"Test Owner"}')
+OWNER_TOKEN=$(echo "$SETUP_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+
+# 2. Create member user (requires owner JWT)
+curl -s -X POST http://localhost:3001/api/users \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $OWNER_TOKEN" \
+  -d '{"email":"member@test.local","password":"testpassword123","name":"Test Member","role":"member"}'
+
+# 3. Login as member to get member JWT
+LOGIN_RESP=$(curl -s -X POST http://localhost:3001/api/auth/user-login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"member@test.local","password":"testpassword123"}')
+MEMBER_TOKEN=$(echo "$LOGIN_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+```
+
+### Testing Role-Gated Endpoints
+For any endpoint with `requireAuth` + `requireRole('owner', 'admin')`:
+```bash
+# No auth → 401
+curl -s -w "\nHTTP: %{http_code}" http://localhost:3001/api/admin/feature-flags
+
+# Member JWT → 403
+curl -s -w "\nHTTP: %{http_code}" -H "Authorization: Bearer $MEMBER_TOKEN" http://localhost:3001/api/admin/feature-flags
+
+# Owner JWT → 200
+curl -s -w "\nHTTP: %{http_code}" -H "Authorization: Bearer $OWNER_TOKEN" http://localhost:3001/api/admin/feature-flags
+```
+
+### Testing HMAC-Gated Endpoints (e.g. /api/ai-stats)
+HMAC-gated endpoints check `x-auth-token` header or `auth_token` cookie. Without `APP_PASSWORD` set, you cannot generate a valid HMAC token. You can still verify:
+- Endpoint responds (doesn't hang) — use `curl --max-time 5`
+- Returns 403 with proper error JSON when no valid token provided
+- If `APP_PASSWORD` is set, you'd need to authenticate via `POST /api/auth/login` with the password to get the HMAC token
+
+## Testing Middleware Behavior
+When testing Express middleware fixes (e.g., verifying a function is called correctly as middleware):
+- Use `curl --max-time 5` to detect hanging requests (middleware that never calls `next()`)
+- A response within the timeout (even 403/401) proves the middleware pipeline is working
+- A timeout proves `next()` is never called — the exact symptom of broken middleware
+
 ## Testing Schema Module (D1-D5)
 
 ### Exported Pure Functions (can be unit tested directly)
@@ -184,6 +239,15 @@ console.log(payment);
 "
 ```
 
+## Testing Graceful Shutdown
+The graceful shutdown handler in `server/index.ts` should stop all background schedulers before closing the database. To verify:
+1. Start the server: `PORT=3001 npx tsx server/index.ts`
+2. Send SIGTERM: `kill -SIGTERM <pid>`
+3. Check logs for "Shutdown signal received, draining..." and clean exit
+4. No "cannot use database after close" errors should appear
+
+To verify all schedulers are stopped, check `server/index.ts` for `stop*()` calls in the `gracefulShutdown` function. As of 2026-04, there should be 12 stop calls (matching all schedulers started in `server/startup.ts`).
+
 ## Verifying SQLite Database
 `sqlite3` CLI may not be available on the VM. Use Node.js instead:
 ```bash
@@ -206,13 +270,11 @@ db.close();
 - Migration runner wraps each migration in a transaction for atomicity
 - `runMigrations()` is called on server startup in `server/index.ts` before route mounting
 - WAL mode enabled for concurrent read performance
-- Graceful shutdown sequence: mark health 503 → mark jobs interrupted → close WebSocket → drain HTTP → flush data → close SQLite
-
-## Build Verification
-```bash
-npx tsc --noEmit --skipLibCheck && npx vite build
-```
-Both must exit 0 before creating PRs.
 
 ## Devin Secrets Needed
-None required for basic backend testing. The server runs without any API keys in development mode.
+
+No secrets required for basic backend testing. Optional for extended testing:
+- `WEBFLOW_API_TOKEN` — Webflow-dependent features
+- `OPENAI_API_KEY` — AI features
+- `STRIPE_SECRET_KEY` — Payment flows
+- `APP_PASSWORD` — Required to test HMAC auth flows (admin panel login, ai-stats with valid token)
