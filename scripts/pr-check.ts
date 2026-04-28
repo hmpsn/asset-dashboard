@@ -4450,9 +4450,14 @@ export const CHECKS: Check[] = [
         });
       }
 
+      function normalizeFontFamily(val: string): string {
+        // Normalize whitespace around commas and quotes for font-family comparison
+        return val.replace(/\s*,\s*/g, ',').replace(/\s+/g, ' ').trim();
+      }
+
       function cssValuesEqual(a: string | undefined, b: string | undefined): boolean {
         if (a === undefined || b === undefined) return a === b;
-        return normalizeCssValue(a) === normalizeCssValue(b);
+        return normalizeCssValue(normalizeFontFamily(a)) === normalizeCssValue(normalizeFontFamily(b));
       }
 
       const canonical = parseTypoClasses(indexCss);
@@ -4478,6 +4483,9 @@ export const CHECKS: Check[] = [
         }
         if (canonicalProps.fontWeight && !cssValuesEqual(canonicalProps.fontWeight, sgProps.fontWeight)) {
           diffs.push(`font-weight: expected ${canonicalProps.fontWeight}, got ${sgProps.fontWeight ?? 'unset'}`);
+        }
+        if (canonicalProps.fontFamily && !cssValuesEqual(canonicalProps.fontFamily, sgProps.fontFamily)) {
+          diffs.push(`font-family: expected ${canonicalProps.fontFamily}, got ${sgProps.fontFamily ?? 'unset'}`);
         }
         if (canonicalProps.lineHeight && !cssValuesEqual(canonicalProps.lineHeight, sgProps.lineHeight)) {
           diffs.push(`line-height: expected ${canonicalProps.lineHeight}, got ${sgProps.lineHeight ?? 'unset'}`);

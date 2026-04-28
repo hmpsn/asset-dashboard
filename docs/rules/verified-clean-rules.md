@@ -142,7 +142,7 @@ explicit justification.
 | No purple/violet in client domain | regex-shell | Phase C new rule (2026-04-27). Pattern `(purple\|violet)-[0-9]+`; pathFilter `src/components/client/`. Stricter than the existing "Purple in client components" rule — also catches `violet-`. Manual `grep -rn --include='*.tsx' --include='*.ts' -E '(purple\|violet)-[0-9]+' src/components/client/` returns zero hits. Mechanizes Law 04 of the Four Laws of Color. 3 fixture tests cover: purple-400 trigger, violet-600 trigger, and teal-400 negative. |
 | score-color-law-parity | customCheck-fixture | Phase C new rule (2026-04-27). customCheck parses `src/components/ui/constants.ts`, extracts the `scoreColorClass` function body, and flags any `green-\d+` references (should use `emerald-*` per Law 03). Verified the current `scoreColorClass` returns `text-emerald-400` / `text-amber-400` / `text-red-400` — zero hits. 3 fixture tests cover: `text-green-400` trigger, correct `text-emerald-400` negative, and missing-function negative. |
 
-**Count: 76 verified-clean rules.**
+**Count: 77 verified-clean rules.**
 
 > Note: `Hand-rolled gradient CTA button` (added in Phase 5 Phase 3) ships at
 > warn severity because a full-repo `--all` scan finds ~11 remaining
