@@ -29,10 +29,6 @@ import type { CustomDateRange } from './google-analytics.js';
 import { getGA4TopPages, getGA4LandingPages } from './google-analytics.js';
 import { upsertInsight, getInsights, deleteStaleInsightsByType, suppressInsights } from './analytics-insights-store.js';
 import { buildEnrichmentContext, enrichInsight } from './insight-enrichment.js';
-
-function toInsightPageId(url: string): string {
-  try { return new URL(url).pathname; } catch { return url; }
-}
 import { loadDecayAnalysis } from './content-decay.js';
 import { runFeedbackLoops } from './insight-feedback.js';
 import { apiCache } from './api-cache.js';
@@ -42,6 +38,10 @@ import { extractBrandTokens, isBrandedQuery } from './competitor-brand-filter.js
 import { listPageKeywords } from './page-keywords.js';
 import { createLogger } from './logger.js';
 import { isProgrammingError } from './errors.js';
+
+function toInsightPageId(url: string): string {
+  try { return new URL(url).pathname; } catch { return url; }
+}
 
 // ── Shared types for computation results ─────────────────────────
 
