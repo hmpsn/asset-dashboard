@@ -129,7 +129,7 @@ export function BusinessProfileTab({ workspaceId, businessProfile, businessConte
   return (
     <div className="space-y-8">
       {isMissingCriticalFields && isLocalBusinessContext && (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 mb-6">
+        <div className="rounded-[var(--radius-lg)] border border-amber-500/30 bg-amber-500/10 p-4 mb-6">
           <p className="t-body text-amber-400 font-medium mb-1">Business profile incomplete</p>
           <p className="t-caption text-[var(--brand-text-muted)]">
             Schema generation for local businesses uses your verified business profile to populate
