@@ -268,7 +268,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
 
               <div className="overflow-y-auto flex-1 min-h-0">
               <table className="w-full text-xs">
-                <thead className="sticky top-0 bg-[var(--surface-2)] z-10">
+                <thead className="sticky top-0 bg-[var(--surface-2)] z-[var(--z-sticky)]">
                   <tr className="border-b border-[var(--brand-border)]">
                     <th className="text-left py-3 px-4 text-[var(--brand-text-muted)] font-medium">
                       {tableView === 'queries' ? 'Query' : 'Page'}

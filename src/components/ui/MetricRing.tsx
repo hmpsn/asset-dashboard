@@ -43,7 +43,7 @@ export function MetricRing({ score, size = 120, strokeWidth, className, noAnimat
           }}
         />
       )}
-      <svg width={size} height={size} className="transform -rotate-90 relative z-10">
+      <svg width={size} height={size} className="transform -rotate-90 relative z-[var(--z-sticky)]">
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--metric-ring-track, #303036)" strokeWidth={sw} />
         <circle
           cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={sw}
@@ -51,7 +51,7 @@ export function MetricRing({ score, size = 120, strokeWidth, className, noAnimat
           className="transition-all duration-1000"
         />
       </svg>
-      <div className="absolute inset-0 flex items-center justify-center z-10">
+      <div className="absolute inset-0 flex items-center justify-center z-[var(--z-sticky)]">
         <span
           className="font-bold"
           style={{

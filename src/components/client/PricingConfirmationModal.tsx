@@ -64,6 +64,7 @@ export function PricingConfirmationModal({
         // to null. The CTA below picks the no-price branch automatically.
         const displayPrice = isExternal ? null : (isUpgrade ? upgradePrice : price);
         const fmt = fmtPrice;
+        // z-index-ok — pricing modal above standard modal scale
         return (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[70] flex items-center justify-center p-4" onClick={() => !pricingConfirming && setPricingModal(null)}>
             {/* pr-check-disable-next-line -- pricing modal surface uses brand signature radius intentionally */}
@@ -71,7 +72,7 @@ export function PricingConfirmationModal({
               {/* Close button */}
               <button
                 onClick={() => !pricingConfirming && setPricingModal(null)}
-                className="absolute top-3 right-3 w-7 h-7 rounded-[var(--radius-lg)] flex items-center justify-center bg-[var(--surface-3)]/80 hover:bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors z-10"
+                className="absolute top-3 right-3 w-7 h-7 rounded-[var(--radius-lg)] flex items-center justify-center bg-[var(--surface-3)]/80 hover:bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors z-[var(--z-sticky)]"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -183,7 +184,7 @@ export function PricingConfirmationModal({
 
       {/* Stripe Elements inline payment modal (lazy-loaded — Stripe SDK only fetched on payment) */}
       {stripePayment && (
-        <Suspense fallback={<div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-teal-400" /></div>}>
+        <Suspense fallback={<div className="fixed inset-0 bg-black/60 z-[var(--z-modal)] flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-teal-400" /></div>}>
           <LazyStripePaymentModal
             clientSecret={stripePayment.clientSecret}
             publishableKey={stripePayment.publishableKey}

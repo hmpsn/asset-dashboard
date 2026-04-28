@@ -17,7 +17,7 @@ const SIGNUP_URL = '#signup'; // Replace with actual signup/trial URL
 
 function NavBar() {
   return (
-    <nav className="fixed top-0 w-full z-50 border-b border-[var(--brand-border)] bg-[var(--surface-1)]/80 backdrop-blur-xl">
+    <nav className="fixed top-0 w-full z-[var(--z-modal)] border-b border-[var(--brand-border)] bg-[var(--surface-1)]/80 backdrop-blur-xl">
       <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
         <img src="/hmpsn-studio-logo-wordmark-white.svg" alt="hmpsn studio" className="h-6 opacity-90" />
         <div className="flex items-center gap-4">
@@ -72,7 +72,7 @@ function Hero() {
 
         {/* Product preview placeholder */}
         <div className="mt-16 relative">
-          <div className="absolute inset-0 bg-gradient-to-t from-[var(--surface-1)] via-transparent to-transparent z-10 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[var(--surface-1)] via-transparent to-transparent z-[var(--z-sticky)] pointer-events-none" />
           <div className="rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-2)]/50 overflow-hidden shadow-2xl shadow-black/40">
             <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--brand-border)] bg-[var(--surface-2)]/80">
               <div className="w-3 h-3 rounded-full bg-[var(--brand-border)]" />

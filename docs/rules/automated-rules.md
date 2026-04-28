@@ -93,6 +93,7 @@ advisory but tracked.
 | 75 | styleguide-typography-parity | error | custom | `public/styleguide.css vs src/index.css` | — | The styleguide must render specimens with the same CSS values the app uses. Drift between the two files means the styleguide lies about the design system. |
 | 76 | No purple/violet in client domain | error | pattern | `src/components/client/` | — | Mechanizes Law 04 of the Four Laws of Color — purple is reserved for admin AI surfaces (AdminChat, SeoAudit). Client-facing views must never use purple or violet. |
 | 77 | score-color-law-parity | error | custom | `*.ts` | — | scoreColorClass() is called from 20+ components. If it drifts from emerald to green, every downstream consumer silently violates Law 03. |
+| 78 | Raw z-index class (use z-[var(--z-*)] tokens) | error | pattern | `src/` | `z-index-ok` | Ensures z-index values come from the centralized token scale in tokens.css, preventing stacking-context collisions. |
 
 ---
 

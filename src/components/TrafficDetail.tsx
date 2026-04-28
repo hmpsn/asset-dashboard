@@ -330,7 +330,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
                   const pct = totalSessions > 0 ? (s.sessions / totalSessions) * 100 : 0;
                   return (
                     <div key={i} className="relative">
-                      <div className="flex items-center gap-2 py-1.5 px-2 rounded-[var(--radius-sm)] relative z-10">
+                      <div className="flex items-center gap-2 py-1.5 px-2 rounded-[var(--radius-sm)] relative z-[var(--z-sticky)]">
                         <span className="text-xs text-[var(--brand-text-bright)] flex-1 truncate">{s.source || '(direct)'}{s.medium !== '(none)' ? ` / ${s.medium}` : ''}</span>
                         <span className="text-xs text-blue-400 font-medium tabular-nums">{s.sessions.toLocaleString()}</span>
                         <span className="t-caption-sm text-[var(--brand-text-muted)] w-12 text-right">{pct.toFixed(1)}%</span>

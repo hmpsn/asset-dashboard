@@ -910,7 +910,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                     Export brief
                   </button>
                   {exportOpen && (
-                    <div className="absolute right-0 top-7 z-50 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl p-1 flex flex-col gap-0.5 min-w-[170px]">
+                    <div className="absolute right-0 top-7 z-[var(--z-modal)] bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl p-1 flex flex-col gap-0.5 min-w-[170px]">
                       <button
                         onClick={() => handleExport('copy')}
                         className="flex items-center gap-2 px-3 py-1.5 rounded t-caption-sm text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] transition-colors text-left"
@@ -977,7 +977,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
               {/* Floating formatting toolbar — appears above text selection */}
               {toolbarPos && (
                 <div
-                  className="absolute z-50 flex items-center gap-0.5 bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded-[var(--radius-md)] shadow-xl px-1 py-0.5 pointer-events-auto"
+                  className="absolute z-[var(--z-modal)] flex items-center gap-0.5 bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded-[var(--radius-md)] shadow-xl px-1 py-0.5 pointer-events-auto"
                   style={{ top: toolbarPos.top, left: toolbarPos.left }}
                   onMouseDown={e => e.preventDefault()}
                 >

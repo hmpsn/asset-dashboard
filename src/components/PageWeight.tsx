@@ -179,7 +179,7 @@ function PageWeight({ siteId }: Props) {
       </div>
 
       {/* Toolbar */}
-      <div className="sticky top-0 z-10 bg-[var(--surface-1)]/95 backdrop-blur-sm py-2">
+      <div className="sticky top-0 z-[var(--z-sticky)] bg-[var(--surface-1)]/95 backdrop-blur-sm py-2">
         <div className="flex items-center gap-3">
           <div className="relative flex-1">
             <Icon as={Search} size="md" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />

@@ -58,9 +58,11 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
   return (
     <>
       {/* Backdrop */}
+      {/* z-index-ok — cart backdrop must sit above modal scale */}
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60]" onClick={closeCart} />
 
       {/* Drawer */}
+      {/* z-index-ok — cart drawer 1 above its own backdrop */}
       <div className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-[var(--surface-2)] border-l border-[var(--brand-border)] z-[61] flex flex-col animate-[slideInRight_0.2s_ease-out]">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--brand-border)]">

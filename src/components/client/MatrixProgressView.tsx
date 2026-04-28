@@ -197,7 +197,7 @@ export function MatrixProgressView({ matrix, onCellPreview, onFlagCell, onDownlo
             <table className="w-full border-collapse text-left">
               <thead>
                 <tr>
-                  <th className="px-3 py-2 t-caption font-semibold text-[var(--brand-text-muted)] uppercase tracking-wider border-b border-[var(--brand-border)] bg-[var(--surface-1)] sticky left-0 z-10">
+                  <th className="px-3 py-2 t-caption font-semibold text-[var(--brand-text-muted)] uppercase tracking-wider border-b border-[var(--brand-border)] bg-[var(--surface-1)] sticky left-0 z-[var(--z-sticky)]">
                     {dim0.label ?? dim0.variableName}
                   </th>
                   {dim1.values.map(col => (
@@ -210,7 +210,7 @@ export function MatrixProgressView({ matrix, onCellPreview, onFlagCell, onDownlo
               <tbody>
                 {dim0.values.map(row => (
                   <tr key={row}>
-                    <td className="px-3 py-2 t-caption font-medium text-[var(--brand-text-bright)] border-b border-[var(--brand-border)] bg-[var(--surface-1)] sticky left-0 z-10 whitespace-nowrap">
+                    <td className="px-3 py-2 t-caption font-medium text-[var(--brand-text-bright)] border-b border-[var(--brand-border)] bg-[var(--surface-1)] sticky left-0 z-[var(--z-sticky)] whitespace-nowrap">
                       {row}
                     </td>
                     {dim1.values.map(col => {

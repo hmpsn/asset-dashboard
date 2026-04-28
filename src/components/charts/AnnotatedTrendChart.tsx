@@ -227,7 +227,7 @@ function CreatePopover({
   return (
     <div
       ref={popoverRef}
-      className="absolute z-50 bg-[var(--surface-2)] border border-[var(--brand-border-hover)] rounded-[var(--radius-md)] shadow-xl p-3 w-64"
+      className="absolute z-[var(--z-modal)] bg-[var(--surface-2)] border border-[var(--brand-border-hover)] rounded-[var(--radius-md)] shadow-xl p-3 w-64"
       style={{ left: Math.min(state.x, (containerWidth ?? 600) - 270), top: state.y + 10 }}
     >
       <div className="flex items-center justify-between mb-2">

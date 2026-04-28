@@ -58,6 +58,7 @@ export function OnboardingWizard({
   const prev = () => { if (stepIdx > 0) setStep(STEPS[stepIdx - 1]); };
 
   return (
+    /* z-index-ok — onboarding wizard above modal scale */
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={onDismiss}>
       <div className="bg-[var(--surface-2)] rounded-[var(--radius-xl)] border border-[var(--brand-border)] shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
 

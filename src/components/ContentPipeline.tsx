@@ -199,7 +199,7 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
           </button>
           {exportOpen && (
             // pr-check-disable-next-line -- export menu dropdown
-            <div className="absolute right-0 top-full mt-1 w-56 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl z-20 py-1 overflow-hidden">
+            <div className="absolute right-0 top-full mt-1 w-56 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl z-[var(--z-dropdown)] py-1 overflow-hidden">
               {EXPORTS.map(exp => (
                 <div key={exp.key} className="flex items-center justify-between px-3 py-2 hover:bg-[var(--surface-3)] group">
                   <span className="text-xs text-[var(--brand-text-bright)]">{exp.label}</span>
@@ -237,7 +237,7 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
       {/* Floating help button */}
       <button
         onClick={() => setGuideOpen(true)}
-        className={"fixed bottom-6 right-6 z-30 w-10 h-10 rounded-full bg-[var(--surface-3)] border border-[var(--brand-border)] hover:border-teal-500/50 hover:bg-[var(--brand-border-hover)] shadow-lg flex items-center justify-center transition-all group" // rounded-literal-ok
+        className={"fixed bottom-6 right-6 z-[var(--z-tooltip)] w-10 h-10 rounded-full bg-[var(--surface-3)] border border-[var(--brand-border)] hover:border-teal-500/50 hover:bg-[var(--brand-border-hover)] shadow-lg flex items-center justify-center transition-all group" // rounded-literal-ok
         }
         title="Content Pipeline Guide"
       >
@@ -246,11 +246,11 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
 
       {/* Guide slide-over */}
       {guideOpen && (
-        <div className={"fixed inset-0 z-40 flex justify-end" // fixed-inset-ok — slide panel
+        <div className={"fixed inset-0 z-[var(--z-modal-backdrop)] flex justify-end" // fixed-inset-ok — slide panel
         }>
           <div className="absolute inset-0 bg-black/40" onClick={() => setGuideOpen(false)} />
           <div className="relative w-full max-w-md bg-[var(--surface-1)] border-l border-[var(--brand-border)] shadow-2xl overflow-y-auto animate-in slide-in-from-right">
-            <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-3.5 bg-[var(--surface-1)]/95 backdrop-blur border-b border-[var(--brand-border)]">
+            <div className="sticky top-0 z-[var(--z-sticky)] flex items-center justify-between px-5 py-3.5 bg-[var(--surface-1)]/95 backdrop-blur border-b border-[var(--brand-border)]">
               <span className="text-sm font-semibold text-[var(--brand-text-bright)]">Content Pipeline Guide</span>
               <button onClick={() => setGuideOpen(false)} className="p-1 rounded-[var(--radius-md)] hover:bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
                 <Icon as={X} size="md" />

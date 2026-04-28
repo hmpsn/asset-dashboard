@@ -178,7 +178,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
           </button>
           {shareOpen && (
             // pr-check-disable-next-line -- Shareable Reports popover dropdown; positioned absolute, not a content card
-            <div className="absolute right-0 top-full mt-2 w-80 bg-[var(--surface-2)] border border-[var(--brand-border-strong)] rounded-[var(--radius-xl)] shadow-xl z-50 overflow-hidden">
+            <div className="absolute right-0 top-full mt-2 w-80 bg-[var(--surface-2)] border border-[var(--brand-border-strong)] rounded-[var(--radius-xl)] shadow-xl z-[var(--z-modal)] overflow-hidden">
               <div className="px-4 py-3 border-b border-[var(--brand-border)]">
                 <div className="t-caption font-medium text-[var(--brand-text)]">Shareable Reports</div>
                 <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">Copy a link to share with your team</div>

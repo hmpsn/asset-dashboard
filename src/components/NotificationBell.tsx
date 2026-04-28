@@ -53,17 +53,17 @@ export function NotificationBell({ onSelectWorkspace }: NotificationBellProps) {
       {/* Backdrop */}
       {open && (
         <div
-          className="fixed inset-0 z-40" // fixed-inset-ok — dropdown backdrop
+          className="fixed inset-0 z-[var(--z-modal-backdrop)]" // fixed-inset-ok — dropdown backdrop
           onClick={() => setOpen(false)}
           aria-hidden="true"
         />
       )}
 
-      {/* Fixed slide-out drawer — slides in from left, 360px wide, z-50 */}
+      {/* Fixed slide-out drawer — slides in from left, 360px wide, z-[var(--z-modal)] */}
       {open && (
         <div
           data-testid="notification-drawer"
-          className="fixed top-0 left-0 h-screen w-[360px] bg-[var(--surface-2)] border-r border-[var(--brand-border)] shadow-2xl shadow-black/40 z-50 flex flex-col"
+          className="fixed top-0 left-0 h-screen w-[360px] bg-[var(--surface-2)] border-r border-[var(--brand-border)] shadow-2xl shadow-black/40 z-[var(--z-modal)] flex flex-col"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--brand-border)] flex-shrink-0">

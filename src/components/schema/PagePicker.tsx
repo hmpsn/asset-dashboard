@@ -25,7 +25,7 @@ export function PagePicker({
 
   return (
     // pr-check-disable-next-line -- dropdown popover
-    <div className="absolute right-0 top-full mt-1 w-72 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] overflow-hidden shadow-xl z-20">
+    <div className="absolute right-0 top-full mt-1 w-72 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] overflow-hidden shadow-xl z-[var(--z-dropdown)]">
       <div className="px-3 py-2 border-b border-[var(--brand-border)]">
         <div className="relative">
           <Icon as={Search} size="sm" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
