@@ -258,6 +258,7 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
     }
   }
 
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: req.params.postId });
   res.json(updated);
 });
 

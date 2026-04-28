@@ -11,6 +11,7 @@ import { getText } from '../api/client';
 import { useAdminPost, useAdminPostVersions, usePublishTarget } from '../hooks/admin';
 import { SectionCard, Icon } from './ui';
 import { SectionEditor } from './post-editor/SectionEditor';
+import { RichTextEditor } from './post-editor/RichTextEditor';
 import { PostPreview } from './post-editor/PostPreview';
 import { VersionHistory } from './post-editor/VersionHistory';
 import { ReviewChecklist } from './post-editor/ReviewChecklist';
@@ -96,9 +97,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set());
   const [editingSection, setEditingSection] = useState<number | null>(null);
   const [editingIntro, setEditingIntro] = useState(false);
-  const [introBuffer, setIntroBuffer] = useState('');
   const [editingConclusion, setEditingConclusion] = useState(false);
-  const [conclusionBuffer, setConclusionBuffer] = useState('');
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleBuffer, setTitleBuffer] = useState('');
   const [regenerating, setRegenerating] = useState<number | null>(null);
@@ -121,6 +120,14 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
     await saveField({ sections });
   };
   const { scheduleAutoSave: scheduleSectionSave, flush: flushSection, saveStatus: sectionSaveStatus } = useAutoSave(sectionAutoSaveFn);
+
+  const { scheduleAutoSave: scheduleIntroSave, flush: flushIntro, saveStatus: introSaveStatus } = useAutoSave(
+    async (html: string) => { await saveField({ introduction: html }); },
+  );
+
+  const { scheduleAutoSave: scheduleConclusionSave, flush: flushConclusion, saveStatus: conclusionSaveStatus } = useAutoSave(
+    async (html: string) => { await saveField({ conclusion: html }); },
+  );
 
   const invalidatePost = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.post(workspaceId, postId) });
   const invalidateVersions = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.postVersions(workspaceId, postId) });
@@ -169,18 +176,6 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
       queryClient.setQueryData(queryKeys.admin.post(workspaceId, postId), updated);
     } catch (err) { console.error('PostEditor operation failed:', err); }
     setRegenerating(null);
-  };
-
-  const saveIntroEdit = () => {
-    if (!post) return;
-    saveField({ introduction: introBuffer });
-    setEditingIntro(false);
-  };
-
-  const saveConclusionEdit = () => {
-    if (!post) return;
-    saveField({ conclusion: conclusionBuffer });
-    setEditingConclusion(false);
   };
 
   const saveTitleEdit = () => {
@@ -415,7 +410,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                 {post.introduction && <span className="t-caption-sm text-[var(--brand-text-muted)]">{post.introduction.split(/\s+/).filter(w => w).length}w</span>}
               </div>
               {post.introduction && !editingIntro && (
-                <button onClick={() => { setEditingIntro(true); setIntroBuffer(post.introduction); }} className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
+                <button onClick={() => setEditingIntro(true)} className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
                   <Icon as={Pencil} size="sm" /> Edit
                 </button>
               )}
@@ -425,10 +420,25 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                 <div className="flex items-center gap-2 text-xs text-[var(--brand-text-muted)]"><Icon as={Loader2} size="sm" className="animate-spin" /> Writing introduction...</div>
               ) : editingIntro ? (
                 <div className="space-y-2">
-                  <textarea value={introBuffer} onChange={e => setIntroBuffer(e.target.value)} className="w-full bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg px-3 py-2 text-xs text-[var(--brand-text-bright)] focus:border-teal-500/50 focus:outline-none resize-y min-h-[100px]" rows={6} />
+                  <RichTextEditor
+                    initialValue={post.introduction}
+                    onChange={scheduleIntroSave}
+                  />
                   <div className="flex items-center gap-2">
-                    <button onClick={saveIntroEdit} className="px-3 py-1.5 rounded-lg t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors flex items-center gap-1"><Icon as={Check} size="sm" /> Save</button>
-                    <button onClick={() => setEditingIntro(false)} className="px-3 py-1.5 rounded-lg t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">Cancel</button>
+                    <button
+                      onClick={async () => { await flushIntro(); setEditingIntro(false); }}
+                      className="px-3 py-1.5 rounded-lg t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors flex items-center gap-1"
+                    >
+                      <Icon as={Check} size="sm" /> Done
+                    </button>
+                    {introSaveStatus === 'saving' && (
+                      <span className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
+                        <Icon as={Loader2} size="sm" className="animate-spin" /> Saving…
+                      </span>
+                    )}
+                    {introSaveStatus === 'saved' && (
+                      <span className="t-caption-sm text-emerald-400/70">Saved</span>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -463,7 +473,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                 {post.conclusion && <span className="t-caption-sm text-[var(--brand-text-muted)]">{post.conclusion.split(/\s+/).filter(w => w).length}w</span>}
               </div>
               {post.conclusion && !editingConclusion && (
-                <button onClick={() => { setEditingConclusion(true); setConclusionBuffer(post.conclusion); }} className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
+                <button onClick={() => setEditingConclusion(true)} className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
                   <Icon as={Pencil} size="sm" /> Edit
                 </button>
               )}
@@ -473,10 +483,25 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                 <div className="flex items-center gap-2 text-xs text-[var(--brand-text-muted)]"><Icon as={Loader2} size="sm" className="animate-spin" /> Writing conclusion...</div>
               ) : editingConclusion ? (
                 <div className="space-y-2">
-                  <textarea value={conclusionBuffer} onChange={e => setConclusionBuffer(e.target.value)} className="w-full bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg px-3 py-2 text-xs text-[var(--brand-text-bright)] focus:border-teal-500/50 focus:outline-none resize-y min-h-[80px]" rows={4} />
+                  <RichTextEditor
+                    initialValue={post.conclusion}
+                    onChange={scheduleConclusionSave}
+                  />
                   <div className="flex items-center gap-2">
-                    <button onClick={saveConclusionEdit} className="px-3 py-1.5 rounded-lg t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors flex items-center gap-1"><Icon as={Check} size="sm" /> Save</button>
-                    <button onClick={() => setEditingConclusion(false)} className="px-3 py-1.5 rounded-lg t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">Cancel</button>
+                    <button
+                      onClick={async () => { await flushConclusion(); setEditingConclusion(false); }}
+                      className="px-3 py-1.5 rounded-lg t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors flex items-center gap-1"
+                    >
+                      <Icon as={Check} size="sm" /> Done
+                    </button>
+                    {conclusionSaveStatus === 'saving' && (
+                      <span className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
+                        <Icon as={Loader2} size="sm" className="animate-spin" /> Saving…
+                      </span>
+                    )}
+                    {conclusionSaveStatus === 'saved' && (
+                      <span className="t-caption-sm text-emerald-400/70">Saved</span>
+                    )}
                   </div>
                 </div>
               ) : (
