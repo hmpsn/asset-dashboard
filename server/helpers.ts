@@ -362,8 +362,11 @@ export async function buildSchemaContext(
         ctx._backlinkReferringDomains = intel.seoContext.backlinkProfile.referringDomains;
       }
     } catch (err) {
-      if (isProgrammingError(err)) log.warn({ err }, 'helpers/buildSchemaContext: intelligence layer error');
-      // Intelligence layer unavailable — schema generation continues without these signals
+      if (isProgrammingError(err)) {
+        log.warn({ err }, 'helpers/buildSchemaContext: intelligence layer error');
+      } else {
+        log.debug({ err }, 'helpers/buildSchemaContext: intelligence layer not ready — skipping SEO signals');
+      }
     }
   }
   const pageKeywordMap = ws?.keywordStrategy?.pageMap?.map(p => ({
