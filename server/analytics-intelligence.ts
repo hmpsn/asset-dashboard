@@ -29,6 +29,10 @@ import type { CustomDateRange } from './google-analytics.js';
 import { getGA4TopPages, getGA4LandingPages } from './google-analytics.js';
 import { upsertInsight, getInsights, deleteStaleInsightsByType, suppressInsights } from './analytics-insights-store.js';
 import { buildEnrichmentContext, enrichInsight } from './insight-enrichment.js';
+
+function toInsightPageId(url: string): string {
+  try { return new URL(url).pathname; } catch { return url; }
+}
 import { loadDecayAnalysis } from './content-decay.js';
 import { runFeedbackLoops } from './insight-feedback.js';
 import { apiCache } from './api-cache.js';
@@ -233,7 +237,7 @@ export function computePageHealthScores(
     else severity = 'critical';
 
     return {
-      pageId: page.page,
+      pageId: toInsightPageId(page.page),
       insightType: 'page_health',
       data: {
         score,
@@ -287,7 +291,7 @@ export function computeRankingOpportunities(
   }
 
   const results: ComputedInsight<QuickWinData>[] = Array.from(bestByPage.values()).map(({ row, gain }) => ({
-    pageId: row.page, // page URL only — lets DB UNIQUE constraint deduplicate correctly
+    pageId: toInsightPageId(row.page),
     insightType: 'ranking_opportunity',
     data: {
       query: row.query,
@@ -661,7 +665,7 @@ export function computeRankingMovers(
     if (!existing || impact > existing.impact) {
       bestByPage.set(curr.page, {
         insightType: 'ranking_mover' as const,
-        pageId: curr.page, // page URL only — lets DB UNIQUE constraint deduplicate correctly
+        pageId: toInsightPageId(curr.page),
         data: {
           query: curr.query, pageUrl: curr.page,
           currentPosition: Math.round(curr.position * 10) / 10,
@@ -731,7 +735,7 @@ export function computeCtrOpportunities(
     if (!existing || clickGap > existing.clickGap) {
       bestByPage.set(row.page, {
         insightType: 'ctr_opportunity' as const,
-        pageId: row.page, // page URL only — lets DB UNIQUE constraint deduplicate correctly
+        pageId: toInsightPageId(row.page),
         data: {
           query: row.query,
           pageUrl: row.page,
@@ -788,7 +792,7 @@ export function computeSerpOpportunities(
 
     results.push({
       insightType: 'serp_opportunity' as const,
-      pageId: page.page,
+      pageId: toInsightPageId(page.page),
       data: {
         pageUrl: page.page,
         impressions: page.impressions,
@@ -914,14 +918,14 @@ export async function refreshContentDecayInsights(workspaceId: string): Promise<
         : page.severity === 'warning' ? 'warning'
         : 'opportunity';
       const enrichment = enrichInsight(
-        { pageId: page.page, insightType: 'content_decay' as InsightType, severity, data: { baselineClicks: page.previousClicks, currentClicks: page.currentClicks, deltaPercent: page.clickDeclinePct, baselinePeriod: 'previous_30d', currentPeriod: 'current_30d' } },
+        { pageId: toInsightPageId(page.page), insightType: 'content_decay' as InsightType, severity, data: { baselineClicks: page.previousClicks, currentClicks: page.currentClicks, deltaPercent: page.clickDeclinePct, baselinePeriod: 'previous_30d', currentPeriod: 'current_30d' } },
         enrichCtx,
       );
       const { data: _enrichedData, ...enrichmentRest } = enrichment;
       upsertInsight({
         ...enrichmentRest,
         workspaceId,
-        pageId: page.page,
+        pageId: toInsightPageId(page.page),
         insightType: 'content_decay',
         data: {
           baselineClicks: page.previousClicks,
@@ -1239,7 +1243,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
           : 'opportunity';
         enrichAndUpsert({
           insightType: 'content_decay',
-          pageId: page.page,
+          pageId: toInsightPageId(page.page),
           data: {
             baselineClicks: page.previousClicks,
             currentClicks: page.currentClicks,
