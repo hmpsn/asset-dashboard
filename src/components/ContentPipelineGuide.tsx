@@ -140,7 +140,7 @@ export function ContentPipelineGuide() {
       </div>
 
       {/* Workflow overview */}
-      <div className="flex items-center gap-2 px-4 py-3 bg-teal-500/5 border border-teal-500/15 overflow-x-auto" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      <div className="flex items-center gap-2 px-4 py-3 bg-teal-500/5 border border-teal-500/15 overflow-x-auto" style={{ borderRadius: 'var(--radius-signature)' }}>
         {[
           { icon: Layers, label: 'Template' },
           { icon: Grid3X3, label: 'Matrix' },
@@ -151,7 +151,7 @@ export function ContentPipelineGuide() {
         ].map((step, i) => (
           <div key={step.label} className="flex items-center gap-2 flex-shrink-0">
             {i > 0 && <Icon as={ArrowRight} size="sm" className="text-teal-500/40" />}
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-teal-500/10">
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-lg)] bg-teal-500/10">
               <Icon as={step.icon} size="sm" className="text-teal-400" />
               <span className="t-caption-sm font-medium text-teal-300">{step.label}</span>
             </div>
@@ -169,7 +169,7 @@ export function ContentPipelineGuide() {
               onClick={() => toggle(section.id)}
               className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-[var(--surface-3)]/30 transition-colors rounded-[var(--radius-xl)]"
             >
-              <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center flex-shrink-0">
+              <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-teal-500/10 flex items-center justify-center flex-shrink-0">
                 <Icon as={SectionIcon} size="md" className="text-teal-400" />
               </div>
               <div className="flex-1 min-w-0">
@@ -186,7 +186,8 @@ export function ContentPipelineGuide() {
                   {section.steps.map((step, i) => (
                     <div key={i} className="flex gap-3">
                       <div className="flex flex-col items-center flex-shrink-0">
-                        <div className="w-5 h-5 rounded-full bg-teal-500/15 flex items-center justify-center">
+                        <div className={"w-5 h-5 rounded-full bg-teal-500/15 flex items-center justify-center" // rounded-literal-ok
+                        }>
                           <span className="t-caption-sm font-bold text-teal-400">{i + 1}</span>
                         </div>
                         {i < section.steps.length - 1 && (
@@ -203,7 +204,7 @@ export function ContentPipelineGuide() {
 
                 {/* Tip */}
                 {section.tip && (
-                  <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-amber-500/5 border border-amber-500/15">
+                  <div className="flex items-start gap-2 px-3 py-2.5 rounded-[var(--radius-lg)] bg-amber-500/5 border border-amber-500/15">
                     <Icon as={Flag} size="sm" className="text-amber-400/80 flex-shrink-0 mt-0.5" />
                     <span className="t-caption-sm text-amber-300/80 leading-relaxed">{section.tip}</span>
                   </div>

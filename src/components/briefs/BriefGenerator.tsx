@@ -37,7 +37,7 @@ export function BriefGenerator({
   onGenerate,
 }: BriefGeneratorProps) {
   return (
-    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' /* asymmetric-radius-ok */ }}>
+    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 space-y-3" style={{ borderRadius: 'var(--radius-signature)' }}>
       <div className="flex items-center gap-2 mb-1">
         <Icon as={Sparkles} size="md" className="text-amber-400" />
         <span className="text-xs font-medium text-[var(--brand-text-bright)]">Generate AI Content Brief</span>

@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, Suspense } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
-import { Clipboard, FileText, RefreshCw, Download, ChevronDown, Layers, HelpCircle, X, TrendingDown, CalendarDays } from 'lucide-react';
-import { LoadingState, Icon, cn } from './ui';
+import { Clipboard, FileText, RefreshCw, Download, ChevronDown, Layers, HelpCircle, X, TrendingDown, CalendarDays } from 'lucide-react'; // trend-icon-ok
+import { LoadingState, Icon, cn, PageHeader } from './ui';
 import { useContentPipeline, useWorkspaces } from '../hooks/admin';
 import { ContentBriefs } from './ContentBriefs';
 import { ContentManager } from './ContentManager';
@@ -118,12 +118,18 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
 
   return (
     <div className="space-y-8">
+      <PageHeader
+        title="Content Pipeline"
+        subtitle="Plan, brief, write, and publish content at scale"
+        icon={<Icon as={Layers} size="lg" className="text-teal-400" />}
+      />
+
       {/* Calendar tab has no workflow phase — stepper only shown for pipeline tabs */}
       {activeTab !== 'calendar' && <WorkflowStepper steps={contentWorkflowSteps} compact />}
 
       {/* Health summary bar */}
       {summary && (summary.briefs > 0 || summary.matrices > 0) && (
-        <div className="flex items-center gap-3 px-4 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] t-caption-sm text-[var(--brand-text)]" style={{ borderRadius: '10px 24px 10px 24px' /* asymmetric-radius-ok */ }}>
+        <div className="flex items-center gap-3 px-4 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] t-caption-sm text-[var(--brand-text)]" style={{ borderRadius: 'var(--radius-signature)' }}>
           {summary.briefs > 0 && <span className="flex items-center gap-1"><Icon as={Clipboard} size="sm" className="text-teal-400" /><span className="font-medium text-[var(--brand-text-bright)]">{summary.briefs}</span> brief{summary.briefs !== 1 ? 's' : ''}</span>}
           {summary.posts > 0 && <><span className="text-[var(--brand-border)]">&middot;</span><span className="flex items-center gap-1"><Icon as={FileText} size="sm" className="text-amber-400" /><span className="font-medium text-[var(--brand-text-bright)]">{summary.posts}</span> post{summary.posts !== 1 ? 's' : ''}</span></>}
           {summary.matrices > 0 && <><span className="text-[var(--brand-border)]">&middot;</span><span className="flex items-center gap-1"><Icon as={Layers} size="sm" className="text-teal-400" /><span className="font-medium text-[var(--brand-text-bright)]">{summary.matrices}</span> matri{summary.matrices !== 1 ? 'ces' : 'x'}</span></>}
@@ -133,7 +139,7 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
 
       {/* Content decay alert */}
       {decay && !decayDismissed && (decay.critical > 0 || decay.warning > 0) && (
-        <div className={cn('flex items-center gap-3 px-4 py-2.5 border text-xs', decay.critical > 0 ? 'bg-red-500/5 border-red-500/20' : 'bg-amber-500/5 border-amber-500/20')} style={{ borderRadius: '10px 24px 10px 24px' /* asymmetric-radius-ok */ }}>
+        <div className={cn('flex items-center gap-3 px-4 py-2.5 border text-xs', decay.critical > 0 ? 'bg-red-500/5 border-red-500/20' : 'bg-amber-500/5 border-amber-500/20')} style={{ borderRadius: 'var(--radius-signature)' }}>
           <Icon as={TrendingDown} size="md" className={cn('flex-shrink-0', decay.critical > 0 ? 'text-red-400' : 'text-amber-400')} />
           <div className="flex-1">
             <span className="font-medium text-[var(--brand-text-bright)]">
@@ -231,7 +237,8 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
       {/* Floating help button */}
       <button
         onClick={() => setGuideOpen(true)}
-        className="fixed bottom-6 right-6 z-30 w-10 h-10 rounded-full bg-[var(--surface-3)] border border-[var(--brand-border)] hover:border-teal-500/50 hover:bg-[var(--brand-border-hover)] shadow-lg flex items-center justify-center transition-all group"
+        className={"fixed bottom-6 right-6 z-30 w-10 h-10 rounded-full bg-[var(--surface-3)] border border-[var(--brand-border)] hover:border-teal-500/50 hover:bg-[var(--brand-border-hover)] shadow-lg flex items-center justify-center transition-all group" // rounded-literal-ok
+        }
         title="Content Pipeline Guide"
       >
         <Icon as={HelpCircle} size="md" className="text-[var(--brand-text)] group-hover:text-teal-400 transition-colors" />
@@ -239,7 +246,8 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
 
       {/* Guide slide-over */}
       {guideOpen && (
-        <div className="fixed inset-0 z-40 flex justify-end">
+        <div className={"fixed inset-0 z-40 flex justify-end" // fixed-inset-ok — slide panel
+        }>
           <div className="absolute inset-0 bg-black/40" onClick={() => setGuideOpen(false)} />
           <div className="relative w-full max-w-md bg-[var(--surface-1)] border-l border-[var(--brand-border)] shadow-2xl overflow-y-auto animate-in slide-in-from-right">
             <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-3.5 bg-[var(--surface-1)]/95 backdrop-blur border-b border-[var(--brand-border)]">
