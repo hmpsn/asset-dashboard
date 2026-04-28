@@ -12,21 +12,36 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
+import { createUser, getUserByEmail, deleteUser } from '../../server/users.js';
+import { signToken } from '../../server/auth.js';
 
 const ctx = createTestContext(13206);
-const { api, postJson } = ctx;
+const { api, postJson, setAuthToken, authApi } = ctx;
+
+const TEST_EMAIL = 'stripe_api_owner@test.local';
+let testUserId = '';
 
 beforeAll(async () => {
   await ctx.startServer();
+  // Stripe config endpoints require JWT auth with owner/admin role.
+  // Create owner user directly in the shared DB and sign a JWT.
+  let user = getUserByEmail(TEST_EMAIL);
+  if (!user) {
+    user = await createUser(TEST_EMAIL, 'testpassword123', 'Stripe API Test Owner', 'owner');
+  }
+  testUserId = user.id;
+  setAuthToken(signToken({ userId: user.id, email: user.email, role: user.role }));
 }, 25_000);
 
 afterAll(() => {
+  setAuthToken('');
+  if (testUserId) deleteUser(testUserId);
   ctx.stopServer();
 });
 
 describe('Stripe Config API', () => {
   it('GET /api/stripe/config returns config status', async () => {
-    const res = await api('/api/stripe/config');
+    const res = await authApi('/api/stripe/config');
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toHaveProperty('hasSecretKey');

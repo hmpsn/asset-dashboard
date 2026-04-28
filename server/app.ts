@@ -307,7 +307,11 @@ export function createApp(): express.Express {
   app.use(siteArchitectureRoutes);
   app.use(llmsTxtRoutes);
   app.use(competitorSchemaRoutes);
-  app.use('/api/ai-stats', verifyAdminToken, aiStatsRoutes);
+  app.use('/api/ai-stats', (req, res, next) => {
+    const token = (req.headers['x-auth-token'] || req.cookies?.auth_token || '') as string;
+    if (verifyAdminToken(token)) return next();
+    return res.status(403).json({ error: 'Admin access required' });
+  }, aiStatsRoutes);
   app.use(featuresRouter);
   app.use(outcomesRouter);
   app.use(intelligenceRouter);
