@@ -4488,7 +4488,7 @@ export const CHECKS: Check[] = [
     pattern: '\\bz-(10|20|30|40|50|60)\\b',
     fileGlobs: ['*.ts', '*.tsx'],
     pathFilter: 'src/',
-    excludeLines: ['z-\\[var\\(--z-', 'z-index-ok'],
+    excludeLines: ['z-[var(--z-', 'z-index-ok'],
     message:
       'Raw z-index classes must use token form: z-10→z-[var(--z-sticky)], z-20→z-[var(--z-dropdown)], z-30→z-[var(--z-tooltip)], z-40→z-[var(--z-modal-backdrop)], z-50→z-[var(--z-modal)], z-60→z-[var(--z-toast)]. Escape hatch: // z-index-ok',
     severity: 'error',
