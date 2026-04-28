@@ -213,7 +213,7 @@ export interface SchemaContext {
 const QUESTION_PREFIXES = /^(how|what|why|when|where|which|can|do|does|is|are|should|will|would)\b/i;
 
 /** Slug pattern for utility/error pages that should never receive schema or appear in nav/hasPart. */
-export const UTILITY_SLUGS = /^\/(401|403|404|500|password|robots(\.txt)?|sitemap(\.xml)?|privacy(-policy)?|terms(-of[- ]?(service|use))?|legal|cookie(-policy)?|maintenance)\b/i;
+export const UTILITY_SLUGS = /^\/(401|403|404|500|password|robots(\.txt)?|sitemap(\.xml)?|privacy(-policy)?|terms(-of[- ]?(service|use))?|legal(-policy)?|cookie(-policy)?|maintenance)(?=\/|$)/i;
 
 /**
  * Extract question-type queries from GSC data that target a specific page.
@@ -567,6 +567,16 @@ function autoFixSchema(schema: Record<string, unknown>): void {
       }
     }
   }
+
+  // Strip any SiteNavigationElement nodes — not a Google rich result type
+  const graphArr = schema['@graph'] as Record<string, unknown>[] | undefined;
+  if (Array.isArray(graphArr)) {
+    const beforeNavStrip = graphArr.length;
+    schema['@graph'] = graphArr.filter(n => n['@type'] !== 'SiteNavigationElement');
+    if ((schema['@graph'] as Record<string, unknown>[]).length < beforeNavStrip) {
+      log.info('Auto-fix: stripped SiteNavigationElement node(s) — not a Google rich result type');
+    }
+  }
 }
 
 // Post-processing: inject cross-references the AI consistently omits
@@ -700,37 +710,6 @@ function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string,
     }
   }
 
-  // Auto-generate SiteNavigationElement for homepage when architecture tree is available
-  const tree = ctx?._architectureTree;
-  if (tree) {
-    const webPage = graph.find(n => n['@type'] === 'WebPage') as Record<string, unknown> | undefined;
-    const pageUrl = (webPage?.['url'] as string) || siteUrl;
-    const isHomepage = pageUrl === siteUrl || pageUrl === `${siteUrl}/` || new URL(pageUrl).pathname === '/';
-    const hasNav = graph.some(n => n['@type'] === 'SiteNavigationElement');
-
-    if (isHomepage && !hasNav && tree.children.length > 0) {
-      const navItems = tree.children
-        .filter(n => n.source === 'existing' && n.hasContent)
-        .slice(0, 10) // Cap at 10 top-level nav items
-        .map((n, i) => ({
-          '@type': 'SiteNavigationElement',
-          'position': i + 1,
-          'name': n.name,
-          'url': `${siteUrl}${n.path}`,
-        }));
-
-      if (navItems.length > 0) {
-        graph.push({
-          '@type': 'SiteNavigationElement',
-          '@id': `${siteUrl}/#navigation`,
-          'name': 'Main Navigation',
-          'hasPart': navItems,
-        });
-        log.info({ navCount: navItems.length }, 'Injected SiteNavigationElement from architecture tree');
-      }
-    }
-  }
-
   // D3: Hub page → CollectionPage/ItemList auto-suggest
   // When a page has 2+ children in the architecture tree, inject CollectionPage schema
   const hubTree = ctx?._architectureTree;
@@ -741,7 +720,7 @@ function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string,
       const pagePath = new URL(pageUrl).pathname.replace(/\/$/, '') || '/';
       const children = getChildNodes(hubTree, pagePath)
         .filter(c => c.source === 'existing');  // Only existing pages, not planned
-      if (children.length >= 2) {
+      if (children.length >= 2 && pagePath !== '/') {
         const hasCollection = graph.some(n => n['@type'] === 'CollectionPage' || n['@type'] === 'ItemList');
         if (!hasCollection) {
           const webPageName = (webPage?.['name'] as string) || 'Collection';
@@ -789,7 +768,7 @@ function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string,
         // relatedLink → sibling pages (max 5 to avoid bloat)
         if (!webPage['relatedLink']) {
           const siblings = getSiblingNodes(relTree, pagePath)
-            .filter(s => s.source === 'existing')
+            .filter(s => s.source === 'existing' && !UTILITY_SLUGS.test(s.path))
             .slice(0, 5);
           if (siblings.length > 0) {
             webPage['relatedLink'] = siblings.map(s => `${siteUrl}${s.path}`);
@@ -800,7 +779,7 @@ function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string,
         // hasPart → child pages
         if (!webPage['hasPart']) {
           const children = getChildNodes(relTree, pagePath)
-            .filter(c => c.source === 'existing');
+            .filter(c => c.source === 'existing' && !UTILITY_SLUGS.test(c.path));
           if (children.length > 0) {
             webPage['hasPart'] = children.map(c => ({
               '@type': 'WebPage',
