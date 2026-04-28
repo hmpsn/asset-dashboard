@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest';
-
-// The UTILITY_SLUGS constant is exported from schema-suggester.ts.
-// We test the regex pattern here to document expected behavior and catch regressions.
-const UTILITY_SLUGS = /^\/(401|403|404|500|password|robots(\.txt)?|sitemap(\.xml)?|privacy(-policy)?|terms(-of[- ]?(service|use))?|legal(-policy)?|cookie(-policy)?|maintenance)(?=\/|$)/i;
+import { UTILITY_SLUGS } from '../../server/schema-suggester.js';
 
 describe('UTILITY_SLUGS regex', () => {
   it('matches error and utility pages', () => {
