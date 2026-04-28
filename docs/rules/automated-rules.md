@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **97** — 77 error, 20 warn.
+Total rules: **99** — 78 error, 21 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -121,6 +121,7 @@ advisory but tracked.
 | 18 | Raw rounded-* literal (use --radius-* token) | warn | pattern | `src/` | `// rounded-literal-ok` | Raw Tailwind radius utility classes bypass the --radius-* token system and cannot theme-switch. Centralizing through tokens keeps every surface radius in lockstep. |
 | 19 | Trend icon import outside TrendBadge | warn | pattern | `src/` | `// trend-icon-ok` | Direct TrendingUp/TrendingDown imports bypass the TrendBadge primitive, causing drift in color (green vs emerald), sizing, and sign handling across callsites. |
 | 20 | Hand-rolled fixed inset-0 outside overlay | warn | pattern | `src/` | `// fixed-inset-ok` | Hand-rolled fixed inset-0 modals miss focus trapping, escape-key handling, scroll lock, and accessible labelling. The Modal primitive consolidates all of these. |
+| 21 | Raw hex chart color in component (use CHART_SERIES_COLORS) | warn | pattern | `src/components/` | `chart-hex-ok` | Centralizes chart palette into CHART_SERIES_COLORS so series colors can be updated in one place. |
 
 ---
 

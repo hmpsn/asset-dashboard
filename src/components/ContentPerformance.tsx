@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } from 'recharts';
 import { PageHeader, SectionCard, EmptyState, Badge, Icon } from './ui';
+import { CHART_SERIES_COLORS } from './ui/constants';
 import { contentPerformance } from '../api/seo';
 
 interface GscMetrics {
@@ -89,8 +90,8 @@ function TrendChart({ trend }: { trend: TrendPoint[] }) {
               </div>
             );
           }} />
-          <Line yAxisId="imps" type="monotone" dataKey="impressions" stroke="#22d3ee" strokeWidth={1.5} strokeOpacity={0.5} dot={false} />
-          <Line yAxisId="clicks" type="monotone" dataKey="clicks" stroke="#60a5fa" strokeWidth={2} dot={false} />
+          <Line yAxisId="imps" type="monotone" dataKey="impressions" stroke="#22d3ee" strokeWidth={1.5} strokeOpacity={0.5} dot={false} /> {/* chart-hex-ok — cyan-400 for impressions axis contrast */}
+          <Line yAxisId="clicks" type="monotone" dataKey="clicks" stroke={CHART_SERIES_COLORS.blue} strokeWidth={2} dot={false} />
         </LineChart>
       </ResponsiveContainer>
       <div className="flex justify-between text-[10px] text-[var(--brand-text-dim)] mt-1">
@@ -318,7 +319,7 @@ export function ContentPerformance({ workspaceId }: Props) {
                       {item.gsc && (
                         <MiniSparkline
                           data={[item.gsc.clicks * 0.6, item.gsc.clicks * 0.8, item.gsc.clicks]}
-                          color="#60a5fa"
+                          color={CHART_SERIES_COLORS.blue}
                           width={60}
                           height={24}
                         />

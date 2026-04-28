@@ -3,6 +3,7 @@ import {
   Globe, Users, ArrowRight,
 } from 'lucide-react';
 import { Icon } from '../ui/Icon';
+import { CHART_SERIES_COLORS } from '../ui/constants';
 import type {
   SearchOverview, PerformanceTrend, SearchComparison,
   GA4Overview, GA4DailyTrend, GA4TopPage, GA4Comparison, GA4NewVsReturning,
@@ -96,7 +97,7 @@ export function SearchSnapshot({ overview, trend, comparison, devices, onViewMor
       {trend.length > 3 && (
         <div>
           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1">Click trend</div>
-          <MiniSparkline data={trend.map(t => t.clicks)} color="#60a5fa" />
+          <MiniSparkline data={trend.map(t => t.clicks)} color={CHART_SERIES_COLORS.blue} />
         </div>
       )}
 
@@ -210,7 +211,7 @@ export function AnalyticsSnapshot({ overview, trend, topPages, comparison, newVs
       {trend.length > 3 && (
         <div>
           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1">Visitor trend</div>
-          <MiniSparkline data={trend.map(t => t.users)} color="#2dd4bf" />
+          <MiniSparkline data={trend.map(t => t.users)} color={CHART_SERIES_COLORS.teal} />
         </div>
       )}
 

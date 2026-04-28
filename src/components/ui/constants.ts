@@ -95,6 +95,25 @@ export function chartTooltipLabelStyle(): CSSProperties {
     : { color: '#a1a1aa', fontFamily: 'monospace' };
 }
 
+/** Canonical chart data-series palette. Recharts needs raw hex strings. */
+export const CHART_SERIES_COLORS = {
+  teal:    '#2dd4bf',  // teal-400 / var(--brand-mint)
+  blue:    '#60a5fa',  // blue-400
+  emerald: '#34d399',  // emerald-400
+  amber:   '#fbbf24',  // amber-400
+  orange:  '#fb923c',  // orange-400
+  red:     '#f87171',  // red-400
+  purple:  '#a78bfa',  // purple-400 — admin AI charts only
+} as const;
+
+export const CHART_SERIES_ORDER = [
+  CHART_SERIES_COLORS.teal,
+  CHART_SERIES_COLORS.blue,
+  CHART_SERIES_COLORS.emerald,
+  CHART_SERIES_COLORS.amber,
+  CHART_SERIES_COLORS.orange,
+] as const;
+
 /** Date range presets */
 export const DATE_PRESETS_SHORT = [
   { label: '7d', value: 7 },

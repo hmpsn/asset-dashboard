@@ -46,6 +46,7 @@ export function ScoreTrendChart({ history }: { history: SnapshotSummary[] }) {
             </div>
           );
         }} />
+        {/* chart-hex-ok — #2ed9c3 is a bespoke teal for audit score trend line */}
         <Area type="monotone" dataKey="score" stroke="#2ed9c3" strokeWidth={2.5} fill="url(#trendGrad)" dot={{ r: 3.5, fill: chartDotFill(), stroke: '#2ed9c3', strokeWidth: 2 }} activeDot={{ r: 4, fill: '#2ed9c3', stroke: chartDotStroke(), strokeWidth: 2 }} />
       </AreaChart>
     </ResponsiveContainer>

@@ -4,7 +4,7 @@ import {
   Users, Clock, ArrowDownRight, UserPlus,
 } from 'lucide-react';
 import { StatCard, EmptyState, Icon } from '../ui';
-import { chartDotStroke } from '../ui/constants';
+import { chartDotStroke, CHART_SERIES_COLORS } from '../ui/constants';
 import {
   ResponsiveContainer, AreaChart, Area,
   XAxis, YAxis, Tooltip, PieChart, Pie, Cell,
@@ -221,7 +221,7 @@ export function AnalyticsTab({
             <h3 className="t-body font-semibold text-[var(--brand-text)] mb-4">Devices</h3>
             <div className="flex-1 flex flex-col items-center justify-center">
               {(() => {
-                const PIE_COLORS = ['#14b8a6', '#60a5fa', '#34d399', '#fbbf24'];
+                const PIE_COLORS = ['#14b8a6', CHART_SERIES_COLORS.blue, CHART_SERIES_COLORS.emerald, CHART_SERIES_COLORS.amber]; // chart-hex-ok — #14b8a6 is teal-500 for pie anchor
                 return (
                   <>
                     <ResponsiveContainer width={128} height={128}>
@@ -426,7 +426,7 @@ export function AnalyticsTab({
                       </div>
                     );
                   }} />
-                  <Area type="monotone" dataKey="eventCount" stroke="#2dd4bf" strokeWidth={2} fill="url(#evtGrad)" dot={{ r: 2.5, fill: '#2dd4bf', opacity: 0.6, strokeWidth: 0 }} activeDot={{ r: 3, fill: '#2dd4bf', stroke: chartDotStroke(), strokeWidth: 1.5 }} />
+                  <Area type="monotone" dataKey="eventCount" stroke={CHART_SERIES_COLORS.teal} strokeWidth={2} fill="url(#evtGrad)" dot={{ r: 2.5, fill: CHART_SERIES_COLORS.teal, opacity: 0.6, strokeWidth: 0 }} activeDot={{ r: 3, fill: CHART_SERIES_COLORS.teal, stroke: chartDotStroke(), strokeWidth: 1.5 }} />
                 </AreaChart>
               </ResponsiveContainer>
               <div className="flex items-center justify-between mt-2 t-caption-sm text-[var(--brand-text-muted)]">

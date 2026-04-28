@@ -4637,6 +4637,19 @@ export const CHECKS: Check[] = [
     rationale: 'Ensures z-index values come from the centralized token scale in tokens.css, preventing stacking-context collisions.',
     claudeMdRef: '#design-system--the-four-laws-of-color',
   },
+  {
+    name: 'Raw hex chart color in component (use CHART_SERIES_COLORS)',
+    pattern: '(stroke|fill|color)=["\']#[0-9a-fA-F]{6}["\']',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: ['src/components/ui/constants.ts'],
+    excludeLines: ['chart-hex-ok', 'chartDotStroke', 'chartDotFill', 'chartGridColor', 'scoreColor(', 'url(#'],
+    message:
+      'Raw hex colors in chart props should use CHART_SERIES_COLORS from ui/constants.ts. Escape hatch: // chart-hex-ok',
+    severity: 'warn',
+    rationale: 'Centralizes chart palette into CHART_SERIES_COLORS so series colors can be updated in one place.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────

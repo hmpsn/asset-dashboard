@@ -7,6 +7,7 @@ import {
 import SearchableSelect from '../SearchableSelect';
 import { get, post, patch, del, getSafe } from '../../api/client';
 import { SectionCard, Icon, Button } from '../ui';
+import { CHART_SERIES_COLORS } from '../ui/constants';
 
 import type { SafeClientUser as ClientUserSafe } from '../../../shared/types/users.ts';
 import type { EventGroup, EventDisplayConfig } from '../../../shared/types/workspace.ts';
@@ -74,7 +75,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
   const [pricingCurrency, setPricingCurrency] = useState('USD');
   const [savingPricing, setSavingPricing] = useState(false);
 
-  const GROUP_COLORS = ['#14b8a6', '#60a5fa', '#34d399', '#fbbf24', '#f472b6', '#fb923c', '#2dd4bf', '#e879f9'];
+  const GROUP_COLORS = ['#14b8a6', CHART_SERIES_COLORS.blue, CHART_SERIES_COLORS.emerald, CHART_SERIES_COLORS.amber, CHART_SERIES_COLORS.orange, CHART_SERIES_COLORS.red, CHART_SERIES_COLORS.teal, CHART_SERIES_COLORS.purple]; // chart-hex-ok — #14b8a6 is teal-500 for darker anchor
 
   const copyClientLink = () => {
     navigator.clipboard.writeText(`${window.location.origin}/client/${workspaceId}`);
