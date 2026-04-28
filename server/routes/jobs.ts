@@ -33,6 +33,7 @@ import { saveSnapshot, getLatestSnapshotBefore } from '../reports.js';
 import { runSalesAudit } from '../sales-audit.js';
 import { saveSchemaSnapshot } from '../schema-store.js';
 import { generateSchemaSuggestions } from '../schema-suggester.js';
+import { getValidations } from '../schema-validator.js';
 import { runSeoAudit } from '../seo-audit.js';
 import { clearSeoContextCache } from '../seo-context.js';
 import {
@@ -633,6 +634,9 @@ router.post('/api/jobs', async (req, res) => {
             updateJob(job.id, { status: 'running', message: 'Scanning pages and generating unified schemas...' });
             const { ctx, pageKeywordMap, gscMap, ga4Map, queryPageData, insightsMap } = await buildSchemaContext(schemaSiteId, { includeAnalytics: true });
             const schemaWsId = (params.workspaceId as string) || '';
+            // Build per-page validation map so the AI can avoid repeating known mistakes
+            const allValidations = ctx.workspaceId ? getValidations(ctx.workspaceId) : [];
+            const validationsByPageId = new Map(allValidations.map(v => [v.pageId, v]));
             // Enrich with architecture tree for deterministic breadcrumbs
             if (ctx.workspaceId) {
               try {
@@ -650,7 +654,7 @@ router.post('/api/jobs', async (req, res) => {
                 lastSaveTime = now;
                 saveSchemaSnapshot(schemaSiteId, schemaWsId, partial);
               }
-            }, () => isJobCancelled(job.id), gscMap, ga4Map, queryPageData, insightsMap);
+            }, () => isJobCancelled(job.id), gscMap, ga4Map, queryPageData, insightsMap, validationsByPageId);
             // Final save — always write the complete result
             if (result.length > 0) {
               saveSchemaSnapshot(schemaSiteId, schemaWsId, result);

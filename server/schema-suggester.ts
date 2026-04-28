@@ -10,6 +10,7 @@ import type { ContentBrief } from '../shared/types/content.ts';
 import { buildPlanContextForPage } from './schema-plan.js';
 import { getAncestorChain, getParentNode, getSiblingNodes, getChildNodes } from './site-architecture.js';
 import { isProgrammingError } from './errors.js';
+import type { SchemaValidation } from './schema-validator.js';
 import { fetchPageMeta } from './seo-audit.js';
 import { fetchPublishedHtml } from './helpers.js';
 import { resolveBaseUrl } from './url-helpers.js';
@@ -1726,6 +1727,16 @@ ${ctx._gscPageData ? `- GSC: ${ctx._gscPageData.impressions.toLocaleString()} im
 ${ctx._ga4PageData ? `- GA4: ${ctx._ga4PageData.pageviews.toLocaleString()} pageviews/90d | ${ctx._ga4PageData.users.toLocaleString()} users | Avg Engagement: ${Math.round(ctx._ga4PageData.avgEngagementTime)}s` : ''}
 High-impression pages with poor position (>10) are prime candidates for rich result schema types like FAQPage, HowTo, and Article.` : ''}
 ${buildSchemaIntelligenceBlock(ctx)}
+${ctx._serpFeatures ? `\nSERP FEATURES (site-level — use to inform schema type priority):
+${ctx._serpFeatures.localPack ? '- Local Pack present: LocalBusiness/Dentist schema is high-value for this site' : ''}
+${ctx._serpFeatures.peopleAlsoAsk > 0 ? `- People Also Ask: ${ctx._serpFeatures.peopleAlsoAsk} site pages → FAQPage schema opportunities exist` : ''}
+${ctx._serpFeatures.featuredSnippets > 0 ? `- Featured Snippets: ${ctx._serpFeatures.featuredSnippets} site pages → long-answer schema (speakable, HowTo) adds value` : ''}
+${ctx._serpFeatures.videoCarousel > 0 ? `- Video Carousels: ${ctx._serpFeatures.videoCarousel} site pages → VideoObject schema is viable` : ''}` : ''}
+${ctx._backlinkReferringDomains != null ? `\nSITE AUTHORITY (referring domains: ${ctx._backlinkReferringDomains}):
+${ctx._backlinkReferringDomains < 50 ? '- Lower-authority site: focus on LocalBusiness, FAQPage, BreadcrumbList — highest schema win rate at this authority level. Avoid over-engineering Article/VideoObject schemas.' : ''}
+${ctx._backlinkReferringDomains >= 100 ? '- Established site: full rich result types (Article, HowTo, VideoObject, FAQPage) are viable.' : ''}` : ''}
+${ctx._existingErrors?.length ? `\nPRIOR SCHEMA VALIDATION ERRORS — fix all of these in the new schema:
+${ctx._existingErrors.map(e => `- ${e.message}`).join('\n')}` : ''}
 ${getPageTypeInstructions(ctx.pageType, siteUrl)}
 ${ctx._planContext || ''}
 ${ctx._personasBlock ? `\n${ctx._personasBlock}` : ''}
@@ -2033,6 +2044,7 @@ export async function generateSchemaSuggestions(
   ga4Map?: Map<string, { pageviews: number; users: number; avgEngagementTime: number }>,
   queryPageData?: Array<{ query: string; page: string; impressions: number; position: number }>,
   insightsMap?: Map<string, { healthScore?: number; healthTrend?: string; isQuickWin?: boolean }>,
+  validationsByPageId?: Map<string, SchemaValidation>,
 ): Promise<SchemaPageSuggestion[]> {
   const baseUrl = await resolveBaseUrl({ liveDomain: ctx.liveDomain, webflowSiteId: siteId }, tokenOverride);
   log.info(`baseUrl=${baseUrl}, liveDomain=${ctx.liveDomain || '(none)'}`);
@@ -2107,6 +2119,10 @@ export async function generateSchemaSuggestions(
         const planContext = sitePlan ? buildPlanContextForPage(sitePlan, isHomepage ? '/' : lookupPath) : '';
         const fullPageUrl = isHomepage ? baseUrl : `${baseUrl}${lookupPath}`;
         const insightData = insightsMap?.get(fullPageUrl);
+        const priorValidation = validationsByPageId?.get(page.id);
+        const existingErrors = (priorValidation?.errors && Array.isArray(priorValidation.errors) && priorValidation.errors.length > 0)
+          ? (priorValidation.errors as Array<{ message: string }>)
+          : undefined;
         const pageCtx: SchemaContext = {
           ...ctx,
           pageKeywords: getPageKeywords(lookupPath),
@@ -2119,6 +2135,7 @@ export async function generateSchemaSuggestions(
           _pageHealthTrend: insightData?.healthTrend as SchemaContext['_pageHealthTrend'],
           _quickWinStatus: insightData?.isQuickWin,
           _faqOpportunities: queryPageData ? extractFaqOpportunities(queryPageData, fullPageUrl) : undefined,
+          _existingErrors: existingErrors,
         };
 
         let suggestedSchemas: SchemaSuggestion[];
