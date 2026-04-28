@@ -2228,8 +2228,9 @@ export async function generateSchemaSuggestions(
 
           const cmsNormalizedPath = (item.path.startsWith('/') ? item.path : `/${item.path}`).replace(/\/$/, '') || '/';
           const cmsInsightData = insightsMap?.get(item.url);
-          // Note: _existingErrors is not wired here — CMS pages are discovered via sitemap and have no
-          // Webflow page ID, so they cannot be looked up in validationsByPageId (keyed by page ID).
+          // Note: _existingErrors is not wired here — discoverCmsUrls only parses sitemap <loc> URLs
+          // and does not fetch Webflow item IDs. To wire this up we'd need to call listCollections +
+          // listCollectionItems to build a slug→itemId map, then look up validationsByPageId by that ID.
           const pageCtx: SchemaContext = {
             ...ctx,
             pageKeywords: getPageKeywords(slug),
