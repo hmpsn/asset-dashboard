@@ -20,7 +20,7 @@ import {
 } from '../../hooks/admin/useCopyPipeline';
 import { copyIntelligence } from '../../api/brand-engine';
 import { queryKeys } from '../../lib/queryKeys';
-import { SectionCard, Badge, SectionCardSkeleton, EmptyState, Icon, cn } from '../ui';
+import { SectionCard, Badge, SectionCardSkeleton, EmptyState, Icon, Toggle, cn } from '../ui';
 import { ErrorBoundary } from '../ErrorBoundary';
 import type { CopyIntelligencePattern, IntelligencePatternType } from '../../../shared/types/copy-pipeline';
 
@@ -72,38 +72,6 @@ const PATTERN_TYPE_ORDER: IntelligencePatternType[] = [
   'structure',
   'keyword_usage',
 ];
-
-// ─── Toggle Switch ─────────────────────────────────────────────────────────────
-
-interface ToggleSwitchProps {
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-  disabled?: boolean;
-  label?: string;
-}
-
-function ToggleSwitch({ checked, onChange, disabled, label }: ToggleSwitchProps) {
-  return (
-    <button
-      role="switch"
-      aria-checked={checked}
-      aria-label={label ?? (checked ? 'Deactivate pattern' : 'Activate pattern')}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={cn(
-        'relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-2)] disabled:cursor-not-allowed disabled:opacity-50',
-        checked ? 'bg-teal-500' : 'bg-[var(--brand-border-hover)]'
-      )}
-    >
-      <span
-        className={cn(
-          'inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform',
-          checked ? 'translate-x-4' : 'translate-x-0.5'
-        )}
-      />
-    </button>
-  );
-}
 
 // ─── Pattern Row ──────────────────────────────────────────────────────────────
 
@@ -171,11 +139,12 @@ function PatternRow({ pattern, workspaceId }: PatternRowProps) {
   return (
     <div className="flex items-center gap-3 py-2.5 px-3 rounded-[var(--radius-md)] bg-[var(--surface-3)]/50 hover:bg-[var(--surface-3)] transition-colors group">
       {/* Toggle */}
-      <ToggleSwitch
+      <Toggle
         checked={pattern.active}
         onChange={(active) => toggleMutation.mutate({ patternId: pattern.id, active })}
         disabled={isToggling || isDeleting}
         label={pattern.active ? 'Deactivate pattern' : 'Activate pattern'}
+        srOnlyLabel
       />
 
       {/* Pattern text — inline edit */}

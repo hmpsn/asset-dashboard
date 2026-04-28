@@ -6,6 +6,7 @@ import {
   ArrowRight, ChevronDown, Activity, HeartPulse, AlertCircle, Clock, type LucideIcon,
 } from 'lucide-react';
 import { clientPath } from '../../routes';
+import { scoreColorClass } from '../ui/constants';
 import { useBetaMode } from './BetaContext';
 import { useClientInsights } from '../../hooks/client/useClientInsights';
 import type { ClientInsight } from '../../../shared/types/narrative.js';
@@ -629,7 +630,7 @@ export function PerformancePulse({ overview, searchComparison, ga4Overview, ga4C
       value: `${audit.siteScore}/100`,
       changeLabel: audit.previousScore != null ? `${audit.siteScore > audit.previousScore ? '+' : ''}${audit.siteScore - audit.previousScore}` : undefined,
       change: audit.previousScore != null ? audit.siteScore - audit.previousScore : undefined,
-      color: audit.siteScore >= 80 ? 'text-emerald-400' : audit.siteScore >= 60 ? 'text-amber-400' : 'text-red-400',
+      color: scoreColorClass(audit.siteScore),
     });
   }
   if (strategyData) {

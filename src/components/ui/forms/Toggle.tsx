@@ -8,13 +8,15 @@ export interface ToggleProps {
   onChange: (checked: boolean) => void;
   label: string;
   disabled?: boolean;
+  /** When true, the label text is visually hidden (sr-only) but still accessible. */
+  srOnlyLabel?: boolean;
   className?: string;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export const Toggle = React.forwardRef<HTMLInputElement, ToggleProps>(
-  function Toggle({ checked, onChange, label, disabled, className }, ref) {
+  function Toggle({ checked, onChange, label, disabled, srOnlyLabel, className }, ref) {
     const id = useId();
 
     return (
@@ -66,7 +68,7 @@ export const Toggle = React.forwardRef<HTMLInputElement, ToggleProps>(
         </span>
 
         {/* Label text */}
-        <span className="text-sm text-zinc-300">{label}</span>
+        <span className={cn('text-sm text-zinc-300', srOnlyLabel && 'sr-only')}>{label}</span>
       </label>
     );
   }
