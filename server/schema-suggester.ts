@@ -10,6 +10,7 @@ import type { ContentBrief } from '../shared/types/content.ts';
 import { buildPlanContextForPage } from './schema-plan.js';
 import { getAncestorChain, getParentNode, getSiblingNodes, getChildNodes } from './site-architecture.js';
 import { isProgrammingError } from './errors.js';
+import type { SchemaValidation } from './schema-validator.js';
 import { fetchPageMeta } from './seo-audit.js';
 import { fetchPublishedHtml } from './helpers.js';
 import { resolveBaseUrl } from './url-helpers.js';
@@ -77,7 +78,7 @@ export const PAGE_TYPE_LABELS: Record<SchemaPageType, string> = {
 // Deterministic mapping: page type → recommended Schema.org types
 export const PAGE_TYPE_SCHEMA_MAP: Record<SchemaPageType, { primary: string[]; secondary: string[] }> = {
   auto: { primary: [], secondary: [] },
-  homepage: { primary: ['Organization', 'WebSite'], secondary: ['SiteNavigationElement'] },
+  homepage: { primary: ['Organization', 'WebSite'], secondary: [] },
   pillar: { primary: ['Article', 'CollectionPage'], secondary: ['Person', 'BreadcrumbList'] },
   service: { primary: ['Service'], secondary: ['Offer', 'BreadcrumbList'] },
   audience: { primary: ['WebPage'], secondary: ['BreadcrumbList'] },
@@ -200,11 +201,20 @@ export interface SchemaContext {
     foundedDate?: string;
     numberOfEmployees?: string;
   };
+  /** Site-level SERP features from SEO data provider — used to steer schema type selection. */
+  _serpFeatures?: { featuredSnippets: number; peopleAlsoAsk: number; localPack: boolean; videoCarousel: number };
+  /** Referring-domain count from backlink profile — used to calibrate schema ambition. */
+  _backlinkReferringDomains?: number;
+  /** Validation errors from the prior schema generation for this page — used to avoid repeating known mistakes. */
+  _existingErrors?: Array<{ message: string }>;
 }
 
 // ── Analytics Intelligence helpers for prompt enrichment ────────────
 
 const QUESTION_PREFIXES = /^(how|what|why|when|where|which|can|do|does|is|are|should|will|would)\b/i;
+
+/** Slug pattern for utility/error pages that should never receive schema or appear in nav/hasPart. */
+export const UTILITY_SLUGS = /^\/(401|403|404|500|password|robots(\.txt)?|sitemap(\.xml)?|privacy(-policy)?|terms(-of[- ]?(service|use))?|legal(-policy)?|cookie(-policy)?|maintenance)(?=\/|$)/i;
 
 /**
  * Extract question-type queries from GSC data that target a specific page.
@@ -375,6 +385,7 @@ const INVALID_PROPERTIES: Record<string, string[]> = {
   Service: ['features', 'benefits', 'pricing'],
   WebPage: ['keywords', 'category'],
   Person: ['title', 'company'],
+  Product: ['pricing', 'features', 'cost'],
 };
 
 // Phone number format: must look like a real number (digits, dashes, parens, spaces, +)
@@ -471,18 +482,70 @@ function validateUnifiedSchema(schema: Record<string, unknown>): string[] {
   return errors;
 }
 
-// Auto-fix: strip invalid properties and fix common AI hallucinations
-function autoFixSchema(schema: Record<string, unknown>): void {
+/** Maps healthcare keyword fragments to their correct Schema.org @type. */
+// NOTE: partial stems (orthodont, chiropract, ophthalmolog, psychiatr, dermatolog) intentionally
+// omit the trailing \b — these stems always have more word characters in real words
+// (e.g. "orthodontic", "chiropractor") so a trailing \b would never match.
+const HEALTHCARE_TYPE_MAP: Array<[RegExp, string]> = [
+  [/\b(dental|dentist|orthodont|periodont|endodont)/i, 'Dentist'],
+  [/\b(physician|doctor|\bmd\b|family medicine|general practitioner|\bgp\b)/i, 'Physician'],
+  [/\b(optician|optometrist|ophthalmolog)/i, 'Optician'],
+  [/\b(chiropract)/i, 'Chiropractor'],
+  [/\bdermatolog/i, 'MedicalBusiness'],
+  [/\b(pediatric|pediatrician)\b/i, 'MedicalBusiness'],
+  [/\b(therapist|therapy|counseling|psychiatr)/i, 'MedicalBusiness'],
+  [/\b(hospital)\b/i, 'Hospital'],
+  [/\b(clinic|urgent care|medical center)\b/i, 'MedicalClinic'],
+  // NOTE: no generic "medical"/"healthcare" catch-all — these match SaaS/tech companies that
+  // serve the healthcare industry (e.g. "medical billing software") and produce false positives.
+];
+
+/**
+ * Deterministically upgrades generic Organization/LocalBusiness nodes to the correct
+ * healthcare Schema.org subtype when the workspace businessContext signals a healthcare provider.
+ * This is a fallback for when the AI model ignores the healthcare prompt rule.
+ */
+export function upgradeHealthcareType(schema: Record<string, unknown>, ctx: SchemaContext): void {
+  const combined = `${ctx.businessContext || ''} ${(ctx.knowledgeBase || '').slice(0, 500)}`;
+  if (!combined.trim()) return;
+
+  let targetType: string | null = null;
+  for (const [pattern, type] of HEALTHCARE_TYPE_MAP) {
+    if (pattern.test(combined)) {
+      targetType = type;
+      break;
+    }
+  }
+  if (!targetType) return;
+
   const graph = schema['@graph'] as Record<string, unknown>[] | undefined;
   if (!Array.isArray(graph)) return;
 
-  // Deduplicate Organization nodes — keep the first one with canonical @id (/#organization)
-  const orgNodes = graph.filter(n => n['@type'] === 'Organization');
+  for (const node of graph) {
+    const rawType = node['@type'];
+    const typesArr: string[] = Array.isArray(rawType) ? rawType as string[] : (typeof rawType === 'string' ? [rawType] : []);
+    if (typesArr.includes('Organization') || typesArr.includes('LocalBusiness')) {
+      const upgraded = typesArr.map(t => (t === 'Organization' || t === 'LocalBusiness') ? targetType : t);
+      log.info({ from: rawType, to: upgraded }, 'Auto-fix: upgraded generic type to healthcare subtype');
+      node['@type'] = upgraded.length === 1 ? upgraded[0] : upgraded;
+    }
+  }
+}
+
+// Auto-fix: strip invalid properties and fix common AI hallucinations
+export function autoFixSchema(schema: Record<string, unknown>): void {
+  const graph = schema['@graph'] as Record<string, unknown>[] | undefined;
+  if (!Array.isArray(graph)) return;
+
+  // Deduplicate org nodes — match by @id so healthcare-upgraded types (Dentist, etc.) are caught too
+  const isOrgNode = (n: Record<string, unknown>) =>
+    n['@type'] === 'Organization' || String(n['@id'] || '').endsWith('/#organization');
+  const orgNodes = graph.filter(isOrgNode);
   if (orgNodes.length > 1) {
     const canonical = orgNodes.find(n => String(n['@id'] || '').endsWith('/#organization')) || orgNodes[0];
     for (let i = graph.length - 1; i >= 0; i--) {
-      if (graph[i]['@type'] === 'Organization' && graph[i] !== canonical) {
-        log.info(`Auto-fix: removed duplicate Organization node with @id "${graph[i]['@id']}"`);
+      if (isOrgNode(graph[i]) && graph[i] !== canonical) {
+        log.info(`Auto-fix: removed duplicate org node (@type "${graph[i]['@type']}", @id "${graph[i]['@id']}")`);
         graph.splice(i, 1);
       }
     }
@@ -515,6 +578,36 @@ function autoFixSchema(schema: Record<string, unknown>): void {
     if (Array.isArray(st) && st.length > 3) {
       log.info(`Auto-fix: trimmed serviceType from ${st.length} to 3 entries on ${type}`);
       node['serviceType'] = st.slice(0, 3);
+    }
+
+    // Trim knowsAbout to max 5 terms (AI routinely generates 8–12)
+    const ka = node['knowsAbout'];
+    if (Array.isArray(ka) && ka.length > 5) {
+      log.info(`Auto-fix: trimmed knowsAbout from ${ka.length} to 5 terms on ${type}`);
+      node['knowsAbout'] = ka.slice(0, 5);
+    }
+
+    // Strip Product nodes with zero-price offers — service/healthcare businesses hallucinate these
+    if (type === 'Product') {
+      const rawOffers = node['offers'];
+      const isZeroPrice = (o: unknown): boolean => {
+        if (!o || typeof o !== 'object') return false;
+        const p = (o as Record<string, unknown>)['price'];
+        return p === 0 || (typeof p === 'string' && p.trim() !== '' && parseFloat(p) === 0);
+      };
+      if (!Array.isArray(rawOffers) && isZeroPrice(rawOffers)) {
+        log.info('Auto-fix: removed zero-price Offer from Product (service business hallucination)');
+        delete node['offers'];
+      }
+      if (Array.isArray(rawOffers)) {
+        const cleaned = rawOffers.filter(o => !isZeroPrice(o));
+        if (cleaned.length === 0 && rawOffers.length > 0) {
+          log.info('Auto-fix: flagged Product for removal — all offers were zero-priced (service business hallucination)');
+          node['_remove'] = true;
+        } else if (cleaned.length < rawOffers.length) {
+          node['offers'] = cleaned;
+        }
+      }
     }
 
     // Normalize Service/SoftwareApplication @id to use canonical product URL
@@ -558,6 +651,14 @@ function autoFixSchema(schema: Record<string, unknown>): void {
       }
     }
   }
+
+  // Strip any SiteNavigationElement nodes — not a Google rich result type
+  const beforeNavStrip = graph.length;
+  const stripped = graph.filter(n => n['@type'] !== 'SiteNavigationElement');
+  if (stripped.length < beforeNavStrip) {
+    schema['@graph'] = stripped;
+    log.info('Auto-fix: stripped SiteNavigationElement node(s) — not a Google rich result type');
+  }
 }
 
 // Post-processing: inject cross-references the AI consistently omits
@@ -569,7 +670,10 @@ function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string,
   const websiteId = `${siteUrl}/#website`;
 
   // Ensure Organization node exists (referenced by WebSite.publisher, Service.provider, etc.)
-  const hasOrg = graph.some(n => n['@type'] === 'Organization');
+  // Match by @id so healthcare-upgraded types (Dentist, Physician, etc.) are recognized too
+  const hasOrg = graph.some(n =>
+    n['@type'] === 'Organization' || String(n['@id'] || '').endsWith('/#organization')
+  );
   if (!hasOrg) {
     graph.unshift({
       '@type': 'Organization',
@@ -691,37 +795,6 @@ function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string,
     }
   }
 
-  // Auto-generate SiteNavigationElement for homepage when architecture tree is available
-  const tree = ctx?._architectureTree;
-  if (tree) {
-    const webPage = graph.find(n => n['@type'] === 'WebPage') as Record<string, unknown> | undefined;
-    const pageUrl = (webPage?.['url'] as string) || siteUrl;
-    const isHomepage = pageUrl === siteUrl || pageUrl === `${siteUrl}/` || new URL(pageUrl).pathname === '/';
-    const hasNav = graph.some(n => n['@type'] === 'SiteNavigationElement');
-
-    if (isHomepage && !hasNav && tree.children.length > 0) {
-      const navItems = tree.children
-        .filter(n => n.source === 'existing' && n.hasContent)
-        .slice(0, 10) // Cap at 10 top-level nav items
-        .map((n, i) => ({
-          '@type': 'SiteNavigationElement',
-          'position': i + 1,
-          'name': n.name,
-          'url': `${siteUrl}${n.path}`,
-        }));
-
-      if (navItems.length > 0) {
-        graph.push({
-          '@type': 'SiteNavigationElement',
-          '@id': `${siteUrl}/#navigation`,
-          'name': 'Main Navigation',
-          'hasPart': navItems,
-        });
-        log.info({ navCount: navItems.length }, 'Injected SiteNavigationElement from architecture tree');
-      }
-    }
-  }
-
   // D3: Hub page → CollectionPage/ItemList auto-suggest
   // When a page has 2+ children in the architecture tree, inject CollectionPage schema
   const hubTree = ctx?._architectureTree;
@@ -731,8 +804,8 @@ function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string,
     try {
       const pagePath = new URL(pageUrl).pathname.replace(/\/$/, '') || '/';
       const children = getChildNodes(hubTree, pagePath)
-        .filter(c => c.source === 'existing');  // Only existing pages, not planned
-      if (children.length >= 2) {
+        .filter(c => c.source === 'existing' && !UTILITY_SLUGS.test(c.path));
+      if (children.length >= 2 && pagePath !== '/') {
         const hasCollection = graph.some(n => n['@type'] === 'CollectionPage' || n['@type'] === 'ItemList');
         if (!hasCollection) {
           const webPageName = (webPage?.['name'] as string) || 'Collection';
@@ -780,7 +853,7 @@ function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string,
         // relatedLink → sibling pages (max 5 to avoid bloat)
         if (!webPage['relatedLink']) {
           const siblings = getSiblingNodes(relTree, pagePath)
-            .filter(s => s.source === 'existing')
+            .filter(s => s.source === 'existing' && !UTILITY_SLUGS.test(s.path))
             .slice(0, 5);
           if (siblings.length > 0) {
             webPage['relatedLink'] = siblings.map(s => `${siteUrl}${s.path}`);
@@ -791,7 +864,7 @@ function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string,
         // hasPart → child pages
         if (!webPage['hasPart']) {
           const children = getChildNodes(relTree, pagePath)
-            .filter(c => c.source === 'existing');
+            .filter(c => c.source === 'existing' && !UTILITY_SLUGS.test(c.path));
           if (children.length > 0) {
             webPage['hasPart'] = children.map(c => ({
               '@type': 'WebPage',
@@ -1369,7 +1442,10 @@ async function postProcessSchema(
   if (Array.isArray(graph) && siteId && ctx.workspaceId) {
     if (isHomepage) {
       // Homepage: extract full Org + WebSite and save as template for future subpages
-      const orgNode = graph.find(n => n['@type'] === 'Organization');
+      // Match by @id so healthcare-upgraded types (Dentist, Physician, etc.) are found too
+      const orgNode = graph.find(n =>
+        n['@type'] === 'Organization' || String(n['@id'] || '').endsWith('/#organization')
+      );
       const wsNode = graph.find(n => n['@type'] === 'WebSite');
       if (orgNode) {
         const websiteNode = wsNode || {
@@ -1387,7 +1463,10 @@ async function postProcessSchema(
       const template = getOrSeedSiteTemplate(siteId, ctx.workspaceId);
       if (template) {
         // Replace AI-generated Organization with stub from template (includes logo for consistency)
-        const orgIdx = graph.findIndex(n => n['@type'] === 'Organization');
+        // Match by @id so healthcare-upgraded types (Dentist, Physician, etc.) are found too
+        const orgIdx = graph.findIndex(n =>
+          n['@type'] === 'Organization' || String(n['@id'] || '').endsWith('/#organization')
+        );
         const orgStub: Record<string, unknown> = {
           '@type': 'Organization',
           '@id': `${siteUrl}/#organization`,
@@ -1420,6 +1499,9 @@ async function postProcessSchema(
 
   // Step 4: Inject cross-references + ensure WebSite/Organization nodes exist
   injectCrossReferences(schema, siteUrl, ctx.companyName, ctx);
+  // Must run AFTER injectCrossReferences — upgrading Organization→Dentist before the cross-reference
+  // pass causes injectCrossReferences to not find an Organization node and inject a duplicate stub.
+  upgradeHealthcareType(schema, ctx);
 
   // Step 4b: Plan validation — strip entities that shouldn't exist per the site plan
   if (ctx._planContext && Array.isArray(schema['@graph'])) {
@@ -1531,7 +1613,10 @@ RULES:
 
         // Re-run auto-fix and cross-references on the fixed version
         autoFixSchema(fixedSchema);
+        const fixedGraphArr = fixedSchema['@graph'] as Record<string, unknown>[] | undefined;
+        if (Array.isArray(fixedGraphArr)) fixedSchema['@graph'] = fixedGraphArr.filter(n => !n['_remove']);
         injectCrossReferences(fixedSchema, siteUrl, ctx.companyName, ctx);
+        upgradeHealthcareType(fixedSchema, ctx);
 
         // Re-validate
         const fixedErrors = validateUnifiedSchema(fixedSchema);
@@ -1663,6 +1748,19 @@ ${ctx._gscPageData ? `- GSC: ${ctx._gscPageData.impressions.toLocaleString()} im
 ${ctx._ga4PageData ? `- GA4: ${ctx._ga4PageData.pageviews.toLocaleString()} pageviews/90d | ${ctx._ga4PageData.users.toLocaleString()} users | Avg Engagement: ${Math.round(ctx._ga4PageData.avgEngagementTime)}s` : ''}
 High-impression pages with poor position (>10) are prime candidates for rich result schema types like FAQPage, HowTo, and Article.` : ''}
 ${buildSchemaIntelligenceBlock(ctx)}
+${ctx._serpFeatures && (ctx._serpFeatures.localPack || ctx._serpFeatures.peopleAlsoAsk > 0 || ctx._serpFeatures.featuredSnippets > 0 || ctx._serpFeatures.videoCarousel > 0) ? `\nSERP FEATURES (site-level — use to inform schema type priority):\n${[
+  ctx._serpFeatures.localPack ? '- Local Pack present: LocalBusiness/Dentist schema is high-value for this site' : '',
+  ctx._serpFeatures.peopleAlsoAsk > 0 ? `- People Also Ask: ${ctx._serpFeatures.peopleAlsoAsk} site pages → FAQPage schema opportunities exist` : '',
+  ctx._serpFeatures.featuredSnippets > 0 ? `- Featured Snippets: ${ctx._serpFeatures.featuredSnippets} site pages → long-answer schema (speakable, HowTo) adds value` : '',
+  ctx._serpFeatures.videoCarousel > 0 ? `- Video Carousels: ${ctx._serpFeatures.videoCarousel} site pages → VideoObject schema is viable` : '',
+].filter(Boolean).join('\n')}` : ''}
+${ctx._backlinkReferringDomains != null ? `\nSITE AUTHORITY (referring domains: ${ctx._backlinkReferringDomains}):\n${[
+  ctx._backlinkReferringDomains < 50 ? '- Lower-authority site: focus on LocalBusiness, FAQPage, BreadcrumbList — highest schema win rate at this authority level. Avoid over-engineering Article/VideoObject schemas.' : '',
+  ctx._backlinkReferringDomains >= 50 && ctx._backlinkReferringDomains < 100 ? '- Moderate-authority site: most rich result types (LocalBusiness, FAQPage, Service, Article) are viable.' : '',
+  ctx._backlinkReferringDomains >= 100 ? '- Established site: full rich result types (Article, HowTo, VideoObject, FAQPage) are viable.' : '',
+].filter(Boolean).join('\n')}` : ''}
+${ctx._existingErrors?.length ? `\nPRIOR SCHEMA VALIDATION ERRORS — fix all of these in the new schema:
+${ctx._existingErrors.map(e => `- ${e.message}`).join('\n')}` : ''}
 ${getPageTypeInstructions(ctx.pageType, siteUrl)}
 ${ctx._planContext || ''}
 ${ctx._personasBlock ? `\n${ctx._personasBlock}` : ''}
@@ -1681,12 +1779,28 @@ REQUIREMENTS:
 1. Return ONE JSON-LD object with "@context": "https://schema.org" and an "@graph" array
 2. The @graph MUST include a WebPage node on every page
 3. On the HOMEPAGE: include a FULL Organization node (name, url, description, logo, knowsAbout, sameAs) and a WebSite node. These will be saved as the site-wide template.
+3b. HEALTHCARE / DENTAL / MEDICAL SITES — MANDATORY TYPE SELECTION: If businessContext or page content mentions "dental", "dentist", "orthodontic", "periodontic", "endodontic", "physician", "doctor", "clinic", "hospital", "therapy", "therapist", "optician", "ophthalmolog", "chiropractic", "chiropractor", "dermatology", "pediatric", or "psychiatric":
+    - You MUST use the most specific Schema.org subtype. Do NOT use generic "Organization" or "LocalBusiness":
+      dental / dentist / orthodontic / periodont / endodont → "Dentist"
+      physician / doctor / family medicine → "Physician"
+      clinic / urgent care / medical center → "MedicalClinic"
+      hospital → "Hospital"
+      therapist / counseling / psychiatr → "MedicalBusiness"
+      optician / optometrist / ophthalmologist / ophthalmology → "Optician"
+      chiropractor → "Chiropractor"
+      dermatology / dermatologist → "MedicalBusiness"
+      pediatric / pediatrician → "MedicalBusiness"
+    - Generating "Organization" on a dental or medical homepage is a VALIDATION FAILURE, not a suggestion.
+    - For treatment/procedure pages, use "MedicalProcedure" with procedureType and howPerformed fields when the page describes a specific procedure.
 4. On SUBPAGES: include only a MINIMAL Organization stub with @id, name, url — no description, logo, knowsAbout, or sameAs. Do NOT include a WebSite node. Focus your tokens on the page-specific entities (Service, Article, FAQPage, etc.).
 5. NEVER include a SearchAction unless the site has a real, confirmed search endpoint. Do NOT use "?s={search_term_string}" — that is a WordPress convention.
 6. Add page-specific types based on content (Article, FAQPage, Service, Product, BreadcrumbList, HowTo, Event, LocalBusiness, Dataset, etc.)
 7. Use "@id" cross-references between nodes (e.g. Organization "@id": "${siteUrl}/#organization")
 8. Fill ALL values from actual page content — ZERO placeholders, ZERO fabricated data
 9. CRITICAL: NEVER invent or fabricate addresses, phone numbers, email addresses, opening hours, geo coordinates, or any contact information. Only include these fields if the EXACT data appears in the page content above. If a LocalBusiness is appropriate but the page lacks an address, include the LocalBusiness with only the fields you can confirm from the content (name, url, description). Omit address/telephone/openingHours/geo entirely if not found.
+9b. NEVER use a Product node for a service business, healthcare provider, or professional practice. Dental care, legal services, consulting, therapy, and financial advice are SERVICES. Use "Service", the specific healthcare subtype ("Dentist", "MedicalBusiness"), or "LocalBusiness" instead.
+    NEVER create an Offer with "price": "0.00" or "price": "0" — this tells Google your service is free, which is incorrect and misleading.
+    The only valid use of Product is for physical goods (e-commerce) or software (SoftwareApplication is preferred for SaaS).
 10. For images, use full absolute URLs (prefix with ${siteUrl} if relative). Only use image URLs found in the page content.
 11. FAQPage: ONLY use FAQPage schema if the page has a DEDICATED FAQ section with clearly labeled questions and answers (e.g. an accordion, a "Frequently Asked Questions" heading, or a visible Q&A list). Section headings like "What's under the hood?" or "How it works" followed by feature descriptions are NOT FAQs — they are rhetorical headings. When in doubt, do NOT include FAQPage. Never fabricate Q&A pairs.
 12. Article/BlogPosting: use real author name, real dates, real headline from the content. ALWAYS include "author" with "@type": "Person" and real credentials if found. If a medical/health reviewer is mentioned, add "reviewedBy" with "@type": "Person" and their credentials.
@@ -1697,11 +1811,6 @@ REQUIREMENTS:
 16b. LEAD-GEN / CONVERSION PAGES (slugs like /demo, /contact, /request-demo, /get-started, /pricing, /signup, /book): Do NOT create a Service or SoftwareApplication node as mainEntity. These pages are about taking an action, not describing a product. Use only WebPage + Organization stub + BreadcrumbList.
 16c. EVERY Service and SoftwareApplication MUST include a "url" field pointing to the canonical product page (e.g. "${siteUrl}/platform"), NOT to the current page if the current page is a comparison, demo, or landing page.
 16d. If multiple pages describe the SAME product, use a CONSISTENT @id for the Service/SoftwareApplication across all of them (e.g. "${siteUrl}/platform/#service" or "${siteUrl}/#software"). Do NOT create page-specific @ids like "${siteUrl}/faros-vs-dx/#service" for the same product.
-17. HEALTHCARE / MEDICAL SITES: If the business context or page content indicates a healthcare provider (dental, medical, clinic, hospital, therapy, etc.):
-    - Use "MedicalBusiness" or more specific subtypes ("Dentist", "Physician", "Optician", etc.) instead of generic "LocalBusiness"
-    - For treatment/procedure pages, use "MedicalProcedure" with procedureType, howPerformed, preparation, followup if found in content
-    - For provider/doctor profile pages, use "Physician" with medicalSpecialty, credentials, and hospitalAffiliation from content
-    - For procedural how-to content, use "HowTo" with step-by-step instructions extracted from the page
 18. DATASET PAGES: If the page presents data tables, rankings, indexes, or structured data collections, include "Dataset" schema with name, description, distribution (if downloadable), dateModified, and creator referencing the Organization
 19. ENTITY LINKING (sameAs): On the Organization node, include a "sameAs" array with links to the business's verified external profiles (Google Business, LinkedIn, Facebook, Yelp, industry association pages) — but ONLY if these URLs actually appear in the page content or site footer. Never fabricate profile URLs
 20. SAAS / PLATFORM HOMEPAGES: If the homepage presents a software product or platform:
@@ -1959,6 +2068,7 @@ export async function generateSchemaSuggestions(
   ga4Map?: Map<string, { pageviews: number; users: number; avgEngagementTime: number }>,
   queryPageData?: Array<{ query: string; page: string; impressions: number; position: number }>,
   insightsMap?: Map<string, { healthScore?: number; healthTrend?: string; isQuickWin?: boolean }>,
+  validationsByPageId?: Map<string, SchemaValidation>,
 ): Promise<SchemaPageSuggestion[]> {
   const baseUrl = await resolveBaseUrl({ liveDomain: ctx.liveDomain, webflowSiteId: siteId }, tokenOverride);
   log.info(`baseUrl=${baseUrl}, liveDomain=${ctx.liveDomain || '(none)'}`);
@@ -1969,9 +2079,11 @@ export async function generateSchemaSuggestions(
 
   const wsId = ctx.workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
   const allPublished = wsId ? await getWorkspacePages(wsId, siteId) : [];
-  const pages = allPublished.filter(
-    (p: { title: string; slug: string }) => !(p.title || '').toLowerCase().includes('password') && !(p.slug || '').toLowerCase().includes('password')
-  );
+  const pages = allPublished.filter(p => {
+    const slug = p.slug ? `/${p.slug.replace(/^\//, '')}` : '';
+    const title = (p.title || '').toLowerCase();
+    return !UTILITY_SLUGS.test(slug) && !title.includes('password');
+  });
   log.info(`${pages.length} published pages to analyze`);
 
   const results: SchemaPageSuggestion[] = [];
@@ -2031,6 +2143,14 @@ export async function generateSchemaSuggestions(
         const planContext = sitePlan ? buildPlanContextForPage(sitePlan, isHomepage ? '/' : lookupPath) : '';
         const fullPageUrl = isHomepage ? baseUrl : `${baseUrl}${lookupPath}`;
         const insightData = insightsMap?.get(fullPageUrl);
+        const priorValidation = validationsByPageId?.get(page.id);
+        const rawErrors = priorValidation?.errors;
+        const validatedErrors = Array.isArray(rawErrors)
+          ? (rawErrors as unknown[]).filter(
+              (e): e is { message: string } => typeof (e as { message?: unknown })?.message === 'string'
+            ).slice(0, 20)
+          : [];
+        const existingErrors = validatedErrors.length > 0 ? validatedErrors : undefined;
         const pageCtx: SchemaContext = {
           ...ctx,
           pageKeywords: getPageKeywords(lookupPath),
@@ -2043,6 +2163,7 @@ export async function generateSchemaSuggestions(
           _pageHealthTrend: insightData?.healthTrend as SchemaContext['_pageHealthTrend'],
           _quickWinStatus: insightData?.isQuickWin,
           _faqOpportunities: queryPageData ? extractFaqOpportunities(queryPageData, fullPageUrl) : undefined,
+          _existingErrors: existingErrors,
         };
 
         let suggestedSchemas: SchemaSuggestion[];
@@ -2121,6 +2242,9 @@ export async function generateSchemaSuggestions(
 
           const cmsNormalizedPath = (item.path.startsWith('/') ? item.path : `/${item.path}`).replace(/\/$/, '') || '/';
           const cmsInsightData = insightsMap?.get(item.url);
+          // Note: _existingErrors is not wired here — discoverCmsUrls only parses sitemap <loc> URLs
+          // and does not fetch Webflow item IDs. To wire this up we'd need to call listCollections +
+          // listCollectionItems to build a slug→itemId map, then look up validationsByPageId by that ID.
           const pageCtx: SchemaContext = {
             ...ctx,
             pageKeywords: getPageKeywords(slug),
