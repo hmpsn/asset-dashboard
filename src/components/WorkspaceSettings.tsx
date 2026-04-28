@@ -54,6 +54,9 @@ interface WorkspaceData {
     goals?: string[];
     targetAudience?: string;
   } | null;
+  keywordStrategy?: {
+    businessContext?: string;
+  } | null;
 }
 
 interface Props {
@@ -234,6 +237,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
         <BusinessProfileTab
           workspaceId={workspaceId}
           businessProfile={ws?.businessProfile}
+          businessContext={ws?.keywordStrategy?.businessContext}
           toast={toast}
           onSave={(profile) => setWs(w => w ? { ...w, businessProfile: profile } : w)}
         />
