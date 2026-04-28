@@ -15,16 +15,20 @@ import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { upsertAnomalyDigestInsight, upsertInsight } from '../../server/analytics-insights-store.js';
 import { getReportForInsight } from '../../server/diagnostic-store.js';
+import { createUser, getUserByEmail, deleteUser } from '../../server/users.js';
+import { signToken } from '../../server/auth.js';
 
 const ctx = createTestContext(13261);
-const { api, postJson } = ctx;
+const { api, postJson, setAuthToken, authApi } = ctx;
 
+const TEST_EMAIL = 'diag_owner@test.local';
+let testUserId = '';
 let testWsId = '';
 let anomalyInsightId = '';
 let nonAnomalyInsightId = '';
 
 async function setFlag(enabled: boolean | null) {
-  await api('/api/admin/feature-flags/deep-diagnostics', {
+  await authApi('/api/admin/feature-flags/deep-diagnostics', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ enabled }),
@@ -33,6 +37,13 @@ async function setFlag(enabled: boolean | null) {
 
 beforeAll(async () => {
   await ctx.startServer();
+  // Feature flag admin endpoints require JWT auth with owner/admin role.
+  let user = getUserByEmail(TEST_EMAIL);
+  if (!user) {
+    user = await createUser(TEST_EMAIL, 'testpassword123', 'Diagnostic Test Owner', 'owner');
+  }
+  testUserId = user.id;
+  setAuthToken(signToken({ userId: user.id, email: user.email, role: user.role }));
   const ws = createWorkspace('Deep Diagnostic Jobs Test');
   testWsId = ws.id;
 
@@ -72,6 +83,8 @@ beforeAll(async () => {
 afterAll(async () => {
   await setFlag(null); // restore default
   deleteWorkspace(testWsId);
+  setAuthToken('');
+  if (testUserId) deleteUser(testUserId);
   ctx.stopServer();
 });
 
