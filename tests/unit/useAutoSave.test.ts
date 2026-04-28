@@ -56,6 +56,18 @@ describe('useAutoSave', () => {
     expect(saveFn).not.toHaveBeenCalled();
   });
 
+  it('calls onError when saveFn throws', async () => {
+    const saveFn = vi.fn().mockRejectedValue(new Error('network error'));
+    const onError = vi.fn();
+    const { result } = renderHook(() => useAutoSave(saveFn, 500, onError));
+
+    act(() => { result.current.scheduleAutoSave('<p>content</p>'); });
+    await act(async () => { vi.advanceTimersByTime(500); });
+
+    expect(saveFn).toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledWith(expect.any(Error));
+  });
+
   it('new content typed during in-flight save is not lost on flush', async () => {
     let resolveFirstSave!: () => void;
     const firstSavePromise = new Promise<void>(r => { resolveFirstSave = r; });

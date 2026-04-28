@@ -50,6 +50,8 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
       setPost(updated);
       queryClient.invalidateQueries({ queryKey: queryKeys.client.postPreview(workspaceId, request.postId) });
     },
+    2000,
+    () => { setToast({ message: 'Failed to save introduction', type: 'error' }); },
   );
 
   const autoSaveSectionContent = async (html: string) => {
@@ -65,7 +67,11 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
     setPost(updated);
     queryClient.invalidateQueries({ queryKey: queryKeys.client.postPreview(workspaceId, request.postId) });
   };
-  const { scheduleAutoSave: scheduleSectionSave, flush: flushSection, saveStatus: sectionSaveStatus } = useAutoSave(autoSaveSectionContent);
+  const { scheduleAutoSave: scheduleSectionSave, flush: flushSection, saveStatus: sectionSaveStatus } = useAutoSave(
+    autoSaveSectionContent,
+    2000,
+    () => { setToast({ message: 'Failed to save section', type: 'error' }); },
+  );
 
   const { scheduleAutoSave: scheduleConclusionSave, flush: flushConclusion, saveStatus: conclusionSaveStatus } = useAutoSave(
     async (html: string) => {
@@ -73,6 +79,8 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
       setPost(updated);
       queryClient.invalidateQueries({ queryKey: queryKeys.client.postPreview(workspaceId, request.postId) });
     },
+    2000,
+    () => { setToast({ message: 'Failed to save conclusion', type: 'error' }); },
   );
 
   // Sync fetched post into local state once (so edits can update it without refetching).

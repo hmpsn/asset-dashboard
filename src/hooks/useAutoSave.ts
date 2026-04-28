@@ -1,13 +1,17 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 
 type SaveStatus = 'idle' | 'saving' | 'saved';
 
 export function useAutoSave(
   saveFn: (html: string) => Promise<void> | void,
   delay = 2000,
+  onError?: (err: unknown) => void,
 ) {
   const saveFnRef = useRef(saveFn);
   saveFnRef.current = saveFn;
+
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
 
   const timer = useRef<NodeJS.Timeout | null>(null);
   const pendingHtml = useRef<string | null>(null);
@@ -20,7 +24,8 @@ export function useAutoSave(
       if (pendingHtml.current === html) pendingHtml.current = null;
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus(s => s === 'saved' ? 'idle' : s), 1500);
-    } catch {
+    } catch (err) {
+      onErrorRef.current?.(err);
       setSaveStatus('idle');
     }
   }, []);
@@ -35,6 +40,12 @@ export function useAutoSave(
     if (timer.current) { clearTimeout(timer.current); timer.current = null; }
     if (pendingHtml.current !== null) await doSave(pendingHtml.current);
   }, [doSave]);
+
+  useEffect(() => {
+    return () => {
+      if (timer.current) clearTimeout(timer.current);
+    };
+  }, []);
 
   return { scheduleAutoSave, flush, saveStatus };
 }
