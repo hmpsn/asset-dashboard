@@ -329,6 +329,16 @@ export function createApp(): express.Express {
   // --- Sentry error handler (must be after all route mounts, before frontend catch-all) ---
   setupSentryErrorHandler(app);
 
+  // --- Global JSON error handler ---
+  // Express finalhandler returns HTML for unhandled errors, which breaks API clients
+  // that expect JSON. This catches synchronous throws from route handlers that escape
+  // to Express's error pipeline and returns a consistent { error: string } shape.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    const msg = err instanceof Error ? err.message : 'Internal server error';
+    res.status(500).json({ error: msg });
+  });
+
   // --- Serve frontend in production (MUST be after all API routes) ---
   if (IS_PROD) {
     const distPath = path.join(__dirname, '..', 'dist');

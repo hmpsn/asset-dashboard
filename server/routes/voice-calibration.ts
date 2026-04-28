@@ -176,10 +176,12 @@ router.post('/api/voice/:workspaceId/calibrate',
     const { promptType, steeringNotes } = req.body;
     const ws = getWorkspace(req.params.workspaceId);
     const tier = (ws?.tier ?? 'free') as string;
-    if (!incrementIfAllowed(req.params.workspaceId, tier, 'voice_calibrations')) {
-      return res.status(429).json({ error: 'Monthly limit reached for your tier', code: 'usage_limit' });
-    }
+    let incremented = false;
     try {
+      if (!incrementIfAllowed(req.params.workspaceId, tier, 'voice_calibrations')) {
+        return res.status(429).json({ error: 'Monthly limit reached for your tier', code: 'usage_limit' });
+      }
+      incremented = true;
       const session = await generateCalibrationVariations(req.params.workspaceId, promptType, steeringNotes);
       addActivity(req.params.workspaceId, 'voice_calibrated', `Generated voice calibration variations for ${promptType}`);
       broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { sessionId: session.id });
@@ -187,7 +189,7 @@ router.post('/api/voice/:workspaceId/calibrate',
       invalidateIntelligenceCache(req.params.workspaceId);
       res.json(session);
     } catch (err) {
-      decrementUsage(req.params.workspaceId, 'voice_calibrations');
+      if (incremented) { try { decrementUsage(req.params.workspaceId, 'voice_calibrations'); } catch { /* best-effort */ } }
       if (err instanceof Error && err.message === 'No voice profile exists for this workspace') {
         return res.status(404).json({ error: 'Voice profile not found. Create one first via POST /api/voice/:workspaceId' });
       }
@@ -205,13 +207,15 @@ router.post('/api/voice/:workspaceId/calibrate/:sessionId/refine',
     const { variationIndex, direction } = req.body;
     const ws = getWorkspace(req.params.workspaceId);
     const tier = (ws?.tier ?? 'free') as string;
-    if (!incrementIfAllowed(req.params.workspaceId, tier, 'voice_calibrations')) {
-      return res.status(429).json({ error: 'Monthly limit reached for your tier', code: 'usage_limit' });
-    }
+    let incremented = false;
     try {
+      if (!incrementIfAllowed(req.params.workspaceId, tier, 'voice_calibrations')) {
+        return res.status(429).json({ error: 'Monthly limit reached for your tier', code: 'usage_limit' });
+      }
+      incremented = true;
       const session = await refineVariation(req.params.workspaceId, req.params.sessionId, variationIndex, direction);
       if (!session) {
-        decrementUsage(req.params.workspaceId, 'voice_calibrations');
+        try { decrementUsage(req.params.workspaceId, 'voice_calibrations'); } catch { /* best-effort */ }
         return res.status(404).json({ error: 'Session or variation not found' });
       }
       addActivity(req.params.workspaceId, 'voice_refined', `Refined voice calibration variation for ${session.promptType}`);
@@ -220,7 +224,7 @@ router.post('/api/voice/:workspaceId/calibrate/:sessionId/refine',
       invalidateIntelligenceCache(req.params.workspaceId);
       res.json(session);
     } catch (err) {
-      decrementUsage(req.params.workspaceId, 'voice_calibrations');
+      if (incremented) { try { decrementUsage(req.params.workspaceId, 'voice_calibrations'); } catch { /* best-effort */ } }
       if (err instanceof Error && err.message === 'No voice profile exists for this workspace') {
         return res.status(404).json({ error: 'Voice profile not found. Create one first via POST /api/voice/:workspaceId' });
       }

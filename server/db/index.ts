@@ -22,8 +22,11 @@ const db = new Database(dbPath);
 
 // Enable WAL mode for better concurrent read performance
 db.pragma('journal_mode = WAL');
-// Wait up to 5 seconds when the database is locked (avoids SQLITE_BUSY in parallel test workers)
-db.pragma('busy_timeout = 5000');
+// Wait up to 30 seconds when the database is locked. macOS APFS fsync() can
+// occasionally stall for 5-15 s under background I/O (Time Machine, Spotlight),
+// which was causing SQLITE_BUSY failures when parallel integration test servers
+// all shared the same database file.
+db.pragma('busy_timeout = 30000');
 // Enable foreign key enforcement
 db.pragma('foreign_keys = ON');
 
