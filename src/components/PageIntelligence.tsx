@@ -490,7 +490,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="w-6 h-6 animate-spin text-teal-400" />
-        <span className="ml-3 text-sm text-[var(--brand-text)]">Loading page intelligence...</span>
+        <span className="ml-3 t-body text-[var(--brand-text)]">Loading page intelligence...</span>
       </div>
     );
   }
@@ -522,7 +522,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Page Intelligence</h3>
+          <h3 className="t-body font-semibold text-[var(--brand-text-bright)]">Page Intelligence</h3>
           <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
             {unifiedPages.length} pages
             {cmsCount > 0 && <span className="text-blue-400"> · {cmsCount} CMS</span>}
@@ -534,7 +534,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
         {bulkProgress ? (
           <div className="flex items-center gap-2 px-3 py-2 bg-teal-500/10 border border-teal-500/30 rounded-[var(--radius-lg)]">
             <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400" />
-            <span className="text-xs text-[var(--brand-text-bright)]">Analyzing {bulkProgress.done}/{bulkProgress.total}...</span>
+            <span className="t-caption text-[var(--brand-text-bright)]">Analyzing {bulkProgress.done}/{bulkProgress.total}...</span>
             <Button variant="ghost" size="sm" className="ml-2 text-red-400 hover:text-red-300" onClick={() => { if (bulkJobIdRef.current) cancelBgJob(bulkJobIdRef.current); else cancelBulkRef.current = true; }}>Cancel</Button>
           </div>
         ) : (
@@ -600,8 +600,8 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
         <div className="bg-amber-500/5 border border-amber-500/20 rounded-[var(--radius-lg)] p-3">
           <div className="flex items-center gap-2 mb-2">
             <Icon as={Zap} size="md" className="text-amber-400" />
-            <span className="text-xs font-semibold text-amber-300">Fix These First</span>
-            <span className="text-[10px] text-[var(--brand-text-muted)] ml-auto">ranked by traffic × optimization gap</span>
+            <span className="t-caption font-semibold text-amber-300">Fix These First</span>
+            <span className="text-[10px] text-[var(--brand-text-muted)] ml-auto">ranked by traffic × optimization gap</span>{/* // arbitrary-text-ok */}
           </div>
           <div className="space-y-1.5">
             {fixQueue.map((item, i) => (
@@ -610,10 +610,12 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                 onClick={() => setExpanded(expanded === item.page.id ? null : item.page.id)}
                 className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-[var(--surface-3)]/50 transition-colors text-left"
               >
-                <span className="text-[10px] font-mono text-[var(--brand-text-muted)] w-4">{i + 1}.</span>
+                <span className="text-[10px] font-mono text-[var(--brand-text-muted)] w-4">{i + 1}.</span>{/* // arbitrary-text-ok */}
                 <span className="t-caption-sm text-[var(--brand-text-bright)] truncate flex-1">{item.page.title || item.page.path}</span>
                 {item.impressions > 0 && (
-                  <span className="text-[10px] text-[var(--brand-text-muted)]">{item.impressions.toLocaleString()} imp</span>
+                  <span
+                    className="text-[10px] text-[var(--brand-text-muted)]" // arbitrary-text-ok
+                  >{item.impressions.toLocaleString()} imp</span>
                 )}
                 <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${ // arbitrary-text-ok
                   item.score < 40 ? 'text-red-400 bg-red-500/10' :
@@ -622,7 +624,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                 }`}>
                   {item.score}/100
                 </span>
-                <span className="text-[10px] text-amber-400/70 font-mono w-12 text-right">↑{item.impact}</span>{/* arbitrary-text-ok */}
+                <span className="text-[10px] text-amber-400/70 font-mono w-12 text-right">↑{item.impact}</span>{/* // arbitrary-text-ok */}
               </button>
             ))}
           </div>
@@ -687,9 +689,10 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                   )}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs text-[var(--brand-text-bright)] truncate">{page.title}</span>
+                      <span className="t-caption text-[var(--brand-text-bright)] truncate">{page.title}</span>
                       {page.source === 'cms' && (
-                        <span className="text-[9px] px-1 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0" /* arbitrary-text-ok */>CMS</span>
+                        <span className="text-[9px] px-1 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0" // arbitrary-text-ok
+                        >CMS</span>
                       )}
                     </div>
                     <span className="t-caption-sm text-[var(--brand-text-muted)] font-mono">{page.path}</span>
@@ -714,7 +717,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                     </span>
                   )}
                   {sp?.validated === false && (
-                    <span className="text-[10px] text-amber-400 bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/20" title="Keyword not validated in SEMRush">{/* arbitrary-text-ok */}
+                    <span className="text-[10px] text-amber-400 bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/20" title="Keyword not validated in SEMRush">{/* // arbitrary-text-ok */}
                       Unvalidated
                     </span>
                   )}
@@ -730,7 +733,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                     </span>
                   ) : null}
                   {displayScore !== undefined && (
-                    <span className={`text-xs font-bold tabular-nums ${scoreColorClass(displayScore)}`}>{displayScore}</span>
+                    <span className={`t-caption font-bold tabular-nums ${scoreColorClass(displayScore)}`}>{displayScore}</span>
                   )}
                 </div>
               </button>
@@ -746,7 +749,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                         <div>
                           <span className="t-label text-[var(--brand-text-muted)]">Primary Keyword</span>
                           <div className="flex items-center gap-2 mt-0.5">
-                            <p className="text-xs text-[var(--brand-text-bright)]">{sp.primaryKeyword}</p>
+                            <p className="t-caption text-[var(--brand-text-bright)]">{sp.primaryKeyword}</p>
                             <button
                               onClick={() => trackKeyword(sp.primaryKeyword)}
                               title={trackedKeywords.has(sp.primaryKeyword) ? 'Tracking' : 'Track in Rank Tracker'}
@@ -831,12 +834,12 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                       <div>
                         <label className="t-label text-[var(--brand-text-muted)] block mb-1">Primary Keyword</label>
                         <input type="text" value={editDraft.primary} onChange={e => setEditDraft(prev => ({ ...prev, primary: e.target.value }))}
-                          className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500" />
+                          className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500" />
                       </div>
                       <div>
                         <label className="t-label text-[var(--brand-text-muted)] block mb-1">Secondary Keywords (comma-separated)</label>
                         <input type="text" value={editDraft.secondary} onChange={e => setEditDraft(prev => ({ ...prev, secondary: e.target.value }))}
-                          className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500" />
+                          className="w-full px-2.5 py-1.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500" />
                       </div>
                       <div className="flex gap-2">
                         <Button variant="primary" size="sm" icon={Check} loading={saving} disabled={saving} onClick={() => saveEdit(page)}>
@@ -852,7 +855,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                   {/* No strategy data — prompt to analyze */}
                   {!sp && !kw && !isAnalyzing && (
                     <div className="text-center py-4">
-                      <p className="text-xs text-[var(--brand-text-muted)] mb-2">This page isn't in your keyword strategy yet.</p>
+                      <p className="t-caption text-[var(--brand-text-muted)] mb-2">This page isn't in your keyword strategy yet.</p>
                       <Button variant="primary" size="sm" icon={Sparkles} onClick={() => analyzePage(page)} className="mx-auto">
                         Run AI Analysis
                       </Button>
@@ -863,7 +866,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                   {isAnalyzing && !kw && (
                     <div className="flex items-center gap-2 py-6 justify-center text-[var(--brand-text-muted)]">
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span className="text-sm">Running AI keyword analysis...</span>
+                      <span className="t-body">Running AI keyword analysis...</span>
                     </div>
                   )}
 
@@ -883,7 +886,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                           <div className="t-label text-[var(--brand-text-muted)] mb-1">Optimization</div>
                           <div className={`text-2xl font-bold ${scoreColorClass(kw.optimizationScore)}`}>
-                            {kw.optimizationScore}<span className="text-xs font-normal text-[var(--brand-text-muted)]">/100</span>
+                            {kw.optimizationScore}<span className="t-caption font-normal text-[var(--brand-text-muted)]">/100</span>
                           </div>
                           <div className="mt-1 h-1 bg-[var(--surface-3)] rounded-full overflow-hidden">
                             <div className={`h-full rounded-full ${scoreBgBarClass(kw.optimizationScore)}`} style={{ width: `${kw.optimizationScore}%` }} />
@@ -892,9 +895,9 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                           <div className="t-label text-[var(--brand-text-muted)] mb-1">Search Intent</div>
                           <div className="flex items-center gap-2">
-                            <span className="w-6 h-6 rounded-full bg-teal-500/20 text-teal-400 flex items-center justify-center text-xs font-bold">{intentIcon(kw.searchIntent)}</span>
+                            <span className="w-6 h-6 rounded-full bg-teal-500/20 text-teal-400 flex items-center justify-center t-caption font-bold">{intentIcon(kw.searchIntent)}</span>
                             <div>
-                              <div className="text-sm font-medium text-[var(--brand-text-bright)] capitalize">{kw.searchIntent}</div>
+                              <div className="t-body font-medium text-[var(--brand-text-bright)] capitalize">{kw.searchIntent}</div>
                               <div className="t-caption-sm text-[var(--brand-text-muted)]">{Math.round(kw.searchIntentConfidence * 100)}% confidence</div>
                             </div>
                           </div>
@@ -910,7 +913,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                       <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                         <div className="flex items-center gap-2 mb-2">
                           <Icon as={Target} size="md" className="text-teal-400" />
-                          <span className="text-xs font-medium text-[var(--brand-text-bright)]">Primary Keyword: <span className="text-white">{kw.primaryKeyword}</span></span>
+                          <span className="t-caption font-medium text-[var(--brand-text-bright)]">Primary Keyword: <span className="text-white">{kw.primaryKeyword}</span></span>
                           <button
                             onClick={() => trackKeyword(kw.primaryKeyword)}
                             title={trackedKeywords.has(kw.primaryKeyword) ? 'Tracking' : 'Track in Rank Tracker'}
@@ -939,7 +942,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                           <div className="flex items-center gap-2 mb-2">
                             <Icon as={Tag} size="md" className="text-blue-400" />
-                            <span className="text-xs font-medium text-[var(--brand-text-bright)]">Secondary Keywords</span>
+                            <span className="t-caption font-medium text-[var(--brand-text-bright)]">Secondary Keywords</span>
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {kw.secondaryKeywords.map((k, i) => (
@@ -950,7 +953,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                           <div className="flex items-center gap-2 mb-2">
                             <Icon as={TrendingUp} size="md" className="text-emerald-400" />
-                            <span className="text-xs font-medium text-[var(--brand-text-bright)]">Long-Tail Keywords</span>
+                            <span className="t-caption font-medium text-[var(--brand-text-bright)]">Long-Tail Keywords</span>
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {kw.longTailKeywords.map((k, i) => (
@@ -965,7 +968,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                           <div className="flex items-center gap-2 mb-2">
                             <Icon as={Zap} size="md" className="text-amber-400" />
-                            <span className="text-xs font-medium text-[var(--brand-text-bright)]">Competitor Keywords</span>
+                            <span className="t-caption font-medium text-[var(--brand-text-bright)]">Competitor Keywords</span>
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {kw.competitorKeywords.map((k, i) => (
@@ -984,11 +987,11 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                             <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                               <div className="flex items-center gap-2 mb-2">
                                 <Icon as={AlertCircle} size="md" className="text-orange-400" />
-                                <span className="text-xs font-medium text-[var(--brand-text-bright)]">Content Gaps</span>
+                                <span className="t-caption font-medium text-[var(--brand-text-bright)]">Content Gaps</span>
                               </div>
                               <ul className="space-y-1">
                                 {kw.contentGaps.map((gap, i) => (
-                                  <li key={i} className="text-xs text-[var(--brand-text)] flex items-start gap-1.5">
+                                  <li key={i} className="t-caption text-[var(--brand-text)] flex items-start gap-1.5">
                                     <span className="text-orange-400 mt-0.5">-</span> {gap}
                                   </li>
                                 ))}
@@ -1001,7 +1004,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                               <div className="bg-[var(--surface-2)] p-3 border border-red-500/20 rounded-[var(--radius-signature)]">
                                 <div className="flex items-center gap-2 mb-2">
                                   <Icon as={AlertCircle} size="md" className="text-red-400" />
-                                  <span className="text-xs font-medium text-[var(--brand-text-bright)]">Issues</span>
+                                  <span className="t-caption font-medium text-[var(--brand-text-bright)]">Issues</span>
                                 </div>
                                 <ul className="space-y-1">
                                   {kw.optimizationIssues.map((issue, i) => (
@@ -1014,7 +1017,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                               <div className="bg-[var(--surface-2)] p-3 border border-emerald-500/20 rounded-[var(--radius-signature)]">
                                 <div className="flex items-center gap-2 mb-2">
                                   <Icon as={Sparkles} size="md" className="text-emerald-400" />
-                                  <span className="text-xs font-medium text-[var(--brand-text-bright)]">Recommendations</span>
+                                  <span className="t-caption font-medium text-[var(--brand-text-bright)]">Recommendations</span>
                                 </div>
                                 <ul className="space-y-1">
                                   {kw.recommendations.map((rec, i) => (
@@ -1032,7 +1035,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                           <div className="flex items-center gap-2 mb-3">
                             <Icon as={BarChart3} size="md" className="text-cyan-400" />
-                            <span className="text-xs font-medium text-[var(--brand-text-bright)]">Content Metrics</span>
+                            <span className="t-caption font-medium text-[var(--brand-text-bright)]">Content Metrics</span>
                           </div>
                           <div className="grid grid-cols-4 gap-3 mb-3">
                             <div>
@@ -1106,7 +1109,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                           {sp!.optimizationScore !== undefined && (
                             <div className="flex items-center gap-2">
                               <span className="t-caption-sm text-[var(--brand-text-muted)]">Score:</span>
-                              <span className={`text-sm font-bold ${scoreColorClass(sp!.optimizationScore!)}`}>{sp!.optimizationScore}</span>
+                              <span className={`t-body font-bold ${scoreColorClass(sp!.optimizationScore!)}`}>{sp!.optimizationScore}</span>
                             </div>
                           )}
                           {sp!.optimizationIssues && sp!.optimizationIssues.length > 0 && (
@@ -1174,7 +1177,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
         })}
 
         {filtered.length === 0 && (
-          <div className="px-4 py-8 text-center text-sm text-[var(--brand-text-muted)]">
+          <div className="px-4 py-8 text-center t-body text-[var(--brand-text-muted)]">
             {search ? 'No pages match your search.' : 'No pages found.'}
           </div>
         )}

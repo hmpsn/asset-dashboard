@@ -1,4 +1,4 @@
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp } from 'lucide-react'; // trend-icon-ok — decorative section icon, not a trend indicator
 import { SectionCard, Icon } from '../ui';
 
 // ── Shared position color helper ──
@@ -80,7 +80,7 @@ export function RankTable({ ranks, limit = 10, showClicks = true, showImpression
 
   return (
     <div className="overflow-hidden rounded-[var(--radius-sm)] border border-[var(--brand-border)]">
-      <table className="w-full text-xs">
+      <table className="w-full t-caption">
         <thead>
           <tr className="bg-[var(--surface-1)]/50">
             <th className="text-left py-2 px-3 text-[var(--brand-text-muted)] font-medium">Keyword</th>

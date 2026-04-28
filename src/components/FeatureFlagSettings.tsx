@@ -165,7 +165,7 @@ export function FeatureFlagSettings() {
           <Icon as={Flag} size="md" className="text-teal-400" />
         </div>
         <div className="flex-1">
-          <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Feature Flags</h3>
+          <h3 className="t-body font-semibold text-[var(--brand-text-bright)]">Feature Flags</h3>
           <p className="t-caption text-[var(--brand-text-muted)]">Toggle dark-launched features. DB overrides take priority over env vars.</p>
         </div>
         {isPending && <Icon as={Loader2} size="md" className="text-[var(--brand-text-muted)] animate-spin" />}
@@ -249,6 +249,7 @@ function FlagRow({ flag, disabled, onToggle, onReset }: FlagRowProps) {
         aria-label={`Toggle ${label}`}
         disabled={disabled}
         onClick={() => onToggle(!flag.enabled)}
+        // pr-check-disable-next-line -- toggle switch active state, not a CTA button
         className={`relative w-9 h-5 rounded-full transition-colors shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 disabled:opacity-50 ${
           flag.enabled
             ? 'bg-gradient-to-r from-teal-600 to-emerald-600'
