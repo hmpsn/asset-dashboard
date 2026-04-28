@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { X, Loader2, Check } from 'lucide-react';
 import type { AiFixResult } from '../../../shared/types/content';
 
@@ -21,9 +22,16 @@ export function FixDiffModal({ issueLabel, result, loading, applying, onApply, o
     ? (() => { try { return JSON.parse(result.originalText) as { seoTitle: string; seoMetaDescription: string }; } catch { return null; } })()
     : null;
 
+  useEffect(() => {
+    if (!loading && !result) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onDismiss(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [loading, result, onDismiss]);
+
   return (
     <div
-      className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4 bg-black/50"
+      className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4 bg-[var(--brand-overlay)]"
       onClick={onDismiss}
     >
       <div
@@ -82,6 +90,7 @@ export function FixDiffModal({ issueLabel, result, loading, applying, onApply, o
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1">Original</div>
+                    {/* Admin-only: AI-generated HTML from trusted endpoint — same pattern as PostEditor/PostPreview */}
                     <div
                       className="p-3 rounded-lg bg-red-500/5 border border-red-500/20 text-xs text-[var(--brand-text)] leading-relaxed line-through decoration-red-500/40 [&_strong]:text-[var(--brand-text-bright)] [&_h2]:font-semibold [&_h2]:text-[var(--brand-text-bright)] [&_a]:text-teal-400 max-h-56 overflow-y-auto"
                       dangerouslySetInnerHTML={{ __html: result.originalText }}

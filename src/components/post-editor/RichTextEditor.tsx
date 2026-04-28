@@ -3,6 +3,7 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
+import { Link as LinkIcon } from 'lucide-react';
 
 export interface RichTextEditorProps {
   initialValue: string;
@@ -25,6 +26,16 @@ export function RichTextEditor({ initialValue, onChange, className }: RichTextEd
       onChange(editor.getHTML());
     },
   });
+
+  useEffect(() => {
+    if (editor && initialValue !== editor.getHTML()) {
+      editor.commands.setContent(initialValue, { emitUpdate: false });
+    }
+  }, [editor, initialValue]);
+
+  useEffect(() => {
+    return () => { editor?.destroy(); };
+  }, [editor]);
 
   useEffect(() => {
     if (showLinkInput) {
@@ -80,30 +91,39 @@ export function RichTextEditor({ initialValue, onChange, className }: RichTextEd
           ) : (
             <>
               <button
+                aria-label="Bold"
+                aria-pressed={editor.isActive('bold')}
                 onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleBold().run(); }}
                 className={`px-2 py-1 rounded text-xs font-bold transition-colors ${editor.isActive('bold') ? 'bg-teal-500/20 text-teal-300' : 'text-[var(--brand-text)] hover:bg-[var(--surface-3)]'}`}
               >
                 B
               </button>
               <button
+                aria-label="Italic"
+                aria-pressed={editor.isActive('italic')}
                 onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleItalic().run(); }}
                 className={`px-2 py-1 rounded text-xs italic transition-colors ${editor.isActive('italic') ? 'bg-teal-500/20 text-teal-300' : 'text-[var(--brand-text)] hover:bg-[var(--surface-3)]'}`}
               >
                 I
               </button>
               <button
+                aria-label="Heading 2"
+                aria-pressed={editor.isActive('heading', { level: 2 })}
                 onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleHeading({ level: 2 }).run(); }}
                 className={`px-2 py-1 rounded text-xs font-semibold transition-colors ${editor.isActive('heading', { level: 2 }) ? 'bg-teal-500/20 text-teal-300' : 'text-[var(--brand-text)] hover:bg-[var(--surface-3)]'}`}
               >
                 H2
               </button>
               <button
+                aria-label="Heading 3"
+                aria-pressed={editor.isActive('heading', { level: 3 })}
                 onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleHeading({ level: 3 }).run(); }}
                 className={`px-2 py-1 rounded text-xs font-semibold transition-colors ${editor.isActive('heading', { level: 3 }) ? 'bg-teal-500/20 text-teal-300' : 'text-[var(--brand-text)] hover:bg-[var(--surface-3)]'}`}
               >
                 H3
               </button>
               <button
+                aria-label="Insert link"
                 onMouseDown={e => {
                   e.preventDefault();
                   const href = editor.getAttributes('link').href as string | undefined;
@@ -113,7 +133,7 @@ export function RichTextEditor({ initialValue, onChange, className }: RichTextEd
                 className={`px-2 py-1 rounded text-xs transition-colors ${editor.isActive('link') ? 'bg-teal-500/20 text-teal-300' : 'text-[var(--brand-text)] hover:bg-[var(--surface-3)]'}`}
                 title="Link (Cmd+K)"
               >
-                🔗
+                <LinkIcon className="w-3 h-3" />
               </button>
             </>
           )}
