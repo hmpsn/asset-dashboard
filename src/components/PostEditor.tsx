@@ -232,6 +232,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   };
 
   const handleRequestFix = async (issueKey: string, reason: string) => {
+    if (fixLoading) return;
     setFixLoading(true);
     setFixIssueLabel(CHECKLIST_ITEMS.find(i => i.key === issueKey)?.label ?? issueKey);
     try {
@@ -250,7 +251,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
     try {
       if (result.field === 'introduction') {
         await saveField({ introduction: result.suggestedText });
-      } else if (result.field === 'section' && result.sectionIndex !== undefined) {
+      } else if (result.field === 'section' && result.sectionIndex !== undefined && result.sectionIndex < post.sections.length) {
         const sections = [...post.sections];
         sections[result.sectionIndex] = { ...sections[result.sectionIndex], content: result.suggestedText };
         await saveField({ sections });
