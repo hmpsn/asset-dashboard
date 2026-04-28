@@ -384,6 +384,7 @@ const INVALID_PROPERTIES: Record<string, string[]> = {
   Service: ['features', 'benefits', 'pricing'],
   WebPage: ['keywords', 'category'],
   Person: ['title', 'company'],
+  Product: ['pricing', 'features', 'cost'],
 };
 
 // Phone number format: must look like a real number (digits, dashes, parens, spaces, +)
@@ -480,8 +481,52 @@ function validateUnifiedSchema(schema: Record<string, unknown>): string[] {
   return errors;
 }
 
+/** Maps healthcare keyword fragments to their correct Schema.org @type. */
+const HEALTHCARE_TYPE_MAP: Array<[RegExp, string]> = [
+  [/\b(dental|dentist|orthodont|periodont|endodont)\b/i, 'Dentist'],
+  [/\b(physician|doctor|md\b|family medicine)\b/i, 'Physician'],
+  [/\b(optician|optometrist|ophthalmolog)\b/i, 'Optician'],
+  [/\b(chiropract)\b/i, 'Chiropractor'],
+  [/\b(dermatolog)\b/i, 'Dermatology'],
+  [/\b(pediatric|pediatrician)\b/i, 'Pediatric'],
+  [/\b(clinic|urgent care|medical center)\b/i, 'MedicalClinic'],
+  [/\b(hospital)\b/i, 'Hospital'],
+  [/\b(therapist|therapy|counseling|psychiatr)\b/i, 'MedicalBusiness'],
+  [/\b(medical|healthcare|health care)\b/i, 'MedicalBusiness'],
+];
+
+/**
+ * Deterministically upgrades generic Organization/LocalBusiness nodes to the correct
+ * healthcare Schema.org subtype when the workspace businessContext signals a healthcare provider.
+ * This is a fallback for when the AI model ignores the healthcare prompt rule.
+ */
+export function upgradeHealthcareType(schema: Record<string, unknown>, ctx: SchemaContext): void {
+  const combined = `${ctx.businessContext || ''} ${(ctx.knowledgeBase || '').slice(0, 500)}`;
+  if (!combined.trim()) return;
+
+  let targetType: string | null = null;
+  for (const [pattern, type] of HEALTHCARE_TYPE_MAP) {
+    if (pattern.test(combined)) {
+      targetType = type;
+      break;
+    }
+  }
+  if (!targetType) return;
+
+  const graph = schema['@graph'] as Record<string, unknown>[] | undefined;
+  if (!Array.isArray(graph)) return;
+
+  for (const node of graph) {
+    const currentType = node['@type'] as string | undefined;
+    if (currentType === 'Organization' || currentType === 'LocalBusiness') {
+      log.info({ from: currentType, to: targetType }, 'Auto-fix: upgraded generic type to healthcare subtype');
+      node['@type'] = targetType;
+    }
+  }
+}
+
 // Auto-fix: strip invalid properties and fix common AI hallucinations
-function autoFixSchema(schema: Record<string, unknown>): void {
+export function autoFixSchema(schema: Record<string, unknown>): void {
   const graph = schema['@graph'] as Record<string, unknown>[] | undefined;
   if (!Array.isArray(graph)) return;
 
@@ -524,6 +569,36 @@ function autoFixSchema(schema: Record<string, unknown>): void {
     if (Array.isArray(st) && st.length > 3) {
       log.info(`Auto-fix: trimmed serviceType from ${st.length} to 3 entries on ${type}`);
       node['serviceType'] = st.slice(0, 3);
+    }
+
+    // Trim knowsAbout to max 5 terms (AI routinely generates 8–12)
+    const ka = node['knowsAbout'];
+    if (Array.isArray(ka) && ka.length > 5) {
+      log.info(`Auto-fix: trimmed knowsAbout from ${ka.length} to 5 terms on ${type}`);
+      node['knowsAbout'] = ka.slice(0, 5);
+    }
+
+    // Strip Product nodes with zero-price offers — service/healthcare businesses hallucinate these
+    if (type === 'Product') {
+      const rawOffers = node['offers'];
+      const isZeroPrice = (o: unknown): boolean => {
+        if (!o || typeof o !== 'object') return false;
+        const p = (o as Record<string, unknown>)['price'];
+        return p === '0' || p === '0.00' || p === 0;
+      };
+      if (!Array.isArray(rawOffers) && isZeroPrice(rawOffers)) {
+        log.info('Auto-fix: removed zero-price Offer from Product (service business hallucination)');
+        delete node['offers'];
+      }
+      if (Array.isArray(rawOffers)) {
+        const cleaned = rawOffers.filter(o => !isZeroPrice(o));
+        if (cleaned.length === 0 && rawOffers.length > 0) {
+          log.info('Auto-fix: flagged Product for removal — all offers were zero-priced (service business hallucination)');
+          node['_remove'] = true;
+        } else if (cleaned.length < rawOffers.length) {
+          node['offers'] = cleaned;
+        }
+      }
     }
 
     // Normalize Service/SoftwareApplication @id to use canonical product URL
@@ -1325,6 +1400,7 @@ async function postProcessSchema(
 ): Promise<{ schema: Record<string, unknown>; reason: string; errors: string[] }> {
   // Step 1: Auto-fix invalid properties and malformed values
   autoFixSchema(schema);
+  upgradeHealthcareType(schema, ctx);
 
   // Step 2: Ensure @graph structure
   if (!schema['@graph'] && schema['@type']) {

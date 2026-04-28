@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { UTILITY_SLUGS } from '../../server/schema-suggester.js';
+import { UTILITY_SLUGS, autoFixSchema, upgradeHealthcareType } from '../../server/schema-suggester.js';
 
 describe('UTILITY_SLUGS regex', () => {
   it('matches error and utility pages', () => {
@@ -20,5 +20,90 @@ describe('UTILITY_SLUGS regex', () => {
     expect(UTILITY_SLUGS.test('/contact-us')).toBe(false);
     expect(UTILITY_SLUGS.test('/blog/post-1')).toBe(false);
     expect(UTILITY_SLUGS.test('/legal-services')).toBe(false);
+  });
+});
+
+describe('autoFixSchema — knowsAbout trim', () => {
+  it('trims knowsAbout to max 5 items', () => {
+    const schema = {
+      '@context': 'https://schema.org',
+      '@graph': [{ '@type': 'Organization', 'name': 'Test Co', 'knowsAbout': ['A','B','C','D','E','F','G'] }],
+    };
+    autoFixSchema(schema);
+    expect((schema['@graph'][0] as any)['knowsAbout']).toHaveLength(5);
+  });
+
+  it('leaves knowsAbout with ≤5 items untouched', () => {
+    const schema = {
+      '@context': 'https://schema.org',
+      '@graph': [{ '@type': 'Organization', 'name': 'Test Co', 'knowsAbout': ['A','B','C'] }],
+    };
+    autoFixSchema(schema);
+    expect((schema['@graph'][0] as any)['knowsAbout']).toHaveLength(3);
+  });
+});
+
+describe('autoFixSchema — Product zero-price strip', () => {
+  it('removes zero-price single offer from Product', () => {
+    const schema = {
+      '@context': 'https://schema.org',
+      '@graph': [{ '@type': 'Product', 'name': 'Dental Services', 'offers': { '@type': 'Offer', 'price': '0.00', 'priceCurrency': 'USD' } }],
+    };
+    autoFixSchema(schema);
+    expect((schema['@graph'][0] as any)['offers']).toBeUndefined();
+  });
+
+  it('flags Product for removal when all offers are zero-priced', () => {
+    const schema = {
+      '@context': 'https://schema.org',
+      '@graph': [{ '@type': 'Product', 'name': 'Dental Care', 'offers': [
+        { '@type': 'Offer', 'price': '0', 'priceCurrency': 'USD' },
+        { '@type': 'Offer', 'price': '0.00', 'priceCurrency': 'USD' },
+      ]}],
+    };
+    autoFixSchema(schema);
+    expect((schema['@graph'][0] as any)['_remove']).toBe(true);
+  });
+
+  it('preserves Product when it has at least one real-price offer', () => {
+    const schema = {
+      '@context': 'https://schema.org',
+      '@graph': [{ '@type': 'Product', 'name': 'Widget', 'offers': [
+        { '@type': 'Offer', 'price': '0', 'priceCurrency': 'USD' },
+        { '@type': 'Offer', 'price': '49.99', 'priceCurrency': 'USD' },
+      ]}],
+    };
+    autoFixSchema(schema);
+    expect((schema['@graph'][0] as any)['_remove']).toBeUndefined();
+    expect((schema['@graph'][0] as any)['offers']).toHaveLength(1);
+  });
+});
+
+describe('upgradeHealthcareType', () => {
+  it('upgrades Organization → Dentist when businessContext mentions dental', () => {
+    const schema = {
+      '@context': 'https://schema.org',
+      '@graph': [{ '@type': 'Organization', 'name': 'Rinse Dental', '@id': 'https://rinse-dental.com/#organization' }],
+    };
+    upgradeHealthcareType(schema, { businessContext: 'We are a dental practice providing cosmetic dentistry services.' } as any);
+    expect((schema['@graph'][0] as any)['@type']).toBe('Dentist');
+  });
+
+  it('does not upgrade when businessContext has no healthcare keywords', () => {
+    const schema = {
+      '@context': 'https://schema.org',
+      '@graph': [{ '@type': 'Organization', 'name': 'Acme SaaS', '@id': 'https://acme.com/#organization' }],
+    };
+    upgradeHealthcareType(schema, { businessContext: 'We build software for project management teams.' } as any);
+    expect((schema['@graph'][0] as any)['@type']).toBe('Organization');
+  });
+
+  it('upgrades LocalBusiness → MedicalClinic for clinic context', () => {
+    const schema = {
+      '@context': 'https://schema.org',
+      '@graph': [{ '@type': 'LocalBusiness', 'name': 'City Urgent Care', '@id': 'https://cityurgentcare.com/#organization' }],
+    };
+    upgradeHealthcareType(schema, { businessContext: 'City urgent care clinic serving patients in downtown.' } as any);
+    expect((schema['@graph'][0] as any)['@type']).toBe('MedicalClinic');
   });
 });
