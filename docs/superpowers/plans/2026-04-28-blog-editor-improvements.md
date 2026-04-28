@@ -250,7 +250,7 @@ export function useAutoSave(
 npx vitest run tests/unit/useAutoSave.test.ts
 ```
 
-Expected: 4 tests pass.
+Expected: 5 tests pass.
 
 ### Step 1.6: Install TipTap dependencies
 
@@ -971,23 +971,40 @@ import { Loader2 } from 'lucide-react';
 
 - [ ] After the state declarations for `introDraft`, `sectionDraft`, `conclusionDraft`, add three `useAutoSave` hooks.
 
-First, verify the `saveIntro`, `saveSection`, `saveConclusion` function signatures in PostReviewCard (they already accept HTML strings — no change needed).
+**Do NOT wrap the existing `saveIntro` / `saveSection` / `saveConclusion` functions** — those close the editor (`setEditingIntro(false)` etc.) and show a toast on every call. Auto-save must call `publicPostReview.clientEdit()` directly and skip the UI side effects. The Done button handles collapsing the editor and feedback is shown via the `saveStatus` indicator from `useAutoSave`.
 
 Add these hooks after the state declarations:
 
 ```tsx
 const { scheduleAutoSave: scheduleIntroSave, flush: flushIntro, saveStatus: introSaveStatus } = useAutoSave(
-  async (html: string) => { await saveIntro(html); },
+  async (html: string) => {
+    const updated = await publicPostReview.clientEdit(workspaceId, post!.id, { introduction: html });
+    setPost(updated);
+    queryClient.invalidateQueries({ queryKey: queryKeys.client.postPreview(workspaceId, request.postId) });
+  },
 );
 
-const saveSectionContent = (html: string) => {
+const autoSaveSectionContent = async (html: string) => {
   if (editingSection === null) return;
-  return saveSection(editingSection, html);
+  const existing = post!.sections.find(s => s.index === editingSection);
+  const sections = [{
+    index: editingSection,
+    heading: existing?.heading ?? '',
+    content: html,
+    wordCount: html.split(/\s+/).filter(Boolean).length,
+  }];
+  const updated = await publicPostReview.clientEdit(workspaceId, post!.id, { sections });
+  setPost(updated);
+  queryClient.invalidateQueries({ queryKey: queryKeys.client.postPreview(workspaceId, request.postId) });
 };
-const { scheduleAutoSave: scheduleSectionSave, flush: flushSection, saveStatus: sectionSaveStatus } = useAutoSave(saveSectionContent);
+const { scheduleAutoSave: scheduleSectionSave, flush: flushSection, saveStatus: sectionSaveStatus } = useAutoSave(autoSaveSectionContent);
 
 const { scheduleAutoSave: scheduleConclusionSave, flush: flushConclusion, saveStatus: conclusionSaveStatus } = useAutoSave(
-  async (html: string) => { await saveConclusion(html); },
+  async (html: string) => {
+    const updated = await publicPostReview.clientEdit(workspaceId, post!.id, { conclusion: html });
+    setPost(updated);
+    queryClient.invalidateQueries({ queryKey: queryKeys.client.postPreview(workspaceId, request.postId) });
+  },
 );
 ```
 
