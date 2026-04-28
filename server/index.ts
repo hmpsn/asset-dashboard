@@ -11,6 +11,15 @@ import { initWebSocket } from './websocket.js';
 import { startSchedulers } from './startup.js';
 import { stopDataRetentionCrons } from './data-retention.js';
 import { stopIntelligenceCrons, stopCompetitorMonitoringCron } from './intelligence-crons.js';
+import { stopScheduler } from './scheduled-audits.js';
+import { stopApprovalReminders } from './approval-reminders.js';
+import { stopTrialReminders } from './trial-reminders.js';
+import { stopChurnSignalScheduler } from './churn-signals.js';
+import { stopAnomalyDetection } from './anomaly-detection.js';
+import { stopOutcomeCrons } from './outcome-crons.js';
+import { stopRankTrackingScheduler } from './rank-tracking-scheduler.js';
+import { stopMonthlyReports } from './monthly-report.js';
+import { stopThrottleCleanup } from './email-throttle.js';
 import { listWorkspaces } from './workspaces.js';
 import { isStripeConfigured } from './stripe.js';
 import { DATA_BASE } from './data-dir.js';
@@ -63,6 +72,15 @@ function gracefulShutdown(signal: string) {
   stopDataRetentionCrons();
   stopIntelligenceCrons();
   stopCompetitorMonitoringCron();
+  stopScheduler();
+  stopApprovalReminders();
+  stopTrialReminders();
+  stopChurnSignalScheduler();
+  stopAnomalyDetection();
+  stopOutcomeCrons();
+  stopRankTrackingScheduler();
+  stopMonthlyReports();
+  stopThrottleCleanup();
 
   // 2. Mark any in-progress jobs as interrupted in SQLite before shutdown
   const activeJobs = listJobs().filter(j => j.status === 'pending' || j.status === 'running');

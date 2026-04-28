@@ -7,7 +7,7 @@ const router = Router();
 
 import { sanitizeString } from '../helpers.js';
 import { checkoutLimiter } from '../middleware.js';
-import { requireAdminAuth } from '../middleware/admin-auth.js';
+import { requireAuth, requireRole } from '../auth.js';
 import { listPayments, getPayment } from '../payments.js';
 import { computeROI } from '../roi.js';
 import {
@@ -40,13 +40,13 @@ const log = createLogger('stripe');
 
 // Get current Stripe config (keys masked)
 // Admin-only: rejects JWT user tokens (client-portal users). See middleware/admin-auth.ts.
-router.get('/api/stripe/config', requireAdminAuth, (_req, res) => {
+router.get('/api/stripe/config', requireAuth, requireRole('owner', 'admin'), (_req, res) => { // auth-ok
   res.json(getStripeConfigSafe());
 });
 
 // Save Stripe API keys
 // Admin-only: these write SYSTEM-level Stripe secrets. JWT user tokens must not pass.
-router.post('/api/stripe/config/keys', requireAdminAuth, (req, res) => {
+router.post('/api/stripe/config/keys', requireAuth, requireRole('owner', 'admin'), (req, res) => { // auth-ok
   const { secretKey, webhookSecret, publishableKey } = req.body;
   if (!secretKey && !webhookSecret && !publishableKey) return res.status(400).json({ error: 'Provide secretKey, webhookSecret, and/or publishableKey' });
   saveStripeKeys(secretKey, webhookSecret, publishableKey);
@@ -55,7 +55,7 @@ router.post('/api/stripe/config/keys', requireAdminAuth, (req, res) => {
 
 // Save product price mappings
 // Admin-only: product/price configuration is system-level.
-router.post('/api/stripe/config/products', requireAdminAuth, (req, res) => {
+router.post('/api/stripe/config/products', requireAuth, requireRole('owner', 'admin'), (req, res) => { // auth-ok
   const { products } = req.body;
   if (!Array.isArray(products)) return res.status(400).json({ error: 'products must be an array' });
   saveStripeProducts(products as StripeProductPrice[]);
@@ -64,7 +64,7 @@ router.post('/api/stripe/config/products', requireAdminAuth, (req, res) => {
 
 // Clear all Stripe config
 // Admin-only: nukes SYSTEM-level Stripe secrets.
-router.delete('/api/stripe/config', requireAdminAuth, (_req, res) => {
+router.delete('/api/stripe/config', requireAuth, requireRole('owner', 'admin'), (_req, res) => { // auth-ok
   clearStripeConfig();
   res.json({ ok: true });
 });
