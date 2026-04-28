@@ -6,7 +6,7 @@ description: Canonical UI vocabulary for action labels, badges, and status text.
 
 Use these exact labels when creating buttons, badges, tooltips, status text, and toast messages. Do NOT invent synonyms.
 
-> **Color assignments below must match `BRAND_DESIGN_LANGUAGE.md` § 2 (Three Laws of Color).** When in doubt, check the Per-Component Color Map.
+> **Color assignments below must match `BRAND_DESIGN_LANGUAGE.md` § 2 (Four Laws of Color).** When in doubt, check the Per-Component Color Map.
 
 ## Action Verbs
 
@@ -85,4 +85,4 @@ All user-facing copy that references the studio or agency MUST use the `STUDIO_N
 4. **Tooltips expand the label** — e.g. button says "Fix", tooltip says "Open SEO Editor".
 5. **Batch labels include the destination** — "Add Errors to Tasks", not just "Add Errors".
 6. **Loading states use "...ing"** — "Pushing...", "Sending...", "Adding...".
-7. **Color rules** — All action colors must follow the Three Laws in `BRAND_DESIGN_LANGUAGE.md`: teal for CTAs, blue for data, purple for admin AI only. Never use violet or indigo.
+7. **Color rules** — All action colors must follow the Four Laws in `BRAND_DESIGN_LANGUAGE.md`: teal for CTAs, blue for data, emerald for success, purple for admin AI only. Never use violet or indigo.

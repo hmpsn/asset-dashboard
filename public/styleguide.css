@@ -577,7 +577,7 @@ var(--surface-2);
 var(--surface-2); }
   .light .radius-tile.is-sig{ background:linear-gradient(135deg, rgba(13,148,136,.05), transparent 70%), #ffffff; border-color:rgba(13,148,136,.35); }
 
-  /* Three Laws of Color strip */
+  /* Four Laws of Color strip */
   .laws{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:16px; }
   .law{
     background:var(--surface-2); border:1px solid var(--brand-border);

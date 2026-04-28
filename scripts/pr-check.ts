@@ -9,7 +9,7 @@
  *   npx tsx scripts/pr-check.ts --all    # full codebase scan (for audits)
  *
  * Catches the most common issues that slip through TypeScript:
- *   - Purple in client-facing components (violates Three Laws of Color)
+ *   - Purple in client-facing components (violates Four Laws of Color)
  *   - violet- or indigo- in any component (forbidden hues)
  *   - Bare JSON.parse on server (use parseJsonSafe / parseJsonFallback)
  *   - Hard-coded "hmpsn.studio" strings (use STUDIO_NAME constant)
@@ -786,7 +786,7 @@ export const CHECKS: Check[] = [
     pattern: 'purple-',
     fileGlobs: ['*.ts', '*.tsx'],
     pathFilter: 'src/components/client/',
-    message: 'Purple is admin-only (Three Laws of Color). Use teal for actions, blue for data.',
+    message: 'Purple is admin-only (Four Laws of Color). Use teal for actions, blue for data.',
     severity: 'error',
   },
   {
@@ -4103,7 +4103,7 @@ export const CHECKS: Check[] = [
   // utilities, hardcoded radii) — promote to error once each backlog reaches
   // zero. See docs/superpowers/plans/2026-04-24-design-system-phase5-sweep.md.
   {
-    // The rose- and pink- hue families are not in the Three Laws of Color
+    // The rose- and pink- hue families are not in the Four Laws of Color
     // palette. Forbidden alongside violet/indigo. Ships at error because the
     // backlog is genuinely zero (verified 2026-04-25). Word-boundary anchor
     // prevents `prose-` (Tailwind typography plugin) false positives.
@@ -4111,9 +4111,9 @@ export const CHECKS: Check[] = [
     pattern: '\\b(rose|pink)-[0-9]',
     fileGlobs: ['*.ts', '*.tsx'],
     pathFilter: 'src/',
-    message: 'rose- and pink- are forbidden. Use teal (actions), blue (data), emerald (success), amber (warning), or red (error) per the Three Laws of Color.',
+    message: 'rose- and pink- are forbidden. Use teal (actions), blue (data), emerald (success), amber (warning), or red (error) per the Four Laws of Color.',
     severity: 'error',
-    rationale: 'Prevents the Three Laws palette from drifting via new rose/pink imports — the same class of bug that violet/indigo represented before they were banned.',
+    rationale: 'Prevents the Four Laws palette from drifting via new rose/pink imports — the same class of bug that violet/indigo represented before they were banned.',
     claudeMdRef: '#design-system--the-four-laws-of-color',
   },
   {
@@ -4194,7 +4194,7 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // Three Laws of Color, Law #3: success/score uses emerald, never green.
+    // Four Laws of Color, Law #3: success/score uses emerald, never green.
     // CLAUDE.md explicitly forbids `text-green-400` for success/score indicators —
     // emerald and green are distinct hues and emerald is canonical. Verified zero
     // backlog (2026-04-25). The rule covers the full text-green-{N} family
@@ -4204,9 +4204,9 @@ export const CHECKS: Check[] = [
     fileGlobs: ['*.ts', '*.tsx'],
     pathFilter: 'src/',
     excludeLines: ['// green-ok'],
-    message: 'Use text-emerald-400 (or scoreColorClass() for scores). Per the Three Laws of Color, emerald is the canonical success hue — green-* drifts the palette. If green is genuinely intended (non-success indicator like an unrelated brand or chart series), add // green-ok inline.',
+    message: 'Use text-emerald-400 (or scoreColorClass() for scores). Per the Four Laws of Color, emerald is the canonical success hue — green-* drifts the palette. If green is genuinely intended (non-success indicator like an unrelated brand or chart series), add // green-ok inline.',
     severity: 'error',
-    rationale: 'Mechanizes the Three Laws Law #3 emerald-vs-green distinction. The CLAUDE.md warning is otherwise unenforced, and the bug recurs every codemod batch as workers default to "green = success" from training data.',
+    rationale: 'Mechanizes the Four Laws Law #3 emerald-vs-green distinction. The CLAUDE.md warning is otherwise unenforced, and the bug recurs every codemod batch as workers default to "green = success" from training data.',
     claudeMdRef: '#design-system--the-four-laws-of-color',
   },
   {

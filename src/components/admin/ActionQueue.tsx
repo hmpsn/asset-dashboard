@@ -14,7 +14,7 @@ interface Props {
   workspaceId: string;
 }
 
-// Severity badge colors following Three Laws of Color
+// Severity badge colors following Four Laws of Color
 const severityBadge = {
   critical: 'bg-red-500/8 text-red-400/80 border-red-500/20',
   warning: 'bg-amber-500/8 text-amber-400/80 border-amber-500/20',

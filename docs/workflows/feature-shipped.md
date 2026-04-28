@@ -26,7 +26,7 @@ For each shipped item:
 If the shipped work added, removed, or changed any UI colors, badges, buttons, or interactive elements:
 
 - Update the **Per-Component Color Map** (§ 4) with new/changed elements and their colors
-- Verify colors follow the **Three Laws**: teal for actions, blue for data, purple for admin AI only
+- Verify colors follow the **Four Laws**: teal for actions, blue for data, purple for admin AI only
 - If new primitives were created, add them to the **UI Primitive Inventory** (§ 3)
 
 ## 4. Update data/roadmap.json
