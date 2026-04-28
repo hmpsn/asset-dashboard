@@ -77,7 +77,7 @@ export const PAGE_TYPE_LABELS: Record<SchemaPageType, string> = {
 // Deterministic mapping: page type → recommended Schema.org types
 export const PAGE_TYPE_SCHEMA_MAP: Record<SchemaPageType, { primary: string[]; secondary: string[] }> = {
   auto: { primary: [], secondary: [] },
-  homepage: { primary: ['Organization', 'WebSite'], secondary: ['SiteNavigationElement'] },
+  homepage: { primary: ['Organization', 'WebSite'], secondary: [] },
   pillar: { primary: ['Article', 'CollectionPage'], secondary: ['Person', 'BreadcrumbList'] },
   service: { primary: ['Service'], secondary: ['Offer', 'BreadcrumbList'] },
   audience: { primary: ['WebPage'], secondary: ['BreadcrumbList'] },
@@ -200,11 +200,21 @@ export interface SchemaContext {
     foundedDate?: string;
     numberOfEmployees?: string;
   };
+  /** Site-level SERP features from SEO data provider — used to steer schema type selection. */
+  _serpFeatures?: { featuredSnippets: number; peopleAlsoAsk: number; localPack: boolean; videoCarousel: number };
+  /** Referring-domain count from backlink profile — used to calibrate schema ambition. */
+  _backlinkReferringDomains?: number;
+  /** Validation errors from the prior schema generation for this page — used to avoid repeating known mistakes. */
+  _existingErrors?: Array<{ message: string }>;
 }
 
 // ── Analytics Intelligence helpers for prompt enrichment ────────────
 
 const QUESTION_PREFIXES = /^(how|what|why|when|where|which|can|do|does|is|are|should|will|would)\b/i;
+
+/** Slug pattern for utility/error pages that should never receive schema or appear in nav/hasPart. */
+const _UTILITY_SLUGS = /^\/(401|403|404|500|password|robots(\.txt)?|sitemap(\.xml)?|privacy(-policy)?|terms(-of[- ]?(service|use))?|legal|cookie(-policy)?|maintenance)\b/i;
+export { _UTILITY_SLUGS as UTILITY_SLUGS };
 
 /**
  * Extract question-type queries from GSC data that target a specific page.
