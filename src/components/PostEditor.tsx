@@ -5,6 +5,7 @@ import {
   Pencil, X, Eye, Hash, Clock, Sparkles, AlertTriangle, Trash2, Globe, ExternalLink,
   History,
 } from 'lucide-react';
+import { useAutoSave } from '../hooks/useAutoSave';
 import { contentPosts } from '../api/content';
 import { getText } from '../api/client';
 import { useAdminPost, useAdminPostVersions, usePublishTarget } from '../hooks/admin';
@@ -94,7 +95,6 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
 
   const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set());
   const [editingSection, setEditingSection] = useState<number | null>(null);
-  const [editBuffer, setEditBuffer] = useState('');
   const [editingIntro, setEditingIntro] = useState(false);
   const [introBuffer, setIntroBuffer] = useState('');
   const [editingConclusion, setEditingConclusion] = useState(false);
@@ -110,6 +110,17 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   const [publishError, setPublishError] = useState('');
   const [showChecklist, setShowChecklist] = useState(false);
   const [reverting, setReverting] = useState<string | null>(null);
+
+  // Auto-save for section editing via RichTextEditor (SectionEditor new interface)
+  const sectionAutoSaveFn = async (html: string) => {
+    if (editingSection === null || !post) return;
+    const sections = [...post.sections];
+    const idx = sections.findIndex(s => s.index === editingSection);
+    if (idx === -1) return;
+    sections[idx] = { ...sections[idx], content: html, wordCount: html.split(/\s+/).filter(w => w.length > 0).length };
+    await saveField({ sections });
+  };
+  const { scheduleAutoSave: scheduleSectionSave, flush: flushSection, saveStatus: sectionSaveStatus } = useAutoSave(sectionAutoSaveFn);
 
   const invalidatePost = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.post(workspaceId, postId) });
   const invalidateVersions = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.postVersions(workspaceId, postId) });
@@ -158,18 +169,6 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
       queryClient.setQueryData(queryKeys.admin.post(workspaceId, postId), updated);
     } catch (err) { console.error('PostEditor operation failed:', err); }
     setRegenerating(null);
-  };
-
-  const saveSectionEdit = () => {
-    if (editingSection === null || !post) return;
-    const sections = [...post.sections];
-    sections[editingSection] = {
-      ...sections[editingSection],
-      content: editBuffer,
-      wordCount: editBuffer.split(/\s+/).filter(w => w.length > 0).length,
-    };
-    saveField({ sections });
-    setEditingSection(null);
   };
 
   const saveIntroEdit = () => {
@@ -444,15 +443,14 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
               key={section.index} section={section}
               expanded={expandedSections.has(section.index)}
               editing={editingSection === section.index}
-              editBuffer={editBuffer}
               regenerating={regenerating === section.index}
               isGenerating={isGenerating}
+              saveStatus={sectionSaveStatus}
               onToggleExpand={toggleSection}
-              onStartEdit={(index, content) => { setEditingSection(index); setEditBuffer(content); }}
-              onSaveEdit={saveSectionEdit}
-              onCancelEdit={() => setEditingSection(null)}
+              onStartEdit={(index) => setEditingSection(index)}
+              onChange={scheduleSectionSave}
+              onDone={async () => { await flushSection(); setEditingSection(null); }}
               onRegenerate={handleRegenerate}
-              onChangeBuffer={setEditBuffer}
             />
           ))}
 
