@@ -97,7 +97,7 @@ export function StrategyDiff({ workspaceId }: StrategyDiffProps) {
               <div className="t-micro text-[var(--brand-text-muted)] uppercase tracking-wider font-medium mb-1.5">Resolved Gaps</div>
               <div className="flex flex-wrap gap-1">
                 {diff.resolvedGaps.map(kw => (
-                  <span key={kw} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-zinc-700/30 border border-zinc-600/20 t-caption-sm text-[var(--brand-text)] line-through">
+                  <span key={kw} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-[var(--surface-3)]/30 border border-[var(--brand-border)]/20 t-caption-sm text-[var(--brand-text)] line-through">
                     {kw}
                   </span>
                 ))}

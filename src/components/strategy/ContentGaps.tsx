@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Icon } from '../ui';
-import { FileText, Sparkles, BarChart3, Eye, Swords, TrendingUp, TrendingDown, Minus, MessageCircleQuestion } from 'lucide-react';
+import { FileText, Sparkles, BarChart3, Eye, Swords, ArrowUpRight, MessageCircleQuestion } from 'lucide-react';
+import { TrendBadge } from '../ui/TrendBadge';
 import { adminPath } from '../../routes';
 import { kdFraming, kdTooltip } from '../../lib/kdFraming.js';
 
@@ -55,7 +56,7 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
       <p className="t-caption-sm text-[var(--brand-text-muted)] mb-3">New content to create — topics with search demand but no page on the site.</p>
       <div className="space-y-2">
         {sorted.map((gap, i) => {
-          const prioColor = gap.priority === 'high' ? 'text-red-400 bg-red-500/10 border-red-500/20' : gap.priority === 'medium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-[var(--brand-text)] bg-zinc-700/30 border-zinc-600/20';
+          const prioColor = gap.priority === 'high' ? 'text-red-400 bg-red-500/10 border-red-500/20' : gap.priority === 'medium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-[var(--brand-text)] bg-[var(--surface-3)]/30 border-[var(--brand-border)]/20';
           return (
             <div key={i} className="px-3 py-2.5 bg-[var(--surface-3)]/40 rounded-[var(--radius-lg)] border border-[var(--brand-border)]">
               <div className="flex items-center justify-between">
@@ -95,7 +96,7 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
                     if (impact < 10) return null;
                     return (
                       <span className="t-caption-sm text-blue-400/70 flex items-center gap-0.5">
-                        <Icon as={TrendingUp} size="sm" className="text-blue-400/70" />
+                        <Icon as={ArrowUpRight} size="sm" className="text-blue-400/70" />
                         ~{fmtNum(impact)}/mo est. clicks at rank #3
                       </span>
                     );
@@ -121,13 +122,13 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
               {/* Trend + SERP + Competitor badges */}
               <div className="flex items-center gap-2 flex-wrap mt-1">
                 {gap.trendDirection === 'rising' && (
-                  <span className="flex items-center gap-0.5 t-caption-sm text-emerald-400 font-medium"><Icon as={TrendingUp} size="sm" className="text-emerald-400" />Rising</span>
+                  <span className="flex items-center gap-0.5 t-caption-sm text-emerald-400 font-medium"><TrendBadge value={1} suffix="" iconOnly /> Rising</span>
                 )}
                 {gap.trendDirection === 'declining' && (
-                  <span className="flex items-center gap-0.5 t-caption-sm text-red-400 font-medium"><Icon as={TrendingDown} size="sm" className="text-red-400" />Declining</span>
+                  <span className="flex items-center gap-0.5 t-caption-sm text-red-400 font-medium"><TrendBadge value={-1} suffix="" iconOnly /> Declining</span>
                 )}
                 {gap.trendDirection === 'stable' && gap.volume && gap.volume > 0 && (
-                  <span className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text)] font-medium"><Icon as={Minus} size="sm" />Stable</span>
+                  <span className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text)] font-medium"><TrendBadge value={0} hideOnZero={false} suffix="" iconOnly /> Stable</span>
                 )}
                 {Array.isArray(gap.serpFeatures) && gap.serpFeatures.length > 0 && (
                   <div className="flex flex-wrap gap-1">
