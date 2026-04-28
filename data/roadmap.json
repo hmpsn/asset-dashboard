@@ -4703,6 +4703,17 @@
           "status": "done",
           "shippedAt": "2026-04-22",
           "notes": "Six discrete backend enrichments across SEO pipelines: (Item 12) GSC queries as keyword candidates in keyword-recommendations.ts; (Item 13) GSC query breakdown in content-decay refresh AI prompt; (Item 13b) Decay query context injected when brief matches decaying page; (Item 13c) DecayContext.topQueries from GSC in copy-refresh AI prompt; (Item 14) SEMRush metrics pre-fetch for top-N pages in jobs.ts bulk analyze; (Item 15) Issue-type-specific recovery rates replacing flat 12% in recommendations.ts. All six independent, no API/UI changes, no new DB columns or shared types."
+        },
+        {
+          "id": "schema-generator-quality-hardening",
+          "title": "Schema Generator One-Shot Quality Hardening",
+          "source": "docs/superpowers/plans/2026-04-28-schema-generator-quality.md",
+          "est": "6-8h",
+          "priority": "P1",
+          "sprint": "H",
+          "status": "done",
+          "shippedAt": "2026-04-28",
+          "notes": "7 targeted fixes to schema output quality and intelligence wiring. (1) UTILITY_SLUGS constant — single regex applied at hasPart/relatedLink injections and generation queue pre-filter. (2) SiteNavigationElement block deleted from postProcessSchema; removed from PAGE_TYPE_SCHEMA_MAP homepage secondary array. (3) CollectionPage injection guarded with pagePath !== '/'. (4) upgradeHealthcareType() deterministic fallback: businessContext → Dentist/Physician/Optician/Chiropractor/MedicalClinic/Hospital/MedicalBusiness. (5) autoFixSchema: knowsAbout trimmed ≤5, Product zero-price offers stripped, SiteNavigationElement nodes stripped. (6) INVALID_PROPERTIES expanded with Product: ['pricing', 'features', 'cost']. (7) Prompt: healthcare rule promoted to 3b with expanded trigger keywords; Product zero-price guard added as 9b; SiteNavigationElement removed from homepage instructions. (8) Intelligence context: _serpFeatures + _backlinkReferringDomains from workspace intelligence layer (non-blocking); _existingErrors from schema_validations at all 3 call sites. (9) Declined keywords filtered before context assembly. (10) BusinessProfileTab amber warning for empty profile on local-business workspace. Audit: docs/superpowers/audits/2026-04-28-schema-generator-audit.md."
         }
       ]
     }
