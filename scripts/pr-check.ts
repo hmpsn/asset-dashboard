@@ -910,7 +910,7 @@ export const CHECKS: Check[] = [
     pathFilter: 'server/',
     excludeLines: ['// map-dup-ok'],
     message: 'new Map(arr.map(r => [key.toLowerCase(), v])) silently keeps the LAST entry on duplicate normalized keys. If the source array has one row per key (API returning unique keywords), add // map-dup-ok inline. If it can have multiple rows per key (GSC query×page, etc.), use reduce to merge/pick: arr.reduce<Map<K,V>>((m, r) => { const k = r.x.toLowerCase(); const existing = m.get(k); if (!existing || r.pos < existing.pos) m.set(k, r); return m; }, new Map()).',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Silent-overwrite in Map construction from tuples — TypeScript cannot see the key collision, and the bug only manifests for a subset of input distributions.',
     claudeMdRef: '#code-conventions',
   },
@@ -970,7 +970,7 @@ export const CHECKS: Check[] = [
     pattern: 'let stmt',
     fileGlobs: ['*.ts'],
     message: 'Use createStmtCache()/stmts() for prepared statements. Local `let stmt` guards are useless.',
-    severity: 'warn',
+    severity: 'error',
   },
   {
     // Hand-rolled trend badge: `<TrendingUp/>` + `<TrendingDown/>` in one ternary.
@@ -1005,7 +1005,7 @@ export const CHECKS: Check[] = [
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
     message: 'Wrap SUM() with COALESCE: COALESCE(SUM(col), 0). SQLite SUM returns NULL (not 0) when no rows match.',
-    severity: 'warn',
+    severity: 'error',
   },
   {
     name: 'as any on dynamic import results',
@@ -1017,7 +1017,7 @@ export const CHECKS: Check[] = [
     exclude: ['server/db/json-validation.ts', 'server/middleware/'],
     excludeLines: ['// as-any-ok'],
     message: 'Use `import type { T } from "./module.js"` instead of `as any`. Guessed property names are the #1 bug source. Add `// as-any-ok` comment if truly unavoidable.',
-    severity: 'warn',
+    severity: 'error',
   },
   {
     name: 'Hardcoded dark hex in inline styles',
@@ -1028,7 +1028,7 @@ export const CHECKS: Check[] = [
     // Exclude correct usages: themeColor/chart helpers already handle light mode
     excludeLines: ['themeColor(', 'chartGridColor(', 'chartAxisColor(', 'chartDotStroke(', 'chartDotFill('],
     message: 'Use CSS variables or chartColor helpers from ui/constants.ts. Hardcoded dark hex breaks light mode.',
-    severity: 'warn',
+    severity: 'error',
   },
   {
     name: 'SVG with hardcoded dark fill/stroke',
@@ -1038,7 +1038,7 @@ export const CHECKS: Check[] = [
     // Exclude correct usages: chart helpers already handle light mode
     excludeLines: ['chartDotStroke(', 'chartDotFill(', 'chartAxisColor(', 'chartGridColor('],
     message: 'Use chartDotStroke()/chartAxisColor() from ui/constants.ts for SVG colors. Dark hex breaks light mode.',
-    severity: 'warn',
+    severity: 'error',
     // Converted from pattern to customCheck — the original pattern contained `\"`
     // inside outer shell double-quotes. The safePattern escaping would double-escape
     // these to `\\"`, breaking the shell command silently (swallowed by || true).
@@ -1100,7 +1100,7 @@ export const CHECKS: Check[] = [
     exclude: ['server/workspace-intelligence.ts', 'tests/'],
     excludeLines: ['// bip-ok'],
     message: 'Use buildIntelPrompt(id, slices) when only the formatted string is needed. When raw intel is also needed: const slices = [...]; formatForPrompt(intel, { sections: slices }). Add `// bip-ok` for intentional exceptions.',
-    severity: 'warn',
+    severity: 'error',
   },
   {
     name: 'Unguarded recordAction() call',
@@ -1110,7 +1110,7 @@ export const CHECKS: Check[] = [
     exclude: ['server/outcome-tracking.ts'],
     excludeLines: ['// recordAction-ok'],
     message: 'recordAction() must be gated by `if (workspaceId)`. Add `// recordAction-ok` if verified safe.',
-    severity: 'warn',
+    severity: 'error',
   },
   {
     name: 'Raw string literal in broadcastToWorkspace() event arg',
@@ -1228,7 +1228,7 @@ export const CHECKS: Check[] = [
     pathFilter: 'tests/',
     excludeLines: ['// readFile-ok'],
     message: 'Test behavior via imports and mocks, not source-file string matching. Add // readFile-ok on the line if this is an intentional endpoint migration guard.',
-    severity: 'warn',
+    severity: 'error',
   },
   {
     // FM-7: Vacuous .every() assertions on potentially empty arrays.
@@ -1239,7 +1239,7 @@ export const CHECKS: Check[] = [
     pathFilter: 'tests/',
     excludeLines: ['// every-ok', '.length', 'toBeGreaterThan', 'toHaveLength'],
     message: 'Assert array.length > 0 before .every(). [].every(fn) always returns true. Add // every-ok if intentional.',
-    severity: 'warn',
+    severity: 'error',
   },
   {
     // FM-6: Bare JSON.parse on DB row columns — must use parseJsonSafe/parseJsonFallback.
@@ -1267,7 +1267,7 @@ export const CHECKS: Check[] = [
     // `status-ok` substring inside an identifier, enum value, or string literal.
     excludeLines: ['// status-ok', '-- status-ok', 'validateTransition'],
     message: 'State machine transitions must use validateTransition(from, to). Direct SET status = ? skips guard. Add // status-ok (JS comment) or -- status-ok (SQL comment) if this is a non-state-machine column.',
-    severity: 'warn',
+    severity: 'error',
   },
   {
     // FM-4: Untyped dynamic import results — as any suppresses field name checks.
@@ -1278,7 +1278,7 @@ export const CHECKS: Check[] = [
     exclude: ['server/db/', 'tests/', 'server/workspace-intelligence.ts'],
     excludeLines: ['// dynamic-import-ok'],
     message: 'Add `import type { T } from "./module.js"` at file top to type dynamic import results. `as any` on dynamic imports hides wrong property names. Add // dynamic-import-ok if unavoidable.',
-    severity: 'warn',
+    severity: 'error',
   },
   {
     name: 'Raw bulk_lookup string outside keywords type file',
@@ -1286,7 +1286,7 @@ export const CHECKS: Check[] = [
     fileGlobs: ['*.ts', '*.tsx'],
     exclude: ['shared/types/keywords.ts', 'shared/types/workspace.ts'],
     message: "Use the 'bulk_lookup' literal only from shared/types/workspace.ts (PageKeywordMap.metricsSource). Raw string references in other files create undiscoverable magic values.",
-    severity: 'warn',
+    severity: 'error',
   },
   {
     // Scope to server/ only — frontend type annotations (e.g. metricsSource?: 'ai_estimate')
@@ -1297,7 +1297,7 @@ export const CHECKS: Check[] = [
     pathFilter: 'server/',
     exclude: ['shared/types/workspace.ts', 'shared/types/keywords.ts'],
     message: "The 'ai_estimate' metricsSource value must only be referenced from shared/types/workspace.ts. Use the shared type, not a raw string literal.",
-    severity: 'warn',
+    severity: 'error',
   },
   {
     name: 'replaceAllPageKeywords called outside keyword-strategy route',
@@ -2033,7 +2033,7 @@ export const CHECKS: Check[] = [
     exclude: ['.test.ts'],
     displayScope: 'shared/types/intelligence.ts + server/workspace-intelligence.ts',
     message: 'Fields declared in *Slice types but not referenced in their format*Section formatter are silently dropped at prompt time. Add to KNOWN_UNRENDERED_FIELDS in scripts/pr-check.ts if intentionally omitted.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'A slice field present in the type but absent from the formatter is assembled but never reaches the AI prompt — silent data loss.',
     claudeMdRef: '#data-flow-rules-mandatory',
     customCheck: (files) => {
@@ -2063,7 +2063,7 @@ export const CHECKS: Check[] = [
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
     message: 'Add json: true when the result is parsed as JSON, json: false when prose. See docs/rules/ai-dispatch-patterns.md.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'callCreativeAI without an explicit json: flag silently drifts between models that return valid JSON and ones that wrap it in prose.',
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
@@ -2303,7 +2303,7 @@ export const CHECKS: Check[] = [
     // via `generate-rules-doc.ts::describeHatch`.
     excludeLines: ['// ws-authz-ok'],
     message: 'Admin mutation functions in server/client-users.ts must take `expectedWorkspaceId: string` and pass `(id, expectedWorkspaceId)` to `assertUserInWorkspace` — `requireWorkspaceAccess(:id)` only verifies the URL workspace, not that `:userId` belongs to it. Suppress with // ws-authz-ok only if the function is not workspace-scoped (rare — justify in a comment). See CLAUDE.md Auth Conventions.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Without an in-function cross-workspace guard on admin mutations, an admin auth\'d for workspace A can mutate a user in workspace B by passing the foreign UUID through a workspace-A URL.',
     claudeMdRef: '#auth-conventions',
     customCheck: (files) => {
@@ -2402,7 +2402,7 @@ export const CHECKS: Check[] = [
     displayScope: 'server/seo-context.ts',
     excludeLines: ['// voice-authority-ok'],
     message: 'Do not inline `voiceProfileBlock.length > 0` authority checks. Call `isVoiceProfileAuthoritative(profile, voiceProfileBlock)` — the helper encodes the full calibration + hasExplicitConfig decision so every call site stays in sync. Suppress with // voice-authority-ok only inside the helper definition itself.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Inline authority checks drift: the shadow-mode copy missed the `hasExplicitConfig` gate, silently dropping the legacy brand voice for samples-only draft profiles (PR #168 bug).',
     claudeMdRef: '#code-conventions',
   },
@@ -2442,7 +2442,7 @@ export const CHECKS: Check[] = [
     // via `generate-rules-doc.ts::describeHatch`.
     excludeLines: ['// safe-read-ok'],
     message: 'Wrap `getVoiceProfile`, `listBrandscripts`, and `listDeliverables` calls in `safeBrandEngineRead("<context>", workspaceId, () => fn(workspaceId), fallback)` so a missing-table error in test envs degrades gracefully instead of crashing buildSeoContext. Suppress with // safe-read-ok on the call line (or the line immediately above for multi-line wrapper layouts). See CLAUDE.md Code Conventions.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'A missing brand-engine table in a non-production env crashes the entire buildSeoContext call tree, and an unnarrowed catch would hide real programming bugs as silent degradation.',
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
@@ -2525,7 +2525,7 @@ export const CHECKS: Check[] = [
     fileGlobs: ['*.test.ts', '*.test.tsx'],
     excludeLines: ['// no-assertion-ok'],
     message: 'Test body has no assertion (no expect(...), assert(...), .rejects, .resolves, or `throw new Error`). A test with no assertion passes unconditionally and provides zero regression coverage. Either add an assertion or delegate to a helper that asserts (and add `// no-assertion-ok` with a comment naming the helper).',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'A vitest/jest test body with no assertion passes unconditionally — a broken implementation will not trip the suite. 2026-04-11 audit found 3 such silent-pass bodies in the stripe webhook suite claiming regression coverage they never had.',
     claudeMdRef: '#test-conventions-mandatory-for-feature-work',
     customCheck: (files) => {
@@ -3158,7 +3158,7 @@ export const CHECKS: Check[] = [
       'history is complete. Add an addActivity() call, or suppress with // activity-ok ' +
       'if this endpoint intentionally doesn\'t need activity logging (e.g. internal bookkeeping, ' +
       'analytics, settings that don\'t affect workspace content).',
-    severity: 'warn',
+    severity: 'error',
     rationale:
       'Significant admin operations that skip addActivity() leave gaps in the workspace ' +
       'activity feed, making it impossible for team members to audit what changed and when.',
@@ -3399,7 +3399,7 @@ export const CHECKS: Check[] = [
     exclude: ['server/seo-data-provider.ts'],
     excludeLines: ['// provider-date-ok'],
     message: 'Raw provider date fields (first_seen, last_seen, last_visited) must go through normalizeProviderDate() at the provider boundary, not new Date() directly. Unix-epoch strings do not parse and cause "Invalid Date" downstream. Add // provider-date-ok if the value is already normalized.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Prevents Invalid Date regressions after PR #218 A4 finding: SEMRush emits Unix epoch strings that new Date() cannot parse.',
     claudeMdRef: '#code-conventions',
   },
@@ -3410,7 +3410,7 @@ export const CHECKS: Check[] = [
     pathFilter: 'server/',
     excludeLines: ['// compkw-serp-ok'],
     message: 'competitorKeywordData entries must carry serpFeatures from the source DomainKeyword. Without it, downstream SERP-feature chip rendering and opportunity scoring go dark. See docs/rules/automated-rules.md. Add // compkw-serp-ok if intentionally dropping.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Prevents regression of PR #218 A3 finding: DomainKeyword.serpFeatures was silently dropped in the inline mapping.',
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
@@ -3474,7 +3474,7 @@ export const CHECKS: Check[] = [
       'Use resolvePagePath(page) instead of `/${page.slug}` — slug is only the final URL segment ' +
       'for nested Webflow pages. resolvePagePath() prefers publishedPath. ' +
       'Suppress with // slug-path-ok for intentional display-only slug suffixes.',
-    severity: 'warn',
+    severity: 'error',
     rationale:
       'Webflow nested pages (`/services/seo`) have slug=`seo` — using `/${page.slug}` directly ' +
       'produces wrong short URLs that break GSC matching and pagePath lookups.',

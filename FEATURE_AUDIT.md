@@ -471,7 +471,11 @@ A comprehensive value assessment of every feature in the platform — **310 feat
 
 **Phase D — Doc drift fixes (2026-04-27):** Renamed "Three Laws" → "Four Laws" across all docs and pr-check rule messages. Added emerald Law 3 (success). Updated `DESIGN_SYSTEM.md` typography scale to match `.t-*` class definitions. Synced `automated-rules.md`.
 
-**Status:** Phases 0, 2, 3, A, B, C, D complete. Phase 1 (primitive implementation — superseded by Phase A) and Phase 4 (light-theme parity validation) remain. Follow-up sweep needed to clear ~400 remaining violations, then final promotion of warn→error rules.
+**Follow-up sweep (2026-04-27, PR #339):** 33 files changed across 5 domains. Fixed oversized Crown icon bug (7 Icon consumers had `inline` className overriding `inline-flex` on Icon wrapper via twMerge, causing SVGs to render at native 24×24 instead of specified size). Strategy (5 files): bg/border zinc → tokens, TrendingUp/Down → TrendBadge. Client (4 files): gradient CTAs → `<Button variant="primary">`. Content/Editor (6 files): added PageHeader, asymmetric radius → `--radius-signature`. Admin (12 files): ~40 text-size migrations, zinc → tokens. Layout/Nav (6 files): text-sm → t-body, zinc → brand-text.
+
+**Final warn→error promotion (2026-04-27):** Promoted 24 warn-level pr-check rules to error severity after verifying zero violations across the full codebase. Rule count: 96 → 96 (76 error, 20 warn). Remaining 20 warn rules all have active violations (range: 1–406 hits). Design-system backlogs: `Raw rounded-*` (406), `Arbitrary pixel text-size` (85), `Raw text-zinc-N` (84), `Raw bg-zinc-N` (35), `Inline asymmetric border-radius` (32), `Raw border-zinc-N` (24), `Trend icon import outside TrendBadge` (16), `Hand-rolled fixed inset-0` (9), `Page component missing PageHeader` (9), `Hand-rolled gradient CTA` (5), `Hardcoded card radius` (1).
+
+**Status:** Phases 0, 2, 3, A, B, C, D, follow-up sweep, and final promotion complete. Phase 1 (primitive implementation — superseded by Phase A) and Phase 4 (light-theme parity validation) remain. 20 warn-level rules remain with active violations for future cleanup passes.
 
 **Agency value:** Professional, cohesive appearance across every screen. No visual inconsistencies that undermine credibility.
 
