@@ -53,12 +53,10 @@ describe('computePageHealthScores: pageId format', () => {
     expect(result).toBeDefined();
   });
 
-  it('does NOT change data.pageUrl (intentionally kept as original URL)', () => {
+  it('pageId is the normalised path, not the raw URL', () => {
     const results = computePageHealthScores(pages, []);
     const result = results.find(r => r.pageId === '/blog/my-post');
-    // data.pageUrl is the display field — should keep original value if present
     expect(result).toBeDefined();
-    // pageId is now the path, not the URL
     expect(result!.pageId).toBe('/blog/my-post');
     expect(result!.pageId).not.toContain('https://');
   });
