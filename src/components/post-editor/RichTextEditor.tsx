@@ -59,7 +59,7 @@ export function RichTextEditor({ initialValue, onChange, className }: RichTextEd
       {editor && (
         <BubbleMenu
           editor={editor}
-          className="flex items-center gap-0.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg shadow-xl p-1 z-[var(--z-modal-backdrop)]"
+          className="flex items-center gap-0.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl p-1 z-[var(--z-modal-backdrop)]"
         >
           {showLinkInput ? (
             <div className="flex items-center gap-1 px-1">
@@ -131,7 +131,7 @@ export function RichTextEditor({ initialValue, onChange, className }: RichTextEd
                   setShowLinkInput(true);
                 }}
                 className={`px-2 py-1 rounded text-xs transition-colors ${editor.isActive('link') ? 'bg-teal-500/20 text-teal-300' : 'text-[var(--brand-text)] hover:bg-[var(--surface-3)]'}`}
-                title="Link (Cmd+K)"
+                title="Link"
               >
                 <LinkIcon className="w-3 h-3" />
               </button>

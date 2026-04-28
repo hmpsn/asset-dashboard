@@ -19,6 +19,7 @@ import {
 import { notifyTeamContentRequest } from '../email.js';
 import { getPost, updatePostField, snapshotPostVersion, getMostRecentPostVersion } from '../content-posts.js';
 import { sanitizeString, validateEnum } from '../helpers.js';
+import { sanitizeRichText, sanitizePlainText } from '../html-sanitize.js';
 import { getPageKeyword, listPageKeywords } from '../page-keywords.js';
 import { getClientActor } from '../middleware.js';
 import { getPageTrend, getQueryPageData } from '../search-console.js';
@@ -492,13 +493,10 @@ router.post('/api/public/content-request/:workspaceId/:id/request-post-changes',
   res.json(updated);
 });
 
-// Strip HTML tags. The client-edit UI uses plain-text textareas (it strips tags
-// on edit-entry), so valid public callers send plain text. Server-side strip
-// prevents malicious callers from injecting HTML that would later render via
-// dangerouslySetInnerHTML in admin/client post views.
-const stripHtmlTags = (s: string) => s.replace(/<[^>]+>/g, '');
-
 // Client edits post content (sections, title, meta — NOT status or admin fields)
+// title/metaDescription are plain text; introduction/conclusion/section.content are
+// rich text (TipTap HTML) — both paths are sanitized via the shared allowlist
+// rather than stripped, so client formatting (bold, italic, headings, links) survives.
 router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', validate(clientPostEditSchema), (req, res, next) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -530,10 +528,10 @@ router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', valid
 
   const { title, metaDescription, introduction, sections, conclusion } = req.body;
   const updates: Record<string, unknown> = {};
-  if (title !== undefined) updates.title = stripHtmlTags(title);
-  if (metaDescription !== undefined) updates.metaDescription = stripHtmlTags(metaDescription);
-  if (introduction !== undefined) updates.introduction = stripHtmlTags(introduction);
-  if (conclusion !== undefined) updates.conclusion = stripHtmlTags(conclusion);
+  if (title !== undefined) updates.title = sanitizePlainText(title);
+  if (metaDescription !== undefined) updates.metaDescription = sanitizePlainText(metaDescription);
+  if (introduction !== undefined) updates.introduction = sanitizeRichText(introduction);
+  if (conclusion !== undefined) updates.conclusion = sanitizeRichText(conclusion);
   if (sections !== undefined) {
     // CRITICAL: merge client edits with existing section data by index.
     // The client only sends { index, heading, content, wordCount } — the editable fields.
@@ -546,8 +544,8 @@ router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', valid
       if (!edit) return existing; // unedited section — keep as-is
       return {
         ...existing,                           // preserves: targetWordCount, keywords, status, error
-        heading: stripHtmlTags(edit.heading),
-        content: stripHtmlTags(edit.content),
+        heading: sanitizePlainText(edit.heading),
+        content: sanitizeRichText(edit.content),
         wordCount: edit.wordCount,
       };
     });
@@ -575,7 +573,7 @@ router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', valid
 
   const actor = getClientActor(req, req.params.workspaceId);
   addActivity(req.params.workspaceId, 'post_client_edit', `${actor?.name || 'Client'} edited post content for "${post.targetKeyword}"`, '', { postId: post.id }, actor);
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { id: updated.id, status: updated.status });
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: updated.id, status: updated.status });
   res.json(updated);
 });
 

@@ -43,6 +43,7 @@ import { validate, z } from '../middleware/validate.js';
 import type { AiFixResult, IssueKey } from '../../shared/types/content.js';
 import { ISSUE_KEYS } from '../../shared/types/content.js';
 import { getVoiceProfile, buildVoiceCalibrationContext } from '../voice-calibration.js';
+import { sanitizeRichText, sanitizePlainText } from '../html-sanitize.js';
 
 const log = createLogger('content-posts');
 
@@ -173,13 +174,11 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
   const previous = getPost(req.params.workspaceId, req.params.postId);
 
   // Snapshot before content-changing edits (not status-only changes)
-  if (previous) {
-    const contentFields = ['title', 'metaDescription', 'introduction', 'sections', 'conclusion', 'seoTitle', 'seoMetaDescription'];
-    const isContentEdit = contentFields.some(f => f in req.body);
-    if (isContentEdit) {
-      const detail = contentFields.filter(f => f in req.body).join(',');
-      snapshotPostVersion(previous, 'manual_edit', `field:${detail}`);
-    }
+  const contentFields = ['title', 'metaDescription', 'introduction', 'sections', 'conclusion', 'seoTitle', 'seoMetaDescription'];
+  const editedContentFields = contentFields.filter(f => f in req.body);
+  const isContentEdit = editedContentFields.length > 0;
+  if (previous && isContentEdit) {
+    snapshotPostVersion(previous, 'manual_edit', `field:${editedContentFields.join(',')}`);
   }
 
   let updated;
@@ -258,6 +257,15 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
     }
   }
 
+  if (isContentEdit) {
+    addActivity(
+      req.params.workspaceId,
+      'content_updated',
+      `Edited post "${updated.title}"`,
+      `Fields: ${editedContentFields.join(', ')}`,
+      { postId: req.params.postId, fields: editedContentFields },
+    );
+  }
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: req.params.postId });
   res.json(updated);
 });
@@ -479,20 +487,29 @@ ${originalText}`;
         temperature: 0.3,
       });
 
-      const suggestedText = aiResult.text.trim();
+      const rawSuggested = aiResult.text.trim();
+      let suggestedText: string;
 
       if (field === 'meta') {
+        let parsed: { seoTitle: string; seoMetaDescription: string };
         try {
-          parseAIJson<{ seoTitle: string; seoMetaDescription: string }>(suggestedText);
+          parsed = parseAIJson<{ seoTitle: string; seoMetaDescription: string }>(rawSuggested);
         } catch { // catch-ok: SyntaxError from malformed AI JSON — expected failure path
           return res.status(500).json({ error: 'Failed to parse AI meta response' });
         }
+        suggestedText = JSON.stringify({
+          seoTitle: sanitizePlainText(parsed.seoTitle ?? ''),
+          seoMetaDescription: sanitizePlainText(parsed.seoMetaDescription ?? ''),
+        });
+      } else {
+        suggestedText = sanitizeRichText(rawSuggested);
       }
 
-      const sectionLabel = field === 'section' && sectionIndex !== undefined
-        ? `section "${post.sections[sectionIndex]?.heading}"`
-        : field;
-      const explanation = `AI revised the ${sectionLabel} to address: ${reason.slice(0, 100)}`;
+      const targetSection = field === 'section' && sectionIndex !== undefined
+        ? post.sections.find(s => s.index === sectionIndex)
+        : undefined;
+      const sectionLabel = targetSection ? `section "${targetSection.heading}"` : field;
+      const explanation = `AI revised the ${sectionLabel} to address: ${sanitizePlainText(reason).slice(0, 100)}`;
 
       const result: AiFixResult = { field, sectionIndex, originalText, suggestedText, explanation };
       res.json(result);

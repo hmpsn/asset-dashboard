@@ -13,6 +13,7 @@ import {
   setupOpenAIMocks,
   mockOpenAIJsonResponse,
   mockOpenAIResponse,
+  mockOpenAIError,
   resetOpenAIMocks,
 } from '../mocks/openai.js';
 
@@ -173,5 +174,49 @@ describe('POST /api/content-posts/:wsId/:postId/ai-fix', () => {
     const parsed = JSON.parse(body.suggestedText);
     expect(parsed).toHaveProperty('seoTitle');
     expect(parsed).toHaveProperty('seoMetaDescription');
+  });
+
+  // FM-2: external API failure must produce 500 + { error: string }, not silent success
+  it('returns 500 with error shape when AI call fails', async () => {
+    resetOpenAIMocks();
+    mockOpenAIError('content-fix', 'OpenAI rate limit exceeded');
+    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
+      issueKey: 'brand_voice',
+      reason: 'test',
+    });
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body).toHaveProperty('error');
+    expect(typeof body.error).toBe('string');
+    expect(body.error).toMatch(/AI fix failed/);
+  });
+
+  // Cross-tenant isolation: post from a different workspace must not be reachable
+  it('returns 404 when postId belongs to a different workspace', async () => {
+    const otherWs = createWorkspace('AI Fix Cross-Tenant Workspace');
+    try {
+      const res = await postJson(`/api/content-posts/${otherWs.id}/${postId}/ai-fix`, {
+        issueKey: 'brand_voice',
+        reason: 'cross-tenant probe',
+      });
+      expect(res.status).toBe(404);
+    } finally {
+      deleteWorkspace(otherWs.id);
+    }
+  });
+
+  // XSS hardening: AI-returned <script> tags must be stripped server-side
+  it('sanitizes <script> tags out of AI suggestedText', async () => {
+    resetOpenAIMocks();
+    mockOpenAIResponse('content-fix', '<p>Improved.</p><script>alert(1)</script><a href="javascript:void(0)">x</a>');
+    const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
+      issueKey: 'brand_voice',
+      reason: 'sanitize probe',
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.suggestedText).not.toContain('<script');
+    expect(body.suggestedText).not.toContain('javascript:');
+    expect(body.suggestedText).toContain('<p>Improved.</p>');
   });
 });

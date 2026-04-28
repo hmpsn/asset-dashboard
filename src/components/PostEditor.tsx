@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Loader2, Copy, Download, FileText, Check,
@@ -231,18 +231,29 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
     setReverting(null);
   };
 
+  // Generation counter prevents a stale AI response (from a request whose modal
+  // the user already dismissed) from re-opening the modal when it eventually resolves.
+  const fixGenRef = useRef(0);
+
   const handleRequestFix = async (issueKey: string, reason: string) => {
     if (fixLoading) return;
+    const gen = ++fixGenRef.current;
     setFixLoading(true);
     setFixIssueLabel(CHECKLIST_ITEMS.find(i => i.key === issueKey)?.label ?? issueKey);
     try {
       const result = await contentPosts.aifix(workspaceId, postId, { issueKey: issueKey as IssueKey, reason });
-      setFixResult(result);
+      if (gen === fixGenRef.current) setFixResult(result);
     } catch (err) {
       console.error('PostEditor operation failed:', err);
     } finally {
-      setFixLoading(false);
+      if (gen === fixGenRef.current) setFixLoading(false);
     }
+  };
+
+  const handleDismissFix = () => {
+    fixGenRef.current++;
+    setFixResult(null);
+    setFixLoading(false);
   };
 
   const handleApplyFix = async (result: AiFixResult) => {
@@ -251,17 +262,30 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
     try {
       if (result.field === 'introduction') {
         await saveField({ introduction: result.suggestedText });
-      } else if (result.field === 'section' && result.sectionIndex !== undefined && result.sectionIndex < post.sections.length) {
-        const sections = [...post.sections];
-        sections[result.sectionIndex] = { ...sections[result.sectionIndex], content: result.suggestedText };
-        await saveField({ sections });
+      } else if (result.field === 'section' && result.sectionIndex !== undefined) {
+        const idx = post.sections.findIndex(s => s.index === result.sectionIndex);
+        if (idx === -1) {
+          console.warn('PostEditor: AI fix section index no longer present', result.sectionIndex);
+        } else {
+          const sections = [...post.sections];
+          sections[idx] = { ...sections[idx], content: result.suggestedText };
+          await saveField({ sections });
+        }
       } else if (result.field === 'conclusion') {
         await saveField({ conclusion: result.suggestedText });
       } else if (result.field === 'meta') {
-        const parsed = JSON.parse(result.suggestedText) as { seoTitle: string; seoMetaDescription: string };
+        let parsed: { seoTitle: string; seoMetaDescription: string };
+        try {
+          parsed = JSON.parse(result.suggestedText);
+        } catch (err) {
+          console.error('PostEditor: meta fix returned malformed JSON', err);
+          handleDismissFix();
+          setFixApplying(false);
+          return;
+        }
         await saveField({ seoTitle: parsed.seoTitle, seoMetaDescription: parsed.seoMetaDescription });
       }
-      setFixResult(null);
+      handleDismissFix();
       invalidatePost();
     } catch (err) {
       console.error('PostEditor operation failed:', err);
@@ -626,7 +650,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
         loading={fixLoading}
         applying={fixApplying}
         onApply={handleApplyFix}
-        onDismiss={() => { setFixResult(null); }}
+        onDismiss={handleDismissFix}
       />
     </div>
   );
