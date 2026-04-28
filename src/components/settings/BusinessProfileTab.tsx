@@ -22,11 +22,12 @@ interface BusinessProfile {
 interface BusinessProfileTabProps {
   workspaceId: string;
   businessProfile?: BusinessProfile | null;
+  businessContext?: string;
   toast: (msg: string, type?: 'success' | 'error' | 'info') => void;
   onSave: (profile: BusinessProfile) => void;
 }
 
-export function BusinessProfileTab({ workspaceId, businessProfile, toast, onSave }: BusinessProfileTabProps) {
+export function BusinessProfileTab({ workspaceId, businessProfile, businessContext, toast, onSave }: BusinessProfileTabProps) {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<BusinessProfile>({
     phone: businessProfile?.phone || '',
@@ -44,6 +45,13 @@ export function BusinessProfileTab({ workspaceId, businessProfile, toast, onSave
     numberOfEmployees: businessProfile?.numberOfEmployees || '',
   });
   const [socialInput, setSocialInput] = useState('');
+
+  const isMissingCriticalFields = !businessProfile?.phone &&
+    !businessProfile?.address?.street &&
+    !businessProfile?.email;
+
+  const isLocalBusinessContext = /\b(dental|dentist|clinic|medical|attorney|accountant|restaurant|retail|salon|spa|plumber|electrician|contractor)\b/i
+    .test(businessContext || '');
 
   // Re-initialize form if businessProfile prop arrives after mount (ws loads async)
   useEffect(() => {
@@ -120,6 +128,17 @@ export function BusinessProfileTab({ workspaceId, businessProfile, toast, onSave
 
   return (
     <div className="space-y-8">
+      {isMissingCriticalFields && isLocalBusinessContext && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 mb-6">
+          <p className="t-body text-amber-400 font-medium mb-1">Business profile incomplete</p>
+          <p className="t-caption text-[var(--brand-text-muted)]">
+            Schema generation for local businesses uses your verified business profile to populate
+            phone, address, and hours — bypassing the need for this data to appear on each page.
+            Add at least one contact field to improve schema accuracy.
+          </p>
+        </div>
+      )}
+
       {/* Header */}
       <SectionCard noPadding>
         <div className="px-5 py-4 flex items-center gap-3 border-b border-[var(--brand-border)]">
