@@ -245,7 +245,7 @@ function FlagRow({ flag, disabled, onToggle, onReset }: FlagRowProps) {
       <Toggle
         checked={flag.enabled}
         onChange={onToggle}
-        label={flag.enabled ? 'Disable flag' : 'Enable flag'}
+        label={`${flag.enabled ? 'Disable' : 'Enable'}: ${flag.key}`}
         srOnlyLabel
         disabled={disabled}
       />

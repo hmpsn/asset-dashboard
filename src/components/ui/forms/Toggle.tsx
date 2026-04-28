@@ -40,7 +40,7 @@ export const Toggle = React.forwardRef<HTMLInputElement, ToggleProps>(
           checked={checked}
           onChange={(e) => onChange(e.target.checked)}
           disabled={disabled}
-          className="sr-only"
+          className="sr-only peer"
         />
 
         {/* Toggle track */}
@@ -51,6 +51,7 @@ export const Toggle = React.forwardRef<HTMLInputElement, ToggleProps>(
             'w-9 h-5 rounded-full',
             'flex-shrink-0',
             'transition-colors duration-150',
+            'peer-focus-visible:ring-2 peer-focus-visible:ring-teal-500',
             checked ? 'bg-[var(--brand-mint)]' : 'bg-zinc-700',
           )}
         >
