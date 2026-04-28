@@ -1305,9 +1305,10 @@ Expected: 404 or connection errors.
 
 ### Step 8.2: Add the `/ai-fix` route
 
-- [ ] In `server/routes/content-posts.ts`, add the import for `AiFixResult` after the existing imports (at the top):
+- [ ] In `server/routes/content-posts.ts`, add the imports for `callAI` and `AiFixResult` after the existing imports (at the top):
 
 ```ts
+import { callAI } from '../ai.js';
 import type { AiFixResult } from '../../shared/types/content.js';
 ```
 
@@ -1371,9 +1372,9 @@ Return ONLY valid JSON with no surrounding text:
       }
       case 'word_count_target': {
         const doneSections = post.sections.filter(s => s.status === 'done');
-        const targetSection = (doneSections.length > 0 ? doneSections : post.sections)
-          .reduce((a, b) => a.wordCount < b.wordCount ? a : b);
-        if (!targetSection) return res.status(422).json({ error: 'No sections available' });
+        const candidates = doneSections.length > 0 ? doneSections : post.sections;
+        if (candidates.length === 0) return res.status(422).json({ error: 'No sections available' });
+        const targetSection = candidates.reduce((a, b) => a.wordCount < b.wordCount ? a : b);
         field = 'section';
         sectionIndex = targetSection.index;
         originalText = targetSection.content;
