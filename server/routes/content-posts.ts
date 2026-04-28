@@ -40,7 +40,9 @@ import { callOpenAI, parseAIJson } from '../openai-helpers.js';
 import { callAI } from '../ai.js';
 import { buildIntelPrompt } from '../workspace-intelligence.js';
 import { validate, z } from '../middleware/validate.js';
-import type { AiFixResult } from '../../shared/types/content.js';
+import type { AiFixResult, IssueKey } from '../../shared/types/content.js';
+import { ISSUE_KEYS } from '../../shared/types/content.js';
+import { getVoiceProfile, buildVoiceCalibrationContext } from '../voice-calibration.js';
 
 const log = createLogger('content-posts');
 
@@ -359,11 +361,11 @@ Return ONLY valid JSON like:
 router.post('/api/content-posts/:workspaceId/:postId/ai-fix',
   requireWorkspaceAccess('workspaceId'),
   validate(z.object({
-    issueKey: z.enum(['factual_accuracy', 'brand_voice', 'internal_links', 'no_hallucinations', 'meta_optimized', 'word_count_target']),
+    issueKey: z.enum([...ISSUE_KEYS] as [string, ...string[]]),
     reason: z.string().min(1).max(500),
   })),
   async (req, res) => {
-    const { issueKey, reason } = req.body as { issueKey: string; reason: string };
+    const { issueKey, reason } = req.body as { issueKey: IssueKey; reason: string };
     const post = getPost(req.params.workspaceId, req.params.postId);
     if (!post) return res.status(404).json({ error: 'Post not found' });
 
@@ -432,10 +434,15 @@ ${originalText}`;
       case 'brand_voice': {
         field = 'introduction';
         originalText = post.introduction;
-        userPrompt = `Rewrite this blog post introduction to better match a professional, authoritative brand voice.
+        const voiceProfile = getVoiceProfile(req.params.workspaceId);
+        const voiceCtx = voiceProfile ? buildVoiceCalibrationContext(voiceProfile) : null;
+        const voiceBlock = voiceCtx
+          ? [voiceCtx.samplesText, voiceCtx.dnaText, voiceCtx.guardrailsText].filter(Boolean).join('\n')
+          : '';
+        userPrompt = `Rewrite this blog post introduction to better match the workspace's brand voice.
 Keep the same topic, key points, and approximate length. Return the FULL INTRODUCTION HTML only.
 
-Issue reason: ${reason}
+Issue reason: ${reason}${voiceBlock ? `\n\nVoice guidelines:\n${voiceBlock}` : ''}
 
 Introduction HTML:
 ${originalText}`;
@@ -474,8 +481,11 @@ ${originalText}`;
       const suggestedText = aiResult.text.trim();
 
       if (field === 'meta') {
-        const parsed = parseAIJson<{ seoTitle: string; seoMetaDescription: string }>(suggestedText);
-        if (!parsed) return res.status(500).json({ error: 'Failed to parse AI meta response' });
+        try {
+          parseAIJson<{ seoTitle: string; seoMetaDescription: string }>(suggestedText);
+        } catch {
+          return res.status(500).json({ error: 'Failed to parse AI meta response' });
+        }
       }
 
       const sectionLabel = field === 'section' && sectionIndex !== undefined

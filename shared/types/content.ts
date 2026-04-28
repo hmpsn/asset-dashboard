@@ -377,3 +377,6 @@ export interface AiFixResult {
   suggestedText: string;
   explanation: string;
 }
+
+export const ISSUE_KEYS = ['factual_accuracy', 'brand_voice', 'internal_links', 'no_hallucinations', 'meta_optimized', 'word_count_target'] as const;
+export type IssueKey = typeof ISSUE_KEYS[number];

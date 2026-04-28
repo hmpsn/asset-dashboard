@@ -1,6 +1,6 @@
 // ── Content API (briefs, posts, content requests) ─────────────────
 import { get, post, patch, put, del, getSafe, getOptional } from './client';
-import type { ContentBrief, GeneratedPost, ContentTopicRequest, ContentTemplate, ContentMatrix, KeywordCandidate, AiFixResult } from '../../shared/types/content';
+import type { ContentBrief, GeneratedPost, ContentTopicRequest, ContentTemplate, ContentMatrix, KeywordCandidate, AiFixResult, IssueKey } from '../../shared/types/content';
 import type { ClientContentRequest } from '../components/client/types';
 
 export const contentBriefs = {
@@ -68,7 +68,7 @@ export const contentPosts = {
   scoreVoice: (wsId: string, postId: string) =>
     post<GeneratedPost>(`/api/content-posts/${wsId}/${postId}/score-voice`, {}),
 
-  aifix: (wsId: string, postId: string, body: { issueKey: string; reason: string }) =>
+  aifix: (wsId: string, postId: string, body: { issueKey: IssueKey; reason: string }) =>
     post<AiFixResult>(`/api/content-posts/${wsId}/${postId}/ai-fix`, body),
 };
 
