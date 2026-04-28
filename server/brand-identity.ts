@@ -215,7 +215,7 @@ Write in the brand's calibrated voice. Be specific to this business. Do not writ
   });
 
   try {
-    return upsert();
+    return upsert.immediate();
   } catch (err) {
     // SQLITE_CONSTRAINT_UNIQUE — another request inserted between our existence
     // check and our INSERT. Re-read the winner and apply our generated content
@@ -236,7 +236,7 @@ Write in the brand's calibrated voice. Be specific to this business. Do not writ
       stmts().updateContent.run({ id: winner.id, workspace_id: workspaceId, content, status: 'draft', version: newVersion, tier, updated_at: retryNow });
       return { ...rowToDeliverable(winner), content, status: 'draft', version: newVersion, tier, updatedAt: retryNow };
     });
-    return retryAsUpdate();
+    return retryAsUpdate.immediate();
   }
 }
 
@@ -285,7 +285,7 @@ Return only the refined content — no preamble.`;
     stmts().updateContent.run({ id, workspace_id: workspaceId, content, status: 'draft', version: newVersion, tier: existing.tier, updated_at: now });
     return { ...rowToDeliverable(existing), content, status: 'draft', version: newVersion, updatedAt: now };
   });
-  return doRefine();
+  return doRefine.immediate();
 }
 
 export function approveDeliverable(workspaceId: string, id: string): BrandDeliverable | null {
@@ -370,7 +370,7 @@ export function setDeliverableStatus(
       log.error({ err, workspaceId, deliverableType: type }, 'failed to auto-create voice sample');
       return { row, now, autoSampleFrom: null as DeliverableType | null };
     }
-  })();
+  }).immediate();
 
   if (!txResult) return null;
 
