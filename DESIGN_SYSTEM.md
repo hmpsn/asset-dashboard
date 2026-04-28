@@ -29,21 +29,34 @@ Inter loaded from Google Fonts: 300–700.
 
 ## Typography Scale
 
-| Token | Size | Line-height | Usage |
-|-------|------|-------------|-------|
-| `stat-hero` | 34px (text-3xl) | 1.15 | Hero stat numbers in score rings, main KPIs |
-| `stat-default` | 28px (text-2xl) | 1.2 | Standard stat card numbers |
-| `stat-compact` | 24px (text-xl + font-bold) | 1.3 | Compact inline stat numbers |
-| `page-title` | 18px (text-lg) | 1.35 | Page headers, section titles |
-| `section-header` | 14px (text-sm) | 1.5 | Card section headers |
-| `body` | 14px (text-sm) | 1.5 | Body text, descriptions |
-| `label` | 12px (text-[11px] → 12px) | 1.5 | Uppercase labels, captions, metadata |
-| `caption` | 12px (text-xs) | 1.45 | Secondary captions, timestamps |
+14 `.t-*` utility classes are defined in `src/index.css` (inside `@layer components`) and available globally. These are the canonical typographic tokens — prefer `.t-*` classes over raw Tailwind `text-*` in new code.
+
+| Class | Font | Size | Weight | Line-height | Extra | Usage |
+|-------|------|------|--------|-------------|-------|-------|
+| `.t-hero` | DIN Pro | 42px | 700 | 1.1 | tracking -0.03em | Hero display numbers |
+| `.t-h1` | DIN Pro | 28px | 600 | 1.2 | tracking -0.025em | Page titles |
+| `.t-h2` | DIN Pro | 22px | 600 | 1.2 | tracking -0.02em | Section headings |
+| `.t-stat-lg` | DIN Pro | 34px | 700 | 1.1 | tracking -0.03em, tabular-nums | Large stat numbers (score rings, hero KPIs) |
+| `.t-stat` | DIN Pro | 24px | 700 | 1.1 | tracking -0.025em, tabular-nums | Standard stat card numbers |
+| `.t-stat-sm` | DIN Pro | 18px | 600 | 1.2 | tracking -0.02em, tabular-nums | Compact inline stat numbers |
+| `.t-page` | Inter | 15.5px | 400 | 1.5 | — | Page-level body text |
+| `.t-body` | Inter | 15.5px | 400 | 1.5 | — | Body text, descriptions (replaces boosted `text-sm`) |
+| `.t-ui` | Inter | 13.5px | 500 | 1.4 | — | UI chrome, nav items, card section headers |
+| `.t-label` | DIN Pro | 11.5px | 500 | 1.4 | tracking 0.06em, uppercase | Uppercase labels, metadata |
+| `.t-caption` | Inter | 13.5px | 400 | 1.4 | — | Secondary captions, timestamps |
+| `.t-caption-sm` | Inter | 13.5px | 400 | 1.4 | — | Smallest body text (replaces boosted `text-[11px]`) |
+| `.t-mono` | Fira Code | 12px | 400 | 1.5 | tabular-nums | Code snippets, monospace data |
+| `.t-micro` | Fira Code | 10px | 400 | 1.4 | tracking 0.1em, uppercase, tabular-nums | Timestamps, IDs, monospace badges |
+
+### Migration note (Phase A, 2026-04-27)
+
+Phase A boosted `.t-caption-sm`, `.t-caption`, and `.t-body` to match pre-existing `!important` CSS overrides that were bumping `text-[11px]`→13.5px, `text-xs`→13.5px, and `text-sm`→15.5px. This ensures `text-sm` → `.t-body` and `text-[11px]` → `.t-caption-sm` migrations are size-preserving. See `docs/rules/phase-b-migration-map.md` for the full mapping table.
 
 ### Rules
-- **Minimum font size**: 12px (CSS overrides text-[11px] to 12px)
+- **Minimum font size**: 10px (`.t-micro` for monospace timestamps/IDs only — body text minimum is 11.5px via `.t-label`)
 - **No grey text below zinc-500** on dark backgrounds
 - **DIN Pro on all numbers** that represent metrics/stats
+- **Prefer `.t-*` classes** over raw Tailwind `text-*` in new code (enforced by `Arbitrary pixel text-size` pr-check rule)
 
 ---
 
@@ -433,7 +446,7 @@ import { Icon } from '@/components/ui';
   - `lg` → `w-5 h-5` (20px)
   - `xl` → `w-6 h-6` (24px)
   - `2xl` → `w-8 h-8` (32px)
-- **Color via `className`**: `currentColor` inheritance (`className="text-teal-400"`). No color enum; composes with the Three Laws color tokens.
+- **Color via `className`**: `currentColor` inheritance (`className="text-teal-400"`). No color enum; composes with the Four Laws color tokens.
 - **A11y**:
   - Inner SVG is `aria-hidden="true"` by default — decorative icons are ignored by screen readers.
   - For a semantic icon that conveys meaning on its own, pass `aria-label` as a prop; it is forwarded to the `<span>` wrapper via the HTMLAttributes rest spread.

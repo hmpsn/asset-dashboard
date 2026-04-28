@@ -1,7 +1,7 @@
 /**
  * AdminInbox — admin component with a Signals tab showing client interest signals.
  *
- * Color rules (Three Laws of Color):
+ * Color rules (Four Laws of Color):
  *   - Teal: action buttons, status badges for active signals
  *   - Blue: data counts
  *   - No purple (admin AI only, not here)

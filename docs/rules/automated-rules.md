@@ -16,7 +16,7 @@ advisory but tracked.
 
 | # | Rule | Severity | Method | Scope | Escape hatch | Rationale |
 |---|------|----------|--------|-------|--------------|-----------|
-| 1 | Purple in client components | error | pattern | `src/components/client/` | — | Purple is admin-only (Three Laws of Color). Use teal for actions, blue for data. |
+| 1 | Purple in client components | error | pattern | `src/components/client/` | — | Purple is admin-only (Four Laws of Color). Use teal for actions, blue for data. |
 | 2 | Forbidden hues (violet/indigo) in components | error | pattern | `*.ts, *.tsx` | — | violet- and indigo- are forbidden. Use teal, blue, or purple (admin only). |
 | 3 | Comma in arbitrary grid-cols/grid-rows (Tailwind v4) | error | pattern | `*.ts, *.tsx` | — | Tailwind v4 needs underscores, not commas, in arbitrary grid track lists. Replace `,` with `_` inside the `[...]` (e.g. `grid-cols-[1fr_80px_80px]`). Commas inside CSS functions like `minmax(100px,1fr)` are fine. |
 | 4 | Bare JSON.parse on server | error | pattern | `server/` | — | Use parseJsonSafe() or parseJsonFallback() from server/db/json-validation.ts. |
@@ -63,8 +63,8 @@ advisory but tracked.
 | 45 | SectionCard className double-wrap trap (space-y-* always wrong; p[xy]?-* needs noPadding) | error | custom | `*.tsx` | — | Devin Phase 2.3a flagged 6 instances of this trap in PR #307 (SeoAudit, SeoAuditGuide×3, RedirectManager×2). Memorialized in feedback_sectioncard_classname_double_wrap.md. |
 | 46 | radius-signature-lg used outside SectionCard | error | custom | `*.tsx, *.css` | — | The asymmetric corner is the brand visual signature. SectionCard.tsx owns the canonical implementation; consumer files MAY use --radius-signature-lg directly when the asymmetric look is intentional, but they must justify the choice with a hatch comment per site so design-system stewards can audit drift. |
 | 47 | Non-standard transition duration | error | custom | `*.tsx, *.css` | — | Enforces the three-speed motion system: 120ms (micro), 180ms (standard), 400ms (entrance). |
-| 48 | Forbidden hues (rose/pink) in components | error | pattern | `src/` | — | Prevents the Three Laws palette from drifting via new rose/pink imports — the same class of bug that violet/indigo represented before they were banned. |
-| 49 | text-green-{N} for success/score (use emerald) | error | pattern | `src/` | `// green-ok` | Mechanizes the Three Laws Law #3 emerald-vs-green distinction. The CLAUDE.md warning is otherwise unenforced, and the bug recurs every codemod batch as workers default to "green = success" from training data. |
+| 48 | Forbidden hues (rose/pink) in components | error | pattern | `src/` | — | Prevents the Four Laws palette from drifting via new rose/pink imports — the same class of bug that violet/indigo represented before they were banned. |
+| 49 | text-green-{N} for success/score (use emerald) | error | pattern | `src/` | `// green-ok` | Mechanizes the Four Laws Law #3 emerald-vs-green distinction. The CLAUDE.md warning is otherwise unenforced, and the bug recurs every codemod batch as workers default to "green = success" from training data. |
 | 50 | styleguide-token-parity | error | custom | `*.css` | — | src/tokens.css is the single canonical token source. public/styleguide.css must import from /tokens.css — not redeclare — so styleguide and app always use identical values. |
 | 51 | No purple/violet in client domain | error | pattern | `src/components/client/` | — | Mechanizes Law 04 of the Four Laws of Color — purple is reserved for admin AI surfaces (AdminChat, SeoAudit). Client-facing views must never use purple or violet. |
 | 52 | score-color-law-parity | error | custom | `*.ts` | — | scoreColorClass() is called from 20+ components. If it drifts from emerald to green, every downstream consumer silently violates Law 03. |

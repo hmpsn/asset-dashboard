@@ -86,7 +86,7 @@ describe('BrandTab', () => {
     expect(screen.getByText('Brand positioning not yet generated')).toBeInTheDocument();
   });
 
-  it('contains no purple color classes (Three Laws compliance)', () => {
+  it('contains no purple color classes (Four Laws compliance)', () => {
     const { container } = renderBrandTab();
     const html = container.innerHTML;
     expect(html).not.toMatch(/purple-/);

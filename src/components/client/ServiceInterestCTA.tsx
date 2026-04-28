@@ -8,7 +8,7 @@
  * Contract: tests/integration/client-cta-contracts.test.ts (21 tests) is the
  * executable spec for server-side behavior this component depends on.
  *
- * Color rule: teal for actions (Three Laws of Color). Never purple.
+ * Color rule: teal for actions (Four Laws of Color). Never purple.
  */
 import { ArrowRight, CheckCircle, Loader2, Clock, RefreshCw, CalendarDays } from 'lucide-react';
 import { useCreateClientSignal } from '../../hooks/admin/useClientSignals';
