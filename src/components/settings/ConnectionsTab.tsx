@@ -113,7 +113,7 @@ export function ConnectionsTab({
               </button>
             </div>
           ) : googleStatus?.configured ? (
-            <button onClick={connectGoogle} className="flex items-center gap-1.5 px-3 py-2 rounded-[var(--radius-lg)] bg-blue-600 hover:bg-blue-500 text-white t-caption font-medium transition-colors">
+            <button onClick={connectGoogle} className="flex items-center gap-1.5 px-3 py-2 rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 text-white t-caption font-medium transition-colors">
               <Icon as={LogIn} size="md" /> Connect
             </button>
           ) : (

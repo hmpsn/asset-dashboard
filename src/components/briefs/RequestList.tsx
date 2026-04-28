@@ -181,7 +181,7 @@ export function RequestList({
                     <span className={`flex items-center gap-1 t-caption-sm ${sc.color}`}><Icon as={StatusIcon} size="sm" /> {sc.label}</span>
                     <div className="flex items-center gap-1 flex-wrap justify-end">
                       {hasBrief && req.status !== 'requested' && (
-                        <button onClick={() => onToggleRequestBrief(req.id, req.briefId!)} disabled={loadingBrief === req.id} className={`flex items-center gap-1 px-2 py-1 rounded border t-caption-sm transition-colors ${expandedRequest === req.id ? 'bg-blue-600/30 border-blue-500/40 text-blue-200' : 'bg-blue-600/20 border-blue-500/30 text-blue-300 hover:bg-blue-600/30'}`}>
+                        <button onClick={() => onToggleRequestBrief(req.id, req.briefId!)} disabled={loadingBrief === req.id} className={`flex items-center gap-1 px-2 py-1 rounded border t-caption-sm transition-colors ${expandedRequest === req.id ? 'bg-teal-600/30 border-teal-500/40 text-teal-200' : 'bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/30'}`}>
                           {loadingBrief === req.id ? <><Icon as={Loader2} size="sm" className="animate-spin" /> Loading...</> : expandedRequest === req.id ? 'Hide Brief' : 'View Brief'}
                         </button>
                       )}

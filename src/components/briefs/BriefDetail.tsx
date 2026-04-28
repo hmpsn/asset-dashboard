@@ -73,7 +73,7 @@ export function BriefDetail({
     <div className="px-4 pb-4 space-y-4 border-t border-[var(--brand-border)]">
       {/* Action buttons */}
       <div className="pt-3 flex items-center gap-2 flex-wrap">
-        <button onClick={() => onGeneratePost(brief.id)} disabled={generatingPostFor === brief.id} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 transition-colors disabled:opacity-50">
+        <button onClick={() => onGeneratePost(brief.id)} disabled={generatingPostFor === brief.id} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50">
           <Icon as={generatingPostFor === brief.id ? Loader2 : PenLine} size="sm" className={generatingPostFor === brief.id ? 'animate-spin' : ''} />
           {generatingPostFor === brief.id ? 'Starting...' : 'Generate Full Post'}
         </button>
