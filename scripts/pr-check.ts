@@ -4454,14 +4454,26 @@ export const CHECKS: Check[] = [
       if (!constantsPath) return hits;
       const content = readFileOrEmpty(constantsPath);
       if (!content) return hits;
-      // Find the scoreColorClass function body
-      const fnMatch = content.match(/function\s+scoreColorClass\b[^{]*\{([^}]+)\}/);
-      if (!fnMatch) return hits;
-      const fnBody = fnMatch[1];
+      // Find the scoreColorClass function body with brace-depth tracking
+      // (handles if/else blocks, not just single-line ternaries)
+      const fnStart = content.search(/function\s+scoreColorClass\b/);
+      if (fnStart === -1) return hits;
+      const braceStart = content.indexOf('{', fnStart);
+      if (braceStart === -1) return hits;
+      let depth = 1;
+      let i = braceStart + 1;
+      while (i < content.length && depth > 0) {
+        if (content[i] === '{') depth++;
+        else if (content[i] === '}') depth--;
+        i++;
+      }
+      const fnBody = content.slice(braceStart + 1, i - 1);
+      const fnBodyStart = braceStart + 1;
       // Check for any green- color references (should be emerald-)
       const greenMatch = fnBody.match(/green-\d+/);
       if (greenMatch) {
-        const lineNum = (content.slice(0, content.indexOf(greenMatch[0])).match(/\n/g) ?? []).length + 1;
+        const greenPos = fnBodyStart + (fnBody.indexOf(greenMatch[0]));
+        const lineNum = (content.slice(0, greenPos).match(/\n/g) ?? []).length + 1;
         hits.push({
           file: constantsPath,
           line: lineNum,

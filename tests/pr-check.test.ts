@@ -5983,4 +5983,41 @@ describe('Rule: score-color-law-parity', () => {
     const hits = runRule(RULE, [file]);
     expect(hits).toHaveLength(0);
   });
+
+  it('flags green-400 inside nested if/else scoreColorClass body', () => {
+    const file = write(
+      uniqPath('score-color', 'ui/constants.ts'),
+      lines(
+        "export function scoreColorClass(score: number): string {",
+        "  if (score >= 80) {",
+        "    return 'text-emerald-400';",
+        "  }",
+        "  if (score >= 60) {",
+        "    return 'text-amber-400';",
+        "  }",
+        "  return 'text-green-400';",
+        "}",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0].text).toMatch(/green/);
+  });
+
+  it('reports correct line number even when green-N appears in a comment earlier', () => {
+    const file = write(
+      uniqPath('score-color', 'ui/constants.ts'),
+      lines(
+        "// Don't use green-400 for success",
+        "",
+        "export function scoreColorClass(score: number): string {",
+        "  return score >= 80 ? 'text-green-400' : score >= 60 ? 'text-amber-400' : 'text-red-400';",
+        "}",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    // Line 4 is where the violation is (inside the function), not line 1 (the comment)
+    expect(hits[0].line).toBe(4);
+  });
 });
