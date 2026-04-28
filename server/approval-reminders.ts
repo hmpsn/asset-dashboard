@@ -4,6 +4,7 @@ import { isEmailConfigured, sendEmail } from './email.js';
 import { renderApprovalReminder } from './email-templates.js';
 import { canSend, recordSend } from './email-throttle.js';
 import { createLogger } from './logger.js';
+import { getReminderSentAt, upsertReminder, deleteReminder, pruneReminders } from './sent-reminders-db.js';
 
 const log = createLogger('approval-reminder');
 
@@ -12,7 +13,6 @@ const CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000; // every 12 hours
 
 let reminderInterval: ReturnType<typeof setInterval> | null = null;
 let startupTimeout: ReturnType<typeof setTimeout> | null = null;
-const sentReminders = new Map<string, number>(); // batchId -> last reminder timestamp
 
 async function sendApprovalReminderEmail(
   clientEmail: string,
@@ -36,8 +36,10 @@ async function checkStaleApprovals() {
 
     const batches = listBatches(ws.id);
     for (const batch of batches) {
+      const key = `approval:${batch.id}`;
+
       if (batch.status === 'applied') {
-        sentReminders.delete(batch.id); // evict applied batches to prevent leak
+        deleteReminder(key);
         continue;
       }
 
@@ -49,8 +51,11 @@ async function checkStaleApprovals() {
       if (staleDays < STALE_DAYS) continue;
 
       // Don't re-send reminder within 3 days
-      const lastSent = sentReminders.get(batch.id) || 0;
-      if (now - lastSent < 3 * 24 * 60 * 60 * 1000) continue;
+      const lastSentAt = getReminderSentAt(key);
+      if (lastSentAt) {
+        const lastSentMs = new Date(lastSentAt).getTime();
+        if (now - lastSentMs < 3 * 24 * 60 * 60 * 1000) continue;
+      }
 
       const dashUrl = getClientPortalUrl(ws);
 
@@ -65,18 +70,15 @@ async function checkStaleApprovals() {
       try {
         await sendApprovalReminderEmail(ws.clientEmail, ws.name, batch.name, pendingItems.length, staleDays, dashUrl);
         recordSend(ws.clientEmail, 'action', 'approval_reminder', ws.id, 1);
-        sentReminders.set(batch.id, now);
+        upsertReminder(key);
       } catch (err) {
         log.error({ err: err }, `Failed to send:`);
       }
     }
   }
 
-  // Prune sentReminders entries older than 7 days to prevent unbounded growth
-  const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
-  for (const [batchId, ts] of sentReminders) {
-    if (ts < sevenDaysAgo) sentReminders.delete(batchId);
-  }
+  // Prune entries older than 7 days
+  pruneReminders('-7 days');
 }
 
 export function startApprovalReminders() {

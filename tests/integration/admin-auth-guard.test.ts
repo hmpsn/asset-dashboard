@@ -382,13 +382,12 @@ describe('Integration — APP_PASSWORD gate (gated server)', () => {
     expect(res.status).toBe(401);
   });
 
-  it('GET /api/workspaces with raw APP_PASSWORD string in x-auth-token passes', async () => {
-    // Legacy path: the raw password itself is also accepted (backward compat)
+  it('GET /api/workspaces with raw APP_PASSWORD string in x-auth-token is rejected', async () => {
+    // Raw password no longer accepted — must use HMAC token from /api/auth/login
     const res = await gatedFetch('/api/workspaces', {
       extraHeaders: { 'x-auth-token': TEST_APP_PASSWORD },
     });
-    // The gate passes — downstream may return 200 or another code, but NOT 401
-    expect(res.status).not.toBe(401);
+    expect(res.status).toBe(401);
   });
 
   it('GET /api/workspaces with valid HMAC token in x-auth-token header passes', async () => {
@@ -498,13 +497,14 @@ describe('Integration — APP_PASSWORD gate (gated server)', () => {
     expect(body.authenticated).toBe(true);
   });
 
-  it('GET /api/auth/check with raw APP_PASSWORD reports authenticated=true', async () => {
+  it('GET /api/auth/check with raw APP_PASSWORD reports authenticated=false', async () => {
+    // Raw password no longer accepted — must use HMAC token from /api/auth/login
     const res = await gatedFetch('/api/auth/check', {
       extraHeaders: { 'x-auth-token': TEST_APP_PASSWORD },
     });
     expect(res.status).toBe(200);
     const body = await res.json() as { required: boolean; authenticated: boolean };
-    expect(body.authenticated).toBe(true);
+    expect(body.authenticated).toBe(false);
   });
 
   it('GET /api/auth/check with wrong token reports authenticated=false', async () => {

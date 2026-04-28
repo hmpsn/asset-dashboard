@@ -10,6 +10,7 @@ import { listWorkspaces, getClientPortalUrl } from './workspaces.js';
 import { isEmailConfigured, sendEmail } from './email.js';
 import { renderDigest, type EmailEvent } from './email-templates.js';
 import { createLogger } from './logger.js';
+import { hasReminder, markReminderSent, pruneReminders } from './sent-reminders-db.js';
 
 const log = createLogger('trial-reminder');
 
@@ -17,8 +18,6 @@ const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // every 6 hours
 const REMINDER_DAYS = [4, 1]; // days before expiry to send reminders
 
 let interval: ReturnType<typeof setInterval> | null = null;
-// Track which reminders we've sent: `${workspaceId}:${daysRemaining}`
-const sentReminders = new Set<string>();
 
 
 async function checkTrialExpiry() {
@@ -39,8 +38,8 @@ async function checkTrialExpiry() {
     for (const reminderDay of REMINDER_DAYS) {
       if (daysRemaining > reminderDay) continue;
 
-      const key = `${ws.id}:${reminderDay}`;
-      if (sentReminders.has(key)) continue;
+      const key = `trial:${ws.id}:${reminderDay}`;
+      if (hasReminder(key)) continue;
 
       // Build a single-event digest for the trial warning template
       const event: EmailEvent = {
@@ -57,7 +56,7 @@ async function checkTrialExpiry() {
 
       try {
         await sendEmail(ws.clientEmail, subject, html);
-        sentReminders.add(key);
+        markReminderSent(key);
         log.info(`Sent ${daysRemaining}-day warning to ${ws.clientEmail} for "${ws.name}"`);
       } catch (err) {
         log.error({ err: err }, `Failed to send:`);
@@ -66,6 +65,9 @@ async function checkTrialExpiry() {
       break; // only send the most urgent reminder per workspace per check
     }
   }
+
+  // Prune old entries every cycle
+  pruneReminders('-30 days');
 }
 
 export function startTrialReminders() {
