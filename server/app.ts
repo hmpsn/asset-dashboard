@@ -203,9 +203,8 @@ export function createApp(): express.Express {
       // Allow health check without auth (diag only in non-prod)
       if (req.path === '/api/health') return next();
       if (req.path === '/api/health/diag' && !IS_PROD) return next();
-      // Check header or cookie (support both legacy raw password and new HMAC token)
       const token = (req.headers['x-auth-token'] || req.cookies?.auth_token || '') as string;
-      if (token === APP_PASSWORD || verifyAdminToken(token)) return next();
+      if (verifyAdminToken(token)) return next();
       // Also accept new JWT user tokens (from cookie or Authorization header)
       const jwtToken = req.cookies?.token || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : '');
       if (jwtToken) {
@@ -241,7 +240,7 @@ export function createApp(): express.Express {
     const ws = getWorkspace(workspaceId);
     if (!ws || !ws.clientPassword) return next();
     const adminToken = (req.headers['x-auth-token'] || req.cookies?.auth_token || '') as string;
-    if (adminToken && (adminToken === APP_PASSWORD || verifyAdminToken(adminToken))) return next();
+    if (adminToken && verifyAdminToken(adminToken)) return next();
     const jwtToken = req.cookies?.token || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : '');
     if (jwtToken) {
       const jwtPayload = verifyJwtToken(jwtToken);

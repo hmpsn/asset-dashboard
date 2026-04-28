@@ -134,7 +134,7 @@ const stmts = createStmtCache(() => ({
   // savePost() routes existing rows to UPDATE (which includes them).
   // New posts never have publish data so omitting here is safe.
   insert: db.prepare(
-    `INSERT OR REPLACE INTO content_posts
+    `INSERT INTO content_posts
            (id, workspace_id, brief_id, target_keyword, title, meta_description,
             introduction, sections, conclusion, seo_title, seo_meta_description,
             total_word_count, target_word_count, status, unification_status,
