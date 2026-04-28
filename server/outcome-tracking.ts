@@ -151,8 +151,11 @@ export function recordAction(params: RecordActionParams): TrackedAction {
     const { getInsights, resolveInsight } = await import('./analytics-insights-store.js'); // dynamic-import-ok: avoids circular dep
     if (!params.pageUrl && !params.targetKeyword) return { modified: 0 };
     const insights = getInsights(params.workspaceId);
+    const normalizedPageUrl = params.pageUrl
+      ? (() => { try { return new URL(params.pageUrl).pathname; } catch { return params.pageUrl; } })()
+      : null;
     const related = insights.filter(i =>
-      (params.pageUrl && i.pageId === params.pageUrl) ||
+      (normalizedPageUrl && i.pageId === normalizedPageUrl) ||
       (params.targetKeyword && i.strategyKeyword === params.targetKeyword),
     ).filter(i =>
       i.resolutionStatus !== 'resolved' &&
