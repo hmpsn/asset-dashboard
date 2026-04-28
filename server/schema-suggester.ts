@@ -1744,15 +1744,17 @@ REQUIREMENTS:
 1. Return ONE JSON-LD object with "@context": "https://schema.org" and an "@graph" array
 2. The @graph MUST include a WebPage node on every page
 3. On the HOMEPAGE: include a FULL Organization node (name, url, description, logo, knowsAbout, sameAs) and a WebSite node. These will be saved as the site-wide template.
-3b. HEALTHCARE / DENTAL / MEDICAL SITES — MANDATORY TYPE SELECTION: If businessContext or page content mentions "dental", "dentist", "orthodontic", "physician", "clinic", "hospital", "therapy", "optician", or "chiropractic":
+3b. HEALTHCARE / DENTAL / MEDICAL SITES — MANDATORY TYPE SELECTION: If businessContext or page content mentions "dental", "dentist", "orthodontic", "periodontic", "endodontic", "physician", "doctor", "clinic", "hospital", "therapy", "therapist", "optician", "ophthalmolog", "chiropractic", "chiropractor", "dermatology", "pediatric", or "psychiatric":
     - You MUST use the most specific Schema.org subtype. Do NOT use generic "Organization" or "LocalBusiness":
-      dental / dentist / orthodontic → "Dentist"
+      dental / dentist / orthodontic / periodont / endodont → "Dentist"
       physician / doctor / family medicine → "Physician"
       clinic / urgent care / medical center → "MedicalClinic"
       hospital → "Hospital"
-      therapist / counseling → "MedicalBusiness"
-      optician / optometrist → "Optician"
+      therapist / counseling / psychiatr → "MedicalBusiness"
+      optician / optometrist / ophthalmologist / ophthalmology → "Optician"
       chiropractor → "Chiropractor"
+      dermatology / dermatologist → "MedicalBusiness"
+      pediatric / pediatrician → "MedicalBusiness"
     - Generating "Organization" on a dental or medical homepage is a VALIDATION FAILURE, not a suggestion.
     - For treatment/procedure pages, use "MedicalProcedure" with procedureType and howPerformed fields when the page describes a specific procedure.
 4. On SUBPAGES: include only a MINIMAL Organization stub with @id, name, url — no description, logo, knowsAbout, or sameAs. Do NOT include a WebSite node. Focus your tokens on the page-specific entities (Service, Article, FAQPage, etc.).
