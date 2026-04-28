@@ -17,6 +17,7 @@ import type { AnalyticsInsight } from '../shared/types/analytics.js';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
 import { CRITICAL_CHECKS, MODERATE_CHECKS, computePageScore } from '../shared/scoring.js';
+import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
 
 
 const log = createLogger('helpers');
@@ -353,7 +354,6 @@ export async function buildSchemaContext(
     // Wire in SEO intelligence signals: SERP features + backlink profile
     // Silent fallback if intelligence layer not available
     try {
-      const { buildWorkspaceIntelligence } = await import('./workspace-intelligence.js');
       const intel = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext'] });
       if (intel.seoContext?.serpFeatures) {
         ctx._serpFeatures = intel.seoContext.serpFeatures;
@@ -361,7 +361,8 @@ export async function buildSchemaContext(
       if (intel.seoContext?.backlinkProfile?.referringDomains != null) {
         ctx._backlinkReferringDomains = intel.seoContext.backlinkProfile.referringDomains;
       }
-    } catch {
+    } catch (err) {
+      if (isProgrammingError(err)) log.warn({ err }, 'helpers/buildSchemaContext: intelligence layer error');
       // Intelligence layer unavailable — schema generation continues without these signals
     }
   }
