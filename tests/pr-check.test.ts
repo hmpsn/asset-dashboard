@@ -4409,6 +4409,8 @@ describe('Meta: customCheck rule name registry', () => {
     'SectionCard titleExtra with ml-auto (use action prop)',
     // Phase 5 design-system token authority (2026-04-24)
     'styleguide-token-parity',
+    // Phase C new rules (2026-04-27)
+    'score-color-law-parity',
     // Phase 2 Batch 1 follow-up — converted from pattern to customCheck so
     // disable-comments work (Devin re-review on PRs #301/#302 flagged that
     // forcing --radius-signature-lg into SectionCard-only was an over-tight
@@ -5772,5 +5774,250 @@ describe('Rule: Inline asymmetric border-radius (use --radius-signature token)',
     );
     const hits = checkFile(probe, makeRule());
     expect(hits.length).toBe(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Phase C — 5 new rules (2026-04-27)
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: Raw rounded-* literal (use --radius-* token)', () => {
+  function makeRule(): Check {
+    const rule = CHECKS.find((c) => c.name === 'Raw rounded-* literal (use --radius-* token)');
+    if (!rule) throw new Error('rule not found in CHECKS');
+    return rule;
+  }
+
+  it('flags rounded-lg in component', () => {
+    const probe = write(
+      uniqPath('rounded-literal', 'probe.tsx'),
+      '<div className="rounded-lg bg-zinc-900">card</div>\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('flags rounded-xl in component', () => {
+    const probe = write(
+      uniqPath('rounded-literal', 'probe.tsx'),
+      '<div className="rounded-xl p-4">section</div>\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('flags rounded-full in component', () => {
+    const probe = write(
+      uniqPath('rounded-literal', 'probe.tsx'),
+      '<div className="w-2 h-2 rounded-full bg-blue-400" />\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('does NOT flag rounded-[var(--radius-lg)] token usage', () => {
+    const probe = write(
+      uniqPath('rounded-token', 'probe.tsx'),
+      '<div className="rounded-[var(--radius-lg)] bg-surface-2">card</div>\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBe(0);
+  });
+
+  it('respects // rounded-literal-ok hatch', () => {
+    const probe = write(
+      uniqPath('rounded-hatched', 'probe.tsx'),
+      '<div className="rounded-lg bg-zinc-900">card</div> // rounded-literal-ok\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBe(0);
+  });
+});
+
+describe('Rule: No purple/violet in client domain', () => {
+  function makeRule(): Check {
+    const rule = CHECKS.find((c) => c.name === 'No purple/violet in client domain');
+    if (!rule) throw new Error('rule not found in CHECKS');
+    return rule;
+  }
+
+  it('flags purple-400 in client component', () => {
+    const probe = write(
+      uniqPath('purple-client', 'src/components/client/probe.tsx'),
+      '<span className="text-purple-400">AI magic</span>\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('flags violet-600 in client component', () => {
+    const probe = write(
+      uniqPath('violet-client', 'src/components/client/probe.tsx'),
+      '<div className="bg-violet-600">overlay</div>\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('does NOT flag teal-400 in client component', () => {
+    const probe = write(
+      uniqPath('teal-client', 'src/components/client/probe.tsx'),
+      '<button className="text-teal-400">action</button>\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBe(0);
+  });
+});
+
+describe('Rule: Trend icon import outside TrendBadge', () => {
+  function makeRule(): Check {
+    const rule = CHECKS.find((c) => c.name === 'Trend icon import outside TrendBadge');
+    if (!rule) throw new Error('rule not found in CHECKS');
+    return rule;
+  }
+
+  it('flags TrendingUp import in a consumer component', () => {
+    const probe = write(
+      uniqPath('trend-icon', 'probe.tsx'),
+      "import { TrendingUp, TrendingDown } from 'lucide-react';\n"
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('does NOT flag TrendBadge import (the primitive itself)', () => {
+    const probe = write(
+      uniqPath('trend-badge', 'probe.tsx'),
+      "import { TrendBadge } from '../ui/TrendBadge';\n"
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBe(0);
+  });
+
+  it('respects // trend-icon-ok hatch', () => {
+    const probe = write(
+      uniqPath('trend-icon-ok', 'probe.tsx'),
+      "import { TrendingUp } from 'lucide-react'; // trend-icon-ok\n"
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBe(0);
+  });
+});
+
+describe('Rule: Hand-rolled fixed inset-0 outside overlay', () => {
+  function makeRule(): Check {
+    const rule = CHECKS.find((c) => c.name === 'Hand-rolled fixed inset-0 outside overlay');
+    if (!rule) throw new Error('rule not found in CHECKS');
+    return rule;
+  }
+
+  it('flags fixed inset-0 in a consumer component', () => {
+    const probe = write(
+      uniqPath('fixed-inset', 'probe.tsx'),
+      '<div className="fixed inset-0 bg-black/50 z-50">\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('does NOT flag fixed bottom-0 (not inset-0)', () => {
+    const probe = write(
+      uniqPath('fixed-bottom', 'probe.tsx'),
+      '<div className="fixed bottom-0 left-0 right-0">\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBe(0);
+  });
+
+  it('respects // fixed-inset-ok hatch', () => {
+    const probe = write(
+      uniqPath('fixed-inset-ok', 'probe.tsx'),
+      '<div className="fixed inset-0 bg-black/50"> // fixed-inset-ok\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBe(0);
+  });
+});
+
+describe('Rule: score-color-law-parity', () => {
+  const RULE = 'score-color-law-parity';
+
+  it('flags scoreColorClass using green instead of emerald', () => {
+    const file = write(
+      uniqPath('score-color', 'ui/constants.ts'),
+      lines(
+        "export function scoreColor(score: number): string {",
+        "  return score >= 80 ? '#34d399' : score >= 60 ? '#fbbf24' : '#f87171';",
+        "}",
+        "",
+        "export function scoreColorClass(score: number): string {",
+        "  return score >= 80 ? 'text-green-400' : score >= 60 ? 'text-amber-400' : 'text-red-400';",
+        "}",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0].text).toMatch(/green/);
+  });
+
+  it('passes when scoreColorClass uses emerald (correct)', () => {
+    const file = write(
+      uniqPath('score-color', 'ui/constants.ts'),
+      lines(
+        "export function scoreColorClass(score: number): string {",
+        "  return score >= 80 ? 'text-emerald-400' : score >= 60 ? 'text-amber-400' : 'text-red-400';",
+        "}",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(0);
+  });
+
+  it('passes when file has no scoreColorClass function', () => {
+    const file = write(
+      uniqPath('score-color', 'ui/constants.ts'),
+      lines(
+        "export const COLORS = { success: 'emerald' };",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(0);
+  });
+
+  it('flags green-400 inside nested if/else scoreColorClass body', () => {
+    const file = write(
+      uniqPath('score-color', 'ui/constants.ts'),
+      lines(
+        "export function scoreColorClass(score: number): string {",
+        "  if (score >= 80) {",
+        "    return 'text-emerald-400';",
+        "  }",
+        "  if (score >= 60) {",
+        "    return 'text-amber-400';",
+        "  }",
+        "  return 'text-green-400';",
+        "}",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0].text).toMatch(/green/);
+  });
+
+  it('reports correct line number even when green-N appears in a comment earlier', () => {
+    const file = write(
+      uniqPath('score-color', 'ui/constants.ts'),
+      lines(
+        "// Don't use green-400 for success",
+        "",
+        "export function scoreColorClass(score: number): string {",
+        "  return score >= 80 ? 'text-green-400' : score >= 60 ? 'text-amber-400' : 'text-red-400';",
+        "}",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    // Line 4 is where the violation is (inside the function), not line 1 (the comment)
+    expect(hits[0].line).toBe(4);
   });
 });

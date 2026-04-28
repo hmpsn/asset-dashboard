@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **91** — 49 error, 42 warn.
+Total rules: **96** — 52 error, 44 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -65,6 +65,9 @@ advisory but tracked.
 | 47 | Non-standard transition duration | error | custom | `*.tsx, *.css` | — | Enforces the three-speed motion system: 120ms (micro), 180ms (standard), 400ms (entrance). |
 | 48 | Forbidden hues (rose/pink) in components | error | pattern | `src/` | — | Prevents the Three Laws palette from drifting via new rose/pink imports — the same class of bug that violet/indigo represented before they were banned. |
 | 49 | text-green-{N} for success/score (use emerald) | error | pattern | `src/` | `// green-ok` | Mechanizes the Three Laws Law #3 emerald-vs-green distinction. The CLAUDE.md warning is otherwise unenforced, and the bug recurs every codemod batch as workers default to "green = success" from training data. |
+| 50 | styleguide-token-parity | error | custom | `*.css` | — | src/tokens.css is the single canonical token source. public/styleguide.css must import from /tokens.css — not redeclare — so styleguide and app always use identical values. |
+| 51 | No purple/violet in client domain | error | pattern | `src/components/client/` | — | Mechanizes Law 04 of the Four Laws of Color — purple is reserved for admin AI surfaces (AdminChat, SeoAudit). Client-facing views must never use purple or violet. |
+| 52 | score-color-law-parity | error | custom | `*.ts` | — | scoreColorClass() is called from 20+ components. If it drifts from emerald to green, every downstream consumer silently violates Law 03. |
 
 ---
 
@@ -113,7 +116,9 @@ advisory but tracked.
 | 39 | Raw bg-zinc-N (use --surface-* token) | warn | pattern | `src/` | `// raw-zinc-ok` | Light-theme parity requires the three-tier --surface system. Raw bg-zinc-N produces dark-on-light invisible-element bugs. |
 | 40 | Raw border-zinc-N (use --brand-border token) | warn | pattern | `src/` | `// raw-zinc-ok` | Light-theme parity requires the --brand-border token system. Raw border-zinc-N produces wrong-contrast borders in light mode. |
 | 41 | Inline asymmetric border-radius (use --radius-signature token) | warn | pattern | `src/` | `// asymmetric-radius-ok` | Hand-rolled asymmetric corners drift from the brand 10/24 pairing and bypass the SectionCard ownership audit. Centralizing through tokens keeps every brand-signature surface in lockstep. |
-| 42 | styleguide-token-parity | warn | custom | `*.css` | — | src/tokens.css is the single canonical token source. public/styleguide.css must import from /tokens.css — not redeclare — so styleguide and app always use identical values. |
+| 42 | Raw rounded-* literal (use --radius-* token) | warn | pattern | `src/` | `// rounded-literal-ok` | Raw Tailwind radius utility classes bypass the --radius-* token system and cannot theme-switch. Centralizing through tokens keeps every surface radius in lockstep. |
+| 43 | Trend icon import outside TrendBadge | warn | pattern | `src/` | `// trend-icon-ok` | Direct TrendingUp/TrendingDown imports bypass the TrendBadge primitive, causing drift in color (green vs emerald), sizing, and sign handling across callsites. |
+| 44 | Hand-rolled fixed inset-0 outside overlay | warn | pattern | `src/` | `// fixed-inset-ok` | Hand-rolled fixed inset-0 modals miss focus trapping, escape-key handling, scroll lock, and accessible labelling. The Modal primitive consolidates all of these. |
 
 ---
 
