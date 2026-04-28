@@ -306,9 +306,14 @@ export type SchemaAnalyticsMaps = {
   insightsMap?: Map<string, { healthScore?: number; healthTrend?: string; isQuickWin?: boolean }>;
 };
 
-// 5-minute TTL cache for analytics maps — prevents repeated API calls on
+// 5-minute TTL cache for analytics maps + intelligence signals — prevents repeated API calls on
 // the interactive single-page generation endpoint.
-const analyticsCache: Record<string, { maps: SchemaAnalyticsMaps; ts: number }> = {};
+const analyticsCache: Record<string, {
+  maps: SchemaAnalyticsMaps;
+  serpFeatures?: { featuredSnippets: number; peopleAlsoAsk: number; localPack: boolean; videoCarousel: number };
+  backlinkReferringDomains?: number;
+  ts: number;
+}> = {};
 const ANALYTICS_CACHE_TTL_MS = 5 * 60 * 1000;
 
 export async function buildSchemaContext(
@@ -351,23 +356,6 @@ export async function buildSchemaContext(
     // Verified business profile for schema grounding (bypasses page content verification)
     if (ws.businessProfile) ctx._businessProfile = ws.businessProfile;
 
-    // Wire in SEO intelligence signals: SERP features + backlink profile
-    // Silent fallback if intelligence layer not available
-    try {
-      const intel = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext'] });
-      if (intel.seoContext?.serpFeatures) {
-        ctx._serpFeatures = intel.seoContext.serpFeatures;
-      }
-      if (intel.seoContext?.backlinkProfile?.referringDomains != null) {
-        ctx._backlinkReferringDomains = intel.seoContext.backlinkProfile.referringDomains;
-      }
-    } catch (err) {
-      if (isProgrammingError(err)) {
-        log.warn({ err }, 'helpers/buildSchemaContext: intelligence layer error');
-      } else {
-        log.debug({ err }, 'helpers/buildSchemaContext: intelligence layer not ready — skipping SEO signals');
-      }
-    }
   }
   const pageKeywordMap = ws?.keywordStrategy?.pageMap?.map(p => ({
     pagePath: p.pagePath,
@@ -393,6 +381,8 @@ export async function buildSchemaContext(
       ga4Map = cached.maps.ga4Map;
       queryPageData = cached.maps.queryPageData;
       insightsMap = cached.maps.insightsMap;
+      if (cached.serpFeatures) ctx._serpFeatures = cached.serpFeatures;
+      if (cached.backlinkReferringDomains != null) ctx._backlinkReferringDomains = cached.backlinkReferringDomains;
     } else {
       const [gscResults, ga4Results, qpResults] = await Promise.allSettled([
         ws.gscPropertyUrl ? getAllGscPages(ws.id, ws.gscPropertyUrl, 90) : Promise.resolve([]),
@@ -462,8 +452,34 @@ export async function buildSchemaContext(
         }
       }
 
+      // Wire in SEO intelligence signals — cached alongside analytics to avoid per-request latency
+      let cachedSerpFeatures: typeof ctx._serpFeatures | undefined;
+      let cachedBacklinkDomains: number | undefined;
+      try {
+        const intel = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext'] });
+        if (intel.seoContext?.serpFeatures) {
+          cachedSerpFeatures = intel.seoContext.serpFeatures;
+          ctx._serpFeatures = cachedSerpFeatures;
+        }
+        if (intel.seoContext?.backlinkProfile?.referringDomains != null) {
+          cachedBacklinkDomains = intel.seoContext.backlinkProfile.referringDomains;
+          ctx._backlinkReferringDomains = cachedBacklinkDomains;
+        }
+      } catch (err) {
+        if (isProgrammingError(err)) {
+          log.warn({ err }, 'helpers/buildSchemaContext: intelligence layer error');
+        } else {
+          log.debug({ err }, 'helpers/buildSchemaContext: intelligence layer not ready — skipping SEO signals');
+        }
+      }
+
       // Store in cache (even if empty — avoids hammering APIs on sites with no connections)
-      analyticsCache[cacheKey] = { maps: { gscMap, ga4Map, queryPageData, insightsMap }, ts: Date.now() };
+      analyticsCache[cacheKey] = {
+        maps: { gscMap, ga4Map, queryPageData, insightsMap },
+        serpFeatures: cachedSerpFeatures,
+        backlinkReferringDomains: cachedBacklinkDomains,
+        ts: Date.now(),
+      };
     }
   }
 

@@ -537,13 +537,15 @@ export function autoFixSchema(schema: Record<string, unknown>): void {
   const graph = schema['@graph'] as Record<string, unknown>[] | undefined;
   if (!Array.isArray(graph)) return;
 
-  // Deduplicate Organization nodes — keep the first one with canonical @id (/#organization)
-  const orgNodes = graph.filter(n => n['@type'] === 'Organization');
+  // Deduplicate org nodes — match by @id so healthcare-upgraded types (Dentist, etc.) are caught too
+  const isOrgNode = (n: Record<string, unknown>) =>
+    n['@type'] === 'Organization' || String(n['@id'] || '').endsWith('/#organization');
+  const orgNodes = graph.filter(isOrgNode);
   if (orgNodes.length > 1) {
     const canonical = orgNodes.find(n => String(n['@id'] || '').endsWith('/#organization')) || orgNodes[0];
     for (let i = graph.length - 1; i >= 0; i--) {
-      if (graph[i]['@type'] === 'Organization' && graph[i] !== canonical) {
-        log.info(`Auto-fix: removed duplicate Organization node with @id "${graph[i]['@id']}"`);
+      if (isOrgNode(graph[i]) && graph[i] !== canonical) {
+        log.info(`Auto-fix: removed duplicate org node (@type "${graph[i]['@type']}", @id "${graph[i]['@id']}")`);
         graph.splice(i, 1);
       }
     }
@@ -668,7 +670,10 @@ function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string,
   const websiteId = `${siteUrl}/#website`;
 
   // Ensure Organization node exists (referenced by WebSite.publisher, Service.provider, etc.)
-  const hasOrg = graph.some(n => n['@type'] === 'Organization');
+  // Match by @id so healthcare-upgraded types (Dentist, Physician, etc.) are recognized too
+  const hasOrg = graph.some(n =>
+    n['@type'] === 'Organization' || String(n['@id'] || '').endsWith('/#organization')
+  );
   if (!hasOrg) {
     graph.unshift({
       '@type': 'Organization',
