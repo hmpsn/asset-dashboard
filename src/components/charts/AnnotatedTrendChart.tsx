@@ -6,15 +6,15 @@ import {
 } from 'recharts';
 import { Plus, X } from 'lucide-react';
 import type { Annotation } from '../../hooks/admin/useAnalyticsAnnotations';
-import { chartGridColor, chartAxisColor, chartDotStroke, chartTooltipStyle, chartTooltipLabelStyle } from '../ui/constants';
+import { chartGridColor, chartAxisColor, chartDotStroke, chartTooltipStyle, chartTooltipLabelStyle, CHART_SERIES_COLORS } from '../ui/constants';
 import { Icon, Button } from '../ui';
 
 // ── Category colors (matches AnalyticsAnnotations badges) ──
 const ANNOTATION_COLORS: Record<string, string> = {
-  site_change: '#3b82f6',
-  algorithm_update: '#f59e0b',
-  campaign: '#a855f7',
-  other: '#71717a',
+  site_change: CHART_SERIES_COLORS.blue,
+  algorithm_update: CHART_SERIES_COLORS.amber,
+  campaign: CHART_SERIES_COLORS.purple,
+  other: '#71717a', // chart-hex-ok — zinc-500 for neutral "other" category
 };
 
 const CATEGORY_LABELS: Record<string, string> = {

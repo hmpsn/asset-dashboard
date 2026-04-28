@@ -117,7 +117,7 @@ export const SEV = {
 
 export const CAT_LABELS: Record<string, { label: string; color: string }> = {
   content: { label: 'Content', color: '#60a5fa' }, technical: { label: 'Technical', color: '#2dd4bf' },
-  social: { label: 'Social', color: '#f472b6' }, performance: { label: 'Performance', color: '#fbbf24' },
+  social: { label: 'Social', color: '#fb923c' }, performance: { label: 'Performance', color: '#fbbf24' },
   accessibility: { label: 'Accessibility', color: '#34d399' },
 };
 

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { SectionCard, DateRangeSelector, DataList, EmptyState, MetricToggleCard, Icon, Button } from './ui';
 import { DATE_PRESETS_FULL } from './ui';
+import { CHART_SERIES_COLORS } from './ui/constants';
 import { fmtNum as formatNumber } from '../utils/formatNumbers';
 import { useAdminGA4 } from '../hooks/admin';
 import { useAnalyticsOverview } from '../hooks/admin/useAnalyticsOverview';
@@ -38,9 +39,9 @@ function formatDuration(seconds: number): string {
 }
 
 const TRAFFIC_LINES: TrendLine[] = [
-  { key: 'users', color: '#14b8a6', yAxisId: 'left', label: 'Users' },
-  { key: 'sessions', color: '#3b82f6', yAxisId: 'left', label: 'Sessions' },
-  { key: 'pageviews', color: '#10b981', yAxisId: 'left', label: 'Pageviews' },
+  { key: 'users', color: '#14b8a6', yAxisId: 'left', label: 'Users' }, // chart-hex-ok — teal-500 for users line
+  { key: 'sessions', color: '#3b82f6', yAxisId: 'left', label: 'Sessions' }, // chart-hex-ok — blue-500 for sessions line
+  { key: 'pageviews', color: CHART_SERIES_COLORS.emerald, yAxisId: 'left', label: 'Pageviews' },
 ];
 
 function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
@@ -129,7 +130,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
           value={formatNumber(overview.totalUsers)}
           delta={comparison ? `${comparison.changePercent.users > 0 ? '+' : ''}${comparison.changePercent.users.toFixed(1)}%` : '—'}
           deltaPositive={(comparison?.changePercent.users ?? 0) >= 0}
-          color="#14b8a6"
+          color="#14b8a6" // chart-hex-ok — teal-500 for users metric
           active={activeTrafficLines.has('users')}
           onClick={() => handleToggleTrafficLine('users')}
         />
@@ -138,7 +139,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
           value={formatNumber(overview.totalSessions)}
           delta={comparison ? `${comparison.changePercent.sessions > 0 ? '+' : ''}${comparison.changePercent.sessions.toFixed(1)}%` : '—'}
           deltaPositive={(comparison?.changePercent.sessions ?? 0) >= 0}
-          color="#3b82f6"
+          color="#3b82f6" // chart-hex-ok — blue-500 for sessions metric
           active={activeTrafficLines.has('sessions')}
           onClick={() => handleToggleTrafficLine('sessions')}
         />
@@ -148,7 +149,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
           delta={comparison ? `${comparison.change.bounceRate > 0 ? '+' : ''}${comparison.change.bounceRate.toFixed(1)}pt` : '—'}
           deltaPositive={(comparison?.change.bounceRate ?? 0) > 0}
           invertDelta
-          color="#f97316"
+          color={CHART_SERIES_COLORS.orange}
           active
           displayOnly
         />
@@ -157,7 +158,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
           value={formatDuration(overview.avgSessionDuration)}
           delta={comparison ? `${comparison.change.avgSessionDuration > 0 ? '+' : comparison.change.avgSessionDuration < 0 ? '-' : ''}${formatDuration(Math.abs(comparison.change.avgSessionDuration))}` : '—'}
           deltaPositive={(comparison?.change.avgSessionDuration ?? 0) > 0}
-          color="#22d3ee"
+          color="#22d3ee" // chart-hex-ok — cyan-400 for avg duration metric
           active
           displayOnly
         />

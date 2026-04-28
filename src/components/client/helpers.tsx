@@ -1,7 +1,7 @@
 import { MetricBlock, ChartBlock, DataTableBlock, SparklineBlock } from '../ChatBlocks';
 import type { PerformanceTrend } from './types';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts';
-import { chartDotStroke } from '../ui/constants';
+import { chartDotStroke, CHART_SERIES_COLORS, scoreColor } from '../ui/constants';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function DarkTooltip({ active, payload, label, metrics }: { active?: boolean; payload?: Array<{ value: number; payload: Record<string, any> }>; label?: string; metrics?: { label: string; key: string; color: string; fmt?: (v: number) => string }[] }) {
@@ -37,10 +37,10 @@ export function TrendChart({ data, metric, color }: { data: PerformanceTrend[]; 
         <XAxis dataKey="date" hide />
         <YAxis hide domain={['dataMin', 'dataMax']} />
         <Tooltip content={<DarkTooltip metrics={[
-          { label: 'Clicks', key: 'clicks', color: '#60a5fa' },
-          { label: 'Impressions', key: 'impressions', color: '#60a5fa' },
-          { label: 'CTR', key: 'ctr', color: '#34d399', fmt: v => `${v}%` },
-          { label: 'Position', key: 'position', color: '#fbbf24' },
+          { label: 'Clicks', key: 'clicks', color: CHART_SERIES_COLORS.blue },
+          { label: 'Impressions', key: 'impressions', color: CHART_SERIES_COLORS.blue },
+          { label: 'CTR', key: 'ctr', color: CHART_SERIES_COLORS.emerald, fmt: v => `${v}%` },
+          { label: 'Position', key: 'position', color: CHART_SERIES_COLORS.amber },
         ]} />} />
         <Area type="monotone" dataKey={metric as string} stroke={color} strokeWidth={1.5} fill={`url(#cg-${metric})`} dot={false} activeDot={{ r: 3, fill: color, stroke: chartDotStroke(), strokeWidth: 1.5 }} />
       </AreaChart>
@@ -72,17 +72,17 @@ export function DualTrendChart({ data, annotations: anns }: { data: PerformanceT
           <YAxis yAxisId="clicks" hide domain={['dataMin', 'dataMax']} />
           <YAxis yAxisId="imps" hide domain={['dataMin', 'dataMax']} orientation="right" />
           <Tooltip content={<DarkTooltip metrics={[
-            { label: 'Clicks', key: 'clicks', color: '#60a5fa' },
-            { label: 'Impressions', key: 'impressions', color: '#2dd4bf' },
-            { label: 'CTR', key: 'ctr', color: '#34d399', fmt: v => `${v}%` },
-            { label: 'Position', key: 'position', color: '#fbbf24' },
+            { label: 'Clicks', key: 'clicks', color: CHART_SERIES_COLORS.blue },
+            { label: 'Impressions', key: 'impressions', color: CHART_SERIES_COLORS.teal },
+            { label: 'CTR', key: 'ctr', color: CHART_SERIES_COLORS.emerald, fmt: v => `${v}%` },
+            { label: 'Position', key: 'position', color: CHART_SERIES_COLORS.amber },
           ]} />} />
-          <Area yAxisId="imps" type="monotone" dataKey="impressions" stroke="#2dd4bf" strokeWidth={1.2} strokeOpacity={0.6} fill="url(#cg-imps-dual)" dot={false} activeDot={{ r: 3, fill: '#2dd4bf', stroke: chartDotStroke(), strokeWidth: 1.5 }} />
-          <Area yAxisId="clicks" type="monotone" dataKey="clicks" stroke="#60a5fa" strokeWidth={1.5} fill="url(#cg-clicks-dual)" dot={false} activeDot={{ r: 3, fill: '#60a5fa', stroke: chartDotStroke(), strokeWidth: 1.5 }} />
+          <Area yAxisId="imps" type="monotone" dataKey="impressions" stroke={CHART_SERIES_COLORS.teal} strokeWidth={1.2} strokeOpacity={0.6} fill="url(#cg-imps-dual)" dot={false} activeDot={{ r: 3, fill: CHART_SERIES_COLORS.teal, stroke: chartDotStroke(), strokeWidth: 1.5 }} />
+          <Area yAxisId="clicks" type="monotone" dataKey="clicks" stroke={CHART_SERIES_COLORS.blue} strokeWidth={1.5} fill="url(#cg-clicks-dual)" dot={false} activeDot={{ r: 3, fill: CHART_SERIES_COLORS.blue, stroke: chartDotStroke(), strokeWidth: 1.5 }} />
           {anns?.map(ann => {
             const idx = data.findIndex(d => d.date === ann.date);
             if (idx < 0) return null;
-            return <ReferenceLine key={ann.id} x={data[idx].date} stroke={ann.color || '#2dd4bf'} strokeWidth={0.8} strokeDasharray="4 3" opacity={0.7} label={{ value: '', position: 'top' }} />;
+            return <ReferenceLine key={ann.id} x={data[idx].date} stroke={ann.color || CHART_SERIES_COLORS.teal} strokeWidth={0.8} strokeDasharray="4 3" opacity={0.7} label={{ value: '', position: 'top' }} />;
           })}
         </AreaChart>
       </ResponsiveContainer>
@@ -114,20 +114,20 @@ export function ScoreHistoryChart({ history }: { history: Array<{ id: string; cr
             const row = payload[0]?.payload;
             if (!row) return null;
             const score = row.siteScore as number;
-            const scoreColor = score >= 80 ? '#34d399' : score >= 60 ? '#fbbf24' : '#f87171';
+            const sc = scoreColor(score);
             return (
               <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl shadow-black/40 min-w-[120px] overflow-hidden">
                 <div className="px-3 py-1.5 border-b border-[var(--brand-border)] t-caption-sm font-semibold text-[var(--brand-text-bright)]">{row.dateFull}</div>
                 <div className="px-3 py-1.5">
                   <div className="flex justify-between t-caption-sm">
-                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: scoreColor }} />Score</span>
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: sc }} />Score</span>
                     <span className="text-[var(--brand-text-bright)] font-medium">{score}/100</span>
                   </div>
                 </div>
               </div>
             );
           }} />
-          <Area type="monotone" dataKey="siteScore" stroke="#34d399" strokeWidth={2} fill="url(#sh-g)" dot={false} activeDot={{ r: 3, fill: '#34d399', stroke: chartDotStroke(), strokeWidth: 1.5 }} />
+          <Area type="monotone" dataKey="siteScore" stroke={CHART_SERIES_COLORS.emerald} strokeWidth={2} fill="url(#sh-g)" dot={false} activeDot={{ r: 3, fill: CHART_SERIES_COLORS.emerald, stroke: chartDotStroke(), strokeWidth: 1.5 }} />
         </AreaChart>
       </ResponsiveContainer>
       <div className="flex justify-between t-caption-sm text-[var(--brand-text-muted)] mt-1">

@@ -3,6 +3,7 @@ import { Flag, Plus, Trash2, Loader2 } from 'lucide-react';
 import { annotations as annotationsApi } from '../api/misc';
 import { EmptyState, Icon, Button } from './ui';
 import { cn } from '../lib/utils';
+import { CHART_SERIES_COLORS } from './ui/constants';
 
 interface Annotation {
   id: string;
@@ -14,7 +15,7 @@ interface Annotation {
   createdAt: string;
 }
 
-const COLORS = ['#2dd4bf', '#60a5fa', '#f472b6', '#fbbf24', '#a78bfa', '#f87171'];
+const COLORS = [CHART_SERIES_COLORS.teal, CHART_SERIES_COLORS.blue, CHART_SERIES_COLORS.orange, CHART_SERIES_COLORS.amber, CHART_SERIES_COLORS.purple, CHART_SERIES_COLORS.red];
 
 export function Annotations({ workspaceId }: { workspaceId: string }) {
   const [annotations, setAnnotations] = useState<Annotation[]>([]);

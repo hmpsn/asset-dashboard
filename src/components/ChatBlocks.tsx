@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { TrendingUp, TrendingDown, Minus, Download, Copy, Check } from 'lucide-react';
 import { Icon } from './ui';
+import { CHART_SERIES_COLORS } from './ui/constants';
 
 // --- Metric Card ---
 interface MetricBlockData {
@@ -52,7 +53,7 @@ interface ChartBlockData {
   valueFormat?: 'number' | 'percent';
 }
 
-const BAR_COLORS = ['#2dd4bf', '#60a5fa', '#a78bfa', '#f59e0b', '#f87171', '#34d399', '#818cf8', '#fb923c'];
+const BAR_COLORS = [CHART_SERIES_COLORS.teal, CHART_SERIES_COLORS.blue, CHART_SERIES_COLORS.purple, CHART_SERIES_COLORS.amber, CHART_SERIES_COLORS.red, CHART_SERIES_COLORS.emerald, CHART_SERIES_COLORS.orange, '#14b8a6']; // chart-hex-ok — #14b8a6 is teal-500 for extra series variety
 
 export function ChartBlock({ data }: { data: ChartBlockData }) {
   const max = Math.max(...data.data.map(d => d.value), 1);
