@@ -52,13 +52,26 @@ The frontend sources its CMS page IDs from `webflow.ts` (double-dash). DB tables
 
 #### Storage changes
 
-**`server/analytics-intelligence.ts`** — 4 GSC/GA4 insight generators (`page_health`, `ranking_mover`, `ctr_opportunity`, `serp_opportunity`) currently write `pageId: row.page` (full GSC URL). Change to:
+**`server/analytics-intelligence.ts`** — 6 GSC/GA4 insight generators store full GSC URLs. Change each to extract `pathname`:
 
 ```ts
 pageId: (() => { try { return new URL(row.page).pathname; } catch { return row.page; } })()
 ```
 
-Wrap in try/catch to skip malformed URLs gracefully (keep original value as fallback).
+Affected write sites (wrap `row.page` / `page.page` / `curr.page` depending on local var name):
+
+| Line | Insight type |
+|------|-------------|
+| 236 | `page_health` |
+| 290 | `ranking_opportunity` |
+| 664 | `ranking_mover` |
+| 734 | `ctr_opportunity` |
+| 791 | `serp_opportunity` |
+| 917, 924, 1242 | `content_decay` (two separate call sites) |
+
+`freshness_alert` at line 1456 already uses `p.pagePath` (already a relative path) — **no change needed**.
+
+Note: `data.pageUrl` fields inside the insight JSON blob (e.g. `ranking_mover.data.pageUrl`) store the raw GSC URL for display/linking purposes and are **intentionally not normalised** — they are not indexed and not compared against `pagePath`.
 
 **`server/routes/webflow-seo.ts:157`** — `audit_finding` write path currently uses `pageId: page.pageId` (Webflow UUID). Change to:
 
@@ -102,14 +115,25 @@ Three broken sites become plain equality:
 
 **Workaround removal:** `server/routes/webflow-seo.ts:340-342` — remove the `endsWith` workaround and its comment. Replace with `i.pageId === pagePath`.
 
+**`server/outcome-tracking.ts:155`** — `i.pageId === params.pageUrl` where `params.pageUrl` can be a raw GSC full URL (passed from `content-decay.ts` as `rec.page`). After normalisation `i.pageId` becomes a path. Fix: normalise `params.pageUrl` to pathname once before the filter:
+
+```ts
+const normalizedPageUrl = params.pageUrl
+  ? (() => { try { return new URL(params.pageUrl).pathname; } catch { return params.pageUrl; } })()
+  : null;
+```
+
+Then use `normalizedPageUrl && i.pageId === normalizedPageUrl` in the filter predicate.
+
 #### Dedup check update
 
 `server/routes/webflow-seo.ts:150` and `server/scheduled-audits.ts:158/165` — currently UUID-to-UUID comparisons for `audit_finding` dedup and auto-resolve. After the write path changes to path format, these comparisons remain structurally identical but compare `/blog/my-post` against `/blog/my-post`. No logic change required.
 
 #### Tests
 
-- Unit: insight path normalisation — full URL, HTTPS, HTTP, malformed URL, path already normalised (idempotent), synthetic key unchanged
+- Unit: insight path normalisation — full URL, HTTPS, HTTP, malformed URL, path already normalised (idempotent), synthetic key unchanged, `freshness_alert` path passthrough unchanged
 - Unit: audit finding write path produces correct path format from slug and from URL fallback
+- Unit: `outcome-tracking` auto-resolve filter matches normalised path against full-URL `params.pageUrl`
 - Integration: after migration, `analytics_insights WHERE page_id LIKE 'http%'` returns zero rows
 - Integration: `assemblePageProfile` with a known pagePath returns matching insights
 - Integration: audit finding dedup still prevents duplicate storage after format change
