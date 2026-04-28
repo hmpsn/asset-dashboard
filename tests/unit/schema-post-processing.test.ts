@@ -116,3 +116,12 @@ describe('upgradeHealthcareType', () => {
     expect((schema['@graph'][0] as any)['@type']).toBe('MedicalBusiness');
   });
 });
+
+describe('generation queue — utility page pre-filter', () => {
+  it('UTILITY_SLUGS matches all intended utility paths', () => {
+    const utilityPaths = ['/401', '/404', '/500', '/privacy-policy', '/terms', '/terms-of-service', '/legal', '/sitemap.xml', '/robots.txt', '/cookie-policy', '/maintenance'];
+    const contentPaths = ['/about', '/services', '/dental-services', '/contact-us', '/blog/post-1', '/team'];
+    utilityPaths.forEach(p => expect(UTILITY_SLUGS.test(p)).toBe(true));
+    contentPaths.forEach(p => expect(UTILITY_SLUGS.test(p)).toBe(false));
+  });
+});

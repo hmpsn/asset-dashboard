@@ -12,6 +12,7 @@ import { getAllGscPages, getQueryPageData } from './search-console.js';
 import { getGA4TopPages } from './google-analytics.js';
 import { getRawKnowledge, buildPersonasContext } from './seo-context.js';
 import { getInsights } from './analytics-insights-store.js';
+import { getDeclinedKeywords } from './keyword-feedback.js';
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
@@ -324,7 +325,16 @@ export async function buildSchemaContext(
     ctx.liveDomain = ws.liveDomain;
     ctx.brandVoice = ws.brandVoice;
     ctx.businessContext = ws.keywordStrategy?.businessContext;
-    ctx.siteKeywords = ws.keywordStrategy?.siteKeywords;
+    const rawSiteKeywords = ws.keywordStrategy?.siteKeywords;
+    if (rawSiteKeywords?.length) {
+      const declined = getDeclinedKeywords(ws.id);
+      if (declined.length > 0) {
+        const declinedSet = new Set(declined.map(k => k.toLowerCase()));
+        ctx.siteKeywords = rawSiteKeywords.filter(k => !declinedSet.has(k.toLowerCase()));
+      } else {
+        ctx.siteKeywords = rawSiteKeywords;
+      }
+    }
     ctx.logoUrl = ws.brandLogoUrl;
     ctx.workspaceId = ws.id;
     ctx._siteId = siteId;
