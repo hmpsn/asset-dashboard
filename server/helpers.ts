@@ -349,6 +349,21 @@ export async function buildSchemaContext(
 
     // Verified business profile for schema grounding (bypasses page content verification)
     if (ws.businessProfile) ctx._businessProfile = ws.businessProfile;
+
+    // Wire in SEO intelligence signals: SERP features + backlink profile
+    // Silent fallback if intelligence layer not available
+    try {
+      const { buildWorkspaceIntelligence } = await import('./workspace-intelligence.js');
+      const intel = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext'] });
+      if (intel.seoContext?.serpFeatures) {
+        ctx._serpFeatures = intel.seoContext.serpFeatures;
+      }
+      if (intel.seoContext?.backlinkProfile?.referringDomains != null) {
+        ctx._backlinkReferringDomains = intel.seoContext.backlinkProfile.referringDomains;
+      }
+    } catch {
+      // Intelligence layer unavailable — schema generation continues without these signals
+    }
   }
   const pageKeywordMap = ws?.keywordStrategy?.pageMap?.map(p => ({
     pagePath: p.pagePath,
