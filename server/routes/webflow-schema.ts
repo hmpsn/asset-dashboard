@@ -110,7 +110,10 @@ router.post('/api/webflow/schema-suggestions/:siteId/page', requireWorkspaceAcce
     if (ctx.workspaceId) {
       const prior = getValidation(ctx.workspaceId, pageId);
       if (prior?.errors && Array.isArray(prior.errors) && prior.errors.length > 0) {
-        ctx._existingErrors = prior.errors as Array<{ message: string }>;
+        const validErrors = (prior.errors as unknown[]).filter(
+          (e): e is { message: string } => typeof (e as { message?: unknown })?.message === 'string'
+        );
+        if (validErrors.length > 0) ctx._existingErrors = validErrors;
       }
     }
     // Enrich with architecture tree for deterministic breadcrumbs
