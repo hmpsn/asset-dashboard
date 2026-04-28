@@ -132,6 +132,51 @@ This approach is more reliable than Playwright `connectOverCDP()` which may time
 - **Border-radius normalization**: CSS normalizes `6px 12px 6px 12px` to `6px 12px` in computed styles (shorthand when opposite corners match). So `var(--radius-signature)` resolving to `6px 12px` in computed styles is correct.
 - **Inline-flex blockification**: When an `inline-flex` element is a direct child of a flex container, the browser "blockifies" it to `flex` per CSS spec. This is expected — check the element's className for `inline-flex` rather than relying solely on computed `display`.
 - **Token resolution check**: Verify CSS custom properties resolve by reading `getComputedStyle(document.documentElement).getPropertyValue('--token-name')`.
+## Design System / CSS Token Testing
+
+When testing design system changes (token migrations, `.t-*` class updates, `@layer` cascade changes):
+
+### Use Playwright CDP for Computed Style Verification
+
+The browser's CDP endpoint at `http://localhost:29229` is reliable for programmatic style checks. This avoids fighting with DevTools element picker focus issues.
+
+```javascript
+const { chromium } = require('playwright');
+const browser = await chromium.connectOverCDP('http://localhost:29229');
+const contexts = browser.contexts();
+const page = contexts[0].pages().find(p => p.url().includes('your-page'));
+
+// Check computed styles on specific elements
+const styles = await page.$eval('.your-selector', el => {
+  const cs = getComputedStyle(el);
+  return { fontSize: cs.fontSize, fontWeight: cs.fontWeight, color: cs.color };
+});
+console.log(styles);
+await browser.close();
+```
+
+**Important**: Install Playwright browsers first: `npx playwright install chromium`
+
+### Key Things to Verify for Token Migrations
+
+1. **`@layer components` cascade**: When `.t-*` classes are in `@layer components`, Tailwind utility classes (like `font-semibold`, `leading-*`) should override them. Verify by checking that a `font-semibold` element using `t-body` has `font-weight: 600` (not `t-body`'s default 400).
+
+2. **`!important` overrides**: Temporary `!important` rules in `src/index.css` boost `text-sm` → 15.5px, `text-xs` → 13.5px, `text-[11px]` → 13.5px. These protect ~195 unconverted files. Verify unconverted elements still render at boosted sizes.
+
+3. **Token resolution**: CSS custom properties like `--brand-border`, `--surface-2`, `--radius-lg` should resolve to their `src/tokens.css` values. Check with `getComputedStyle(el).borderTopColor`, `.backgroundColor`, `.borderRadius`.
+
+4. **Unlayered CSS conflicts**: Rules outside `@layer` (like `.font-bold { font-family: DIN Pro }` at line 37 of `src/index.css`) beat `@layer components` rules. This can cause font-family regressions. Check elements that combine `.t-*` + `.font-bold`.
+
+### Styleguide Page
+
+The styleguide at `/styleguide.html` uses `public/styleguide.css` (which imports `public/tokens.css`), NOT `src/index.css`. So `.t-*` class sizes on the styleguide may differ from the app if `src/index.css` has temporary `!important` overrides. This is expected during migration phases.
+
+### Triggering UI Primitives
+
+- **ConfirmDialog**: Only used in `ApprovalsTab.tsx` (client portal). Requires approval data in the workspace. If no approvals exist, ConfirmDialog cannot be triggered visually.
+- **TierGate**: Requires a free-tier workspace with strategy data to show gated sections.
+- **AIContextIndicator**: Requires a linked Webflow site for the KeywordStrategy page to render it.
+- **Modal**: Can be triggered via Settings → various actions, or any page with overlay flows.
 
 ## WebSocket Testing
 
@@ -178,6 +223,7 @@ NODE_ENV=production npx tsx server/index.ts
 - **No OpenAI API**: Knowledge base generation, brand voice generation, and AI-powered features require `OPENAI_API_KEY`.
 - **No Stripe**: Payment features require `STRIPE_SECRET_KEY`.
 - **CDP port 29229**: Chrome DevTools Protocol is available at `http://localhost:29229`. Playwright `connectOverCDP` may timeout; prefer raw WebSocket CDP approach (see DOM Inspection section above).
+- **Browser focus issues**: The `computer` tool's `console` action requires Chrome to be in the foreground. Use `wmctrl -a Chrome` to bring it forward, or prefer Playwright CDP scripts for programmatic checks.
 - **Rate limiting**: The `publicApiLimiter` uses per-path mode. The `globalPublicLimiter` is IP-based at 200 req/min. Avoid changing `publicApiLimiter` to global mode as it shares the same bucket key format with `globalPublicLimiter`, causing double-counting.
 
 ## Devin Secrets Needed
