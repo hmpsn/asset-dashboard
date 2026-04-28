@@ -2043,9 +2043,11 @@ export async function generateSchemaSuggestions(
 
   const wsId = ctx.workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
   const allPublished = wsId ? await getWorkspacePages(wsId, siteId) : [];
-  const pages = allPublished.filter(
-    (p: { title: string; slug: string }) => !(p.title || '').toLowerCase().includes('password') && !(p.slug || '').toLowerCase().includes('password')
-  );
+  const pages = allPublished.filter(p => {
+    const slug = p.slug ? `/${p.slug.replace(/^\//, '')}` : '';
+    const title = (p.title || '').toLowerCase();
+    return !UTILITY_SLUGS.test(slug) && !title.includes('password');
+  });
   log.info(`${pages.length} published pages to analyze`);
 
   const results: SchemaPageSuggestion[] = [];
