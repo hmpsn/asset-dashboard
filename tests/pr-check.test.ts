@@ -4409,6 +4409,8 @@ describe('Meta: customCheck rule name registry', () => {
     'SectionCard titleExtra with ml-auto (use action prop)',
     // Phase 5 design-system token authority (2026-04-24)
     'styleguide-token-parity',
+    // Phase 6A — .t-* typography parity between styleguide.css and index.css
+    'styleguide-typography-parity',
     // Phase C new rules (2026-04-27)
     'score-color-law-parity',
     // Phase 2 Batch 1 follow-up — converted from pattern to customCheck so
@@ -6019,5 +6021,37 @@ describe('Rule: score-color-law-parity', () => {
     expect(hits.length).toBeGreaterThanOrEqual(1);
     // Line 4 is where the violation is (inside the function), not line 1 (the comment)
     expect(hits[0].line).toBe(4);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: styleguide-typography-parity
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: styleguide-typography-parity', () => {
+  const RULE = 'styleguide-typography-parity';
+
+  it('passes when public/styleguide.css matches src/index.css (current repo state)', () => {
+    // This rule reads the actual repo files, so we pass the real paths to trigger it.
+    // After Phase 6A fixes, both files should be in sync — zero hits expected.
+    const hits = runRule(RULE, [
+      path.join(process.cwd(), 'public/styleguide.css'),
+      path.join(process.cwd(), 'src/index.css'),
+    ]);
+    expect(hits).toHaveLength(0);
+  });
+
+  it('has a customCheck function', () => {
+    const check = CHECKS.find(c => c.name === RULE);
+    expect(check).toBeDefined();
+    expect(check!.customCheck).toBeDefined();
+  });
+
+  it('returns empty when neither file is in the changed set (non --all mode)', () => {
+    // Passing unrelated files — the rule should skip and return no hits
+    const hits = runRule(RULE, [
+      write(uniqPath('typo-parity', 'src/components/Foo.tsx'), 'export const Foo = () => null;'),
+    ]);
+    expect(hits).toHaveLength(0);
   });
 });
