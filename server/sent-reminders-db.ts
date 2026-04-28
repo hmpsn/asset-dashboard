@@ -20,10 +20,14 @@ export function hasReminder(key: string): boolean {
   return !!stmts().check.get(key);
 }
 
-/** Returns the sent_at timestamp (ISO string) or null. */
+/** Returns the sent_at timestamp (UTC ISO string) or null. */
 export function getReminderSentAt(key: string): string | null {
   const row = stmts().check.get(key) as { sent_at: string } | undefined;
-  return row?.sent_at ?? null;
+  if (!row) return null;
+  // SQLite datetime('now') returns 'YYYY-MM-DD HH:MM:SS' without timezone;
+  // append 'Z' so JS Date parses it as UTC (matching SQLite's UTC storage).
+  const raw = row.sent_at;
+  return raw.endsWith('Z') ? raw : raw + 'Z';
 }
 
 /** Record a reminder as sent (INSERT OR IGNORE — won't overwrite). */
