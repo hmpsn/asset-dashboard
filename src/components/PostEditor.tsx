@@ -14,7 +14,9 @@ import { SectionEditor } from './post-editor/SectionEditor';
 import { RichTextEditor } from './post-editor/RichTextEditor';
 import { PostPreview } from './post-editor/PostPreview';
 import { VersionHistory } from './post-editor/VersionHistory';
-import { ReviewChecklist } from './post-editor/ReviewChecklist';
+import { ReviewChecklist, CHECKLIST_ITEMS } from './post-editor/ReviewChecklist';
+import { FixDiffModal } from './post-editor/FixDiffModal';
+import type { AiFixResult, IssueKey } from '../../shared/types/content';
 import { queryKeys } from '../lib/queryKeys';
 
 interface PostSection {
@@ -109,6 +111,10 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   const [publishError, setPublishError] = useState('');
   const [showChecklist, setShowChecklist] = useState(false);
   const [reverting, setReverting] = useState<string | null>(null);
+  const [fixLoading, setFixLoading] = useState(false);
+  const [fixApplying, setFixApplying] = useState(false);
+  const [fixResult, setFixResult] = useState<AiFixResult | null>(null);
+  const [fixIssueLabel, setFixIssueLabel] = useState('');
 
   // Auto-save for section editing via RichTextEditor (SectionEditor new interface)
   const sectionAutoSaveFn = async (html: string) => {
@@ -223,6 +229,44 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
       invalidateVersions();
     } catch (err) { console.error('PostEditor operation failed:', err); }
     setReverting(null);
+  };
+
+  const handleRequestFix = async (issueKey: string, reason: string) => {
+    setFixLoading(true);
+    setFixIssueLabel(CHECKLIST_ITEMS.find(i => i.key === issueKey)?.label ?? issueKey);
+    try {
+      const result = await contentPosts.aifix(workspaceId, postId, { issueKey: issueKey as IssueKey, reason });
+      setFixResult(result);
+    } catch (err) {
+      console.error('PostEditor operation failed:', err);
+    } finally {
+      setFixLoading(false);
+    }
+  };
+
+  const handleApplyFix = async (result: AiFixResult) => {
+    if (!post) return;
+    setFixApplying(true);
+    try {
+      if (result.field === 'introduction') {
+        await saveField({ introduction: result.suggestedText });
+      } else if (result.field === 'section' && result.sectionIndex !== undefined) {
+        const sections = [...post.sections];
+        sections[result.sectionIndex] = { ...sections[result.sectionIndex], content: result.suggestedText };
+        await saveField({ sections });
+      } else if (result.field === 'conclusion') {
+        await saveField({ conclusion: result.suggestedText });
+      } else if (result.field === 'meta') {
+        const parsed = JSON.parse(result.suggestedText) as { seoTitle: string; seoMetaDescription: string };
+        await saveField({ seoTitle: parsed.seoTitle, seoMetaDescription: parsed.seoMetaDescription });
+      }
+      setFixResult(null);
+      invalidatePost();
+    } catch (err) {
+      console.error('PostEditor operation failed:', err);
+    } finally {
+      setFixApplying(false);
+    }
   };
 
   const toggleSection = (i: number) => {
@@ -384,6 +428,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
             const res = await contentPosts.aiReview(workspaceId, postId);
             return res?.review ?? null;
           }}
+          onRequestFix={handleRequestFix}
         />
       )}
 
@@ -574,6 +619,14 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
           </div>
         </div>
       )}
+      <FixDiffModal
+        issueLabel={fixIssueLabel}
+        result={fixResult}
+        loading={fixLoading}
+        applying={fixApplying}
+        onApply={handleApplyFix}
+        onDismiss={() => { setFixResult(null); }}
+      />
     </div>
   );
 }
