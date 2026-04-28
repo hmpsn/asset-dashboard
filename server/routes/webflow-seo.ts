@@ -34,7 +34,7 @@ import { getInsights } from '../analytics-insights-store.js';
 import type * as AnalyticsInsightsStore from '../analytics-insights-store.js';
 import { buildKeywordMapContext } from '../seo-context.js';
 import { isProgrammingError } from '../errors.js';
-import { applySuppressionsToAudit, stripHtmlToText, stripCodeFences, tryResolvePagePath, matchGscUrlToPath, applyBulkKeywordGuards, findPageMapEntryForPage } from '../helpers.js';
+import { applySuppressionsToAudit, stripHtmlToText, stripCodeFences, tryResolvePagePath, matchGscUrlToPath, applyBulkKeywordGuards, findPageMapEntryForPage, toAuditFindingPageId } from '../helpers.js';
 import { resolveBaseUrl } from '../url-helpers.js';
 import { createJob, updateJob, isJobCancelled, hasActiveJob, registerAbort } from '../jobs.js';
 import { broadcastToWorkspace } from '../broadcast.js';
@@ -108,7 +108,7 @@ router.get('/api/webflow/seo-audit/:siteId', requireWorkspaceAccessFromQuery(), 
         const pagesWithIssues = new Set<string>();
         for (const page of effectiveAudit.pages) {
           if (page.issues?.some((i: { severity: string }) => i.severity === 'error' || i.severity === 'warning')) {
-            pagesWithIssues.add(page.pageId);
+            pagesWithIssues.add(toAuditFindingPageId(page));
           }
         }
 
@@ -147,14 +147,14 @@ router.get('/api/webflow/seo-audit/:siteId', requireWorkspaceAccessFromQuery(), 
 
           // Deduplicate: skip if identical audit_finding insight exists for this page
           const existingForPage = existing.find(
-            i => i.insightType === 'audit_finding' && i.pageId === page.pageId && i.resolutionStatus !== 'resolved',
+            i => i.insightType === 'audit_finding' && i.pageId === toAuditFindingPageId(page) && i.resolutionStatus !== 'resolved',
           );
           if (existingForPage) continue;
 
           upsert({
             workspaceId: auditWs.id,
             insightType: 'audit_finding',
-            pageId: page.pageId,
+            pageId: toAuditFindingPageId(page),
             pageTitle: page.page,
             severity: pageIssues.some((i: { severity: string }) => i.severity === 'error') ? 'critical' : 'warning',
             data: {

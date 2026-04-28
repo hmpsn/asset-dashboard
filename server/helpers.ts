@@ -598,3 +598,13 @@ export function stripCodeFences(text: string): string {
     .replace(/^```(?:json|html|xml)?\s*/i, '')
     .replace(/\s*```\s*$/i, '');
 }
+
+/**
+ * Convert a Webflow audit page object to the canonical relative path used for
+ * `analytics_insights.page_id`. Prefers slug (→ /slug), falls back to URL pathname,
+ * and finally falls back to the raw pageId (Webflow UUID) as a last resort.
+ */
+export function toAuditFindingPageId(page: { slug: string; url: string; pageId: string }): string {
+  if (page.slug) return `/${page.slug}`;
+  try { return new URL(page.url).pathname; } catch { return page.pageId; }
+}
