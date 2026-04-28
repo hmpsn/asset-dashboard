@@ -26,6 +26,7 @@ import { fireBridge, withWorkspaceLock, debouncedOutcomeReweight } from './bridg
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import { applyScoreAdjustment } from './insight-score-adjustments.js';
+import { toInsightPageId } from './helpers.js';
 
 const log = createLogger('outcome-tracking');
 
@@ -151,9 +152,7 @@ export function recordAction(params: RecordActionParams): TrackedAction {
     const { getInsights, resolveInsight } = await import('./analytics-insights-store.js'); // dynamic-import-ok: avoids circular dep
     if (!params.pageUrl && !params.targetKeyword) return { modified: 0 };
     const insights = getInsights(params.workspaceId);
-    const normalizedPageUrl = params.pageUrl
-      ? (() => { try { return new URL(params.pageUrl).pathname; } catch { return params.pageUrl; } })()
-      : null;
+    const normalizedPageUrl = params.pageUrl ? toInsightPageId(params.pageUrl) : null;
     const related = insights.filter(i =>
       (normalizedPageUrl && i.pageId === normalizedPageUrl) ||
       (params.targetKeyword && i.strategyKeyword === params.targetKeyword),

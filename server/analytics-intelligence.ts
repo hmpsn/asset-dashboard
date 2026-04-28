@@ -38,10 +38,7 @@ import { extractBrandTokens, isBrandedQuery } from './competitor-brand-filter.js
 import { listPageKeywords } from './page-keywords.js';
 import { createLogger } from './logger.js';
 import { isProgrammingError } from './errors.js';
-
-function toInsightPageId(url: string): string {
-  try { return new URL(url).pathname; } catch { return url; }
-}
+import { toInsightPageId } from './helpers.js';
 
 // ── Shared types for computation results ─────────────────────────
 
