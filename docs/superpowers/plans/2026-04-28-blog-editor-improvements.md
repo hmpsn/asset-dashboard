@@ -154,6 +154,34 @@ describe('useAutoSave', () => {
     await act(async () => { await result.current.flush(); });
     expect(saveFn).not.toHaveBeenCalled();
   });
+
+  it('new content typed during in-flight save is not lost on flush', async () => {
+    // Exposes the pendingHtml clobber race: if doSave unconditionally nulled
+    // pendingHtml after save, content typed during the await would be lost.
+    let resolveFirstSave!: () => void;
+    const firstSavePromise = new Promise<void>(r => { resolveFirstSave = r; });
+    let callCount = 0;
+    const saveFn = vi.fn().mockImplementation(() => {
+      callCount++;
+      return callCount === 1 ? firstSavePromise : Promise.resolve();
+    });
+    const { result } = renderHook(() => useAutoSave(saveFn, 500));
+
+    // Trigger auto-save for v1
+    act(() => { result.current.scheduleAutoSave('<p>v1</p>'); });
+    await act(async () => { vi.advanceTimersByTime(500); }); // timer fires, save starts
+
+    // While v1 save is in-flight, user types v2
+    act(() => { result.current.scheduleAutoSave('<p>v2</p>'); });
+
+    // Resolve v1 save — pendingHtml should NOT be cleared (it now holds v2)
+    await act(async () => { resolveFirstSave(); await firstSavePromise; });
+
+    // Flush should save v2, not skip it
+    await act(async () => { await result.current.flush(); });
+    expect(saveFn).toHaveBeenCalledTimes(2);
+    expect(saveFn).toHaveBeenLastCalledWith('<p>v2</p>');
+  });
 });
 ```
 
@@ -189,7 +217,9 @@ export function useAutoSave(
     setSaveStatus('saving');
     try {
       await saveFnRef.current(html);
-      pendingHtml.current = null;
+      // Only clear if no newer value was scheduled while the save was in-flight.
+      // If pendingHtml changed during the await, a newer save is already queued.
+      if (pendingHtml.current === html) pendingHtml.current = null;
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus(s => s === 'saved' ? 'idle' : s), 1500);
     } catch {
@@ -1138,7 +1168,6 @@ import { setupOpenAIMocks, mockOpenAIJsonResponse, mockOpenAIResponse, resetOpen
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { savePost } from '../../server/content-posts.js';
-import { savePost as saveBrief } from '../../server/content-brief.js';
 
 setupOpenAIMocks();
 
@@ -1146,15 +1175,16 @@ const ctx = createTestContext(13329);
 const { authPostJson } = ctx;
 
 let wsId = '';
-let postId = '';
+const postId = 'post_test_aifix';
 
 beforeAll(async () => {
   await ctx.startServer();
   const ws = createWorkspace('AI Fix Test Workspace');
   wsId = ws.id;
 
-  const post = savePost(wsId, {
-    id: `post_test_aifix`,
+  // savePost returns void — use the hardcoded id above
+  savePost(wsId, {
+    id: postId,
     briefId: 'brief_none',
     targetKeyword: 'test keyword',
     title: 'Test Post',
@@ -1169,8 +1199,7 @@ beforeAll(async () => {
     totalWordCount: 20,
     targetWordCount: 500,
     status: 'draft',
-  });
-  postId = post.id;
+  } as Parameters<typeof savePost>[1]);
 }, 25_000);
 
 afterAll(() => {

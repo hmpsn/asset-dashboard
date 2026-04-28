@@ -200,6 +200,7 @@ interface FixDiffModalProps {
   issueLabel: string;        // e.g. "Internal links verified and working"
   result: AiFixResult | null;
   loading: boolean;
+  applying: boolean;         // true while apply is in-flight; shows spinner on Apply button
   onApply: (result: AiFixResult) => void;
   onDismiss: () => void;
 }
