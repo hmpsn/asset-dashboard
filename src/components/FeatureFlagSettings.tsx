@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Flag, RotateCcw, Loader2 } from 'lucide-react';
 import { put, get } from '../api/client';
 import { useToast } from './Toast';
-import { Icon } from './ui';
+import { Icon, Toggle } from './ui';
 import { queryKeys } from '../lib/queryKeys';
 
 interface FlagMeta {
@@ -242,26 +242,13 @@ function FlagRow({ flag, disabled, onToggle, onReset }: FlagRowProps) {
 
   return (
     <div className="flex items-center gap-3">
-      {/* Toggle */}
-      <button
-        role="switch"
-        aria-checked={flag.enabled}
-        aria-label={`Toggle ${label}`}
+      <Toggle
+        checked={flag.enabled}
+        onChange={onToggle}
+        label={`${flag.enabled ? 'Disable' : 'Enable'}: ${flag.key}`}
+        srOnlyLabel
         disabled={disabled}
-        onClick={() => onToggle(!flag.enabled)}
-        // pr-check-disable-next-line -- toggle switch active state, not a CTA button
-        className={`relative w-9 h-5 rounded-full transition-colors shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 disabled:opacity-50 ${
-          flag.enabled
-            ? 'bg-gradient-to-r from-teal-600 to-emerald-600'
-            : 'bg-[var(--brand-border-hover)]'
-        }`}
-      >
-        <span
-          className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-            flag.enabled ? 'translate-x-4' : 'translate-x-0'
-          }`}
-        />
-      </button>
+      />
 
       {/* Label */}
       <div className="flex-1 min-w-0">
