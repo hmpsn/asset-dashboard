@@ -27,7 +27,7 @@ export function MobileGuard({ children }: { children: React.ReactNode }) {
   return (
     <>
       {isMobile && !dismissed && (
-        <div className="fixed top-0 left-0 right-0 z-[9999] bg-amber-500/8 border-b border-amber-500/20 px-4 py-3">
+        <div className="fixed top-0 left-0 right-0 z-[9999] bg-amber-500/8 border-b border-amber-500/20 px-4 py-3"> {/* z-index-ok — mobile guard must overlay everything */}
           <div className="flex items-center justify-between max-w-screen-xl mx-auto">
             <div className="flex items-center gap-2">
               <Icon as={Monitor} size="md" className="text-amber-400/80 flex-shrink-0" />

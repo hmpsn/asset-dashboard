@@ -108,7 +108,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
 
       {open && (
         // pr-check-disable-next-line -- dropdown
-        <div className="absolute top-full left-0 mt-2 w-80 rounded-[var(--radius-xl)] shadow-2xl z-50 overflow-hidden bg-[var(--surface-2)] border border-[var(--brand-border-hover)]">
+        <div className="absolute top-full left-0 mt-2 w-80 rounded-[var(--radius-xl)] shadow-2xl z-[var(--z-modal)] overflow-hidden bg-[var(--surface-2)] border border-[var(--brand-border-hover)]">
           {workspaces.length > 0 && (
             <div className="p-1">
               {workspaces.map(ws => (
@@ -158,7 +158,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
                         <Icon as={MoreHorizontal} size="sm" className="text-[var(--brand-text-muted)]" />
                       </button>
                       {menuOpen === ws.id && (
-                        <div className="absolute right-0 top-full mt-1 w-36 rounded-[var(--radius-lg)] shadow-xl z-50 py-1 bg-[var(--surface-2)] border border-[var(--brand-border-hover)]">
+                        <div className="absolute right-0 top-full mt-1 w-36 rounded-[var(--radius-lg)] shadow-xl z-[var(--z-modal)] py-1 bg-[var(--surface-2)] border border-[var(--brand-border-hover)]">
                           <button
                             onClick={(e) => { e.stopPropagation(); setConfirmDelete(ws.id); setMenuOpen(null); }}
                             className="flex items-center gap-2 w-full px-3 py-1.5 t-caption text-red-400 hover:bg-red-500/10 transition-colors"

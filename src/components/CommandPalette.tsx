@@ -319,7 +319,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh]" // fixed-inset-ok — command palette overlay
+    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh]" // fixed-inset-ok — command palette overlay // z-index-ok — above modal scale
       onClick={() => setOpen(false)}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       {/* pr-check-disable-next-line -- modal container */}

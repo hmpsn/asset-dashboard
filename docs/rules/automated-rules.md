@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **96** — 76 error, 20 warn.
+Total rules: **97** — 77 error, 20 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -92,6 +92,7 @@ advisory but tracked.
 | 74 | styleguide-token-parity | error | custom | `*.css` | — | src/tokens.css is the single canonical token source. public/styleguide.css must import from /tokens.css — not redeclare — so styleguide and app always use identical values. |
 | 75 | No purple/violet in client domain | error | pattern | `src/components/client/` | — | Mechanizes Law 04 of the Four Laws of Color — purple is reserved for admin AI surfaces (AdminChat, SeoAudit). Client-facing views must never use purple or violet. |
 | 76 | score-color-law-parity | error | custom | `*.ts` | — | scoreColorClass() is called from 20+ components. If it drifts from emerald to green, every downstream consumer silently violates Law 03. |
+| 77 | Raw z-index class (use z-[var(--z-*)] tokens) | error | pattern | `src/` | `z-index-ok` | Ensures z-index values come from the centralized token scale in tokens.css, preventing stacking-context collisions. |
 
 ---
 

@@ -192,7 +192,7 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
               {filterStatus !== 'all' && <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />}
             </button>
             {showFilter && (
-              <div className="absolute top-full left-0 mt-1 w-48 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl z-20 py-1">
+              <div className="absolute top-full left-0 mt-1 w-48 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl z-[var(--z-dropdown)] py-1">
                 <button
                   onClick={() => { setFilterStatus('all'); setShowFilter(false); }}
                   className={`w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--surface-3)] transition-colors ${filterStatus === 'all' ? 'text-teal-400' : 'text-[var(--brand-text)]'}`}
@@ -221,7 +221,7 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
               <ArrowUpDown className="w-3 h-3" /> Sort
             </button>
             {showSort && (
-              <div className="absolute top-full left-0 mt-1 w-40 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl z-20 py-1">
+              <div className="absolute top-full left-0 mt-1 w-40 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl z-[var(--z-dropdown)] py-1">
                 {([['status', 'Status'], ['volume', 'Volume'], ['difficulty', 'Difficulty'], ['alphabetical', 'Alphabetical']] as const).map(([key, label]) => (
                   <button
                     key={key}
@@ -251,7 +251,7 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
                   Actions
                 </button>
                 {showBulkMenu && (
-                  <div className="absolute top-full right-0 mt-1 w-52 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl z-20 py-1">
+                  <div className="absolute top-full right-0 mt-1 w-52 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl z-[var(--z-dropdown)] py-1">
                     {[
                       { key: 'optimize' as const, label: 'Optimize Keywords', icon: Sparkles },
                       { key: 'generate_briefs' as const, label: 'Generate Briefs', icon: FileText },
@@ -283,7 +283,7 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
             <table className="w-full border-collapse text-left">
               <thead>
                 <tr>
-                  <th className="px-3 py-2 t-caption font-semibold text-[var(--brand-text-muted)] uppercase tracking-wider border-b border-[var(--brand-border)] bg-[var(--surface-1)] sticky left-0 z-10">
+                  <th className="px-3 py-2 t-caption font-semibold text-[var(--brand-text-muted)] uppercase tracking-wider border-b border-[var(--brand-border)] bg-[var(--surface-1)] sticky left-0 z-[var(--z-sticky)]">
                     {dim0.label ?? dim0.variableName} / {dim1.label ?? dim1.variableName}
                   </th>
                   {dim1.values.map(col => (
@@ -296,7 +296,7 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
               <tbody>
                 {dim0.values.map(row => (
                   <tr key={row}>
-                    <td className="px-3 py-2 text-xs font-medium text-[var(--brand-text-bright)] border-b border-[var(--brand-border)] bg-[var(--surface-1)] sticky left-0 z-10 whitespace-nowrap">
+                    <td className="px-3 py-2 text-xs font-medium text-[var(--brand-text-bright)] border-b border-[var(--brand-border)] bg-[var(--surface-1)] sticky left-0 z-[var(--z-sticky)] whitespace-nowrap">
                       {row}
                     </td>
                     {dim1.values.map(col => {

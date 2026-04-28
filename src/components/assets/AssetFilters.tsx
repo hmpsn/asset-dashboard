@@ -23,7 +23,7 @@ export function AssetFilters({
   onSearchChange, onFilterChange, onSortChange,
 }: AssetFiltersProps) {
   return (
-    <div className="flex items-center gap-3 sticky top-0 z-10 bg-[var(--surface-1)]/95 backdrop-blur-sm py-2 -mx-1 px-1">
+    <div className="flex items-center gap-3 sticky top-0 z-[var(--z-sticky)] bg-[var(--surface-1)]/95 backdrop-blur-sm py-2 -mx-1 px-1">
       <div className="relative flex-1">
         <Icon as={Search} size="md" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
         <input

@@ -68,7 +68,7 @@ export function CellDetailPanel({
   };
 
   return (
-    <div className="fixed inset-y-0 right-0 w-full max-w-sm bg-[var(--surface-2)] border-l border-[var(--brand-border)] shadow-2xl z-50 flex flex-col animate-[slideInRight_0.2s_ease-out]">
+    <div className="fixed inset-y-0 right-0 w-full max-w-sm bg-[var(--surface-2)] border-l border-[var(--brand-border)] shadow-2xl z-[var(--z-modal)] flex flex-col animate-[slideInRight_0.2s_ease-out]">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--brand-border)]">
         <div className="flex items-center gap-2 min-w-0">

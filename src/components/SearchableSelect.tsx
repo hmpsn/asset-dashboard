@@ -70,7 +70,7 @@ export default function SearchableSelect({
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 w-full min-w-[200px] bg-[var(--surface-2)] border border-[var(--brand-border-hover)] rounded-[var(--radius-lg)] shadow-xl overflow-hidden">
+        <div className="absolute z-[var(--z-modal)] mt-1 w-full min-w-[200px] bg-[var(--surface-2)] border border-[var(--brand-border-hover)] rounded-[var(--radius-lg)] shadow-xl overflow-hidden">
           <div className="flex items-center gap-1.5 px-2 py-1.5 border-b border-[var(--brand-border)]">
             <Icon as={Search} size="sm" className="text-[var(--brand-text-muted)] shrink-0" />
             <input

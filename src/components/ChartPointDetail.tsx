@@ -21,7 +21,7 @@ export function ChartPointDetail({ date, metrics, onClose, xPct }: Props) {
 
   return (
     <div
-      className="absolute z-30 top-0 mt-1 pointer-events-auto"
+      className="absolute z-[var(--z-tooltip)] top-0 mt-1 pointer-events-auto"
       style={{ left: alignRight ? undefined : `${xPct}%`, right: alignRight ? `${100 - xPct}%` : undefined }}
     >
       <div className="bg-[var(--surface-2)] border border-[var(--brand-border-hover)] rounded-[var(--radius-sm)] shadow-xl shadow-black/40 min-w-[160px] overflow-hidden">

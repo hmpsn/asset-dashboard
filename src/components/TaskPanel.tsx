@@ -64,7 +64,7 @@ export function TaskPanel() {
   if (recentJobs.length === 0) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-80">
+    <div className="fixed bottom-4 right-4 z-[var(--z-modal)] w-80">
       {/* Header pill */}
       <button
         onClick={() => setExpanded(!expanded)}

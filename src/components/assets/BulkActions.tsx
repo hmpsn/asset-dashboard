@@ -23,7 +23,7 @@ export function BulkActions({
   onBulkGenerateAlt, onBulkRename, onBulkCompress, onBulkDelete, onClearSelection,
 }: BulkActionsProps) {
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 bg-[var(--surface-2)] border border-[var(--brand-border-hover)] rounded-[var(--radius-md)] text-sm sticky top-0 z-20 shadow-lg shadow-black/30">
+    <div className="flex items-center gap-3 px-4 py-2.5 bg-[var(--surface-2)] border border-[var(--brand-border-hover)] rounded-[var(--radius-md)] text-sm sticky top-0 z-[var(--z-dropdown)] shadow-lg shadow-black/30">
       <span className="text-[var(--brand-text-bright)] font-medium">{selectedCount} selected</span>
       <button
         onClick={onBulkGenerateAlt}

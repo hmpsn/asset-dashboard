@@ -372,7 +372,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
       )}
 
       {/* Sticky toolbar */}
-      <div className="sticky top-0 z-10 bg-[var(--surface-1)]/95 backdrop-blur-sm py-2 space-y-3">
+      <div className="sticky top-0 z-[var(--z-sticky)] bg-[var(--surface-1)]/95 backdrop-blur-sm py-2 space-y-3">
         {/* Search + sort */}
         <div className="flex items-center gap-3">
           <div className="relative flex-1">
@@ -594,7 +594,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
       </div>
       {/* Lightbox modal */}
       {lightboxIssue && lightboxIssue.url && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" // fixed-inset-ok — image lightbox
+        <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/80 backdrop-blur-sm" // fixed-inset-ok — image lightbox
             onClick={() => setLightboxIssue(null)}>
           <div className="relative max-w-4xl max-h-[90vh] w-full mx-4" onClick={e => e.stopPropagation()}>
             <button

@@ -51,7 +51,7 @@ export function Breadcrumbs({
               {selected.webflowSiteName || selected.name}
               <Icon as={ChevronRight} size="sm" className="text-zinc-600 rotate-90" />
             </button>
-            <div className="absolute top-full left-0 mt-1 w-48 max-h-[300px] overflow-y-auto bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 py-1">
+            <div className="absolute top-full left-0 mt-1 w-48 max-h-[300px] overflow-y-auto bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[var(--z-modal)] py-1">
               {workspaces.map(ws => (
                 <button
                   key={ws.id}

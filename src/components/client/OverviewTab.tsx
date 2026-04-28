@@ -453,7 +453,7 @@ export function OverviewTab({
                     const cfg = icons[entry.type] || { color: '#94a3b8', label: 'Note' };
                     return (
                       <div key={entry.id} className="flex items-start gap-2.5 pl-0">
-                        <div className="w-[11px] h-[11px] rounded-full border-2 flex-shrink-0 mt-1 z-10" style={{ borderColor: cfg.color, backgroundColor: themeColor('#0f1219', '#f8fafc') }} />
+                        <div className="w-[11px] h-[11px] rounded-full border-2 flex-shrink-0 mt-1 z-[var(--z-sticky)]" style={{ borderColor: cfg.color, backgroundColor: themeColor('#0f1219', '#f8fafc') }} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5">
                             <span className="t-caption-sm font-medium px-1 py-0.5 rounded" style={{ backgroundColor: `${cfg.color}15`, color: cfg.color }}>{cfg.label}</span>

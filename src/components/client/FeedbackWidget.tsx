@@ -111,7 +111,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
     return (
       <button
         onClick={() => setOpen(true)}
-        className={cn('fixed bottom-6 left-6 flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border)]/50 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] t-caption font-medium shadow-lg transition-all z-40 backdrop-blur-sm', chatExpanded ? 'sm:flex hidden' : '')}
+        className={cn('fixed bottom-6 left-6 flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border)]/50 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] t-caption font-medium shadow-lg transition-all z-[var(--z-modal-backdrop)] backdrop-blur-sm', chatExpanded ? 'sm:flex hidden' : '')}
       >
         <Icon as={MessageSquarePlus} size="md" />
         Feedback
@@ -123,7 +123,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
   }
 
   return (
-    <div className={cn('fixed bottom-6 left-6 w-[360px] max-h-[520px] bg-[var(--surface-2)] rounded-[var(--radius-xl)] border border-[var(--brand-border)] shadow-2xl shadow-black/40 overflow-hidden z-40 flex flex-col', chatExpanded ? 'sm:flex hidden' : '')}>
+    <div className={cn('fixed bottom-6 left-6 w-[360px] max-h-[520px] bg-[var(--surface-2)] rounded-[var(--radius-xl)] border border-[var(--brand-border)] shadow-2xl shadow-black/40 overflow-hidden z-[var(--z-modal-backdrop)] flex flex-col', chatExpanded ? 'sm:flex hidden' : '')}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--brand-border)] flex-shrink-0">
         <div className="flex items-center gap-2">

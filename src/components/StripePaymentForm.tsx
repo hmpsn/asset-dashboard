@@ -310,7 +310,7 @@ export function StripePaymentModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/70 backdrop-blur-md z-[70] flex items-center justify-center p-4" // fixed-inset-ok — payment form overlay
+      className="fixed inset-0 bg-black/70 backdrop-blur-md z-[70] flex items-center justify-center p-4" // fixed-inset-ok — payment form overlay // z-index-ok — above modal scale for payment
       onClick={onClose}
     >
       {/* Stripe payment modal must be ALWAYS DARK regardless of dashboard theme.
@@ -327,7 +327,7 @@ export function StripePaymentModal({
         {/* Close button — always-dark per modal constraint */}
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 w-7 h-7 rounded-[var(--radius-lg)] flex items-center justify-center bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors z-10" // raw-zinc-ok
+          className="absolute top-3 right-3 w-7 h-7 rounded-[var(--radius-lg)] flex items-center justify-center bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors z-[var(--z-sticky)]" // raw-zinc-ok
         >
           <Icon as={X} size="md" />
         </button>

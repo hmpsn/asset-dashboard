@@ -83,13 +83,13 @@ export function ClientChatWidget({
           onClick={() => setChatOpen(true)}
           icon={Sparkles}
           size="lg"
-          className="fixed bottom-6 right-6 rounded-full shadow-lg shadow-teal-900/30 z-50"
+          className="fixed bottom-6 right-6 rounded-full shadow-lg shadow-teal-900/30 z-[var(--z-modal)]"
         >
           Insights Engine
         </Button>
       )}
       {chatOpen && (
-        <div className={cn('fixed bg-[var(--surface-2)] border-[var(--brand-border)] shadow-2xl shadow-black/40 overflow-hidden z-50 flex flex-col transition-all duration-200', chatExpanded ? 'inset-y-0 right-0 w-full sm:w-[480px] border-l rounded-none' : 'bottom-6 right-6 w-96 max-h-[500px] rounded-[var(--radius-xl)] border')}>
+        <div className={cn('fixed bg-[var(--surface-2)] border-[var(--brand-border)] shadow-2xl shadow-black/40 overflow-hidden z-[var(--z-modal)] flex flex-col transition-all duration-200', chatExpanded ? 'inset-y-0 right-0 w-full sm:w-[480px] border-l rounded-none' : 'bottom-6 right-6 w-96 max-h-[500px] rounded-[var(--radius-xl)] border')}>
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--brand-border)] flex-shrink-0">
             <div className="flex items-center gap-2">

@@ -276,7 +276,7 @@ export function AnalyticsTab({
             const pct = totalSessions > 0 ? (s.sessions / totalSessions) * 100 : 0;
             return (
               <div key={i} className="relative">
-                <div className="flex items-center gap-2 py-1.5 px-2 rounded-[var(--radius-lg)] relative z-10">
+                <div className="flex items-center gap-2 py-1.5 px-2 rounded-[var(--radius-lg)] relative z-[var(--z-sticky)]">
                   <span className="t-caption text-[var(--brand-text)] flex-1 truncate">{s.source}{s.medium !== '(none)' ? ` / ${s.medium}` : ''}</span>
                   <span className="t-caption text-blue-400 font-medium tabular-nums">{s.sessions.toLocaleString()}</span>
                   <span className="t-caption-sm text-[var(--brand-text-muted)] w-12 text-right">{pct.toFixed(1)}%</span>
