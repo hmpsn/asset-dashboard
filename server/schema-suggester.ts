@@ -485,15 +485,16 @@ function validateUnifiedSchema(schema: Record<string, unknown>): string[] {
 /** Maps healthcare keyword fragments to their correct Schema.org @type. */
 const HEALTHCARE_TYPE_MAP: Array<[RegExp, string]> = [
   [/\b(dental|dentist|orthodont|periodont|endodont)\b/i, 'Dentist'],
-  [/\b(physician|doctor|md\b|family medicine)\b/i, 'Physician'],
+  [/\b(physician|doctor|md\b|family medicine|general practitioner|gp\b)\b/i, 'Physician'],
   [/\b(optician|optometrist|ophthalmolog)\b/i, 'Optician'],
   [/\b(chiropract)\b/i, 'Chiropractor'],
   [/\bdermatolog/i, 'MedicalBusiness'],
   [/\b(pediatric|pediatrician)\b/i, 'MedicalBusiness'],
-  [/\b(clinic|urgent care|medical center)\b/i, 'MedicalClinic'],
-  [/\b(hospital)\b/i, 'Hospital'],
   [/\b(therapist|therapy|counseling|psychiatr)\b/i, 'MedicalBusiness'],
-  [/\b(medical|healthcare|health care)\b/i, 'MedicalBusiness'],
+  [/\b(hospital)\b/i, 'Hospital'],
+  [/\b(clinic|urgent care|medical center)\b/i, 'MedicalClinic'],
+  // NOTE: no generic "medical"/"healthcare" catch-all — these match SaaS/tech companies that
+  // serve the healthcare industry (e.g. "medical billing software") and produce false positives.
 ];
 
 /**
@@ -518,10 +519,12 @@ export function upgradeHealthcareType(schema: Record<string, unknown>, ctx: Sche
   if (!Array.isArray(graph)) return;
 
   for (const node of graph) {
-    const currentType = node['@type'] as string | undefined;
-    if (currentType === 'Organization' || currentType === 'LocalBusiness') {
-      log.info({ from: currentType, to: targetType }, 'Auto-fix: upgraded generic type to healthcare subtype');
-      node['@type'] = targetType;
+    const rawType = node['@type'];
+    const typesArr: string[] = Array.isArray(rawType) ? rawType as string[] : (typeof rawType === 'string' ? [rawType] : []);
+    if (typesArr.includes('Organization') || typesArr.includes('LocalBusiness')) {
+      const upgraded = typesArr.map(t => (t === 'Organization' || t === 'LocalBusiness') ? targetType : t);
+      log.info({ from: rawType, to: upgraded }, 'Auto-fix: upgraded generic type to healthcare subtype');
+      node['@type'] = upgraded.length === 1 ? upgraded[0] : upgraded;
     }
   }
 }
@@ -793,7 +796,7 @@ function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string,
     try {
       const pagePath = new URL(pageUrl).pathname.replace(/\/$/, '') || '/';
       const children = getChildNodes(hubTree, pagePath)
-        .filter(c => c.source === 'existing');  // Only existing pages, not planned
+        .filter(c => c.source === 'existing' && !UTILITY_SLUGS.test(c.path));
       if (children.length >= 2 && pagePath !== '/') {
         const hasCollection = graph.some(n => n['@type'] === 'CollectionPage' || n['@type'] === 'ItemList');
         if (!hasCollection) {
@@ -1594,6 +1597,8 @@ RULES:
 
         // Re-run auto-fix and cross-references on the fixed version
         autoFixSchema(fixedSchema);
+        const fixedGraphArr = fixedSchema['@graph'] as Record<string, unknown>[] | undefined;
+        if (Array.isArray(fixedGraphArr)) fixedSchema['@graph'] = fixedGraphArr.filter(n => !n['_remove']);
         upgradeHealthcareType(fixedSchema, ctx);
         injectCrossReferences(fixedSchema, siteUrl, ctx.companyName, ctx);
 
@@ -1727,15 +1732,17 @@ ${ctx._gscPageData ? `- GSC: ${ctx._gscPageData.impressions.toLocaleString()} im
 ${ctx._ga4PageData ? `- GA4: ${ctx._ga4PageData.pageviews.toLocaleString()} pageviews/90d | ${ctx._ga4PageData.users.toLocaleString()} users | Avg Engagement: ${Math.round(ctx._ga4PageData.avgEngagementTime)}s` : ''}
 High-impression pages with poor position (>10) are prime candidates for rich result schema types like FAQPage, HowTo, and Article.` : ''}
 ${buildSchemaIntelligenceBlock(ctx)}
-${ctx._serpFeatures && (ctx._serpFeatures.localPack || ctx._serpFeatures.peopleAlsoAsk > 0 || ctx._serpFeatures.featuredSnippets > 0 || ctx._serpFeatures.videoCarousel > 0) ? `\nSERP FEATURES (site-level — use to inform schema type priority):
-${ctx._serpFeatures.localPack ? '- Local Pack present: LocalBusiness/Dentist schema is high-value for this site' : ''}
-${ctx._serpFeatures.peopleAlsoAsk > 0 ? `- People Also Ask: ${ctx._serpFeatures.peopleAlsoAsk} site pages → FAQPage schema opportunities exist` : ''}
-${ctx._serpFeatures.featuredSnippets > 0 ? `- Featured Snippets: ${ctx._serpFeatures.featuredSnippets} site pages → long-answer schema (speakable, HowTo) adds value` : ''}
-${ctx._serpFeatures.videoCarousel > 0 ? `- Video Carousels: ${ctx._serpFeatures.videoCarousel} site pages → VideoObject schema is viable` : ''}` : ''}
-${ctx._backlinkReferringDomains != null ? `\nSITE AUTHORITY (referring domains: ${ctx._backlinkReferringDomains}):
-${ctx._backlinkReferringDomains < 50 ? '- Lower-authority site: focus on LocalBusiness, FAQPage, BreadcrumbList — highest schema win rate at this authority level. Avoid over-engineering Article/VideoObject schemas.' : ''}
-${ctx._backlinkReferringDomains >= 50 && ctx._backlinkReferringDomains < 100 ? '- Moderate-authority site: most rich result types (LocalBusiness, FAQPage, Service, Article) are viable.' : ''}
-${ctx._backlinkReferringDomains >= 100 ? '- Established site: full rich result types (Article, HowTo, VideoObject, FAQPage) are viable.' : ''}` : ''}
+${ctx._serpFeatures && (ctx._serpFeatures.localPack || ctx._serpFeatures.peopleAlsoAsk > 0 || ctx._serpFeatures.featuredSnippets > 0 || ctx._serpFeatures.videoCarousel > 0) ? `\nSERP FEATURES (site-level — use to inform schema type priority):\n${[
+  ctx._serpFeatures.localPack ? '- Local Pack present: LocalBusiness/Dentist schema is high-value for this site' : '',
+  ctx._serpFeatures.peopleAlsoAsk > 0 ? `- People Also Ask: ${ctx._serpFeatures.peopleAlsoAsk} site pages → FAQPage schema opportunities exist` : '',
+  ctx._serpFeatures.featuredSnippets > 0 ? `- Featured Snippets: ${ctx._serpFeatures.featuredSnippets} site pages → long-answer schema (speakable, HowTo) adds value` : '',
+  ctx._serpFeatures.videoCarousel > 0 ? `- Video Carousels: ${ctx._serpFeatures.videoCarousel} site pages → VideoObject schema is viable` : '',
+].filter(Boolean).join('\n')}` : ''}
+${ctx._backlinkReferringDomains != null ? `\nSITE AUTHORITY (referring domains: ${ctx._backlinkReferringDomains}):\n${[
+  ctx._backlinkReferringDomains < 50 ? '- Lower-authority site: focus on LocalBusiness, FAQPage, BreadcrumbList — highest schema win rate at this authority level. Avoid over-engineering Article/VideoObject schemas.' : '',
+  ctx._backlinkReferringDomains >= 50 && ctx._backlinkReferringDomains < 100 ? '- Moderate-authority site: most rich result types (LocalBusiness, FAQPage, Service, Article) are viable.' : '',
+  ctx._backlinkReferringDomains >= 100 ? '- Established site: full rich result types (Article, HowTo, VideoObject, FAQPage) are viable.' : '',
+].filter(Boolean).join('\n')}` : ''}
 ${ctx._existingErrors?.length ? `\nPRIOR SCHEMA VALIDATION ERRORS — fix all of these in the new schema:
 ${ctx._existingErrors.map(e => `- ${e.message}`).join('\n')}` : ''}
 ${getPageTypeInstructions(ctx.pageType, siteUrl)}
@@ -2121,9 +2128,13 @@ export async function generateSchemaSuggestions(
         const fullPageUrl = isHomepage ? baseUrl : `${baseUrl}${lookupPath}`;
         const insightData = insightsMap?.get(fullPageUrl);
         const priorValidation = validationsByPageId?.get(page.id);
-        const existingErrors = (priorValidation?.errors && Array.isArray(priorValidation.errors) && priorValidation.errors.length > 0)
-          ? (priorValidation.errors as Array<{ message: string }>)
-          : undefined;
+        const rawErrors = priorValidation?.errors;
+        const validatedErrors = Array.isArray(rawErrors)
+          ? (rawErrors as unknown[]).filter(
+              (e): e is { message: string } => typeof (e as { message?: unknown })?.message === 'string'
+            ).slice(0, 20)
+          : [];
+        const existingErrors = validatedErrors.length > 0 ? validatedErrors : undefined;
         const pageCtx: SchemaContext = {
           ...ctx,
           pageKeywords: getPageKeywords(lookupPath),
