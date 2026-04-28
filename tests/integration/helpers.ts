@@ -75,10 +75,6 @@ export function createTestContext(port: number): TestContext {
         // open file descriptor limits when multiple test servers run concurrently.
         NODE_ENV: 'test',
         APP_PASSWORD: '',
-        // Disable SDK retry backoffs so AI-error tests fail fast instead of
-        // waiting ~30s per retry cycle (which causes timeouts under parallel load).
-        OPENAI_MAX_RETRIES: '0',
-        ANTHROPIC_MAX_RETRIES: '0',
       },
       stdio: 'pipe',
     });

@@ -23,6 +23,7 @@ import { getPresence } from './websocket.js';
 import { setupSentryErrorHandler } from './sentry.js';
 import { requestLogger } from './middleware/request-logger.js';
 import { createLogger } from './logger.js';
+import { sanitizeErrorMessage } from './helpers.js';
 
 const log = createLogger('app');
 
@@ -334,9 +335,9 @@ export function createApp(): express.Express {
   // that expect JSON. This catches synchronous throws from route handlers that escape
   // to Express's error pipeline and returns a consistent { error: string } shape.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-    const msg = err instanceof Error ? err.message : 'Internal server error';
-    res.status(500).json({ error: msg });
+  app.use((err: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (res.headersSent) return next(err);
+    res.status(500).json({ error: sanitizeErrorMessage(err, 'Internal server error') });
   });
 
   // --- Serve frontend in production (MUST be after all API routes) ---
