@@ -569,13 +569,11 @@ function autoFixSchema(schema: Record<string, unknown>): void {
   }
 
   // Strip any SiteNavigationElement nodes — not a Google rich result type
-  const graphArr = schema['@graph'] as Record<string, unknown>[] | undefined;
-  if (Array.isArray(graphArr)) {
-    const beforeNavStrip = graphArr.length;
-    schema['@graph'] = graphArr.filter(n => n['@type'] !== 'SiteNavigationElement');
-    if ((schema['@graph'] as Record<string, unknown>[]).length < beforeNavStrip) {
-      log.info('Auto-fix: stripped SiteNavigationElement node(s) — not a Google rich result type');
-    }
+  const beforeNavStrip = graph.length;
+  const stripped = graph.filter(n => n['@type'] !== 'SiteNavigationElement');
+  if (stripped.length < beforeNavStrip) {
+    schema['@graph'] = stripped;
+    log.info('Auto-fix: stripped SiteNavigationElement node(s) — not a Google rich result type');
   }
 }
 
