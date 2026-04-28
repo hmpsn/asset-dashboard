@@ -73,7 +73,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
   };
 
   // Reset state when closing link panel
-  useEffect(() => {
+  useEffect(() => { // effect-layout-ok — resets hidden form state, no layout flash
     if (!linkingId) {
       setLinkToken('');
       setSites([]);
@@ -125,7 +125,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
                         'w-2 h-2 rounded-full shrink-0',
                         ws.webflowSiteId ? 'bg-emerald-400' : 'bg-[var(--brand-text-muted)]'
                       )} />
-                      <span className="text-sm truncate">{ws.name}</span>
+                      <span className="t-body truncate">{ws.name}</span>
                       {ws.webflowSiteName && (
                         <span className="flex items-center gap-1 t-caption text-[var(--brand-text-muted)]">
                           <Icon as={Link} size="sm" />
@@ -250,11 +250,11 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
                   onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
                   placeholder="Workspace name..."
                   autoFocus
-                  className="flex-1 px-3 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border-hover)] rounded-[var(--radius-lg)] text-sm focus:outline-none focus:border-[var(--brand-text-muted)]"
+                  className="flex-1 px-3 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border-hover)] rounded-[var(--radius-lg)] t-body focus:outline-none focus:border-[var(--brand-text-muted)]"
                 />
                 <button
                   onClick={handleCreate}
-                  className="px-3 py-1.5 bg-teal-600 text-white text-sm font-medium rounded-[var(--radius-lg)] hover:bg-teal-500 transition-colors"
+                  className="px-3 py-1.5 bg-teal-600 text-white t-body font-medium rounded-[var(--radius-lg)] hover:bg-teal-500 transition-colors"
                 >
                   Add
                 </button>
@@ -262,7 +262,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
             ) : (
               <button
                 onClick={() => setCreating(true)}
-                className="flex items-center gap-2 w-full px-3 py-2 text-sm text-[var(--brand-text-muted)] hover:text-white hover:bg-[var(--brand-border-hover)]/50 rounded-[var(--radius-lg)] transition-colors"
+                className="flex items-center gap-2 w-full px-3 py-2 t-body text-[var(--brand-text-muted)] hover:text-white hover:bg-[var(--brand-border-hover)]/50 rounded-[var(--radius-lg)] transition-colors"
               >
                 <Icon as={Plus} size="md" />
                 New workspace
