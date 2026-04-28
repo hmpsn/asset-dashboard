@@ -369,3 +369,11 @@ export interface PageTypeBriefConfig {
   /** Full page-type instruction block injected verbatim into the generateBrief() prompt. */
   prompt: string;
 }
+
+export interface AiFixResult {
+  field: 'introduction' | 'section' | 'conclusion' | 'meta';
+  sectionIndex?: number;
+  originalText: string;
+  suggestedText: string;
+  explanation: string;
+}
