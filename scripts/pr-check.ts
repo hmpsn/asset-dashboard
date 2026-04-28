@@ -4328,7 +4328,7 @@ export const CHECKS: Check[] = [
   // ─── Phase 5 — Token authority ───────────────────────────────────────────────
   {
     name: 'styleguide-token-parity',
-    severity: 'warn', // promoted to error in Phase 3 after Phase 2 clears the backlog
+    severity: 'error', // promoted from warn in Phase C (2026-04-27) — zero hits verified on staging
     fileGlobs: ['*.css'],
     message:
       'public/styleguide.css must only @import url(\'/tokens.css\'); redeclaring tokens creates drift. ' +
@@ -4360,6 +4360,113 @@ export const CHECKS: Check[] = [
         } catch {
           // File doesn't exist — skip (not an error in Phase 0 before styleguide is created)
         }
+      }
+      return hits;
+    },
+  },
+
+  // ─── Phase C — 5 new rules (2026-04-27) ──────────────────────────────────────
+  // Added after Phase B domain sweeps. Rules whose backlog is zero ship at error;
+  // rules with remaining backlog ship at warn and will be promoted after a
+  // follow-up sweep drives them to zero.
+
+  {
+    // Catches raw Tailwind radius utility classes that bypass the --radius-* token
+    // system. Different from "Hardcoded card radius" (which only catches rounded-xl
+    // inside className="...") — this rule catches ALL literal rounded-* usage
+    // everywhere except the ui/ primitives that own the canonical radius values.
+    name: 'Raw rounded-* literal (use --radius-* token)',
+    pattern: 'rounded-(sm|md|lg|xl|2xl|3xl|full)',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    exclude: [
+      'src/components/ui/',
+    ],
+    excludeLines: ['// rounded-literal-ok'],
+    message: 'Use rounded-[var(--radius-sm)], rounded-[var(--radius-md)], rounded-[var(--radius-lg)], or rounded-[var(--radius-xl)] instead of raw rounded-sm/md/lg/xl. Raw radius classes do not theme-switch. Add // rounded-literal-ok inline if an exception is justified.',
+    severity: 'warn',
+    rationale: 'Raw Tailwind radius utility classes bypass the --radius-* token system and cannot theme-switch. Centralizing through tokens keeps every surface radius in lockstep.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+  },
+  {
+    // Purple and violet are forbidden in client-facing views (Law 04).
+    // This rule is stricter than the existing "Purple in client components" rule
+    // (which only catches `purple-` prefix) — it also catches `violet-`.
+    name: 'No purple/violet in client domain',
+    pattern: '(purple|violet)-[0-9]+',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/components/client/',
+    message: 'Purple and violet are forbidden in client-facing views (Law 04: purple for admin AI only). Use teal for actions, blue for data, emerald for success.',
+    severity: 'error',
+    rationale: 'Mechanizes Law 04 of the Four Laws of Color — purple is reserved for admin AI surfaces (AdminChat, SeoAudit). Client-facing views must never use purple or violet.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+  },
+  {
+    // Catches direct imports of TrendingUp/TrendingDown/ArrowUp/ArrowDown from
+    // lucide-react outside TrendBadge.tsx and its tests. Consumers should use
+    // <TrendBadge> instead of composing raw directional icons.
+    name: 'Trend icon import outside TrendBadge',
+    pattern: 'import.*\\b(TrendingUp|TrendingDown)\\b.*from.*lucide-react',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    exclude: [
+      'src/components/ui/TrendBadge.tsx',
+      'src/components/ui/__tests__/',
+    ],
+    excludeLines: ['// trend-icon-ok'],
+    message: 'Use <TrendBadge value={n} /> from src/components/ui/TrendBadge.tsx instead of importing TrendingUp/TrendingDown directly. The primitive consolidates color, sign handling, and zero-state.',
+    severity: 'warn',
+    rationale: 'Direct TrendingUp/TrendingDown imports bypass the TrendBadge primitive, causing drift in color (green vs emerald), sizing, and sign handling across callsites.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+  },
+  {
+    // Catches hand-rolled fixed inset-0 modals outside the overlay primitives.
+    // Modal, ConfirmDialog, and OnboardingChecklist own the canonical fixed-inset
+    // pattern. Consumer files should use <Modal> instead.
+    name: 'Hand-rolled fixed inset-0 outside overlay',
+    pattern: 'fixed[[:space:]]+inset-0',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    exclude: [
+      'src/components/ui/overlay/',
+      'src/components/ui/ConfirmDialog.tsx',
+      'src/components/ui/OnboardingChecklist.tsx',
+    ],
+    excludeLines: ['// fixed-inset-ok'],
+    message: 'Use <Modal> from src/components/ui/overlay/Modal.tsx instead of hand-rolling a fixed inset-0 backdrop. The primitive handles focus trap, escape key, scroll lock, and backdrop click.',
+    severity: 'warn',
+    rationale: 'Hand-rolled fixed inset-0 modals miss focus trapping, escape-key handling, scroll lock, and accessible labelling. The Modal primitive consolidates all of these.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+  },
+  {
+    // Verifies that scoreColorClass() in src/components/ui/constants.ts uses
+    // emerald/amber/red (Law 03: emerald for success, never green). This is a
+    // structural check — it reads the function body and asserts no `green-` colors.
+    name: 'score-color-law-parity',
+    fileGlobs: ['*.ts'],
+    message: 'scoreColorClass() in ui/constants.ts must use emerald (not green) for success per Law 03. The function return values should be text-emerald-400, text-amber-400, text-red-400.',
+    severity: 'error',
+    rationale: 'scoreColorClass() is called from 20+ components. If it drifts from emerald to green, every downstream consumer silently violates Law 03.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const constantsPath = files.find(f => f.endsWith('ui/constants.ts') || f.endsWith('ui' + path.sep + 'constants.ts'));
+      if (!constantsPath) return hits;
+      const content = readFileOrEmpty(constantsPath);
+      if (!content) return hits;
+      // Find the scoreColorClass function body
+      const fnMatch = content.match(/function\s+scoreColorClass\b[^{]*\{([^}]+)\}/);
+      if (!fnMatch) return hits;
+      const fnBody = fnMatch[1];
+      // Check for any green- color references (should be emerald-)
+      const greenMatch = fnBody.match(/green-\d+/);
+      if (greenMatch) {
+        const lineNum = (content.slice(0, content.indexOf(greenMatch[0])).match(/\n/g) ?? []).length + 1;
+        hits.push({
+          file: constantsPath,
+          line: lineNum,
+          text: `scoreColorClass uses ${greenMatch[0]} — should use emerald-* per Law 03`,
+        });
       }
       return hits;
     },
