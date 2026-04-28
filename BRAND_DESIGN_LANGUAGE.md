@@ -124,7 +124,7 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **ChartCard** | `ChartCard.tsx` | Same as SectionCard (`bg-[var(--surface-2)] border-zinc-800`) | Thin SectionCard wrapper for chart-friendly defaults: tighter padding (`px-4 py-3`), inline title + optional `<TrendBadge>` row, no `border-b` separator. Preserves signature `10px 24px` radius. |
 | **TrendBadge** | `TrendBadge.tsx` | Positive: `text-emerald-400` + `TrendingUp`; Negative: `text-red-400` + `TrendingDown`; Zero (when `hideOnZero={false}`): `text-zinc-400` + `Minus` | Canonical directional delta indicator. Props: `value`, `suffix='%'`, `invert`, `showSign`, `label`, `size='sm'\|'md'`, `hideOnZero=true`. Replaces all hand-rolled `TrendingUp/Down + emerald/red` ternaries. Use `invert` when lower=better (positions, error counts). |
 | **PageHeader** | `PageHeader.tsx` | `text-lg font-semibold text-zinc-100` | Title + optional subtitle + action slot |
-| **Badge** | `Badge.tsx` | 9 colors: `teal`, `blue`, `emerald`, `green`, `amber`, `red`, `orange`, `purple`, `zinc` | Pattern: `bg-{color}-500/10 text-{color}-400` |
+| **Badge** | `Badge.tsx` | 7 colors: `teal`, `blue`, `emerald`, `amber`, `red`, `orange`, `zinc` | Pattern: `bg-{color}-500/10 text-{color}-400` |
 | **TabBar** | `TabBar.tsx` | Active: `border-teal-500 text-teal-200` | Underline style, `border-b-2` |
 | **DateRangeSelector** | `DateRangeSelector.tsx` | Active: `bg-zinc-700 text-zinc-200` | Segmented control style |
 | **EmptyState** | `EmptyState.tsx` | Icon: `text-zinc-400` in `bg-zinc-800` container | Centered layout with optional CTA |
@@ -240,7 +240,7 @@ For inline styles and Recharts props that can't be overridden by CSS class rules
 | **OnboardingChecklist.tsx** | Progress bar | `bg-blue-500` | Data metric — tracks setup completion |
 | **OnboardingChecklist.tsx** | Completed step checkmarks | `text-teal-400` | Teal = action accomplished |
 | **OnboardingChecklist.tsx** | Dismiss button | `text-zinc-400 hover:text-zinc-200` | Neutral close action |
-| **WorkflowStepper.tsx** | Completed step circle | `bg-emerald-500 text-white` | Green = done |
+| **WorkflowStepper.tsx** | Completed step circle | `bg-emerald-500/10 border-emerald-500/40 text-emerald-400` | Emerald = done |
 | **WorkflowStepper.tsx** | Current step circle | `bg-teal-500 text-white` | Teal = active |
 | **WorkflowStepper.tsx** | Future step circle | `bg-zinc-700 text-zinc-400` | Zinc = inactive |
 | **WorkspaceHealthBar.tsx** | Metric progress bars | `bg-blue-500` | Blue = data metric (read-only) |
@@ -416,7 +416,7 @@ The platform's signature shape is an asymmetric diagonal radius — tight top-le
 | `src/components/ui/DataList.tsx` | Ranked data list |
 | `src/components/ui/ConfirmDialog.tsx` | Confirmation modal (teal CTA, destructive variant = red CTA, Escape/Enter keyboard, backdrop dismiss) |
 | `src/components/ui/OnboardingChecklist.tsx` | First-visit workspace setup modal (blue progress, teal checkmarks, localStorage) |
-| `src/components/ui/WorkflowStepper.tsx` | Horizontal numbered stepper (green=done, teal=current, zinc=future) |
+| `src/components/ui/WorkflowStepper.tsx` | Horizontal numbered stepper (emerald=done, teal=current, zinc=future) |
 | `src/components/ui/WorkspaceHealthBar.tsx` | Multi-metric health bars + recommended next action (blue fills, teal CTA) |
 | `src/components/ClientDashboard.tsx` | Client-facing dashboard (largest component) |
 | `src/components/AdminChat.tsx` | Admin AI chat (purple accent) |
