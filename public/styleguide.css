@@ -1573,7 +1573,7 @@ var(--surface-2);
   }
   .sb-issue   { background:rgba(251,191,36,.08); border-color:rgba(251,191,36,.3); color:rgba(251,191,36,.8); }
   .sb-fix     { background:rgba(96,165,250,.1);  border-color:rgba(96,165,250,.3); color:var(--blue); }
-  .sb-review  { background:rgba(167,139,250,.1); border-color:rgba(167,139,250,.3); color:var(--purple); }
+  .sb-review  { background:rgba(45,212,191,.1);  border-color:rgba(45,212,191,.3); color:var(--teal); }
   .sb-approved{ background:rgba(16,185,129,.08); border-color:rgba(16,185,129,.3); color:rgba(16,185,129,.8); }
   .sb-rejected{ background:rgba(248,113,113,.08); border-color:rgba(248,113,113,.3); color:rgba(248,113,113,.8); }
   .sb-live    { background:rgba(16,185,129,.1);  border-color:rgba(16,185,129,.35); color:var(--emerald); }
@@ -1692,7 +1692,7 @@ var(--surface-2);
   /* StatusBadge — boost text to dark, keep tinted bg */
   .light .sb-issue   { background:rgba(180,83,9,.1);  border-color:rgba(180,83,9,.25);  color:#92400e; }
   .light .sb-fix     { background:rgba(37,99,235,.1); border-color:rgba(37,99,235,.25); color:#1d4ed8; }
-  .light .sb-review  { background:rgba(109,40,217,.1); border-color:rgba(109,40,217,.25); color:#6d28d9; }
+  .light .sb-review  { background:rgba(13,148,136,.1); border-color:rgba(13,148,136,.25); color:#0d9488; }
   .light .sb-approved{ background:rgba(4,120,87,.1); border-color:rgba(4,120,87,.3); color:#047857; }
   .light .sb-rejected{ background:rgba(220,38,38,.1); border-color:rgba(220,38,38,.3); color:#dc2626; }
   .light .sb-live    { background:rgba(4,120,87,.1); border-color:rgba(4,120,87,.35); color:#047857; }
