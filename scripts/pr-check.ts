@@ -4365,6 +4365,148 @@ export const CHECKS: Check[] = [
     },
   },
 
+  // ─── Phase 6A — .t-* typography parity ──────────────────────────────────────
+  {
+    name: 'styleguide-typography-parity',
+    severity: 'error',
+    fileGlobs: ['*.css'],
+    message:
+      '.t-* class definitions in public/styleguide.css must match src/index.css exactly. ' +
+      'Copy canonical values from src/index.css into public/styleguide.css.',
+    rationale:
+      'The styleguide must render specimens with the same CSS values the app uses. ' +
+      'Drift between the two files means the styleguide lies about the design system.',
+    claudeMdRef: 'Design System — Token authority',
+    displayScope: 'public/styleguide.css vs src/index.css',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+
+      // Only run when either file is in the changed set (or --all)
+      const relevantFiles = files.filter(
+        f => f.endsWith('public/styleguide.css') || f.endsWith('src/index.css') ||
+             f.endsWith('public' + path.sep + 'styleguide.css') || f.endsWith('src' + path.sep + 'index.css')
+      );
+      if (relevantFiles.length === 0 && !SCAN_ALL) return hits;
+
+      const indexCssPath = path.join(ROOT, 'src/index.css');
+      const styleguideCssPath = path.join(ROOT, 'public/styleguide.css');
+
+      let indexCss: string;
+      let styleguideCss: string;
+      try {
+        indexCss = readFileSync(indexCssPath, 'utf-8');
+        styleguideCss = readFileSync(styleguideCssPath, 'utf-8');
+      } catch {
+        return hits; // files don't exist yet
+      }
+
+      type TypoProps = {
+        fontSize?: string;
+        fontWeight?: string;
+        fontFamily?: string;
+        lineHeight?: string;
+        letterSpacing?: string;
+      };
+
+      function parseTypoClasses(css: string): Map<string, { props: TypoProps; line: number }> {
+        const result = new Map<string, { props: TypoProps; line: number }>();
+        // Match .t-<name> { ... } blocks — handles both multi-line and single-line
+        const blockRe = /\.(t-[\w-]+)\s*\{([^}]+)\}/g;
+        let m: RegExpExecArray | null;
+        while ((m = blockRe.exec(css)) !== null) {
+          const className = m[1];
+          const body = m[2];
+          const lineNum = (css.slice(0, m.index).match(/\n/g) ?? []).length + 1;
+          const props: TypoProps = {};
+
+          const fsMatch = body.match(/font-size:\s*([^;]+)/);
+          if (fsMatch) props.fontSize = fsMatch[1].trim();
+
+          const fwMatch = body.match(/font-weight:\s*([^;]+)/);
+          if (fwMatch) props.fontWeight = fwMatch[1].trim();
+
+          const ffMatch = body.match(/font-family:\s*([^;]+)/);
+          if (ffMatch) props.fontFamily = ffMatch[1].trim();
+
+          const lhMatch = body.match(/line-height:\s*([^;]+)/);
+          if (lhMatch) props.lineHeight = lhMatch[1].trim();
+
+          const lsMatch = body.match(/letter-spacing:\s*([^;]+)/);
+          if (lsMatch) props.letterSpacing = lsMatch[1].trim();
+
+          // Only store the first occurrence (canonical definition)
+          if (!result.has(className)) {
+            result.set(className, { props, line: lineNum });
+          }
+        }
+        return result;
+      }
+
+      // Normalize CSS values for comparison: -.03em → -0.03em, etc.
+      function normalizeCssValue(val: string): string {
+        return val.replace(/(^|[^0-9])-?\./g, (match) => {
+          // Insert leading zero: -.03 → -0.03, .5 → 0.5
+          return match.replace(/(-?)\./, '$10.');
+        });
+      }
+
+      function normalizeFontFamily(val: string): string {
+        // Normalize whitespace around commas and quotes for font-family comparison
+        return val.replace(/\s*,\s*/g, ',').replace(/\s+/g, ' ').trim();
+      }
+
+      function cssValuesEqual(a: string | undefined, b: string | undefined): boolean {
+        if (a === undefined || b === undefined) return a === b;
+        return normalizeCssValue(normalizeFontFamily(a)) === normalizeCssValue(normalizeFontFamily(b));
+      }
+
+      const canonical = parseTypoClasses(indexCss);
+      const styleguide = parseTypoClasses(styleguideCss);
+
+      for (const [className, { props: canonicalProps }] of canonical) {
+        const sgEntry = styleguide.get(className);
+        if (!sgEntry) {
+          // Missing class in styleguide
+          hits.push({
+            file: styleguideCssPath,
+            line: 1,
+            text: `.${className} is defined in src/index.css but missing from public/styleguide.css`,
+          });
+          continue;
+        }
+
+        const sgProps = sgEntry.props;
+        const diffs: string[] = [];
+
+        if (canonicalProps.fontSize && !cssValuesEqual(canonicalProps.fontSize, sgProps.fontSize)) {
+          diffs.push(`font-size: expected ${canonicalProps.fontSize}, got ${sgProps.fontSize ?? 'unset'}`);
+        }
+        if (canonicalProps.fontWeight && !cssValuesEqual(canonicalProps.fontWeight, sgProps.fontWeight)) {
+          diffs.push(`font-weight: expected ${canonicalProps.fontWeight}, got ${sgProps.fontWeight ?? 'unset'}`);
+        }
+        if (canonicalProps.fontFamily && !cssValuesEqual(canonicalProps.fontFamily, sgProps.fontFamily)) {
+          diffs.push(`font-family: expected ${canonicalProps.fontFamily}, got ${sgProps.fontFamily ?? 'unset'}`);
+        }
+        if (canonicalProps.lineHeight && !cssValuesEqual(canonicalProps.lineHeight, sgProps.lineHeight)) {
+          diffs.push(`line-height: expected ${canonicalProps.lineHeight}, got ${sgProps.lineHeight ?? 'unset'}`);
+        }
+        if (canonicalProps.letterSpacing && !cssValuesEqual(canonicalProps.letterSpacing, sgProps.letterSpacing)) {
+          diffs.push(`letter-spacing: expected ${canonicalProps.letterSpacing}, got ${sgProps.letterSpacing ?? 'unset'}`);
+        }
+
+        if (diffs.length > 0) {
+          hits.push({
+            file: styleguideCssPath,
+            line: sgEntry.line,
+            text: `.${className} mismatch: ${diffs.join('; ')}`,
+          });
+        }
+      }
+
+      return hits;
+    },
+  },
+
   // ─── Phase C — 5 new rules (2026-04-27) ──────────────────────────────────────
   // Added after Phase B domain sweeps. Rules whose backlog is zero ship at error;
   // rules with remaining backlog ship at warn and will be promoted after a

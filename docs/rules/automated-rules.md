@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **96** — 76 error, 20 warn.
+Total rules: **97** — 77 error, 20 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -90,8 +90,9 @@ advisory but tracked.
 | 72 | Forbidden hues (rose/pink) in components | error | pattern | `src/` | — | Prevents the Four Laws palette from drifting via new rose/pink imports — the same class of bug that violet/indigo represented before they were banned. |
 | 73 | text-green-{N} for success/score (use emerald) | error | pattern | `src/` | `// green-ok` | Mechanizes the Four Laws Law #3 emerald-vs-green distinction. The CLAUDE.md warning is otherwise unenforced, and the bug recurs every codemod batch as workers default to "green = success" from training data. |
 | 74 | styleguide-token-parity | error | custom | `*.css` | — | src/tokens.css is the single canonical token source. public/styleguide.css must import from /tokens.css — not redeclare — so styleguide and app always use identical values. |
-| 75 | No purple/violet in client domain | error | pattern | `src/components/client/` | — | Mechanizes Law 04 of the Four Laws of Color — purple is reserved for admin AI surfaces (AdminChat, SeoAudit). Client-facing views must never use purple or violet. |
-| 76 | score-color-law-parity | error | custom | `*.ts` | — | scoreColorClass() is called from 20+ components. If it drifts from emerald to green, every downstream consumer silently violates Law 03. |
+| 75 | styleguide-typography-parity | error | custom | `public/styleguide.css vs src/index.css` | — | The styleguide must render specimens with the same CSS values the app uses. Drift between the two files means the styleguide lies about the design system. |
+| 76 | No purple/violet in client domain | error | pattern | `src/components/client/` | — | Mechanizes Law 04 of the Four Laws of Color — purple is reserved for admin AI surfaces (AdminChat, SeoAudit). Client-facing views must never use purple or violet. |
+| 77 | score-color-law-parity | error | custom | `*.ts` | — | scoreColorClass() is called from 20+ components. If it drifts from emerald to green, every downstream consumer silently violates Law 03. |
 
 ---
 
