@@ -1,5 +1,5 @@
 import { Icon } from '../ui';
-import { TrendingUp } from 'lucide-react';
+import { Zap } from 'lucide-react';
 
 interface QuickWin {
   pagePath: string;
@@ -19,12 +19,12 @@ export function QuickWins({ quickWins }: QuickWinsProps) {
   return (
     <div className="bg-[var(--surface-2)] border border-emerald-500/20 p-5 rounded-[var(--radius-signature)]">
       <h4 className="t-caption-sm font-semibold text-emerald-300 mb-1 flex items-center gap-1.5">
-        <Icon as={TrendingUp} size="md" className="text-emerald-300" /> Quick Wins
+        <Icon as={Zap} size="md" className="text-emerald-300" /> Quick Wins
       </h4>
       <p className="t-caption-sm text-[var(--brand-text-muted)] mb-3">High-impact changes that can be implemented immediately.</p>
       <div className="space-y-2">
         {quickWins.map((qw, i) => {
-          const impactColor = qw.estimatedImpact === 'high' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : qw.estimatedImpact === 'medium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-[var(--brand-text)] bg-zinc-700/30 border-zinc-600/20';
+          const impactColor = qw.estimatedImpact === 'high' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : qw.estimatedImpact === 'medium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-[var(--brand-text)] bg-[var(--surface-3)]/30 border-[var(--brand-border)]/20';
           return (
             <div key={i} className="px-3 py-2.5 bg-[var(--surface-3)]/40 rounded-[var(--radius-lg)] border border-[var(--brand-border)]">
               <div className="flex items-center justify-between">

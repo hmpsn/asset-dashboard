@@ -53,7 +53,7 @@ export function NotificationBell({ onSelectWorkspace }: NotificationBellProps) {
       {/* Backdrop */}
       {open && (
         <div
-          className="fixed inset-0 z-40"
+          className="fixed inset-0 z-40" // fixed-inset-ok — dropdown backdrop
           onClick={() => setOpen(false)}
           aria-hidden="true"
         />
@@ -107,7 +107,7 @@ export function NotificationBell({ onSelectWorkspace }: NotificationBellProps) {
                         <div className="t-caption font-medium text-[var(--brand-text-bright)] truncate">{item.label}</div>
                         <div className="t-micro text-[var(--brand-text-muted)] truncate">{item.sub}</div>
                       </div>
-                      <Icon as={AlertTriangle} size="sm" className="text-zinc-700 flex-shrink-0" />
+                      <Icon as={AlertTriangle} size="sm" className="text-[var(--brand-text-dim)] flex-shrink-0" />
                     </button>
                   );
                 })}

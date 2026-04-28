@@ -61,7 +61,7 @@ export default function SearchableSelect({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className={`flex items-center gap-1.5 w-full bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded-[var(--radius-lg)] text-left text-[var(--brand-text)] hover:border-zinc-600 transition-colors focus:outline-none focus:border-teal-500 ${
+        className={`flex items-center gap-1.5 w-full bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded-[var(--radius-lg)] text-left text-[var(--brand-text)] hover:border-[var(--brand-border-hover)] transition-colors focus:outline-none focus:border-teal-500 ${
           isSm ? 'px-2 py-1 t-caption-sm' : 'px-2.5 py-1.5 t-caption'
         }`}
       >

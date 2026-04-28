@@ -620,7 +620,8 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
             <div className="flex items-center gap-2 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-1.5">
               <Icon as={FileText} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
               <span className="text-xs text-[var(--brand-text-bright)] flex-1 truncate">{pageData.slug ? `/${pageData.slug}` : pageUrl}</span>
-              <button onClick={openCombo} className="text-[10px] text-teal-400 hover:text-teal-300 font-medium flex-shrink-0">Change</button>{/* arbitrary-text-ok */}
+              <button onClick={openCombo} className={"text-[10px] text-teal-400 hover:text-teal-300 font-medium flex-shrink-0" // arbitrary-text-ok
+              }>Change</button>
             </div>
           )}
 
@@ -692,7 +693,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
               )}
 
               {!isUrlQuery && filteredPages.length === 0 && (
-                <div className="px-3 py-2 text-[11px] text-[var(--brand-text-muted)]">
+                <div className="px-3 py-2 t-caption-sm text-[var(--brand-text-muted)]">
                   {sitemapPages.length > 0 ? `No pages match "${comboQuery}"` : 'No sitemap — paste a full URL above'}
                 </div>
               )}
@@ -743,7 +744,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                       <button
                         key={i}
                         onClick={() => sendMessage(prompt)}
-                        className="text-left px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/50 border border-[var(--brand-border)]/50 hover:border-teal-500/30 hover:bg-[var(--surface-3)] text-[11px] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
+                        className="text-left px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/50 border border-[var(--brand-border)]/50 hover:border-teal-500/30 hover:bg-[var(--surface-3)] t-caption-sm text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
                       >
                         {prompt}
                       </button>
@@ -787,7 +788,8 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                           </button>
                           <button
                             onClick={() => copyToClipboard(msgEdits[i] ?? extractRewriteOnly(msg.content), i)}
-                            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)]/50 transition-colors"
+                            className={"flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)]/50 transition-colors" // arbitrary-text-ok
+                            }
                           >
                             {copiedIdx === i ? <Icon as={Check} size="sm" className="text-teal-400" /> : <Icon as={Copy} size="sm" />}
                             {copiedIdx === i ? 'Copied' : 'Copy'}
@@ -803,7 +805,8 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                         <div className="flex items-center gap-1 mt-2 pt-2 border-t border-[var(--brand-border)]/30">
                           <button
                             onClick={() => copyToClipboard(msg.content, i)}
-                            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)]/50 transition-colors"
+                            className={"flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)]/50 transition-colors" // arbitrary-text-ok
+                            }
                           >
                             {copiedIdx === i ? <Icon as={Check} size="sm" className="text-teal-400" /> : <Icon as={Copy} size="sm" />}
                             {copiedIdx === i ? 'Copied' : 'Copy'}
@@ -891,7 +894,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                   href={pageUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-[11px] text-[var(--brand-text)] hover:text-teal-400 transition-colors flex-1 min-w-0"
+                  className="flex items-center gap-1 t-caption-sm text-[var(--brand-text)] hover:text-teal-400 transition-colors flex-1 min-w-0"
                 >
                   <span className="truncate">{pageData.slug ? `/${pageData.slug}` : pageUrl}</span>
                   <Icon as={ExternalLink} size="sm" className="flex-shrink-0" />
@@ -901,7 +904,8 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                   <button
                     ref={exportBtnRef}
                     onClick={() => setExportOpen(o => !o)}
-                    className="flex items-center gap-1 px-2 py-1 rounded text-[10px] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)] transition-colors"
+                    className={"flex items-center gap-1 px-2 py-1 rounded text-[10px] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)] transition-colors" // arbitrary-text-ok
+                    }
                   >
                     Export brief
                   </button>
@@ -909,19 +913,19 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                     <div className="absolute right-0 top-7 z-50 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl p-1 flex flex-col gap-0.5 min-w-[170px]">
                       <button
                         onClick={() => handleExport('copy')}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded text-[11px] text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] transition-colors text-left"
+                        className="flex items-center gap-2 px-3 py-1.5 rounded t-caption-sm text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] transition-colors text-left"
                       >
                         <Icon as={Copy} size="sm" /> Copy as Markdown
                       </button>
                       <button
                         onClick={() => handleExport('download')}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded text-[11px] text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] transition-colors text-left"
+                        className="flex items-center gap-2 px-3 py-1.5 rounded t-caption-sm text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] transition-colors text-left"
                       >
                         <Icon as={FileText} size="sm" /> Download .md
                       </button>
                       <button
                         onClick={() => handleExport('docx')}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded text-[11px] text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] transition-colors text-left"
+                        className="flex items-center gap-2 px-3 py-1.5 rounded t-caption-sm text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] transition-colors text-left"
                       >
                         <Icon as={FileText} size="sm" /> Download .docx
                       </button>
@@ -936,7 +940,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                   {pageData.issues.slice(0, 20).map((issue, i) => (
                     <span
                       key={i}
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] border ${ /* arbitrary-text-ok */
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] border ${ // arbitrary-text-ok
                         issue.severity === 'error'
                           ? 'bg-red-950/40 border-red-500/40 text-red-400'
                           : issue.severity === 'warning'
@@ -973,17 +977,19 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
               {/* Floating formatting toolbar — appears above text selection */}
               {toolbarPos && (
                 <div
-                  className="absolute z-50 flex items-center gap-0.5 bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded-md shadow-xl px-1 py-0.5 pointer-events-auto"
+                  className="absolute z-50 flex items-center gap-0.5 bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded-[var(--radius-md)] shadow-xl px-1 py-0.5 pointer-events-auto"
                   style={{ top: toolbarPos.top, left: toolbarPos.left }}
                   onMouseDown={e => e.preventDefault()}
                 >
-                  <button onClick={() => execFormat('bold')} className="px-2 py-1 text-[11px] font-bold text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded transition-colors">B</button>
-                  <button onClick={() => execFormat('italic')} className="px-2 py-1 text-[11px] italic text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded transition-colors">I</button>
+                  <button onClick={() => execFormat('bold')} className="px-2 py-1 t-caption-sm font-bold text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded transition-colors">B</button>
+                  <button onClick={() => execFormat('italic')} className="px-2 py-1 t-caption-sm italic text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded transition-colors">I</button>
                   <div className="w-px h-3 bg-[var(--brand-border-hover)] mx-0.5" />
-                  <button onClick={() => wrapHeading('h2')} className="px-2 py-1 text-[10px] text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded transition-colors">H2</button>
-                  <button onClick={() => wrapHeading('h3')} className="px-2 py-1 text-[10px] text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded transition-colors">H3</button>
+                  <button onClick={() => wrapHeading('h2')} className={"px-2 py-1 text-[10px] text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded transition-colors" // arbitrary-text-ok
+                  }>H2</button>
+                  <button onClick={() => wrapHeading('h3')} className={"px-2 py-1 text-[10px] text-[var(--brand-text-bright)] hover:bg-[var(--surface-1)] rounded transition-colors" // arbitrary-text-ok
+                  }>H3</button>
                   <div className="w-px h-3 bg-[var(--brand-border-hover)] mx-0.5" />
-                  <button onClick={clearFormatting} className="px-2 py-1 text-[11px] text-[var(--brand-text-muted)] hover:bg-[var(--surface-1)] rounded transition-colors">&times;</button>
+                  <button onClick={clearFormatting} className="px-2 py-1 t-caption-sm text-[var(--brand-text-muted)] hover:bg-[var(--surface-1)] rounded transition-colors">&times;</button>
                 </div>
               )}
             </>

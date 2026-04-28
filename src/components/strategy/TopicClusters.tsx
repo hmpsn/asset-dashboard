@@ -1,5 +1,5 @@
 import { Icon } from '../ui';
-import { Layers, TrendingUp, AlertTriangle } from 'lucide-react';
+import { Layers, BarChart3, AlertTriangle } from 'lucide-react';
 
 interface TopicCluster {
   topic: string;
@@ -47,14 +47,14 @@ export function TopicClusters({ clusters }: TopicClustersProps) {
               </div>
             </div>
             {/* Coverage bar */}
-            <div className="mt-1.5 h-1.5 bg-zinc-700 rounded-full overflow-hidden">
+            <div className="mt-1.5 h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden">
               <div className={`h-full rounded-full transition-all ${coverageBarColor(cluster.coveragePercent)}`} style={{ width: `${cluster.coveragePercent}%` }} />
             </div>
             <div className="flex items-center justify-between mt-1.5">
               <div className="flex items-center gap-2 flex-wrap">
                 {cluster.avgPosition && (
                   <span className="t-caption-sm text-[var(--brand-text)] flex items-center gap-0.5">
-                    <Icon as={TrendingUp} size="sm" />Avg pos #{cluster.avgPosition}
+                    <Icon as={BarChart3} size="sm" />Avg pos #{cluster.avgPosition}
                   </span>
                 )}
                 {cluster.topCompetitor && cluster.topCompetitorCoverage && (

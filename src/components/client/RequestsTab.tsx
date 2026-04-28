@@ -193,7 +193,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
           <p className="t-caption-sm text-[var(--brand-text-muted)] mb-4">Report a bug, request a design change, or suggest an improvement — {STUDIO_NAME} will get right on it.</p>
           <button onClick={() => setShowNewRequest(true)}
             className="px-4 py-2 bg-teal-600 hover:bg-teal-500 rounded-[var(--radius-lg)] t-caption font-medium transition-colors">
-            <Icon as={Plus} size="md" className="inline mr-1" /> Create Your First Request
+            <Icon as={Plus} size="md" className="mr-1" /> Create Your First Request
           </button>
         </div>
       )}

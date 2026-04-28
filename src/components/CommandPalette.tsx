@@ -319,7 +319,8 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh]" onClick={() => setOpen(false)}>
+    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh]" // fixed-inset-ok — command palette overlay
+      onClick={() => setOpen(false)}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       {/* pr-check-disable-next-line -- modal container */}
       <div
@@ -335,7 +336,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Search tools, workspaces, actions..."
-            className="flex-1 bg-transparent text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-dim)] outline-none"
+            className="flex-1 bg-transparent t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-dim)] outline-none"
           />
           <kbd className="flex-shrink-0 t-caption-sm font-medium text-[var(--brand-text-muted)] bg-[var(--surface-3)] px-1.5 py-0.5 rounded border border-[var(--brand-border-hover)]">
             ESC

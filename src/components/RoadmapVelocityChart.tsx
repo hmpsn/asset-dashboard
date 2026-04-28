@@ -46,7 +46,7 @@ export function ShippingVelocityChart({ items }: { items: RoadmapItem[] }) {
   return (
     <SectionCard
       title="Shipping Velocity"
-      action={<span className="text-[11px] text-zinc-500">{data[data.length - 1].cumulative} features shipped</span>}
+      action={<span className="t-caption-sm text-[var(--brand-text-muted)]">{data[data.length - 1].cumulative} features shipped</span>}
     >
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 200 }}>
         <defs>

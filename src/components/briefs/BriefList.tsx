@@ -126,7 +126,7 @@ export function BriefList({
       ) : (
         <div className="space-y-2">
           {standaloneBriefs.map(brief => (
-            <div key={brief.id} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden group/brief" style={{ borderRadius: '10px 24px 10px 24px' /* asymmetric-radius-ok */ }}>
+            <div key={brief.id} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden group/brief" style={{ borderRadius: 'var(--radius-signature)' }}>
               {/* Brief header row */}
               <div className="flex items-center gap-3 px-4 py-3">
                 <button

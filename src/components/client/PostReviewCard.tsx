@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Check, X, ChevronDown, ChevronUp, Edit3 } from 'lucide-react';
-import { Icon } from '../ui';
+import { Icon, Button } from '../ui';
 import type { ClientContentRequest } from './types';
 import type { GeneratedPost, ContentTopicRequest } from '../../../shared/types/content';
 import { publicPostReview } from '../../api/content';
@@ -277,14 +277,14 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
 
       {/* Action buttons */}
       <div className="flex items-center gap-3 pt-1">
-        <button
+        <Button
           onClick={handleApprove}
           disabled={approving || submitting}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-lg)] bg-gradient-to-r from-teal-600 to-emerald-600 text-white t-caption font-medium hover:from-teal-500 hover:to-emerald-500 transition-all disabled:opacity-50"
+          icon={Check}
+          className="rounded-[var(--radius-lg)] t-caption"
         >
-          <Icon as={Check} size="sm" />
           {approving ? 'Approving…' : 'Approve Post'}
-        </button>
+        </Button>
         <button
           onClick={() => { setShowFeedback(true); handleRequestChanges(); }}
           disabled={approving || submitting}

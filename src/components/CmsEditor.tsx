@@ -962,7 +962,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
           <Icon as={Sparkles} size="md" className="text-teal-400 mt-0.5 flex-shrink-0" />
           <div className="t-caption-sm text-[var(--brand-text-muted)]">
             <strong className="text-[var(--brand-text)]">How it works:</strong> Changes are saved as drafts first. Click <strong className="text-[var(--brand-text)]">Publish</strong> on a collection to make changes live.
-            The <Icon as={Wand2} size="sm" className="inline text-teal-400" /> button generates AI-optimized rewrites.
+            The <Icon as={Wand2} size="sm" className="text-teal-400" /> button generates AI-optimized rewrites.
             {collections.some(c => c.seoFields.filter(f => f.slug !== 'name' && f.slug !== 'slug').length === 0) && (
               <span className="block mt-1 text-amber-400/80">
                 Tip: Some collections don't have dedicated SEO fields. Consider adding "SEO Title" and "Meta Description" text fields in Webflow's collection schema for better control.

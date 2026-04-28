@@ -475,7 +475,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
           {t.label}
         </button>
       ))}
-      <div className="w-px h-4 bg-zinc-700 mx-1 self-center" />
+      <div className="w-px h-4 bg-[var(--surface-3)] mx-1 self-center" />
       {([
         { id: 'content-decay' as const, label: 'Content Health', icon: TrendingDown },
         { id: 'aeo-review' as const, label: 'AI Search Ready', icon: Sparkles },
@@ -489,7 +489,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
           {t.label}
         </button>
       ))}
-      <div className="w-px h-4 bg-zinc-700 mx-1 self-center" />
+      <div className="w-px h-4 bg-[var(--surface-3)] mx-1 self-center" />
       <button
         onClick={() => setAuditSubTab('guide')}
         className={cn('flex items-center gap-1.5 px-3 py-2 t-caption font-medium border-b-2 transition-colors -mb-px', auditSubTab === 'guide' ? 'border-teal-500 text-teal-300' : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}
@@ -517,7 +517,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
       <div>
         {auditTabBar}
         <div className="flex flex-col items-center justify-center py-16 gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-[var(--surface-2)] flex items-center justify-center">
+          <div className="w-16 h-16 rounded-[var(--radius-xl)] bg-[var(--surface-2)] flex items-center justify-center">
             <Icon as={Globe} size="2xl" className="text-[var(--brand-text-muted)]" />
           </div>
           <p className="text-[var(--brand-text)] t-body">Comprehensive SEO audit for your Webflow site</p>
@@ -526,7 +526,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
           </p>
           <button
             onClick={runAudit}
-            className="px-5 py-2.5 bg-teal-600 hover:bg-teal-500 rounded-lg text-sm font-medium transition-colors"
+            className="px-5 py-2.5 bg-teal-600 hover:bg-teal-500 rounded-[var(--radius-lg)] t-body font-medium transition-colors"
           >
             Run SEO Audit
           </button>
@@ -535,7 +535,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
               type="checkbox"
               checked={!skipLinkCheck}
               onChange={e => setSkipLinkCheck(!e.target.checked)}
-              className="rounded border-zinc-600 bg-zinc-800 text-teal-500 focus:ring-teal-500 focus:ring-offset-zinc-900"
+              className="rounded border-zinc-600 bg-zinc-800 text-teal-500 focus:ring-teal-500 focus:ring-offset-zinc-900" // raw-zinc-ok
             />
             Include dead link scan
           </label>
@@ -667,7 +667,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         if (hasPerformanceIssues) tips.push({ icon: TrendingDown, label: 'Check page weight & speed in the Performance tab', tool: 'Performance' });
         if (tips.length === 0) return null;
         return (
-          <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[var(--surface-2)]/50 border border-[var(--brand-border)] flex-wrap">
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-[var(--radius-lg)] bg-[var(--surface-2)]/50 border border-[var(--brand-border)] flex-wrap">
             <span className="t-caption-sm text-[var(--brand-text-muted)] font-medium tracking-wider mr-1">Quick fixes →</span>
             {tips.map(tip => (
               <span key={tip.tool} className="flex items-center gap-1 t-caption-sm text-teal-400/80 bg-teal-500/5 px-2 py-1 rounded border border-teal-500/10">
@@ -695,7 +695,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
             const cfg = SEVERITY_CONFIG[issue.severity];
             const SeverityIcon = cfg.icon;
             return (
-              <div key={idx} className="flex items-start gap-3 px-3 py-2 rounded-lg bg-[var(--surface-1)]/50">
+              <div key={idx} className="flex items-start gap-3 px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-1)]/50">
                 <Icon as={SeverityIcon} size="md" className={cn('mt-0.5 flex-shrink-0', cfg.color)} />
                 <div className="flex-1 min-w-0">
                   <div className="t-body text-[var(--brand-text-bright)]">{issue.message}</div>
@@ -761,7 +761,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
 
       {/* Share URL banner */}
       {shareUrl && (
-        <div className="flex items-center gap-3 px-4 py-3 rounded-lg" style={{ backgroundColor: 'rgba(45,212,191,0.1)', border: '1px solid rgba(46,217,195,0.2)' }}>
+        <div className="flex items-center gap-3 px-4 py-3 rounded-[var(--radius-lg)]" style={{ backgroundColor: 'rgba(45,212,191,0.1)', border: '1px solid rgba(46,217,195,0.2)' }}>
           <Icon as={Share2} size="md" className="flex-shrink-0 text-teal-400" />
           <div className="flex-1 min-w-0">
             <div className="t-caption font-medium text-teal-400">Report saved! Share this link with clients:</div>
@@ -836,7 +836,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
           const trackBorder = statusBorderClass(pageState?.status);
 
           return (
-            <div key={page.slug || page.page} className={cn('bg-[var(--surface-2)] border', trackBorder || 'border-[var(--brand-border)]')} style={{ borderRadius: '6px 12px 6px 12px' }}>
+            <div key={page.slug || page.page} className={cn('bg-[var(--surface-2)] border', trackBorder || 'border-[var(--brand-border)]')} style={{ borderRadius: 'var(--radius-signature)' }}>
               <button
                 onClick={() => toggleExpand(page.page)}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors text-left"
@@ -870,7 +870,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
               {isExpanded && (
                 <div className="ml-8 mb-2 space-y-1">
                   {page.noindex && (
-                    <div className="mx-4 mb-1 px-3 py-1.5 rounded-lg bg-[var(--surface-2)]/60 border border-[var(--brand-border)] t-caption-sm text-[var(--brand-text)] flex items-center gap-1.5">
+                    <div className="mx-4 mb-1 px-3 py-1.5 rounded-[var(--radius-lg)] bg-[var(--surface-2)]/60 border border-[var(--brand-border)] t-caption-sm text-[var(--brand-text)] flex items-center gap-1.5">
                       <Icon as={EyeOff} size="sm" className="flex-shrink-0" />
                       This page is marked <span className="font-medium text-[var(--brand-text-bright)]">noindex</span> — issues listed below won't affect crawlability or search rankings and are excluded from the site health score.
                     </div>

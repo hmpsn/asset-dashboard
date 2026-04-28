@@ -37,7 +37,7 @@ export function BriefGenerator({
   onGenerate,
 }: BriefGeneratorProps) {
   return (
-    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' /* asymmetric-radius-ok */ }}>
+    <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 space-y-3" style={{ borderRadius: 'var(--radius-signature)' }}>
       <div className="flex items-center gap-2 mb-1">
         <Icon as={Sparkles} size="md" className="text-amber-400" />
         <span className="text-xs font-medium text-[var(--brand-text-bright)]">Generate AI Content Brief</span>
@@ -97,7 +97,7 @@ export function BriefGenerator({
         <div className="space-y-2 pl-1 border-l-2 border-[var(--brand-border)] ml-1">
           <div>
             <label className="t-caption-sm text-[var(--brand-text-muted)] block mb-0.5">
-              <Icon as={ExternalLink} size="sm" className="inline mr-1" />
+              <Icon as={ExternalLink} size="sm" className="mr-1" />
               Reference URLs (competitor/inspiration pages — one per line)
             </label>
             <textarea

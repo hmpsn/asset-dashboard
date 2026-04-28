@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Sparkles, Send, MessageSquare, X, Lock, Loader2, Plus,
 } from 'lucide-react';
-import { Icon, cn } from '../ui';
+import { Icon, cn, Button } from '../ui';
 import { getOptional, getSafe } from '../../api/client';
 import { clientPath } from '../../routes';
 import { STUDIO_NAME } from '../../constants';
@@ -79,12 +79,14 @@ export function ClientChatWidget({
   return (
     <>
       {!chatOpen && (
-        <button
+        <Button
           onClick={() => setChatOpen(true)}
-          className="fixed bottom-6 right-6 flex items-center gap-2 px-4 py-3 rounded-full bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white t-body font-medium shadow-lg shadow-teal-900/30 transition-all z-50"
+          icon={Sparkles}
+          size="lg"
+          className="fixed bottom-6 right-6 rounded-full shadow-lg shadow-teal-900/30 z-50"
         >
-          <Icon as={Sparkles} size="md" className="text-white" /> Insights Engine
-        </button>
+          Insights Engine
+        </Button>
       )}
       {chatOpen && (
         <div className={cn('fixed bg-[var(--surface-2)] border-[var(--brand-border)] shadow-2xl shadow-black/40 overflow-hidden z-50 flex flex-col transition-all duration-200', chatExpanded ? 'inset-y-0 right-0 w-full sm:w-[480px] border-l rounded-none' : 'bottom-6 right-6 w-96 max-h-[500px] rounded-[var(--radius-xl)] border')}>

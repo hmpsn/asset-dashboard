@@ -98,7 +98,7 @@ function buildNavGroups(copyEngineEnabled: boolean, diagnosticsEnabled: boolean)
       { id: 'content-perf', label: 'Content Perf', icon: BarChart3, needsSite: true, desc: 'Post-publish content performance metrics' },
     ]},
     { label: 'ADMIN', groupIcon: Settings, groupColor: 'text-[var(--brand-text)]',
-      activeBg: 'bg-zinc-500/10', activeText: 'text-[var(--brand-text-bright)]', activeIcon: 'text-[var(--brand-text)]', inactiveIcon: 'text-zinc-600', hoverBg: 'hover:bg-zinc-500/5', hoverText: 'hover:text-[var(--brand-text-bright)]',
+      activeBg: 'bg-zinc-500/10', activeText: 'text-[var(--brand-text-bright)]', activeIcon: 'text-[var(--brand-text)]', inactiveIcon: 'text-[var(--brand-text-dim)]', hoverBg: 'hover:bg-zinc-500/5', hoverText: 'hover:text-[var(--brand-text-bright)]', // raw-zinc-ok — admin group neutral tint
       items: [
       { id: 'outcomes-overview', label: 'Team Outcomes', icon: Trophy, desc: 'Cross-workspace outcomes overview' },
       { id: 'prospect', label: 'Prospect', icon: FileSearch, desc: 'Sales prospect research' },
@@ -163,7 +163,7 @@ export function Sidebar({
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onExitHidden?.(); }}
         title="Exit focus mode"
       >
-        <span className="[writing-mode:vertical-rl] rotate-180 text-zinc-600 t-micro select-none">◀</span>
+        <span className="[writing-mode:vertical-rl] rotate-180 text-[var(--brand-text-dim)] t-micro select-none">◀</span>
       </aside>
     );
   }
@@ -211,7 +211,7 @@ export function Sidebar({
                     return <GIcon className={cn('w-3.5 h-3.5', group.groupColor || 'text-[var(--brand-text-muted)]', 'opacity-70 group-hover/hdr:opacity-100 transition-opacity')} />;
                   })()}
                   <span className="t-caption-sm text-[var(--brand-text-muted)] font-semibold tracking-widest uppercase flex-1 text-left">{group.label}</span>
-                  <ChevronRight className={`w-3 h-3 text-zinc-600 transition-transform duration-150 ${!isCollapsed ? 'rotate-90' : ''}`} />
+                  <ChevronRight className={`w-3 h-3 text-[var(--brand-text-dim)] transition-transform duration-150 ${!isCollapsed ? 'rotate-90' : ''}`} />
                   {isCollapsed && groupBadgeCount > 0 && (
                     <span className="t-caption-sm font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 tabular-nums min-w-[18px] text-center leading-tight">
                       {groupBadgeCount}
@@ -234,7 +234,7 @@ export function Sidebar({
                       active
                         ? `${group.activeBg || 'bg-teal-500/10'} ${group.activeText || 'text-teal-300'}`
                         : disabled
-                          ? 'text-zinc-700 cursor-not-allowed'
+                          ? 'text-[var(--brand-text-dim)] cursor-not-allowed'
                           : `text-[var(--brand-text)] ${group.hoverText || 'hover:text-[var(--brand-text-bright)]'} ${group.hoverBg || 'hover:bg-[var(--surface-3)]'}`
                     )}
                   >
