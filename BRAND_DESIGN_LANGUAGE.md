@@ -137,7 +137,7 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **ActionQueue** | `admin/ActionQueue.tsx` | Blue=impact scores (data), teal=resolve CTA (action) | Admin-only. No purple. |
 | **DataList** | `DataList.tsx` | Rank: `text-zinc-500`, label: `text-zinc-300`, value: `text-zinc-400` | Optional ranking numbers |
 | **OnboardingChecklist** | `ui/OnboardingChecklist.tsx` | Progress bar: `bg-blue-500` (data); checkmarks: `text-teal-400` (action); celebration: `text-teal-400` | Modal overlay. Blue = read-only progress metric. Teal = completion/action state. |
-| **WorkflowStepper** | `ui/WorkflowStepper.tsx` | Current: `bg-teal-500/10 border-teal-500 text-teal-400`; Completed: `bg-green-500/10 border-green-500/40 text-green-400`; Future: `bg-zinc-800/50 border-zinc-700 text-zinc-500` | Horizontal step indicator. Green = success/done state. Teal = active step. |
+| **WorkflowStepper** | `ui/WorkflowStepper.tsx` | Current: `bg-teal-500/10 border-teal-500 text-teal-400`; Completed: `bg-emerald-500/10 border-emerald-500/40 text-emerald-400`; Future: `bg-zinc-800/50 border-zinc-700 text-zinc-500` | Horizontal step indicator. Emerald = success/done state. Teal = active step. |
 | **WorkspaceHealthBar** | `ui/WorkspaceHealthBar.tsx` | Progress bars: `bg-blue-500` (data/read-only); recommendation arrows: `text-teal-500` hover `text-teal-400` (action) | Wraps SectionCard. Blue = data metrics. Teal = actionable next steps. |
 | **Heading** | `ui/typography/Heading.tsx` | Inherits `var(--brand-text-bright)`; `level={1\|2\|3}` → `.t-h1` / `.t-h2` / `.t-page` | Phase 5. `as` prop overrides HTML tag. forwardRef. |
 | **Stat** | `ui/typography/Stat.tsx` | Inherits text color (caller controls via parent `text-*`); `size="hero"\|"default"\|"sm"` → `.t-stat-lg` / `.t-stat` / `.t-stat-sm` | Phase 5. DIN Pro numerals. forwardRef. |
@@ -168,9 +168,9 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | Function | Returns | Usage |
 |----------|---------|-------|
 | `scoreColor(score)` | Hex string (`#34d399`, `#fbbf24`, `#f87171`) | MetricRing, any health score |
-| `scoreColorClass(score)` | Tailwind class (`text-green-400`, etc.) | Text coloring for scores |
-| `scoreBgClass(score)` | Background class (`bg-green-500/10`, etc.) | Score badges, backgrounds |
-| `scoreBgBarClass(score)` | Solid bg class (`bg-green-500`, etc.) | Progress bar fills (4-tier: green/amber/orange/red) |
+| `scoreColorClass(score)` | Tailwind class (`text-emerald-400`, etc.) | Text coloring for scores |
+| `scoreBgClass(score)` | Background class (`bg-emerald-500/10`, etc.) | Score badges, backgrounds |
+| `scoreBgBarClass(score)` | Solid bg class (`bg-emerald-500`, etc.) | Progress bar fills (4-tier: emerald/amber/orange/red) |
 | `DATE_PRESETS_SHORT` | `[7d, 28d, 90d]` | Compact date selectors |
 | `DATE_PRESETS_FULL` | `[7d, 14d, 28d, 90d, 6mo, 1y]` | Full date selectors |
 | `DATE_PRESETS_SEARCH` | `[7d, 28d, 90d, 6mo, 16mo]` | Search Console selectors |
@@ -226,7 +226,7 @@ For inline styles and Recharts props that can't be overridden by CSS class rules
 | **OnboardingChecklist** | Completed step checkmark | `text-teal-400` | Action/completion state |
 | **OnboardingChecklist** | Celebration icon | `bg-teal-500/10 text-teal-400` | Completion success |
 | **WorkflowStepper** | Current step circle | `bg-teal-500/10 border-teal-500 text-teal-400` | Active = teal |
-| **WorkflowStepper** | Completed step circle | `bg-green-500/10 border-green-500/40 text-green-400` | Success = green |
+| **WorkflowStepper** | Completed step circle | `bg-emerald-500/10 border-emerald-500/40 text-emerald-400` | Success = emerald |
 | **WorkflowStepper** | Future step circle | `bg-zinc-800/50 border-zinc-700 text-zinc-500` | Inactive = zinc |
 | **WorkspaceHealthBar** | Progress bars | `bg-blue-500` | Data metric — read-only |
 | **WorkspaceHealthBar** | Recommendation arrows | `text-teal-500 hover:text-teal-400` | Action CTAs |
@@ -400,7 +400,7 @@ The platform's signature shape is an asymmetric diagonal radius — tight top-le
 | `FEATURE_AUDIT.md` | Feature inventory, shipped/planned items, cascade update prompt |
 | `src/components/ui/index.ts` | Barrel export of all primitives |
 | `src/components/ui/constants.ts` | `scoreColor()`, `scoreColorClass()`, date presets |
-| `src/components/ui/Badge.tsx` | 9-color badge primitive |
+| `src/components/ui/Badge.tsx` | 7-color badge primitive |
 | `src/components/ui/StatCard.tsx` | Default + CompactStatBar |
 | `src/components/ui/MetricRing.tsx` | MetricRing + MetricRingSvg |
 | `src/components/ui/SectionCard.tsx` | Standard card container |
