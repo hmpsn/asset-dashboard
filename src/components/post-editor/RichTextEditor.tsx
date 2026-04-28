@@ -48,7 +48,7 @@ export function RichTextEditor({ initialValue, onChange, className }: RichTextEd
       {editor && (
         <BubbleMenu
           editor={editor}
-          className="flex items-center gap-0.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg shadow-xl p-1 z-40"
+          className="flex items-center gap-0.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg shadow-xl p-1 z-[var(--z-modal-backdrop)]"
         >
           {showLinkInput ? (
             <div className="flex items-center gap-1 px-1">
