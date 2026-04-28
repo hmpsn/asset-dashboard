@@ -9,7 +9,7 @@
  *   npx tsx scripts/pr-check.ts --all    # full codebase scan (for audits)
  *
  * Catches the most common issues that slip through TypeScript:
- *   - Purple in client-facing components (violates Three Laws of Color)
+ *   - Purple in client-facing components (violates Four Laws of Color)
  *   - violet- or indigo- in any component (forbidden hues)
  *   - Bare JSON.parse on server (use parseJsonSafe / parseJsonFallback)
  *   - Hard-coded "hmpsn.studio" strings (use STUDIO_NAME constant)
@@ -786,7 +786,7 @@ export const CHECKS: Check[] = [
     pattern: 'purple-',
     fileGlobs: ['*.ts', '*.tsx'],
     pathFilter: 'src/components/client/',
-    message: 'Purple is admin-only (Three Laws of Color). Use teal for actions, blue for data.',
+    message: 'Purple is admin-only (Four Laws of Color). Use teal for actions, blue for data.',
     severity: 'error',
   },
   {
@@ -910,7 +910,7 @@ export const CHECKS: Check[] = [
     pathFilter: 'server/',
     excludeLines: ['// map-dup-ok'],
     message: 'new Map(arr.map(r => [key.toLowerCase(), v])) silently keeps the LAST entry on duplicate normalized keys. If the source array has one row per key (API returning unique keywords), add // map-dup-ok inline. If it can have multiple rows per key (GSC query×page, etc.), use reduce to merge/pick: arr.reduce<Map<K,V>>((m, r) => { const k = r.x.toLowerCase(); const existing = m.get(k); if (!existing || r.pos < existing.pos) m.set(k, r); return m; }, new Map()).',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Silent-overwrite in Map construction from tuples — TypeScript cannot see the key collision, and the bug only manifests for a subset of input distributions.',
     claudeMdRef: '#code-conventions',
   },
@@ -970,7 +970,7 @@ export const CHECKS: Check[] = [
     pattern: 'let stmt',
     fileGlobs: ['*.ts'],
     message: 'Use createStmtCache()/stmts() for prepared statements. Local `let stmt` guards are useless.',
-    severity: 'warn',
+    severity: 'error',
   },
   {
     // Hand-rolled trend badge: `<TrendingUp/>` + `<TrendingDown/>` in one ternary.
@@ -1005,7 +1005,7 @@ export const CHECKS: Check[] = [
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
     message: 'Wrap SUM() with COALESCE: COALESCE(SUM(col), 0). SQLite SUM returns NULL (not 0) when no rows match.',
-    severity: 'warn',
+    severity: 'error',
   },
   {
     name: 'as any on dynamic import results',
@@ -1017,7 +1017,7 @@ export const CHECKS: Check[] = [
     exclude: ['server/db/json-validation.ts', 'server/middleware/'],
     excludeLines: ['// as-any-ok'],
     message: 'Use `import type { T } from "./module.js"` instead of `as any`. Guessed property names are the #1 bug source. Add `// as-any-ok` comment if truly unavoidable.',
-    severity: 'warn',
+    severity: 'error',
   },
   {
     name: 'Hardcoded dark hex in inline styles',
@@ -1028,7 +1028,7 @@ export const CHECKS: Check[] = [
     // Exclude correct usages: themeColor/chart helpers already handle light mode
     excludeLines: ['themeColor(', 'chartGridColor(', 'chartAxisColor(', 'chartDotStroke(', 'chartDotFill('],
     message: 'Use CSS variables or chartColor helpers from ui/constants.ts. Hardcoded dark hex breaks light mode.',
-    severity: 'warn',
+    severity: 'error',
   },
   {
     name: 'SVG with hardcoded dark fill/stroke',
@@ -1038,7 +1038,7 @@ export const CHECKS: Check[] = [
     // Exclude correct usages: chart helpers already handle light mode
     excludeLines: ['chartDotStroke(', 'chartDotFill(', 'chartAxisColor(', 'chartGridColor('],
     message: 'Use chartDotStroke()/chartAxisColor() from ui/constants.ts for SVG colors. Dark hex breaks light mode.',
-    severity: 'warn',
+    severity: 'error',
     // Converted from pattern to customCheck — the original pattern contained `\"`
     // inside outer shell double-quotes. The safePattern escaping would double-escape
     // these to `\\"`, breaking the shell command silently (swallowed by || true).
@@ -1100,7 +1100,7 @@ export const CHECKS: Check[] = [
     exclude: ['server/workspace-intelligence.ts', 'tests/'],
     excludeLines: ['// bip-ok'],
     message: 'Use buildIntelPrompt(id, slices) when only the formatted string is needed. When raw intel is also needed: const slices = [...]; formatForPrompt(intel, { sections: slices }). Add `// bip-ok` for intentional exceptions.',
-    severity: 'warn',
+    severity: 'error',
   },
   {
     name: 'Unguarded recordAction() call',
@@ -1110,7 +1110,7 @@ export const CHECKS: Check[] = [
     exclude: ['server/outcome-tracking.ts'],
     excludeLines: ['// recordAction-ok'],
     message: 'recordAction() must be gated by `if (workspaceId)`. Add `// recordAction-ok` if verified safe.',
-    severity: 'warn',
+    severity: 'error',
   },
   {
     name: 'Raw string literal in broadcastToWorkspace() event arg',
@@ -1228,7 +1228,7 @@ export const CHECKS: Check[] = [
     pathFilter: 'tests/',
     excludeLines: ['// readFile-ok'],
     message: 'Test behavior via imports and mocks, not source-file string matching. Add // readFile-ok on the line if this is an intentional endpoint migration guard.',
-    severity: 'warn',
+    severity: 'error',
   },
   {
     // FM-7: Vacuous .every() assertions on potentially empty arrays.
@@ -1239,7 +1239,7 @@ export const CHECKS: Check[] = [
     pathFilter: 'tests/',
     excludeLines: ['// every-ok', '.length', 'toBeGreaterThan', 'toHaveLength'],
     message: 'Assert array.length > 0 before .every(). [].every(fn) always returns true. Add // every-ok if intentional.',
-    severity: 'warn',
+    severity: 'error',
   },
   {
     // FM-6: Bare JSON.parse on DB row columns — must use parseJsonSafe/parseJsonFallback.
@@ -1267,7 +1267,7 @@ export const CHECKS: Check[] = [
     // `status-ok` substring inside an identifier, enum value, or string literal.
     excludeLines: ['// status-ok', '-- status-ok', 'validateTransition'],
     message: 'State machine transitions must use validateTransition(from, to). Direct SET status = ? skips guard. Add // status-ok (JS comment) or -- status-ok (SQL comment) if this is a non-state-machine column.',
-    severity: 'warn',
+    severity: 'error',
   },
   {
     // FM-4: Untyped dynamic import results — as any suppresses field name checks.
@@ -1278,7 +1278,7 @@ export const CHECKS: Check[] = [
     exclude: ['server/db/', 'tests/', 'server/workspace-intelligence.ts'],
     excludeLines: ['// dynamic-import-ok'],
     message: 'Add `import type { T } from "./module.js"` at file top to type dynamic import results. `as any` on dynamic imports hides wrong property names. Add // dynamic-import-ok if unavoidable.',
-    severity: 'warn',
+    severity: 'error',
   },
   {
     name: 'Raw bulk_lookup string outside keywords type file',
@@ -1286,7 +1286,7 @@ export const CHECKS: Check[] = [
     fileGlobs: ['*.ts', '*.tsx'],
     exclude: ['shared/types/keywords.ts', 'shared/types/workspace.ts'],
     message: "Use the 'bulk_lookup' literal only from shared/types/workspace.ts (PageKeywordMap.metricsSource). Raw string references in other files create undiscoverable magic values.",
-    severity: 'warn',
+    severity: 'error',
   },
   {
     // Scope to server/ only — frontend type annotations (e.g. metricsSource?: 'ai_estimate')
@@ -1297,7 +1297,7 @@ export const CHECKS: Check[] = [
     pathFilter: 'server/',
     exclude: ['shared/types/workspace.ts', 'shared/types/keywords.ts'],
     message: "The 'ai_estimate' metricsSource value must only be referenced from shared/types/workspace.ts. Use the shared type, not a raw string literal.",
-    severity: 'warn',
+    severity: 'error',
   },
   {
     name: 'replaceAllPageKeywords called outside keyword-strategy route',
@@ -2033,7 +2033,7 @@ export const CHECKS: Check[] = [
     exclude: ['.test.ts'],
     displayScope: 'shared/types/intelligence.ts + server/workspace-intelligence.ts',
     message: 'Fields declared in *Slice types but not referenced in their format*Section formatter are silently dropped at prompt time. Add to KNOWN_UNRENDERED_FIELDS in scripts/pr-check.ts if intentionally omitted.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'A slice field present in the type but absent from the formatter is assembled but never reaches the AI prompt — silent data loss.',
     claudeMdRef: '#data-flow-rules-mandatory',
     customCheck: (files) => {
@@ -2063,7 +2063,7 @@ export const CHECKS: Check[] = [
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
     message: 'Add json: true when the result is parsed as JSON, json: false when prose. See docs/rules/ai-dispatch-patterns.md.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'callCreativeAI without an explicit json: flag silently drifts between models that return valid JSON and ones that wrap it in prose.',
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
@@ -2303,7 +2303,7 @@ export const CHECKS: Check[] = [
     // via `generate-rules-doc.ts::describeHatch`.
     excludeLines: ['// ws-authz-ok'],
     message: 'Admin mutation functions in server/client-users.ts must take `expectedWorkspaceId: string` and pass `(id, expectedWorkspaceId)` to `assertUserInWorkspace` — `requireWorkspaceAccess(:id)` only verifies the URL workspace, not that `:userId` belongs to it. Suppress with // ws-authz-ok only if the function is not workspace-scoped (rare — justify in a comment). See CLAUDE.md Auth Conventions.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Without an in-function cross-workspace guard on admin mutations, an admin auth\'d for workspace A can mutate a user in workspace B by passing the foreign UUID through a workspace-A URL.',
     claudeMdRef: '#auth-conventions',
     customCheck: (files) => {
@@ -2402,7 +2402,7 @@ export const CHECKS: Check[] = [
     displayScope: 'server/seo-context.ts',
     excludeLines: ['// voice-authority-ok'],
     message: 'Do not inline `voiceProfileBlock.length > 0` authority checks. Call `isVoiceProfileAuthoritative(profile, voiceProfileBlock)` — the helper encodes the full calibration + hasExplicitConfig decision so every call site stays in sync. Suppress with // voice-authority-ok only inside the helper definition itself.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Inline authority checks drift: the shadow-mode copy missed the `hasExplicitConfig` gate, silently dropping the legacy brand voice for samples-only draft profiles (PR #168 bug).',
     claudeMdRef: '#code-conventions',
   },
@@ -2442,7 +2442,7 @@ export const CHECKS: Check[] = [
     // via `generate-rules-doc.ts::describeHatch`.
     excludeLines: ['// safe-read-ok'],
     message: 'Wrap `getVoiceProfile`, `listBrandscripts`, and `listDeliverables` calls in `safeBrandEngineRead("<context>", workspaceId, () => fn(workspaceId), fallback)` so a missing-table error in test envs degrades gracefully instead of crashing buildSeoContext. Suppress with // safe-read-ok on the call line (or the line immediately above for multi-line wrapper layouts). See CLAUDE.md Code Conventions.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'A missing brand-engine table in a non-production env crashes the entire buildSeoContext call tree, and an unnarrowed catch would hide real programming bugs as silent degradation.',
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
@@ -2525,7 +2525,7 @@ export const CHECKS: Check[] = [
     fileGlobs: ['*.test.ts', '*.test.tsx'],
     excludeLines: ['// no-assertion-ok'],
     message: 'Test body has no assertion (no expect(...), assert(...), .rejects, .resolves, or `throw new Error`). A test with no assertion passes unconditionally and provides zero regression coverage. Either add an assertion or delegate to a helper that asserts (and add `// no-assertion-ok` with a comment naming the helper).',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'A vitest/jest test body with no assertion passes unconditionally — a broken implementation will not trip the suite. 2026-04-11 audit found 3 such silent-pass bodies in the stripe webhook suite claiming regression coverage they never had.',
     claudeMdRef: '#test-conventions-mandatory-for-feature-work',
     customCheck: (files) => {
@@ -3158,7 +3158,7 @@ export const CHECKS: Check[] = [
       'history is complete. Add an addActivity() call, or suppress with // activity-ok ' +
       'if this endpoint intentionally doesn\'t need activity logging (e.g. internal bookkeeping, ' +
       'analytics, settings that don\'t affect workspace content).',
-    severity: 'warn',
+    severity: 'error',
     rationale:
       'Significant admin operations that skip addActivity() leave gaps in the workspace ' +
       'activity feed, making it impossible for team members to audit what changed and when.',
@@ -3399,7 +3399,7 @@ export const CHECKS: Check[] = [
     exclude: ['server/seo-data-provider.ts'],
     excludeLines: ['// provider-date-ok'],
     message: 'Raw provider date fields (first_seen, last_seen, last_visited) must go through normalizeProviderDate() at the provider boundary, not new Date() directly. Unix-epoch strings do not parse and cause "Invalid Date" downstream. Add // provider-date-ok if the value is already normalized.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Prevents Invalid Date regressions after PR #218 A4 finding: SEMRush emits Unix epoch strings that new Date() cannot parse.',
     claudeMdRef: '#code-conventions',
   },
@@ -3410,7 +3410,7 @@ export const CHECKS: Check[] = [
     pathFilter: 'server/',
     excludeLines: ['// compkw-serp-ok'],
     message: 'competitorKeywordData entries must carry serpFeatures from the source DomainKeyword. Without it, downstream SERP-feature chip rendering and opportunity scoring go dark. See docs/rules/automated-rules.md. Add // compkw-serp-ok if intentionally dropping.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Prevents regression of PR #218 A3 finding: DomainKeyword.serpFeatures was silently dropped in the inline mapping.',
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
@@ -3474,7 +3474,7 @@ export const CHECKS: Check[] = [
       'Use resolvePagePath(page) instead of `/${page.slug}` — slug is only the final URL segment ' +
       'for nested Webflow pages. resolvePagePath() prefers publishedPath. ' +
       'Suppress with // slug-path-ok for intentional display-only slug suffixes.',
-    severity: 'warn',
+    severity: 'error',
     rationale:
       'Webflow nested pages (`/services/seo`) have slug=`seo` — using `/${page.slug}` directly ' +
       'produces wrong short URLs that break GSC matching and pagePath lookups.',
@@ -4103,7 +4103,7 @@ export const CHECKS: Check[] = [
   // utilities, hardcoded radii) — promote to error once each backlog reaches
   // zero. See docs/superpowers/plans/2026-04-24-design-system-phase5-sweep.md.
   {
-    // The rose- and pink- hue families are not in the Three Laws of Color
+    // The rose- and pink- hue families are not in the Four Laws of Color
     // palette. Forbidden alongside violet/indigo. Ships at error because the
     // backlog is genuinely zero (verified 2026-04-25). Word-boundary anchor
     // prevents `prose-` (Tailwind typography plugin) false positives.
@@ -4111,9 +4111,9 @@ export const CHECKS: Check[] = [
     pattern: '\\b(rose|pink)-[0-9]',
     fileGlobs: ['*.ts', '*.tsx'],
     pathFilter: 'src/',
-    message: 'rose- and pink- are forbidden. Use teal (actions), blue (data), emerald (success), amber (warning), or red (error) per the Three Laws of Color.',
+    message: 'rose- and pink- are forbidden. Use teal (actions), blue (data), emerald (success), amber (warning), or red (error) per the Four Laws of Color.',
     severity: 'error',
-    rationale: 'Prevents the Three Laws palette from drifting via new rose/pink imports — the same class of bug that violet/indigo represented before they were banned.',
+    rationale: 'Prevents the Four Laws palette from drifting via new rose/pink imports — the same class of bug that violet/indigo represented before they were banned.',
     claudeMdRef: '#design-system--the-four-laws-of-color',
   },
   {
@@ -4194,7 +4194,7 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // Three Laws of Color, Law #3: success/score uses emerald, never green.
+    // Four Laws of Color, Law #3: success/score uses emerald, never green.
     // CLAUDE.md explicitly forbids `text-green-400` for success/score indicators —
     // emerald and green are distinct hues and emerald is canonical. Verified zero
     // backlog (2026-04-25). The rule covers the full text-green-{N} family
@@ -4204,9 +4204,9 @@ export const CHECKS: Check[] = [
     fileGlobs: ['*.ts', '*.tsx'],
     pathFilter: 'src/',
     excludeLines: ['// green-ok'],
-    message: 'Use text-emerald-400 (or scoreColorClass() for scores). Per the Three Laws of Color, emerald is the canonical success hue — green-* drifts the palette. If green is genuinely intended (non-success indicator like an unrelated brand or chart series), add // green-ok inline.',
+    message: 'Use text-emerald-400 (or scoreColorClass() for scores). Per the Four Laws of Color, emerald is the canonical success hue — green-* drifts the palette. If green is genuinely intended (non-success indicator like an unrelated brand or chart series), add // green-ok inline.',
     severity: 'error',
-    rationale: 'Mechanizes the Three Laws Law #3 emerald-vs-green distinction. The CLAUDE.md warning is otherwise unenforced, and the bug recurs every codemod batch as workers default to "green = success" from training data.',
+    rationale: 'Mechanizes the Four Laws Law #3 emerald-vs-green distinction. The CLAUDE.md warning is otherwise unenforced, and the bug recurs every codemod batch as workers default to "green = success" from training data.',
     claudeMdRef: '#design-system--the-four-laws-of-color',
   },
   {
@@ -4328,7 +4328,7 @@ export const CHECKS: Check[] = [
   // ─── Phase 5 — Token authority ───────────────────────────────────────────────
   {
     name: 'styleguide-token-parity',
-    severity: 'warn', // promoted to error in Phase 3 after Phase 2 clears the backlog
+    severity: 'error', // promoted from warn in Phase C (2026-04-27) — zero hits verified on staging
     fileGlobs: ['*.css'],
     message:
       'public/styleguide.css must only @import url(\'/tokens.css\'); redeclaring tokens creates drift. ' +
@@ -4363,6 +4363,292 @@ export const CHECKS: Check[] = [
       }
       return hits;
     },
+  },
+
+  // ─── Phase 6A — .t-* typography parity ──────────────────────────────────────
+  {
+    name: 'styleguide-typography-parity',
+    severity: 'error',
+    fileGlobs: ['*.css'],
+    message:
+      '.t-* class definitions in public/styleguide.css must match src/index.css exactly. ' +
+      'Copy canonical values from src/index.css into public/styleguide.css.',
+    rationale:
+      'The styleguide must render specimens with the same CSS values the app uses. ' +
+      'Drift between the two files means the styleguide lies about the design system.',
+    claudeMdRef: 'Design System — Token authority',
+    displayScope: 'public/styleguide.css vs src/index.css',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+
+      // Only run when either file is in the changed set (or --all)
+      const relevantFiles = files.filter(
+        f => f.endsWith('public/styleguide.css') || f.endsWith('src/index.css') ||
+             f.endsWith('public' + path.sep + 'styleguide.css') || f.endsWith('src' + path.sep + 'index.css')
+      );
+      if (relevantFiles.length === 0 && !SCAN_ALL) return hits;
+
+      const indexCssPath = path.join(ROOT, 'src/index.css');
+      const styleguideCssPath = path.join(ROOT, 'public/styleguide.css');
+
+      let indexCss: string;
+      let styleguideCss: string;
+      try {
+        indexCss = readFileSync(indexCssPath, 'utf-8');
+        styleguideCss = readFileSync(styleguideCssPath, 'utf-8');
+      } catch {
+        return hits; // files don't exist yet
+      }
+
+      type TypoProps = {
+        fontSize?: string;
+        fontWeight?: string;
+        fontFamily?: string;
+        lineHeight?: string;
+        letterSpacing?: string;
+      };
+
+      function parseTypoClasses(css: string): Map<string, { props: TypoProps; line: number }> {
+        const result = new Map<string, { props: TypoProps; line: number }>();
+        // Match .t-<name> { ... } blocks — handles both multi-line and single-line
+        const blockRe = /\.(t-[\w-]+)\s*\{([^}]+)\}/g;
+        let m: RegExpExecArray | null;
+        while ((m = blockRe.exec(css)) !== null) {
+          const className = m[1];
+          const body = m[2];
+          const lineNum = (css.slice(0, m.index).match(/\n/g) ?? []).length + 1;
+          const props: TypoProps = {};
+
+          const fsMatch = body.match(/font-size:\s*([^;]+)/);
+          if (fsMatch) props.fontSize = fsMatch[1].trim();
+
+          const fwMatch = body.match(/font-weight:\s*([^;]+)/);
+          if (fwMatch) props.fontWeight = fwMatch[1].trim();
+
+          const ffMatch = body.match(/font-family:\s*([^;]+)/);
+          if (ffMatch) props.fontFamily = ffMatch[1].trim();
+
+          const lhMatch = body.match(/line-height:\s*([^;]+)/);
+          if (lhMatch) props.lineHeight = lhMatch[1].trim();
+
+          const lsMatch = body.match(/letter-spacing:\s*([^;]+)/);
+          if (lsMatch) props.letterSpacing = lsMatch[1].trim();
+
+          // Only store the first occurrence (canonical definition)
+          if (!result.has(className)) {
+            result.set(className, { props, line: lineNum });
+          }
+        }
+        return result;
+      }
+
+      // Normalize CSS values for comparison: -.03em → -0.03em, etc.
+      function normalizeCssValue(val: string): string {
+        return val.replace(/(^|[^0-9])-?\./g, (match) => {
+          // Insert leading zero: -.03 → -0.03, .5 → 0.5
+          return match.replace(/(-?)\./, '$10.');
+        });
+      }
+
+      function normalizeFontFamily(val: string): string {
+        // Normalize whitespace around commas and quotes for font-family comparison
+        return val.replace(/\s*,\s*/g, ',').replace(/\s+/g, ' ').trim();
+      }
+
+      function cssValuesEqual(a: string | undefined, b: string | undefined): boolean {
+        if (a === undefined || b === undefined) return a === b;
+        return normalizeCssValue(normalizeFontFamily(a)) === normalizeCssValue(normalizeFontFamily(b));
+      }
+
+      const canonical = parseTypoClasses(indexCss);
+      const styleguide = parseTypoClasses(styleguideCss);
+
+      for (const [className, { props: canonicalProps }] of canonical) {
+        const sgEntry = styleguide.get(className);
+        if (!sgEntry) {
+          // Missing class in styleguide
+          hits.push({
+            file: styleguideCssPath,
+            line: 1,
+            text: `.${className} is defined in src/index.css but missing from public/styleguide.css`,
+          });
+          continue;
+        }
+
+        const sgProps = sgEntry.props;
+        const diffs: string[] = [];
+
+        if (canonicalProps.fontSize && !cssValuesEqual(canonicalProps.fontSize, sgProps.fontSize)) {
+          diffs.push(`font-size: expected ${canonicalProps.fontSize}, got ${sgProps.fontSize ?? 'unset'}`);
+        }
+        if (canonicalProps.fontWeight && !cssValuesEqual(canonicalProps.fontWeight, sgProps.fontWeight)) {
+          diffs.push(`font-weight: expected ${canonicalProps.fontWeight}, got ${sgProps.fontWeight ?? 'unset'}`);
+        }
+        if (canonicalProps.fontFamily && !cssValuesEqual(canonicalProps.fontFamily, sgProps.fontFamily)) {
+          diffs.push(`font-family: expected ${canonicalProps.fontFamily}, got ${sgProps.fontFamily ?? 'unset'}`);
+        }
+        if (canonicalProps.lineHeight && !cssValuesEqual(canonicalProps.lineHeight, sgProps.lineHeight)) {
+          diffs.push(`line-height: expected ${canonicalProps.lineHeight}, got ${sgProps.lineHeight ?? 'unset'}`);
+        }
+        if (canonicalProps.letterSpacing && !cssValuesEqual(canonicalProps.letterSpacing, sgProps.letterSpacing)) {
+          diffs.push(`letter-spacing: expected ${canonicalProps.letterSpacing}, got ${sgProps.letterSpacing ?? 'unset'}`);
+        }
+
+        if (diffs.length > 0) {
+          hits.push({
+            file: styleguideCssPath,
+            line: sgEntry.line,
+            text: `.${className} mismatch: ${diffs.join('; ')}`,
+          });
+        }
+      }
+
+      return hits;
+    },
+  },
+
+  // ─── Phase C — 5 new rules (2026-04-27) ──────────────────────────────────────
+  // Added after Phase B domain sweeps. Rules whose backlog is zero ship at error;
+  // rules with remaining backlog ship at warn and will be promoted after a
+  // follow-up sweep drives them to zero.
+
+  {
+    // Catches raw Tailwind radius utility classes that bypass the --radius-* token
+    // system. Different from "Hardcoded card radius" (which only catches rounded-xl
+    // inside className="...") — this rule catches ALL literal rounded-* usage
+    // everywhere except the ui/ primitives that own the canonical radius values.
+    name: 'Raw rounded-* literal (use --radius-* token)',
+    pattern: 'rounded-(sm|md|lg|xl|2xl|3xl|full)',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    exclude: [
+      'src/components/ui/',
+    ],
+    excludeLines: ['// rounded-literal-ok'],
+    message: 'Use rounded-[var(--radius-sm)], rounded-[var(--radius-md)], rounded-[var(--radius-lg)], or rounded-[var(--radius-xl)] instead of raw rounded-sm/md/lg/xl. Raw radius classes do not theme-switch. Add // rounded-literal-ok inline if an exception is justified.',
+    severity: 'warn',
+    rationale: 'Raw Tailwind radius utility classes bypass the --radius-* token system and cannot theme-switch. Centralizing through tokens keeps every surface radius in lockstep.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+  },
+  {
+    // Purple and violet are forbidden in client-facing views (Law 04).
+    // This rule is stricter than the existing "Purple in client components" rule
+    // (which only catches `purple-` prefix) — it also catches `violet-`.
+    name: 'No purple/violet in client domain',
+    pattern: '(purple|violet)-[0-9]+',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/components/client/',
+    message: 'Purple and violet are forbidden in client-facing views (Law 04: purple for admin AI only). Use teal for actions, blue for data, emerald for success.',
+    severity: 'error',
+    rationale: 'Mechanizes Law 04 of the Four Laws of Color — purple is reserved for admin AI surfaces (AdminChat, SeoAudit). Client-facing views must never use purple or violet.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+  },
+  {
+    // Catches direct imports of TrendingUp/TrendingDown from lucide-react
+    // outside TrendBadge.tsx and its tests. Consumers should use <TrendBadge>
+    // instead of composing raw directional icons.
+    name: 'Trend icon import outside TrendBadge',
+    pattern: 'import.*\\b(TrendingUp|TrendingDown)\\b.*from.*lucide-react',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    exclude: [
+      'src/components/ui/TrendBadge.tsx',
+      'src/components/ui/__tests__/',
+    ],
+    excludeLines: ['// trend-icon-ok'],
+    message: 'Use <TrendBadge value={n} /> from src/components/ui/TrendBadge.tsx instead of importing TrendingUp/TrendingDown directly. The primitive consolidates color, sign handling, and zero-state.',
+    severity: 'warn',
+    rationale: 'Direct TrendingUp/TrendingDown imports bypass the TrendBadge primitive, causing drift in color (green vs emerald), sizing, and sign handling across callsites.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+  },
+  {
+    // Catches hand-rolled fixed inset-0 modals outside the overlay primitives.
+    // Modal, ConfirmDialog, and OnboardingChecklist own the canonical fixed-inset
+    // pattern. Consumer files should use <Modal> instead.
+    name: 'Hand-rolled fixed inset-0 outside overlay',
+    pattern: 'fixed[[:space:]]+inset-0',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    exclude: [
+      'src/components/ui/overlay/',
+      'src/components/ui/ConfirmDialog.tsx',
+      'src/components/ui/OnboardingChecklist.tsx',
+    ],
+    excludeLines: ['// fixed-inset-ok'],
+    message: 'Use <Modal> from src/components/ui/overlay/Modal.tsx instead of hand-rolling a fixed inset-0 backdrop. The primitive handles focus trap, escape key, scroll lock, and backdrop click.',
+    severity: 'warn',
+    rationale: 'Hand-rolled fixed inset-0 modals miss focus trapping, escape-key handling, scroll lock, and accessible labelling. The Modal primitive consolidates all of these.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+  },
+  {
+    // Verifies that scoreColorClass() in src/components/ui/constants.ts uses
+    // emerald/amber/red (Law 03: emerald for success, never green). This is a
+    // structural check — it reads the function body and asserts no `green-` colors.
+    name: 'score-color-law-parity',
+    fileGlobs: ['*.ts'],
+    message: 'scoreColorClass() in ui/constants.ts must use emerald (not green) for success per Law 03. The function return values should be text-emerald-400, text-amber-400, text-red-400.',
+    severity: 'error',
+    rationale: 'scoreColorClass() is called from 20+ components. If it drifts from emerald to green, every downstream consumer silently violates Law 03.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const constantsPath = files.find(f => f.endsWith('ui/constants.ts') || f.endsWith('ui' + path.sep + 'constants.ts'));
+      if (!constantsPath) return hits;
+      const content = readFileOrEmpty(constantsPath);
+      if (!content) return hits;
+      // Find the scoreColorClass function body with brace-depth tracking
+      // (handles if/else blocks, not just single-line ternaries)
+      const fnStart = content.search(/function\s+scoreColorClass\b/);
+      if (fnStart === -1) return hits;
+      const braceStart = content.indexOf('{', fnStart);
+      if (braceStart === -1) return hits;
+      let depth = 1;
+      let i = braceStart + 1;
+      while (i < content.length && depth > 0) {
+        if (content[i] === '{') depth++;
+        else if (content[i] === '}') depth--;
+        i++;
+      }
+      const fnBody = content.slice(braceStart + 1, i - 1);
+      const fnBodyStart = braceStart + 1;
+      // Check for any green- color references (should be emerald-)
+      const greenMatch = fnBody.match(/green-\d+/);
+      if (greenMatch) {
+        const greenPos = fnBodyStart + (fnBody.indexOf(greenMatch[0]));
+        const lineNum = (content.slice(0, greenPos).match(/\n/g) ?? []).length + 1;
+        hits.push({
+          file: constantsPath,
+          line: lineNum,
+          text: `scoreColorClass uses ${greenMatch[0]} — should use emerald-* per Law 03`,
+        });
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'Raw z-index class (use z-[var(--z-*)] tokens)',
+    pattern: '\\bz-(10|20|30|40|50|60)\\b',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    excludeLines: ['z-[var(--z-', 'z-index-ok'],
+    message:
+      'Raw z-index classes must use token form: z-10→z-[var(--z-sticky)], z-20→z-[var(--z-dropdown)], z-30→z-[var(--z-tooltip)], z-40→z-[var(--z-modal-backdrop)], z-50→z-[var(--z-modal)], z-60→z-[var(--z-toast)]. Escape hatch: // z-index-ok',
+    severity: 'error',
+    rationale: 'Ensures z-index values come from the centralized token scale in tokens.css, preventing stacking-context collisions.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
+  },
+  {
+    name: 'Raw hex chart color in component (use CHART_SERIES_COLORS)',
+    pattern: '(stroke|fill|color)=["\']#[0-9a-fA-F]{6}["\']',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: ['src/components/ui/constants.ts'],
+    excludeLines: ['chart-hex-ok', 'chartDotStroke', 'chartDotFill', 'chartGridColor', 'scoreColor(', 'url(#'],
+    message:
+      'Raw hex colors in chart props should use CHART_SERIES_COLORS from ui/constants.ts. Escape hatch: // chart-hex-ok',
+    severity: 'warn',
+    rationale: 'Centralizes chart palette into CHART_SERIES_COLORS so series colors can be updated in one place.',
+    claudeMdRef: '#design-system--the-four-laws-of-color',
   },
 ];
 

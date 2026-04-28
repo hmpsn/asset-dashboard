@@ -5,9 +5,8 @@ import {
   Loader2, Save, Sparkles, BookOpen, Users, MessageSquare,
   Plus, Pencil, Trash2, Check, Upload, Mic, Award, Map,
 } from 'lucide-react';
-import { PageHeader, SectionCard, TabBar, ErrorState, NextStepsCard, ProgressIndicator, Icon, Button } from './ui';
+import { PageHeader, SectionCard, TabBar, ErrorState, NextStepsCard, ProgressIndicator, Icon, Button, ConfirmDialog } from './ui';
 import { ErrorBoundary } from './ErrorBoundary';
-import { themeColor } from './ui/constants';
 import { workspaces } from '../api';
 import { queryKeys } from '../lib/queryKeys';
 import { BrandscriptTab } from './brand/BrandscriptTab';
@@ -88,6 +87,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
   const [editingPersonaId, setEditingPersonaId] = useState<string | null>(null);
   const [personaDraft, setPersonaDraft] = useState({ name: '', description: '', painPoints: '', goals: '', objections: '', preferredContentFormat: '', buyingStage: '' as string });
   const [generatingPersonas, setGeneratingPersonas] = useState(false);
+  const [confirmDeletePersona, setConfirmDeletePersona] = useState<AudiencePersona | null>(null);
 
   // Brand voice error + completion state
   const [showNextSteps, setShowNextSteps] = useState(false);
@@ -288,7 +288,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
               setEditingPersonaId(null);
             }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors"
-            style={{ backgroundColor: themeColor('#27272a', '#e2e8f0'), color: themeColor('#a1a1aa', '#64748b') }}
+            style={{ backgroundColor: 'var(--surface-3)', color: 'var(--brand-text)' }}
           >
             {showPersonas ? 'Close' : <><Icon as={Plus} size="sm" /> Manage</>}
           </button>
@@ -346,10 +346,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
                     <button
                       type="button"
                       aria-label={`Delete persona ${p.name}`}
-                      onClick={() => {
-                        if (!window.confirm(`Delete persona "${p.name}"? This change is applied locally and persisted when you click Save Personas.`)) return;
-                        setLocalPersonas(prev => prev.filter(x => x.id !== p.id));
-                      }}
+                      onClick={() => setConfirmDeletePersona(p)}
                       className="p-1 rounded text-[var(--brand-text-muted)] hover:text-red-400"
                     >
                       <Icon as={Trash2} size="sm" />
@@ -559,6 +556,19 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
       </div>
       </>}
     </div>
+
+    <ConfirmDialog
+      open={!!confirmDeletePersona}
+      title="Delete Persona"
+      message={confirmDeletePersona ? `Delete persona "${confirmDeletePersona.name}"? This change is applied locally and persisted when you click Save Personas.` : ''}
+      variant="destructive"
+      confirmLabel="Delete"
+      onConfirm={() => {
+        if (confirmDeletePersona) setLocalPersonas(prev => prev.filter(x => x.id !== confirmDeletePersona.id));
+        setConfirmDeletePersona(null);
+      }}
+      onCancel={() => setConfirmDeletePersona(null)}
+    />
     </ErrorBoundary>
   );
 }

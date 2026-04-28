@@ -58,7 +58,7 @@ const VAR_COLORS = [
 function VariablePill({ variable, index, onRemove }: { variable: TemplateVariable; index: number; onRemove: () => void }) {
   const color = VAR_COLORS[index % VAR_COLORS.length];
   return (
-    <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${color.bg} ${color.border}`}>
+    <div className={`flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] border ${color.bg} ${color.border}`}>
       <span className={`text-xs font-mono font-semibold ${color.text}`}>{`{${variable.name}}`}</span>
       <span className="t-caption text-[var(--brand-text)]">Label: {variable.label}</span>
       {variable.description && <span className="t-caption text-[var(--brand-text-muted)]">&mdash; {variable.description}</span>}
@@ -96,7 +96,7 @@ function SectionItem({
       onDragStart={onDragStart}
       onDragOver={onDragOver}
       onDrop={onDrop}
-      className="bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg overflow-hidden transition-colors hover:border-[var(--brand-border-hover)]"
+      className="bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] overflow-hidden transition-colors hover:border-[var(--brand-border-hover)]"
     >
       <button
         onClick={onToggle}
@@ -119,7 +119,7 @@ function SectionItem({
               value={section.headingTemplate}
               onChange={e => onUpdate({ headingTemplate: e.target.value })}
               placeholder="e.g. {service} in {city}"
-              className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
+              className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
             />
             <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
               Preview: {replaceVariables(section.headingTemplate, variables)}
@@ -132,7 +132,7 @@ function SectionItem({
               onChange={e => onUpdate({ guidance: e.target.value })}
               placeholder="AI guidance for this section..."
               rows={2}
-              className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] resize-none focus:border-teal-500/40 focus:outline-none transition-colors"
+              className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] resize-none focus:border-teal-500/40 focus:outline-none transition-colors"
             />
           </div>
           <div className="flex items-center gap-3">
@@ -143,7 +143,7 @@ function SectionItem({
                 value={section.wordCountTarget}
                 onChange={e => onUpdate({ wordCountTarget: parseInt(e.target.value) || 0 })}
                 min={0}
-                className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text)] focus:border-teal-500/40 focus:outline-none transition-colors"
+                className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] focus:border-teal-500/40 focus:outline-none transition-colors"
               />
             </div>
             <div className="flex-1">
@@ -153,7 +153,7 @@ function SectionItem({
                 value={section.cmsFieldSlug ?? ''}
                 onChange={e => onUpdate({ cmsFieldSlug: e.target.value || undefined })}
                 placeholder="hero_content"
-                className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
+                className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
               />
             </div>
           </div>
@@ -317,7 +317,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="e.g. Service \u00d7 Location Page"
-              className="w-full mt-1 px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
+              className="w-full mt-1 px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
             />
           </div>
           <div>
@@ -327,7 +327,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder="What is this template for?"
-              className="w-full mt-1 px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
+              className="w-full mt-1 px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
             />
           </div>
           <div>
@@ -335,7 +335,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
             <select
               value={pageType}
               onChange={e => setPageType(e.target.value as ContentTemplate['pageType'])}
-              className="w-full mt-1 px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text)] focus:border-teal-500/40 focus:outline-none transition-colors"
+              className="w-full mt-1 px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] focus:border-teal-500/40 focus:outline-none transition-colors"
             >
               {PAGE_TYPES.map(pt => (
                 <option key={pt} value={pt}>{pt.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}</option>
@@ -355,7 +355,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
             ))}
 
             {showAddVar ? (
-              <div className="bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg p-3 space-y-2">
+              <div className="bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] p-3 space-y-2">
                 <div className="flex items-center gap-2">
                   <div className="flex-1">
                     <input
@@ -363,7 +363,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
                       value={newVarName}
                       onChange={e => setNewVarName(e.target.value)}
                       placeholder="Variable name (e.g. city)"
-                      className="w-full px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
+                      className="w-full px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
                     />
                   </div>
                   <div className="flex-1">
@@ -372,7 +372,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
                       value={newVarLabel}
                       onChange={e => setNewVarLabel(e.target.value)}
                       placeholder="Display label (e.g. City)"
-                      className="w-full px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
+                      className="w-full px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
                     />
                   </div>
                 </div>
@@ -381,7 +381,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
                   value={newVarDesc}
                   onChange={e => setNewVarDesc(e.target.value)}
                   placeholder="Description (optional)"
-                  className="w-full px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
+                  className="w-full px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
                 />
                 <div className="flex items-center gap-2">
                   <Button variant="primary" size="sm" onClick={handleAddVariable}>
@@ -411,7 +411,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
                   value={urlPattern}
                   onChange={e => setUrlPattern(e.target.value)}
                   placeholder="/services/{city}/{service}"
-                  className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text)] font-mono placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
+                  className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] font-mono placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
                 />
                 {urlPattern && (
                   <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 font-mono">{replaceVariables(urlPattern, variables)}</p>
@@ -426,7 +426,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
                   value={keywordPattern}
                   onChange={e => setKeywordPattern(e.target.value)}
                   placeholder="{service} in {city}"
-                  className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text)] font-mono placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
+                  className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] font-mono placeholder-[var(--brand-text-muted)] focus:border-teal-500/40 focus:outline-none transition-colors"
                 />
                 {keywordPattern && (
                   <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 font-mono">{replaceVariables(keywordPattern, variables)}</p>
@@ -441,7 +441,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
                   onChange={e => setToneAndStyle(e.target.value)}
                   placeholder="Optional brand voice override..."
                   rows={2}
-                  className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] resize-none focus:border-teal-500/40 focus:outline-none transition-colors"
+                  className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] resize-none focus:border-teal-500/40 focus:outline-none transition-colors"
                 />
               </div>
             </div>
@@ -514,7 +514,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
           ))}
           <button
             onClick={handleAddSection}
-            className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg border border-dashed border-[var(--brand-border-hover)] text-xs text-[var(--brand-text)] hover:text-teal-400 hover:border-teal-500/30 transition-colors"
+            className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-[var(--radius-lg)] border border-dashed border-[var(--brand-border-hover)] text-xs text-[var(--brand-text)] hover:text-teal-400 hover:border-teal-500/30 transition-colors"
           >
             <Plus className="w-3.5 h-3.5" /> Add Section
           </button>

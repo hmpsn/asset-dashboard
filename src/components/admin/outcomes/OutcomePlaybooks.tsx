@@ -18,7 +18,7 @@ function PlaybookCard({ playbook }: { playbook: ActionPlaybook }) {
   const steps = playbook.actionSequence.map(s => s.actionType.replace(/_/g, ' '));
 
   return (
-    <div className="rounded-lg border border-[var(--brand-border)] bg-[var(--surface-2)] p-4 space-y-3">
+    <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-4 space-y-3">
       <div className="flex items-start justify-between gap-3">
         <h3 className="text-sm font-medium text-[var(--brand-text-bright)] capitalize">{playbook.name}</h3>
         <Badge label={`${playbook.confidence} confidence`} color={confidenceColor(playbook.confidence)} />

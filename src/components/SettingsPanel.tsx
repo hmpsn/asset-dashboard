@@ -152,7 +152,7 @@ export function SettingsPanel() {
               </button>
             </div>
           ) : googleStatus?.configured ? (
-            <button onClick={connectGoogle} className="flex items-center gap-1.5 px-3 py-2 rounded-[var(--radius-lg)] bg-blue-600 hover:bg-blue-500 text-white t-caption font-medium transition-colors">
+            <button onClick={connectGoogle} className="flex items-center gap-1.5 px-3 py-2 rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 text-white t-caption font-medium transition-colors">
               <Icon as={LogIn} size="sm" /> Connect Google
             </button>
           ) : (
@@ -396,7 +396,7 @@ export function SettingsPanel() {
                   disabled={!!pruning}
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] transition-colors text-left"
                 >
-                  <Icon as={Trash2} size="sm" className="text-blue-400 shrink-0" />
+                  <Icon as={Trash2} size="sm" className="text-red-400 shrink-0" />
                   <div className="flex-1">
                     <span className="t-caption text-[var(--brand-text)]">Prune activity logs</span>
                     <span className="t-caption-sm text-[var(--brand-text-muted)] ml-1.5">&gt;6 months old</span>

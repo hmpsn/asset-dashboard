@@ -34,7 +34,7 @@ The Content Planner feature has 5 UI components: TemplateEditor, MatrixGrid, Mat
 - Frontend previously used `keyword_optimized` and `client_review` which don't exist on server
 - Always verify status names match `shared/types/content.ts` MatrixCellStatus type
 
-### 4. No Purple Rule (Three Laws of Color)
+### 4. No Purple Rule (Four Laws of Color)
 - Purple is reserved for admin AI features only (AdminChat, SeoAudit)
 - All Content Planner components must use zinc/blue/amber/teal/green/orange
 - Check status legends, variable pills, badges, and detail panel elements

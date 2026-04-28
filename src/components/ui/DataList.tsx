@@ -23,11 +23,11 @@ export function DataList({ items, ranked = true, maxHeight = '300px', className 
       {items.map((item, i) => (
         <div key={i} className="flex items-center gap-2 text-xs py-1.5">
           {ranked && (
-            <span className="text-zinc-500 w-5 text-right flex-shrink-0 tabular-nums">{i + 1}</span>
+            <span className="text-[var(--brand-text-muted)] w-5 text-right flex-shrink-0 tabular-nums">{i + 1}</span>
           )}
-          <span className="text-zinc-300 truncate flex-1 min-w-0" title={item.label}>{item.label}</span>
-          {item.sub && <span className="text-zinc-500 flex-shrink-0 text-[11px]">{item.sub}</span>}
-          <span className={`flex-shrink-0 tabular-nums ${item.valueColor ?? 'text-zinc-400'}`}>{item.value}</span>
+          <span className="text-[var(--brand-text)] truncate flex-1 min-w-0" title={item.label}>{item.label}</span>
+          {item.sub && <span className="text-[var(--brand-text-muted)] flex-shrink-0 t-caption-sm">{item.sub}</span>}
+          <span className={`flex-shrink-0 tabular-nums ${item.valueColor ?? 'text-[var(--brand-text)]'}`}>{item.value}</span>
           {item.extra}
         </div>
       ))}

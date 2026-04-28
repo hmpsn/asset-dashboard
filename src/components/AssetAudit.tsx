@@ -231,14 +231,14 @@ function AssetAudit({ siteId, workspaceId }: Props) {
   if (!hasRun) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
-        <div className="w-16 h-16 rounded-2xl bg-[var(--surface-2)] flex items-center justify-center">
+        <div className="w-16 h-16 rounded-[var(--radius-xl)] bg-[var(--surface-2)] flex items-center justify-center">
           <Icon as={AlertTriangle} size="2xl" className="text-[var(--brand-text-muted)]" />
         </div>
         <p className="text-[var(--brand-text)] t-body">Scan your Webflow site for asset issues</p>
         <p className="t-caption text-[var(--brand-text-muted)]">Checks for missing alt text, oversized files, unused assets, and more</p>
         <button
           onClick={runAudit}
-          className="px-5 py-2.5 bg-teal-600 hover:bg-teal-500 rounded-lg t-body font-medium transition-colors"
+          className="px-5 py-2.5 bg-teal-600 hover:bg-teal-500 rounded-[var(--radius-lg)] t-body font-medium transition-colors"
         >
           Run Asset Audit
         </button>
@@ -268,7 +268,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
         <button
           onClick={() => setActiveFilter(null)}
           className={cn('bg-[var(--surface-2)] p-5 border text-left transition-colors', activeFilter === null ? 'border-[var(--brand-border-hover)]' : 'border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]')}
-          style={{ borderRadius: '6px 12px 6px 12px' }}
+          style={{ borderRadius: 'var(--radius-signature)' }}
         >
           <div className={cn('text-3xl font-bold', scoreColor)}>{score}</div>
           <div className="t-caption text-[var(--brand-text-muted)] mt-1">Health Score</div>
@@ -278,7 +278,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
         <button
           onClick={() => setActiveFilter(activeFilter === 'missing-alt' ? null : 'missing-alt')}
           className={cn('bg-[var(--surface-2)] p-5 border text-left transition-colors', activeFilter === 'missing-alt' ? 'border-amber-500/50' : 'border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]')}
-          style={{ borderRadius: '6px 12px 6px 12px' }}
+          style={{ borderRadius: 'var(--radius-signature)' }}
         >
           <div className="text-3xl font-bold text-amber-400">{audit.missingAlt}</div>
           <div className="t-caption text-[var(--brand-text-muted)] mt-1">Missing Alt Text</div>
@@ -290,7 +290,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
         <button
           onClick={() => setActiveFilter(activeFilter === 'oversized' ? null : 'oversized')}
           className={cn('bg-[var(--surface-2)] p-5 border text-left transition-colors', activeFilter === 'oversized' ? 'border-orange-500/50' : 'border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]')}
-          style={{ borderRadius: '6px 12px 6px 12px' }}
+          style={{ borderRadius: 'var(--radius-signature)' }}
         >
           <div className="text-3xl font-bold text-orange-400">{audit.oversized}</div>
           <div className="t-caption text-[var(--brand-text-muted)] mt-1">Oversized</div>
@@ -301,8 +301,12 @@ function AssetAudit({ siteId, workspaceId }: Props) {
 
         <button
           onClick={() => setActiveFilter(activeFilter === 'unused' ? null : 'unused')}
-          className={cn('bg-[var(--surface-2)] p-5 border text-left transition-colors', activeFilter === 'unused' ? 'border-zinc-500/50' : 'border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]')}
-          style={{ borderRadius: '6px 12px 6px 12px' }}
+          className={cn('bg-[var(--surface-2)] p-5 border text-left transition-colors',
+            activeFilter === 'unused'
+              ? 'border-zinc-500/50' // raw-zinc-ok
+              : 'border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]'
+          )}
+          style={{ borderRadius: 'var(--radius-signature)' }}
         >
           <div className="text-3xl font-bold text-[var(--brand-text)]">{audit.unused}</div>
           <div className="t-caption text-[var(--brand-text-muted)] mt-1">Unused</div>
@@ -332,7 +336,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
 
       {/* Bulk progress bars */}
       {bulkAltProgress && (
-        <div className="flex items-center gap-3 px-4 py-3 bg-teal-950/50 border border-teal-800/50 rounded-lg">
+        <div className="flex items-center gap-3 px-4 py-3 bg-teal-950/50 border border-teal-800/50 rounded-[var(--radius-lg)]">
           <Loader2 className="w-4 h-4 animate-spin text-teal-400" />
           <div className="flex-1">
             <div className="t-body text-teal-200">
@@ -348,7 +352,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
         </div>
       )}
       {bulkCompressProgress && (
-        <div className="flex items-center gap-3 px-4 py-3 bg-blue-950/50 border border-blue-800/50 rounded-lg">
+        <div className="flex items-center gap-3 px-4 py-3 bg-blue-950/50 border border-blue-800/50 rounded-[var(--radius-lg)]">
           <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
           <div className="flex-1">
             <div className="t-body text-blue-200">
@@ -368,7 +372,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
       )}
 
       {/* Sticky toolbar */}
-      <div className="sticky top-0 z-10 bg-[var(--surface-1)]/95 backdrop-blur-sm py-2 space-y-3">
+      <div className="sticky top-0 z-[var(--z-sticky)] bg-[var(--surface-1)]/95 backdrop-blur-sm py-2 space-y-3">
         {/* Search + sort */}
         <div className="flex items-center gap-3">
           <div className="relative flex-1">
@@ -378,14 +382,14 @@ function AssetAudit({ siteId, workspaceId }: Props) {
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search issues by name or page..."
-              className="w-full pl-10 pr-4 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg t-body focus:outline-none focus:border-[var(--brand-border-hover)]"
+              className="w-full pl-10 pr-4 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-body focus:outline-none focus:border-[var(--brand-border-hover)]"
             />
           </div>
           <div className="relative">
             <select
               value={sort}
               onChange={e => setSort(e.target.value as SortField)}
-              className="appearance-none pl-3 pr-8 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg t-body focus:outline-none cursor-pointer"
+              className="appearance-none pl-3 pr-8 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-body focus:outline-none cursor-pointer"
             >
               <option value="issues">Most Issues</option>
               <option value="size">Largest</option>
@@ -401,7 +405,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
             <button
               onClick={handleBulkGenerateAlt}
               disabled={!!bulkAltProgress}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-lg t-caption font-medium transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
             >
               <Icon as={Sparkles} size="md" />
               {bulkAltProgress
@@ -413,7 +417,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
             <button
               onClick={handleBulkCompress}
               disabled={!!bulkCompressProgress}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-700 hover:bg-blue-600 disabled:opacity-50 rounded-lg t-caption font-medium transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-700 hover:bg-blue-600 disabled:opacity-50 rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
             >
               <Icon as={Minimize2} size="md" />
               {bulkCompressProgress
@@ -425,7 +429,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
             <button
               onClick={handleDeleteUnused}
               disabled={deletingUnused}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-900/50 hover:bg-red-800 text-red-300 rounded-lg t-caption font-medium transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-900/50 hover:bg-red-800 text-red-300 rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
             >
               <Icon as={Trash2} size="md" />
               {deletingUnused ? 'Deleting...' : `Delete All Unused (${audit.unused})`}
@@ -437,7 +441,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
                 <button
                   onClick={handleBulkGenerateAlt}
                   disabled={!!bulkAltProgress}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-lg t-caption font-medium transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
                 >
                   <Icon as={Sparkles} size="md" /> Generate All Alt Text ({audit.missingAlt})
                 </button>
@@ -446,7 +450,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
                 <button
                   onClick={handleBulkCompress}
                   disabled={!!bulkCompressProgress}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-700 hover:bg-blue-600 disabled:opacity-50 rounded-lg t-caption font-medium transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-700 hover:bg-blue-600 disabled:opacity-50 rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
                 >
                   <Icon as={Minimize2} size="md" /> Compress All ({audit.oversized + unoptimizedPngCount})
                 </button>
@@ -455,7 +459,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
                 <button
                   onClick={handleDeleteUnused}
                   disabled={deletingUnused}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-900/50 hover:bg-red-800 text-red-300 rounded-lg t-caption font-medium transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-900/50 hover:bg-red-800 text-red-300 rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
                 >
                   <Icon as={Trash2} size="md" /> Remove Unused ({audit.unused})
                 </button>
@@ -464,14 +468,14 @@ function AssetAudit({ siteId, workspaceId }: Props) {
           )}
           <button
             onClick={handleExportCSV}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] rounded-lg t-caption font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
             title="Export audit as CSV"
           >
             <Icon as={Download} size="md" /> Export
           </button>
           <button
             onClick={runAudit}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] rounded-lg t-caption font-medium transition-colors ml-auto"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] rounded-[var(--radius-lg)] t-caption font-medium transition-colors ml-auto"
           >
             <Icon as={RefreshCw} size="md" /> Re-scan
           </button>
@@ -497,7 +501,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
           </div>
         ) : (
           filteredIssues.map(issue => (
-            <div key={issue.assetId} className="flex items-center gap-3 px-4 py-3 bg-[var(--surface-2)] hover:bg-[var(--surface-3)]/50 border border-[var(--brand-border)] transition-colors group" style={{ borderRadius: '6px 12px 6px 12px' }}>
+            <div key={issue.assetId} className="flex items-center gap-3 px-4 py-3 bg-[var(--surface-2)] hover:bg-[var(--surface-3)]/50 border border-[var(--brand-border)] transition-colors group" style={{ borderRadius: 'var(--radius-signature)' }}>
               {/* Thumbnail — click for lightbox */}
               <button
                 className="w-10 h-10 rounded bg-[var(--surface-3)] overflow-hidden flex-shrink-0 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-zinc-600 transition-all"
@@ -590,7 +594,8 @@ function AssetAudit({ siteId, workspaceId }: Props) {
       </div>
       {/* Lightbox modal */}
       {lightboxIssue && lightboxIssue.url && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setLightboxIssue(null)}>
+        <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/80 backdrop-blur-sm" // fixed-inset-ok — image lightbox
+            onClick={() => setLightboxIssue(null)}>
           <div className="relative max-w-4xl max-h-[90vh] w-full mx-4" onClick={e => e.stopPropagation()}>
             <button
               onClick={() => setLightboxIssue(null)}
@@ -598,7 +603,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
             >
               <Icon as={X} size="lg" />
             </button>
-            <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
+            <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature)' }}>
               <div className="flex items-center justify-center bg-[var(--surface-1)] p-6 min-h-[300px] max-h-[60vh]">
                 <img
                   src={lightboxIssue.url}
@@ -663,7 +668,7 @@ function AssetAudit({ siteId, workspaceId }: Props) {
                   )}
                   <button
                     onClick={() => { navigator.clipboard.writeText(lightboxIssue.url || ''); }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--surface-3)] hover:bg-zinc-700 rounded t-caption font-medium transition-colors ml-auto"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--surface-3)] hover:bg-[var(--surface-3)] rounded t-caption font-medium transition-colors ml-auto"
                   >
                     <Icon as={Copy} size="sm" /> Copy URL
                   </button>

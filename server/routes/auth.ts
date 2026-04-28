@@ -47,7 +47,7 @@ router.post('/api/auth/logout', (_req, res) => {
 router.get('/api/auth/check', (req, res) => {
   if (!APP_PASSWORD) return res.json({ required: false });
   const token = (req.headers['x-auth-token'] || req.cookies?.auth_token || '') as string;
-  res.json({ required: true, authenticated: token === APP_PASSWORD || verifyAdminToken(token) });
+  res.json({ required: true, authenticated: verifyAdminToken(token) });
 });
 
 // ── User-based JWT Auth ──

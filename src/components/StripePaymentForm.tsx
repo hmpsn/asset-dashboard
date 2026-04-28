@@ -71,8 +71,8 @@ function PaymentFormInner({ amount, productName, onSuccess, onCancel }: PaymentF
           <Icon as={CheckCircle2} size="2xl" className="text-teal-400" />
         </div>
         <div className="text-center">
-          <div className="text-sm font-semibold text-zinc-100">Payment Successful</div>
-          <div className="text-xs text-zinc-500 mt-1">{fmt(amount)} paid for {productName}</div>
+          <div className="t-body font-semibold text-zinc-100">Payment Successful</div> {/* raw-zinc-ok */}
+          <div className="t-caption text-zinc-500 mt-1">{fmt(amount)} paid for {productName}</div> {/* raw-zinc-ok */}
         </div>
       </div>
     );
@@ -104,7 +104,7 @@ function PaymentFormInner({ amount, productName, onSuccess, onCancel }: PaymentF
         disabled={!stripe || processing}
         loading={processing}
         icon={processing ? undefined : Lock}
-        className="w-full py-3 text-sm font-semibold shadow-lg shadow-teal-900/40 active:scale-[0.98]"
+        className="w-full py-3 t-body font-semibold shadow-lg shadow-teal-900/40 active:scale-[0.98]"
       >
         {processing ? 'Processing…' : `Pay ${fmt(amount)}`}
       </Button>
@@ -114,7 +114,7 @@ function PaymentFormInner({ amount, productName, onSuccess, onCancel }: PaymentF
         type="button"
         onClick={onCancel}
         disabled={processing}
-        className="w-full px-4 py-2 rounded-[var(--radius-xl)] text-xs text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 transition-all flex items-center justify-center gap-1.5"
+        className="w-full px-4 py-2 rounded-[var(--radius-xl)] t-caption text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 transition-all flex items-center justify-center gap-1.5" // raw-zinc-ok
       >
         <Icon as={ArrowLeft} size="md" />
         Back
@@ -123,13 +123,13 @@ function PaymentFormInner({ amount, productName, onSuccess, onCancel }: PaymentF
       {/* Trust footer — always-dark per Stripe modal constraint */}
       <div className="flex items-center justify-center gap-4 pt-1">
         <div className="flex items-center gap-1.5">
-          <Icon as={Shield} size="sm" className="text-zinc-500" />
-          <span className="text-xs text-zinc-500">SSL Encrypted</span>
+          <Icon as={Shield} size="sm" className="text-zinc-500" /> {/* raw-zinc-ok */}
+          <span className="t-caption text-zinc-500">SSL Encrypted</span> {/* raw-zinc-ok */}
         </div>
-        <div className="w-px h-3 bg-zinc-700" />
+        <div className="w-px h-3 bg-zinc-700" /> {/* raw-zinc-ok */}
         <div className="flex items-center gap-1.5">
-          <svg className="w-3 h-3 text-zinc-500" viewBox="0 0 24 24" fill="currentColor"><path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z"/></svg>
-          <span className="text-xs text-zinc-500">Powered by Stripe</span>
+          <svg className="w-3 h-3 text-zinc-500" /* raw-zinc-ok */ viewBox="0 0 24 24" fill="currentColor"><path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z"/></svg>
+          <span className="t-caption text-zinc-500">Powered by Stripe</span> {/* raw-zinc-ok */}
         </div>
       </div>
     </form>
@@ -165,7 +165,7 @@ export function StripePaymentForm({
   if (!stripePromise || !clientSecret) {
     return (
       <div className="flex items-center justify-center py-10">
-        <Icon as={Loader2} size="lg" className="animate-spin text-zinc-500" />
+        <Icon as={Loader2} size="lg" className="animate-spin text-zinc-500" /> {/* raw-zinc-ok */}
       </div>
     );
   }
@@ -175,7 +175,7 @@ export function StripePaymentForm({
       stripe={stripePromise}
       options={{
         clientSecret,
-        // Stripe Elements appearance is always dark — the payment modal container (bg-zinc-900)
+        // Stripe Elements appearance is always dark — the payment modal container (bg-zinc-900) raw-zinc-ok
         // is dark regardless of page theme. Do not use themeColor() here.
         appearance: {
           theme: 'night',
@@ -192,7 +192,7 @@ export function StripePaymentForm({
             fontSizeBase: '13px',
             fontSizeSm: '12px',
             fontSizeXs: '11px',
-            borderRadius: '10px',
+            borderRadius: '10px', // raw-zinc-ok — Stripe Elements config
             spacingUnit: '4px',
             spacingGridRow: '14px',
             spacingTab: '10px',
@@ -220,7 +220,7 @@ export function StripePaymentForm({
             '.Tab': {
               backgroundColor: 'transparent',
               border: '1px solid rgba(63, 63, 70, 0.4)',
-              borderRadius: '8px',
+              borderRadius: '8px', // raw-zinc-ok — Stripe Elements config
               boxShadow: 'none',
               transition: 'all 0.15s ease',
             },
@@ -310,7 +310,7 @@ export function StripePaymentModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/70 backdrop-blur-md z-[70] flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/70 backdrop-blur-md z-[70] flex items-center justify-center p-4" // fixed-inset-ok — payment form overlay // z-index-ok — above modal scale for payment
       onClick={onClose}
     >
       {/* Stripe payment modal must be ALWAYS DARK regardless of dashboard theme.
@@ -321,13 +321,13 @@ export function StripePaymentModal({
           replace these zinc-* values with `--surface-*` / `--brand-text-*`
           tokens. See the same warning at line 178. */}
       <div
-        className="relative bg-zinc-900 border border-zinc-700/50 rounded-2xl shadow-2xl shadow-black/50 w-full max-w-md overflow-hidden animate-[scaleIn_0.2s_ease-out]"
+        className="relative bg-zinc-900 border border-zinc-700/50 rounded-[var(--radius-xl)] shadow-2xl shadow-black/50 w-full max-w-md overflow-hidden animate-[scaleIn_0.2s_ease-out]" // raw-zinc-ok
         onClick={e => e.stopPropagation()}
       >
         {/* Close button — always-dark per modal constraint */}
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 w-7 h-7 rounded-[var(--radius-lg)] flex items-center justify-center bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors z-10"
+          className="absolute top-3 right-3 w-7 h-7 rounded-[var(--radius-lg)] flex items-center justify-center bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors z-[var(--z-sticky)]" // raw-zinc-ok
         >
           <Icon as={X} size="md" />
         </button>
@@ -336,9 +336,9 @@ export function StripePaymentModal({
         <div className="relative px-6 pt-6 pb-4 overflow-hidden bg-gradient-to-br from-teal-600/15 via-emerald-600/10 to-transparent">
           <div className="absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl opacity-20 bg-teal-500" />
           <div className="relative">
-            <div className="text-sm font-semibold text-zinc-100 mb-1">{productName}</div>
-            <div className="text-xs text-zinc-500">{topic}</div>
-            <div className="text-xs mt-0.5 text-teal-400/80">
+            <div className="t-body font-semibold text-zinc-100 mb-1">{productName}</div> {/* raw-zinc-ok */}
+            <div className="t-caption text-zinc-500">{topic}</div> {/* raw-zinc-ok */}
+            <div className="t-caption mt-0.5 text-teal-400/80">
               Keyword: &ldquo;{targetKeyword}&rdquo;
             </div>
           </div>
@@ -348,7 +348,7 @@ export function StripePaymentModal({
             <span className="text-lg font-bold tracking-tight text-teal-300">
               {fmt(amount)}
             </span>
-            <span className="text-xs text-zinc-500">one-time</span>
+            <span className="t-caption text-zinc-500">one-time</span> {/* raw-zinc-ok */}
           </div>
         </div>
 

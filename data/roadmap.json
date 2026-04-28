@@ -1,6 +1,407 @@
 {
   "sprints": [
     {
+      "id": "sprint-polish-quick-wins",
+      "name": "Polish & Quick Wins",
+      "hours": "14-20",
+      "rationale": "P1 items and fast visual wins — closes open UX gaps and knocks out the QA backlog before hardening begins.",
+      "items": [
+        {
+          "id": 503,
+          "title": "Unified Notification Hub — Merge NotificationBell + TaskPanel",
+          "source": "UI_UX_AUDIT §7",
+          "est": "3-4h",
+          "priority": "P1",
+          "notes": "Current fragmentation: NotificationBell (top right), TaskPanel (processing queue), inline toasts, email queue. Create unified notification center with categories: Actions Needed (approvals, requests), System Events (audits complete), Alerts (score drops). Add notification preferences per workspace.\n[Audit 2026-04-22 partial] NotificationBell and TaskPanel both ship as separate components rendered side-by-side; no unified hub merges their categories.",
+          "status": "pending"
+        },
+        {
+          "id": 535,
+          "title": "CMS Editor UX Redesign — Match SeoEditor simplicity",
+          "source": "PR #138 review / manual testing",
+          "est": "3-5h",
+          "priority": "P1",
+          "notes": "CmsEditor UI/UX is noticeably rougher than the clean static-page SeoEditor. Redesign to match: consistent card layout, inline field editing, clear save/publish flow, per-collection grouping with search/filter. Consider shared editing primitives between CmsEditor and SeoEditor to prevent future drift.\n[Audit 2026-04-22 partial] CmsEditor.tsx already shares SeoEditor primitives (CharacterCounter, SerpPreview, SocialPreview, StatusBadge, statusBorderClass) and the PendingApprovals panel; full layout-parity redesign vs SeoEditor is unverified.",
+          "status": "pending"
+        },
+        {
+          "id": 624,
+          "title": "Stripe payment modal — visual QA in test mode (light + dark)",
+          "source": "Phase 5 Phase 2 follow-up — PR #314",
+          "est": "10-15m",
+          "priority": "P1",
+          "notes": "Phase 2 token sweep PR #314 touched StripePaymentForm.tsx + StripePaymentModal.tsx + inner PaymentFormInner. Devin caught the always-dark constraint (Stripe Elements is hardcoded to theme: 'night') and the changes were reverted to hardcoded zinc shades with a comment block warning future migrations. Reverts are clean on main, but a real test-mode checkout flow visually confirming no regressions (light mode + dark mode side-by-side) was deferred from the original ship cycle. Use Stripe test card 4242 4242 4242 4242 — confirm modal renders correctly, payment intent succeeds, success state matches prior look. Risk if skipped: low (code-level diff confirms no theme-token references remain).",
+          "status": "pending"
+        },
+        {
+          "id": 625,
+          "title": "Mobile breakpoint visual smoke — Phase 5 token migration",
+          "source": "Phase 5 Phase 2 follow-up — staging smoke gap",
+          "est": "15-20m",
+          "priority": "P1",
+          "notes": "Phase 2 codemod batches touched ~225 components but the original staging smoke test on 2026-04-25 only exercised desktop breakpoints — the resize_window MCP call didn't take effect on the Chrome instance. Tailwind responsive utilities are unchanged at the codemod level (only color tokens swapped, not breakpoint prefixes), but token swaps at breakpoint-conditional className boundaries could have edge cases. Test at 375 (mobile), 640 (sm), 768 (md), 1024 (lg) breakpoints across: WorkspaceOverview (admin home), ClientDashboard (overview/strategy/content tabs), SeoAudit (audit results table), Settings (Workspace + Client tabs). Look for: stacked vs grid layouts, button sizes, table overflow, sidebar collapse. Risk if skipped: medium — a regression at one breakpoint is invisible on desktop testing.",
+          "status": "pending"
+        },
+        {
+          "id": 626,
+          "title": "Harden flaky brand-engine + brand-identity integration tests",
+          "source": "CI flakiness — recurring on staging push runs",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Two recurring failure modes in parallel-run integration tests, same root cause (test server not ready when first request fires, or server crash mid-suite under parallel load):\n\n1. tests/integration/brand-engine-routes.test.ts (port 13317) — DELETE voice samples test fails with `SyntaxError: Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON`. The Express server's startServer() promise resolves but the route registry isn't ready, so the POST /api/voice/.../samples returns Vite's SPA fallback HTML. Hit on 2026-04-27 staging push (PR #322 merge).\n\n2. tests/integration/brand-identity-hardening.test.ts (port unknown) — 4 tests fail with `TypeError: fetch failed / SocketError: other side closed`. Server connection drops mid-test. Hit on 2026-04-27 PR #319 round-3 commit CI run.\n\nBoth have unique ports (no collision per pr-check rule). Both pass on rerun, blocking confirmation that they aren't real bugs. Fixes to investigate:\n- Add explicit await for server.listen() callback before resolving startServer()\n- Add retry-on-HTML-response in postJson/del helpers (quick guard)\n- Consider --threads=1 for integration tests in CI (slower but eliminates parallelism)\n- Add a health-check ping in beforeAll() to wait for server readiness\n\nGoal: zero false-failure CI runs from these test files over 2 weeks of normal merge cadence. Stretch: extract a shared `waitForServer(port)` helper to tests/integration/helpers.ts so all integration suites benefit.",
+          "status": "pending"
+        },
+        {
+          "id": 306,
+          "title": "Schema: Write generated schema to CMS collection field",
+          "source": "Schema bulk generation discussion",
+          "est": "3-4h",
+          "priority": "P1",
+          "notes": "Allow writing generated schema JSON to a designated CMS collection field (e.g. 'schema-markup' rich text or plain text field) via Webflow CMS API. Would enable CMS-driven schema injection without Webflow custom code embeds. Also consider: cap CMS pages in bulk gen, add overall timeout/token budget, skip CMS pages matching existing CMS template.",
+          "status": "pending"
+        },
+        {
+          "id": 517,
+          "title": "Form Validation Standardization — React Hook Form + Zod",
+          "source": "UI_UX_AUDIT §9",
+          "est": "3-4h",
+          "priority": "P2",
+          "notes": "Replace basic HTML validation with consistent form library. Inline field-level validation with clear errors. aria-invalid + aria-describedby support. Success states for valid fields.",
+          "status": "pending"
+        },
+        {
+          "id": 518,
+          "title": "Loading State Consistency — Unified skeleton system",
+          "source": "UI_UX_AUDIT §3",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Standardize loading patterns: route-level (keep ChunkFallback), data fetching (skeleton screens), actions (button loading + optimistic UI), background jobs (progress panel).\n[Audit 2026-04-22 partial] Skeleton primitive widely adopted (169 usages across 34 files including Roadmap, ClientDashboard, AdminInbox, brand/*, client/*); no formal standardization rule, lint, or codified loading-pattern doc.",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "sprint-hardening",
+      "name": "Hardening Pass",
+      "hours": "28-42",
+      "rationale": "Data normalization, validation coverage, test gaps, and small code-quality fixes that reduce future bug surface.",
+      "items": [
+        {
+          "id": 598,
+          "title": "Extend useWorkspaceEvents centralization rule to catch string-literal duplicates",
+          "source": "PR #254 code review flag 3",
+          "est": "1-2h",
+          "priority": "P2",
+          "notes": "The pr-check rule added in #597 only matches [WS_EVENTS.X] computed-property patterns. Components using raw string literals like 'activity:new' bypass it entirely. Fix: at check time, build a reverse map of WS_EVENTS string values → constant names from wsEvents.ts, then flag raw string literal subscriptions whose value matches a centralized event (unless ws-invalidation-ok hatch present). After the WorkspaceHome fix in PR #254 only ClientDashboard retains string-literal handlers — that's the one legitimate case (client route, useWsInvalidation not mounted there), so it would need a ws-invalidation-ok hatch. Low-risk, ~1h of pr-check work.",
+          "status": "pending"
+        },
+        {
+          "id": 595,
+          "title": "JSDoc @reads/@writes convention for read/write asymmetry prevention",
+          "source": "Devin review of PR #249 + recurring asymmetry bug pattern",
+          "est": "3-5h",
+          "priority": "P2",
+          "notes": "Recurring bug pattern: GET endpoint short-circuits on one data source (e.g. ws.keywordStrategy) while writes populate adjacent storage (e.g. page_keywords table). Examples: PR #248 (PageIntelligence case-sensitivity), PR #249 (synthesized shell for partial state). Proposed convention: every GET handler gets a `@reads: <table|blob>, <table|blob>, ...` JSDoc tag; every write handler gets a matching `@writes: ...` tag. Mechanize with a pr-check rule that parses these tags across all routes and flags tables that are written without a corresponding read endpoint (or vice versa). Deliverables: (1) tag convention documented in docs/rules/automated-rules.md, (2) pr-check rule that parses @reads/@writes from route files and builds a read/write graph, (3) initial annotation pass on the 10 most-touched routes. Audit pass to find existing asymmetry: grep for `if (!ws\\.\\w+) return.*json\\(null\\)` patterns across server/routes/.",
+          "status": "pending"
+        },
+        {
+          "id": 594,
+          "title": "Server-side page-join assembler audit (Option 2 scoping)",
+          "source": "Post-slug-path-hardening discussion 2026-04-21",
+          "est": "4-6h",
+          "priority": "P2",
+          "notes": "Audit-only task. Grep every client-side pairing site across the platform (pages↔strategy, pages↔GSC, pages↔insights, pages↔content pipeline, pages↔page keywords, keywords↔rank tracking). For each join, document: (a) which components consume it, (b) what fields each consumer actually reads, (c) invalidation surface (which writes should trigger a refetch), (d) whether it's worth lifting to a server-side assembler (extending server/workspace-intelligence.ts pattern) vs leaving as a client hook. Output: planning doc with per-join recommendation table. Do NOT implement — this is scoping work to decide platform-wide architecture. Prerequisite for any multi-phase server-join refactor.",
+          "status": "pending"
+        },
+        {
+          "id": 587,
+          "title": "Shared WebSocket event bus — eliminate per-hook WS connections",
+          "source": "Platform Health Sprint PR1 Devin review (2026-04-14)",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "useWorkspaceEvents() creates a new WebSocket connection per call. SeoEditor + SeoAudit (and other multi-hook components) each open dedicated WS connections, scaling linearly with component count. Fix: lift workspace WS connection to a shared React context (or use the existing event bus pattern) so all hooks share one connection per workspaceId. Not urgent — connections close on unmount, but it's wasteful and could cause scaling issues with many concurrent users.",
+          "status": "pending"
+        },
+        {
+          "id": 577,
+          "title": "Page Rewriter: applyToSection feedback when target heading not found",
+          "source": "PR #159 code review flag",
+          "est": "0.5h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "When AI sectionTarget slug doesn't match any data-section heading, show a toast (e.g. 'Section not found — content inserted at end') instead of silently appending to document end. Deferred from PR #159."
+        },
+        {
+          "id": 578,
+          "title": "Page Rewriter: expand HTML tokenizer to capture <div>, <li>, <blockquote> body text",
+          "source": "PR #159 code review flag",
+          "est": "1-2h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "extractPageSections() only tokenizes <h1-6> and <p> tags. Pages using <div> wrappers for body text (common in Webflow CMS templates) produce sections with empty body fields. Expand the two-pass tokenizer to also capture <li>, <blockquote>, and non-empty <div> text nodes. Deferred from PR #159."
+        },
+        {
+          "id": 574,
+          "title": "JSON validation follow-up: schema coverage for high-value parseJsonFallback columns",
+          "source": "TECH DEBT",
+          "est": "1.5h",
+          "priority": "P2",
+          "notes": "Three deferred items from typed-contracts PR (#87) code review: (1) work-orders.ts has bare JSON.parse calls not migrated in the PR — add parseJsonFallback or parseJsonSafeArray. (2) recommendations.ts and reports.ts use parseJsonFallback for high-value recommendation/summary data — add Zod schemas (RecommendationSchema, SummarySchema) and switch to parseJsonSafe with typed fallback. (3) pageKeywordMapSchema missing ~16 optional fields from PageKeywordMap interface — harmless due to .passthrough() but represents schema drift; add optional fields to keep schema in sync for future required-field additions.",
+          "status": "pending"
+        },
+        {
+          "id": 599,
+          "title": "Per-feature usage budgets (split strategy_generations pool)",
+          "source": "PR #255 code review — Devin comment on shared billing pool",
+          "est": "4-6h",
+          "priority": "P2",
+          "notes": "All AI generation endpoints (keyword strategy, brand voice, knowledge base, personas, alt-text, brand identity deliverables) share a single 'strategy_generations' pool (free=0, growth=3, premium=∞). A user who generates a knowledge base + brand voice + personas exhausts their limit and can no longer generate alt text or deliverables — surprising UX. Options: (1) split into named sub-pools per feature category (e.g. 'brand_generations', 'seo_generations') each with their own limits; (2) raise the shared pool limit; (3) tier-specific per-feature overrides. Requires migration to add new usage_tracking feature keys, updating checkUsageLimit/incrementUsage call sites across all guarded routes, and updating client-facing usage display (if any). Coordinate with MONETIZATION.md tier redesign if limits are revisited.",
+          "status": "pending"
+        },
+        {
+          "id": 365,
+          "title": "Normalize contentGaps into dedicated SQLite table",
+          "source": "TECH DEBT",
+          "est": "2h",
+          "priority": "P2",
+          "notes": "Extract keywordStrategy.contentGaps[] into a content_gaps table keyed by (workspace_id, target_keyword). Enables per-gap voting/updates without rewriting the full strategy blob. Read by client portal (StrategyTab), briefs (anti-cannibalization), and content planner. Pattern: same as #364 (page_keywords). ~6 reader/writer call sites.",
+          "status": "pending"
+        },
+        {
+          "id": 367,
+          "title": "Normalize quickWins into dedicated SQLite table",
+          "source": "TECH DEBT",
+          "est": "1.5h",
+          "priority": "P3",
+          "notes": "Extract keywordStrategy.quickWins[] into a quick_wins table keyed by (workspace_id, page_path). Read by client portal and strategy UI. Lower priority since these are regenerated wholesale (not individually updated). Pattern: same as #364. ~4 call sites.",
+          "status": "pending"
+        },
+        {
+          "id": 368,
+          "title": "Normalize keywordGaps into dedicated SQLite table",
+          "source": "TECH DEBT",
+          "est": "1.5h",
+          "priority": "P3",
+          "notes": "Extract keywordStrategy.keywordGaps[] into a keyword_gaps table keyed by (workspace_id, keyword). Read by client portal and strategy UI. Regenerated wholesale during strategy generation. Pattern: same as #364. ~4 call sites.",
+          "status": "pending"
+        },
+        {
+          "id": 369,
+          "title": "Normalize topicClusters into dedicated SQLite table",
+          "source": "TECH DEBT",
+          "est": "2h",
+          "priority": "P3",
+          "notes": "Extract keywordStrategy.topicClusters[] into a topic_clusters table keyed by (workspace_id, topic). Read by internal links (intra-cluster linking), cannibalization detection, and client portal. Grows proportionally with site size. Pattern: same as #364. ~5 call sites.",
+          "status": "pending"
+        },
+        {
+          "id": 370,
+          "title": "Normalize cannibalization into dedicated SQLite table",
+          "source": "TECH DEBT",
+          "est": "2h",
+          "priority": "P3",
+          "notes": "Extract keywordStrategy.cannibalization[] into a cannibalization_issues table keyed by (workspace_id, keyword). Enables historical tracking of cannibalization over time (currently overwritten each run). Already has its own detection module (cannibalization-detection.ts) but results stored in strategy blob. Pattern: same as #364. ~3 call sites.",
+          "status": "pending"
+        },
+        {
+          "id": 583,
+          "title": "Verify client_signal → 'internal' category mapping in email-throttle",
+          "source": "PR #162 typecheck cleanup",
+          "est": "0.5h",
+          "priority": "P3",
+          "notes": "server/email-throttle.ts has a guessed mapping of the client_signal insight category to 'internal' throttle bucket. Needs human review — confirm this matches intent or adjust. Low risk because it only affects email throttle grouping, not correctness. Flagged during the typecheck cleanup.",
+          "status": "pending"
+        },
+        {
+          "id": 584,
+          "title": "Remove applyScoreAdjustment return-type escape hatches",
+          "source": "PR #162 typecheck cleanup",
+          "est": "1h",
+          "priority": "P3",
+          "notes": "anomaly-detection.ts:639 and outcome-tracking.ts:329 use `data: newData as never` because applyScoreAdjustment returns Partial<AnalyticsInsight> which doesn't overlap with the narrow discriminated union of InsightDataMap. Fix by making applyScoreAdjustment generic over InsightType so it preserves the data shape through the score adjustment. Blocked on #580.",
+          "status": "pending"
+        },
+        {
+          "id": "competitor-snapshot-store-refactor",
+          "title": "Refactor detectCompetitorAlerts: separate computation from DB persistence",
+          "source": "TECH DEBT — scaled code review on PR #267 (feat/seo-tier2-capabilities)",
+          "est": "1-2h",
+          "priority": "P3",
+          "notes": "detectCompetitorAlerts() in server/competitor-snapshot-store.ts both computes alerts AND inserts them into the competitor_alerts table as a side effect. This tight coupling makes the function hard to unit-test in isolation and violates the separation seen elsewhere (e.g. computePageHealthScores returns data without DB writes). Fix: split into computeCompetitorAlerts(current, previous, opts) returning CompetitorAlert[] (pure, no DB writes) and saveCompetitorAlerts(workspaceId, alerts) for the insert pass. Callers in intelligence-crons.ts call both in sequence.",
+          "status": "pending"
+        },
+        {
+          "id": "analytics-intelligence-phase-reorder",
+          "title": "Move Phase 5 (emerging_keyword) and Phase 6 (freshness_alert) to after Phase 4 in analytics-intelligence.ts",
+          "source": "TECH DEBT — scaled code review on PR #267",
+          "est": "0.5h",
+          "priority": "P3",
+          "notes": "Phase 5 (line ~1309) and Phase 6 (line ~1349) are currently inserted between Phase 3B and Phase 3C, contradicting the new rule 8.3 in docs/rules/analytics-insights.md (phases must be appended after the last existing phase). Pure code motion — no logic change, no dependency conflicts. Deferred from PR #267 to avoid mixing functional bug fixes with pure reorder churn.",
+          "status": "pending"
+        },
+        {
+          "id": "freshness-detection-direct-test",
+          "title": "Add direct unit test for Phase 6 content freshness detection logic",
+          "source": "TECH DEBT — scaled code review on PR #267",
+          "est": "0.5h",
+          "priority": "P3",
+          "notes": "tests/integration/content-freshness.test.ts only validates the GET /api/public/insights endpoint accepts freshness_alert shapes — it does NOT actually run the Phase 6 detection filter. Mirror tests/unit/emerging-keywords.test.ts: extract the 90d+100impressions filter into a helper (or test the existing pageKws.filter logic by calling into analytics-intelligence via a test harness). Goal: confirm pages exactly at the 90/100 thresholds behave correctly and stale pages below MIN_IMPRESSIONS are excluded.",
+          "status": "pending"
+        },
+        {
+          "id": "insight-cards-empty-state-parity",
+          "title": "Unify empty-state behavior for new Tier 2 InsightCards (grid gap fix)",
+          "source": "UX — scaled code review on PR #267",
+          "est": "0.5h",
+          "priority": "P3",
+          "notes": "CompetitorAlertCard, EmergingKeywordCard, FreshnessAlertCard in src/components/client/InsightCards.tsx return null when no data is available for growth/premium tiers, breaking the 3-column grid (leaves 8 cards as 3+3+2). The original 6 cards always render with an empty state. Fix: give the new cards a lightweight empty state rather than returning null, or switch all 9 to conditional rendering so the grid is consistent. Pick one pattern.",
+          "status": "pending"
+        },
+        {
+          "id": 430,
+          "title": "Content Briefs — template cross-reference",
+          "source": "TOOL_AUDIT §2d",
+          "est": "2h",
+          "priority": "P3",
+          "notes": "When generating a brief for a keyword matching a matrix cell, show callout and pre-fill from template sections.",
+          "status": "pending"
+        },
+        {
+          "id": 431,
+          "title": "Workspace Home — content velocity metric",
+          "source": "TOOL_AUDIT §4c",
+          "est": "2h",
+          "priority": "P3",
+          "notes": "Track pages published per month as a trend. Leading indicator for ranking momentum.",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "sprint-send-to-client",
+      "name": "Send to Client Expansion",
+      "hours": "9-14",
+      "rationale": "Unified delivery story — every major analysis surface (AEO, Internal Links, Keywords, Redirects, Content Decay, Page Rewriter) gains a client-send action in one sprint.",
+      "items": [
+        {
+          "id": 609,
+          "title": "AEO Review: Send to Client per-page changes",
+          "source": "Send to Client consistency initiative",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Add per-page Send to Client button to AEO Review change cards. Each recommended change (rewrite_intro, add_faq, add_section, etc.) should be sendable to the client approval queue with current→suggested diff as the approval payload.",
+          "status": "pending"
+        },
+        {
+          "id": 610,
+          "title": "Internal Links: Send to Client link suggestions",
+          "source": "Send to Client consistency initiative",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Add Send to Client button per page in Internal Links results. Sends suggested link insertions (anchor text, target URL, context snippet) to client approval queue so client can approve before agency implements.",
+          "status": "pending"
+        },
+        {
+          "id": 611,
+          "title": "Keyword Strategy: Send to Client strategy recommendations",
+          "source": "Send to Client consistency initiative",
+          "est": "1-2h",
+          "priority": "P3",
+          "notes": "Add bulk Send to Client for keyword strategy tabs (Quick Wins, Content Gaps, Low Hanging Fruit). Packages selected recommendations into approval batch for client review before implementation.",
+          "status": "pending"
+        },
+        {
+          "id": 612,
+          "title": "Redirect Manager: Send to Client redirect proposals",
+          "source": "Send to Client consistency initiative",
+          "est": "1-2h",
+          "priority": "P2",
+          "notes": "Add Send to Client for proposed redirects (broken links, chain fixes). Client reviews source→target mappings before agency publishes them to Webflow.",
+          "status": "pending"
+        },
+        {
+          "id": 297,
+          "title": "Content Decay: Send to Client refresh recommendations",
+          "source": "Send to Client consistency initiative",
+          "est": "1-2h",
+          "priority": "P3",
+          "notes": "Add Send to Client for decaying content pages. Sends page title, traffic decline data, and recommended action (refresh, merge, redirect) to client for awareness/approval.",
+          "status": "pending"
+        },
+        {
+          "id": 579,
+          "title": "Page Rewriter: PDF export via print stylesheet",
+          "source": "User request Apr 2026",
+          "est": "1h",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "Add 'Download PDF' option to the Export brief menu. Cleanest approach: inject document content into a hidden print-only div with a styled print stylesheet and call window.print(). No new dependencies. DOCX export (#579 shipped) is the primary export; PDF is a lightweight complement for sharing/printing."
+        }
+      ]
+    },
+    {
+      "id": "sprint-seo-intelligence-depth",
+      "name": "SEO Intelligence Depth",
+      "hours": "19-24",
+      "rationale": "Deepen the data layer: competitor monitoring, difficulty calibration, URL-level keyword intel, score history, anti-hallucination, and E-E-A-T signals.",
+      "items": [
+        {
+          "id": 570,
+          "title": "Competitor Content Monitoring (Scheduled Job)",
+          "source": "USER REQUEST",
+          "est": "4h",
+          "priority": "P2",
+          "notes": "Future — Scheduled job to periodically fetch new competitor keywords and alert when competitors gain new rankings.",
+          "status": "pending"
+        },
+        {
+          "id": 571,
+          "title": "Authority-Adjusted Difficulty Filtering",
+          "source": "USER REQUEST",
+          "est": "3h",
+          "priority": "P2",
+          "notes": "Future — Contextualize keyword difficulty (KD) by site's domain authority/rating. A KD of 40% means different things for a DR-20 site vs a DR-60 site.",
+          "status": "pending"
+        },
+        {
+          "id": 322,
+          "title": "URL-Level Keyword Intelligence (url_organic API)",
+          "source": "USER REQUEST",
+          "est": "3h",
+          "priority": "P2",
+          "notes": "Future — Use SEMRush url_organic API to get per-page keyword data instead of domain-level. More precise keyword assignments for individual pages.",
+          "status": "pending"
+        },
+        {
+          "id": 351,
+          "title": "Page Intelligence — Optimization Score History & Trending",
+          "source": "USER REQUEST",
+          "est": "3-4h",
+          "priority": "P2",
+          "notes": "Track optimization score snapshots over time (per page). Show sparkline trend in page list. Enable 'your average page health improved from X → Y this month' reporting. Requires new DB table or JSON snapshot storage.",
+          "status": "pending"
+        },
+        {
+          "id": 355,
+          "title": "AI Research Mode — Anti-Hallucination Prompt Blocks",
+          "source": "USER REQUEST (Reddit find: Anthropic docs anti-hallucination techniques)",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Add toggleable 'research mode' prompt blocks to AI features that make factual claims. Three techniques from Anthropic docs: (1) Allow 'I don't know' — stops confident-sounding fiction. (2) Verify with citations — retract unsourced claims. (3) Direct quotes for factual grounding — extract verbatim before analyzing. Apply to: content briefs (competitor insights, SERP analysis), SEO audit AI recommendations, content post generation, admin chat. Do NOT apply to creative features (SEO rewrites, keyword brainstorming) — research shows citation constraints reduce creative output. Implementation: add researchMode flag to callOpenAI opts, inject prompt blocks conditionally.",
+          "status": "pending"
+        },
+        {
+          "id": 356,
+          "title": "E-E-A-T Asset Library — Personalized Trust Signal Recommendations",
+          "source": "USER REQUEST",
+          "est": "4-6h",
+          "priority": "P2",
+          "notes": "Current E-E-A-T guidance in content briefs is generic per-pillar text ('include case studies'). Gap: no inventory of what assets a client ACTUALLY has. Build: (1) Workspace-level E-E-A-T profile in settings — admin tags existing client assets: testimonials (with quotes + attribution), case studies (with URLs + metrics), certifications/credentials, before/after galleries, team bios/expertise, awards/recognition, data/research, client logos. (2) Content briefs inject specific asset recommendations: 'Add the Dr. Smith testimonial from /reviews' or 'Include the Acme Corp case study showing 40% conversion lift'. (3) Page Intelligence flags pages missing trust signals based on page type (service pages need testimonials, product pages need reviews, etc.). (4) Schema generator uses asset library for author/credential structured data. New DB table: eeat_assets (workspace_id, type, title, url, content, metadata JSON). New UI: settings tab or workspace profile section.",
+          "status": "pending"
+        }
+      ]
+    },
+    {
       "id": "sprint-self-service",
       "name": "Self-Service & Growth",
       "hours": "26-37",
@@ -64,10 +465,9 @@
       ]
     },
     {
-      "id": "sprint-team",
-      "name": "Team & Collaboration",
-      "hours": "20-26",
-      "rationale": "Multi-user support for growing agencies. Execute when team size or client demands justify it.",
+      "id": "sprint-future",
+      "name": "Future",
+      "rationale": "Aspirational features and team-scale work deferred until the current sprint queue clears.",
       "items": [
         {
           "id": 16,
@@ -113,374 +513,6 @@
           "priority": "P3",
           "notes": "Per-user email settings, digest frequency.\n[Audit 2026-04-22 partial] In-app notification feed shipped (NotificationBell + useNotifications); per-user email/digest frequency preferences are not built.",
           "status": "pending"
-        }
-      ]
-    },
-    {
-      "id": "sprint-planner-integration",
-      "name": "Content Planner Integration",
-      "hours": "35-40",
-      "rationale": "Wire content planner data into every existing tool so the platform feels unified. New features are isolated — this sprint connects them.",
-      "items": [
-        {
-          "id": 414,
-          "title": "Client Overview — content plan insights in InsightsDigest",
-          "source": "TOOL_AUDIT §1b",
-          "est": "3h",
-          "priority": "P1",
-          "notes": "Shipped — InsightsDigest: 3 insight variants (review needed, progress %, complete). OverviewTab action banner includes content plan review items.",
-          "status": "done"
-        },
-        {
-          "id": 415,
-          "title": "Workspace Home — content pipeline stat card + action items",
-          "source": "TOOL_AUDIT §1a",
-          "est": "2h",
-          "priority": "P1",
-          "notes": "Shipped — 5th stat card with published/total %, action item for review cells. Data derived in workspace-home.ts.",
-          "status": "done"
-        },
-        {
-          "id": 416,
-          "title": "Content Plan tab badge count",
-          "source": "TOOL_AUDIT §3a",
-          "est": "30m",
-          "priority": "P1",
-          "notes": "Shipped — Blue badge on Content Plan tab showing review+flagged cell count.",
-          "status": "done"
-        },
-        {
-          "id": 417,
-          "title": "Strategy tab — show planned coverage badges",
-          "source": "TOOL_AUDIT §3d",
-          "est": "2h",
-          "priority": "P1",
-          "notes": "Shipped — Violet Planned/In Progress/Approved/Published badges on content gaps matching matrix cells.",
-          "status": "done"
-        },
-        {
-          "id": 418,
-          "title": "ROI Dashboard — include matrix-planned content",
-          "source": "TOOL_AUDIT §1f",
-          "est": "1h",
-          "priority": "P1",
-          "notes": "Shipped — Published matrix cells included in contentItems with violet 'Content Plan' badge. Deduped by keyword.",
-          "status": "done"
-        },
-        {
-          "id": 419,
-          "title": "Strategy → Content Planner action bridge",
-          "source": "TOOL_AUDIT §1c",
-          "est": "3h",
-          "priority": "P2",
-          "notes": "Shipped — Admin 'Add to Planner' button on content gaps → Content Pipeline. Client 'Planned' badges are clickable → Content Plan tab. Feature #164.",
-          "status": "done"
-        },
-        {
-          "id": 420,
-          "title": "Site Architecture — show planned URLs from matrices",
-          "source": "TOOL_AUDIT §1d",
-          "est": "2h",
-          "priority": "P2",
-          "notes": "Shipped — Purple 'Planned' badge, source priority enforcement, published cells excluded from planned. Feature #161.",
-          "status": "done"
-        },
-        {
-          "id": 421,
-          "title": "Content Performance — track matrix-published content",
-          "source": "TOOL_AUDIT §1e",
-          "est": "2h",
-          "priority": "P2",
-          "notes": "Shipped — Published matrix cells included in performance view, deduped by keyword, violet 'Content Plan' badge. Feature #162.",
-          "status": "done"
-        },
-        {
-          "id": 422,
-          "title": "Client Overview → Content Plan quick action card",
-          "source": "TOOL_AUDIT §3b",
-          "est": "1h",
-          "priority": "P2",
-          "notes": "Shipped — Implemented as part of #414 (action-needed banner + InsightsDigest cards).",
-          "status": "done"
-        },
-        {
-          "id": 423,
-          "title": "Inbox — include content plan reviews",
-          "source": "TOOL_AUDIT §3c",
-          "est": "2h",
-          "priority": "P2",
-          "notes": "Shipped — 'Content Plan' filter in Inbox showing review/flagged cells with flag action. Feature #163.",
-          "status": "done"
-        },
-        {
-          "id": 424,
-          "title": "Notification bell — content plan review alerts",
-          "source": "TOOL_AUDIT §2c",
-          "est": "1h",
-          "priority": "P2",
-          "notes": "Shipped — Workspace overview includes contentPlan.review count. NotificationBell shows violet alert for review/flagged cells. Feature #165.",
-          "status": "done"
-        },
-        {
-          "id": 425,
-          "title": "Content Calendar — matrix cell entries",
-          "source": "TOOL_AUDIT §1g",
-          "est": "2h",
-          "priority": "P2",
-          "notes": "Shipped — Matrix cells on calendar with violet 'Matrix Cell' type, filter pill, stat card. Dates from linked posts/briefs or matrix updatedAt. Feature #166.",
-          "status": "done"
-        },
-        {
-          "id": 426,
-          "title": "Content Pipeline — health summary bar",
-          "source": "TOOL_AUDIT §4b",
-          "est": "2h",
-          "priority": "P2",
-          "notes": "Shipped — Summary bar above tabs: briefs, posts, matrices, cells with publish %. Feature #167.",
-          "status": "done"
-        },
-        {
-          "id": 427,
-          "title": "Matrix cell status timeline",
-          "source": "TOOL_AUDIT §4a",
-          "est": "2h",
-          "priority": "P3",
-          "notes": "Shipped — StatusHistoryEntry type + auto-record in updateMatrixCell + vertical timeline in CellDetailPanel with relative timestamps. Feature #168.",
-          "status": "done"
-        },
-        {
-          "id": 428,
-          "title": "Admin Chat — content plan context",
-          "source": "TOOL_AUDIT §1i",
-          "est": "1h",
-          "priority": "P3",
-          "notes": "Include template/matrix counts and pipeline status in AI chat context for content-plan-aware answers.\n[Audit 2026-04-22] Shipped: admin chat assembles Content Plan (templates + matrices) at server/admin-chat-context.ts:738.",
-          "status": "done",
-          "shippedAt": "2026-04-22"
-        },
-        {
-          "id": 429,
-          "title": "Client Chat — content plan context",
-          "source": "TOOL_AUDIT §3e",
-          "est": "1h",
-          "priority": "P3",
-          "notes": "Include content plan summary in client chat context for 'What's my content status?' queries.\n[Audit 2026-04-22] Shipped: client chat assembles CONTENT PLAN section at server/routes/public-analytics.ts:329-373.",
-          "status": "done",
-          "shippedAt": "2026-04-22"
-        },
-        {
-          "id": 430,
-          "title": "Content Briefs — template cross-reference",
-          "source": "TOOL_AUDIT §2d",
-          "est": "2h",
-          "priority": "P3",
-          "notes": "When generating a brief for a keyword matching a matrix cell, show callout and pre-fill from template sections.",
-          "status": "pending"
-        },
-        {
-          "id": 431,
-          "title": "Workspace Home — content velocity metric",
-          "source": "TOOL_AUDIT §4c",
-          "est": "2h",
-          "priority": "P3",
-          "notes": "Track pages published per month as a trend. Leading indicator for ranking momentum.",
-          "status": "pending"
-        },
-        {
-          "id": 432,
-          "title": "LLMs.txt — include planned/approved content",
-          "source": "TOOL_AUDIT §1h",
-          "est": "1h",
-          "priority": "P3",
-          "notes": "Shipped — Included in Phase 4/5 overhaul: matrix cells with status != published included as upcoming content. Active content requests also included.",
-          "status": "done"
-        },
-        {
-          "id": 433,
-          "title": "Move Guide tab to floating help button",
-          "source": "TOOL_AUDIT §2a",
-          "est": "1h",
-          "priority": "P3",
-          "notes": "Content Pipeline has 7 sub-tabs. Move Guide to a floating ? button to reduce tab clutter.\n[Audit 2026-04-22] Shipped: floating Guide help button + slide-over in ContentPipeline.tsx:240-260 (replaces Guide tab).",
-          "status": "done",
-          "shippedAt": "2026-04-22"
-        },
-        {
-          "id": 434,
-          "title": "Command Palette — content planner quick actions",
-          "source": "TOOL_AUDIT §2b",
-          "est": "30m",
-          "priority": "P4",
-          "notes": "Add 'Create Content Template', 'Build Content Matrix', 'View Content Plan' to CommandPalette.\n[Audit 2026-04-22 partial] Two of three quick actions already shipped in CommandPalette.tsx (Create Content Template, Build Content Matrix); only \"View Content Plan\" remains.\n[Shipped 2026-04-22] Added \"View Content Plan\" action to CommandPalette.tsx (navigates to content-pipeline?tab=planner). All three quick actions now live.",
-          "status": "done",
-          "shippedAt": "2026-04-22"
-        }
-      ]
-    },
-    {
-      "id": "sprint-ui-ux-audit",
-      "name": "UI/UX Audit Implementation",
-      "hours": "45-60",
-      "rationale": "Complete implementation of all findings from comprehensive UI/UX audit: quick wins (empty states, command palette, mobile), backend capability exposure (churn, anomalies, ROI, cannibalization), and strategic improvements (widget system, AI insights, accessibility).",
-      "items": [
-        {
-          "id": 500,
-          "title": "Empty State Standardization — Migrate 114 ad-hoc empty states to EmptyState primitive",
-          "source": "UI_UX_AUDIT §4",
-          "est": "4-6h",
-          "priority": "P0",
-          "notes": "Shipped — Replaced generic 'No data' messages with consistent EmptyState component across GoogleAnalytics, DataList, ContentPerformance, MatrixBuilder, PageSpeedPanel, PageWeight. Added context-appropriate icons and actions. Fixed DataList test to match new 'No data available' text.",
-          "status": "done",
-          "shippedAt": "2026-03-24"
-        },
-        {
-          "id": 501,
-          "title": "Command Palette Visibility — Add search trigger to header bar",
-          "source": "UI_UX_AUDIT §3",
-          "est": "30m",
-          "priority": "P0",
-          "notes": "Command Palette exists but only accessible via ⌘K keyboard shortcut. Add magnifying glass icon button to header bar (next to notification bell) that opens Command Palette. Show ⌘K hint in tooltip.",
-          "status": "done",
-          "shippedAt": "2026-03-19"
-        },
-        {
-          "id": 502,
-          "title": "MobileGuard Improvement — Allow read-only mobile access",
-          "source": "UI_UX_AUDIT §6",
-          "est": "2-3h",
-          "priority": "P0",
-          "notes": "Currently blocks all mobile with 'Desktop only' message. Change to: allow read-only views (analytics, search, audit results) on mobile. Block only complex editing tools. Show 'Best on desktop' notice instead of hard block.",
-          "status": "done",
-          "shippedAt": "2026-03-19"
-        },
-        {
-          "id": 503,
-          "title": "Unified Notification Hub — Merge NotificationBell + TaskPanel",
-          "source": "UI_UX_AUDIT §7",
-          "est": "3-4h",
-          "priority": "P1",
-          "notes": "Current fragmentation: NotificationBell (top right), TaskPanel (processing queue), inline toasts, email queue. Create unified notification center with categories: Actions Needed (approvals, requests), System Events (audits complete), Alerts (score drops). Add notification preferences per workspace.\n[Audit 2026-04-22 partial] NotificationBell and TaskPanel both ship as separate components rendered side-by-side; no unified hub merges their categories.",
-          "status": "pending"
-        },
-        {
-          "id": 504,
-          "title": "Churn Signals Exposure — Add 'At Risk' filter to workspace overview",
-          "source": "UI_UX_AUDIT §Backend Capabilities",
-          "est": "1-2h",
-          "priority": "P1",
-          "notes": "Shipped — At Risk badge on workspace cards (red critical / amber warning), border highlighting, Needs Attention churn alert. Server returns churnSignals counts in /api/workspace-overview. Feature #154.",
-          "status": "done",
-          "shippedAt": "2026-03-26"
-        },
-        {
-          "id": 505,
-          "title": "Client Dashboard Primary CTAs — Contextual next actions",
-          "source": "UI_UX_AUDIT §Client Dashboard",
-          "est": "2-3h",
-          "priority": "P0",
-          "notes": "Shipped — Added contextual CTA banners in Overview tab: 'Generate Brief' when strategy exists, 'View Issues' when health < 80, 'Find Keywords' when traffic low. Color-coded banners with direct navigation to relevant tabs.",
-          "status": "done",
-          "shippedAt": "2026-03-24"
-        },
-        {
-          "id": 506,
-          "title": "Client Empty State Enhancement — Setup guidance checklist",
-          "source": "UI_UX_AUDIT §Client Dashboard",
-          "est": "1-2h",
-          "priority": "P0",
-          "notes": "Shipped — Replaced generic empty state with setup checklist: Connect GSC, Connect GA4, Run First Audit. Added contextual guidance and clear next steps for new workspaces.",
-          "status": "done",
-          "shippedAt": "2026-03-24"
-        },
-        {
-          "id": 507,
-          "title": "Loading & Error State Components — Contextual messaging",
-          "source": "UI_UX_AUDIT §Technical Polish",
-          "est": "3-4h",
-          "priority": "P1",
-          "notes": "Shipped — Created LoadingState and ErrorState components with contextual messages. Updated ROIDashboard ('Calculating traffic value...') and ApprovalsTab ('Loading approvals...'). Added recovery actions and type-specific error handling.",
-          "status": "done",
-          "shippedAt": "2026-03-24"
-        },
-        {
-          "id": 508,
-          "title": "Admin Notification Center — Global notification aggregation",
-          "source": "UI_UX_AUDIT §Admin Navigation",
-          "est": "2-3h",
-          "priority": "P1",
-          "notes": "Shipped — Added NotificationBell to sidebar utility bar. Aggregates anomalies, requests, approvals across all workspaces. Real-time updates every 5 minutes with click-to-navigate functionality.",
-          "status": "done",
-          "shippedAt": "2026-03-24"
-        },
-        {
-          "id": 509,
-          "title": "Command Center Anomaly Banner — Global issue visibility",
-          "source": "UI_UX_AUDIT §Admin Navigation",
-          "est": "1-2h",
-          "priority": "P1",
-          "notes": "Shipped — Added global anomaly banner at top of Command Center. Shows critical/warning anomalies across workspaces with severity-based styling and direct navigation to first affected workspace.",
-          "status": "done",
-          "shippedAt": "2026-03-24"
-        },
-        {
-          "id": 510,
-          "title": "Anomaly Detection Dashboard — Expose ML-based traffic/ranking anomalies",
-          "source": "UI_UX_AUDIT §Backend Capabilities",
-          "est": "2-3h",
-          "priority": "P2",
-          "notes": "Backend has anomaly-detection.ts with ML-based anomaly detection. Currently barely visible. Create 'Insights' tab or section showing detected anomalies with explanations: 'Your LPC improved 23% this week', 'Traffic drop detected on [page]', 'Ranking anomaly for [keyword]'.\n[Audit 2026-04-22] Shipped: AnomalyAlerts.tsx wired into WorkspaceHome.tsx:544 via useAnomalyAlerts hook + server anomaly-detection.ts.",
-          "status": "done",
-          "shippedAt": "2026-04-22"
-        },
-        {
-          "id": 511,
-          "title": "ROI Dashboard in Admin — Show organic traffic value per workspace",
-          "source": "UI_UX_AUDIT §Backend Capabilities",
-          "est": "2h",
-          "priority": "P1",
-          "notes": "ROI calculation exists in client portal only. Add ROI metric cards to admin Workspace Home and Command Center workspace cards. Shows organic traffic value delivered to justify agency fees.\n[Audit 2026-04-22] Shipped: WorkspaceHome.tsx:412-418 renders organic value + ad-spend equivalent via useAdminROI; client ROIDashboard.tsx complement.",
-          "status": "done",
-          "shippedAt": "2026-04-22"
-        },
-        {
-          "id": 512,
-          "title": "Cannibalization Detection UI — Surface keyword conflicts in Strategy tab",
-          "source": "UI_UX_AUDIT §Backend Capabilities",
-          "est": "2-3h",
-          "priority": "P2",
-          "notes": "Shipped — CannibalizationAlert component in Strategy tab with severity badges, per-page metrics, GSC/map source labels, and canonical recommender (action types: canonical_tag, redirect_301, differentiate, noindex). Feature #153.",
-          "status": "done",
-          "shippedAt": "2026-03-23"
-        },
-        {
-          "id": 513,
-          "title": "Content Decay Prominence — Promote decaying content alert to main view",
-          "source": "UI_UX_AUDIT §Backend Capabilities",
-          "est": "1-2h",
-          "priority": "P2",
-          "notes": "Shipped — Dismissible decay alert card in ContentPipeline between summary bar and tabs. Shows total decaying pages, critical/warning counts, avg decline %. Feature #155.",
-          "status": "done",
-          "shippedAt": "2026-03-26"
-        },
-        {
-          "id": 538,
-          "title": "Approval Reminders UI — Add 'Send reminder' to approval batches",
-          "source": "UI_UX_AUDIT §Backend Capabilities",
-          "est": "1-2h",
-          "priority": "P2",
-          "notes": "Shipped — 'Remind' button on PendingApprovals batches with pending items. POST /api/approvals/:wsId/:batchId/remind sends branded email. Loading + 'Sent' confirmation states. Feature #156.",
-          "status": "done",
-          "shippedAt": "2026-03-26"
-        },
-        {
-          "id": 539,
-          "title": "Scheduled Audits Config — UI for recurring audit settings",
-          "source": "UI_UX_AUDIT §Backend Capabilities",
-          "est": "2h",
-          "priority": "P2",
-          "notes": "Backend has scheduled-audits.ts. Add configuration UI to Site Audit tab: enable/disable, frequency (weekly/monthly), email alerts on score drops.\n[Audit 2026-04-22] Shipped: audit/ScheduledAuditSettings.tsx (enable/disable, intervalDays, scoreDropThreshold) PUTting /api/audit-schedules/:workspaceId.",
-          "status": "done",
-          "shippedAt": "2026-04-22"
         },
         {
           "id": 540,
@@ -535,443 +567,6 @@
           "priority": "P2",
           "notes": "Add ARIA landmarks, focus management for modals, keyboard navigation for complex widgets. Skip links. Test with screen reader (NVDA/VoiceOver).\n[Audit 2026-04-22 partial] 63 aria-label usages across 20 components ship; ARIA landmark roles, skip-links, and modal focus-management are not implemented.",
           "status": "pending"
-        },
-        {
-          "id": 517,
-          "title": "Form Validation Standardization — React Hook Form + Zod",
-          "source": "UI_UX_AUDIT §9",
-          "est": "3-4h",
-          "priority": "P2",
-          "notes": "Replace basic HTML validation with consistent form library. Inline field-level validation with clear errors. aria-invalid + aria-describedby support. Success states for valid fields.",
-          "status": "pending"
-        },
-        {
-          "id": 518,
-          "title": "Loading State Consistency — Unified skeleton system",
-          "source": "UI_UX_AUDIT §3",
-          "est": "2-3h",
-          "priority": "P2",
-          "notes": "Standardize loading patterns: route-level (keep ChunkFallback), data fetching (skeleton screens), actions (button loading + optimistic UI), background jobs (progress panel).\n[Audit 2026-04-22 partial] Skeleton primitive widely adopted (169 usages across 34 files including Roadmap, ClientDashboard, AdminInbox, brand/*, client/*); no formal standardization rule, lint, or codified loading-pattern doc.",
-          "status": "pending"
-        },
-        {
-          "id": 535,
-          "title": "CMS Editor UX Redesign — Match SeoEditor simplicity",
-          "source": "PR #138 review / manual testing",
-          "est": "3-5h",
-          "priority": "P1",
-          "notes": "CmsEditor UI/UX is noticeably rougher than the clean static-page SeoEditor. Redesign to match: consistent card layout, inline field editing, clear save/publish flow, per-collection grouping with search/filter. Consider shared editing primitives between CmsEditor and SeoEditor to prevent future drift.\n[Audit 2026-04-22 partial] CmsEditor.tsx already shares SeoEditor primitives (CharacterCounter, SerpPreview, SocialPreview, StatusBadge, statusBorderClass) and the PendingApprovals panel; full layout-parity redesign vs SeoEditor is unverified.",
-          "status": "pending"
-        },
-        {
-          "id": 588,
-          "title": "Composite Health Score Dashboard — admin badge + client card",
-          "source": "Platform Health Sprint PR2 (2026-04-14)",
-          "est": "3-5h",
-          "priority": "P1",
-          "notes": "Shipped — compositeHealthScore (0-100, 40% churn + 30% ROI + 30% engagement) surfaced in admin WorkspaceHome (badge next to workspace name) and client OverviewTab (HealthScoreCard with MetricRing, contextual messaging, legend). Wired into ClientIntelligence type + endpoint for Growth+ tiers. Feature #81.",
-          "status": "done",
-          "shippedAt": "2026-04-14"
-        },
-        {
-          "id": 589,
-          "title": "Prediction Showcase Card (weCalledIt) — client dashboard",
-          "source": "Platform Health Sprint PR2 (2026-04-14)",
-          "est": "2-4h",
-          "priority": "P1",
-          "notes": "Shipped — PredictionShowcaseCard shows top 5 predictions that came true from outcome tracking. Wired into ClientIntelligence.weCalledIt for Growth+ tiers. Empty state with Trophy icon when no predictions yet. Feature #82.",
-          "status": "done",
-          "shippedAt": "2026-04-14"
-        },
-        {
-          "id": 590,
-          "title": "Cannibalization Warning Alerts — admin content pipeline",
-          "source": "Platform Health Sprint PR2 (2026-04-14)",
-          "est": "2-3h",
-          "priority": "P1",
-          "notes": "Shipped — CannibalizationAlert component in ContentPipeline with severity-based color coding (red/amber/blue for high/medium/low), TierGate for Growth+. Shows affected keywords and competing page paths. Feature #83.",
-          "status": "done",
-          "shippedAt": "2026-04-14"
-        },
-        {
-          "id": 622,
-          "title": "Design System Phase 5 — Phase 0 Foundation (canonical tokens + law cleanup)",
-          "source": "docs/superpowers/plans/2026-04-24-design-system-phase5-sweep.md",
-          "est": "6-8h",
-          "priority": "P0",
-          "notes": "Shipped — Phase 0 of the Total Unification Sweep. src/tokens.css created as canonical single source for all --* CSS custom properties (113 tokens). @import chain established in src/index.css. Vite copyTokensPlugin emits public/tokens.css at build. 14 .t-* typography utility classes added to src/index.css. scoreColorClass fixed to return text-emerald-400 (was text-green-400) for score >=80, matching scoreColor() hex #34d399. Bulk text-green-400 → text-emerald-400 across 70 component files. Badge.tsx purple variant removed (Law 03). statusConfig.ts in-review → blue tokens. All rose/pink hues removed from src/components/ (14 hits). styleguide-token-parity customCheck rule added to pr-check with 4 fixture tests. Barrel skeleton committed: 30 placeholder files for Phase 1 primitives (typography, Icon, Button, IconButton, ActionPill, SegmentedControl, forms/, layout/, overlay/). 11 audit output files frozen in docs/superpowers/audits/2026-04-24-phase5/. FEATURE_AUDIT.md updated. CLAUDE.md + design-system-enforcement.md updated with Phase 5 guardrails.",
-          "status": "done",
-          "shippedAt": "2026-04-24"
-        },
-        {
-          "id": 623,
-          "title": "Design System Phase 5 — Phase 3 Enforcement Hardening (pr-check rules)",
-          "source": "docs/superpowers/plans/2026-04-24-design-system-phase5-sweep.md",
-          "est": "2-3h",
-          "priority": "P0",
-          "notes": "Shipped — Phase 3 enforcement hardening that locks in Phase 2 codemod gains. Added 8 new pr-check rules: Forbidden hues (rose/pink) [error, 0 hits], text-green-{N} for success/score [error, 0 hits after migrating RequestList.tsx Deliver Brief button to emerald], Hand-rolled gradient CTA button [warn, ~10 backlog], Arbitrary pixel text-size [warn, ~318 backlog], Raw text-zinc-N / bg-zinc-N / border-zinc-N [warn, ~514 combined backlog], Inline asymmetric border-radius [warn, ~114 backlog]. Promoted 2 rules warn→error after backlog reached zero: Hand-rolled trend badge, Non-standard transition duration. 5 hand-rolled gradient CTAs migrated to <Button variant=\"primary\"> in same PR (TemplateEditor×2, ClientDashboardTab×2, AiSuggested, BlueprintDetail); 1 preview-disabled gradient hatched. 28 fixture tests added in tests/pr-check.test.ts. verified-clean-rules.md count 72→74. automated-rules.md regenerated (83→91 rules; 49 error / 42 warn). BRAND_DESIGN_LANGUAGE.md changelog updated. CLAUDE.md Forbidden list and Three Laws Law #3 (text-green ban) now mechanized rather than prose-only. Hardcoded card radius (rounded-xl outside ui/) stays at warn pending dedicated rounded-literal cleanup PR (26 hits remaining).",
-          "status": "done",
-          "shippedAt": "2026-04-25"
-        },
-        {
-          "id": 624,
-          "title": "Stripe payment modal — visual QA in test mode (light + dark)",
-          "source": "Phase 5 Phase 2 follow-up — PR #314",
-          "est": "10-15m",
-          "priority": "P1",
-          "notes": "Phase 2 token sweep PR #314 touched StripePaymentForm.tsx + StripePaymentModal.tsx + inner PaymentFormInner. Devin caught the always-dark constraint (Stripe Elements is hardcoded to theme: 'night') and the changes were reverted to hardcoded zinc shades with a comment block warning future migrations. Reverts are clean on main, but a real test-mode checkout flow visually confirming no regressions (light mode + dark mode side-by-side) was deferred from the original ship cycle. Use Stripe test card 4242 4242 4242 4242 — confirm modal renders correctly, payment intent succeeds, success state matches prior look. Risk if skipped: low (code-level diff confirms no theme-token references remain).",
-          "status": "pending"
-        },
-        {
-          "id": 625,
-          "title": "Mobile breakpoint visual smoke — Phase 5 token migration",
-          "source": "Phase 5 Phase 2 follow-up — staging smoke gap",
-          "est": "15-20m",
-          "priority": "P1",
-          "notes": "Phase 2 codemod batches touched ~225 components but the original staging smoke test on 2026-04-25 only exercised desktop breakpoints — the resize_window MCP call didn't take effect on the Chrome instance. Tailwind responsive utilities are unchanged at the codemod level (only color tokens swapped, not breakpoint prefixes), but token swaps at breakpoint-conditional className boundaries could have edge cases. Test at 375 (mobile), 640 (sm), 768 (md), 1024 (lg) breakpoints across: WorkspaceOverview (admin home), ClientDashboard (overview/strategy/content tabs), SeoAudit (audit results table), Settings (Workspace + Client tabs). Look for: stacked vs grid layouts, button sizes, table overflow, sidebar collapse. Risk if skipped: medium — a regression at one breakpoint is invisible on desktop testing.",
-          "status": "pending"
-        },
-        {
-          "id": 626,
-          "title": "Harden flaky brand-engine + brand-identity integration tests",
-          "source": "CI flakiness — recurring on staging push runs",
-          "est": "1-2h",
-          "priority": "P1",
-          "notes": "Two recurring failure modes in parallel-run integration tests, same root cause (test server not ready when first request fires, or server crash mid-suite under parallel load):\n\n1. tests/integration/brand-engine-routes.test.ts (port 13317) — DELETE voice samples test fails with `SyntaxError: Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON`. The Express server's startServer() promise resolves but the route registry isn't ready, so the POST /api/voice/.../samples returns Vite's SPA fallback HTML. Hit on 2026-04-27 staging push (PR #322 merge).\n\n2. tests/integration/brand-identity-hardening.test.ts (port unknown) — 4 tests fail with `TypeError: fetch failed / SocketError: other side closed`. Server connection drops mid-test. Hit on 2026-04-27 PR #319 round-3 commit CI run.\n\nBoth have unique ports (no collision per pr-check rule). Both pass on rerun, blocking confirmation that they aren't real bugs. Fixes to investigate:\n- Add explicit await for server.listen() callback before resolving startServer()\n- Add retry-on-HTML-response in postJson/del helpers (quick guard)\n- Consider --threads=1 for integration tests in CI (slower but eliminates parallelism)\n- Add a health-check ping in beforeAll() to wait for server readiness\n\nGoal: zero false-failure CI runs from these test files over 2 weeks of normal merge cadence. Stretch: extract a shared `waitForServer(port)` helper to tests/integration/helpers.ts so all integration suites benefit.",
-          "status": "pending"
-        }
-      ]
-    },
-    {
-      "id": "backlog",
-      "name": "Backlog",
-      "hours": "80+",
-      "rationale": "Revisit quarterly. Prioritize when a specific client need, revenue opportunity, or scale threshold justifies it.",
-      "items": [
-        {
-          "id": 602,
-          "title": "Atomic increment-and-check in usage-tracking.ts (close TOCTOU race on concurrent bulk AI calls)",
-          "source": "PR #255 scaled code review — security agent flag",
-          "est": "2-3h",
-          "priority": "P2",
-          "notes": "Shipped — 2026-04-22 tech-debt-hardening PR #256. Added incrementIfAllowed() + decrementUsage() in server/usage-tracking.ts wrapping check+increment in db.transaction(). Migrated all 6 billing call sites (keyword-strategy.ts, brand-voice.ts, knowledge-base.ts, personas.ts, webflow-alt-text.ts single+bulk, brand-identity.ts refine).",
-          "status": "done",
-          "shippedAt": "2026-04-22"
-        },
-        {
-          "id": 603,
-          "title": "Extract NDJSON/SSE stream reader helper (deduplicate bulkGenerateAltText + streamKeywordStrategy)",
-          "source": "PR #255 scaled code review — code smells agent flag",
-          "est": "1-2h",
-          "priority": "P3",
-          "notes": "Shipped — 2026-04-22 tech-debt-hardening PR #256. Extracted readNdjsonStream<T> + readSseStream<T> into src/api/streamUtils.ts. Replaced inline loops in seo.ts bulkGenerateAltText + streamKeywordStrategy. AssetBrowser.tsx refactored to use bulkGenerateAltText wrapper.",
-          "status": "done",
-          "shippedAt": "2026-04-22"
-        },
-        {
-          "id": 604,
-          "title": "Move workspaceId to path param + requireWorkspaceAccess on alt-text routes (close pre-existing auth gap)",
-          "source": "PR #255 scaled code review — security agent flag (pre-existing, deferred from PR #255)",
-          "est": "2-3h",
-          "priority": "P3",
-          "notes": "Shipped — 2026-04-22 tech-debt-hardening PR #256. Routes renamed to /api/webflow/:workspaceId/generate-alt/:assetId + /api/webflow/:workspaceId/bulk-generate-alt with requireWorkspaceAccess('workspaceId'). Updated AssetBrowser.tsx, AssetAudit.tsx, MediaTab.tsx, App.tsx, and src/api/seo.ts wrappers.",
-          "status": "done",
-          "shippedAt": "2026-04-22"
-        },
-        {
-          "id": 599,
-          "title": "Per-feature usage budgets (split strategy_generations pool)",
-          "source": "PR #255 code review — Devin comment on shared billing pool",
-          "est": "4-6h",
-          "priority": "P2",
-          "notes": "All AI generation endpoints (keyword strategy, brand voice, knowledge base, personas, alt-text, brand identity deliverables) share a single 'strategy_generations' pool (free=0, growth=3, premium=∞). A user who generates a knowledge base + brand voice + personas exhausts their limit and can no longer generate alt text or deliverables — surprising UX. Options: (1) split into named sub-pools per feature category (e.g. 'brand_generations', 'seo_generations') each with their own limits; (2) raise the shared pool limit; (3) tier-specific per-feature overrides. Requires migration to add new usage_tracking feature keys, updating checkUsageLimit/incrementUsage call sites across all guarded routes, and updating client-facing usage display (if any). Coordinate with MONETIZATION.md tier redesign if limits are revisited.",
-          "status": "pending"
-        },
-        {
-          "id": 598,
-          "title": "Extend useWorkspaceEvents centralization rule to catch string-literal duplicates",
-          "source": "PR #254 code review flag 3",
-          "est": "1-2h",
-          "priority": "P2",
-          "notes": "The pr-check rule added in #597 only matches [WS_EVENTS.X] computed-property patterns. Components using raw string literals like 'activity:new' bypass it entirely. Fix: at check time, build a reverse map of WS_EVENTS string values → constant names from wsEvents.ts, then flag raw string literal subscriptions whose value matches a centralized event (unless ws-invalidation-ok hatch present). After the WorkspaceHome fix in PR #254 only ClientDashboard retains string-literal handlers — that's the one legitimate case (client route, useWsInvalidation not mounted there), so it would need a ws-invalidation-ok hatch. Low-risk, ~1h of pr-check work.",
-          "status": "pending"
-        },
-        {
-          "id": 595,
-          "title": "JSDoc @reads/@writes convention for read/write asymmetry prevention",
-          "source": "Devin review of PR #249 + recurring asymmetry bug pattern",
-          "est": "3-5h",
-          "priority": "P2",
-          "notes": "Recurring bug pattern: GET endpoint short-circuits on one data source (e.g. ws.keywordStrategy) while writes populate adjacent storage (e.g. page_keywords table). Examples: PR #248 (PageIntelligence case-sensitivity), PR #249 (synthesized shell for partial state). Proposed convention: every GET handler gets a `@reads: <table|blob>, <table|blob>, ...` JSDoc tag; every write handler gets a matching `@writes: ...` tag. Mechanize with a pr-check rule that parses these tags across all routes and flags tables that are written without a corresponding read endpoint (or vice versa). Deliverables: (1) tag convention documented in docs/rules/automated-rules.md, (2) pr-check rule that parses @reads/@writes from route files and builds a read/write graph, (3) initial annotation pass on the 10 most-touched routes. Audit pass to find existing asymmetry: grep for `if (!ws\\.\\w+) return.*json\\(null\\)` patterns across server/routes/.",
-          "status": "pending"
-        },
-        {
-          "id": 593,
-          "title": "Unified page-join shared client hooks (Option 1)",
-          "source": "Post-slug-path-hardening discussion 2026-04-21",
-          "est": "6-10h",
-          "priority": "P1",
-          "notes": "Shipped: usePageJoin hook + UnifiedPage type; migrated SeoEditor, PageIntelligence, ApprovalsTab",
-          "status": "done"
-        },
-        {
-          "id": 594,
-          "title": "Server-side page-join assembler audit (Option 2 scoping)",
-          "source": "Post-slug-path-hardening discussion 2026-04-21",
-          "est": "4-6h",
-          "priority": "P2",
-          "notes": "Audit-only task. Grep every client-side pairing site across the platform (pages↔strategy, pages↔GSC, pages↔insights, pages↔content pipeline, pages↔page keywords, keywords↔rank tracking). For each join, document: (a) which components consume it, (b) what fields each consumer actually reads, (c) invalidation surface (which writes should trigger a refetch), (d) whether it's worth lifting to a server-side assembler (extending server/workspace-intelligence.ts pattern) vs leaving as a client hook. Output: planning doc with per-join recommendation table. Do NOT implement — this is scoping work to decide platform-wide architecture. Prerequisite for any multi-phase server-join refactor.",
-          "status": "pending"
-        },
-        {
-          "id": 580,
-          "title": "Tighten AnalyticsInsight.data to InsightDataMap discriminated union",
-          "source": "PR #162 typecheck cleanup",
-          "est": "2-3h",
-          "priority": "P2",
-          "notes": "Shipped — 2026-04-20 insight-hardening sprint. Made AnalyticsInsight<T extends InsightType = InsightType> generic with insightType: T and data: InsightDataMap[T]. Added InsightDataBase interface (index signature) to all 14 insight data interfaces for backward compatibility. Made UpsertInsightParams<T>, upsertInsight<T>, cloneInsightParams<T>, applyScoreAdjustment<T> generic. Replaced `as never` casts in anomaly-detection.ts and outcome-tracking.ts. Replaced `as unknown as XData` read-site casts in admin-chat-context.ts and content-brief.ts with type predicates. Removed pr-check grandfather exception for shared/types/analytics.ts.",
-          "status": "done",
-          "shippedAt": "2026-04-20"
-        },
-        {
-          "id": 581,
-          "title": "Reconcile KeywordStrategy schema ↔ interface drift",
-          "source": "PR #162 typecheck cleanup",
-          "est": "1-2h",
-          "priority": "P2",
-          "notes": "Shipped — 2026-04-20 insight-hardening sprint. Added missing fields to keywordStrategySchema in server/schemas/workspace-schemas.ts: siteKeywordMetrics (array of {keyword, volume, difficulty}, optional) and generatedAt (string, optional). Added .passthrough() to tolerate future schema additions. Removed `as unknown as KeywordStrategy` cast in server/workspaces.ts.",
-          "status": "done",
-          "shippedAt": "2026-04-20"
-        },
-        {
-          "id": 582,
-          "title": "Reconcile PageHealthData shape drift between reports.ts and analytics schema",
-          "source": "PR #162 typecheck cleanup",
-          "est": "1h",
-          "priority": "P3",
-          "notes": "Shipped — PR 3 Platform Health Sprint. Extended PageHealthData interface with optional audit-enrichment fields (auditSnapshotId, errorCount, warningCount, topIssues) and removed the `as never` cast.",
-          "status": "done",
-          "shippedAt": "2026-04-15"
-        },
-        {
-          "id": 583,
-          "title": "Verify client_signal → 'internal' category mapping in email-throttle",
-          "source": "PR #162 typecheck cleanup",
-          "est": "0.5h",
-          "priority": "P3",
-          "notes": "server/email-throttle.ts has a guessed mapping of the client_signal insight category to 'internal' throttle bucket. Needs human review — confirm this matches intent or adjust. Low risk because it only affects email throttle grouping, not correctness. Flagged during the typecheck cleanup.",
-          "status": "pending"
-        },
-        {
-          "id": 584,
-          "title": "Remove applyScoreAdjustment return-type escape hatches",
-          "source": "PR #162 typecheck cleanup",
-          "est": "1h",
-          "priority": "P3",
-          "notes": "anomaly-detection.ts:639 and outcome-tracking.ts:329 use `data: newData as never` because applyScoreAdjustment returns Partial<AnalyticsInsight> which doesn't overlap with the narrow discriminated union of InsightDataMap. Fix by making applyScoreAdjustment generic over InsightType so it preserves the data shape through the score adjustment. Blocked on #580.",
-          "status": "pending"
-        },
-        {
-          "id": 585,
-          "title": "Audit docs/rules/*.md for staleness and coverage gaps",
-          "source": "pr-check-audit-and-backfill plan (2026-04-10)",
-          "est": "2-3h",
-          "priority": "P2",
-          "notes": "Shipped — Platform Health Sprint PR 5a (bf92a95). Walked all 12 docs/rules/*.md files. Stale refs fixed: ai-dispatch-patterns.md (generateCalibrationVariations line number ~185→~277), analytics-insights.md (useWebSocket→useWorkspaceEvents, schema file location updated, queryKeys refs updated), data-flow.md (init callback location server/index.ts→server/websocket.ts). automated-rules.md regenerated — no diff (already current). bridge-authoring.md, multi-agent-coordination.md, outcome-engine-stubs.md, pr-check-rule-authoring.md, route-removal-checklist.md, ui-ux-consistency.md, verified-clean-rules.md: no stale refs found.",
-          "status": "done",
-          "shippedAt": "2026-04-15"
-        },
-        {
-          "id": 591,
-          "title": "Platform Health Sprint PR 5b — unskip health-routes tests, EmptyState CTA sweep, client-portal silent-catch fixes, archive shipped audits",
-          "source": "Platform Health Sprint PR 5b plan",
-          "est": "3-4h",
-          "priority": "P2",
-          "notes": "Shipped — commits on feature/platform-health-pr5b. Task 6.1 (558172e): unskipped 4 health-routes tests (storage-stats + 3 prune endpoints) by allocating an isolated temp DATA_DIR via fs.mkdtempSync before createTestContext(13217) spawns the server, so getStorageReport/pruneChatSessions/pruneBackups run against an empty dir; 7/7 pass in 2.59s. Task 6.3 (498e7a4): added action-oriented CTAs to 4 dead-end EmptyState instances — OutcomeScorecard (Retry on error → refetch), RankTracker (Take First Snapshot in keywords-but-no-ranks branch, distinct from header to avoid selector collision), ActionItemsPanel (Add Item opens inline form, replaced 'Click Add to track work' prose), ContentCalendar (Create a Brief → navigate to seo-briefs tab via adminPath). All teal per Three Laws. Task 6.4 (b101da4): replaced 4 silent .catch() handlers in client portal with user-facing errors (ContentTab setToast on export failure, FixRecommendations serverRecsError banner, StrategyTab feedbackLoadError + trackedKeywordsError, InboxTab error state); added 2 EmptyState CTAs (removed 2 duplicates). Code-review fixes (94837d3): moved StrategyTab's feedbackLoadError + trackedKeywordsError banners to top of component (were hidden inside collapsed page-keyword-map section); RankTracker.load() sets error state on failure (was console.error only); ActionItemsPanel.load() surfaces loadError with Retry button (was silent). Task 6.5: archived 6 shipped audit docs to docs/superpowers/audits/archive/ (light-mode-and-polish, intelligence-phase2-bridge, page-strategy-engine, admin-ux-restructure, copy-pipeline, deep-diagnostics). Specs + plans were already archived in prior work. Full test suite: 4210/4210 pass, typecheck clean, build clean.",
-          "status": "done",
-          "shippedAt": "2026-04-15"
-        },
-        {
-          "id": 586,
-          "title": "Voice/Brand-engine review follow-ups (PR #166 + PR #168 deferred items)",
-          "source": "PR #166 + PR #168 scaled-code-review (2026-04-11)",
-          "est": "6-8h",
-          "priority": "P2",
-          "notes": "Audit re-run 2026-04-21 against current HEAD — see docs/superpowers/plans/2026-04-21-brand-engine-hardening.md for execution plan. ## DONE (verified shipped): A1/A2/A3 (prior PRs). A4 shadow-mode voice parity check — isVoiceProfileAuthoritative() short-circuit in server/seo-context.ts:106-120. I9 PATCH extractions atomicity + addActivity + invalidation — server/routes/discovery-ingestion.ts:209. I18 pr-check-rule-authoring.md examples — current. ## INVALID (drop): I7 CalibrationVariation.ratings — column does not exist anywhere in schema or types; the finding referenced a column that was never created. ## DEFERRED (await clarification): I6 deliverable reset cascade — auto-creation cascade exists at server/brand-identity.ts:304-362 (draft→approved triggers voice-sample creation), but \"reset\" semantics are ambiguous. Revisit when content-deliverables roadmap reaches the re-approval workflow. I11 SteeringChat auto-summarization — zero server-side steering-chat code exists; defer to Copy Engine Phase 3 per docs/superpowers/plans/COPY_ENGINE_GUARDRAILS.md. ## PENDING (actionable — in hardening plan): (A5) Voice profile auto-creation on GET — server/voice-calibration.ts:81-93 getOrCreateVoiceProfile() still creates on GET. (I8) localFeedback dead UI — src/components/brand/VoiceTab.tsx:720 captures feedback but never saves. (I10) PUT sections route missing addActivity — server/routes/brandscript.ts:102-121. (I12) Prompt injection defense — server/routes/discovery-ingestion.ts:163 feeds rawContent.slice(0,12000) to AI unsanitized. (I13) Brand-engine tier gating — zero requireTier/checkTier usage in brand-identity.ts / voice-calibration.ts / brandscript.ts. (I14) Rate limiting — rateLimit middleware exists in server/middleware.ts but not applied to brand-engine AI routes. (I15 PARTIAL) rawText size limit — app-level 1MB cap exists at discovery-ingestion.ts:35 but DB column raw_content TEXT has no length constraint (migration 053:44). (I16) err.message leakage — server/routes/brand-identity.ts:90,106 echoes err.message to client (discovery-ingestion.ts is safe). (I19 NARROWED) COPY_ENGINE_GUARDRAILS.md line 33 references `tsc --noEmit` which checks zero files against root tsconfig — should be `npm run typecheck`. No `.windsurf/` references found.",
-          "status": "done",
-          "completedNotes": "Shipped 2026-04-22 on branch claude/brand-engine-hardening. 12 hardening items closed across 9 commits: Task 1 (ddfa41e5) — UsageFeature extension + sanitizers; Task 2 (cddf3484 + a96e3baa) — migration 067/068 raw_content 1MiB DB cap; Task 3 (1609ec46) — brand-identity aiLimiter + incrementIfAllowed + sanitizeErrorMessage; Task 4 (26c58772) — brandscript routes + PUT sections addActivity; Task 5 (26c58772) — voice-calibration routes hardening + explicit POST create + feedback persistence (migration 069); Task 6 (e9581678) — discovery-ingestion prompt-injection defense + 413 size-cap; Task 7+8 (485997b1) — VoiceTab create CTA + feedback save UI + guardrails doc fix. All 4635 tests passing; pr-check clean; typecheck clean. FEATURE_AUDIT.md entry #312."
-        },
-        {
-          "id": 587,
-          "title": "Shared WebSocket event bus — eliminate per-hook WS connections",
-          "source": "Platform Health Sprint PR1 Devin review (2026-04-14)",
-          "est": "2-3h",
-          "priority": "P2",
-          "notes": "useWorkspaceEvents() creates a new WebSocket connection per call. SeoEditor + SeoAudit (and other multi-hook components) each open dedicated WS connections, scaling linearly with component count. Fix: lift workspace WS connection to a shared React context (or use the existing event bus pattern) so all hooks share one connection per workspaceId. Not urgent — connections close on unmount, but it's wasteful and could cause scaling issues with many concurrent users.",
-          "status": "pending"
-        },
-        {
-          "id": 592,
-          "title": "Harden rowToInsight: validate corrupt insight data at DB read boundary",
-          "source": "PR #244 Devin review — analytics-insights-store.ts:104",
-          "est": "4-6h",
-          "priority": "P2",
-          "notes": "Shipped — 2026-04-22 tech-debt-hardening PR #256. Added Zod schemas for all 14 insight data types in server/schemas/insight-schemas.ts. Added INSIGHT_DATA_SCHEMA_MAP + .passthrough() on all entries (so cross-cutting _originalBaseScore/_scoreAdjustments survive). rowToInsight() now uses parseJsonSafe() with schema validation. Fixed test fixtures in migration-data-preservation.test.ts, anomaly-boost-reversal.test.ts, insight-data-shapes.test.ts, and public-analytics.test.ts.",
-          "status": "done",
-          "shippedAt": "2026-04-22"
-        },
-        {
-          "id": 537,
-          "title": "Backfill addActivity() calls on all public-portal mutation endpoints",
-          "source": "PIE Group 3 code review",
-          "est": "0.5h",
-          "priority": "P2",
-          "notes": "All 5 public-portal mutation endpoints now have addActivity() calls: POST /onboarding/:id (line 187), POST /keyword-feedback single (line 389) + bulk (line 430), POST /business-priorities (line 508), POST /content-gap-vote (line 616).",
-          "status": "done"
-        },
-        {
-          "id": 532,
-          "title": "Fix anomaly-detection recordScanTime FK constraint failure",
-          "source": "Staging deploy 2026-03-31",
-          "est": "0.5h",
-          "priority": "P2",
-          "notes": "Already fixed in migration 045-anomaly-scan-tracker.sql. Dedicated anomaly_scan_tracker singleton table replaces fake sentinel row. listAnomalies() __last_scan__ filter is vestigial but harmless.",
-          "status": "done"
-        },
-        {
-          "id": 531,
-          "title": "Replace remaining hardcoded 'hmpsn.studio' strings with STUDIO_URL/STUDIO_BOT_UA constants",
-          "source": "pr-check.ts",
-          "est": "0.25h",
-          "priority": "P3",
-          "notes": "STUDIO_URL and STUDIO_BOT_UA constants added to server/constants.ts. All 8 occurrences now use constants. Remaining 6 fixed: web-scraper.ts (UA), sales-report-html.ts (2x), brief-export-html.ts, post-export-html.ts, reports.ts.",
-          "status": "done"
-        },
-        {
-          "id": 400,
-          "title": "Content Templates backend (CRUD + migration 014)",
-          "source": "CONTENT_PLANNER_PLAN",
-          "est": "3-4h",
-          "priority": "P1",
-          "notes": "Shipped — Phase 1a: Reusable page structure templates with variables, sections, URL/keyword patterns. SQLite migration 014, CRUD, routes, API client, 10 integration tests.",
-          "status": "done"
-        },
-        {
-          "id": 401,
-          "title": "Keyword Pre-Assignment & SEMRush Validation",
-          "source": "CONTENT_PLANNER_PLAN",
-          "est": "2-3h",
-          "priority": "P1",
-          "notes": "Shipped — Phase 1b: Brief generation accepts template constraints + pre-locked keywords. SEMRush validation endpoints (single + bulk). Migration 015 for keyword tracking columns.",
-          "status": "done"
-        },
-        {
-          "id": 402,
-          "title": "Content Matrices backend (CRUD + migration 016)",
-          "source": "CONTENT_PLANNER_PLAN",
-          "est": "3-4h",
-          "priority": "P1",
-          "notes": "Shipped — Phase 2a: Bulk content planning grids with cartesian product cell generation. Per-cell status tracking, SQLite migration 016, routes, API client, 12 integration tests.",
-          "status": "done"
-        },
-        {
-          "id": 403,
-          "title": "Smart Keyword Recommendations (SEMRush + AI scoring)",
-          "source": "CONTENT_PLANNER_PLAN",
-          "est": "2-3h",
-          "priority": "P1",
-          "notes": "Shipped — Phase 2b: Opportunity scoring (volume/difficulty), SEMRush related keywords, optional AI re-ranking via GPT-4.1-nano. Standalone + per-cell endpoints.",
-          "status": "done"
-        },
-        {
-          "id": 404,
-          "title": "Cannibalization Detection",
-          "source": "CONTENT_PLANNER_PLAN",
-          "est": "2-3h",
-          "priority": "P1",
-          "notes": "Shipped — Phase 2c: Keyword overlap detection against existing pages, same-matrix cells, cross-matrix cells. Three severity levels. Full matrix report + single keyword check endpoints.",
-          "status": "done"
-        },
-        {
-          "id": 405,
-          "title": "Content Planner Export (CSV/JSON)",
-          "source": "CONTENT_PLANNER_PLAN",
-          "est": "1-2h",
-          "priority": "P2",
-          "notes": "Shipped — Phase 3: Matrix cells flattened CSV/JSON export + template metadata export. Added to existing data-export routes.",
-          "status": "done"
-        },
-        {
-          "id": 407,
-          "title": "Site Architecture Planner",
-          "source": "CONTENT_PLANNER_PLAN",
-          "est": "2-3h",
-          "priority": "P2",
-          "notes": "Shipped — URL tree from Webflow pages + CMS sitemap + matrix planned pages + keyword strategy. Gap detection for missing hub pages. Depth distribution + orphan analysis.",
-          "status": "done"
-        },
-        {
-          "id": 408,
-          "title": "LLMs.txt Generator",
-          "source": "Feature request",
-          "est": "1-2h",
-          "priority": "P2",
-          "notes": "Shipped — Generates LLMs.txt from site pages, keyword strategy, and planned content. JSON preview + .txt download endpoint.",
-          "status": "done"
-        },
-        {
-          "id": 409,
-          "title": "Site Architecture Planner UI",
-          "source": "CONTENT_PLANNER_PLAN",
-          "est": "2-3h",
-          "priority": "P1",
-          "notes": "Shipped — Interactive collapsible URL tree with source badges, search/filter, stat cards, gap list, orphan warnings, depth chart. Wired as Architecture sub-tab in Content Pipeline.",
-          "status": "done"
-        },
-        {
-          "id": 410,
-          "title": "LLMs.txt Generator UI",
-          "source": "Feature request",
-          "est": "1-2h",
-          "priority": "P1",
-          "notes": "Shipped — One-click generate, copy, download .txt, stat cards, scrollable preview, info card. Wired as LLMs.txt sub-tab in Content Pipeline.",
-          "status": "done"
-        },
-        {
-          "id": 411,
-          "title": "Content Pipeline Data Export Dropdown",
-          "source": "UI audit",
-          "est": "30m",
-          "priority": "P2",
-          "notes": "Shipped — Unified Export button in Content Pipeline tab bar. CSV/JSON for briefs, requests, matrices, templates, strategy.",
-          "status": "done"
-        },
-        {
-          "id": 412,
-          "title": "Content Planner Admin Orchestrator",
-          "source": "CONTENT_PLANNER_PLAN",
-          "est": "2-3h",
-          "priority": "P1",
-          "notes": "Shipped — ContentPlanner.tsx orchestrates TemplateEditor, MatrixBuilder, MatrixGrid. Lazy-loaded Planner sub-tab in ContentPipeline. List view with template/matrix cards, progress bars, badges.",
-          "status": "done"
-        },
-        {
-          "id": 413,
-          "title": "Client Content Plan Tab",
-          "source": "CONTENT_PLANNER_PLAN",
-          "est": "1-2h",
-          "priority": "P1",
-          "notes": "Shipped — ContentPlanTab in client portal (paid tiers). Fetches plans from public API, auto-selects single plan, shows MatrixProgressView with cell flagging + downloads.",
-          "status": "done"
-        },
-        {
-          "id": 406,
-          "title": "Client Review Flow (Tiered Content Plan Review)",
-          "source": "CONTENT_PLANNER_PLAN",
-          "est": "2-3h",
-          "priority": "P1",
-          "notes": "Shipped — Tiered review: template approval via batch, sample cell review, batch-approve remaining. Public matrix progress view + cell flagging. 6 API endpoints (3 public + 3 admin).",
-          "status": "done"
         },
         {
           "id": 76,
@@ -1037,16 +632,6 @@
           "status": "pending"
         },
         {
-          "id": 42,
-          "title": "Full-site PageSpeed scan",
-          "source": "FEATURE_AUDIT",
-          "est": "3-4h",
-          "priority": "P3",
-          "notes": "Multi-page PSI scan as background job.\n[Audit 2026-04-22] Shipped via runSiteSpeed in server/pagespeed.ts (iterates static + CMS pages); exposed at /api/webflow/pagespeed/:siteId.",
-          "status": "done",
-          "shippedAt": "2026-04-22"
-        },
-        {
           "id": 43,
           "title": "Accessibility audit expansion",
           "source": "FEATURE_AUDIT",
@@ -1063,16 +648,6 @@
           "priority": "P3",
           "notes": "Focus indicators, keyboard nav for all interactive elements.",
           "status": "pending"
-        },
-        {
-          "id": 90,
-          "title": "Schema generator → gpt-4.1-mini upgrade",
-          "source": "FEATURE_AUDIT",
-          "est": "15m",
-          "priority": "P3",
-          "notes": "Shipped — all AI models upgraded to GPT-4.1 series (Mar 2026). Schema uses gpt-4.1-mini.",
-          "status": "done",
-          "shippedAt": "2026-03"
         },
         {
           "id": 45,
@@ -1100,16 +675,6 @@
           "priority": "P4",
           "notes": "Push rules via API (Enterprise-only).",
           "status": "pending"
-        },
-        {
-          "id": 48,
-          "title": "Sales report: branded PDF export",
-          "source": "FEATURE_AUDIT",
-          "est": "3-4h",
-          "priority": "P4",
-          "notes": "Shipped — sales-report-html.ts generates branded HTML export for prospects.",
-          "status": "done",
-          "shippedAt": "2026"
         },
         {
           "id": 49,
@@ -1199,347 +764,6 @@
           "est": "6-8h",
           "priority": "P3",
           "notes": "Each new workspace requires: connect Webflow, connect GSC, connect GA4, run keyword analysis, run site audit, set up brand voice, configure competitors, set content pricing, enable client portal. Most steps are identical across workspaces. Add: workspace templates (clone config from existing workspace), batch analysis trigger (run audit + keyword analysis + decay analysis in one click), onboarding checklist with progress tracking, default competitor auto-discovery. Separate initiative from intelligence engine — scoped as its own spec.",
-          "status": "pending"
-        },
-        {
-          "id": 522,
-          "title": "Typed data contracts audit — replace Record<string, unknown> across codebase",
-          "source": "Connected Intelligence PR review",
-          "est": "3-4h",
-          "priority": "P2",
-          "notes": "Added StrategyAlignmentData interface for the only untyped InsightDataMap entry (strategy_alignment). Updated UpsertInsightParams.data to InsightDataMap[InsightType] union type. Updated enrichAndUpsert<T> to generic with typed data. Removed all as unknown as Record<string,unknown> casts in analytics-intelligence.ts for compute functions (ranking_mover, ctr_opportunity, serp_opportunity). Added strategyAlignmentDataSchema to server/schemas/insight-schemas.ts. Added tests/unit/insight-data-types.test.ts. All 224 test files / 3669 tests pass.",
-          "status": "done"
-        },
-        {
-          "id": "meeting-brief-phase1",
-          "title": "Meeting Brief — Phase 1 (Strategic Intelligence Brief)",
-          "source": "docs/superpowers/plans/2026-04-07-meeting-brief.md",
-          "est": "8-12h",
-          "priority": "P1",
-          "notes": "On-demand AI-synthesized meeting brief tab (admin-only, screen-shareable). 6 sections: situation summary, wins, attention items, recommendations, blueprint progress (conditional), at-a-glance metrics strip. DB: meeting_briefs table (migration 048) + custom_prompt_notes column on workspaces (Layer 3 prompt assembly). Server: GET + POST /api/workspaces/:id/meeting-brief/generate. Uses buildSystemPrompt() from prompt-assembly.ts. Prompt hash deduplication skips AI call when data unchanged. Phase 2 (Site Architecture Intelligence) deferred until Voice Intelligence lands.\n[Audit 2026-04-22] Shipped: full stack (server/routes/meeting-brief.ts, generator, store, migration 054, MeetingBriefPage.tsx, useAdminMeetingBrief, shared/types/meeting-brief.ts, 3 server tests).",
-          "status": "done",
-          "shippedAt": "2026-04-22"
-        },
-        {
-          "id": "brandscript-engine-phase1",
-          "title": "Brandscript Engine + Voice Calibration — Phase 1",
-          "source": "docs/superpowers/plans/2026-03-26-brandscript-engine.md",
-          "est": "20-28h",
-          "priority": "P1",
-          "notes": "4 new Brand Hub sub-tabs: Brandscript Builder (StoryBrand framework + AI-assist), Discovery Ingestion (transcript/doc upload → extraction review), Voice Calibration (calibration loop with steering), Brand Identity (deliverable generation). Migration 049. Task 5b extends prompt-assembly.ts with Layer 2 voice DNA translation — activates automatically for all AI features once a workspace profile is calibrated. Prerequisite for prompt standardization pass and Page Strategy Engine.\n[Audit 2026-04-22] Shipped: all 4 Brand Hub tabs (Brandscript/Discovery/Voice/Identity), migration 053-brandscript-engine.sql, server/brandscript.ts, SteeringChat.tsx, plus follow-up migrations 056/057.",
-          "status": "done",
-          "shippedAt": "2026-04-22"
-        },
-        {
-          "id": "prompt-standardization-pass",
-          "title": "Prompt Standardization Pass — wire existing AI features through buildSystemPrompt()",
-          "source": "docs/superpowers/plans/2026-04-08-prompt-standardization-pass.md",
-          "est": "4-6h",
-          "priority": "P1",
-          "notes": "Shipped (April 2026, PR #156). Wired 5 AI features through buildSystemPrompt(): SEO rewrite (single + bulk), content brief, monthly digest, rewrite chat, keyword strategy. Added response_format support to callOpenAI() + AIRequestDeduplicator.createKey(). SEO rewrite now injects keyword map context (buildKeywordMapContext) + page intelligence (cannibalization, decay, health) with URL-aware pageId matching. Content brief adds workspace learnings block (outcome-ai-injection gated) and moves to system+user message structure with JSON mode. Monthly digest gets top-wins narrative from insights. Keyword strategy wraps existing system messages rather than prepending a second one. Temperature standardized across all features. Tests: 6 new unit tests (openai-helpers-format, prompt-standardization); content-brief integration tests updated for system+user message split.",
-          "status": "done"
-        },
-        {
-          "id": "page-strategy-engine-phase2",
-          "title": "Page Strategy Engine + Site Blueprint — Phase 2",
-          "source": "docs/superpowers/plans/2026-03-27-page-strategy-engine.md",
-          "est": "16-22h",
-          "priority": "P1",
-          "notes": "Shipped — Site Blueprint deliverable with page-by-page content plan. Intelligence-informed generation. Auto-brief creation. Prerequisite for Copy Pipeline Phase 3.",
-          "status": "done"
-        },
-        {
-          "id": "copy-pipeline-phase3",
-          "title": "Copy Pipeline — Phase 3 (Full AI Copy Generation)",
-          "source": "docs/superpowers/plans/2026-03-27-copy-pipeline.md",
-          "est": "24-32h",
-          "priority": "P1",
-          "notes": "Shipped — Tier 1 (Tasks 1-19): 4 server modules (copy-generation, copy-review, copy-intelligence, copy-export), migration 058, Zod schemas, frontend API + hooks, 5 UI components (CopyReviewPanel, BatchGenerationPanel, CopyExportPanel, CopyIntelligenceManager, BlueprintDetail Copy tab). 21 integration tests. Tier 2 (Tasks 20-28): voice sample feedback loop, steering classification, pattern promotion, client copy review portal, questionnaire→brandscript, admin chat awareness, content decay→copy refresh, workspace intelligence wiring. Feature-flagged via copy-engine-pipeline. PR #173 (Tier 1) + PR for Tier 2.",
-          "status": "done"
-        },
-        {
-          "id": 605,
-          "title": "Add requireWorkspaceAccess to compress route (POST /api/webflow/compress/:assetId)",
-          "source": "PR #257 code review — deferred hardening item",
-          "est": "0.5h",
-          "priority": "P2",
-          "notes": "POST /api/webflow/compress/:assetId is missing requireWorkspaceAccess(\"workspaceId\"). The route currently has no workspace path param — needs renaming to /api/webflow/:workspaceId/compress/:assetId to match the pattern established in PR #257 for alt-text routes. Low urgency (Webflow asset writes are scoped by siteId from the request body, not the URL), but closes the gap for consistency and defense-in-depth. Shipped in PR #257 tack-on.",
-          "status": "done",
-          "shippedAt": "2026-04-22"
-        },
-        {
-          "id": 606,
-          "title": "Replace raw fetch in DropZone.tsx with getText() / typed API helper",
-          "source": "PR #257 Task 8 — partial raw fetch cleanup, DropZone deferred",
-          "est": "0.5h",
-          "priority": "P3",
-          "notes": "Task 8 in the tack-on sprint cleaned up PostEditor.tsx and ContentBriefs.tsx. DropZone.tsx still has a raw fetch().then(r => r.text()) call. Straightforward swap to getText() from src/api/client.ts — no logic change required. Shipped in PR #257 tack-on. Also found postForm<T> helper already exists in src/api/client.ts — used that.",
-          "status": "done",
-          "shippedAt": "2026-04-22"
-        },
-        {
-          "id": 577,
-          "title": "Page Rewriter: applyToSection feedback when target heading not found",
-          "source": "PR #159 code review flag",
-          "est": "0.5h",
-          "priority": "P2",
-          "status": "pending",
-          "notes": "When AI sectionTarget slug doesn't match any data-section heading, show a toast (e.g. 'Section not found — content inserted at end') instead of silently appending to document end. Deferred from PR #159."
-        },
-        {
-          "id": 578,
-          "title": "Page Rewriter: expand HTML tokenizer to capture <div>, <li>, <blockquote> body text",
-          "source": "PR #159 code review flag",
-          "est": "1-2h",
-          "priority": "P2",
-          "status": "pending",
-          "notes": "extractPageSections() only tokenizes <h1-6> and <p> tags. Pages using <div> wrappers for body text (common in Webflow CMS templates) produce sections with empty body fields. Expand the two-pass tokenizer to also capture <li>, <blockquote>, and non-empty <div> text nodes. Deferred from PR #159."
-        },
-        {
-          "id": 579,
-          "title": "Page Rewriter: PDF export via print stylesheet",
-          "source": "User request Apr 2026",
-          "est": "1h",
-          "priority": "P3",
-          "status": "pending",
-          "notes": "Add 'Download PDF' option to the Export brief menu. Cleanest approach: inject document content into a hidden print-only div with a styled print stylesheet and call window.print(). No new dependencies. DOCX export (#579 shipped) is the primary export; PDF is a lightweight complement for sharing/printing."
-        },
-        {
-          "id": 609,
-          "title": "AEO Review: Send to Client per-page changes",
-          "source": "Send to Client consistency initiative",
-          "est": "2-3h",
-          "priority": "P2",
-          "notes": "Add per-page Send to Client button to AEO Review change cards. Each recommended change (rewrite_intro, add_faq, add_section, etc.) should be sendable to the client approval queue with current→suggested diff as the approval payload.",
-          "status": "pending"
-        },
-        {
-          "id": 610,
-          "title": "Internal Links: Send to Client link suggestions",
-          "source": "Send to Client consistency initiative",
-          "est": "2-3h",
-          "priority": "P2",
-          "notes": "Add Send to Client button per page in Internal Links results. Sends suggested link insertions (anchor text, target URL, context snippet) to client approval queue so client can approve before agency implements.",
-          "status": "pending"
-        },
-        {
-          "id": 611,
-          "title": "Keyword Strategy: Send to Client strategy recommendations",
-          "source": "Send to Client consistency initiative",
-          "est": "1-2h",
-          "priority": "P3",
-          "notes": "Add bulk Send to Client for keyword strategy tabs (Quick Wins, Content Gaps, Low Hanging Fruit). Packages selected recommendations into approval batch for client review before implementation.",
-          "status": "pending"
-        },
-        {
-          "id": 612,
-          "title": "Redirect Manager: Send to Client redirect proposals",
-          "source": "Send to Client consistency initiative",
-          "est": "1-2h",
-          "priority": "P2",
-          "notes": "Add Send to Client for proposed redirects (broken links, chain fixes). Client reviews source→target mappings before agency publishes them to Webflow.",
-          "status": "pending"
-        },
-        {
-          "id": 297,
-          "title": "Content Decay: Send to Client refresh recommendations",
-          "source": "Send to Client consistency initiative",
-          "est": "1-2h",
-          "priority": "P3",
-          "notes": "Add Send to Client for decaying content pages. Sends page title, traffic decline data, and recommended action (refresh, merge, redirect) to client for awareness/approval.",
-          "status": "pending"
-        },
-        {
-          "id": 306,
-          "title": "Schema: Write generated schema to CMS collection field",
-          "source": "Schema bulk generation discussion",
-          "est": "3-4h",
-          "priority": "P1",
-          "notes": "Allow writing generated schema JSON to a designated CMS collection field (e.g. 'schema-markup' rich text or plain text field) via Webflow CMS API. Would enable CMS-driven schema injection without Webflow custom code embeds. Also consider: cap CMS pages in bulk gen, add overall timeout/token budget, skip CMS pages matching existing CMS template.",
-          "status": "pending"
-        },
-        {
-          "id": 570,
-          "title": "Competitor Content Monitoring (Scheduled Job)",
-          "source": "USER REQUEST",
-          "est": "4h",
-          "priority": "P2",
-          "notes": "Future — Scheduled job to periodically fetch new competitor keywords and alert when competitors gain new rankings.",
-          "status": "pending"
-        },
-        {
-          "id": 571,
-          "title": "Authority-Adjusted Difficulty Filtering",
-          "source": "USER REQUEST",
-          "est": "3h",
-          "priority": "P2",
-          "notes": "Future — Contextualize keyword difficulty (KD) by site's domain authority/rating. A KD of 40% means different things for a DR-20 site vs a DR-60 site.",
-          "status": "pending"
-        },
-        {
-          "id": 322,
-          "title": "URL-Level Keyword Intelligence (url_organic API)",
-          "source": "USER REQUEST",
-          "est": "3h",
-          "priority": "P2",
-          "notes": "Future — Use SEMRush url_organic API to get per-page keyword data instead of domain-level. More precise keyword assignments for individual pages.",
-          "status": "pending"
-        },
-        {
-          "id": 351,
-          "title": "Page Intelligence — Optimization Score History & Trending",
-          "source": "USER REQUEST",
-          "est": "3-4h",
-          "priority": "P2",
-          "notes": "Track optimization score snapshots over time (per page). Show sparkline trend in page list. Enable 'your average page health improved from X → Y this month' reporting. Requires new DB table or JSON snapshot storage.",
-          "status": "pending"
-        },
-        {
-          "id": 355,
-          "title": "AI Research Mode — Anti-Hallucination Prompt Blocks",
-          "source": "USER REQUEST (Reddit find: Anthropic docs anti-hallucination techniques)",
-          "est": "2-3h",
-          "priority": "P2",
-          "notes": "Add toggleable 'research mode' prompt blocks to AI features that make factual claims. Three techniques from Anthropic docs: (1) Allow 'I don't know' — stops confident-sounding fiction. (2) Verify with citations — retract unsourced claims. (3) Direct quotes for factual grounding — extract verbatim before analyzing. Apply to: content briefs (competitor insights, SERP analysis), SEO audit AI recommendations, content post generation, admin chat. Do NOT apply to creative features (SEO rewrites, keyword brainstorming) — research shows citation constraints reduce creative output. Implementation: add researchMode flag to callOpenAI opts, inject prompt blocks conditionally.",
-          "status": "pending"
-        },
-        {
-          "id": 356,
-          "title": "E-E-A-T Asset Library — Personalized Trust Signal Recommendations",
-          "source": "USER REQUEST",
-          "est": "4-6h",
-          "priority": "P2",
-          "notes": "Current E-E-A-T guidance in content briefs is generic per-pillar text ('include case studies'). Gap: no inventory of what assets a client ACTUALLY has. Build: (1) Workspace-level E-E-A-T profile in settings — admin tags existing client assets: testimonials (with quotes + attribution), case studies (with URLs + metrics), certifications/credentials, before/after galleries, team bios/expertise, awards/recognition, data/research, client logos. (2) Content briefs inject specific asset recommendations: 'Add the Dr. Smith testimonial from /reviews' or 'Include the Acme Corp case study showing 40% conversion lift'. (3) Page Intelligence flags pages missing trust signals based on page type (service pages need testimonials, product pages need reviews, etc.). (4) Schema generator uses asset library for author/credential structured data. New DB table: eeat_assets (workspace_id, type, title, url, content, metadata JSON). New UI: settings tab or workspace profile section.",
-          "status": "pending"
-        },
-        {
-          "id": 357,
-          "title": "SEO Editor — Convert Bulk Analyze to Background Job",
-          "source": "TECH DEBT",
-          "est": "1h",
-          "priority": "P1",
-          "notes": "SeoEditor.tsx line 351-358: sequential for-loop calling analyzePage() per page. Same bug PageIntelligence had — navigate away = lost progress. Convert to page-analysis background job or create seo-editor-analyze job type. Should reuse the page-analysis job infrastructure.\n[Audit 2026-04-22] Shipped: seo-bulk-analyze background job (server/webflow-seo.ts:1211) wired through SeoEditor.tsx:494 + seoBulkJobs API.",
-          "status": "done",
-          "shippedAt": "2026-04-22"
-        },
-        {
-          "id": 358,
-          "title": "SEO Editor — Convert Bulk Rewrite Apply to Background Job",
-          "source": "TECH DEBT",
-          "est": "1.5h",
-          "priority": "P2",
-          "notes": "SeoEditor.tsx line 493-504: sequential for-loop pushing SEO changes to Webflow API one page at a time. Blocks UI during apply. Convert to server-side job that applies all previewed changes, reports progress via WebSocket. Lower priority than analyze — individual API calls are fast.\n[Audit 2026-04-22] Shipped: seo-bulk-rewrite background job (server/webflow-seo.ts:1471) wired through SeoEditor.tsx:621.",
-          "status": "done",
-          "shippedAt": "2026-04-22"
-        },
-        {
-          "id": 359,
-          "title": "SEO Audit — Convert Accept All Fixes to Background Job",
-          "source": "TECH DEBT",
-          "est": "1h",
-          "priority": "P2",
-          "notes": "SeoAudit.tsx line 309-319: sequential for-loop pushing fixes to Webflow API. Similar to SeoEditor bulk apply — blocks UI, lose progress on navigation. Convert to server-side job. Uses AbortController currently which is good, but should be a proper cancellable background job.\n[Audit 2026-04-22] Shipped: seo-bulk-accept-fixes background job (server/webflow-seo.ts:1761) wired through audit/BulkAcceptPanel.tsx:140.",
-          "status": "done",
-          "shippedAt": "2026-04-22"
-        },
-        {
-          "id": 365,
-          "title": "Normalize contentGaps into dedicated SQLite table",
-          "source": "TECH DEBT",
-          "est": "2h",
-          "priority": "P2",
-          "notes": "Extract keywordStrategy.contentGaps[] into a content_gaps table keyed by (workspace_id, target_keyword). Enables per-gap voting/updates without rewriting the full strategy blob. Read by client portal (StrategyTab), briefs (anti-cannibalization), and content planner. Pattern: same as #364 (page_keywords). ~6 reader/writer call sites.",
-          "status": "pending"
-        },
-        {
-          "id": 366,
-          "title": "Normalize pageEditStates into dedicated SQLite table",
-          "source": "TECH DEBT",
-          "est": "2.5h",
-          "priority": "P1",
-          "notes": "Extract workspace pageEditStates JSON map into a page_edit_states table keyed by (workspace_id, page_id). Written on every SEO edit, approval, bulk operation, cart fix, and recommendation resolution. Currently full blob read-modify-write on each action. Enables SQL queries like 'all pages in review across workspaces' for future admin dashboard. Pattern: same as #364. High write frequency makes this the highest-impact normalization after pageMap.\n[Audit 2026-04-22] Shipped: dedicated page_edit_states table in migration 005-workspaces.sql; full module at server/page-edit-states.ts.",
-          "status": "done",
-          "shippedAt": "2026-04-22"
-        },
-        {
-          "id": 367,
-          "title": "Normalize quickWins into dedicated SQLite table",
-          "source": "TECH DEBT",
-          "est": "1.5h",
-          "priority": "P3",
-          "notes": "Extract keywordStrategy.quickWins[] into a quick_wins table keyed by (workspace_id, page_path). Read by client portal and strategy UI. Lower priority since these are regenerated wholesale (not individually updated). Pattern: same as #364. ~4 call sites.",
-          "status": "pending"
-        },
-        {
-          "id": 368,
-          "title": "Normalize keywordGaps into dedicated SQLite table",
-          "source": "TECH DEBT",
-          "est": "1.5h",
-          "priority": "P3",
-          "notes": "Extract keywordStrategy.keywordGaps[] into a keyword_gaps table keyed by (workspace_id, keyword). Read by client portal and strategy UI. Regenerated wholesale during strategy generation. Pattern: same as #364. ~4 call sites.",
-          "status": "pending"
-        },
-        {
-          "id": 369,
-          "title": "Normalize topicClusters into dedicated SQLite table",
-          "source": "TECH DEBT",
-          "est": "2h",
-          "priority": "P3",
-          "notes": "Extract keywordStrategy.topicClusters[] into a topic_clusters table keyed by (workspace_id, topic). Read by internal links (intra-cluster linking), cannibalization detection, and client portal. Grows proportionally with site size. Pattern: same as #364. ~5 call sites.",
-          "status": "pending"
-        },
-        {
-          "id": 370,
-          "title": "Normalize cannibalization into dedicated SQLite table",
-          "source": "TECH DEBT",
-          "est": "2h",
-          "priority": "P3",
-          "notes": "Extract keywordStrategy.cannibalization[] into a cannibalization_issues table keyed by (workspace_id, keyword). Enables historical tracking of cannibalization over time (currently overwritten each run). Already has its own detection module (cannibalization-detection.ts) but results stored in strategy blob. Pattern: same as #364. ~3 call sites.",
-          "status": "pending"
-        },
-        {
-          "id": 574,
-          "title": "JSON validation follow-up: schema coverage for high-value parseJsonFallback columns",
-          "source": "TECH DEBT",
-          "est": "1.5h",
-          "priority": "P2",
-          "notes": "Three deferred items from typed-contracts PR (#87) code review: (1) work-orders.ts has bare JSON.parse calls not migrated in the PR — add parseJsonFallback or parseJsonSafeArray. (2) recommendations.ts and reports.ts use parseJsonFallback for high-value recommendation/summary data — add Zod schemas (RecommendationSchema, SummarySchema) and switch to parseJsonSafe with typed fallback. (3) pageKeywordMapSchema missing ~16 optional fields from PageKeywordMap interface — harmless due to .passthrough() but represents schema drift; add optional fields to keep schema in sync for future required-field additions.",
-          "status": "pending"
-        },
-        {
-          "id": "competitor-snapshot-store-refactor",
-          "title": "Refactor detectCompetitorAlerts: separate computation from DB persistence",
-          "source": "TECH DEBT — scaled code review on PR #267 (feat/seo-tier2-capabilities)",
-          "est": "1-2h",
-          "priority": "P3",
-          "notes": "detectCompetitorAlerts() in server/competitor-snapshot-store.ts both computes alerts AND inserts them into the competitor_alerts table as a side effect. This tight coupling makes the function hard to unit-test in isolation and violates the separation seen elsewhere (e.g. computePageHealthScores returns data without DB writes). Fix: split into computeCompetitorAlerts(current, previous, opts) returning CompetitorAlert[] (pure, no DB writes) and saveCompetitorAlerts(workspaceId, alerts) for the insert pass. Callers in intelligence-crons.ts call both in sequence.",
-          "status": "pending"
-        },
-        {
-          "id": "analytics-intelligence-phase-reorder",
-          "title": "Move Phase 5 (emerging_keyword) and Phase 6 (freshness_alert) to after Phase 4 in analytics-intelligence.ts",
-          "source": "TECH DEBT — scaled code review on PR #267",
-          "est": "0.5h",
-          "priority": "P3",
-          "notes": "Phase 5 (line ~1309) and Phase 6 (line ~1349) are currently inserted between Phase 3B and Phase 3C, contradicting the new rule 8.3 in docs/rules/analytics-insights.md (phases must be appended after the last existing phase). Pure code motion — no logic change, no dependency conflicts. Deferred from PR #267 to avoid mixing functional bug fixes with pure reorder churn.",
-          "status": "pending"
-        },
-        {
-          "id": "freshness-detection-direct-test",
-          "title": "Add direct unit test for Phase 6 content freshness detection logic",
-          "source": "TECH DEBT — scaled code review on PR #267",
-          "est": "0.5h",
-          "priority": "P3",
-          "notes": "tests/integration/content-freshness.test.ts only validates the GET /api/public/insights endpoint accepts freshness_alert shapes — it does NOT actually run the Phase 6 detection filter. Mirror tests/unit/emerging-keywords.test.ts: extract the 90d+100impressions filter into a helper (or test the existing pageKws.filter logic by calling into analytics-intelligence via a test harness). Goal: confirm pages exactly at the 90/100 thresholds behave correctly and stale pages below MIN_IMPRESSIONS are excluded.",
-          "status": "pending"
-        },
-        {
-          "id": "insight-cards-empty-state-parity",
-          "title": "Unify empty-state behavior for new Tier 2 InsightCards (grid gap fix)",
-          "source": "UX — scaled code review on PR #267",
-          "est": "0.5h",
-          "priority": "P3",
-          "notes": "CompetitorAlertCard, EmergingKeywordCard, FreshnessAlertCard in src/components/client/InsightCards.tsx return null when no data is available for growth/premium tiers, breaking the 3-column grid (leaves 8 cards as 3+3+2). The original 6 cards always render with an empty state. Fix: give the new cards a lightweight empty state rather than returning null, or switch all 9 to conditional rendering so the grid is consistent. Pick one pattern.",
           "status": "pending"
         }
       ]
@@ -3690,6 +2914,803 @@
           "title": "In-portal pricing/plans page",
           "status": "done",
           "shippedAt": "2026-01"
+        }
+      ]
+    },
+    {
+      "id": "shipped-apr-2026",
+      "name": "✅ SHIPPED — April 2026",
+      "items": [
+        {
+          "id": 414,
+          "title": "Client Overview — content plan insights in InsightsDigest",
+          "source": "TOOL_AUDIT §1b",
+          "est": "3h",
+          "priority": "P1",
+          "notes": "Shipped — InsightsDigest: 3 insight variants (review needed, progress %, complete). OverviewTab action banner includes content plan review items.",
+          "status": "done"
+        },
+        {
+          "id": 415,
+          "title": "Workspace Home — content pipeline stat card + action items",
+          "source": "TOOL_AUDIT §1a",
+          "est": "2h",
+          "priority": "P1",
+          "notes": "Shipped — 5th stat card with published/total %, action item for review cells. Data derived in workspace-home.ts.",
+          "status": "done"
+        },
+        {
+          "id": 416,
+          "title": "Content Plan tab badge count",
+          "source": "TOOL_AUDIT §3a",
+          "est": "30m",
+          "priority": "P1",
+          "notes": "Shipped — Blue badge on Content Plan tab showing review+flagged cell count.",
+          "status": "done"
+        },
+        {
+          "id": 417,
+          "title": "Strategy tab — show planned coverage badges",
+          "source": "TOOL_AUDIT §3d",
+          "est": "2h",
+          "priority": "P1",
+          "notes": "Shipped — Violet Planned/In Progress/Approved/Published badges on content gaps matching matrix cells.",
+          "status": "done"
+        },
+        {
+          "id": 418,
+          "title": "ROI Dashboard — include matrix-planned content",
+          "source": "TOOL_AUDIT §1f",
+          "est": "1h",
+          "priority": "P1",
+          "notes": "Shipped — Published matrix cells included in contentItems with violet 'Content Plan' badge. Deduped by keyword.",
+          "status": "done"
+        },
+        {
+          "id": 419,
+          "title": "Strategy → Content Planner action bridge",
+          "source": "TOOL_AUDIT §1c",
+          "est": "3h",
+          "priority": "P2",
+          "notes": "Shipped — Admin 'Add to Planner' button on content gaps → Content Pipeline. Client 'Planned' badges are clickable → Content Plan tab. Feature #164.",
+          "status": "done"
+        },
+        {
+          "id": 420,
+          "title": "Site Architecture — show planned URLs from matrices",
+          "source": "TOOL_AUDIT §1d",
+          "est": "2h",
+          "priority": "P2",
+          "notes": "Shipped — Purple 'Planned' badge, source priority enforcement, published cells excluded from planned. Feature #161.",
+          "status": "done"
+        },
+        {
+          "id": 421,
+          "title": "Content Performance — track matrix-published content",
+          "source": "TOOL_AUDIT §1e",
+          "est": "2h",
+          "priority": "P2",
+          "notes": "Shipped — Published matrix cells included in performance view, deduped by keyword, violet 'Content Plan' badge. Feature #162.",
+          "status": "done"
+        },
+        {
+          "id": 422,
+          "title": "Client Overview → Content Plan quick action card",
+          "source": "TOOL_AUDIT §3b",
+          "est": "1h",
+          "priority": "P2",
+          "notes": "Shipped — Implemented as part of #414 (action-needed banner + InsightsDigest cards).",
+          "status": "done"
+        },
+        {
+          "id": 423,
+          "title": "Inbox — include content plan reviews",
+          "source": "TOOL_AUDIT §3c",
+          "est": "2h",
+          "priority": "P2",
+          "notes": "Shipped — 'Content Plan' filter in Inbox showing review/flagged cells with flag action. Feature #163.",
+          "status": "done"
+        },
+        {
+          "id": 424,
+          "title": "Notification bell — content plan review alerts",
+          "source": "TOOL_AUDIT §2c",
+          "est": "1h",
+          "priority": "P2",
+          "notes": "Shipped — Workspace overview includes contentPlan.review count. NotificationBell shows violet alert for review/flagged cells. Feature #165.",
+          "status": "done"
+        },
+        {
+          "id": 425,
+          "title": "Content Calendar — matrix cell entries",
+          "source": "TOOL_AUDIT §1g",
+          "est": "2h",
+          "priority": "P2",
+          "notes": "Shipped — Matrix cells on calendar with violet 'Matrix Cell' type, filter pill, stat card. Dates from linked posts/briefs or matrix updatedAt. Feature #166.",
+          "status": "done"
+        },
+        {
+          "id": 426,
+          "title": "Content Pipeline — health summary bar",
+          "source": "TOOL_AUDIT §4b",
+          "est": "2h",
+          "priority": "P2",
+          "notes": "Shipped — Summary bar above tabs: briefs, posts, matrices, cells with publish %. Feature #167.",
+          "status": "done"
+        },
+        {
+          "id": 427,
+          "title": "Matrix cell status timeline",
+          "source": "TOOL_AUDIT §4a",
+          "est": "2h",
+          "priority": "P3",
+          "notes": "Shipped — StatusHistoryEntry type + auto-record in updateMatrixCell + vertical timeline in CellDetailPanel with relative timestamps. Feature #168.",
+          "status": "done"
+        },
+        {
+          "id": 428,
+          "title": "Admin Chat — content plan context",
+          "source": "TOOL_AUDIT §1i",
+          "est": "1h",
+          "priority": "P3",
+          "notes": "Include template/matrix counts and pipeline status in AI chat context for content-plan-aware answers.\n[Audit 2026-04-22] Shipped: admin chat assembles Content Plan (templates + matrices) at server/admin-chat-context.ts:738.",
+          "status": "done",
+          "shippedAt": "2026-04-22"
+        },
+        {
+          "id": 429,
+          "title": "Client Chat — content plan context",
+          "source": "TOOL_AUDIT §3e",
+          "est": "1h",
+          "priority": "P3",
+          "notes": "Include content plan summary in client chat context for 'What's my content status?' queries.\n[Audit 2026-04-22] Shipped: client chat assembles CONTENT PLAN section at server/routes/public-analytics.ts:329-373.",
+          "status": "done",
+          "shippedAt": "2026-04-22"
+        },
+        {
+          "id": 432,
+          "title": "LLMs.txt — include planned/approved content",
+          "source": "TOOL_AUDIT §1h",
+          "est": "1h",
+          "priority": "P3",
+          "notes": "Shipped — Included in Phase 4/5 overhaul: matrix cells with status != published included as upcoming content. Active content requests also included.",
+          "status": "done"
+        },
+        {
+          "id": 433,
+          "title": "Move Guide tab to floating help button",
+          "source": "TOOL_AUDIT §2a",
+          "est": "1h",
+          "priority": "P3",
+          "notes": "Content Pipeline has 7 sub-tabs. Move Guide to a floating ? button to reduce tab clutter.\n[Audit 2026-04-22] Shipped: floating Guide help button + slide-over in ContentPipeline.tsx:240-260 (replaces Guide tab).",
+          "status": "done",
+          "shippedAt": "2026-04-22"
+        },
+        {
+          "id": 434,
+          "title": "Command Palette — content planner quick actions",
+          "source": "TOOL_AUDIT §2b",
+          "est": "30m",
+          "priority": "P4",
+          "notes": "Add 'Create Content Template', 'Build Content Matrix', 'View Content Plan' to CommandPalette.\n[Audit 2026-04-22 partial] Two of three quick actions already shipped in CommandPalette.tsx (Create Content Template, Build Content Matrix); only \"View Content Plan\" remains.\n[Shipped 2026-04-22] Added \"View Content Plan\" action to CommandPalette.tsx (navigates to content-pipeline?tab=planner). All three quick actions now live.",
+          "status": "done",
+          "shippedAt": "2026-04-22"
+        },
+        {
+          "id": 500,
+          "title": "Empty State Standardization — Migrate 114 ad-hoc empty states to EmptyState primitive",
+          "source": "UI_UX_AUDIT §4",
+          "est": "4-6h",
+          "priority": "P0",
+          "notes": "Shipped — Replaced generic 'No data' messages with consistent EmptyState component across GoogleAnalytics, DataList, ContentPerformance, MatrixBuilder, PageSpeedPanel, PageWeight. Added context-appropriate icons and actions. Fixed DataList test to match new 'No data available' text.",
+          "status": "done",
+          "shippedAt": "2026-03-24"
+        },
+        {
+          "id": 501,
+          "title": "Command Palette Visibility — Add search trigger to header bar",
+          "source": "UI_UX_AUDIT §3",
+          "est": "30m",
+          "priority": "P0",
+          "notes": "Command Palette exists but only accessible via ⌘K keyboard shortcut. Add magnifying glass icon button to header bar (next to notification bell) that opens Command Palette. Show ⌘K hint in tooltip.",
+          "status": "done",
+          "shippedAt": "2026-03-19"
+        },
+        {
+          "id": 502,
+          "title": "MobileGuard Improvement — Allow read-only mobile access",
+          "source": "UI_UX_AUDIT §6",
+          "est": "2-3h",
+          "priority": "P0",
+          "notes": "Currently blocks all mobile with 'Desktop only' message. Change to: allow read-only views (analytics, search, audit results) on mobile. Block only complex editing tools. Show 'Best on desktop' notice instead of hard block.",
+          "status": "done",
+          "shippedAt": "2026-03-19"
+        },
+        {
+          "id": 504,
+          "title": "Churn Signals Exposure — Add 'At Risk' filter to workspace overview",
+          "source": "UI_UX_AUDIT §Backend Capabilities",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped — At Risk badge on workspace cards (red critical / amber warning), border highlighting, Needs Attention churn alert. Server returns churnSignals counts in /api/workspace-overview. Feature #154.",
+          "status": "done",
+          "shippedAt": "2026-03-26"
+        },
+        {
+          "id": 505,
+          "title": "Client Dashboard Primary CTAs — Contextual next actions",
+          "source": "UI_UX_AUDIT §Client Dashboard",
+          "est": "2-3h",
+          "priority": "P0",
+          "notes": "Shipped — Added contextual CTA banners in Overview tab: 'Generate Brief' when strategy exists, 'View Issues' when health < 80, 'Find Keywords' when traffic low. Color-coded banners with direct navigation to relevant tabs.",
+          "status": "done",
+          "shippedAt": "2026-03-24"
+        },
+        {
+          "id": 506,
+          "title": "Client Empty State Enhancement — Setup guidance checklist",
+          "source": "UI_UX_AUDIT §Client Dashboard",
+          "est": "1-2h",
+          "priority": "P0",
+          "notes": "Shipped — Replaced generic empty state with setup checklist: Connect GSC, Connect GA4, Run First Audit. Added contextual guidance and clear next steps for new workspaces.",
+          "status": "done",
+          "shippedAt": "2026-03-24"
+        },
+        {
+          "id": 507,
+          "title": "Loading & Error State Components — Contextual messaging",
+          "source": "UI_UX_AUDIT §Technical Polish",
+          "est": "3-4h",
+          "priority": "P1",
+          "notes": "Shipped — Created LoadingState and ErrorState components with contextual messages. Updated ROIDashboard ('Calculating traffic value...') and ApprovalsTab ('Loading approvals...'). Added recovery actions and type-specific error handling.",
+          "status": "done",
+          "shippedAt": "2026-03-24"
+        },
+        {
+          "id": 508,
+          "title": "Admin Notification Center — Global notification aggregation",
+          "source": "UI_UX_AUDIT §Admin Navigation",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — Added NotificationBell to sidebar utility bar. Aggregates anomalies, requests, approvals across all workspaces. Real-time updates every 5 minutes with click-to-navigate functionality.",
+          "status": "done",
+          "shippedAt": "2026-03-24"
+        },
+        {
+          "id": 509,
+          "title": "Command Center Anomaly Banner — Global issue visibility",
+          "source": "UI_UX_AUDIT §Admin Navigation",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped — Added global anomaly banner at top of Command Center. Shows critical/warning anomalies across workspaces with severity-based styling and direct navigation to first affected workspace.",
+          "status": "done",
+          "shippedAt": "2026-03-24"
+        },
+        {
+          "id": 510,
+          "title": "Anomaly Detection Dashboard — Expose ML-based traffic/ranking anomalies",
+          "source": "UI_UX_AUDIT §Backend Capabilities",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Backend has anomaly-detection.ts with ML-based anomaly detection. Currently barely visible. Create 'Insights' tab or section showing detected anomalies with explanations: 'Your LPC improved 23% this week', 'Traffic drop detected on [page]', 'Ranking anomaly for [keyword]'.\n[Audit 2026-04-22] Shipped: AnomalyAlerts.tsx wired into WorkspaceHome.tsx:544 via useAnomalyAlerts hook + server anomaly-detection.ts.",
+          "status": "done",
+          "shippedAt": "2026-04-22"
+        },
+        {
+          "id": 511,
+          "title": "ROI Dashboard in Admin — Show organic traffic value per workspace",
+          "source": "UI_UX_AUDIT §Backend Capabilities",
+          "est": "2h",
+          "priority": "P1",
+          "notes": "ROI calculation exists in client portal only. Add ROI metric cards to admin Workspace Home and Command Center workspace cards. Shows organic traffic value delivered to justify agency fees.\n[Audit 2026-04-22] Shipped: WorkspaceHome.tsx:412-418 renders organic value + ad-spend equivalent via useAdminROI; client ROIDashboard.tsx complement.",
+          "status": "done",
+          "shippedAt": "2026-04-22"
+        },
+        {
+          "id": 512,
+          "title": "Cannibalization Detection UI — Surface keyword conflicts in Strategy tab",
+          "source": "UI_UX_AUDIT §Backend Capabilities",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Shipped — CannibalizationAlert component in Strategy tab with severity badges, per-page metrics, GSC/map source labels, and canonical recommender (action types: canonical_tag, redirect_301, differentiate, noindex). Feature #153.",
+          "status": "done",
+          "shippedAt": "2026-03-23"
+        },
+        {
+          "id": 513,
+          "title": "Content Decay Prominence — Promote decaying content alert to main view",
+          "source": "UI_UX_AUDIT §Backend Capabilities",
+          "est": "1-2h",
+          "priority": "P2",
+          "notes": "Shipped — Dismissible decay alert card in ContentPipeline between summary bar and tabs. Shows total decaying pages, critical/warning counts, avg decline %. Feature #155.",
+          "status": "done",
+          "shippedAt": "2026-03-26"
+        },
+        {
+          "id": 538,
+          "title": "Approval Reminders UI — Add 'Send reminder' to approval batches",
+          "source": "UI_UX_AUDIT §Backend Capabilities",
+          "est": "1-2h",
+          "priority": "P2",
+          "notes": "Shipped — 'Remind' button on PendingApprovals batches with pending items. POST /api/approvals/:wsId/:batchId/remind sends branded email. Loading + 'Sent' confirmation states. Feature #156.",
+          "status": "done",
+          "shippedAt": "2026-03-26"
+        },
+        {
+          "id": 539,
+          "title": "Scheduled Audits Config — UI for recurring audit settings",
+          "source": "UI_UX_AUDIT §Backend Capabilities",
+          "est": "2h",
+          "priority": "P2",
+          "notes": "Backend has scheduled-audits.ts. Add configuration UI to Site Audit tab: enable/disable, frequency (weekly/monthly), email alerts on score drops.\n[Audit 2026-04-22] Shipped: audit/ScheduledAuditSettings.tsx (enable/disable, intervalDays, scoreDropThreshold) PUTting /api/audit-schedules/:workspaceId.",
+          "status": "done",
+          "shippedAt": "2026-04-22"
+        },
+        {
+          "id": 588,
+          "title": "Composite Health Score Dashboard — admin badge + client card",
+          "source": "Platform Health Sprint PR2 (2026-04-14)",
+          "est": "3-5h",
+          "priority": "P1",
+          "notes": "Shipped — compositeHealthScore (0-100, 40% churn + 30% ROI + 30% engagement) surfaced in admin WorkspaceHome (badge next to workspace name) and client OverviewTab (HealthScoreCard with MetricRing, contextual messaging, legend). Wired into ClientIntelligence type + endpoint for Growth+ tiers. Feature #81.",
+          "status": "done",
+          "shippedAt": "2026-04-14"
+        },
+        {
+          "id": 589,
+          "title": "Prediction Showcase Card (weCalledIt) — client dashboard",
+          "source": "Platform Health Sprint PR2 (2026-04-14)",
+          "est": "2-4h",
+          "priority": "P1",
+          "notes": "Shipped — PredictionShowcaseCard shows top 5 predictions that came true from outcome tracking. Wired into ClientIntelligence.weCalledIt for Growth+ tiers. Empty state with Trophy icon when no predictions yet. Feature #82.",
+          "status": "done",
+          "shippedAt": "2026-04-14"
+        },
+        {
+          "id": 590,
+          "title": "Cannibalization Warning Alerts — admin content pipeline",
+          "source": "Platform Health Sprint PR2 (2026-04-14)",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — CannibalizationAlert component in ContentPipeline with severity-based color coding (red/amber/blue for high/medium/low), TierGate for Growth+. Shows affected keywords and competing page paths. Feature #83.",
+          "status": "done",
+          "shippedAt": "2026-04-14"
+        },
+        {
+          "id": 622,
+          "title": "Design System Phase 5 — Phase 0 Foundation (canonical tokens + law cleanup)",
+          "source": "docs/superpowers/plans/2026-04-24-design-system-phase5-sweep.md",
+          "est": "6-8h",
+          "priority": "P0",
+          "notes": "Shipped — Phase 0 of the Total Unification Sweep. src/tokens.css created as canonical single source for all --* CSS custom properties (113 tokens). @import chain established in src/index.css. Vite copyTokensPlugin emits public/tokens.css at build. 14 .t-* typography utility classes added to src/index.css. scoreColorClass fixed to return text-emerald-400 (was text-green-400) for score >=80, matching scoreColor() hex #34d399. Bulk text-green-400 → text-emerald-400 across 70 component files. Badge.tsx purple variant removed (Law 03). statusConfig.ts in-review → blue tokens. All rose/pink hues removed from src/components/ (14 hits). styleguide-token-parity customCheck rule added to pr-check with 4 fixture tests. Barrel skeleton committed: 30 placeholder files for Phase 1 primitives (typography, Icon, Button, IconButton, ActionPill, SegmentedControl, forms/, layout/, overlay/). 11 audit output files frozen in docs/superpowers/audits/2026-04-24-phase5/. FEATURE_AUDIT.md updated. CLAUDE.md + design-system-enforcement.md updated with Phase 5 guardrails.",
+          "status": "done",
+          "shippedAt": "2026-04-24"
+        },
+        {
+          "id": 623,
+          "title": "Design System Phase 5 — Phase 3 Enforcement Hardening (pr-check rules)",
+          "source": "docs/superpowers/plans/2026-04-24-design-system-phase5-sweep.md",
+          "est": "2-3h",
+          "priority": "P0",
+          "notes": "Shipped — Phase 3 enforcement hardening that locks in Phase 2 codemod gains. Added 8 new pr-check rules: Forbidden hues (rose/pink) [error, 0 hits], text-green-{N} for success/score [error, 0 hits after migrating RequestList.tsx Deliver Brief button to emerald], Hand-rolled gradient CTA button [warn, ~10 backlog], Arbitrary pixel text-size [warn, ~318 backlog], Raw text-zinc-N / bg-zinc-N / border-zinc-N [warn, ~514 combined backlog], Inline asymmetric border-radius [warn, ~114 backlog]. Promoted 2 rules warn→error after backlog reached zero: Hand-rolled trend badge, Non-standard transition duration. 5 hand-rolled gradient CTAs migrated to <Button variant=\"primary\"> in same PR (TemplateEditor×2, ClientDashboardTab×2, AiSuggested, BlueprintDetail); 1 preview-disabled gradient hatched. 28 fixture tests added in tests/pr-check.test.ts. verified-clean-rules.md count 72→74. automated-rules.md regenerated (83→91 rules; 49 error / 42 warn). BRAND_DESIGN_LANGUAGE.md changelog updated. CLAUDE.md Forbidden list and Three Laws Law #3 (text-green ban) now mechanized rather than prose-only. Hardcoded card radius (rounded-xl outside ui/) stays at warn pending dedicated rounded-literal cleanup PR (26 hits remaining).",
+          "status": "done",
+          "shippedAt": "2026-04-25"
+        },
+        {
+          "id": 602,
+          "title": "Atomic increment-and-check in usage-tracking.ts (close TOCTOU race on concurrent bulk AI calls)",
+          "source": "PR #255 scaled code review — security agent flag",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Shipped — 2026-04-22 tech-debt-hardening PR #256. Added incrementIfAllowed() + decrementUsage() in server/usage-tracking.ts wrapping check+increment in db.transaction(). Migrated all 6 billing call sites (keyword-strategy.ts, brand-voice.ts, knowledge-base.ts, personas.ts, webflow-alt-text.ts single+bulk, brand-identity.ts refine).",
+          "status": "done",
+          "shippedAt": "2026-04-22"
+        },
+        {
+          "id": 603,
+          "title": "Extract NDJSON/SSE stream reader helper (deduplicate bulkGenerateAltText + streamKeywordStrategy)",
+          "source": "PR #255 scaled code review — code smells agent flag",
+          "est": "1-2h",
+          "priority": "P3",
+          "notes": "Shipped — 2026-04-22 tech-debt-hardening PR #256. Extracted readNdjsonStream<T> + readSseStream<T> into src/api/streamUtils.ts. Replaced inline loops in seo.ts bulkGenerateAltText + streamKeywordStrategy. AssetBrowser.tsx refactored to use bulkGenerateAltText wrapper.",
+          "status": "done",
+          "shippedAt": "2026-04-22"
+        },
+        {
+          "id": 604,
+          "title": "Move workspaceId to path param + requireWorkspaceAccess on alt-text routes (close pre-existing auth gap)",
+          "source": "PR #255 scaled code review — security agent flag (pre-existing, deferred from PR #255)",
+          "est": "2-3h",
+          "priority": "P3",
+          "notes": "Shipped — 2026-04-22 tech-debt-hardening PR #256. Routes renamed to /api/webflow/:workspaceId/generate-alt/:assetId + /api/webflow/:workspaceId/bulk-generate-alt with requireWorkspaceAccess('workspaceId'). Updated AssetBrowser.tsx, AssetAudit.tsx, MediaTab.tsx, App.tsx, and src/api/seo.ts wrappers.",
+          "status": "done",
+          "shippedAt": "2026-04-22"
+        },
+        {
+          "id": 593,
+          "title": "Unified page-join shared client hooks (Option 1)",
+          "source": "Post-slug-path-hardening discussion 2026-04-21",
+          "est": "6-10h",
+          "priority": "P1",
+          "notes": "Shipped: usePageJoin hook + UnifiedPage type; migrated SeoEditor, PageIntelligence, ApprovalsTab",
+          "status": "done"
+        },
+        {
+          "id": 580,
+          "title": "Tighten AnalyticsInsight.data to InsightDataMap discriminated union",
+          "source": "PR #162 typecheck cleanup",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Shipped — 2026-04-20 insight-hardening sprint. Made AnalyticsInsight<T extends InsightType = InsightType> generic with insightType: T and data: InsightDataMap[T]. Added InsightDataBase interface (index signature) to all 14 insight data interfaces for backward compatibility. Made UpsertInsightParams<T>, upsertInsight<T>, cloneInsightParams<T>, applyScoreAdjustment<T> generic. Replaced `as never` casts in anomaly-detection.ts and outcome-tracking.ts. Replaced `as unknown as XData` read-site casts in admin-chat-context.ts and content-brief.ts with type predicates. Removed pr-check grandfather exception for shared/types/analytics.ts.",
+          "status": "done",
+          "shippedAt": "2026-04-20"
+        },
+        {
+          "id": 581,
+          "title": "Reconcile KeywordStrategy schema ↔ interface drift",
+          "source": "PR #162 typecheck cleanup",
+          "est": "1-2h",
+          "priority": "P2",
+          "notes": "Shipped — 2026-04-20 insight-hardening sprint. Added missing fields to keywordStrategySchema in server/schemas/workspace-schemas.ts: siteKeywordMetrics (array of {keyword, volume, difficulty}, optional) and generatedAt (string, optional). Added .passthrough() to tolerate future schema additions. Removed `as unknown as KeywordStrategy` cast in server/workspaces.ts.",
+          "status": "done",
+          "shippedAt": "2026-04-20"
+        },
+        {
+          "id": 582,
+          "title": "Reconcile PageHealthData shape drift between reports.ts and analytics schema",
+          "source": "PR #162 typecheck cleanup",
+          "est": "1h",
+          "priority": "P3",
+          "notes": "Shipped — PR 3 Platform Health Sprint. Extended PageHealthData interface with optional audit-enrichment fields (auditSnapshotId, errorCount, warningCount, topIssues) and removed the `as never` cast.",
+          "status": "done",
+          "shippedAt": "2026-04-15"
+        },
+        {
+          "id": 585,
+          "title": "Audit docs/rules/*.md for staleness and coverage gaps",
+          "source": "pr-check-audit-and-backfill plan (2026-04-10)",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Shipped — Platform Health Sprint PR 5a (bf92a95). Walked all 12 docs/rules/*.md files. Stale refs fixed: ai-dispatch-patterns.md (generateCalibrationVariations line number ~185→~277), analytics-insights.md (useWebSocket→useWorkspaceEvents, schema file location updated, queryKeys refs updated), data-flow.md (init callback location server/index.ts→server/websocket.ts). automated-rules.md regenerated — no diff (already current). bridge-authoring.md, multi-agent-coordination.md, outcome-engine-stubs.md, pr-check-rule-authoring.md, route-removal-checklist.md, ui-ux-consistency.md, verified-clean-rules.md: no stale refs found.",
+          "status": "done",
+          "shippedAt": "2026-04-15"
+        },
+        {
+          "id": 591,
+          "title": "Platform Health Sprint PR 5b — unskip health-routes tests, EmptyState CTA sweep, client-portal silent-catch fixes, archive shipped audits",
+          "source": "Platform Health Sprint PR 5b plan",
+          "est": "3-4h",
+          "priority": "P2",
+          "notes": "Shipped — commits on feature/platform-health-pr5b. Task 6.1 (558172e): unskipped 4 health-routes tests (storage-stats + 3 prune endpoints) by allocating an isolated temp DATA_DIR via fs.mkdtempSync before createTestContext(13217) spawns the server, so getStorageReport/pruneChatSessions/pruneBackups run against an empty dir; 7/7 pass in 2.59s. Task 6.3 (498e7a4): added action-oriented CTAs to 4 dead-end EmptyState instances — OutcomeScorecard (Retry on error → refetch), RankTracker (Take First Snapshot in keywords-but-no-ranks branch, distinct from header to avoid selector collision), ActionItemsPanel (Add Item opens inline form, replaced 'Click Add to track work' prose), ContentCalendar (Create a Brief → navigate to seo-briefs tab via adminPath). All teal per Three Laws. Task 6.4 (b101da4): replaced 4 silent .catch() handlers in client portal with user-facing errors (ContentTab setToast on export failure, FixRecommendations serverRecsError banner, StrategyTab feedbackLoadError + trackedKeywordsError, InboxTab error state); added 2 EmptyState CTAs (removed 2 duplicates). Code-review fixes (94837d3): moved StrategyTab's feedbackLoadError + trackedKeywordsError banners to top of component (were hidden inside collapsed page-keyword-map section); RankTracker.load() sets error state on failure (was console.error only); ActionItemsPanel.load() surfaces loadError with Retry button (was silent). Task 6.5: archived 6 shipped audit docs to docs/superpowers/audits/archive/ (light-mode-and-polish, intelligence-phase2-bridge, page-strategy-engine, admin-ux-restructure, copy-pipeline, deep-diagnostics). Specs + plans were already archived in prior work. Full test suite: 4210/4210 pass, typecheck clean, build clean.",
+          "status": "done",
+          "shippedAt": "2026-04-15"
+        },
+        {
+          "id": 586,
+          "title": "Voice/Brand-engine review follow-ups (PR #166 + PR #168 deferred items)",
+          "source": "PR #166 + PR #168 scaled-code-review (2026-04-11)",
+          "est": "6-8h",
+          "priority": "P2",
+          "notes": "Audit re-run 2026-04-21 against current HEAD — see docs/superpowers/plans/2026-04-21-brand-engine-hardening.md for execution plan. ## DONE (verified shipped): A1/A2/A3 (prior PRs). A4 shadow-mode voice parity check — isVoiceProfileAuthoritative() short-circuit in server/seo-context.ts:106-120. I9 PATCH extractions atomicity + addActivity + invalidation — server/routes/discovery-ingestion.ts:209. I18 pr-check-rule-authoring.md examples — current. ## INVALID (drop): I7 CalibrationVariation.ratings — column does not exist anywhere in schema or types; the finding referenced a column that was never created. ## DEFERRED (await clarification): I6 deliverable reset cascade — auto-creation cascade exists at server/brand-identity.ts:304-362 (draft→approved triggers voice-sample creation), but \"reset\" semantics are ambiguous. Revisit when content-deliverables roadmap reaches the re-approval workflow. I11 SteeringChat auto-summarization — zero server-side steering-chat code exists; defer to Copy Engine Phase 3 per docs/superpowers/plans/COPY_ENGINE_GUARDRAILS.md. ## PENDING (actionable — in hardening plan): (A5) Voice profile auto-creation on GET — server/voice-calibration.ts:81-93 getOrCreateVoiceProfile() still creates on GET. (I8) localFeedback dead UI — src/components/brand/VoiceTab.tsx:720 captures feedback but never saves. (I10) PUT sections route missing addActivity — server/routes/brandscript.ts:102-121. (I12) Prompt injection defense — server/routes/discovery-ingestion.ts:163 feeds rawContent.slice(0,12000) to AI unsanitized. (I13) Brand-engine tier gating — zero requireTier/checkTier usage in brand-identity.ts / voice-calibration.ts / brandscript.ts. (I14) Rate limiting — rateLimit middleware exists in server/middleware.ts but not applied to brand-engine AI routes. (I15 PARTIAL) rawText size limit — app-level 1MB cap exists at discovery-ingestion.ts:35 but DB column raw_content TEXT has no length constraint (migration 053:44). (I16) err.message leakage — server/routes/brand-identity.ts:90,106 echoes err.message to client (discovery-ingestion.ts is safe). (I19 NARROWED) COPY_ENGINE_GUARDRAILS.md line 33 references `tsc --noEmit` which checks zero files against root tsconfig — should be `npm run typecheck`. No `.windsurf/` references found.",
+          "status": "done",
+          "completedNotes": "Shipped 2026-04-22 on branch claude/brand-engine-hardening. 12 hardening items closed across 9 commits: Task 1 (ddfa41e5) — UsageFeature extension + sanitizers; Task 2 (cddf3484 + a96e3baa) — migration 067/068 raw_content 1MiB DB cap; Task 3 (1609ec46) — brand-identity aiLimiter + incrementIfAllowed + sanitizeErrorMessage; Task 4 (26c58772) — brandscript routes + PUT sections addActivity; Task 5 (26c58772) — voice-calibration routes hardening + explicit POST create + feedback persistence (migration 069); Task 6 (e9581678) — discovery-ingestion prompt-injection defense + 413 size-cap; Task 7+8 (485997b1) — VoiceTab create CTA + feedback save UI + guardrails doc fix. All 4635 tests passing; pr-check clean; typecheck clean. FEATURE_AUDIT.md entry #312."
+        },
+        {
+          "id": 592,
+          "title": "Harden rowToInsight: validate corrupt insight data at DB read boundary",
+          "source": "PR #244 Devin review — analytics-insights-store.ts:104",
+          "est": "4-6h",
+          "priority": "P2",
+          "notes": "Shipped — 2026-04-22 tech-debt-hardening PR #256. Added Zod schemas for all 14 insight data types in server/schemas/insight-schemas.ts. Added INSIGHT_DATA_SCHEMA_MAP + .passthrough() on all entries (so cross-cutting _originalBaseScore/_scoreAdjustments survive). rowToInsight() now uses parseJsonSafe() with schema validation. Fixed test fixtures in migration-data-preservation.test.ts, anomaly-boost-reversal.test.ts, insight-data-shapes.test.ts, and public-analytics.test.ts.",
+          "status": "done",
+          "shippedAt": "2026-04-22"
+        },
+        {
+          "id": 537,
+          "title": "Backfill addActivity() calls on all public-portal mutation endpoints",
+          "source": "PIE Group 3 code review",
+          "est": "0.5h",
+          "priority": "P2",
+          "notes": "All 5 public-portal mutation endpoints now have addActivity() calls: POST /onboarding/:id (line 187), POST /keyword-feedback single (line 389) + bulk (line 430), POST /business-priorities (line 508), POST /content-gap-vote (line 616).",
+          "status": "done"
+        },
+        {
+          "id": 532,
+          "title": "Fix anomaly-detection recordScanTime FK constraint failure",
+          "source": "Staging deploy 2026-03-31",
+          "est": "0.5h",
+          "priority": "P2",
+          "notes": "Already fixed in migration 045-anomaly-scan-tracker.sql. Dedicated anomaly_scan_tracker singleton table replaces fake sentinel row. listAnomalies() __last_scan__ filter is vestigial but harmless.",
+          "status": "done"
+        },
+        {
+          "id": 531,
+          "title": "Replace remaining hardcoded 'hmpsn.studio' strings with STUDIO_URL/STUDIO_BOT_UA constants",
+          "source": "pr-check.ts",
+          "est": "0.25h",
+          "priority": "P3",
+          "notes": "STUDIO_URL and STUDIO_BOT_UA constants added to server/constants.ts. All 8 occurrences now use constants. Remaining 6 fixed: web-scraper.ts (UA), sales-report-html.ts (2x), brief-export-html.ts, post-export-html.ts, reports.ts.",
+          "status": "done"
+        },
+        {
+          "id": 400,
+          "title": "Content Templates backend (CRUD + migration 014)",
+          "source": "CONTENT_PLANNER_PLAN",
+          "est": "3-4h",
+          "priority": "P1",
+          "notes": "Shipped — Phase 1a: Reusable page structure templates with variables, sections, URL/keyword patterns. SQLite migration 014, CRUD, routes, API client, 10 integration tests.",
+          "status": "done"
+        },
+        {
+          "id": 401,
+          "title": "Keyword Pre-Assignment & SEMRush Validation",
+          "source": "CONTENT_PLANNER_PLAN",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — Phase 1b: Brief generation accepts template constraints + pre-locked keywords. SEMRush validation endpoints (single + bulk). Migration 015 for keyword tracking columns.",
+          "status": "done"
+        },
+        {
+          "id": 402,
+          "title": "Content Matrices backend (CRUD + migration 016)",
+          "source": "CONTENT_PLANNER_PLAN",
+          "est": "3-4h",
+          "priority": "P1",
+          "notes": "Shipped — Phase 2a: Bulk content planning grids with cartesian product cell generation. Per-cell status tracking, SQLite migration 016, routes, API client, 12 integration tests.",
+          "status": "done"
+        },
+        {
+          "id": 403,
+          "title": "Smart Keyword Recommendations (SEMRush + AI scoring)",
+          "source": "CONTENT_PLANNER_PLAN",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — Phase 2b: Opportunity scoring (volume/difficulty), SEMRush related keywords, optional AI re-ranking via GPT-4.1-nano. Standalone + per-cell endpoints.",
+          "status": "done"
+        },
+        {
+          "id": 404,
+          "title": "Cannibalization Detection",
+          "source": "CONTENT_PLANNER_PLAN",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — Phase 2c: Keyword overlap detection against existing pages, same-matrix cells, cross-matrix cells. Three severity levels. Full matrix report + single keyword check endpoints.",
+          "status": "done"
+        },
+        {
+          "id": 405,
+          "title": "Content Planner Export (CSV/JSON)",
+          "source": "CONTENT_PLANNER_PLAN",
+          "est": "1-2h",
+          "priority": "P2",
+          "notes": "Shipped — Phase 3: Matrix cells flattened CSV/JSON export + template metadata export. Added to existing data-export routes.",
+          "status": "done"
+        },
+        {
+          "id": 407,
+          "title": "Site Architecture Planner",
+          "source": "CONTENT_PLANNER_PLAN",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Shipped — URL tree from Webflow pages + CMS sitemap + matrix planned pages + keyword strategy. Gap detection for missing hub pages. Depth distribution + orphan analysis.",
+          "status": "done"
+        },
+        {
+          "id": 408,
+          "title": "LLMs.txt Generator",
+          "source": "Feature request",
+          "est": "1-2h",
+          "priority": "P2",
+          "notes": "Shipped — Generates LLMs.txt from site pages, keyword strategy, and planned content. JSON preview + .txt download endpoint.",
+          "status": "done"
+        },
+        {
+          "id": 409,
+          "title": "Site Architecture Planner UI",
+          "source": "CONTENT_PLANNER_PLAN",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — Interactive collapsible URL tree with source badges, search/filter, stat cards, gap list, orphan warnings, depth chart. Wired as Architecture sub-tab in Content Pipeline.",
+          "status": "done"
+        },
+        {
+          "id": 410,
+          "title": "LLMs.txt Generator UI",
+          "source": "Feature request",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped — One-click generate, copy, download .txt, stat cards, scrollable preview, info card. Wired as LLMs.txt sub-tab in Content Pipeline.",
+          "status": "done"
+        },
+        {
+          "id": 411,
+          "title": "Content Pipeline Data Export Dropdown",
+          "source": "UI audit",
+          "est": "30m",
+          "priority": "P2",
+          "notes": "Shipped — Unified Export button in Content Pipeline tab bar. CSV/JSON for briefs, requests, matrices, templates, strategy.",
+          "status": "done"
+        },
+        {
+          "id": 412,
+          "title": "Content Planner Admin Orchestrator",
+          "source": "CONTENT_PLANNER_PLAN",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — ContentPlanner.tsx orchestrates TemplateEditor, MatrixBuilder, MatrixGrid. Lazy-loaded Planner sub-tab in ContentPipeline. List view with template/matrix cards, progress bars, badges.",
+          "status": "done"
+        },
+        {
+          "id": 413,
+          "title": "Client Content Plan Tab",
+          "source": "CONTENT_PLANNER_PLAN",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped — ContentPlanTab in client portal (paid tiers). Fetches plans from public API, auto-selects single plan, shows MatrixProgressView with cell flagging + downloads.",
+          "status": "done"
+        },
+        {
+          "id": 406,
+          "title": "Client Review Flow (Tiered Content Plan Review)",
+          "source": "CONTENT_PLANNER_PLAN",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — Tiered review: template approval via batch, sample cell review, batch-approve remaining. Public matrix progress view + cell flagging. 6 API endpoints (3 public + 3 admin).",
+          "status": "done"
+        },
+        {
+          "id": 42,
+          "title": "Full-site PageSpeed scan",
+          "source": "FEATURE_AUDIT",
+          "est": "3-4h",
+          "priority": "P3",
+          "notes": "Multi-page PSI scan as background job.\n[Audit 2026-04-22] Shipped via runSiteSpeed in server/pagespeed.ts (iterates static + CMS pages); exposed at /api/webflow/pagespeed/:siteId.",
+          "status": "done",
+          "shippedAt": "2026-04-22"
+        },
+        {
+          "id": 90,
+          "title": "Schema generator → gpt-4.1-mini upgrade",
+          "source": "FEATURE_AUDIT",
+          "est": "15m",
+          "priority": "P3",
+          "notes": "Shipped — all AI models upgraded to GPT-4.1 series (Mar 2026). Schema uses gpt-4.1-mini.",
+          "status": "done",
+          "shippedAt": "2026-03"
+        },
+        {
+          "id": 48,
+          "title": "Sales report: branded PDF export",
+          "source": "FEATURE_AUDIT",
+          "est": "3-4h",
+          "priority": "P4",
+          "notes": "Shipped — sales-report-html.ts generates branded HTML export for prospects.",
+          "status": "done",
+          "shippedAt": "2026"
+        },
+        {
+          "id": 522,
+          "title": "Typed data contracts audit — replace Record<string, unknown> across codebase",
+          "source": "Connected Intelligence PR review",
+          "est": "3-4h",
+          "priority": "P2",
+          "notes": "Added StrategyAlignmentData interface for the only untyped InsightDataMap entry (strategy_alignment). Updated UpsertInsightParams.data to InsightDataMap[InsightType] union type. Updated enrichAndUpsert<T> to generic with typed data. Removed all as unknown as Record<string,unknown> casts in analytics-intelligence.ts for compute functions (ranking_mover, ctr_opportunity, serp_opportunity). Added strategyAlignmentDataSchema to server/schemas/insight-schemas.ts. Added tests/unit/insight-data-types.test.ts. All 224 test files / 3669 tests pass.",
+          "status": "done"
+        },
+        {
+          "id": "meeting-brief-phase1",
+          "title": "Meeting Brief — Phase 1 (Strategic Intelligence Brief)",
+          "source": "docs/superpowers/plans/2026-04-07-meeting-brief.md",
+          "est": "8-12h",
+          "priority": "P1",
+          "notes": "On-demand AI-synthesized meeting brief tab (admin-only, screen-shareable). 6 sections: situation summary, wins, attention items, recommendations, blueprint progress (conditional), at-a-glance metrics strip. DB: meeting_briefs table (migration 048) + custom_prompt_notes column on workspaces (Layer 3 prompt assembly). Server: GET + POST /api/workspaces/:id/meeting-brief/generate. Uses buildSystemPrompt() from prompt-assembly.ts. Prompt hash deduplication skips AI call when data unchanged. Phase 2 (Site Architecture Intelligence) deferred until Voice Intelligence lands.\n[Audit 2026-04-22] Shipped: full stack (server/routes/meeting-brief.ts, generator, store, migration 054, MeetingBriefPage.tsx, useAdminMeetingBrief, shared/types/meeting-brief.ts, 3 server tests).",
+          "status": "done",
+          "shippedAt": "2026-04-22"
+        },
+        {
+          "id": "brandscript-engine-phase1",
+          "title": "Brandscript Engine + Voice Calibration — Phase 1",
+          "source": "docs/superpowers/plans/2026-03-26-brandscript-engine.md",
+          "est": "20-28h",
+          "priority": "P1",
+          "notes": "4 new Brand Hub sub-tabs: Brandscript Builder (StoryBrand framework + AI-assist), Discovery Ingestion (transcript/doc upload → extraction review), Voice Calibration (calibration loop with steering), Brand Identity (deliverable generation). Migration 049. Task 5b extends prompt-assembly.ts with Layer 2 voice DNA translation — activates automatically for all AI features once a workspace profile is calibrated. Prerequisite for prompt standardization pass and Page Strategy Engine.\n[Audit 2026-04-22] Shipped: all 4 Brand Hub tabs (Brandscript/Discovery/Voice/Identity), migration 053-brandscript-engine.sql, server/brandscript.ts, SteeringChat.tsx, plus follow-up migrations 056/057.",
+          "status": "done",
+          "shippedAt": "2026-04-22"
+        },
+        {
+          "id": "prompt-standardization-pass",
+          "title": "Prompt Standardization Pass — wire existing AI features through buildSystemPrompt()",
+          "source": "docs/superpowers/plans/2026-04-08-prompt-standardization-pass.md",
+          "est": "4-6h",
+          "priority": "P1",
+          "notes": "Shipped (April 2026, PR #156). Wired 5 AI features through buildSystemPrompt(): SEO rewrite (single + bulk), content brief, monthly digest, rewrite chat, keyword strategy. Added response_format support to callOpenAI() + AIRequestDeduplicator.createKey(). SEO rewrite now injects keyword map context (buildKeywordMapContext) + page intelligence (cannibalization, decay, health) with URL-aware pageId matching. Content brief adds workspace learnings block (outcome-ai-injection gated) and moves to system+user message structure with JSON mode. Monthly digest gets top-wins narrative from insights. Keyword strategy wraps existing system messages rather than prepending a second one. Temperature standardized across all features. Tests: 6 new unit tests (openai-helpers-format, prompt-standardization); content-brief integration tests updated for system+user message split.",
+          "status": "done"
+        },
+        {
+          "id": "page-strategy-engine-phase2",
+          "title": "Page Strategy Engine + Site Blueprint — Phase 2",
+          "source": "docs/superpowers/plans/2026-03-27-page-strategy-engine.md",
+          "est": "16-22h",
+          "priority": "P1",
+          "notes": "Shipped — Site Blueprint deliverable with page-by-page content plan. Intelligence-informed generation. Auto-brief creation. Prerequisite for Copy Pipeline Phase 3.",
+          "status": "done"
+        },
+        {
+          "id": "copy-pipeline-phase3",
+          "title": "Copy Pipeline — Phase 3 (Full AI Copy Generation)",
+          "source": "docs/superpowers/plans/2026-03-27-copy-pipeline.md",
+          "est": "24-32h",
+          "priority": "P1",
+          "notes": "Shipped — Tier 1 (Tasks 1-19): 4 server modules (copy-generation, copy-review, copy-intelligence, copy-export), migration 058, Zod schemas, frontend API + hooks, 5 UI components (CopyReviewPanel, BatchGenerationPanel, CopyExportPanel, CopyIntelligenceManager, BlueprintDetail Copy tab). 21 integration tests. Tier 2 (Tasks 20-28): voice sample feedback loop, steering classification, pattern promotion, client copy review portal, questionnaire→brandscript, admin chat awareness, content decay→copy refresh, workspace intelligence wiring. Feature-flagged via copy-engine-pipeline. PR #173 (Tier 1) + PR for Tier 2.",
+          "status": "done"
+        },
+        {
+          "id": 605,
+          "title": "Add requireWorkspaceAccess to compress route (POST /api/webflow/compress/:assetId)",
+          "source": "PR #257 code review — deferred hardening item",
+          "est": "0.5h",
+          "priority": "P2",
+          "notes": "POST /api/webflow/compress/:assetId is missing requireWorkspaceAccess(\"workspaceId\"). The route currently has no workspace path param — needs renaming to /api/webflow/:workspaceId/compress/:assetId to match the pattern established in PR #257 for alt-text routes. Low urgency (Webflow asset writes are scoped by siteId from the request body, not the URL), but closes the gap for consistency and defense-in-depth. Shipped in PR #257 tack-on.",
+          "status": "done",
+          "shippedAt": "2026-04-22"
+        },
+        {
+          "id": 606,
+          "title": "Replace raw fetch in DropZone.tsx with getText() / typed API helper",
+          "source": "PR #257 Task 8 — partial raw fetch cleanup, DropZone deferred",
+          "est": "0.5h",
+          "priority": "P3",
+          "notes": "Task 8 in the tack-on sprint cleaned up PostEditor.tsx and ContentBriefs.tsx. DropZone.tsx still has a raw fetch().then(r => r.text()) call. Straightforward swap to getText() from src/api/client.ts — no logic change required. Shipped in PR #257 tack-on. Also found postForm<T> helper already exists in src/api/client.ts — used that.",
+          "status": "done",
+          "shippedAt": "2026-04-22"
+        },
+        {
+          "id": 357,
+          "title": "SEO Editor — Convert Bulk Analyze to Background Job",
+          "source": "TECH DEBT",
+          "est": "1h",
+          "priority": "P1",
+          "notes": "SeoEditor.tsx line 351-358: sequential for-loop calling analyzePage() per page. Same bug PageIntelligence had — navigate away = lost progress. Convert to page-analysis background job or create seo-editor-analyze job type. Should reuse the page-analysis job infrastructure.\n[Audit 2026-04-22] Shipped: seo-bulk-analyze background job (server/webflow-seo.ts:1211) wired through SeoEditor.tsx:494 + seoBulkJobs API.",
+          "status": "done",
+          "shippedAt": "2026-04-22"
+        },
+        {
+          "id": 358,
+          "title": "SEO Editor — Convert Bulk Rewrite Apply to Background Job",
+          "source": "TECH DEBT",
+          "est": "1.5h",
+          "priority": "P2",
+          "notes": "SeoEditor.tsx line 493-504: sequential for-loop pushing SEO changes to Webflow API one page at a time. Blocks UI during apply. Convert to server-side job that applies all previewed changes, reports progress via WebSocket. Lower priority than analyze — individual API calls are fast.\n[Audit 2026-04-22] Shipped: seo-bulk-rewrite background job (server/webflow-seo.ts:1471) wired through SeoEditor.tsx:621.",
+          "status": "done",
+          "shippedAt": "2026-04-22"
+        },
+        {
+          "id": 359,
+          "title": "SEO Audit — Convert Accept All Fixes to Background Job",
+          "source": "TECH DEBT",
+          "est": "1h",
+          "priority": "P2",
+          "notes": "SeoAudit.tsx line 309-319: sequential for-loop pushing fixes to Webflow API. Similar to SeoEditor bulk apply — blocks UI, lose progress on navigation. Convert to server-side job. Uses AbortController currently which is good, but should be a proper cancellable background job.\n[Audit 2026-04-22] Shipped: seo-bulk-accept-fixes background job (server/webflow-seo.ts:1761) wired through audit/BulkAcceptPanel.tsx:140.",
+          "status": "done",
+          "shippedAt": "2026-04-22"
+        },
+        {
+          "id": 366,
+          "title": "Normalize pageEditStates into dedicated SQLite table",
+          "source": "TECH DEBT",
+          "est": "2.5h",
+          "priority": "P1",
+          "notes": "Extract workspace pageEditStates JSON map into a page_edit_states table keyed by (workspace_id, page_id). Written on every SEO edit, approval, bulk operation, cart fix, and recommendation resolution. Currently full blob read-modify-write on each action. Enables SQL queries like 'all pages in review across workspaces' for future admin dashboard. Pattern: same as #364. High write frequency makes this the highest-impact normalization after pageMap.\n[Audit 2026-04-22] Shipped: dedicated page_edit_states table in migration 005-workspaces.sql; full module at server/page-edit-states.ts.",
+          "status": "done",
+          "shippedAt": "2026-04-22"
+        },
+        {
+          "id": "design-system-followup-sweep",
+          "title": "Design System Phase 5 — Follow-up sweep + final warn→error promotion",
+          "priority": "P1",
+          "status": "done",
+          "notes": "Shipped — Two-part completion of the design system cleanup. Follow-up sweep (PR #339): 33 files across 5 domains, fixed oversized Crown icon bug (inline className overriding inline-flex on Icon wrapper via twMerge), migrated raw Tailwind tokens in strategy/client/content/admin/layout files. Final warn→error promotion: audited all 44 warn-level pr-check rules against the full codebase, promoted 24 rules with zero violations to error severity. Rule count unchanged at 96 total (76 error, 20 warn). Remaining 20 warn rules all have active violations (largest: Raw rounded-* at 406 hits). Docs updated: FEATURE_AUDIT.md, automated-rules.md regenerated.",
+          "source": "Session 2026-04-27 — follow-up to Phases A–D"
         }
       ]
     },

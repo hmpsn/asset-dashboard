@@ -106,7 +106,7 @@ function VitalCard({ label, value, formatted, vitalKey }: { label: string; value
   const rating = vitalRating(vitalKey, value);
   return (
     <div className={`rounded-[var(--radius-lg)] border p-3 ${ratingBg(rating)}`}>
-      <div className="text-[11px] text-[var(--brand-text-muted)] uppercase tracking-wider mb-1">{label}</div>
+      <div className="t-caption-sm text-[var(--brand-text-muted)] uppercase tracking-wider mb-1">{label}</div>
       <div className={`text-lg font-bold tabular-nums ${ratingColor(rating)}`}>{formatted}</div>
     </div>
   );
@@ -211,7 +211,7 @@ export function PageSpeedPanel({ siteId }: Props) {
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => runSingleTest(strategy === 'mobile' ? 'desktop' : 'mobile')}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-md)] text-xs text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
           >
             {strategy === 'mobile' ? <Icon as={Monitor} size="sm" /> : <Icon as={Smartphone} size="sm" />}
             Test {strategy === 'mobile' ? 'Desktop' : 'Mobile'}
@@ -230,8 +230,8 @@ export function PageSpeedPanel({ siteId }: Props) {
         <div className="flex flex-col items-center gap-2">
           <MetricRing score={result.score} size={100} />
           <div className="text-xs text-[var(--brand-text-muted)]">{strategy === 'mobile' ? 'Mobile' : 'Desktop'}</div>
-          {result.fieldDataAvailable && <div className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">Real users</div>}
-          {!result.fieldDataAvailable && <div className="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 border border-amber-500/20 text-amber-400">Lab test</div>}
+          {result.fieldDataAvailable && <div className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400" /* arbitrary-text-ok */>Real users</div>}
+          {!result.fieldDataAvailable && <div className="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 border border-amber-500/20 text-amber-400" /* arbitrary-text-ok */>Lab test</div>}
         </div>
         <div className="grid grid-cols-3 gap-2">
           <VitalCard label="LCP" value={result.vitals.LCP} formatted={formatMs(result.vitals.LCP)} vitalKey="LCP" />
@@ -254,10 +254,10 @@ export function PageSpeedPanel({ siteId }: Props) {
                 <Icon as={AlertTriangle} size="sm" className="mt-0.5 text-amber-400 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="text-xs text-[var(--brand-text-bright)]">{opp.title}</div>
-                  <div className="text-[11px] text-[var(--brand-text-muted)] mt-0.5 line-clamp-2">{opp.description}</div>
+                  <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 line-clamp-2">{opp.description}</div>
                 </div>
                 {opp.savings && (
-                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 flex-shrink-0">
+                  <span className="t-caption-sm px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 flex-shrink-0">
                     Save {opp.savings}
                   </span>
                 )}
@@ -278,10 +278,10 @@ export function PageSpeedPanel({ siteId }: Props) {
                 <Icon as={Info} size="sm" className="mt-0.5 text-blue-400 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="text-xs text-[var(--brand-text-bright)]">{diag.title}</div>
-                  <div className="text-[11px] text-[var(--brand-text-muted)] mt-0.5 line-clamp-2">{diag.description}</div>
+                  <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 line-clamp-2">{diag.description}</div>
                 </div>
                 {diag.displayValue && (
-                  <span className="text-[11px] text-[var(--brand-text-muted)] flex-shrink-0">{diag.displayValue}</span>
+                  <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">{diag.displayValue}</span>
                 )}
               </div>
             ))}
@@ -294,7 +294,7 @@ export function PageSpeedPanel({ siteId }: Props) {
   if (!hasRun) {
     return (
       <div className="flex flex-col items-center justify-center py-12 gap-5">
-        <div className="w-16 h-16 rounded-2xl bg-[var(--surface-2)] flex items-center justify-center">
+        <div className="w-16 h-16 rounded-[var(--radius-xl)] bg-[var(--surface-2)] flex items-center justify-center">
           <Icon as={Gauge} size="2xl" className="text-[var(--brand-text-muted)]" />
         </div>
         <p className="text-[var(--brand-text)] text-sm">Core Web Vitals &amp; Performance</p>
@@ -505,10 +505,10 @@ export function PageSpeedPanel({ siteId }: Props) {
                               <Icon as={AlertTriangle} size="sm" className="mt-0.5 text-amber-400 flex-shrink-0" />
                               <div className="flex-1 min-w-0">
                                 <div className="text-xs text-[var(--brand-text-bright)]">{opp.title}</div>
-                                <div className="text-[11px] text-[var(--brand-text-muted)] mt-0.5 line-clamp-2">{opp.description}</div>
+                                <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 line-clamp-2">{opp.description}</div>
                               </div>
                               {opp.savings && (
-                                <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 flex-shrink-0">
+                                <span className="t-caption-sm px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 flex-shrink-0">
                                   Save {opp.savings}
                                 </span>
                               )}
@@ -537,10 +537,10 @@ export function PageSpeedPanel({ siteId }: Props) {
                               <Icon as={Info} size="sm" className="mt-0.5 text-blue-400 flex-shrink-0" />
                               <div className="flex-1 min-w-0">
                                 <div className="text-xs text-[var(--brand-text-bright)]">{diag.title}</div>
-                                <div className="text-[11px] text-[var(--brand-text-muted)] mt-0.5 line-clamp-2">{diag.description}</div>
+                                <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 line-clamp-2">{diag.description}</div>
                               </div>
                               {diag.displayValue && (
-                                <span className="text-[11px] text-[var(--brand-text-muted)] flex-shrink-0">{diag.displayValue}</span>
+                                <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">{diag.displayValue}</span>
                               )}
                             </div>
                           ))}

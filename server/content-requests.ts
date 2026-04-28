@@ -18,6 +18,7 @@ interface RequestRow {
   rationale: string;
   status: string;
   brief_id: string | null;
+  post_id: string | null;
   client_note: string | null;
   internal_note: string | null;
   decline_reason: string | null;
@@ -39,12 +40,12 @@ const stmts = createStmtCache(() => ({
   insert: db.prepare(
     `INSERT INTO content_topic_requests
            (id, workspace_id, topic, target_keyword, intent, priority, rationale, status,
-            brief_id, client_note, internal_note, decline_reason, client_feedback,
+            brief_id, post_id, client_note, internal_note, decline_reason, client_feedback,
             source, service_type, page_type, upgraded_at, delivery_url, delivery_notes,
             target_page_id, target_page_slug, comments, requested_at, updated_at)
          VALUES
            (@id, @workspace_id, @topic, @target_keyword, @intent, @priority, @rationale, @status,
-            @brief_id, @client_note, @internal_note, @decline_reason, @client_feedback,
+            @brief_id, @post_id, @client_note, @internal_note, @decline_reason, @client_feedback,
             @source, @service_type, @page_type, @upgraded_at, @delivery_url, @delivery_notes,
             @target_page_id, @target_page_slug, @comments, @requested_at, @updated_at)`,
   ),
@@ -59,7 +60,7 @@ const stmts = createStmtCache(() => ({
   ),
   update: db.prepare(
     `UPDATE content_topic_requests SET
-           status = @status, brief_id = @brief_id, client_note = @client_note,
+           status = @status, brief_id = @brief_id, post_id = @post_id, client_note = @client_note,
            internal_note = @internal_note, decline_reason = @decline_reason,
            client_feedback = @client_feedback, service_type = @service_type,
            upgraded_at = @upgraded_at, delivery_url = @delivery_url,
@@ -82,6 +83,7 @@ function rowToRequest(row: RequestRow): ContentTopicRequest {
     rationale: row.rationale,
     status: row.status as ContentTopicRequest['status'],
     briefId: row.brief_id ?? undefined,
+    postId: row.post_id ?? undefined,
     clientNote: row.client_note ?? undefined,
     internalNote: row.internal_note ?? undefined,
     declineReason: row.decline_reason ?? undefined,
@@ -148,6 +150,7 @@ export function createContentRequest(
     rationale: request.rationale,
     status: request.status,
     brief_id: request.briefId ?? null,
+    post_id: null,
     client_note: request.clientNote ?? null,
     internal_note: request.internalNote ?? null,
     decline_reason: request.declineReason ?? null,
@@ -171,7 +174,7 @@ export function createContentRequest(
 export function updateContentRequest(
   workspaceId: string,
   id: string,
-  updates: Partial<Pick<ContentTopicRequest, 'status' | 'briefId' | 'internalNote' | 'declineReason' | 'clientFeedback' | 'serviceType' | 'upgradedAt' | 'deliveryUrl' | 'deliveryNotes'>>
+  updates: Partial<Pick<ContentTopicRequest, 'status' | 'briefId' | 'postId' | 'internalNote' | 'declineReason' | 'clientFeedback' | 'serviceType' | 'upgradedAt' | 'deliveryUrl' | 'deliveryNotes'>>
 ): ContentTopicRequest | null {
   const existing = getContentRequest(workspaceId, id);
   if (!existing) return null;
@@ -193,6 +196,7 @@ export function updateContentRequest(
     workspace_id: workspaceId,
     status: existing.status,
     brief_id: existing.briefId ?? null,
+    post_id: existing.postId ?? null,
     client_note: existing.clientNote ?? null,
     internal_note: existing.internalNote ?? null,
     decline_reason: existing.declineReason ?? null,
@@ -234,6 +238,7 @@ export function addComment(
     workspace_id: workspaceId,
     status: existing.status,
     brief_id: existing.briefId ?? null,
+    post_id: existing.postId ?? null,
     client_note: existing.clientNote ?? null,
     internal_note: existing.internalNote ?? null,
     decline_reason: existing.declineReason ?? null,

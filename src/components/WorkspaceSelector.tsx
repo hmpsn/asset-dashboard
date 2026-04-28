@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, ChevronDown, Link, Link2Off, Trash2, Globe, Eye, EyeOff, ExternalLink, MoreHorizontal, AlertTriangle } from 'lucide-react';
-import { cn, Icon } from './ui';
+import { Plus, ChevronDown, Link, Link2Off, Trash2, Globe, Eye, EyeOff, ExternalLink, MoreHorizontal } from 'lucide-react';
+import { cn, Icon, ConfirmDialog } from './ui';
 import { webflow } from '../api';
 
 export interface Workspace {
@@ -73,7 +73,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
   };
 
   // Reset state when closing link panel
-  useEffect(() => {
+  useEffect(() => { // effect-layout-ok — resets hidden form state, no layout flash
     if (!linkingId) {
       setLinkToken('');
       setSites([]);
@@ -108,7 +108,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
 
       {open && (
         // pr-check-disable-next-line -- dropdown
-        <div className="absolute top-full left-0 mt-2 w-80 rounded-[var(--radius-xl)] shadow-2xl z-50 overflow-hidden bg-[var(--surface-2)] border border-[var(--brand-border-hover)]">
+        <div className="absolute top-full left-0 mt-2 w-80 rounded-[var(--radius-xl)] shadow-2xl z-[var(--z-modal)] overflow-hidden bg-[var(--surface-2)] border border-[var(--brand-border-hover)]">
           {workspaces.length > 0 && (
             <div className="p-1">
               {workspaces.map(ws => (
@@ -125,7 +125,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
                         'w-2 h-2 rounded-full shrink-0',
                         ws.webflowSiteId ? 'bg-emerald-400' : 'bg-[var(--brand-text-muted)]'
                       )} />
-                      <span className="text-sm truncate">{ws.name}</span>
+                      <span className="t-body truncate">{ws.name}</span>
                       {ws.webflowSiteName && (
                         <span className="flex items-center gap-1 t-caption text-[var(--brand-text-muted)]">
                           <Icon as={Link} size="sm" />
@@ -158,7 +158,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
                         <Icon as={MoreHorizontal} size="sm" className="text-[var(--brand-text-muted)]" />
                       </button>
                       {menuOpen === ws.id && (
-                        <div className="absolute right-0 top-full mt-1 w-36 rounded-[var(--radius-lg)] shadow-xl z-50 py-1 bg-[var(--surface-2)] border border-[var(--brand-border-hover)]">
+                        <div className="absolute right-0 top-full mt-1 w-36 rounded-[var(--radius-lg)] shadow-xl z-[var(--z-modal)] py-1 bg-[var(--surface-2)] border border-[var(--brand-border-hover)]">
                           <button
                             onClick={(e) => { e.stopPropagation(); setConfirmDelete(ws.id); setMenuOpen(null); }}
                             className="flex items-center gap-2 w-full px-3 py-1.5 t-caption text-red-400 hover:bg-red-500/10 transition-colors"
@@ -250,11 +250,11 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
                   onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
                   placeholder="Workspace name..."
                   autoFocus
-                  className="flex-1 px-3 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border-hover)] rounded-[var(--radius-lg)] text-sm focus:outline-none focus:border-[var(--brand-text-muted)]"
+                  className="flex-1 px-3 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border-hover)] rounded-[var(--radius-lg)] t-body focus:outline-none focus:border-[var(--brand-text-muted)]"
                 />
                 <button
                   onClick={handleCreate}
-                  className="px-3 py-1.5 bg-teal-600 text-white text-sm font-medium rounded-[var(--radius-lg)] hover:bg-teal-500 transition-colors"
+                  className="px-3 py-1.5 bg-teal-600 text-white t-body font-medium rounded-[var(--radius-lg)] hover:bg-teal-500 transition-colors"
                 >
                   Add
                 </button>
@@ -262,7 +262,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
             ) : (
               <button
                 onClick={() => setCreating(true)}
-                className="flex items-center gap-2 w-full px-3 py-2 text-sm text-[var(--brand-text-muted)] hover:text-white hover:bg-[var(--brand-border-hover)]/50 rounded-[var(--radius-lg)] transition-colors"
+                className="flex items-center gap-2 w-full px-3 py-2 t-body text-[var(--brand-text-muted)] hover:text-white hover:bg-[var(--brand-border-hover)]/50 rounded-[var(--radius-lg)] transition-colors"
               >
                 <Icon as={Plus} size="md" />
                 New workspace
@@ -271,32 +271,16 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
           </div>
         </div>
       )}
-      {/* Delete confirmation modal */}
-      {confirmDelete && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100]" onClick={() => setConfirmDelete(null)}>
-          <div className="w-80 rounded-[var(--radius-xl)] p-5 shadow-2xl bg-[var(--surface-2)] border border-[var(--brand-border-hover)]" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-9 h-9 rounded-[var(--radius-lg)] bg-red-500/8 flex items-center justify-center shrink-0">
-                <Icon as={AlertTriangle} size="md" className="text-red-400/80" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Delete workspace?</h3>
-                <p className="t-caption mt-0.5 text-[var(--brand-text-muted)]">
-                  This will permanently remove <strong>{workspaces.find(w => w.id === confirmDelete)?.name}</strong> and all its data.
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-2 mt-4">
-              <button onClick={() => setConfirmDelete(null)} className="flex-1 px-3 py-2 rounded-[var(--radius-lg)] t-caption font-medium transition-colors bg-[var(--surface-2)] text-[var(--brand-text-muted)] border border-[var(--brand-border)]">
-                Cancel
-              </button>
-              <button onClick={() => { onDelete(confirmDelete); setConfirmDelete(null); setOpen(false); }} className="flex-1 px-3 py-2 rounded-[var(--radius-lg)] t-caption font-medium bg-red-600 hover:bg-red-500 text-white transition-colors">
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Delete workspace?"
+        message={`This will permanently remove ${workspaces.find(w => w.id === confirmDelete)?.name ?? 'this workspace'} and all its data.`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="destructive"
+        onConfirm={() => { if (confirmDelete) { onDelete(confirmDelete); setConfirmDelete(null); setOpen(false); } }}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 }

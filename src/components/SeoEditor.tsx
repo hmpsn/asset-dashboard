@@ -826,14 +826,14 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         <button
           onClick={() => handleBulkFix('title')}
           disabled={bulkFixing || missingTitles === 0}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-lg text-xs font-medium transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-[var(--radius-lg)] text-xs font-medium transition-colors"
         >
           <Icon as={Wand2} size="sm" /> AI Fix Titles ({missingTitles})
         </button>
         <button
           onClick={() => handleBulkFix('description')}
           disabled={bulkFixing || missingDescs === 0}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-lg text-xs font-medium transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-[var(--radius-lg)] text-xs font-medium transition-colors"
         >
           <Icon as={Wand2} size="sm" /> AI Fix Descriptions ({missingDescs})
         </button>
@@ -848,8 +848,8 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         <button
           onClick={handlePublish}
           disabled={publishing}
-          className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-            published ? 'bg-emerald-600 text-white' : 'bg-white text-black hover:bg-zinc-200'
+          className={`flex items-center gap-1.5 px-4 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium transition-colors ${
+            published ? 'bg-emerald-600 text-white' : 'bg-white text-black hover:bg-zinc-200' /* raw-zinc-ok: light button on dark UI */
           }`}
         >
           <Icon as={publishing ? Loader2 : published ? Check : Upload} size="sm" className={publishing ? 'animate-spin' : ''} />
@@ -865,7 +865,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         />
       )}
       {bulkResults && (
-        <div className="flex items-center gap-2 px-4 py-3 bg-emerald-500/8 border border-emerald-500/30 rounded-lg text-sm text-emerald-300">
+        <div className="flex items-center gap-2 px-4 py-3 bg-emerald-500/8 border border-emerald-500/30 rounded-[var(--radius-lg)] text-sm text-emerald-300">
           <Icon as={Check} size="md" /> {bulkResults}
         </div>
       )}
@@ -927,7 +927,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       {workspaceId && (
         <div className="flex items-center gap-3">
           {bulkAnalyzeProgress ? (
-            <div className="flex items-center gap-2 px-3 py-2 bg-teal-500/10 border border-teal-500/30 rounded-lg">
+            <div className="flex items-center gap-2 px-3 py-2 bg-teal-500/10 border border-teal-500/30 rounded-[var(--radius-lg)]">
               <Icon as={Loader2} size="md" className="animate-spin text-teal-400" />
               <span className="text-xs text-[var(--brand-text-bright)]">Analyzing {bulkAnalyzeProgress.done}/{bulkAnalyzeProgress.total} pages...</span>
               <button onClick={() => { if (bulkAnalyzeJobId) { cancelJob(bulkAnalyzeJobId); setBulkAnalyzeJobId(null); setBulkAnalyzeProgress(null); queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId!) }); } }} className="t-caption-sm text-red-400 hover:text-red-300 ml-2">Cancel</button>
@@ -936,7 +936,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
             <button
               onClick={analyzeAllPages}
               disabled={analyzing.size > 0 || analyzedPages.size === pages.length}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-teal-600/80 hover:bg-teal-500/80 text-white rounded-lg transition-colors disabled:opacity-40"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-teal-600/80 hover:bg-teal-500/80 text-white rounded-[var(--radius-lg)] transition-colors disabled:opacity-40"
             >
               <Icon as={Sparkles} size="md" />
               {analyzedPages.size === pages.length && pages.length > 0
@@ -956,7 +956,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       <div className="flex items-center gap-2">
         <button
           onClick={() => setShowCmsOnly(prev => !prev)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium transition-colors border ${
             showCmsOnly
               ? 'bg-teal-600/20 border-teal-500/40 text-teal-300'
               : 'bg-[var(--surface-3)] border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
@@ -977,11 +977,11 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         value={search}
         onChange={e => setSearch(e.target.value)}
         placeholder="Search pages..."
-        className="w-full px-4 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
+        className="w-full px-4 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-[var(--brand-border-hover)]"
       />
 
       {hasUnsaved && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/8 border border-amber-500/30 rounded-lg text-xs text-amber-400/80">
+        <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/8 border border-amber-500/30 rounded-[var(--radius-lg)] text-xs text-amber-400/80">
           <Icon as={AlertCircle} size="md" /> You have unsaved changes. Save individual pages then publish to go live.
         </div>
       )}

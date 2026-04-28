@@ -62,7 +62,7 @@ function WinCard({ entry }: { entry: OutcomeWinEntry }) {
       <div className="flex items-start gap-2">
         <Icon as={Lightbulb} size="md" className="text-teal-400 flex-shrink-0 mt-0.5" />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-[var(--brand-text-bright)] leading-snug">{entry.recommendation}</p>
+          <p className="t-body font-medium text-[var(--brand-text-bright)] leading-snug">{entry.recommendation}</p>
           <p className="t-caption text-[var(--brand-text-muted)] mt-0.5 truncate">For {pageLabel}</p>
         </div>
       </div>
@@ -70,7 +70,7 @@ function WinCard({ entry }: { entry: OutcomeWinEntry }) {
       {/* Result */}
       <div className="flex items-center gap-2">
         {deltaDirectionIcon(entry.delta.direction)}
-        <div className="text-sm">
+        <div className="t-body">
           <span className="text-[var(--brand-text)]">{entry.delta.primary_metric}: </span>
           <span className={`font-semibold ${deltaColor(entry.delta.direction)}`}>
             {formatDelta(entry.delta)}
@@ -175,7 +175,7 @@ export default function WeCalledIt({ workspaceId, tier }: WeCalledItProps) {
       <SectionCard>
         <div className="flex items-center gap-2 mb-4">
           <Icon as={Sparkles} size="md" className="text-teal-400" />
-          <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">We called it</h3>
+          <h3 className="t-body font-semibold text-[var(--brand-text-bright)]">We called it</h3>
           <span className="t-caption text-[var(--brand-text-muted)] ml-1">— recommended, implemented, proven</span>
         </div>
 

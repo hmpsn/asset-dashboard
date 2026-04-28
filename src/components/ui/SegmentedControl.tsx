@@ -1,3 +1,4 @@
+/** @deprecated No consumers — remove if still unused by 2026-06-01. */
 import React, { useRef } from 'react';
 import { cn } from '../../lib/utils';
 

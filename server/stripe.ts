@@ -403,14 +403,32 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       const contentSubPlan = CONTENT_SUB_PLANS.find(p => p.plan === productType);
       if (contentSubPlan && session.subscription) {
         const stripeSubId = typeof session.subscription === 'string' ? session.subscription : session.subscription.id;
+
+        // Retrieve actual billing period from Stripe
+        const stripe = getStripe();
+        let periodStart = new Date().toISOString();
+        let periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+        if (stripe) {
+          try {
+            const subscription = await stripe.subscriptions.retrieve(stripeSubId);
+            const item = subscription.items.data[0];
+            if (item) {
+              periodStart = new Date(item.current_period_start * 1000).toISOString();
+              periodEnd = new Date(item.current_period_end * 1000).toISOString();
+            }
+          } catch (err) {
+            log.warn({ err }, `Failed to retrieve subscription period for ${stripeSubId}, using 30-day fallback`);
+          }
+        }
+
         createContentSubscription(workspaceId, {
           plan: contentSubPlan.plan,
           postsPerMonth: contentSubPlan.postsPerMonth,
           priceUsd: contentSubPlan.priceUsd,
           stripeSubscriptionId: stripeSubId,
           status: 'active',
-          currentPeriodStart: new Date().toISOString(),
-          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          currentPeriodStart: periodStart,
+          currentPeriodEnd: periodEnd,
         });
         _broadcastFn?.(workspaceId, 'content-subscription:created', { plan: contentSubPlan.plan });
         log.info(`Content subscription created: workspace=${workspaceId} plan=${contentSubPlan.plan}`);
@@ -621,11 +639,15 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       if (!subId || !invoice.metadata?.workspaceId) return;
       const workspaceId = invoice.metadata.workspaceId;
 
-      // Reset content subscription period on renewal
+      // Reset content subscription period on renewal using actual invoice billing period
       const contentSub = getContentSubscriptionByStripeId(subId);
       if (contentSub) {
-        const periodStart = new Date().toISOString();
-        const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+        const periodStart = invoice.period_start
+          ? new Date(invoice.period_start * 1000).toISOString()
+          : new Date().toISOString();
+        const periodEnd = invoice.period_end
+          ? new Date(invoice.period_end * 1000).toISOString()
+          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
         resetPeriod(contentSub.workspaceId, contentSub.id, periodStart, periodEnd);
         updateContentSubscription(contentSub.workspaceId, contentSub.id, { status: 'active' });
         _broadcastFn?.(workspaceId, 'content-subscription:renewed', { id: contentSub.id });

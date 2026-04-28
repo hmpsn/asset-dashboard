@@ -50,13 +50,13 @@ export function PredictionShowcaseCard({ predictions }: PredictionShowcaseCardPr
             {/* What we predicted */}
             <div className="flex items-start gap-2">
               <Icon as={TrendingUp} size="md" className="text-teal-400 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-[var(--brand-text-bright)] leading-snug">
+              <p className="t-body text-[var(--brand-text-bright)] leading-snug">
                 We predicted <span className="font-medium text-[var(--brand-text-bright)]">{p.prediction}</span>
               </p>
             </div>
 
             {/* What actually happened */}
-            <p className="text-sm text-teal-400 pl-6 leading-snug">
+            <p className="t-body text-teal-400 pl-6 leading-snug">
               Result: {p.outcome}
             </p>
 

@@ -2,7 +2,7 @@ import {
   Loader2, Trash2, Sparkles, FileText,
   Inbox, CheckCircle2, XCircle, Clock, Zap,
   Copy, Download, Search, Target, MessageSquare, BarChart3,
-  BookOpen, Users, TrendingUp, Check, ExternalLink, Link2, PenLine,
+  BookOpen, Users, TrendingUp, Check, ExternalLink, Link2, PenLine, Eye, Send,
 } from 'lucide-react';
 import { SectionCard, Icon } from '../ui';
 import type { PostSummary } from '../../../shared/types/content';
@@ -47,7 +47,7 @@ interface ContentTopicRequest {
   intent: string;
   priority: string;
   rationale: string;
-  status: 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'delivered' | 'published' | 'declined';
+  status: 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'post_review' | 'delivered' | 'published' | 'declined';
   briefId?: string;
   clientNote?: string;
   internalNote?: string;
@@ -149,9 +149,10 @@ export function RequestList({
             approved: { icon: CheckCircle2, color: 'text-emerald-400', label: 'Approved' },
             changes_requested: { icon: Clock, color: 'text-orange-400', label: 'Changes Requested' },
             in_progress: { icon: Zap, color: 'text-teal-400', label: 'In Progress' },
+            post_review: { icon: Eye, color: 'text-cyan-400', label: 'Client Review' },
             delivered: { icon: CheckCircle2, color: 'text-emerald-400', label: 'Delivered' },
             published: { icon: CheckCircle2, color: 'text-teal-400', label: 'Published' },
-            declined: { icon: XCircle, color: 'text-zinc-500', label: 'Declined' },
+            declined: { icon: XCircle, color: 'text-[var(--brand-text-muted)]', label: 'Declined' },
           };
           const sc = statusConfig[req.status] || statusConfig.requested;
           const StatusIcon = sc.icon;
@@ -180,7 +181,7 @@ export function RequestList({
                     <span className={`flex items-center gap-1 t-caption-sm ${sc.color}`}><Icon as={StatusIcon} size="sm" /> {sc.label}</span>
                     <div className="flex items-center gap-1 flex-wrap justify-end">
                       {hasBrief && req.status !== 'requested' && (
-                        <button onClick={() => onToggleRequestBrief(req.id, req.briefId!)} disabled={loadingBrief === req.id} className={`flex items-center gap-1 px-2 py-1 rounded border t-caption-sm transition-colors ${expandedRequest === req.id ? 'bg-blue-600/30 border-blue-500/40 text-blue-200' : 'bg-blue-600/20 border-blue-500/30 text-blue-300 hover:bg-blue-600/30'}`}>
+                        <button onClick={() => onToggleRequestBrief(req.id, req.briefId!)} disabled={loadingBrief === req.id} className={`flex items-center gap-1 px-2 py-1 rounded border t-caption-sm transition-colors ${expandedRequest === req.id ? 'bg-teal-600/30 border-teal-500/40 text-teal-200' : 'bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/30'}`}>
                           {loadingBrief === req.id ? <><Icon as={Loader2} size="sm" className="animate-spin" /> Loading...</> : expandedRequest === req.id ? 'Hide Brief' : 'View Brief'}
                         </button>
                       )}
@@ -198,6 +199,9 @@ export function RequestList({
                       )}
                       {req.status === 'client_review' && (
                         <span className="t-caption-sm text-cyan-400/60 italic">Awaiting client feedback</span>
+                      )}
+                      {req.status === 'post_review' && (
+                        <span className="t-caption-sm text-cyan-400/60 italic">Post sent — awaiting client approval</span>
                       )}
                       {req.status === 'approved' && (req.serviceType || 'brief_only') === 'full_post' && req.briefId && (() => {
                         const existingPost = posts.find(p => p.briefId === req.briefId);
@@ -234,20 +238,55 @@ export function RequestList({
                       {req.status === 'approved' && (req.serviceType || 'brief_only') === 'brief_only' && !req.upgradedAt && deliveringReqId !== req.id && (
                         <button onClick={() => { onSetDeliveringReqId(req.id); onSetDeliveryUrl(req.deliveryUrl || ''); onSetDeliveryNotes(req.deliveryNotes || ''); }} className="px-2 py-1 rounded bg-emerald-600/20 border border-emerald-500/30 t-caption-sm text-emerald-300 hover:bg-emerald-600/30 transition-colors flex items-center gap-1"><Icon as={Link2} size="sm" /> Deliver Brief</button>
                       )}
-                      {req.status === 'changes_requested' && (
-                        <button onClick={() => onUpdateRequestStatus(req.id, 'client_review')} className="px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 t-caption-sm text-cyan-300 hover:bg-cyan-600/30 transition-colors">Resubmit to Client</button>
-                      )}
+                      {req.status === 'changes_requested' && (() => {
+                        const existingPost = req.briefId
+                          ? posts.find(p => p.briefId === req.briefId)
+                          : undefined;
+                        const isPostFlow = !!existingPost && req.serviceType === 'full_post';
+                        if (isPostFlow) {
+                          return (
+                            <button
+                              onClick={() => onUpdateRequestStatus(req.id, 'post_review')}
+                              className="flex items-center gap-1 px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 t-caption-sm text-cyan-300 hover:bg-cyan-600/30 transition-colors"
+                              title="Send the revised post back to client for review"
+                            >
+                              <Icon as={Send} size="sm" /> Resend Post to Client
+                            </button>
+                          );
+                        }
+                        return (
+                          <button
+                            onClick={() => onUpdateRequestStatus(req.id, 'client_review')}
+                            className="flex items-center gap-1 px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 t-caption-sm text-cyan-300 hover:bg-cyan-600/30 transition-colors"
+                            title="Send the revised brief back to client for review"
+                          >
+                            <Icon as={Send} size="sm" /> Resubmit to Client
+                          </button>
+                        );
+                      })()}
                       {req.status === 'in_progress' && req.briefId && (() => {
                         const existingPost = posts.find(p => p.briefId === req.briefId);
                         if (!existingPost) return null;
+                        const canSendToClient = existingPost.status === 'review' || existingPost.status === 'approved';
                         return (
-                          <button
-                            onClick={() => onOpenPost?.(existingPost.id)}
-                            className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors"
-                            title="Open post in editor"
-                          >
-                            <Icon as={PenLine} size="sm" /> Open Post
-                          </button>
+                          <>
+                            <button
+                              onClick={() => onOpenPost?.(existingPost.id)}
+                              className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors"
+                              title="Open post in editor"
+                            >
+                              <Icon as={PenLine} size="sm" /> Open Post
+                            </button>
+                            {canSendToClient && (
+                              <button
+                                onClick={() => onUpdateRequestStatus(req.id, 'post_review')}
+                                className="flex items-center gap-1 px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 t-caption-sm text-cyan-300 hover:bg-cyan-600/30 transition-colors"
+                                title="Send post to client for review and approval"
+                              >
+                                <Icon as={Send} size="sm" /> Send Post to Client
+                              </button>
+                            )}
+                          </>
                         );
                       })()}
                       {req.status === 'in_progress' && deliveringReqId !== req.id && (
@@ -258,26 +297,26 @@ export function RequestList({
                 </div>
                 {/* Delivery form */}
                 {(req.status === 'in_progress' || (req.status === 'approved' && (req.serviceType || 'brief_only') === 'brief_only' && !req.upgradedAt)) && deliveringReqId === req.id && (
-                  <div className="mt-2 bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-3 space-y-2">
+                  <div className="mt-2 bg-emerald-500/5 border border-emerald-500/20 rounded-[var(--radius-lg)] p-3 space-y-2">
                     <div className="flex items-center gap-1.5 mb-1"><Icon as={Link2} size="md" className="text-emerald-400" /><span className="t-caption-sm uppercase tracking-wider text-emerald-400 font-medium">Attach Deliverable</span></div>
-                    <input type="url" value={deliveryUrl} onChange={e => onSetDeliveryUrl(e.target.value)} placeholder="Google Doc link, Dropbox URL, or any content URL..." className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-emerald-500/50 focus:outline-none" />
-                    <textarea value={deliveryNotes} onChange={e => onSetDeliveryNotes(e.target.value)} placeholder="Delivery notes (optional) — e.g. revision notes, word count, etc." className="w-full px-3 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-emerald-500/50 focus:outline-none resize-y" rows={2} />
+                    <input type="url" value={deliveryUrl} onChange={e => onSetDeliveryUrl(e.target.value)} placeholder="Google Doc link, Dropbox URL, or any content URL..." className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-emerald-500/50 focus:outline-none" />
+                    <textarea value={deliveryNotes} onChange={e => onSetDeliveryNotes(e.target.value)} placeholder="Delivery notes (optional) — e.g. revision notes, word count, etc." className="w-full px-3 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-emerald-500/50 focus:outline-none resize-y" rows={2} />
                     <div className="flex items-center gap-2">
-                      <button onClick={async () => { await onUpdateRequestStatus(req.id, 'delivered', { deliveryUrl: deliveryUrl.trim() || undefined, deliveryNotes: deliveryNotes.trim() || undefined }); onSetDeliveringReqId(null); onSetDeliveryUrl(''); onSetDeliveryNotes(''); }} className="px-3 py-1.5 rounded-lg bg-emerald-600/20 border border-emerald-500/30 t-caption-sm font-medium text-emerald-300 hover:bg-emerald-600/30 transition-colors flex items-center gap-1"><Icon as={Check} size="sm" /> Mark Delivered</button>
-                      <button onClick={() => { onSetDeliveringReqId(null); onSetDeliveryUrl(''); onSetDeliveryNotes(''); }} className="px-3 py-1.5 rounded-lg t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">Cancel</button>
+                      <button onClick={async () => { await onUpdateRequestStatus(req.id, 'delivered', { deliveryUrl: deliveryUrl.trim() || undefined, deliveryNotes: deliveryNotes.trim() || undefined }); onSetDeliveringReqId(null); onSetDeliveryUrl(''); onSetDeliveryNotes(''); }} className="px-3 py-1.5 rounded-[var(--radius-lg)] bg-emerald-600/20 border border-emerald-500/30 t-caption-sm font-medium text-emerald-300 hover:bg-emerald-600/30 transition-colors flex items-center gap-1"><Icon as={Check} size="sm" /> Mark Delivered</button>
+                      <button onClick={() => { onSetDeliveringReqId(null); onSetDeliveryUrl(''); onSetDeliveryNotes(''); }} className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">Cancel</button>
                     </div>
                   </div>
                 )}
                 {/* Mark Published button for delivered content */}
                 {req.status === 'delivered' && (
                   <div className="mt-2 flex items-center gap-2">
-                    <button onClick={() => onUpdateRequestStatus(req.id, 'published')} className="px-3 py-1.5 rounded-lg bg-teal-600/20 border border-teal-500/30 t-caption-sm font-medium text-teal-300 hover:bg-teal-600/30 transition-colors flex items-center gap-1"><Icon as={CheckCircle2} size="sm" /> Mark Published</button>
+                    <button onClick={() => onUpdateRequestStatus(req.id, 'published')} className="px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm font-medium text-teal-300 hover:bg-teal-600/30 transition-colors flex items-center gap-1"><Icon as={CheckCircle2} size="sm" /> Mark Published</button>
                     {req.targetPageId && <span className="t-caption-sm text-[var(--brand-text-muted)]">Will mark target page as Live</span>}
                   </div>
                 )}
                 {/* Show delivery info */}
                 {(req.status === 'delivered' || req.status === 'published') && req.deliveryUrl && (
-                  <div className="mt-2 bg-emerald-500/5 border border-emerald-500/20 rounded-lg px-3 py-2">
+                  <div className="mt-2 bg-emerald-500/5 border border-emerald-500/20 rounded-[var(--radius-lg)] px-3 py-2">
                     <div className="flex items-center gap-2">
                       <Icon as={ExternalLink} size="sm" className="text-emerald-400 flex-shrink-0" />
                       <a href={req.deliveryUrl} target="_blank" rel="noopener noreferrer" className="t-caption-sm text-emerald-400 hover:text-emerald-300 underline underline-offset-2 truncate">{req.deliveryUrl}</a>
@@ -314,20 +353,20 @@ export function RequestList({
                 <div className="border-t border-[var(--brand-border)] px-4 pb-4 space-y-4">
                   {/* Export buttons */}
                   <div className="pt-3 flex items-center gap-2">
-                    <button onClick={() => onCopyAsMarkdown(inlineBrief)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
+                    <button onClick={() => onCopyAsMarkdown(inlineBrief)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
                       <Icon as={Copy} size="sm" /> Copy for AI Tool
                     </button>
-                    <button onClick={() => onExportClientHTML(inlineBrief)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
+                    <button onClick={() => onExportClientHTML(inlineBrief)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
                       <Icon as={Download} size="sm" /> Export PDF
                     </button>
-                    <button onClick={() => { navigator.clipboard.writeText(JSON.stringify(inlineBrief, null, 2)); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg t-caption-sm font-medium bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
+                    <button onClick={() => { navigator.clipboard.writeText(JSON.stringify(inlineBrief, null, 2)); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
                       <Icon as={Copy} size="sm" /> Copy JSON
                     </button>
                   </div>
 
                   {/* Executive Summary */}
                   {inlineBrief.executiveSummary && (
-                    <div className="bg-teal-500/5 border border-teal-500/20 rounded-lg px-4 py-3">
+                    <div className="bg-teal-500/5 border border-teal-500/20 rounded-[var(--radius-lg)] px-4 py-3">
                       <div className="flex items-center gap-1.5 mb-1.5"><Icon as={BookOpen} size="md" className="text-teal-400" /><span className="t-caption-sm uppercase tracking-wider text-teal-400 font-medium">Executive Summary</span></div>
                       <div className="text-xs text-[var(--brand-text-bright)] leading-relaxed">{inlineBrief.executiveSummary}</div>
                     </div>
@@ -337,32 +376,32 @@ export function RequestList({
                   <div className="space-y-2">
                     <div>
                       <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1">Suggested Title</div>
-                      <div className="text-xs text-teal-400 bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)]">{inlineBrief.suggestedTitle}</div>
+                      <div className="text-xs text-teal-400 bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">{inlineBrief.suggestedTitle}</div>
                     </div>
                     <div>
                       <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1">Meta Description</div>
-                      <div className="text-xs text-[var(--brand-text-bright)] bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)]">{inlineBrief.suggestedMetaDesc}</div>
+                      <div className="text-xs text-[var(--brand-text-bright)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">{inlineBrief.suggestedMetaDesc}</div>
                     </div>
                   </div>
 
                   {/* Key Metrics Row */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)]">
+                    <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">
                       <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-0.5">Word Count</div>
                       <div className="text-sm font-bold text-blue-400">{inlineBrief.wordCountTarget?.toLocaleString()}</div>
                     </div>
-                    <div className="bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)]">
+                    <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">
                       <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-0.5">Intent</div>
                       <div className="text-xs text-[var(--brand-text-bright)] capitalize font-medium">{inlineBrief.intent}</div>
                     </div>
                     {inlineBrief.contentFormat && (
-                      <div className="bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)]">
+                      <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">
                         <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-0.5">Format</div>
                         <div className="text-xs text-amber-400 capitalize font-medium">{inlineBrief.contentFormat}</div>
                       </div>
                     )}
                     {inlineBrief.difficultyScore != null && (
-                      <div className="bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)]">
+                      <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">
                         <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-0.5">Difficulty</div>
                         <div className={`text-sm font-bold ${inlineBrief.difficultyScore <= 30 ? 'text-emerald-400' : inlineBrief.difficultyScore <= 60 ? 'text-amber-400' : 'text-red-400'}`}>{inlineBrief.difficultyScore}/100</div>
                       </div>
@@ -371,7 +410,7 @@ export function RequestList({
 
                   {/* Traffic Potential */}
                   {inlineBrief.trafficPotential && (
-                    <div className="flex items-start gap-2 bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)]">
+                    <div className="flex items-start gap-2 bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">
                       <Icon as={TrendingUp} size="md" className="text-emerald-400 mt-0.5 flex-shrink-0" />
                       <div><div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-0.5">Traffic Potential</div><div className="text-xs text-[var(--brand-text-bright)]">{inlineBrief.trafficPotential}</div></div>
                     </div>
@@ -381,12 +420,12 @@ export function RequestList({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <div className="flex items-center gap-1.5 mb-1"><Icon as={Users} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Audience</span></div>
-                      <div className="text-xs text-[var(--brand-text)] bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)]">{inlineBrief.audience}</div>
+                      <div className="text-xs text-[var(--brand-text)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">{inlineBrief.audience}</div>
                     </div>
                     {inlineBrief.toneAndStyle && (
                       <div>
                         <div className="flex items-center gap-1.5 mb-1"><Icon as={MessageSquare} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Tone & Style</span></div>
-                        <div className="text-xs text-[var(--brand-text)] bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)]">{inlineBrief.toneAndStyle}</div>
+                        <div className="text-xs text-[var(--brand-text)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">{inlineBrief.toneAndStyle}</div>
                       </div>
                     )}
                   </div>
@@ -421,7 +460,7 @@ export function RequestList({
                       <div className="flex items-center gap-1.5 mb-1.5"><Icon as={MessageSquare} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Questions to Answer</span></div>
                       <div className="space-y-1">
                         {inlineBrief.peopleAlsoAsk.map((q, i) => (
-                          <div key={i} className="flex items-start gap-2 text-xs text-[var(--brand-text-bright)] bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)]">
+                          <div key={i} className="flex items-start gap-2 text-xs text-[var(--brand-text-bright)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">
                             <span className="text-amber-400 flex-shrink-0 font-medium">Q{i + 1}.</span> {q}
                           </div>
                         ))}
@@ -433,7 +472,7 @@ export function RequestList({
                   {inlineBrief.serpAnalysis && (
                     <div>
                       <div className="flex items-center gap-1.5 mb-1.5"><Icon as={BarChart3} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">SERP Analysis</span></div>
-                      <div className="bg-[var(--surface-1)] rounded-lg px-3 py-3 border border-[var(--brand-border)] space-y-2">
+                      <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-3 border border-[var(--brand-border)] space-y-2">
                         <div className="grid grid-cols-2 gap-3">
                           <div><span className="t-caption-sm text-[var(--brand-text-muted)]">Content Type:</span><span className="text-xs text-[var(--brand-text-bright)] ml-1">{inlineBrief.serpAnalysis.contentType}</span></div>
                           <div><span className="t-caption-sm text-[var(--brand-text-muted)]">Avg Word Count:</span><span className="text-xs text-[var(--brand-text-bright)] ml-1">{inlineBrief.serpAnalysis.avgWordCount.toLocaleString()}</span></div>
@@ -454,7 +493,7 @@ export function RequestList({
                       <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-2">Content Outline</div>
                       <div className="space-y-2">
                         {inlineBrief.outline.map((section, i) => (
-                          <div key={i} className="bg-[var(--surface-1)] rounded-lg px-3 py-2.5 border border-[var(--brand-border)]">
+                          <div key={i} className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2.5 border border-[var(--brand-border)]">
                             <div className="flex items-center justify-between">
                               <div className="text-xs font-medium text-[var(--brand-text-bright)]">H2: {section.heading}</div>
                               {section.wordCount && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{section.wordCount} words</span>}
@@ -474,7 +513,7 @@ export function RequestList({
                     <div>
                       <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1.5">CTA Recommendations</div>
                       <div className="space-y-1">{inlineBrief.ctaRecommendations.map((cta, i) => (
-                        <div key={i} className="text-xs text-[var(--brand-text-bright)] bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)] flex items-start gap-2">
+                        <div key={i} className="text-xs text-[var(--brand-text-bright)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)] flex items-start gap-2">
                           <span className={`t-caption-sm px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${i === 0 ? 'bg-teal-500/20 text-teal-400' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)]'}`}>{i === 0 ? 'Primary' : 'Secondary'}</span>{cta}
                         </div>
                       ))}</div>
@@ -485,7 +524,7 @@ export function RequestList({
                   {inlineBrief.competitorInsights && (
                     <div>
                       <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1">Competitor Insights</div>
-                      <div className="text-xs text-[var(--brand-text)] bg-[var(--surface-1)] rounded-lg px-3 py-2 border border-[var(--brand-border)] leading-relaxed">{inlineBrief.competitorInsights}</div>
+                      <div className="text-xs text-[var(--brand-text)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)] leading-relaxed">{inlineBrief.competitorInsights}</div>
                     </div>
                   )}
 
@@ -512,7 +551,7 @@ export function RequestList({
                           { label: 'Authority', value: inlineBrief.eeatGuidance.authority, color: 'text-teal-400' },
                           { label: 'Trust', value: inlineBrief.eeatGuidance.trust, color: 'text-amber-400' },
                         ].filter(e => e.value).map((e, i) => (
-                          <div key={i} className="bg-[var(--surface-1)] rounded-lg px-3 py-2.5 border border-[var(--brand-border)]">
+                          <div key={i} className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2.5 border border-[var(--brand-border)]">
                             <div className={`t-caption-sm uppercase tracking-wider ${e.color} font-medium mb-1`}>{e.label}</div>
                             <div className="t-caption-sm text-[var(--brand-text)] leading-relaxed">{e.value}</div>
                           </div>
@@ -525,7 +564,7 @@ export function RequestList({
                   {inlineBrief.contentChecklist && inlineBrief.contentChecklist.length > 0 && (
                     <div>
                       <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-2">Content Checklist</div>
-                      <div className="bg-[var(--surface-1)] rounded-lg border border-[var(--brand-border)] divide-y divide-[var(--brand-border)]/50">
+                      <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] border border-[var(--brand-border)] divide-y divide-[var(--brand-border)]/50">
                         {inlineBrief.contentChecklist.map((item, i) => (
                           <div key={i} className="flex items-start gap-2.5 px-4 py-2.5">
                             <div className="w-4 h-4 mt-0.5 rounded border border-[var(--brand-border)] flex-shrink-0" />
@@ -542,7 +581,7 @@ export function RequestList({
                       <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-2">Schema Markup</div>
                       <div className="space-y-2">
                         {inlineBrief.schemaRecommendations.map((schema, i) => (
-                          <div key={i} className="bg-[var(--surface-1)] rounded-lg px-4 py-3 border border-[var(--brand-border)]">
+                          <div key={i} className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-4 py-3 border border-[var(--brand-border)]">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="t-caption-sm px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-medium">{schema.type}</span>
                             </div>

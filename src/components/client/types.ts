@@ -43,12 +43,34 @@ export interface ChatMessage { role: 'user' | 'assistant'; content: string; }
 
 export interface ClientContentRequest {
   id: string; topic: string; targetKeyword: string; intent: string; priority: string;
-  status: 'pending_payment' | 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'delivered' | 'published' | 'declined';
-  source?: 'strategy' | 'client'; briefId?: string;
+  status: 'pending_payment' | 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'post_review' | 'delivered' | 'published' | 'declined';
+  source?: 'strategy' | 'client'; briefId?: string; postId?: string;
   serviceType?: 'brief_only' | 'full_post'; pageType?: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource'; upgradedAt?: string;
-  deliveryUrl?: string; deliveryNotes?: string;
+  deliveryUrl?: string; deliveryNotes?: string; clientFeedback?: string;
   comments?: { id: string; author: 'client' | 'team'; content: string; createdAt: string }[];
   requestedAt: string; updatedAt: string;
+}
+
+/**
+ * Disambiguates the dual-purpose `changes_requested` status for progress-bar display.
+ *
+ * `changes_requested` can mean "client wants brief revisions" (came from client_review)
+ * OR "client wants post revisions" (came from post_review). The state machine merged
+ * these into one terminal label, but the progress bar needs them separated so it
+ * correctly reflects the user's actual phase on the timeline.
+ *
+ * `postId` is the disambiguator — it's only populated when admin transitioned to
+ * post_review (Task 5 auto-populates from listPosts via briefId match). For brief-flow
+ * `changes_requested`, postId is undefined.
+ *
+ * Returns the status the progress bar should treat the request as. For non-changes_requested
+ * statuses, returns `req.status` unchanged.
+ */
+export function getDisplayStatus(req: ClientContentRequest): ClientContentRequest['status'] {
+  if (req.status === 'changes_requested' && req.postId) {
+    return 'post_review';
+  }
+  return req.status;
 }
 
 export interface ClientBriefPreview {
@@ -95,7 +117,7 @@ export const SEV = {
 
 export const CAT_LABELS: Record<string, { label: string; color: string }> = {
   content: { label: 'Content', color: '#60a5fa' }, technical: { label: 'Technical', color: '#2dd4bf' },
-  social: { label: 'Social', color: '#f472b6' }, performance: { label: 'Performance', color: '#fbbf24' },
+  social: { label: 'Social', color: '#fb923c' }, performance: { label: 'Performance', color: '#fbbf24' },
   accessibility: { label: 'Accessibility', color: '#34d399' },
 };
 

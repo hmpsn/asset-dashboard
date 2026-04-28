@@ -100,14 +100,14 @@ export function DropZone({ workspaceId, type, disabled }: Props) {
       {uploading ? (
         <>
           <div className="w-8 h-8 border-2 rounded-full animate-spin border-[var(--brand-border-hover)] border-t-teal-400" />
-          <p className="text-sm text-[var(--brand-text)]">Processing...</p>
+          <p className="t-body text-[var(--brand-text)]">Processing...</p>
         </>
       ) : lastCount !== null ? (
         <>
           <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
             <Icon as={Upload} size="lg" className="text-emerald-400" />
           </div>
-          <p className="text-sm text-emerald-400 font-medium">
+          <p className="t-body text-emerald-400 font-medium">
             {lastCount} file{lastCount !== 1 ? 's' : ''} sent to pipeline
           </p>
         </>
@@ -117,16 +117,16 @@ export function DropZone({ workspaceId, type, disabled }: Props) {
             <Icon as={DropIcon} size="lg" className="text-teal-400" />
           </div>
           <div className="text-center">
-            <p className="text-sm font-medium text-[var(--brand-text-bright)]">
+            <p className="t-body font-medium text-[var(--brand-text-bright)]">
               {type === 'meta' ? 'Meta / OG Images' : 'Assets'}
             </p>
-            <p className="text-xs mt-1 text-[var(--brand-text-muted)]">
+            <p className="t-caption mt-1 text-[var(--brand-text-muted)]">
               {type === 'meta'
                 ? 'Optimized JPEG — keeps format for social sharing'
                 : 'Converts to AVIF, minifies SVGs'}
             </p>
           </div>
-          <p className="text-xs text-[var(--brand-text-muted)]">Drop files or click to browse</p>
+          <p className="t-caption text-[var(--brand-text-muted)]">Drop files or click to browse</p>
         </>
       )}
     </div>

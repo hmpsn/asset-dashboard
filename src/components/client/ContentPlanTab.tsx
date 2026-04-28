@@ -59,7 +59,7 @@ export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
     return (
       <div className="flex items-center justify-center py-24 gap-3">
         <Icon as={Loader2} size="lg" className="animate-spin text-teal-400" />
-        <span className="text-sm text-[var(--brand-text-muted)]">Loading content plans…</span>
+        <span className="t-body text-[var(--brand-text-muted)]">Loading content plans…</span>
       </div>
     );
   }
@@ -70,7 +70,7 @@ export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
         icon={AlertTriangle}
         title="Couldn't load content plans"
         description={error}
-        action={<button onClick={loadPlans} className="text-xs px-3 py-1.5 rounded-lg bg-teal-500/10 text-teal-400 hover:bg-teal-500/15 transition-colors">Retry</button>}
+        action={<button onClick={loadPlans} className="t-caption px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-500/10 text-teal-400 hover:bg-teal-500/15 transition-colors">Retry</button>}
       />
     );
   }
@@ -94,7 +94,7 @@ export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
         {plans.length > 1 && (
           <button
             onClick={() => setSelectedMatrixId(null)}
-            className="flex items-center gap-1 text-xs text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+            className="flex items-center gap-1 t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
           >
             ← All Content Plans
           </button>
@@ -128,15 +128,15 @@ export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
               <button
                 key={plan.id}
                 onClick={() => setSelectedMatrixId(plan.id)}
-                className="w-full flex items-center justify-between px-4 py-3 rounded-[var(--radius-xl)] bg-zinc-800/50 hover:bg-[var(--surface-3)] transition-colors text-left group"
+                className="w-full flex items-center justify-between px-4 py-3 rounded-[var(--radius-xl)] bg-[var(--surface-3)]/50 hover:bg-[var(--surface-3)] transition-colors text-left group"
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <Icon as={Grid3X3} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
                   <div className="min-w-0">
-                    <span className="text-sm font-medium text-[var(--brand-text)] group-hover:text-white transition-colors truncate block">
+                    <span className="t-body font-medium text-[var(--brand-text)] group-hover:text-white transition-colors truncate block">
                       {plan.name}
                     </span>
-                    <span className="text-xs text-[var(--brand-text-muted)]">
+                    <span className="t-caption text-[var(--brand-text-muted)]">
                       {total} pages · {progress}% complete
                     </span>
                   </div>
@@ -145,7 +145,7 @@ export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
                   {inReview > 0 && (
                     <Badge label={`${inReview} needs review`} color="blue" />
                   )}
-                  <div className="w-20 h-1.5 bg-zinc-700 rounded-full overflow-hidden">
+                  <div className="w-20 h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden">
                     <div className="h-full bg-teal-500/50 rounded-full transition-all" style={{ width: `${progress}%` }} />
                   </div>
                 </div>

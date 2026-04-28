@@ -136,11 +136,11 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
       {/* Header */}
       <div className="text-center">
         <h2 className="text-2xl font-bold text-[var(--brand-text)]">Plans & Pricing</h2>
-        <p className="text-sm text-[var(--brand-text-muted)] mt-2 max-w-md mx-auto">Choose the right plan for your business. All plans include your dedicated client dashboard.</p>
+        <p className="t-body text-[var(--brand-text-muted)] mt-2 max-w-md mx-auto">Choose the right plan for your business. All plans include your dedicated client dashboard.</p>
         {isTrial && (
           <div className="inline-flex items-center gap-2 mt-3 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/20">
             <Icon as={Zap} size="md" className="text-amber-400" />
-            <span className="text-xs text-amber-300 font-medium">You&apos;re trialing {plans.find(p => p.id === tier)?.name} — {ws.trialDaysRemaining} day{ws.trialDaysRemaining !== 1 ? 's' : ''} remaining</span>
+            <span className="t-caption text-amber-300 font-medium">You&apos;re trialing {plans.find(p => p.id === tier)?.name} — {ws.trialDaysRemaining} day{ws.trialDaysRemaining !== 1 ? 's' : ''} remaining</span>
           </div>
         )}
       </div>
@@ -151,7 +151,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
           const isCurrent = plan.id === tier;
           const isUpgrade = (plan.id === 'growth' && tier === 'free') || (plan.id === 'premium' && tier !== 'premium');
           return (
-            <div key={plan.id} className={`relative rounded-[var(--radius-xl)] border p-5 transition-all ${isCurrent ? `${plan.bgColor} ${plan.borderColor} ring-1 ring-offset-0 ${plan.id !== 'free' ? 'ring-teal-500/20' : 'ring-zinc-700'}` : `bg-zinc-900/50 border-[var(--brand-border)] hover:border-[var(--brand-border-strong)]`}`}>
+            <div key={plan.id} className={`relative rounded-[var(--radius-xl)] border p-5 transition-all ${isCurrent ? `${plan.bgColor} ${plan.borderColor} ring-1 ring-offset-0 ${plan.id !== 'free' ? 'ring-teal-500/20' : 'ring-zinc-700'}` : `bg-[var(--surface-2)]/50 border-[var(--brand-border)] hover:border-[var(--brand-border-strong)]`}`}>
               {isCurrent && (
                 <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full t-caption-sm uppercase tracking-wider font-semibold border ${plan.id !== 'free' ? 'bg-teal-500/20 border-teal-500/30 text-teal-300' : 'bg-[var(--surface-3)] border-[var(--brand-border-strong)] text-[var(--brand-text-muted)]'}`}>
                   {isTrial ? 'Current Trial' : 'Current Plan'}
@@ -161,7 +161,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                 <h3 className={`text-lg font-bold ${plan.color}`}>{plan.name}</h3>
                 <div className="flex items-baseline gap-1 mt-1">
                   <span className={`text-2xl font-bold ${plan.color}`}>{plan.price}</span>
-                  {plan.price !== 'Free' && <span className="text-xs text-[var(--brand-text-muted)]">/month</span>}
+                  {plan.price !== 'Free' && <span className="t-caption text-[var(--brand-text-muted)]">/month</span>}
                 </div>
                 <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1.5 mb-4">{plan.tagline}</p>
                 <div className="space-y-3">
@@ -175,7 +175,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                           ) : (
                             <Icon as={X} size="md" className="flex-shrink-0 text-[var(--brand-text-faint)]" />
                           )}
-                          <span className={`text-xs ${f.included ? 'text-[var(--brand-text)]' : 'text-[var(--brand-text-faint)]'}`}>{f.label}</span>
+                          <span className={`t-caption ${f.included ? 'text-[var(--brand-text)]' : 'text-[var(--brand-text-faint)]'}`}>{f.label}</span>
                         </div>
                       ))}
                     </div>
@@ -184,14 +184,14 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                 <div className="mt-5">
                   {isCurrent ? (
                     <div className="space-y-2">
-                      <div className={`w-full py-2 rounded-lg text-xs font-medium text-center border ${plan.id !== 'free' ? 'bg-teal-500/10 border-teal-500/20 text-teal-300' : 'bg-[var(--surface-3)] border-[var(--brand-border-strong)] text-[var(--brand-text-muted)]'}`}>
+                      <div className={`w-full py-2 rounded-[var(--radius-lg)] t-caption font-medium text-center border ${plan.id !== 'free' ? 'bg-teal-500/10 border-teal-500/20 text-teal-300' : 'bg-[var(--surface-3)] border-[var(--brand-border-strong)] text-[var(--brand-text-muted)]'}`}>
                         {isTrial ? 'Trialing Now' : 'Your Plan'}
                       </div>
                       {plan.id !== 'free' && !isTrial && (
                         <button
                           onClick={openBillingPortal}
                           disabled={billingLoading}
-                          className="w-full py-2 rounded-lg t-caption-sm font-medium text-center border border-[var(--brand-border-strong)] bg-zinc-800/50 hover:bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors flex items-center justify-center gap-1.5"
+                          className="w-full py-2 rounded-[var(--radius-lg)] t-caption-sm font-medium text-center border border-[var(--brand-border-strong)] bg-[var(--surface-3)]/50 hover:bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors flex items-center justify-center gap-1.5"
                         >
                           {billingLoading ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={CreditCard} size="sm" />}
                           Manage Billing
@@ -211,7 +211,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                       Upgrade to {plan.name}
                     </Button>
                   ) : (
-                    <div className="w-full py-2 rounded-lg text-xs font-medium text-center bg-zinc-800/50 border border-[var(--brand-border)] text-[var(--brand-text-faint)]">
+                    <div className="w-full py-2 rounded-[var(--radius-lg)] t-caption font-medium text-center bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-[var(--brand-text-faint)]">
                       Included
                     </div>
                   )}
@@ -225,7 +225,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
       {/* Content pricing section */}
       {(briefPrice != null || fullPostPrice != null) && (
         <SectionCard title="Content Services" titleIcon={<Icon as={FileText} size="lg" className="text-teal-400" />}>
-          <p className="text-xs text-[var(--brand-text-muted)] mb-5">Professional content created by {STUDIO_NAME}, tailored to your SEO strategy.</p>
+          <p className="t-caption text-[var(--brand-text-muted)] mb-5">Professional content created by {STUDIO_NAME}, tailored to your SEO strategy.</p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             {briefPrice != null && (
@@ -233,7 +233,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <Icon as={FileText} size="md" className="text-teal-400" />
-                    <span className="text-sm font-semibold text-[var(--brand-text)]">Content Brief</span>
+                    <span className="t-body font-semibold text-[var(--brand-text)]">Content Brief</span>
                   </div>
                   <span className="text-lg font-bold text-teal-300">{fmtPrice(briefPrice)}</span>
                 </div>
@@ -245,7 +245,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <Icon as={Sparkles} size="md" className="text-teal-400" />
-                    <span className="text-sm font-semibold text-[var(--brand-text)]">Full Blog Post</span>
+                    <span className="t-body font-semibold text-[var(--brand-text)]">Full Blog Post</span>
                   </div>
                   <span className="text-lg font-bold text-teal-300">{fmtPrice(fullPostPrice)}</span>
                 </div>
@@ -256,7 +256,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
 
           {tier !== 'free' && (
             <div className="mt-5 text-center">
-              <button onClick={() => navigate(clientPath(workspaceId, 'content', betaMode))} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-xs text-white font-medium transition-colors">
+              <button onClick={() => navigate(clientPath(workspaceId, 'content', betaMode))} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 t-caption text-white font-medium transition-colors">
                 <Icon as={FileText} size="md" /> Browse Content Opportunities
               </button>
             </div>
@@ -267,7 +267,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
       {/* Content subscription packages */}
       {subData && subData.plans.length > 0 && (
         <SectionCard title="Monthly Content Packages" titleIcon={<Icon as={RefreshCw} size="lg" className="text-teal-400" />}>
-          <p className="text-xs text-[var(--brand-text-muted)] mb-5">Recurring SEO-optimized content delivered every month, powered by your keyword strategy.</p>
+          <p className="t-caption text-[var(--brand-text-muted)] mb-5">Recurring SEO-optimized content delivered every month, powered by your keyword strategy.</p>
 
           {/* Active subscription banner */}
           {subData.subscription && (
@@ -276,7 +276,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                 <div>
                   <div className="flex items-center gap-2">
                     <Icon as={CheckCircle2} size="md" className="text-teal-400" />
-                    <span className="text-sm font-medium text-[var(--brand-text)]">
+                    <span className="t-body font-medium text-[var(--brand-text)]">
                       {subData.plans.find(p => p.plan === subData.subscription?.plan)?.displayName || subData.subscription.plan}
                     </span>
                     <span className={`t-caption-sm px-1.5 py-0.5 rounded font-medium ${
@@ -287,12 +287,12 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                       {subData.subscription.status === 'active' ? 'Active' : subData.subscription.status === 'past_due' ? 'Past Due' : subData.subscription.status}
                     </span>
                   </div>
-                  <p className="text-xs text-[var(--brand-text-muted)] mt-1">
+                  <p className="t-caption text-[var(--brand-text-muted)] mt-1">
                     {subData.subscription.postsDeliveredThisPeriod} of {subData.subscription.postsPerMonth} posts delivered this period
                   </p>
                 </div>
                 <div className="text-right">
-                  <div className="text-lg font-bold text-teal-300">${subData.subscription.priceUsd}<span className="text-xs text-[var(--brand-text-muted)]">/mo</span></div>
+                  <div className="text-lg font-bold text-teal-300">${subData.subscription.priceUsd}<span className="t-caption text-[var(--brand-text-muted)]">/mo</span></div>
                 </div>
               </div>
               {/* Progress */}
@@ -311,12 +311,12 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
           {!subData.subscription && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {subData.plans.map(plan => (
-                <div key={plan.plan} className="p-4 rounded-[var(--radius-xl)] bg-zinc-800/50 border border-[var(--brand-border-strong)] hover:border-zinc-600 transition-colors">
-                  <h4 className="text-sm font-semibold text-[var(--brand-text)]">{plan.displayName}</h4>
+                <div key={plan.plan} className="p-4 rounded-[var(--radius-xl)] bg-[var(--surface-3)]/50 border border-[var(--brand-border-strong)] hover:border-[var(--brand-border-hover)] transition-colors">
+                  <h4 className="t-body font-semibold text-[var(--brand-text)]">{plan.displayName}</h4>
                   <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">{plan.description}</p>
                   <div className="flex items-baseline gap-1 mt-3">
                     <span className="text-xl font-bold text-teal-300">${plan.priceUsd}</span>
-                    <span className="text-xs text-[var(--brand-text-muted)]">/mo</span>
+                    <span className="t-caption text-[var(--brand-text-muted)]">/mo</span>
                   </div>
                   <Button
                     onClick={() => handleSubscribe(plan.plan)}
@@ -342,20 +342,20 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
               <Icon as={DollarSign} size="lg" className="text-emerald-400" />
             </div>
             <div className="flex-1">
-              <h3 className="text-sm font-semibold text-[var(--brand-text)] mb-1">See the dollar value of your organic traffic</h3>
-              <p className="text-xs text-[var(--brand-text-muted)] leading-relaxed mb-3">
+              <h3 className="t-body font-semibold text-[var(--brand-text)] mb-1">See the dollar value of your organic traffic</h3>
+              <p className="t-caption text-[var(--brand-text-muted)] leading-relaxed mb-3">
                 The ROI Dashboard shows what your organic search traffic would cost if you bought it through Google Ads. Growth plan clients see their traffic value, page-by-page breakdown, and content investment returns.
               </p>
               <div className="grid grid-cols-3 gap-3 mb-3">
-                <div className="bg-zinc-900/60 rounded-lg border border-[var(--brand-border)] p-2.5 text-center">
+                <div className="bg-[var(--surface-2)]/60 rounded-[var(--radius-lg)] border border-[var(--brand-border)] p-2.5 text-center">
                   <Icon as={TrendingUp} size="md" className="text-emerald-400 mx-auto mb-1" />
                   <div className="t-caption-sm text-[var(--brand-text-muted)]">Traffic Value</div>
                 </div>
-                <div className="bg-zinc-900/60 rounded-lg border border-[var(--brand-border)] p-2.5 text-center">
+                <div className="bg-[var(--surface-2)]/60 rounded-[var(--radius-lg)] border border-[var(--brand-border)] p-2.5 text-center">
                   <Icon as={DollarSign} size="md" className="text-blue-400 mx-auto mb-1" />
                   <div className="t-caption-sm text-[var(--brand-text-muted)]">Ad Spend Saved</div>
                 </div>
-                <div className="bg-zinc-900/60 rounded-lg border border-[var(--brand-border)] p-2.5 text-center">
+                <div className="bg-[var(--surface-2)]/60 rounded-[var(--radius-lg)] border border-[var(--brand-border)] p-2.5 text-center">
                   <Icon as={Sparkles} size="md" className="text-teal-400 mx-auto mb-1" />
                   <div className="t-caption-sm text-[var(--brand-text-muted)]">Content ROI</div>
                 </div>
@@ -367,10 +367,10 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
 
       {/* Contact CTA */}
       {/* pr-check-disable-next-line -- Contact CTA strip; no section header, pure styled row */}
-      <div className="text-center py-6 bg-zinc-900/50 rounded-[var(--radius-xl)] border border-[var(--brand-border)]">
-        <p className="text-sm text-[var(--brand-text-muted)] mb-3">Have questions about which plan is right for you?</p>
+      <div className="text-center py-6 bg-[var(--surface-2)]/50 rounded-[var(--radius-xl)] border border-[var(--brand-border)]">
+        <p className="t-body text-[var(--brand-text-muted)] mb-3">Have questions about which plan is right for you?</p>
         <button onClick={onOpenChat}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[var(--surface-3)] hover:bg-zinc-700 border border-[var(--brand-border-strong)] text-sm text-[var(--brand-text)] font-medium transition-colors">
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-strong)] t-body text-[var(--brand-text)] font-medium transition-colors">
           <Icon as={MessageSquare} size="md" /> Ask Your AI Advisor
         </button>
       </div>

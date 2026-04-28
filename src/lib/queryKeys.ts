@@ -181,6 +181,7 @@ export const queryKeys = {
     copyEntriesCount: (wsId: string) => ['client-copy-entries-count', wsId] as const,
     copySections: (wsId: string, entryId: string) => ['client-copy-sections', wsId, entryId] as const,
     copySectionsAll: (wsId: string) => ['client-copy-sections', wsId] as const,
+    postPreview: (wsId: string, postId: string | undefined) => ['client', 'post-preview', wsId, postId] as const,
   },
 
   // ── Shared (used by both admin and client contexts) ────────────────

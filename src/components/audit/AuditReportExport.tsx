@@ -161,9 +161,9 @@ interface ReportModalProps {
 
 export function ReportModal({ onExportHtml, onExportCsv, onClose }: ReportModalProps) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={onClose}>
       {/* pr-check-disable-next-line -- modal dialog */}
-      <div className="relative max-w-md w-full mx-4 bg-[var(--surface-2)] rounded-xl border border-[var(--brand-border)] p-6" onClick={e => e.stopPropagation()}>
+      <div className="relative max-w-md w-full mx-4 bg-[var(--surface-2)] rounded-[var(--radius-lg)] border border-[var(--brand-border)] p-6" onClick={e => e.stopPropagation()}>
         <button onClick={onClose} className="absolute top-4 right-4 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]">
           <Icon as={X} size="md" />
         </button>
@@ -172,7 +172,7 @@ export function ReportModal({ onExportHtml, onExportCsv, onClose }: ReportModalP
         <div className="space-y-3">
           <button
             onClick={onExportHtml}
-            className="w-full flex items-center gap-3 px-4 py-3 bg-teal-600 hover:bg-teal-500 rounded-lg transition-colors text-left"
+            className="w-full flex items-center gap-3 px-4 py-3 bg-teal-600 hover:bg-teal-500 rounded-[var(--radius-lg)] transition-colors text-left"
           >
             <Icon as={FileText} size="lg" />
             <div>
@@ -182,7 +182,7 @@ export function ReportModal({ onExportHtml, onExportCsv, onClose }: ReportModalP
           </button>
           <button
             onClick={onExportCsv}
-            className="w-full flex items-center gap-3 px-4 py-3 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] rounded-lg transition-colors text-left"
+            className="w-full flex items-center gap-3 px-4 py-3 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] rounded-[var(--radius-lg)] transition-colors text-left"
           >
             <Icon as={Download} size="lg" />
             <div>
@@ -206,7 +206,7 @@ interface ReportViewerProps {
 
 export function ReportViewer({ reportView, data, onClose }: ReportViewerProps) {
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black/90 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[var(--z-modal)] flex flex-col bg-black/90 backdrop-blur-sm">
       <div className="flex items-center justify-between px-4 py-3 bg-[var(--surface-2)] border-b border-[var(--brand-border)]">
         <div className="t-body font-medium text-[var(--brand-text-bright)]">
           {reportView === 'html' ? 'SEO Audit Report' : 'CSV Export'}
@@ -215,7 +215,7 @@ export function ReportViewer({ reportView, data, onClose }: ReportViewerProps) {
           {reportView === 'csv' && (
             <button
               onClick={() => { navigator.clipboard.writeText(getCSV(data)); }}
-              className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-lg t-caption font-medium transition-colors"
+              className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
             >
               Copy to Clipboard
             </button>
@@ -226,14 +226,14 @@ export function ReportViewer({ reportView, data, onClose }: ReportViewerProps) {
                 const iframe = document.getElementById('report-iframe') as HTMLIFrameElement;
                 if (iframe?.contentWindow) iframe.contentWindow.print();
               }}
-              className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-lg t-caption font-medium transition-colors"
+              className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
             >
               Print / Save as PDF
             </button>
           )}
           <button
             onClick={onClose}
-            className="p-1.5 hover:bg-[var(--surface-3)] rounded-lg transition-colors"
+            className="p-1.5 hover:bg-[var(--surface-3)] rounded-[var(--radius-lg)] transition-colors"
           >
             <Icon as={X} size="md" className="text-[var(--brand-text)]" />
           </button>

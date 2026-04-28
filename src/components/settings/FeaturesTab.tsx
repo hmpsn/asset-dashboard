@@ -71,7 +71,7 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
                     : 'bg-[var(--surface-3)]/30 border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:border-[var(--brand-border-hover)]'
                 }`}
               >
-                {t === 'premium' && <Icon as={Sparkles} size="xs" className="inline mr-1" />}
+                {t === 'premium' && <Icon as={Sparkles} size="xs" className="mr-1" />}
                 {t.charAt(0).toUpperCase() + t.slice(1)}
               </button>
             ))}

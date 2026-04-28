@@ -11,7 +11,7 @@ export function StatusBadge({ status, size = 'sm', showLabel = true }: StatusBad
   const c = statusConfig[status];
   if (!c) return null;
 
-  const textSize = size === 'sm' ? 'text-[11px]' : 'text-xs';
+  const textSize = size === 'sm' ? 'text-[11px]' : 'text-xs'; // arbitrary-text-ok — StatusBadge owns this size scale
   const padding = size === 'sm' ? 'px-1.5 py-0.5' : 'px-2 py-1';
 
   return (

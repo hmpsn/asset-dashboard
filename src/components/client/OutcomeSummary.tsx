@@ -57,7 +57,7 @@ function TopThreeWins({ scorecard }: { scorecard: OutcomeScorecard }) {
 
   if (topCategories.length === 0) {
     return (
-      <p className="text-sm text-[var(--brand-text-muted)] italic">
+      <p className="t-body text-[var(--brand-text-muted)] italic">
         Not enough scored results yet — check back after your first recommendations are measured.
       </p>
     );
@@ -66,7 +66,7 @@ function TopThreeWins({ scorecard }: { scorecard: OutcomeScorecard }) {
   return (
     <ul className="space-y-2">
       {topCategories.map(cat => (
-        <li key={cat.actionType} className="flex items-start gap-2 text-sm text-[var(--brand-text-bright)]">
+        <li key={cat.actionType} className="flex items-start gap-2 t-body text-[var(--brand-text-bright)]">
           <Icon as={CheckCircle2} size="md" className="text-emerald-400 flex-shrink-0 mt-0.5" />
           <span>
             <span className="font-medium text-[var(--brand-text-bright)]">
@@ -113,7 +113,7 @@ function FullScorecard({ scorecard }: { scorecard: OutcomeScorecard }) {
       </div>
 
       {/* Trend indicator */}
-      <div className="flex items-center gap-2 text-sm text-[var(--brand-text)]">
+      <div className="flex items-center gap-2 t-body text-[var(--brand-text)]">
         <TrendIcon trend={scorecard.trend} />
         <span>
           {scorecard.trend === 'improving' && 'Your results are trending in the right direction.'}
@@ -135,7 +135,7 @@ function FullScorecard({ scorecard }: { scorecard: OutcomeScorecard }) {
                 return (
                   <div
                     key={cat.actionType}
-                    className={`flex items-center justify-between px-3 py-2 rounded-[var(--radius-md)] border text-sm ${winRateBg(cat.winRate)}`}
+                    className={`flex items-center justify-between px-3 py-2 rounded-[var(--radius-md)] border t-body ${winRateBg(cat.winRate)}`}
                   >
                     <span className="text-[var(--brand-text-bright)]">{ACTION_TYPE_LABELS[cat.actionType]}</span>
                     <div className="flex items-center gap-3 text-right">
@@ -202,7 +202,7 @@ export default function OutcomeSummary({ workspaceId, tier }: OutcomeSummaryProp
       <SectionCard>
         <div className="flex items-center gap-2 mb-4">
           <Icon as={Trophy} size="md" className="text-teal-400" />
-          <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Your results</h3>
+          <h3 className="t-body font-semibold text-[var(--brand-text-bright)]">Your results</h3>
           <span className="t-caption text-[var(--brand-text-muted)] ml-auto flex items-center gap-1">
             <Icon as={Clock} size="sm" /> Measured over 90 days
           </span>
@@ -229,7 +229,7 @@ export default function OutcomeSummary({ workspaceId, tier }: OutcomeSummaryProp
             {/* Free: top 3 wins text only */}
             {tier === 'free' && (
               <div className="space-y-3">
-                <p className="text-sm text-[var(--brand-text)]">
+                <p className="t-body text-[var(--brand-text)]">
                   Here's what's been working for your site so far:
                 </p>
                 <TopThreeWins scorecard={scorecard} />

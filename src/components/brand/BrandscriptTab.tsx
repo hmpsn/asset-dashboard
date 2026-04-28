@@ -7,7 +7,7 @@ import {
 import { brandscripts } from '../../api/brand-engine';
 import { ApiError } from '../../api/client';
 import type { Brandscript, BrandscriptSection, BrandscriptTemplate } from '../../../shared/types/brand-engine';
-import { SectionCard, EmptyState, Skeleton, Icon, Button, cn } from '../ui';
+import { SectionCard, EmptyState, Skeleton, Icon, Button, cn, ConfirmDialog } from '../ui';
 import { useToast } from '../Toast';
 import { queryKeys } from '../../lib/queryKeys';
 
@@ -472,10 +472,9 @@ function ListView({ workspaceId, items, templates, onSelect, onDeleted, onCreate
   const { toast } = useToast();
   const [showCreate, setShowCreate] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    if (!window.confirm('Delete this brandscript? This cannot be undone.')) return;
+  const executeDelete = async (id: string) => {
     setDeletingId(id);
     try {
       await brandscripts.remove(workspaceId, id);
@@ -516,7 +515,7 @@ function ListView({ workspaceId, items, templates, onSelect, onDeleted, onCreate
     );
   }
 
-  return (
+  return (<>
     <div className="space-y-5">
       {/* Toolbar */}
       {!showCreate && (
@@ -567,7 +566,7 @@ function ListView({ workspaceId, items, templates, onSelect, onDeleted, onCreate
 
               <button
                 type="button"
-                onClick={e => handleDelete(e, bs.id)}
+                onClick={e => { e.stopPropagation(); setConfirmDeleteId(bs.id); }}
                 disabled={deletingId === bs.id}
                 className="shrink-0 text-[var(--brand-text-muted)] hover:text-red-400 transition-colors p-1 rounded disabled:opacity-50"
                 aria-label="Delete brandscript"
@@ -583,6 +582,20 @@ function ListView({ workspaceId, items, templates, onSelect, onDeleted, onCreate
         ))}
       </div>
     </div>
+
+    <ConfirmDialog
+      open={!!confirmDeleteId}
+      title="Delete Brandscript"
+      message="Delete this brandscript? This cannot be undone."
+      variant="destructive"
+      confirmLabel="Delete"
+      onConfirm={() => {
+        if (confirmDeleteId) executeDelete(confirmDeleteId);
+        setConfirmDeleteId(null);
+      }}
+      onCancel={() => setConfirmDeleteId(null)}
+    />
+  </>
   );
 }
 

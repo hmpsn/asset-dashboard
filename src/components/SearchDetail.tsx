@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Search, ExternalLink, ArrowUpDown, Loader2 } from 'lucide-react';
 import { SectionCard, DateRangeSelector, EmptyState, MetricToggleCard, Icon } from './ui';
-import { DATE_PRESETS_SEARCH } from './ui/constants';
+import { DATE_PRESETS_SEARCH, CHART_SERIES_COLORS } from './ui/constants';
 import type { FeedInsight } from '../../shared/types/insights';
 import { useAdminSearch } from '../hooks/admin';
 import { useInsightFeed } from '../hooks/admin/useInsightFeed';
@@ -21,10 +21,10 @@ interface Props {
 type SortKey = 'clicks' | 'impressions' | 'ctr' | 'position';
 
 const SEARCH_LINES: TrendLine[] = [
-  { key: 'clicks', color: '#60a5fa', yAxisId: 'left', label: 'Clicks' },
-  { key: 'impressions', color: '#22d3ee', yAxisId: 'left', label: 'Impressions' },
-  { key: 'ctr', color: '#f59e0b', yAxisId: 'right', label: 'CTR %' },
-  { key: 'position', color: '#ef4444', yAxisId: 'right', label: 'Avg Position' },
+  { key: 'clicks', color: CHART_SERIES_COLORS.blue, yAxisId: 'left', label: 'Clicks' },
+  { key: 'impressions', color: '#22d3ee', yAxisId: 'left', label: 'Impressions' }, // chart-hex-ok — cyan-400 for impressions axis contrast
+  { key: 'ctr', color: CHART_SERIES_COLORS.amber, yAxisId: 'right', label: 'CTR %' },
+  { key: 'position', color: CHART_SERIES_COLORS.red, yAxisId: 'right', label: 'Avg Position' },
 ];
 
 // ── Insight badge types + builder ──
@@ -184,7 +184,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
               value={fmtNum(overview.totalClicks)}
               delta={hasDelta ? fmtDelta(comparison!.changePercent.clicks, '%') : '—'}
               deltaPositive={hasDelta ? isDeltaPositive(comparison!.changePercent.clicks) : true}
-              color="#60a5fa"
+              color={CHART_SERIES_COLORS.blue}
               active={activeSearchLines.has('clicks')}
               onClick={() => handleToggleLine('clicks')}
             />
@@ -193,7 +193,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
               value={fmtNum(overview.totalImpressions)}
               delta={hasDelta ? fmtDelta(comparison!.changePercent.impressions, '%') : '—'}
               deltaPositive={hasDelta ? isDeltaPositive(comparison!.changePercent.impressions) : true}
-              color="#22d3ee"
+              color="#22d3ee" // chart-hex-ok — cyan-400 for impressions axis contrast
               active={activeSearchLines.has('impressions')}
               onClick={() => handleToggleLine('impressions')}
             />
@@ -202,7 +202,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
               value={`${overview.avgCtr}%`}
               delta={hasDelta ? fmtDelta(comparison!.change.ctr, 'pt') : '—'}
               deltaPositive={hasDelta ? isDeltaPositive(comparison!.change.ctr) : true}
-              color="#f59e0b"
+              color={CHART_SERIES_COLORS.amber}
               active={activeSearchLines.has('ctr')}
               onClick={() => handleToggleLine('ctr')}
             />
@@ -211,7 +211,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
               value={overview.avgPosition.toFixed(1)}
               delta={hasDelta ? fmtDelta(comparison!.change.position) : '—'}
               deltaPositive={hasDelta ? isDeltaPositive(comparison!.change.position) : true}
-              color="#ef4444"
+              color={CHART_SERIES_COLORS.red}
               active={activeSearchLines.has('position')}
               onClick={() => handleToggleLine('position')}
               invertDelta
@@ -268,7 +268,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
 
               <div className="overflow-y-auto flex-1 min-h-0">
               <table className="w-full text-xs">
-                <thead className="sticky top-0 bg-[var(--surface-2)] z-10">
+                <thead className="sticky top-0 bg-[var(--surface-2)] z-[var(--z-sticky)]">
                   <tr className="border-b border-[var(--brand-border)]">
                     <th className="text-left py-3 px-4 text-[var(--brand-text-muted)] font-medium">
                       {tableView === 'queries' ? 'Query' : 'Page'}

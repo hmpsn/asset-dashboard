@@ -75,4 +75,31 @@ export const addTrackedKeywordSchema = z.object({
 // DELETE /api/public/tracked-keywords/:workspaceId
 export const removeTrackedKeywordSchema = z.object({
   keyword: z.string().min(1, 'Keyword required'),
-});
+}).strict();
+
+// POST /api/public/content-request/:workspaceId/:id/approve-post
+export const approvePostSchema = z.object({}).strict();
+
+// POST /api/public/content-request/:workspaceId/:id/request-post-changes
+export const requestPostChangesSchema = z.object({
+  feedback: z.string().min(1).max(2000),
+}).strict();
+
+// PATCH /api/public/content-posts/:workspaceId/:postId/client-edit
+// IMPORTANT: only include client-editable fields. Do NOT include targetWordCount,
+// keywords, or status — those are admin/AI fields. The route merges these client
+// updates with the existing section data (preserving required DB fields) so that
+// parseJsonSafeArray(postSectionSchema) does not silently drop sections on read-back.
+export const clientPostEditSchema = z.object({
+  title: z.string().max(500).optional(),
+  metaDescription: z.string().max(500).optional(),
+  introduction: z.string().max(20000).optional(),
+  sections: z.array(z.object({
+    index: z.number(),
+    heading: z.string().max(500),
+    content: z.string().max(100000),
+    wordCount: z.number(),
+    // targetWordCount, keywords, status intentionally omitted — merged from DB by route
+  })).optional(),
+  conclusion: z.string().max(20000).optional(),
+}).strict();

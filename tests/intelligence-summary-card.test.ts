@@ -2,17 +2,17 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 
 describe('IntelligenceSummaryCard component contract', () => {
-  const src = readFileSync('src/components/client/IntelligenceSummaryCard.tsx', 'utf-8'); // readFile-ok — UI contract guard: asserts IntelligenceSummaryCard follows Three Laws of Color (blue data, no purple), uses useClientIntelligence, and gates Growth+ content in TierGate.
+  const src = readFileSync('src/components/client/IntelligenceSummaryCard.tsx', 'utf-8'); // readFile-ok — UI contract guard: asserts IntelligenceSummaryCard follows Four Laws of Color (blue data, no purple), uses useClientIntelligence, and gates Growth+ content in TierGate.
 
   it('uses useClientIntelligence hook', () => {
     expect(src).toMatch(/useClientIntelligence/);
   });
 
-  it('uses blue for data metrics (Three Laws of Color)', () => {
+  it('uses blue for data metrics (Four Laws of Color)', () => {
     expect(src).toMatch(/text-blue-|bg-blue-/);
   });
 
-  it('does NOT use purple (Three Laws of Color — purple is admin-only)', () => {
+  it('does NOT use purple (Four Laws of Color — purple is admin-only)', () => {
     expect(src).not.toMatch(/purple-/);
   });
 

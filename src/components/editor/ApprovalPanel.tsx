@@ -19,7 +19,7 @@ export function ApprovalPanel({
     <button
       onClick={onSendApproval}
       disabled={sendingApproval || approvalSelected.size === 0}
-      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium transition-colors ${
         approvalSent ? 'bg-emerald-600 text-white' : 'bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white'
       }`}
     >

@@ -1,5 +1,6 @@
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp } from 'lucide-react'; // trend-icon-ok — decorative section icon, not a trend indicator
 import { SectionCard, Icon } from '../ui';
+import { CHART_SERIES_ORDER } from '../ui/constants';
 
 // ── Shared position color helper ──
 export function positionColor(pos: number): string {
@@ -16,7 +17,7 @@ interface RankHistoryChartProps {
   height?: string;
 }
 
-const CHART_COLORS = ['#2dd4bf', '#60a5fa', '#f472b6', '#fbbf24', '#a78bfa'];
+const CHART_COLORS = [...CHART_SERIES_ORDER];
 
 export function RankHistoryChart({ rankHistory, maxKeywords = 5, height = 'h-28' }: RankHistoryChartProps) {
   if (rankHistory.length < 2) return null;
@@ -80,7 +81,7 @@ export function RankTable({ ranks, limit = 10, showClicks = true, showImpression
 
   return (
     <div className="overflow-hidden rounded-[var(--radius-sm)] border border-[var(--brand-border)]">
-      <table className="w-full text-xs">
+      <table className="w-full t-caption">
         <thead>
           <tr className="bg-[var(--surface-1)]/50">
             <th className="text-left py-2 px-3 text-[var(--brand-text-muted)] font-medium">Keyword</th>

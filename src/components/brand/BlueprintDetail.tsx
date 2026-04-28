@@ -25,7 +25,7 @@ import { useToast } from '../Toast';
 import { useBlueprint } from '../../hooks/admin/useBlueprints';
 import { queryKeys } from '../../lib/queryKeys';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
-import { TabBar, Icon, Button, cn } from '../ui/index';
+import { TabBar, Icon, Button, cn, ConfirmDialog } from '../ui/index';
 import { useCopyStatus, useGenerateCopy } from '../../hooks/admin/useCopyPipeline';
 import { CopyReviewPanel } from './CopyReviewPanel';
 import { BatchGenerationPanel } from './BatchGenerationPanel';
@@ -133,7 +133,7 @@ function EntryCard({
 
         <Icon as={Layout} size="md" className="text-[var(--brand-text)] shrink-0" />
 
-        <span className="flex-1 min-w-0 text-sm font-medium text-[var(--brand-text-bright)] truncate">
+        <span className="flex-1 min-w-0 t-body font-medium text-[var(--brand-text-bright)] truncate">
           {entry.name}
         </span>
 
@@ -212,7 +212,7 @@ function EntryCard({
               </span>
               <div className="flex-1 min-w-0 space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-medium text-[var(--brand-text-bright)] capitalize">
+                  <span className="t-body font-medium text-[var(--brand-text-bright)] capitalize">
                     {section.sectionType.replace(/-/g, ' ')}
                   </span>
                   {/* narrative role — purple (admin-only) */}
@@ -359,6 +359,7 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
   // Ids currently being mutated (to show per-entry loading states)
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [confirmRemoveEntry, setConfirmRemoveEntry] = useState<BlueprintEntry | null>(null);
 
   // ── Copy Pipeline state ──────────────────────────────────────────────────
   const copyEnabled = useFeatureFlag('copy-engine-pipeline');
@@ -462,7 +463,10 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
   }
 
   function handleRemove(entry: BlueprintEntry) {
-    if (!window.confirm(`Remove "${entry.name}" from this blueprint? This cannot be undone.`)) return;
+    setConfirmRemoveEntry(entry);
+  }
+
+  function executeRemove(entry: BlueprintEntry) {
     setRemovingId(entry.id);
     removeEntryMutation.mutate(entry.id);
   }
@@ -476,7 +480,7 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 text-[var(--brand-text)] text-sm py-8">
+      <div className="flex items-center gap-2 text-[var(--brand-text)] t-body py-8">
         <Icon as={Loader2} size="md" className="animate-spin" />
         Loading blueprint...
       </div>
@@ -486,10 +490,10 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
   if (isError || !blueprint) {
     return (
       <div className="space-y-3 py-8">
-        <p className="text-sm text-[var(--brand-text)]">Blueprint not found or failed to load.</p>
+        <p className="t-body text-[var(--brand-text)]">Blueprint not found or failed to load.</p>
         <button
           onClick={onBack}
-          className="text-sm text-teal-400 hover:text-teal-300 transition-colors"
+          className="t-body text-teal-400 hover:text-teal-300 transition-colors"
         >
           &larr; Back to blueprints
         </button>
@@ -497,7 +501,7 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
     );
   }
 
-  return (
+  return (<>
     <div className="space-y-6">
       {/* Top bar */}
       <div className="flex items-start justify-between gap-4">
@@ -544,7 +548,7 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
           {/* In Scope section */}
           <section className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-[var(--brand-text)]">
+              <h3 className="t-body font-semibold text-[var(--brand-text)]">
                 In Scope ({inScope.length})
               </h3>
               {!showAddForm && (
@@ -572,7 +576,7 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
                       value={newEntryName}
                       onChange={e => setNewEntryName(e.target.value)}
                       placeholder="e.g. Home, Services, About Us"
-                      className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
+                      className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
                       disabled={addEntryMutation.isPending}
                       onKeyDown={e => e.key === 'Enter' && handleAddEntry()}
                     />
@@ -585,7 +589,7 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
                       id="new-entry-type"
                       value={newEntryType}
                       onChange={e => setNewEntryType(e.target.value as BlueprintPageType)}
-                      className="bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
+                      className="bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-md)] px-3 py-2 t-body text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500"
                       disabled={addEntryMutation.isPending}
                     >
                       {Object.entries(PAGE_TYPE_LABELS).map(([value, label]) => (
@@ -614,7 +618,7 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
                       setNewEntryType('service');
                     }}
                     disabled={addEntryMutation.isPending}
-                    className="px-3 py-1.5 text-[var(--brand-text-muted)] text-sm hover:text-[var(--brand-text)] transition-colors disabled:opacity-40"
+                    className="px-3 py-1.5 text-[var(--brand-text-muted)] t-body hover:text-[var(--brand-text)] transition-colors disabled:opacity-40"
                   >
                     Cancel
                   </button>
@@ -623,7 +627,7 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
             )}
 
             {inScope.length === 0 && !showAddForm && (
-              <p className="text-sm text-[var(--brand-text-muted)] italic">No pages in scope yet. Add one above.</p>
+              <p className="t-body text-[var(--brand-text-muted)] italic">No pages in scope yet. Add one above.</p>
             )}
 
             {inScope.map(entry => (
@@ -654,7 +658,7 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
           {/* Recommended — Upsell Opportunities */}
           {recommended.length > 0 && (
             <section className="space-y-3">
-              <h3 className="text-sm font-semibold text-[var(--brand-text)]">
+              <h3 className="t-body font-semibold text-[var(--brand-text)]">
                 Recommended — Upsell Opportunities ({recommended.length})
               </h3>
 
@@ -705,5 +709,19 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
         </div>
       )}
     </div>
+
+    <ConfirmDialog
+      open={!!confirmRemoveEntry}
+      title="Remove Page"
+      message={confirmRemoveEntry ? `Remove "${confirmRemoveEntry.name}" from this blueprint? This cannot be undone.` : ''}
+      variant="destructive"
+      confirmLabel="Remove"
+      onConfirm={() => {
+        if (confirmRemoveEntry) executeRemove(confirmRemoveEntry);
+        setConfirmRemoveEntry(null);
+      }}
+      onCancel={() => setConfirmRemoveEntry(null)}
+    />
+  </>
   );
 }

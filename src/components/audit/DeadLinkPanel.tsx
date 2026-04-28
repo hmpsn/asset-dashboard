@@ -80,7 +80,7 @@ export function DeadLinkPanel({ deadLinkDetails, siteId, workspaceId }: DeadLink
           const isFormOpen = redirectFormUrl === link.url;
           const hasRedirect = pendingRedirects.has(link.url);
           return (
-            <div key={idx} className="rounded-lg border border-[var(--brand-border)] bg-zinc-950/40 overflow-hidden">
+            <div key={idx} className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)]/40 overflow-hidden">
               <div className="flex items-start gap-2 px-3 py-2">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
@@ -97,7 +97,7 @@ export function DeadLinkPanel({ deadLinkDetails, siteId, workspaceId }: DeadLink
                     <span className="t-caption-sm text-[var(--brand-text)] truncate">{link.foundOn || link.foundOnSlug}</span>
                     {link.anchorText && (
                       <>
-                        <span className="t-caption-sm text-zinc-600">·</span>
+                        <span className="t-caption-sm text-[var(--brand-text-dim)]">·</span>
                         <span className="t-caption-sm text-[var(--brand-text-muted)] italic truncate">"{link.anchorText}"</span>
                       </>
                     )}

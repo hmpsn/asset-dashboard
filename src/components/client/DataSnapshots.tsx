@@ -3,6 +3,7 @@ import {
   Globe, Users, ArrowRight,
 } from 'lucide-react';
 import { Icon } from '../ui/Icon';
+import { CHART_SERIES_COLORS } from '../ui/constants';
 import type {
   SearchOverview, PerformanceTrend, SearchComparison,
   GA4Overview, GA4DailyTrend, GA4TopPage, GA4Comparison, GA4NewVsReturning,
@@ -96,7 +97,7 @@ export function SearchSnapshot({ overview, trend, comparison, devices, onViewMor
       {trend.length > 3 && (
         <div>
           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1">Click trend</div>
-          <MiniSparkline data={trend.map(t => t.clicks)} color="#60a5fa" />
+          <MiniSparkline data={trend.map(t => t.clicks)} color={CHART_SERIES_COLORS.blue} />
         </div>
       )}
 
@@ -210,7 +211,7 @@ export function AnalyticsSnapshot({ overview, trend, topPages, comparison, newVs
       {trend.length > 3 && (
         <div>
           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1">Visitor trend</div>
-          <MiniSparkline data={trend.map(t => t.users)} color="#2dd4bf" />
+          <MiniSparkline data={trend.map(t => t.users)} color={CHART_SERIES_COLORS.teal} />
         </div>
       )}
 
@@ -329,11 +330,11 @@ export function OrganicInsight({ organic, landingPages, newVsReturning }: Organi
             <div className="grid grid-cols-2 gap-3 mt-4">
               <div className="bg-[var(--surface-3)]/30 rounded-[var(--radius-md)] px-3 py-2">
                 <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">New bounce rate</div>
-                <div className={`text-sm font-bold ${newSeg.bounceRate > 60 ? 'text-red-400' : 'text-emerald-400'}`}>{newSeg.bounceRate}%</div>
+                <div className={`t-body font-bold ${newSeg.bounceRate > 60 ? 'text-red-400' : 'text-emerald-400'}`}>{newSeg.bounceRate}%</div>
               </div>
               <div className="bg-[var(--surface-3)]/30 rounded-[var(--radius-md)] px-3 py-2">
                 <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Returning bounce rate</div>
-                <div className={`text-sm font-bold ${retSeg.bounceRate > 60 ? 'text-red-400' : 'text-emerald-400'}`}>{retSeg.bounceRate}%</div>
+                <div className={`t-body font-bold ${retSeg.bounceRate > 60 ? 'text-red-400' : 'text-emerald-400'}`}>{retSeg.bounceRate}%</div>
               </div>
             </div>
           </SectionCard>

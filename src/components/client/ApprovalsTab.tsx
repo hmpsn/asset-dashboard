@@ -170,7 +170,7 @@ export function ApprovalsTab({
         <Icon as={ClipboardCheck} size="lg" className="text-teal-400" />
         <div>
           <h2 className="text-xl font-semibold text-[var(--brand-text)]">SEO Change Approvals</h2>
-          <p className="text-sm text-[var(--brand-text-muted)] mt-1 leading-relaxed">Review proposed SEO changes, make edits if needed, then approve to push live.</p>
+          <p className="t-body text-[var(--brand-text-muted)] mt-1 leading-relaxed">Review proposed SEO changes, make edits if needed, then approve to push live.</p>
         </div>
         {pendingApprovals > 0 && (
           <span className="ml-auto px-2 py-0.5 t-caption-sm font-medium rounded-full bg-teal-500/20 border border-teal-500/30 text-teal-300">
@@ -201,16 +201,16 @@ export function ApprovalsTab({
             <button
               key={tab.id}
               onClick={() => setBatchFilter(tab.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption font-medium transition-colors ${
                 batchFilter === tab.id
                   ? 'text-teal-400 bg-teal-500/10 border border-teal-500/20'
-                  : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-zinc-800/50 border border-transparent'
+                  : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]/50 border border-transparent'
               }`}
             >
               {tab.label}
               {tab.count > 0 && (
                 <span className={`px-1.5 py-0.5 rounded t-caption-sm font-semibold ${
-                  batchFilter === tab.id ? 'bg-teal-500/20 text-teal-300' : 'bg-zinc-700 text-[var(--brand-text-muted)]'
+                  batchFilter === tab.id ? 'bg-teal-500/20 text-teal-300' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)]'
                 }`}>
                   {tab.count}
                 </span>
@@ -227,12 +227,12 @@ export function ApprovalsTab({
         const batchRejected = batch.items.filter(i => i.status === 'rejected').length;
         const isApplying = applyingBatch === batch.id;
 
-        return (
-          <div key={batch.id} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
+        return ( // pr-check-disable-next-line -- Brand signature radius intentional
+          <div key={batch.id} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
             {/* Batch header */}
             <div className="px-5 py-4 border-b border-[var(--brand-border)] flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-medium text-[var(--brand-text)]">{batch.name}</h3>
+                <h3 className="t-body font-medium text-[var(--brand-text)]">{batch.name}</h3>
                 <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
                   {new Date(batch.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   {' · '}{batch.items.length} change{batch.items.length !== 1 ? 's' : ''}
@@ -247,7 +247,7 @@ export function ApprovalsTab({
             </div>
 
             {/* Items grouped by page */}
-            <div className="divide-y divide-zinc-800/50">
+            <div className="divide-y divide-[var(--brand-border)]/50">
               {(() => {
                 // Group items by pageId
                 const grouped = new Map<string, ApprovalItem[]>();
@@ -265,14 +265,14 @@ export function ApprovalsTab({
                   const pageState = getState(pageId);
 
                   return (
-                    <div key={pageKey} className="border-b border-zinc-800/50 last:border-b-0">
+                    <div key={pageKey} className="border-b border-[var(--brand-border)]/50 last:border-b-0">
                       {/* Page header */}
                       <button
                         onClick={() => togglePage(pageKey)}
-                        className="w-full px-5 py-3 flex items-center gap-2 hover:bg-zinc-800/30 transition-colors text-left"
+                        className="w-full px-5 py-3 flex items-center gap-2 hover:bg-[var(--surface-3)]/30 transition-colors text-left"
                       >
                         {isCollapsed ? <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)] shrink-0" /> : <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] shrink-0" />}
-                        <span className="text-xs font-medium text-[var(--brand-text)] truncate">{first.pageTitle}</span>
+                        <span className="t-caption font-medium text-[var(--brand-text)] truncate">{first.pageTitle}</span>
                         <span className="t-caption-sm text-[var(--brand-text-muted)]">/{first.pageSlug}</span>
                         <StatusBadge status={pageState?.status} />
                         <span className="ml-auto t-caption-sm text-[var(--brand-text-muted)]">{pageItems.length} change{pageItems.length !== 1 ? 's' : ''}</span>
@@ -340,7 +340,7 @@ export function ApprovalsTab({
                                           {kw.primaryKeyword}
                                         </span>
                                         {kw.secondaryKeywords?.slice(0, 2).map(kw2 => (
-                                          <span key={kw2} className="t-caption-sm px-1.5 py-0.5 rounded bg-zinc-700/60 border border-zinc-600 text-[var(--brand-text-muted)]">
+                                          <span key={kw2} className="t-caption-sm px-1.5 py-0.5 rounded bg-[var(--surface-3)]/60 border border-[var(--brand-border-strong)] text-[var(--brand-text-muted)]">
                                             {kw2}
                                           </span>
                                         ))}
@@ -351,7 +351,7 @@ export function ApprovalsTab({
 
                                 {/* Reason / context from audit */}
                                 {item.reason && (
-                                  <div className="mt-2 px-3 py-2 rounded-lg bg-blue-500/5 border border-blue-500/10 t-caption-sm text-blue-300/80">
+                                  <div className="mt-2 px-3 py-2 rounded-[var(--radius-lg)] bg-blue-500/5 border border-blue-500/10 t-caption-sm text-blue-300/80">
                                     <span className="font-medium text-blue-400">Why: </span>{item.reason}
                                   </div>
                                 )}
@@ -360,7 +360,7 @@ export function ApprovalsTab({
                                 {isSchema ? (
                                   <div className="mt-2">
                                     <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1">Proposed Schema</div>
-                                    <pre className="t-caption-sm text-[var(--brand-text)] bg-zinc-800/50 rounded-lg px-3 py-2 overflow-x-auto max-h-[200px] overflow-y-auto border border-[var(--brand-border)] font-mono leading-relaxed">
+                                    <pre className="t-caption-sm text-[var(--brand-text)] bg-[var(--surface-3)]/50 rounded-[var(--radius-lg)] px-3 py-2 overflow-x-auto max-h-[200px] overflow-y-auto border border-[var(--brand-border)] font-mono leading-relaxed">
                                       {displayValue}
                                     </pre>
                                     {item.currentValue && (
@@ -373,7 +373,7 @@ export function ApprovalsTab({
                                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
                                     <div>
                                       <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1">Current</div>
-                                      <div className="t-caption-sm text-[var(--brand-text-muted)] bg-zinc-800/30 rounded-lg px-3 py-2 min-h-[2rem]">
+                                      <div className="t-caption-sm text-[var(--brand-text-muted)] bg-[var(--surface-3)]/30 rounded-[var(--radius-lg)] px-3 py-2 min-h-[2rem]">
                                         {item.currentValue || <span className="italic text-[var(--brand-text-muted)]">Empty</span>}
                                       </div>
                                     </div>
@@ -389,14 +389,14 @@ export function ApprovalsTab({
                                               type="text"
                                               value={editDraft}
                                               onChange={e => setEditDraft(e.target.value)}
-                                              className="w-full px-3 py-1.5 bg-[var(--surface-3)] border border-teal-500/50 rounded-lg text-xs text-[var(--brand-text)] focus:outline-none focus:border-teal-400"
+                                              className="w-full px-3 py-1.5 bg-[var(--surface-3)] border border-teal-500/50 rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:outline-none focus:border-teal-400"
                                             />
                                           ) : (
                                             <textarea
                                               value={editDraft}
                                               onChange={e => setEditDraft(e.target.value)}
                                               rows={2}
-                                              className="w-full px-3 py-1.5 bg-[var(--surface-3)] border border-teal-500/50 rounded-lg text-xs text-[var(--brand-text)] focus:outline-none focus:border-teal-400 resize-none"
+                                              className="w-full px-3 py-1.5 bg-[var(--surface-3)] border border-teal-500/50 rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:outline-none focus:border-teal-400 resize-none"
                                             />
                                           )}
                                           <div className="flex gap-1.5">
@@ -406,12 +406,12 @@ export function ApprovalsTab({
                                             >Save Edit</button>
                                             <button
                                               onClick={() => { setEditingApproval(null); setEditDraft(''); }}
-                                              className="px-2.5 py-1 bg-[var(--surface-3)] hover:bg-zinc-700 rounded t-caption-sm text-[var(--brand-text-muted)] transition-colors"
+                                              className="px-2.5 py-1 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] rounded t-caption-sm text-[var(--brand-text-muted)] transition-colors"
                                             >Cancel</button>
                                           </div>
                                         </div>
                                       ) : (
-                                        <div className="t-caption-sm text-[var(--brand-text)] bg-zinc-800/30 rounded-lg px-3 py-2 min-h-[2rem]">
+                                        <div className="t-caption-sm text-[var(--brand-text)] bg-[var(--surface-3)]/30 rounded-[var(--radius-lg)] px-3 py-2 min-h-[2rem]">
                                           {displayValue}
                                         </div>
                                       )}
@@ -432,21 +432,21 @@ export function ApprovalsTab({
                                   <div className="flex items-center gap-2 mt-3">
                                     <button
                                       onClick={() => updateApprovalItem(batch.id, item.id, { status: 'approved' })}
-                                      className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600/80 hover:bg-emerald-500 rounded-lg t-caption-sm font-medium transition-colors"
+                                      className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600/80 hover:bg-emerald-500 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors"
                                     >
                                       <Icon as={Check} size="sm" /> Approve
                                     </button>
                                     {!isSchema && (
                                       <button
                                         onClick={() => { setEditingApproval(item.id); setEditDraft(displayValue); }}
-                                        className="flex items-center gap-1 px-3 py-1.5 bg-[var(--surface-3)] hover:bg-zinc-700 border border-[var(--brand-border-strong)] rounded-lg t-caption-sm font-medium text-[var(--brand-text)] transition-colors"
+                                        className="flex items-center gap-1 px-3 py-1.5 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text)] transition-colors"
                                       >
                                         <Icon as={Edit3} size="sm" /> Edit
                                       </button>
                                     )}
                                     <button
                                       onClick={() => { setRejectingItem(item.id); setRejectDraft(''); }}
-                                      className="flex items-center gap-1 px-3 py-1.5 bg-[var(--surface-3)] hover:bg-zinc-700 border border-[var(--brand-border-strong)] rounded-lg t-caption-sm font-medium text-red-400 transition-colors"
+                                      className="flex items-center gap-1 px-3 py-1.5 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption-sm font-medium text-red-400 transition-colors"
                                     >
                                       <Icon as={X} size="sm" /> Reject
                                     </button>
@@ -462,7 +462,7 @@ export function ApprovalsTab({
                                       onChange={e => setRejectDraft(e.target.value)}
                                       rows={2}
                                       placeholder="Reason for rejection (optional)"
-                                      className="w-full px-3 py-1.5 bg-[var(--surface-3)] border border-red-500/30 rounded-lg text-xs text-[var(--brand-text)] focus:outline-none focus:border-red-400 resize-none placeholder:text-[var(--brand-text-faint)]"
+                                      className="w-full px-3 py-1.5 bg-[var(--surface-3)] border border-red-500/30 rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:outline-none focus:border-red-400 resize-none placeholder:text-[var(--brand-text-faint)]"
                                     />
                                     <div className="flex gap-1.5">
                                       <button
@@ -471,13 +471,13 @@ export function ApprovalsTab({
                                           setRejectingItem(null);
                                           setRejectDraft('');
                                         }}
-                                        className="flex items-center gap-1 px-3 py-1.5 bg-red-600/80 hover:bg-red-500 rounded-lg t-caption-sm font-medium transition-colors"
+                                        className="flex items-center gap-1 px-3 py-1.5 bg-red-600/80 hover:bg-red-500 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors"
                                       >
                                         <Icon as={X} size="sm" /> Confirm Reject
                                       </button>
                                       <button
                                         onClick={() => { setRejectingItem(null); setRejectDraft(''); }}
-                                        className="px-2.5 py-1 bg-[var(--surface-3)] hover:bg-zinc-700 rounded t-caption-sm text-[var(--brand-text-muted)] transition-colors"
+                                        className="px-2.5 py-1 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] rounded t-caption-sm text-[var(--brand-text-muted)] transition-colors"
                                       >Cancel</button>
                                     </div>
                                   </div>
@@ -487,7 +487,7 @@ export function ApprovalsTab({
                                     <Icon as={Check} size="sm" /> Approved — will be applied when you push changes live
                                     <button
                                       onClick={() => updateApprovalItem(batch.id, item.id, { status: 'pending' })}
-                                      className="ml-2 px-2 py-0.5 bg-[var(--surface-3)] hover:bg-zinc-700 border border-[var(--brand-border-strong)] rounded t-caption-sm text-[var(--brand-text-muted)] transition-colors"
+                                      className="ml-2 px-2 py-0.5 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-strong)] rounded t-caption-sm text-[var(--brand-text-muted)] transition-colors"
                                     >Undo</button>
                                   </div>
                                 )}
@@ -497,7 +497,7 @@ export function ApprovalsTab({
                                       <Icon as={X} size="sm" /> Rejected
                                       <button
                                         onClick={() => updateApprovalItem(batch.id, item.id, { status: 'pending', clientNote: '' })}
-                                        className="ml-2 px-2 py-0.5 bg-[var(--surface-3)] hover:bg-zinc-700 border border-[var(--brand-border-strong)] rounded t-caption-sm text-[var(--brand-text-muted)] transition-colors"
+                                        className="ml-2 px-2 py-0.5 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-strong)] rounded t-caption-sm text-[var(--brand-text-muted)] transition-colors"
                                       >Undo</button>
                                     </div>
                                     {item.clientNote && (
@@ -523,7 +523,7 @@ export function ApprovalsTab({
 
             {/* Batch actions */}
             {/* Batch footer actions */}
-            <div className="px-5 py-4 border-t border-[var(--brand-border)] bg-zinc-900/50 flex items-center justify-between gap-3">
+            <div className="px-5 py-4 border-t border-[var(--brand-border)] bg-[var(--surface-2)]/50 flex items-center justify-between gap-3">
               <span className="t-caption-sm text-[var(--brand-text-muted)]">
                 {batchApplied > 0 && <>{batchApplied} applied · </>}
                 {batchApproved > 0 && <>{batchApproved} approved · </>}
@@ -536,7 +536,7 @@ export function ApprovalsTab({
                 {batchPending > 0 && effectiveTier !== 'free' && (
                   <button
                     onClick={() => approveAllInBatch(batch)}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 rounded-lg t-caption-sm font-medium text-emerald-400 transition-colors"
+                    className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 rounded-[var(--radius-lg)] t-caption-sm font-medium text-emerald-400 transition-colors"
                   >
                     <Icon as={Check} size="sm" /> Approve All ({batchPending})
                   </button>
@@ -545,7 +545,7 @@ export function ApprovalsTab({
                   <button
                     onClick={() => applyApprovedBatch(batch.id)}
                     disabled={isApplying}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 rounded-lg text-xs font-medium transition-colors"
+                    className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
                   >
                     {isApplying ? <Icon as={Loader2} size="md" className="animate-spin" /> : <Icon as={Check} size="md" />}
                     {isApplying ? 'Applying...' : 'Apply to Website'}

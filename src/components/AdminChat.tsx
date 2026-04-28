@@ -133,10 +133,10 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
 
   // ── Container classes ──
   const containerCls = cn(
-    'shadow-2xl shadow-black/40 z-50 flex flex-col',
+    'shadow-2xl shadow-black/40 z-[var(--z-modal)] flex flex-col',
     docked
       ? 'fixed top-0 right-0 h-screen border-l border-[var(--brand-border)] bg-[var(--surface-2)]'
-      : 'fixed bottom-6 right-6 bg-[var(--surface-2)] rounded-2xl border border-[var(--brand-border)] overflow-hidden'
+      : 'fixed bottom-6 right-6 bg-[var(--surface-2)] rounded-[var(--radius-xl)] border border-[var(--brand-border)] overflow-hidden'
   );
 
   return (
@@ -144,7 +144,7 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
       {/* ── Floating trigger button ── */}
       {!open && (
         <button onClick={() => setOpen(true)}
-          className="fixed bottom-6 right-6 flex items-center gap-2 px-4 py-3 rounded-full bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white text-sm font-medium shadow-lg shadow-purple-900/30 transition-all z-50">
+          className="fixed bottom-6 right-6 flex items-center gap-2 px-4 py-3 rounded-full bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white t-body font-medium shadow-lg shadow-purple-900/30 transition-all z-[var(--z-modal)]">
           <Icon as={Bot} size="md" /> Admin Insights
         </button>
       )}
@@ -159,7 +159,7 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
           {/* ── Resize handles ── */}
           {/* Left edge */}
           <div
-            className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-purple-500/20 transition-colors z-10"
+            className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-purple-500/20 transition-colors z-[var(--z-sticky)]"
             onPointerDown={onPointerDown('left')}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
@@ -167,7 +167,7 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
           {/* Top edge (floating only) */}
           {!docked && (
             <div
-              className="absolute top-0 left-0 right-0 h-1.5 cursor-row-resize hover:bg-purple-500/20 transition-colors z-10"
+              className="absolute top-0 left-0 right-0 h-1.5 cursor-row-resize hover:bg-purple-500/20 transition-colors z-[var(--z-sticky)]"
               onPointerDown={onPointerDown('top')}
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}
@@ -176,7 +176,7 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
           {/* Top-left corner (floating only) */}
           {!docked && (
             <div
-              className="absolute top-0 left-0 w-3 h-3 cursor-nwse-resize hover:bg-purple-500/30 rounded-tl-2xl transition-colors z-20"
+              className="absolute top-0 left-0 w-3 h-3 cursor-nwse-resize hover:bg-purple-500/30 rounded-tl-2xl transition-colors z-[var(--z-dropdown)]"
               onPointerDown={onPointerDown('corner')}
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}
@@ -187,7 +187,7 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
           <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--brand-border)] flex-shrink-0 bg-gradient-to-r from-purple-500/5 to-purple-400/5">
             <div className="flex items-center gap-2 min-w-0">
               <Icon as={Bot} size="md" className="text-purple-400 flex-shrink-0" />
-              <span className="text-sm font-medium text-[var(--brand-text-bright)] truncate">Admin Insights</span>
+              <span className="t-body font-medium text-[var(--brand-text-bright)] truncate">Admin Insights</span>
               <span className="t-caption text-[var(--brand-text-muted)] bg-[var(--surface-3)] px-1.5 py-0.5 rounded truncate max-w-[120px]">{workspaceName}</span>
             </div>
             <div className="flex items-center gap-0.5 flex-shrink-0">
@@ -218,7 +218,7 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
               {sessions.map(s => (
                 <button key={s.id} onClick={() => loadSession(s.id)}
                   className={cn(
-                    'w-full text-left px-3 py-2 rounded-lg border transition-colors',
+                    'w-full text-left px-3 py-2 rounded-[var(--radius-lg)] border transition-colors',
                     s.id === sessionId
                       ? 'bg-purple-500/10 border-purple-500/30 text-purple-300'
                       : 'bg-[var(--surface-3)]/50 border-[var(--brand-border)] text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)]'

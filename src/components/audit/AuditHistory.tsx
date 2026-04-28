@@ -38,7 +38,7 @@ export function AuditHistory({ siteId, history, onRefresh }: { siteId: string; h
     <div className="space-y-8">
       {/* Summary */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg p-4">
+        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] p-4">
           <div className="t-caption text-[var(--brand-text-muted)] mb-1">Latest Score</div>
           <div className="flex items-end gap-2">
             <span className={cn('text-3xl font-bold', scoreColorClass(latest.siteScore))}>{latest.siteScore}</span>
@@ -52,11 +52,11 @@ export function AuditHistory({ siteId, history, onRefresh }: { siteId: string; h
             )}
           </div>
         </div>
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg p-4">
+        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] p-4">
           <div className="t-caption text-[var(--brand-text-muted)] mb-1">Total Audits</div>
           <div className="text-3xl font-bold text-[var(--brand-text-bright)]">{history.length}</div>
         </div>
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-lg p-4">
+        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] p-4">
           <div className="t-caption text-[var(--brand-text-muted)] mb-1">Error Trend</div>
           <div className="flex items-end gap-2">
             <span className="text-3xl font-bold text-red-400">{latest.errors}</span>
@@ -90,11 +90,11 @@ export function AuditHistory({ siteId, history, onRefresh }: { siteId: string; h
             onClick={() => {
               navigator.clipboard.writeText(`${window.location.origin}/report/audit/${siteId}`);
             }}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-md t-caption font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] transition-colors"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] transition-colors"
           >
             <Icon as={Copy} size="sm" /> Copy
           </button>
-          <a href={`/report/audit/${siteId}`} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md hover:bg-[var(--surface-3)] text-teal-400">
+          <a href={`/report/audit/${siteId}`} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-[var(--radius-md)] hover:bg-[var(--surface-3)] text-teal-400">
             <Icon as={ExternalLink} size="md" />
           </a>
         </div>
@@ -114,7 +114,7 @@ export function AuditHistory({ siteId, history, onRefresh }: { siteId: string; h
             const prev = history[i + 1];
             const delta = prev ? snap.siteScore - prev.siteScore : 0;
             return (
-              <div key={snap.id} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-[var(--surface-2)]/50 transition-colors group">
+              <div key={snap.id} className="flex items-center gap-3 px-4 py-3 rounded-[var(--radius-lg)] hover:bg-[var(--surface-2)]/50 transition-colors group">
                 <div className={cn('text-lg font-bold tabular-nums w-10', scoreColorClass(snap.siteScore))}>{snap.siteScore}</div>
                 <div className="flex-1 min-w-0">
                   <div className="t-body text-[var(--brand-text-bright)]">
@@ -131,7 +131,7 @@ export function AuditHistory({ siteId, history, onRefresh }: { siteId: string; h
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={() => copyLink(snap.id)}
-                    className="p-1.5 rounded-md hover:bg-[var(--surface-2)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
+                    className="p-1.5 rounded-[var(--radius-md)] hover:bg-[var(--surface-2)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
                     title="Copy share link"
                   >
                     {loadingId === snap.id
@@ -140,7 +140,7 @@ export function AuditHistory({ siteId, history, onRefresh }: { siteId: string; h
                   </button>
                   <button
                     onClick={() => openReport(snap.id)}
-                    className="p-1.5 rounded-md hover:bg-[var(--surface-2)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
+                    className="p-1.5 rounded-[var(--radius-md)] hover:bg-[var(--surface-2)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]"
                     title="View report"
                   >
                     <Icon as={ExternalLink} size="md" />

@@ -207,7 +207,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
       // pr-check-disable-next-line -- InsightsEngine empty state is a top-level client container intentionally using brand signature shape
       <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-8 text-center" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
         <Icon as={Shield} size="2xl" className="text-teal-400 mx-auto mb-3" />
-        <p className="text-sm font-medium text-[var(--brand-text-bright)]">No recommendations yet</p>
+        <p className="t-body font-medium text-[var(--brand-text-bright)]">No recommendations yet</p>
         <p className="t-caption text-[var(--brand-text-muted)] mt-1">Run a site audit to generate prioritized recommendations.</p>
       </div>
     );
@@ -225,7 +225,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
         <div className="px-5 py-4 border-b border-[var(--brand-border)]">
           <div className="flex items-center gap-2">
             <Icon as={Lightbulb} size="md" className="text-amber-400" />
-            <span className="text-sm font-semibold text-[var(--brand-text-bright)]">Action Plan</span>
+            <span className="t-body font-semibold text-[var(--brand-text-bright)]">Action Plan</span>
             <span className="t-caption text-[var(--brand-text-muted)] ml-auto">{activeCount} active · {completedCount} completed</span>
           </div>
           {data.summary.trafficAtRisk > 0 && (
@@ -319,7 +319,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
       <div className="px-5 py-4 border-b border-[var(--brand-border)]">
         <div className="flex items-center gap-2">
           <Icon as={Lightbulb} size="md" className="text-amber-400" />
-          <span className="text-sm font-semibold text-[var(--brand-text-bright)]">Prioritized Action Plan</span>
+          <span className="t-body font-semibold text-[var(--brand-text-bright)]">Prioritized Action Plan</span>
           <div className="ml-auto flex items-center gap-2">
             <span className="t-caption text-[var(--brand-text-muted)]">{activeCount} active · {completedCount} done</span>
             <button
@@ -334,7 +334,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
         </div>
         {isPremium ? (
           <p className="t-caption text-[var(--brand-text)] mt-1.5 leading-relaxed">
-            <Icon as={Crown} size="sm" className="text-amber-400 inline mr-1" />
+            <Icon as={Crown} size="sm" className="text-amber-400 mr-1" />
             {STUDIO_NAME} is actively working through these recommendations. Items are prioritized by traffic impact.
           </p>
         ) : (
@@ -372,7 +372,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className={`text-sm font-semibold ${config.color}`}>{config.label}</span>
+                    <span className={`t-body font-semibold ${config.color}`}>{config.label}</span>
                     <span className="t-caption text-[var(--brand-text-muted)]">
                       {pendingCount > 0 && `${pendingCount} pending`}
                       {inProgressCount > 0 && `${pendingCount > 0 ? ' · ' : ''}${inProgressCount} in progress`}

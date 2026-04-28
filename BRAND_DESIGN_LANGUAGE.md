@@ -38,11 +38,12 @@
 
 ## 2. Color System — Master Rules
 
-### The Three Laws of Color
+### The Four Laws of Color
 
 1. **Teal for actions.** Every CTA, active state, toggle, accent highlight, tier badge, and interactive element uses teal. Never violet, blue, or indigo for buttons or interactive highlights.
 2. **Blue for data.** Clicks, sessions, impressions, links, info badges, "Needs Review" status, "unsaved" state, progress bars for data metrics — all blue. Blue is read-only, never actionable.
-3. **Purple for admin AI only.** The admin chatbot (`AdminChat.tsx`) and admin-only AI features (`SeoAudit.tsx` "Flag for Client") use purple to visually distinguish admin intelligence from client-facing teal UI. Purple never appears in any client-facing view.
+3. **Emerald for success.** `scoreColorClass()` returns `text-emerald-400` for score ≥80; `scoreColor()` hex is `#34d399` (emerald-400). Never `text-green-400` for success/score indicators — green and emerald are distinct hues, emerald is canonical.
+4. **Purple for admin AI only.** The admin chatbot (`AdminChat.tsx`) and admin-only AI features (`SeoAudit.tsx` "Flag for Client") use purple to visually distinguish admin intelligence from client-facing teal UI. Purple never appears in any client-facing view.
 
 ### Primary Palette
 
@@ -123,7 +124,7 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **ChartCard** | `ChartCard.tsx` | Same as SectionCard (`bg-[var(--surface-2)] border-zinc-800`) | Thin SectionCard wrapper for chart-friendly defaults: tighter padding (`px-4 py-3`), inline title + optional `<TrendBadge>` row, no `border-b` separator. Preserves signature `10px 24px` radius. |
 | **TrendBadge** | `TrendBadge.tsx` | Positive: `text-emerald-400` + `TrendingUp`; Negative: `text-red-400` + `TrendingDown`; Zero (when `hideOnZero={false}`): `text-zinc-400` + `Minus` | Canonical directional delta indicator. Props: `value`, `suffix='%'`, `invert`, `showSign`, `label`, `size='sm'\|'md'`, `hideOnZero=true`. Replaces all hand-rolled `TrendingUp/Down + emerald/red` ternaries. Use `invert` when lower=better (positions, error counts). |
 | **PageHeader** | `PageHeader.tsx` | `text-lg font-semibold text-zinc-100` | Title + optional subtitle + action slot |
-| **Badge** | `Badge.tsx` | 9 colors: `teal`, `blue`, `emerald`, `green`, `amber`, `red`, `orange`, `purple`, `zinc` | Pattern: `bg-{color}-500/10 text-{color}-400` |
+| **Badge** | `Badge.tsx` | 7 colors: `teal`, `blue`, `emerald`, `amber`, `red`, `orange`, `zinc` | Pattern: `bg-{color}-500/10 text-{color}-400` |
 | **TabBar** | `TabBar.tsx` | Active: `border-teal-500 text-teal-200` | Underline style, `border-b-2` |
 | **DateRangeSelector** | `DateRangeSelector.tsx` | Active: `bg-zinc-700 text-zinc-200` | Segmented control style |
 | **EmptyState** | `EmptyState.tsx` | Icon: `text-zinc-400` in `bg-zinc-800` container | Centered layout with optional CTA |
@@ -136,7 +137,7 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **ActionQueue** | `admin/ActionQueue.tsx` | Blue=impact scores (data), teal=resolve CTA (action) | Admin-only. No purple. |
 | **DataList** | `DataList.tsx` | Rank: `text-zinc-500`, label: `text-zinc-300`, value: `text-zinc-400` | Optional ranking numbers |
 | **OnboardingChecklist** | `ui/OnboardingChecklist.tsx` | Progress bar: `bg-blue-500` (data); checkmarks: `text-teal-400` (action); celebration: `text-teal-400` | Modal overlay. Blue = read-only progress metric. Teal = completion/action state. |
-| **WorkflowStepper** | `ui/WorkflowStepper.tsx` | Current: `bg-teal-500/10 border-teal-500 text-teal-400`; Completed: `bg-green-500/10 border-green-500/40 text-green-400`; Future: `bg-zinc-800/50 border-zinc-700 text-zinc-500` | Horizontal step indicator. Green = success/done state. Teal = active step. |
+| **WorkflowStepper** | `ui/WorkflowStepper.tsx` | Current: `bg-teal-500/10 border-teal-500 text-teal-400`; Completed: `bg-emerald-500/10 border-emerald-500/40 text-emerald-400`; Future: `bg-zinc-800/50 border-zinc-700 text-zinc-500` | Horizontal step indicator. Emerald = success/done state. Teal = active step. |
 | **WorkspaceHealthBar** | `ui/WorkspaceHealthBar.tsx` | Progress bars: `bg-blue-500` (data/read-only); recommendation arrows: `text-teal-500` hover `text-teal-400` (action) | Wraps SectionCard. Blue = data metrics. Teal = actionable next steps. |
 | **Heading** | `ui/typography/Heading.tsx` | Inherits `var(--brand-text-bright)`; `level={1\|2\|3}` → `.t-h1` / `.t-h2` / `.t-page` | Phase 5. `as` prop overrides HTML tag. forwardRef. |
 | **Stat** | `ui/typography/Stat.tsx` | Inherits text color (caller controls via parent `text-*`); `size="hero"\|"default"\|"sm"` → `.t-stat-lg` / `.t-stat` / `.t-stat-sm` | Phase 5. DIN Pro numerals. forwardRef. |
@@ -167,9 +168,9 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | Function | Returns | Usage |
 |----------|---------|-------|
 | `scoreColor(score)` | Hex string (`#34d399`, `#fbbf24`, `#f87171`) | MetricRing, any health score |
-| `scoreColorClass(score)` | Tailwind class (`text-green-400`, etc.) | Text coloring for scores |
-| `scoreBgClass(score)` | Background class (`bg-green-500/10`, etc.) | Score badges, backgrounds |
-| `scoreBgBarClass(score)` | Solid bg class (`bg-green-500`, etc.) | Progress bar fills (4-tier: green/amber/orange/red) |
+| `scoreColorClass(score)` | Tailwind class (`text-emerald-400`, etc.) | Text coloring for scores |
+| `scoreBgClass(score)` | Background class (`bg-emerald-500/10`, etc.) | Score badges, backgrounds |
+| `scoreBgBarClass(score)` | Solid bg class (`bg-emerald-500`, etc.) | Progress bar fills (4-tier: emerald/amber/orange/red) |
 | `DATE_PRESETS_SHORT` | `[7d, 28d, 90d]` | Compact date selectors |
 | `DATE_PRESETS_FULL` | `[7d, 14d, 28d, 90d, 6mo, 1y]` | Full date selectors |
 | `DATE_PRESETS_SEARCH` | `[7d, 28d, 90d, 6mo, 16mo]` | Search Console selectors |
@@ -225,7 +226,7 @@ For inline styles and Recharts props that can't be overridden by CSS class rules
 | **OnboardingChecklist** | Completed step checkmark | `text-teal-400` | Action/completion state |
 | **OnboardingChecklist** | Celebration icon | `bg-teal-500/10 text-teal-400` | Completion success |
 | **WorkflowStepper** | Current step circle | `bg-teal-500/10 border-teal-500 text-teal-400` | Active = teal |
-| **WorkflowStepper** | Completed step circle | `bg-green-500/10 border-green-500/40 text-green-400` | Success = green |
+| **WorkflowStepper** | Completed step circle | `bg-emerald-500/10 border-emerald-500/40 text-emerald-400` | Success = emerald |
 | **WorkflowStepper** | Future step circle | `bg-zinc-800/50 border-zinc-700 text-zinc-500` | Inactive = zinc |
 | **WorkspaceHealthBar** | Progress bars | `bg-blue-500` | Data metric — read-only |
 | **WorkspaceHealthBar** | Recommendation arrows | `text-teal-500 hover:text-teal-400` | Action CTAs |
@@ -239,7 +240,7 @@ For inline styles and Recharts props that can't be overridden by CSS class rules
 | **OnboardingChecklist.tsx** | Progress bar | `bg-blue-500` | Data metric — tracks setup completion |
 | **OnboardingChecklist.tsx** | Completed step checkmarks | `text-teal-400` | Teal = action accomplished |
 | **OnboardingChecklist.tsx** | Dismiss button | `text-zinc-400 hover:text-zinc-200` | Neutral close action |
-| **WorkflowStepper.tsx** | Completed step circle | `bg-emerald-500 text-white` | Green = done |
+| **WorkflowStepper.tsx** | Completed step circle | `bg-emerald-500/10 border-emerald-500/40 text-emerald-400` | Emerald = done |
 | **WorkflowStepper.tsx** | Current step circle | `bg-teal-500 text-white` | Teal = active |
 | **WorkflowStepper.tsx** | Future step circle | `bg-zinc-700 text-zinc-400` | Zinc = inactive |
 | **WorkspaceHealthBar.tsx** | Metric progress bars | `bg-blue-500` | Blue = data metric (read-only) |
@@ -399,7 +400,7 @@ The platform's signature shape is an asymmetric diagonal radius — tight top-le
 | `FEATURE_AUDIT.md` | Feature inventory, shipped/planned items, cascade update prompt |
 | `src/components/ui/index.ts` | Barrel export of all primitives |
 | `src/components/ui/constants.ts` | `scoreColor()`, `scoreColorClass()`, date presets |
-| `src/components/ui/Badge.tsx` | 9-color badge primitive |
+| `src/components/ui/Badge.tsx` | 7-color badge primitive |
 | `src/components/ui/StatCard.tsx` | Default + CompactStatBar |
 | `src/components/ui/MetricRing.tsx` | MetricRing + MetricRingSvg |
 | `src/components/ui/SectionCard.tsx` | Standard card container |
@@ -415,7 +416,7 @@ The platform's signature shape is an asymmetric diagonal radius — tight top-le
 | `src/components/ui/DataList.tsx` | Ranked data list |
 | `src/components/ui/ConfirmDialog.tsx` | Confirmation modal (teal CTA, destructive variant = red CTA, Escape/Enter keyboard, backdrop dismiss) |
 | `src/components/ui/OnboardingChecklist.tsx` | First-visit workspace setup modal (blue progress, teal checkmarks, localStorage) |
-| `src/components/ui/WorkflowStepper.tsx` | Horizontal numbered stepper (green=done, teal=current, zinc=future) |
+| `src/components/ui/WorkflowStepper.tsx` | Horizontal numbered stepper (emerald=done, teal=current, zinc=future) |
 | `src/components/ui/WorkspaceHealthBar.tsx` | Multi-metric health bars + recommended next action (blue fills, teal CTA) |
 | `src/components/ClientDashboard.tsx` | Client-facing dashboard (largest component) |
 | `src/components/AdminChat.tsx` | Admin AI chat (purple accent) |
@@ -511,10 +512,18 @@ When shipping UI changes that affect color or design patterns:
 | 2026-03-29 | **Outcome Intelligence Engine**: Added Outcome Tracking color map — win rate rings use `scoreColor()`, score badges (strong_win/win=green, neutral=amber, loss=red, insufficient_data/inconclusive=zinc), action type badges (blue), delta indicators (green/red/zinc), confidence badges (green/amber/red). Client "We Called It" uses soft teal. All outcome CTAs use standard teal gradient. |
 | 2026-03-30 | **Light Mode Audit + Visual Polish**: Fixed 148 dark-color instances across 42 files. Added 7 chart theme helpers to `constants.ts` (`themeColor`, `chartGridColor`, `chartAxisColor`, `chartDotStroke`, `chartDotFill`, `chartTooltipStyle`, `chartTooltipLabelStyle`). Fixed MetricRing glow to match score color (not always teal). Fixed ScannerReveal overlay, MetricRing track, Skeleton shimmer, Stripe Elements theming, all Recharts chart axes/grids/dots/tooltips. Added 17 missing `.dashboard-light` CSS overrides. Added 2 pr-check rules for dark hex enforcement. Standardized `space-y-8` on 10 page wrappers, asymmetric border radius on 11 cards. |
 | 2026-04-09 | **Page Rewriter UI** (Feature #138): Apply interaction uses teal highlight — `background-color: rgba(13,148,136,0.2)` + `border-left: 2px solid #0d9488` — fades over 2s via CSS transition (all three properties cleared). Floating formatting toolbar uses `bg-zinc-700 border-zinc-600` (no teal — it's a utility tool, not an action). Issue chips: `red-*` for errors, `amber-*` for warnings, `blue-*` for info — follows existing status color convention. Focus mode toggle: teal active state (`text-teal-400 bg-teal-500/10`) per Law 1 (toggle = action). **Integration note for Copy & Brand Engine:** `data-section` attribute on all document headings and `applyToSection()` in `PageRewriteChat.tsx` are the designated extension points for inline text-selection targeting. |
-| 2026-04-13 | **Admin UX PR4 — Onboarding & Guided Flows**: Added 3 new shared UI primitives. `OnboardingChecklist`: modal overlay with blue progress bar (data), teal checkmarks (action accomplished), focus trap, Escape-key dismiss, localStorage persistence per workspace. `WorkflowStepper`: horizontal numbered stepper — green=completed, teal=current, zinc=future; compact variant. `WorkspaceHealthBar`: blue progress fills (data metric law) + teal Recommended Next CTA (action law). Added per-component color map rows for all three. Also fixed purple violations in `PageIntelligence` (admin-only component with no client-facing exposure — purple removed per Three Laws). |
+| 2026-04-13 | **Admin UX PR4 — Onboarding & Guided Flows**: Added 3 new shared UI primitives. `OnboardingChecklist`: modal overlay with blue progress bar (data), teal checkmarks (action accomplished), focus trap, Escape-key dismiss, localStorage persistence per workspace. `WorkflowStepper`: horizontal numbered stepper — green=completed, teal=current, zinc=future; compact variant. `WorkspaceHealthBar`: blue progress fills (data metric law) + teal Recommended Next CTA (action law). Added per-component color map rows for all three. Also fixed purple violations in `PageIntelligence` (admin-only component with no client-facing exposure — purple removed per Four Laws). |
 | 2026-04-20 | **Light Mode Overhaul (client portal)**: `.dashboard-light` token set expanded from 10 → 25 variables (WCAG AA verified). New tokens: `--brand-bg-hover`, `--brand-bg-active`, `--brand-text-disabled`, `--brand-border-strong`, `--brand-shadow-sm/md`, `--scrollbar-thumb/hover`, `--chart-grid`, `--chart-tooltip-bg/text`, `--brand-overlay`, `--brand-mint/hover/dim`, `--metric-ring-track`. `--brand-text-muted` adjusted `#64748b`→`#475569` (slate-600, 6.5:1 contrast). Four-step text hierarchy restored. `chartGridColor()` and `chartTooltipStyle()` now read from CSS variables via `getCssVar()`. New UI primitive: `ConfirmDialog` (centered modal, teal CTA, Escape/Enter keyboard support, destructive variant). ApprovalsTab: 3 `window.confirm()` calls replaced with `ConfirmDialog`; filter bar added (All / Needs Action / Ready to Apply / Applied with live batch counts). |
-| 2026-04-25 | **Phase 5 Phase 3 — Design system enforcement hardening**: Added 8 new pr-check rules (3 error, 5 warn) to lock in Phase 2's codemod gains. **Error severity** (zero-hit verified): `Forbidden hues (rose/pink) in components`, `text-green-{N} for success/score`, plus warn→error promotions for `Hand-rolled trend badge` and `Non-standard transition duration`. **Warn severity** (long-tail backlog): `Hand-rolled gradient CTA button` (~10 sites), `Arbitrary pixel text-size` (use .t-* utility, ~318 sites), `Raw text-zinc-N` / `bg-zinc-N` / `border-zinc-N` (use --brand-*/--surface-* tokens, ~514 sites combined), `Inline asymmetric border-radius` (use --radius-signature, ~114 sites). Migrations in same PR: 5 hand-rolled gradient CTAs (TemplateEditor×2, ClientDashboardTab×2, AiSuggested, BlueprintDetail) → `<Button variant="primary">`; 1 green button (RequestList Deliver Brief) → emerald; 1 preview-disabled gradient button hatched. Total pr-check rule count: 83 → 91 (49 error, 42 warn). 28 fixture tests added. CLAUDE.md "Forbidden" list and Three Laws Law #3 now mechanized rather than prose-only. |
+| 2026-04-25 | **Phase 5 Phase 3 — Design system enforcement hardening**: Added 8 new pr-check rules (3 error, 5 warn) to lock in Phase 2's codemod gains. **Error severity** (zero-hit verified): `Forbidden hues (rose/pink) in components`, `text-green-{N} for success/score`, plus warn→error promotions for `Hand-rolled trend badge` and `Non-standard transition duration`. **Warn severity** (long-tail backlog): `Hand-rolled gradient CTA button` (~10 sites), `Arbitrary pixel text-size` (use .t-* utility, ~318 sites), `Raw text-zinc-N` / `bg-zinc-N` / `border-zinc-N` (use --brand-*/--surface-* tokens, ~514 sites combined), `Inline asymmetric border-radius` (use --radius-signature, ~114 sites). Migrations in same PR: 5 hand-rolled gradient CTAs (TemplateEditor×2, ClientDashboardTab×2, AiSuggested, BlueprintDetail) → `<Button variant="primary">`; 1 green button (RequestList Deliver Brief) → emerald; 1 preview-disabled gradient button hatched. Total pr-check rule count: 83 → 91 (49 error, 42 warn). 28 fixture tests added. CLAUDE.md "Forbidden" list and Four Laws Law #3 now mechanized rather than prose-only. |
 
 ---
 
-> **Golden rule**: Teal for actions, blue for data, purple for admin AI, zinc for structure. When in doubt, check the decision tree above.
+| 2026-04-27 | **Design System Phase A — Tokenize UI primitives** (PR #329): Migrated 10 core UI primitives (SectionCard, Modal, ConfirmDialog, StatCard, TrendBadge, Badge, StatusBadge, DataList, TierGate, AIContextIndicator) from raw Tailwind classes to CSS custom property tokens (`--surface-*`, `--brand-text-*`, `--brand-border`, `--radius-*`). `.t-*` typography sizes boosted to match existing `!important` overrides (`.t-caption-sm` 13.5px, `.t-caption` 13.5px, `.t-body` 15.5px). `@layer components` cascade fix ensures Tailwind utilities override `.t-*` font properties. Migration lookup table: `docs/rules/phase-b-migration-map.md`. |
+| 2026-04-27 | **Design System Phase B — Domain sweeps** (PRs #332–#336): 5 parallel domain sweeps migrating ~115 consumer files from raw Tailwind to `.t-*` typography classes and `--surface-*`/`--brand-*` tokens. B.1 Admin analytics (5 files), B.2 Admin content (31 files), B.3 Admin operations (21 files, added `iconOnly` prop to TrendBadge, WorkspaceSelector delete → ConfirmDialog), B.4 Client domain (43 files, 4 hand-rolled modals → `<Modal>`), B.5 Brand/schema/revenue (15 files, 8 `window.confirm()` → `<ConfirmDialog>`). |
+| 2026-04-27 | **Design System Phase C — New pr-check rules** (PR #337): 5 new rules (`Raw rounded-* literal` warn, `No purple/violet in client domain` error, `Trend icon import outside TrendBadge` warn, `Hand-rolled fixed inset-0 outside overlay` warn, `score-color-law-parity` error) + promoted `styleguide-token-parity` warn→error. Rule count: 91→96 (52 error, 44 warn). |
+| 2026-04-27 | **Design System Phase D — Doc drift fixes**: Renamed "Three Laws" → "Four Laws" across all docs and pr-check rule messages. Added emerald Law 3 (success). Updated `DESIGN_SYSTEM.md` typography scale to match `.t-*` class definitions. Synced `automated-rules.md`. |
+| 2026-04-28 | **Design System Phase 6D — Blue-on-Button Law 02 Audit**: Audited blue usage on interactive elements per Law 02 ("Blue is read-only, never actionable"). Changed 4 actionable buttons from blue to teal: RequestList "View Brief" toggle, BriefDetail "Generate Full Post", SettingsPanel + ConnectionsTab "Connect Google". SettingsPanel Trash2 prune icon changed blue→red (destructive action). SeoAudit Info StatCard blue retained as severity-category color (consistent with Errors=red, Warnings=amber). |
+
+---
+
+> **Golden rule**: Teal for actions, blue for data, emerald for success, purple for admin AI, zinc for structure. When in doubt, check the decision tree above.

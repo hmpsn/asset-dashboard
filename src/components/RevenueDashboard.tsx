@@ -28,7 +28,7 @@ function RevenueChart({ months }: { months: RevenueSummary['months'] }) {
     <div className="flex items-end gap-1.5 h-32">
       {months.map((m, i) => (
         <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative">
-          <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded px-2 py-1 t-caption-sm whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+          <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded px-2 py-1 t-caption-sm whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-[var(--z-sticky)]">
             {m.month}: {fmtCents(m.revenue)} ({m.count})
           </div>
           <div

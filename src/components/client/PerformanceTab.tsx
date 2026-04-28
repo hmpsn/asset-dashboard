@@ -58,7 +58,7 @@ export function PerformanceTab(props: PerformanceTabProps) {
     <>
       {/* Sub-tab selector — only show when both data sources exist */}
       {(hasSearch || hasAnalytics) && (
-        <TabBar
+        <TabBar /* tab-deeplink-ok — sub-tab within client dashboard; parent manages ?tab= */
           tabs={[
             { id: 'search', label: 'Search', icon: Search },
             { id: 'analytics', label: 'Analytics', icon: LineChart },

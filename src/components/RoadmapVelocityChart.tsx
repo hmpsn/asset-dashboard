@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { RoadmapItem } from '../../shared/types/roadmap';
-import { chartGridColor, chartDotFill } from './ui/constants';
+import { chartGridColor, chartDotFill, CHART_SERIES_COLORS } from './ui/constants';
 import { SectionCard } from './ui/index';
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -46,7 +46,7 @@ export function ShippingVelocityChart({ items }: { items: RoadmapItem[] }) {
   return (
     <SectionCard
       title="Shipping Velocity"
-      action={<span className="text-[11px] text-zinc-500">{data[data.length - 1].cumulative} features shipped</span>}
+      action={<span className="t-caption-sm text-[var(--brand-text-muted)]">{data[data.length - 1].cumulative} features shipped</span>}
     >
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 200 }}>
         <defs>
@@ -67,10 +67,10 @@ export function ShippingVelocityChart({ items }: { items: RoadmapItem[] }) {
           );
         })}
         <path d={areaPath} fill="url(#vel-grad)" />
-        <path d={linePath} fill="none" stroke="#2dd4bf" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d={linePath} fill="none" stroke={CHART_SERIES_COLORS.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         {points.map((p, i) => (
           <g key={i}>
-            <circle cx={p.x} cy={p.y} r="3.5" fill={chartDotFill()} stroke="#2dd4bf" strokeWidth="2" />
+            <circle cx={p.x} cy={p.y} r="3.5" fill={chartDotFill()} stroke={CHART_SERIES_COLORS.teal} strokeWidth="2" />
             <text x={p.x} y={p.y - 8} textAnchor="middle" className="fill-teal-400" fontSize="10" fontWeight="600">
               +{p.count}
             </text>

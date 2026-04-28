@@ -110,7 +110,10 @@ input::placeholder, textarea::placeholder {
 .hover\:text-zinc-300:hover { color: #f4f4f5 !important; }
 .hover\:text-zinc-200:hover { color: #ffffff !important; }
 
-/* ─── Type scale: bump small sizes for readability ─── */
+/* ─── Type scale: bump small sizes for readability ───
+   TEMPORARY: these !important overrides keep ~195 unconverted files at their
+   boosted sizes while Phase B domain sweeps migrate them to .t-* classes.
+   Remove this block once all Phase B PRs have merged. */
 .text-\[11px\] { font-size: 13.5px !important; line-height: 1.5 !important; }
 .text-xs { font-size: 13.5px !important; line-height: 1.5 !important; }
 .text-sm { font-size: 15.5px !important; line-height: 1.5 !important; }
@@ -259,7 +262,12 @@ body::after {
 
    Law: Phase 2 codemods replace arbitrary text sizes → .t-* classes.
          Phase 3 pr-check blocks new text-[Npx] usages.
+
+   Wrapped in @layer components so Tailwind utilities (font-semibold,
+   leading-none, etc.) can override font-weight / line-height when needed.
    ─────────────────────────────────────────────────────────────────────────── */
+
+@layer components {
 
 /* Display / Hero */
 .t-hero {
@@ -325,7 +333,7 @@ body::after {
 
 .t-body {
   font-family: 'Inter', sans-serif;
-  font-size: 14.5px;
+  font-size: 15.5px;
   font-weight: 400;
   line-height: 1.5;
 }
@@ -349,14 +357,14 @@ body::after {
 
 .t-caption {
   font-family: 'Inter', sans-serif;
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 400;
   line-height: 1.4;
 }
 
 .t-caption-sm {
   font-family: 'Inter', sans-serif;
-  font-size: 11px;
+  font-size: 13.5px;
   font-weight: 400;
   line-height: 1.4;
 }
@@ -380,6 +388,8 @@ body::after {
   text-transform: uppercase;
   font-variant-numeric: tabular-nums;
 }
+
+} /* end @layer components — .t-* typography utilities */
 
 /* ─── Client Dashboard Light Theme ─── */
 

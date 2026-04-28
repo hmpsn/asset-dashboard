@@ -119,7 +119,10 @@ export function SchemaPageCard({
   const isStale = staleDays !== null && staleDays > 90;
 
   return (
-    <div className={cn('bg-[var(--surface-2)] border overflow-hidden', statusBorderClass(editState?.status) || (hasErrors ? 'border-amber-500/30' : 'border-[var(--brand-border)]'))} style={{ borderRadius: '10px 24px 10px 24px' }}>
+    <div
+      className={cn('bg-[var(--surface-2)] border overflow-hidden', statusBorderClass(editState?.status) || (hasErrors ? 'border-amber-500/30' : 'border-[var(--brand-border)]'))}
+      style={{ borderRadius: '10px 24px 10px 24px' }} // asymmetric-radius-ok
+    >
       <div className="flex items-center gap-3 px-4 py-3">
         <button
           onClick={() => onToggleExpand(page.pageId)}
@@ -127,7 +130,7 @@ export function SchemaPageCard({
         >
           {isOpen ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" /> : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />}
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium text-[var(--brand-text-bright)] truncate">{page.pageTitle}</div>
+            <div className="t-body font-medium text-[var(--brand-text-bright)] truncate">{page.pageTitle}</div>
             <div className="t-caption text-[var(--brand-text-muted)] truncate">/{page.slug}</div>
           </div>
         </button>
@@ -420,6 +423,7 @@ export function SchemaPageCard({
                   </div>
                 ) : (
                   <button
+                    // pr-check-disable-next-line -- publish action with loading state
                     onClick={() => onConfirmPublish(page.pageId)}
                     disabled={publishing}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors disabled:opacity-50 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white"

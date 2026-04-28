@@ -324,7 +324,7 @@ Every completed task — no matter how small — must include these steps:
 ### UI / frontend work
 | Priority | Doc | What it tells you |
 |----------|-----|-------------------|
-| 1 | `BRAND_DESIGN_LANGUAGE.md` | **Color rules** (Three Laws), per-component color map, admin vs client, AI prompting guidelines, primitive inventory |
+| 1 | `BRAND_DESIGN_LANGUAGE.md` | **Color rules** (Four Laws), per-component color map, admin vs client, AI prompting guidelines, primitive inventory |
 | 2 | `DESIGN_SYSTEM.md` | Component specs, typography, spacing, Tailwind classes, migration checklist |
 | 3 | `.windsurf/workflows/use-primitives.md` | When and how to use `src/components/ui/` primitives |
 | 4 | `.windsurf/workflows/ui-vocabulary.md` | Canonical labels for buttons, badges, status text, toasts |
@@ -358,10 +358,11 @@ Every completed task — no matter how small — must include these steps:
 
 **Before writing or modifying ANY UI code**, you MUST follow these rules:
 
-### The Three Laws of Color
+### The Four Laws of Color
 1. **Teal for actions** — every CTA, toggle, active state, tier badge, interactive highlight
 2. **Blue for data** — clicks, sessions, impressions, info badges, progress bars (read-only, never actionable)
-3. **Purple for admin AI only** — `AdminChat.tsx` and `SeoAudit.tsx` "Flag for Client". **Never in client-facing views.**
+3. **Emerald for success** — `scoreColorClass()` returns `text-emerald-400` for score ≥80. Never `text-green-400` for success/score indicators.
+4. **Purple for admin AI only** — `AdminChat.tsx` and `SeoAudit.tsx` "Flag for Client". **Never in client-facing views.**
 
 ### Color Decision Quick Reference
 ```
@@ -388,7 +389,7 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
 | `StatCard` / `CompactStatBar` | `./ui` | Metric displays |
 | `PageHeader` | `./ui` | Page/tab header with title + actions |
 | `MetricRing` / `MetricRingSvg` | `./ui` | Score rings |
-| `Badge` | `./ui` | Status/category pills (9 colors) |
+| `Badge` | `./ui` | Status/category pills (7 colors) |
 | `TabBar` | `./ui` | Sub-navigation tabs |
 | `DateRangeSelector` | `./ui` | Segmented date pickers |
 | `DataList` | `./ui` | Ranked list displays |
@@ -525,7 +526,7 @@ These will be addressed in a dedicated cleanup pass. **Do not attempt to fix the
 
 - Update Per-Component Color Map (§ 4) with new/changed elements
 - If new primitives created, add to UI Primitive Inventory (§ 3)
-- Verify Three Laws compliance
+- Verify Four Laws compliance
 
 ### ACTION_PLAN.md — the decision log
 

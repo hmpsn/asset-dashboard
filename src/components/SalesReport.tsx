@@ -140,7 +140,7 @@ export function SalesReport() {
         {/* URL Input */}
         <div className="max-w-2xl mx-auto">
           <div className="text-center mb-8">
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: 'linear-gradient(135deg, #2dd4bf, #14b8a6)' }}>
+            <div className="w-14 h-14 rounded-[var(--radius-xl)] flex items-center justify-center mx-auto mb-4" style={{ background: 'linear-gradient(135deg, #2dd4bf, #14b8a6)' }}>
               <Globe className="w-7 h-7 text-black" />
             </div>
             <h2 className="text-xl font-bold text-[var(--brand-text-bright)]">Sales SEO Report</h2>
@@ -158,14 +158,14 @@ export function SalesReport() {
                 onChange={(e) => setUrl(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && !loading && runReport()}
                 placeholder="Enter website URL (e.g. swishsmiles.com)"
-                className="w-full pl-10 pr-4 py-3 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 bg-[var(--surface-2)] border border-[var(--brand-border)] text-[var(--brand-text-bright)]"
+                className="w-full pl-10 pr-4 py-3 rounded-[var(--radius-lg)] text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 bg-[var(--surface-2)] border border-[var(--brand-border)] text-[var(--brand-text-bright)]"
                 disabled={loading}
               />
             </div>
             <button
               onClick={runReport}
               disabled={loading || !url.trim()}
-              className="px-6 py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 bg-teal-400 text-[#0f1219]"
+              className="px-6 py-3 rounded-[var(--radius-lg)] text-sm font-semibold transition-all disabled:opacity-50 bg-teal-400 text-[var(--surface-1)]"
             >
               {loading ? (
                 <div className="flex items-center gap-2">
@@ -184,7 +184,7 @@ export function SalesReport() {
           )}
 
           {error && (
-            <div className="mt-4 rounded-lg px-4 py-3 bg-red-500/10 border border-red-500/30">
+            <div className="mt-4 rounded-[var(--radius-lg)] px-4 py-3 bg-red-500/10 border border-red-500/30">
               <p className="text-red-400 text-sm">{error}</p>
             </div>
           )}
@@ -198,7 +198,7 @@ export function SalesReport() {
               {history.map((h) => (
                 <div
                   key={h.id}
-                  className="flex items-center justify-between px-4 py-3 rounded-xl cursor-pointer transition-colors hover:bg-[var(--surface-3)] bg-[var(--surface-2)] border border-[var(--brand-border)]"
+                  className="flex items-center justify-between px-4 py-3 rounded-[var(--radius-lg)] cursor-pointer transition-colors hover:bg-[var(--surface-3)] bg-[var(--surface-2)] border border-[var(--brand-border)]"
                   onClick={() => loadReport(h.id)}
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -214,7 +214,7 @@ export function SalesReport() {
                     </div>
                     <button
                       onClick={(e) => { e.stopPropagation(); openHtmlReport(h.id); }}
-                      className="p-1.5 rounded-lg hover:bg-[var(--surface-3)] transition-colors"
+                      className="p-1.5 rounded-[var(--radius-lg)] hover:bg-[var(--surface-3)] transition-colors"
                       title="View printable report"
                     >
                       <FileText className="w-4 h-4 text-[var(--brand-text-muted)]" />
@@ -238,7 +238,7 @@ export function SalesReport() {
       <div className="flex items-center justify-between">
         <button
           onClick={() => { setView('input'); setReport(null); }}
-          className="text-sm px-3 py-1.5 rounded-lg hover:bg-[var(--surface-3)] transition-colors text-[var(--brand-text-muted)]"
+          className="text-sm px-3 py-1.5 rounded-[var(--radius-lg)] hover:bg-[var(--surface-3)] transition-colors text-[var(--brand-text-muted)]"
         >
           ← Back
         </button>
@@ -246,7 +246,7 @@ export function SalesReport() {
           {r.id && (
             <button
               onClick={() => openHtmlReport(r.id!)}
-              className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors bg-teal-400 text-[#0f1219]"
+              className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-[var(--radius-lg)] transition-colors bg-teal-400 text-[var(--surface-1)]"
             >
               <ExternalLink className="w-3.5 h-3.5" />
               Client Report
@@ -257,7 +257,7 @@ export function SalesReport() {
               const domain = r.url.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
               window.location.hash = `#new-workspace?url=${encodeURIComponent(r.url)}&name=${encodeURIComponent(domain)}`;
             }}
-            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)] border border-[var(--brand-border-hover)]"
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-[var(--radius-lg)] transition-colors bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)] border border-[var(--brand-border-hover)]"
           >
             <Zap className="w-3.5 h-3.5" />
             Onboard as Client
@@ -303,7 +303,7 @@ export function SalesReport() {
           </h3>
           <div className="space-y-2">
             {r.topRisks.map((risk, idx) => (
-              <div key={idx} className="rounded-xl px-4 py-3 bg-red-500/5 border border-red-500/20">
+              <div key={idx} className="rounded-[var(--radius-lg)] px-4 py-3 bg-red-500/5 border border-red-500/20">
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
                   <div>
@@ -329,7 +329,7 @@ export function SalesReport() {
           </h3>
           <div className="space-y-2">
             {r.quickWins.map((win, idx) => (
-              <div key={idx} className="rounded-xl px-4 py-3 bg-emerald-500/5 border border-emerald-500/20">
+              <div key={idx} className="rounded-[var(--radius-lg)] px-4 py-3 bg-emerald-500/5 border border-emerald-500/20">
                 <div className="flex items-start gap-2">
                   <Zap className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
                   <div>
@@ -352,7 +352,7 @@ export function SalesReport() {
           </h3>
           <div className="space-y-1">
             {r.siteWideIssues.map((issue, idx) => (
-              <div key={idx} className="flex items-start gap-2.5 px-3 py-2 rounded-lg bg-[var(--surface-2)]">
+              <div key={idx} className="flex items-start gap-2.5 px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-2)]">
                 <SeverityBadge severity={issue.severity} />
                 <div className="min-w-0">
                   <p className="text-sm text-[var(--brand-text-bright)]">{issue.message}</p>
@@ -373,7 +373,7 @@ export function SalesReport() {
           {r.pages.map((page) => (
             <div key={page.url}>
               <div
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors hover:bg-[var(--surface-3)] bg-[var(--surface-2)] border border-[var(--brand-border)]"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-lg)] cursor-pointer transition-colors hover:bg-[var(--surface-3)] bg-[var(--surface-2)] border border-[var(--brand-border)]"
                 onClick={() => setExpandedPage(expandedPage === page.url ? null : page.url)}
               >
                 {expandedPage === page.url
@@ -405,7 +405,7 @@ export function SalesReport() {
                     <div className="px-3 py-2 text-xs text-emerald-400">✓ No issues found</div>
                   ) : (
                     page.issues.map((issue, idx) => (
-                      <div key={idx} className="flex items-start gap-2.5 px-3 py-2 rounded-lg bg-[var(--surface-2)]">
+                      <div key={idx} className="flex items-start gap-2.5 px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-2)]">
                         <SeverityBadge severity={issue.severity} />
                         <div className="min-w-0">
                           <p className="text-xs text-[var(--brand-text-bright)]">{issue.message}</p>

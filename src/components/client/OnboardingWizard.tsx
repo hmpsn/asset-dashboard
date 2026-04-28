@@ -58,8 +58,9 @@ export function OnboardingWizard({
   const prev = () => { if (stepIdx > 0) setStep(STEPS[stepIdx - 1]); };
 
   return (
+    /* z-index-ok — onboarding wizard above modal scale */
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={onDismiss}>
-      <div className="bg-[var(--surface-2)] rounded-2xl border border-[var(--brand-border)] shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+      <div className="bg-[var(--surface-2)] rounded-[var(--radius-xl)] border border-[var(--brand-border)] shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
 
         {/* Step indicator */}
         <div className="flex items-center justify-center gap-2 pt-5 pb-1">
@@ -77,15 +78,15 @@ export function OnboardingWizard({
             <div className="relative px-6 pt-4 pb-6 overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(45,212,191,0.08), transparent)' }}>
               <div className="absolute -top-20 -right-20 w-48 h-48 rounded-full blur-3xl opacity-15 bg-gradient-to-br from-teal-500 to-emerald-500" />
               <div className="relative text-center">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-500/20 to-emerald-500/20 ring-1 ring-teal-500/20 flex items-center justify-center mx-auto mb-4">
+                <div className="w-14 h-14 rounded-[var(--radius-xl)] bg-gradient-to-br from-teal-500/20 to-emerald-500/20 ring-1 ring-teal-500/20 flex items-center justify-center mx-auto mb-4">
                   <Icon as={Sparkles} size="2xl" className="text-teal-400" />
                 </div>
                 <h2 className="text-xl font-bold text-[var(--brand-text-bright)] mb-1">Welcome to your dashboard</h2>
-                <p className="text-sm text-[var(--brand-text)]">{workspaceName}</p>
+                <p className="t-body text-[var(--brand-text)]">{workspaceName}</p>
                 {!betaMode && <div className="flex items-center justify-center gap-2 mt-3">
-                  <span className={`text-[11px] px-2.5 py-1 rounded-full border font-semibold ${tierBg}`}>{tierLabel} Plan</span>
+                  <span className={`t-caption-sm px-2.5 py-1 rounded-full border font-semibold ${tierBg}`}>{tierLabel} Plan</span>
                   {isTrial && trialDaysRemaining != null && (
-                    <span className="text-[11px] px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 font-medium">
+                    <span className="t-caption-sm px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 font-medium">
                       {trialDaysRemaining} day{trialDaysRemaining !== 1 ? 's' : ''} left in trial
                     </span>
                   )}
@@ -105,7 +106,7 @@ export function OnboardingWizard({
                 <div className="flex items-start gap-2">
                   <Icon as={Zap} size="md" className="text-blue-400 mt-0.5 flex-shrink-0" />
                   <div>
-                    <div className="text-xs font-semibold text-[var(--brand-text-bright)]">You&apos;re on a free trial</div>
+                    <div className="t-caption font-semibold text-[var(--brand-text-bright)]">You&apos;re on a free trial</div>
                     <div className="t-caption-sm text-[var(--brand-text)] mt-0.5">Explore all {tierLabel} features for {trialDaysRemaining} more day{trialDaysRemaining !== 1 ? 's' : ''}. No credit card required.</div>
                   </div>
                 </div>
@@ -118,7 +119,7 @@ export function OnboardingWizard({
         {step === 'tour' && (
           <>
             <div className="px-6 pt-4 pb-2 text-center">
-              <div className="w-10 h-10 rounded-xl bg-blue-500/10 ring-1 ring-blue-500/20 flex items-center justify-center mx-auto mb-3">
+              <div className="w-10 h-10 rounded-[var(--radius-xl)] bg-blue-500/10 ring-1 ring-blue-500/20 flex items-center justify-center mx-auto mb-3">
                 <Icon as={BarChart3} size="lg" className="text-blue-400" />
               </div>
               <h2 className="text-lg font-bold text-[var(--brand-text-bright)] mb-1">What&apos;s included</h2>
@@ -128,7 +129,7 @@ export function OnboardingWizard({
             <div className="px-6 py-4">
               <div className="grid grid-cols-2 gap-3">
                 {features.map((f, i) => (
-                  <div key={i} className={cn('px-3 py-2.5 rounded-lg border transition-colors', f.available ? 'bg-[var(--surface-3)]/50 border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]' : 'bg-[var(--surface-2)]/50 border-[var(--brand-border)]/50 opacity-50')}>
+                  <div key={i} className={cn('px-3 py-2.5 rounded-[var(--radius-lg)] border transition-colors', f.available ? 'bg-[var(--surface-3)]/50 border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]' : 'bg-[var(--surface-2)]/50 border-[var(--brand-border)]/50 opacity-50')}>
                     <div className="flex items-center gap-2 mb-1">
                       <f.icon className={cn('w-3.5 h-3.5', f.available ? 'text-teal-400' : 'text-[var(--brand-border)]')} />
                       <span className={cn('t-caption-sm font-semibold', f.available ? 'text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)]')}>{f.label}</span>
@@ -146,7 +147,7 @@ export function OnboardingWizard({
         {step === 'actions' && (
           <>
             <div className="px-6 pt-4 pb-2 text-center">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/20 flex items-center justify-center mx-auto mb-3">
+              <div className="w-10 h-10 rounded-[var(--radius-xl)] bg-emerald-500/10 ring-1 ring-emerald-500/20 flex items-center justify-center mx-auto mb-3">
                 <Icon as={Trophy} size="lg" className="text-emerald-400" />
               </div>
               <h2 className="text-lg font-bold text-[var(--brand-text-bright)] mb-1">Get started</h2>
@@ -158,13 +159,13 @@ export function OnboardingWizard({
                 <button
                   key={i}
                   onClick={() => { onDismiss(); navigate(clientPath(workspaceId, a.tab, betaMode)); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border ${a.bg} hover:scale-[1.01] transition-all text-left group`}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-[var(--radius-xl)] border ${a.bg} hover:scale-[1.01] transition-all text-left group`}
                 >
-                  <div className={`w-8 h-8 rounded-lg bg-[var(--surface-2)]/50 flex items-center justify-center flex-shrink-0`}>
+                  <div className={`w-8 h-8 rounded-[var(--radius-lg)] bg-[var(--surface-2)]/50 flex items-center justify-center flex-shrink-0`}>
                     <a.icon className={`w-4 h-4 ${a.color}`} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs font-semibold text-[var(--brand-text-bright)]">{a.label}</div>
+                    <div className="t-caption font-semibold text-[var(--brand-text-bright)]">{a.label}</div>
                     <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{a.desc}</div>
                   </div>
                   <ArrowRight className="w-3.5 h-3.5 text-[var(--brand-border)] group-hover:text-[var(--brand-text)] transition-colors flex-shrink-0" />
@@ -177,7 +178,7 @@ export function OnboardingWizard({
         {/* Navigation */}
         <div className="px-6 pb-6 flex items-center justify-between gap-3">
           {stepIdx > 0 ? (
-            <button onClick={prev} className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-xl)] bg-[var(--surface-3)] border border-[var(--brand-border)] text-xs text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)] transition-colors">
+            <button onClick={prev} className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-xl)] bg-[var(--surface-3)] border border-[var(--brand-border)] t-caption text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)] transition-colors">
               <ChevronLeft className="w-3.5 h-3.5" /> Back
             </button>
           ) : (

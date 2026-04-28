@@ -167,8 +167,8 @@ export function AIUsageSection() {
                 </div>
               );
             }} />
-            <Bar dataKey="openaiCost" stackId="cost" fill="#059669" radius={[0, 0, 0, 0]} />
-            <Bar dataKey="anthropicCost" stackId="cost" fill="#ea580c" radius={[2, 2, 0, 0]} />
+            <Bar dataKey="openaiCost" stackId="cost" fill="#059669" radius={[0, 0, 0, 0]} /> {/* chart-hex-ok — emerald-600 for OpenAI brand */}
+            <Bar dataKey="anthropicCost" stackId="cost" fill="#ea580c" radius={[2, 2, 0, 0]} /> {/* chart-hex-ok — orange-700 for Anthropic brand */}
           </BarChart>
         </ResponsiveContainer>
       </div>

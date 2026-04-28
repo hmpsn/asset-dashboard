@@ -1,4 +1,5 @@
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { cn } from '../../lib/utils';
 
 export interface TrendBadgeProps {
   value: number;
@@ -13,6 +14,8 @@ export interface TrendBadgeProps {
   size?: 'sm' | 'md';
   /** Hide entirely when value is 0. Default true. Set false to render a neutral Minus icon. */
   hideOnZero?: boolean;
+  /** Render only the directional icon, suppressing the numeric value and suffix. */
+  iconOnly?: boolean;
   className?: string;
 }
 
@@ -24,19 +27,20 @@ export function TrendBadge({
   label,
   size = 'sm',
   hideOnZero = true,
+  iconOnly = false,
   className,
 }: TrendBadgeProps) {
   if (value === 0 && hideOnZero) return null;
 
-  const textSize = size === 'sm' ? 'text-[11px]' : 'text-xs';
+  const textSize = size === 'sm' ? 'text-[11px]' : 'text-xs'; // arbitrary-text-ok — TrendBadge owns this size scale
   const iconSize = size === 'sm' ? 'w-3 h-3' : 'w-3.5 h-3.5';
 
   if (value === 0) {
     return (
-      <span className={`inline-flex items-center gap-0.5 ${textSize} font-medium text-zinc-400 ${className ?? ''}`}>
+      <span className={cn(`inline-flex items-center gap-0.5 ${textSize} font-medium text-[var(--brand-text)]`, className)}>
         <Minus className={iconSize} />
-        0{suffix}
-        {label ? ` ${label}` : null}
+        {!iconOnly && <>0{suffix}</>}
+        {!iconOnly && label ? ` ${label}` : null}
       </span>
     );
   }
@@ -47,10 +51,10 @@ export function TrendBadge({
   const displayValue = showSign ? value : Math.abs(value);
 
   return (
-    <span className={`inline-flex items-center gap-0.5 ${textSize} font-medium ${color} ${className ?? ''}`}>
+    <span className={cn(`inline-flex items-center gap-0.5 ${textSize} font-medium ${color}`, className)}>
       {positive ? <TrendingUp className={iconSize} /> : <TrendingDown className={iconSize} />}
-      {sign}{displayValue}{suffix}
-      {label ? ` ${label}` : null}
+      {!iconOnly && <>{sign}{displayValue}{suffix}</>}
+      {!iconOnly && label ? ` ${label}` : null}
     </span>
   );
 }

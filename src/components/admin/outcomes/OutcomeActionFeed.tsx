@@ -69,7 +69,7 @@ function ActionRow({ action }: ActionRowProps) {
   const hasDelta = delta !== null && !Number.isNaN(delta);
 
   return (
-    <div className="border border-[var(--brand-border)] rounded-xl overflow-hidden">
+    <div className="border border-[var(--brand-border)] rounded-[var(--radius-lg)] overflow-hidden">
       <button
         className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-[var(--surface-3)] transition-colors"
         onClick={() => setExpanded((v) => !v)}
@@ -188,7 +188,7 @@ export default function OutcomeActionFeed({ workspaceId }: Props) {
         <select
           value={typeFilter}
           onChange={(e) => setTypeFilter(e.target.value)}
-          className="bg-[var(--surface-2)] border border-[var(--brand-border)] text-xs text-[var(--brand-text-bright)] rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[var(--brand-border-hover)] transition-colors"
+          className="bg-[var(--surface-2)] border border-[var(--brand-border)] text-xs text-[var(--brand-text-bright)] rounded-[var(--radius-lg)] px-2.5 py-1.5 focus:outline-none focus:border-[var(--brand-border-hover)] transition-colors"
           aria-label="Filter by action type"
         >
           {ACTION_TYPE_OPTIONS.map((opt) => (
@@ -198,7 +198,7 @@ export default function OutcomeActionFeed({ workspaceId }: Props) {
         <select
           value={scoreFilter}
           onChange={(e) => setScoreFilter(e.target.value)}
-          className="bg-[var(--surface-2)] border border-[var(--brand-border)] text-xs text-[var(--brand-text-bright)] rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[var(--brand-border-hover)] transition-colors"
+          className="bg-[var(--surface-2)] border border-[var(--brand-border)] text-xs text-[var(--brand-text-bright)] rounded-[var(--radius-lg)] px-2.5 py-1.5 focus:outline-none focus:border-[var(--brand-border-hover)] transition-colors"
           aria-label="Filter by score"
         >
           {SCORE_OPTIONS.map((opt) => (

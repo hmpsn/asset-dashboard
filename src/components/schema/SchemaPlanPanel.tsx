@@ -29,17 +29,17 @@ const ROLE_COLORS: Partial<Record<SchemaPageRole, string>> = {
   audience: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
   'lead-gen': 'bg-orange-500/15 text-orange-300 border-orange-500/30',
   blog: 'bg-purple-500/15 text-purple-300 border-purple-500/30',
-  about: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30',
-  contact: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30',
+  about: 'bg-[var(--brand-text-muted)]/15 text-[var(--brand-text)] border-[var(--brand-text-muted)]/30',
+  contact: 'bg-[var(--brand-text-muted)]/15 text-[var(--brand-text)] border-[var(--brand-text-muted)]/30',
   location: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
   product: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
   partnership: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
   faq: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
   'case-study': 'bg-blue-500/15 text-blue-300 border-blue-500/30',
   comparison: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-  generic: 'bg-zinc-500/10 text-zinc-400 border-zinc-600/30',
+  generic: 'bg-[var(--brand-text-muted)]/10 text-[var(--brand-text)] border-[var(--brand-text-dim)]/30',
 };
-const DEFAULT_ROLE_COLOR = 'bg-zinc-500/10 text-zinc-400 border-zinc-600/30';
+const DEFAULT_ROLE_COLOR = 'bg-[var(--brand-text-muted)]/10 text-[var(--brand-text)] border-[var(--brand-text-dim)]/30';
 
 export function SchemaPlanPanel({ siteId }: Props) {
   const [plan, setPlan] = useState<SchemaSitePlan | null>(null);
@@ -143,7 +143,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
 
   const statusBadge = (status: SchemaSitePlan['status']) => {
     const map: Record<string, { label: string; cls: string }> = {
-      draft: { label: 'Draft', cls: 'bg-zinc-500/15 text-zinc-400 border-zinc-500/30' },
+      draft: { label: 'Draft', cls: 'bg-[var(--brand-text-muted)]/15 text-[var(--brand-text)] border-[var(--brand-text-muted)]/30' },
       sent_to_client: { label: 'Sent to Client', cls: 'bg-blue-500/15 text-blue-300 border-blue-500/30' },
       client_approved: { label: 'Client Approved', cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
       client_changes_requested: { label: 'Changes Requested', cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
@@ -164,7 +164,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
   // No plan yet — show generate button
   if (!plan) {
     return (
-      <div className="bg-[var(--surface-2)]/50 border border-[var(--brand-border)] p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      <div className="bg-[var(--surface-2)]/50 border border-[var(--brand-border)] p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' /* asymmetric-radius-ok */ }}>
         <div className="flex items-center gap-2">
           <Icon as={Globe} size="md" className="text-teal-400" />
           <span className="text-sm font-medium text-[var(--brand-text-bright)]">Schema Site Plan</span>
@@ -196,7 +196,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
   }, {} as Record<string, number>);
 
   return (
-    <div className="bg-[var(--surface-2)]/50 border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
+    <div className="bg-[var(--surface-2)]/50 border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' /* asymmetric-radius-ok */ }}>
       {/* Header */}
       <button
         onClick={() => setExpanded(!expanded)}

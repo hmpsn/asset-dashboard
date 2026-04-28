@@ -1,4 +1,5 @@
-import { BarChart2, TrendingUp, TrendingDown, Minus, Activity } from 'lucide-react';
+import { BarChart2, Minus, Activity } from 'lucide-react';
+import { TrendBadge } from '../../ui/TrendBadge';
 import {
   MetricRing,
   SectionCard,
@@ -19,8 +20,8 @@ interface Props {
 }
 
 function TrendIcon({ trend }: { trend: 'improving' | 'stable' | 'declining' }) {
-  if (trend === 'improving') return <TrendingUp className="w-4 h-4 text-emerald-400" />;
-  if (trend === 'declining') return <TrendingDown className="w-4 h-4 text-red-400" />;
+  if (trend === 'improving') return <TrendBadge value={1} iconOnly hideOnZero={false} size="md" />;
+  if (trend === 'declining') return <TrendBadge value={-1} iconOnly hideOnZero={false} size="md" />;
   return <Minus className="w-4 h-4 text-[var(--brand-text)]" />;
 }
 
@@ -42,7 +43,7 @@ export default function OutcomeScorecard({ workspaceId }: Props) {
       <div className="space-y-5">
         {/* Win rate ring + stat cards */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-          <div className="flex flex-col items-center justify-center bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-2xl p-6">
+          <div className="flex flex-col items-center justify-center bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] p-6">
             <Skeleton className="w-36 h-36 rounded-full" />
             <Skeleton className="w-20 h-3 mt-3" />
           </div>
@@ -66,7 +67,7 @@ export default function OutcomeScorecard({ workspaceId }: Props) {
         action={
           <button
             onClick={() => refetch()}
-            className="text-xs px-3 py-1.5 rounded-lg bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 transition-colors"
+            className="text-xs px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 transition-colors"
           >
             Retry
           </button>

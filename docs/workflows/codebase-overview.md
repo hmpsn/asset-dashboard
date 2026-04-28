@@ -194,6 +194,6 @@ All client-facing copy should:
 - `AI_CHATBOT_ROADMAP.md` — Chatbot phases, shipped and planned
 - `AUTH_ROADMAP.md` — Authentication/authorization phases (Phases 1, 2, 4 shipped)
 - `DESIGN_SYSTEM.md` — UI primitives, component specs, typography, spacing, Tailwind classes
-- `BRAND_DESIGN_LANGUAGE.md` — Color rules (Three Laws), per-component color map, admin vs client rules, AI prompting guidelines. **Read before any UI work.**
+- `BRAND_DESIGN_LANGUAGE.md` — Color rules (Four Laws), per-component color map, admin vs client rules, AI prompting guidelines. **Read before any UI work.**
 - `ADMIN_UX_AUDIT.md` — Comprehensive admin dashboard UX audit: 12 proposed changes across 3 priority tiers (P0: sidebar collapse, command center, extraction; P1: notification bell, ⌘K, breadcrumb; P2: onboarding, tooltips, freshness, nav, chat, theme)
 - `data/roadmap.json` — Sprint-level tracking with item statuses across 19 sprints (5 active + backlog + 13 archived), managed via /api/roadmap. 80+ features shipped total.

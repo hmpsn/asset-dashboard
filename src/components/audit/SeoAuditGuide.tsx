@@ -98,9 +98,9 @@ export function SeoAuditGuide() {
         {SECTIONS.map((section, idx) => {
           const SectionIcon = section.icon;
           return (
-            <div key={idx} className={cn('border p-5', section.bg)} style={{ borderRadius: '6px 12px 6px 12px' }}>
+            <div key={idx} className={cn('border p-5', section.bg)} style={{ borderRadius: '6px 12px 6px 12px' /* asymmetric-radius-ok */ }}>
               <div className="flex items-start gap-3">
-                <div className={cn('flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--surface-2)]/60 flex-shrink-0', section.color)}>
+                <div className={cn('flex items-center justify-center w-8 h-8 rounded-[var(--radius-lg)] bg-[var(--surface-2)]/60 flex-shrink-0', section.color)}>
                   <Icon as={SectionIcon} size="md" />
                 </div>
                 <div className="flex-1 min-w-0 space-y-2">
@@ -144,7 +144,7 @@ export function SeoAuditGuide() {
             { label: 'Sort by Traffic', desc: 'Rank pages by organic traffic — fix high-traffic pages first' },
             { label: 'Batch actions', desc: 'Accept or suppress multiple issues at once after filtering' },
           ].map(f => (
-            <div key={f.label} className="flex items-start gap-2 px-3 py-2 bg-[var(--surface-3)] rounded-lg">
+            <div key={f.label} className="flex items-start gap-2 px-3 py-2 bg-[var(--surface-3)] rounded-[var(--radius-lg)]">
               <Icon as={CheckCircle} size="sm" className="text-teal-500 mt-0.5 flex-shrink-0" />
               <div>
                 <div className="t-caption-sm font-medium text-[var(--brand-text-bright)]">{f.label}</div>
@@ -205,7 +205,7 @@ export function SeoAuditGuide() {
             'Save snapshot → share report',
             'Schedule next run in 30 days',
           ].map((step, i) => (
-            <div key={i} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--surface-3)]/50 rounded-lg t-caption-sm text-[var(--brand-text)]">
+            <div key={i} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--surface-3)]/50 rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text)]">
               <span className="text-teal-400 font-bold">{i + 1}.</span>
               {step}
             </div>

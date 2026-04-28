@@ -132,7 +132,7 @@ export default function ContentDecay({ workspaceId }: Props) {
           <div className="grid grid-cols-4 gap-3">
             <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 text-center rounded-[var(--radius-signature)]">
               <div className="text-2xl font-bold text-[var(--brand-text-bright)]">{analysis.summary.totalDecaying}</div>
-              <div className="text-[11px] text-[var(--brand-text-muted)] mt-1">Declining Pages</div>
+              <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">Declining Pages</div>
             </div>
             {(['critical', 'warning', 'watch'] as const).map(sev => {
               const cfg = SEV_CONFIG[sev];
@@ -141,7 +141,7 @@ export default function ContentDecay({ workspaceId }: Props) {
                 <button key={sev} onClick={() => setSeverityFilter(severityFilter === sev ? 'all' : sev)}
                   className={`border p-4 text-center transition-colors rounded-[var(--radius-signature)] ${severityFilter === sev ? `${cfg.bg} ${cfg.border}` : 'bg-[var(--surface-2)] border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]'}`}>
                   <div className={`text-2xl font-bold ${cfg.text}`}>{count}</div>
-                  <div className="text-[11px] text-[var(--brand-text-muted)] mt-1">{cfg.label}</div>
+                  <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">{cfg.label}</div>
                 </button>
               );
             })}
@@ -164,7 +164,7 @@ export default function ContentDecay({ workspaceId }: Props) {
                 <span className="text-xs font-medium text-[var(--brand-text-bright)]">
                   {severityFilter === 'all' ? 'All Declining Pages' : `${SEV_CONFIG[severityFilter].label} Pages`}
                 </span>
-                <span className="text-[11px] text-[var(--brand-text-muted)]">{filtered.length} pages</span>
+                <span className="t-caption-sm text-[var(--brand-text-muted)]">{filtered.length} pages</span>
               </div>
               <div className="divide-y divide-[var(--brand-border)]/50 max-h-[500px] overflow-y-auto">
                 {filtered.map(page => {
@@ -173,16 +173,16 @@ export default function ContentDecay({ workspaceId }: Props) {
                   return (
                     <div key={page.page}>
                       <button onClick={() => togglePage(page.page)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)]/30 transition-colors text-left">
-                        <div className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 ${cfg.bg}`}>
+                        <div className={`w-6 h-6 rounded-[var(--radius-md)] flex items-center justify-center flex-shrink-0 ${cfg.bg}`}>
                           <cfg.icon className={`w-3.5 h-3.5 ${cfg.text}`} />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="text-xs font-medium text-[var(--brand-text-bright)] truncate">{page.page}</div>
                           <div className="flex items-center gap-3 mt-0.5">
-                            <span className="text-[11px] text-red-400 flex items-center gap-0.5">
+                            <span className="t-caption-sm text-red-400 flex items-center gap-0.5">
                               <Icon as={ArrowDown} size="sm" /> {page.clickDeclinePct}% clicks
                             </span>
-                            <span className="text-[11px] text-[var(--brand-text-muted)]">
+                            <span className="t-caption-sm text-[var(--brand-text-muted)]">
                               {page.previousClicks} → {page.currentClicks}
                             </span>
                           </div>
@@ -195,7 +195,7 @@ export default function ContentDecay({ workspaceId }: Props) {
                             </div>
                             <div className="text-[10px] text-[var(--brand-text-muted)]">now #{page.currentPosition}</div>
                           </div>
-                          <span className={`text-[10px] font-medium px-2 py-0.5 rounded ${cfg.bg} ${cfg.text}`}>{cfg.label}</span>
+                          <span className={`text-[10px] font-medium px-2 py-0.5 rounded ${cfg.bg} ${cfg.text}`} /* arbitrary-text-ok */>{cfg.label}</span>
                         </div>
                       </button>
                       {isExpanded && (
@@ -204,25 +204,25 @@ export default function ContentDecay({ workspaceId }: Props) {
                             <div className="bg-[var(--surface-3)]/50 rounded-[var(--radius-lg)] p-2">
                               <div className="text-[10px] text-[var(--brand-text-muted)]">Clicks</div>
                               <div className="text-xs font-medium text-red-400">{page.previousClicks} → {page.currentClicks}</div>
-                              <div className="text-[10px] text-red-400/70">{page.clickDeclinePct}%</div>
+                              <div className="text-[10px] text-red-400/70" /* arbitrary-text-ok */>{page.clickDeclinePct}%</div>
                             </div>
                             <div className="bg-[var(--surface-3)]/50 rounded-[var(--radius-lg)] p-2">
                               <div className="text-[10px] text-[var(--brand-text-muted)]">Impressions</div>
                               <div className={`text-xs font-medium ${page.impressionChangePct < 0 ? 'text-amber-400' : 'text-emerald-400'}`}>{page.previousImpressions} → {page.currentImpressions}</div>
-                              <div className={`text-[10px] ${page.impressionChangePct < 0 ? 'text-amber-400/70' : 'text-emerald-400/70'}`}>{page.impressionChangePct > 0 ? '+' : ''}{page.impressionChangePct}%</div>
+                              <div className={`text-[10px] ${page.impressionChangePct < 0 ? 'text-amber-400/70' : 'text-emerald-400/70'}`} /* arbitrary-text-ok */>{page.impressionChangePct > 0 ? '+' : ''}{page.impressionChangePct}%</div>
                             </div>
                             <div className="bg-[var(--surface-3)]/50 rounded-[var(--radius-lg)] p-2">
                               <div className="text-[10px] text-[var(--brand-text-muted)]">Position</div>
                               <div className={`text-xs font-medium ${page.positionChange > 0 ? 'text-red-400' : 'text-emerald-400'}`}>{page.previousPosition} → {page.currentPosition}</div>
-                              <div className={`text-[10px] ${page.positionChange > 0 ? 'text-red-400/70' : 'text-emerald-400/70'}`}>{page.positionChange > 0 ? '+' : ''}{page.positionChange}</div>
+                              <div className={`text-[10px] ${page.positionChange > 0 ? 'text-red-400/70' : 'text-emerald-400/70'}`} /* arbitrary-text-ok */>{page.positionChange > 0 ? '+' : ''}{page.positionChange}</div>
                             </div>
                           </div>
                           {page.refreshRecommendation && (
                             <div className="bg-purple-500/5 border border-purple-500/15 rounded-[var(--radius-lg)] p-3 mt-2">
-                              <div className="flex items-center gap-1.5 text-[11px] font-medium text-purple-300 mb-2">
+                              <div className="flex items-center gap-1.5 t-caption-sm font-medium text-purple-300 mb-2">
                                 <Icon as={Sparkles} size="md" /> AI Refresh Recommendation
                               </div>
-                              <div className="text-[11px] text-[var(--brand-text-bright)] leading-relaxed whitespace-pre-wrap">{page.refreshRecommendation}</div>
+                              <div className="t-caption-sm text-[var(--brand-text-bright)] leading-relaxed whitespace-pre-wrap">{page.refreshRecommendation}</div>
                             </div>
                           )}
                         </div>

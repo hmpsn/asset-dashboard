@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import {
   X, ExternalLink, FileText, PenTool, Flag, Check,
-  TrendingUp, Search, ArrowRight, ChevronRight, Clock,
+  Search, ArrowRight, ChevronRight, Clock,
 } from 'lucide-react';
-import { Badge } from '../ui';
+import { Badge, Button } from '../ui';
+import { TrendBadge } from '../ui/TrendBadge';
 import type { MatrixCell } from './types';
 import { timeAgo } from '../../lib/timeAgo';
 
@@ -67,11 +68,11 @@ export function CellDetailPanel({
   };
 
   return (
-    <div className="fixed inset-y-0 right-0 w-full max-w-sm bg-[var(--surface-2)] border-l border-[var(--brand-border)] shadow-2xl z-50 flex flex-col animate-[slideInRight_0.2s_ease-out]">
+    <div className="fixed inset-y-0 right-0 w-full max-w-sm bg-[var(--surface-2)] border-l border-[var(--brand-border)] shadow-2xl z-[var(--z-modal)] flex flex-col animate-[slideInRight_0.2s_ease-out]">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--brand-border)]">
         <div className="flex items-center gap-2 min-w-0">
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
+          <button onClick={onClose} className="p-1 rounded-[var(--radius-lg)] hover:bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
             <X className="w-4 h-4" />
           </button>
           <span className="text-sm font-semibold text-[var(--brand-text-bright)] truncate">{cellTitle}</span>
@@ -117,17 +118,17 @@ export function CellDetailPanel({
 
           {cell.keywordValidation && (
             <div className="grid grid-cols-3 gap-2">
-              <div className="bg-[var(--surface-1)] rounded-lg px-2.5 py-2 text-center">
+              <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-2.5 py-2 text-center">
                 <p className="text-sm font-bold text-[var(--brand-text-bright)] tabular-nums">{cell.keywordValidation.volume}<span className="t-caption-sm text-[var(--brand-text-muted)] font-normal">/mo</span></p>
                 <p className="t-caption-sm text-[var(--brand-text-muted)]">Volume</p>
               </div>
-              <div className="bg-[var(--surface-1)] rounded-lg px-2.5 py-2 text-center">
+              <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-2.5 py-2 text-center">
                 <p className={`text-sm font-bold tabular-nums ${cell.keywordValidation.difficulty > 60 ? 'text-red-400' : cell.keywordValidation.difficulty > 35 ? 'text-amber-400' : 'text-emerald-400'}`}>
                   {cell.keywordValidation.difficulty}<span className="t-caption-sm text-[var(--brand-text-muted)] font-normal">/100</span>
                 </p>
                 <p className="t-caption-sm text-[var(--brand-text-muted)]">Difficulty</p>
               </div>
-              <div className="bg-[var(--surface-1)] rounded-lg px-2.5 py-2 text-center">
+              <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-2.5 py-2 text-center">
                 <p className="text-sm font-bold text-[var(--brand-text-bright)] tabular-nums">${cell.keywordValidation.cpc}</p>
                 <p className="t-caption-sm text-[var(--brand-text-muted)]">CPC</p>
               </div>
@@ -135,9 +136,9 @@ export function CellDetailPanel({
           )}
 
           {cell.recommendedKeyword && cell.recommendedKeyword !== keyword && (
-            <div className="bg-teal-500/5 border border-teal-500/20 rounded-lg p-3 space-y-2">
+            <div className="bg-teal-500/5 border border-teal-500/20 rounded-[var(--radius-lg)] p-3 space-y-2">
               <div className="flex items-center gap-1.5">
-                <TrendingUp className="w-3 h-3 text-teal-400" />
+                <TrendBadge value={1} iconOnly hideOnZero={false} size="sm" className="text-teal-400" />
                 <span className="t-caption text-teal-400 font-medium">Recommended</span>
               </div>
               <p className="text-xs text-[var(--brand-text-bright)]">&ldquo;{cell.recommendedKeyword}&rdquo;</p>
@@ -149,7 +150,7 @@ export function CellDetailPanel({
               })()}
               <button
                 onClick={handleAcceptRecommendation}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-teal-600/20 border border-teal-500/30 t-caption text-teal-300 hover:bg-teal-600/30 transition-colors font-medium"
+                className="flex items-center gap-1 px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption text-teal-300 hover:bg-teal-600/30 transition-colors font-medium"
               >
                 <Check className="w-3 h-3" /> Accept Recommendation
               </button>
@@ -161,9 +162,9 @@ export function CellDetailPanel({
             <div className="space-y-1">
               <span className="t-caption text-[var(--brand-text-muted)] font-medium">All Candidates</span>
               {cell.keywordCandidates.map((c, i) => (
-                <div key={i} className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs ${c.isRecommended ? 'bg-teal-500/5 border border-teal-500/15' : 'bg-[var(--surface-1)]'}`}>
+                <div key={i} className={`flex items-center justify-between px-2.5 py-1.5 rounded-[var(--radius-lg)] text-xs ${c.isRecommended ? 'bg-teal-500/5 border border-teal-500/15' : 'bg-[var(--surface-1)]'}`}>
                   <div className="flex items-center gap-2 min-w-0">
-                    {c.isRecommended && <TrendingUp className="w-3 h-3 text-teal-400 flex-shrink-0" />}
+                    {c.isRecommended && <TrendBadge value={1} suffix="" hideOnZero={false} size="sm" className="text-teal-400 flex-shrink-0" />}
                     <span className={`truncate ${c.isRecommended ? 'text-teal-300' : 'text-[var(--brand-text-bright)]'}`}>{c.keyword}</span>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0 t-caption-sm text-[var(--brand-text-muted)]">
@@ -197,7 +198,7 @@ export function CellDetailPanel({
           </div>
 
           {cell.briefId ? (
-            <button className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-[var(--surface-1)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] transition-colors text-xs text-[var(--brand-text-bright)]">
+            <button className="w-full flex items-center justify-between px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-1)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] transition-colors text-xs text-[var(--brand-text-bright)]">
               <span className="flex items-center gap-1.5">
                 <FileText className="w-3 h-3 text-amber-400" /> View Brief
               </span>
@@ -208,7 +209,7 @@ export function CellDetailPanel({
           )}
 
           {cell.postId ? (
-            <button className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-[var(--surface-1)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] transition-colors text-xs text-[var(--brand-text-bright)]">
+            <button className="w-full flex items-center justify-between px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-1)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] transition-colors text-xs text-[var(--brand-text-bright)]">
               <span className="flex items-center gap-1.5">
                 <PenTool className="w-3 h-3 text-emerald-400" /> View Post
               </span>
@@ -253,18 +254,21 @@ export function CellDetailPanel({
           </div>
 
           {onGenerateBrief && !cell.briefId && (
-            <button
+            <Button
+              variant="primary"
+              size="sm"
+              icon={FileText}
               onClick={() => onGenerateBrief(cell.id)}
-              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 text-xs text-white font-medium hover:from-teal-500 hover:to-emerald-500 transition-colors"
+              className="w-full"
             >
-              <FileText className="w-3 h-3" /> Generate Brief
-            </button>
+              Generate Brief
+            </Button>
           )}
 
           {onSendReview && cell.briefId && cell.status !== 'review' && cell.status !== 'published' && (
             <button
               onClick={() => onSendReview(cell.id)}
-              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-teal-600/20 border border-teal-500/30 text-xs text-teal-300 hover:bg-teal-600/30 transition-colors font-medium"
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 text-xs text-teal-300 hover:bg-teal-600/30 transition-colors font-medium"
             >
               <ExternalLink className="w-3 h-3" /> Send for Review
             </button>
@@ -277,19 +281,19 @@ export function CellDetailPanel({
                 onChange={e => setFlagComment(e.target.value)}
                 placeholder="Describe what needs to change..."
                 rows={2}
-                className="w-full px-2.5 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] resize-none focus:border-amber-500/40 focus:outline-none transition-colors"
+                className="w-full px-2.5 py-1.5 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] resize-none focus:border-amber-500/40 focus:outline-none transition-colors"
               />
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleFlag}
                   disabled={!flagComment.trim()}
-                  className="px-3 py-1.5 rounded-lg bg-amber-600/20 border border-amber-500/30 t-caption text-amber-300 hover:bg-amber-600/30 transition-colors font-medium disabled:opacity-50"
+                  className="px-3 py-1.5 rounded-[var(--radius-lg)] bg-amber-600/20 border border-amber-500/30 t-caption text-amber-300 hover:bg-amber-600/30 transition-colors font-medium disabled:opacity-50"
                 >
                   Submit Flag
                 </button>
                 <button
                   onClick={() => { setShowFlagForm(false); setFlagComment(''); }}
-                  className="px-3 py-1.5 rounded-lg t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"
+                  className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"
                 >
                   Cancel
                 </button>
@@ -298,7 +302,7 @@ export function CellDetailPanel({
           ) : (
             <button
               onClick={() => setShowFlagForm(true)}
-              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--brand-border-hover)] text-xs text-[var(--brand-text)] hover:text-amber-400 hover:border-amber-500/30 transition-colors"
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-[var(--radius-lg)] border border-[var(--brand-border-hover)] text-xs text-[var(--brand-text)] hover:text-amber-400 hover:border-amber-500/30 transition-colors"
             >
               <Flag className="w-3 h-3" /> Flag for Changes
             </button>

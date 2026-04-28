@@ -414,7 +414,7 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
           {visibleCount < filteredPages.length && (
             <button
               onClick={() => setVisibleCount(v => v + ITEMS_PER_PAGE)}
-              className="text-[11px] text-teal-400 hover:text-teal-300 transition-colors font-medium"
+              className="t-caption-sm text-teal-400 hover:text-teal-300 transition-colors font-medium"
             >
               Show {Math.min(ITEMS_PER_PAGE, filteredPages.length - visibleCount)} more
             </button>

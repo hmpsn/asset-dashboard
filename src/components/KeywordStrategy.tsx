@@ -228,7 +228,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       case 'informational': return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
       case 'transactional': return 'text-amber-400 bg-amber-500/10 border-amber-500/20';
       case 'navigational': return 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20';
-      default: return 'text-[var(--brand-text)] bg-zinc-500/10 border-zinc-500/20';
+      default: return 'text-[var(--brand-text)] bg-zinc-500/10 border-zinc-500/20'; // raw-zinc-ok
     }
   };
 
@@ -596,14 +596,14 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                 {top10.length > 0 && <div className="bg-teal-500 h-full transition-all" style={{ width: `${(top10.length / filteredPageMap.length) * 100}%` }} />}
                 {top20.length > 0 && <div className="bg-amber-500 h-full transition-all" style={{ width: `${(top20.length / filteredPageMap.length) * 100}%` }} />}
                 {beyond20.length > 0 && <div className="bg-red-500/60 h-full transition-all" style={{ width: `${(beyond20.length / filteredPageMap.length) * 100}%` }} />}
-                {notRankingCount > 0 && <div className="bg-zinc-700 h-full transition-all" style={{ width: `${(notRankingCount / filteredPageMap.length) * 100}%` }} />}
+                {notRankingCount > 0 && <div className="bg-[var(--surface-3)] h-full transition-all" style={{ width: `${(notRankingCount / filteredPageMap.length) * 100}%` }} />}
               </div>
               <div className="flex items-center gap-4 mt-2 flex-wrap">
                 <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" /> <span className="text-emerald-400 font-medium">{top3.length}</span> <span className="text-[var(--brand-text-muted)]">Top 3</span></span>
                 <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-full bg-teal-500 inline-block" /> <span className="text-teal-400 font-medium">{top10.length}</span> <span className="text-[var(--brand-text-muted)]">4–10</span></span>
                 <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" /> <span className="text-amber-400 font-medium">{top20.length}</span> <span className="text-[var(--brand-text-muted)]">11–20</span></span>
                 <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-full bg-red-500/60 inline-block" /> <span className="text-red-400 font-medium">{beyond20.length}</span> <span className="text-[var(--brand-text-muted)]">20+</span></span>
-                <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-full bg-zinc-700 inline-block" /> <span className="text-[var(--brand-text-muted)] font-medium">{notRankingCount}</span> <span className="text-[var(--brand-text-muted)]">Not ranking</span></span>
+                <span className="flex items-center gap-1.5 t-caption-sm"><span className="w-2.5 h-2.5 rounded-full bg-[var(--surface-3)] inline-block" /> <span className="text-[var(--brand-text-muted)] font-medium">{notRankingCount}</span> <span className="text-[var(--brand-text-muted)]">Not ranking</span></span>
               </div>
               {Object.keys(intentCounts).length > 1 && (
                 <div className="mt-3 pt-3 border-t border-[var(--brand-border)]">

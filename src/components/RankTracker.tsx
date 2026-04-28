@@ -6,10 +6,11 @@ import {
 import { get, post, patch, del } from '../api/client';
 import { EmptyState, SectionCard, Icon, Button } from './ui';
 import { cn } from '../lib/utils';
-import { chartGridColor, chartAxisColor } from './ui/constants';
+import { chartGridColor, chartAxisColor, CHART_SERIES_COLORS } from './ui/constants';
 
 // ── Trend colors (blue/teal/green family per design system — no violet/indigo) ──
-const TREND_COLORS = ['#60a5fa', '#38bdf8', '#22d3ee', '#2dd4bf', '#34d399', '#06b6d4', '#0ea5e9'];
+// chart-hex-ok — multi-keyword trend chart needs 7+ visually distinct cool-hue steps
+const TREND_COLORS = [CHART_SERIES_COLORS.blue, '#38bdf8', '#22d3ee', CHART_SERIES_COLORS.teal, CHART_SERIES_COLORS.emerald, '#06b6d4', '#0ea5e9'];
 
 // ── Sparkline: compact position-over-time for a single keyword ──
 function PositionSparkline({ data }: { data: { date: string; position: number }[] }) {
@@ -33,8 +34,8 @@ function PositionSparkline({ data }: { data: { date: string; position: number }[
   return (
     <div className="flex items-center gap-4">
       <svg width={W} height={H} className="flex-shrink-0">
-        <path d={pathD} fill="none" stroke="#60a5fa" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        <circle cx={last.x} cy={last.y} r="2.5" fill="#60a5fa" />
+        <path d={pathD} fill="none" stroke={CHART_SERIES_COLORS.blue} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx={last.x} cy={last.y} r="2.5" fill={CHART_SERIES_COLORS.blue} />
       </svg>
       <div className="t-caption-sm text-[var(--brand-text-muted)] space-y-0.5">
         <div>Best: <span className="text-emerald-400 font-medium">#{min.toFixed(1)}</span> · Worst: <span className="text-red-400 font-medium">#{max.toFixed(1)}</span></div>

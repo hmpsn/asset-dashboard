@@ -11,7 +11,7 @@ import type {
   VoiceSampleContext,
 } from '../../../shared/types/brand-engine';
 import { PROMPT_TYPE_TO_SECTION_TYPE } from '../../../shared/types/brand-engine';
-import { SectionCard, EmptyState, Skeleton, TabBar, Icon, Button, cn } from '../ui';
+import { SectionCard, EmptyState, Skeleton, TabBar, Icon, Button, cn, ConfirmDialog } from '../ui';
 import { useToast } from '../Toast';
 
 type VoiceSection = 'samples' | 'dna' | 'guardrails' | 'calibration';
@@ -93,6 +93,7 @@ function SamplesSection({ workspaceId, samples, onChanged }: SamplesSectionProps
   const [contextTag, setContextTag] = useState<VoiceSampleContext>('headline');
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,7 +117,6 @@ function SamplesSection({ workspaceId, samples, onChanged }: SamplesSectionProps
   };
 
   const handleDelete = async (sampleId: string) => {
-    if (!window.confirm('Delete this sample? This cannot be undone.')) return;
     setDeletingId(sampleId);
     try {
       await voice.deleteSample(workspaceId, sampleId);
@@ -129,7 +129,7 @@ function SamplesSection({ workspaceId, samples, onChanged }: SamplesSectionProps
     }
   };
 
-  return (
+  return (<>
     <div className="space-y-4">
       {/* Toolbar */}
       {!showAdd && (
@@ -232,7 +232,7 @@ function SamplesSection({ workspaceId, samples, onChanged }: SamplesSectionProps
               </div>
               <button
                 type="button"
-                onClick={() => handleDelete(sample.id)}
+                onClick={() => setConfirmDeleteId(sample.id)}
                 disabled={deletingId === sample.id}
                 aria-label="Delete sample"
                 className="shrink-0 text-[var(--brand-text-muted)] hover:text-red-400 transition-colors p-1 rounded disabled:opacity-50"
@@ -248,6 +248,20 @@ function SamplesSection({ workspaceId, samples, onChanged }: SamplesSectionProps
         </div>
       )}
     </div>
+
+    <ConfirmDialog
+      open={!!confirmDeleteId}
+      title="Delete Sample"
+      message="Delete this sample? This cannot be undone."
+      variant="destructive"
+      confirmLabel="Delete"
+      onConfirm={() => {
+        if (confirmDeleteId) handleDelete(confirmDeleteId);
+        setConfirmDeleteId(null);
+      }}
+      onCancel={() => setConfirmDeleteId(null)}
+    />
+  </>
   );
 }
 

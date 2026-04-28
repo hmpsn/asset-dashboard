@@ -70,3 +70,11 @@ export function startRankTrackingScheduler(): void {
 
   log.info('Rank tracking scheduler started (initial run in 2m, then 24h interval)');
 }
+
+/** Stop the rank tracking scheduler (used during graceful shutdown). */
+export function stopRankTrackingScheduler(): void {
+  if (rankInterval) {
+    clearInterval(rankInterval);
+    rankInterval = null;
+  }
+}

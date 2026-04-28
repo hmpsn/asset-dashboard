@@ -485,7 +485,7 @@ export async function generateLlmsTxt(workspaceId: string): Promise<LlmsTxtResul
     const briefMap = new Map(briefs.map(b => [b.id, b]));
 
     const activeRequests = requests.filter(r =>
-      ['brief_generated', 'client_review', 'approved', 'in_progress'].includes(r.status) &&
+      ['brief_generated', 'client_review', 'approved', 'in_progress', 'post_review'].includes(r.status) &&
       !matrixKeywords.has((r.targetKeyword || r.topic || '').toLowerCase())
     );
 

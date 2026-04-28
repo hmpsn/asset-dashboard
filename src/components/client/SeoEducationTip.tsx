@@ -70,15 +70,15 @@ export function SeoEducationTip({ tab, workspaceId }: Props) {
   if (!visible || !tip) return null;
 
   return (
-    <div className="mb-4 border border-teal-500/20 bg-gradient-to-r from-teal-500/5 to-emerald-500/5 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300" style={{ borderRadius: '6px 12px 6px 12px' }}>
+    <div className="mb-4 border border-teal-500/20 bg-gradient-to-r from-teal-500/5 to-emerald-500/5 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300" style={{ borderRadius: 'var(--radius-signature)' }}>
       <div className="px-4 py-3">
         <div className="flex items-start gap-3">
-          <div className="w-8 h-8 rounded-lg bg-teal-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+          <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-teal-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
             <Icon as={Lightbulb} size="md" className="text-teal-400" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <h4 className="text-xs font-semibold text-[var(--brand-text-bright)]">{tip.title}</h4>
+              <h4 className="t-caption font-semibold text-[var(--brand-text-bright)]">{tip.title}</h4>
               <span className="t-micro px-1.5 py-0.5 rounded-full bg-teal-500/10 text-teal-400 font-medium">SEO Tip</span>
             </div>
             <p className="text-[12px] text-[var(--brand-text)] leading-relaxed">{tip.body}</p>
