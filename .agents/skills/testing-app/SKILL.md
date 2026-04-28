@@ -124,8 +124,8 @@ This approach is more reliable than Playwright `connectOverCDP()` which may time
 | Content Manager | Content Pipeline → Posts tab | Renders within ContentPipeline, not a separate route |
 | Features | `/features` | Global page (not workspace-scoped) |
 | Site Audit | `/ws/<wsId>/seo-audit` | Requires webflowSiteId |
-| Asset Audit | `/ws/<wsId>/assets` | Under SITE HEALTH |
-| Client Portal | `/client/<wsId>?tab=<tab>` | Tabs: insights, performance, health, strategy, inbox, schema, plans |
+| Asset Audit | `/ws/<wsId>/media` | Under SITE HEALTH |
+| Client Portal | `/client/<wsId>/<tab>` | Tabs: overview, performance, search, health, strategy, analytics, inbox, approvals, requests, content, plans, roi, brand |
 
 ## CSS Token Testing Notes
 
@@ -168,7 +168,7 @@ NODE_ENV=production npx tsx server/index.ts
 ## Build & Test Commands
 
 - Build: `npx vite build`
-- Tests: `npx vitest run` (339+ tests)
+- Tests: `npx vitest run` (5062+ tests across 339 test files)
 - TypeScript check: `npm run typecheck` (uses `tsc -b --noEmit` with project references; do NOT use plain `npx tsc --noEmit` against root tsconfig as it checks zero files)
 - PR check: `npx tsx scripts/pr-check.ts`
 
