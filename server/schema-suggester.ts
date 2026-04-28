@@ -1404,7 +1404,6 @@ async function postProcessSchema(
 ): Promise<{ schema: Record<string, unknown>; reason: string; errors: string[] }> {
   // Step 1: Auto-fix invalid properties and malformed values
   autoFixSchema(schema);
-  upgradeHealthcareType(schema, ctx);
 
   // Step 2: Ensure @graph structure
   if (!schema['@graph'] && schema['@type']) {
@@ -1486,6 +1485,9 @@ async function postProcessSchema(
 
   // Step 4: Inject cross-references + ensure WebSite/Organization nodes exist
   injectCrossReferences(schema, siteUrl, ctx.companyName, ctx);
+  // Must run AFTER injectCrossReferences — upgrading Organization→Dentist before the cross-reference
+  // pass causes injectCrossReferences to not find an Organization node and inject a duplicate stub.
+  upgradeHealthcareType(schema, ctx);
 
   // Step 4b: Plan validation — strip entities that shouldn't exist per the site plan
   if (ctx._planContext && Array.isArray(schema['@graph'])) {
@@ -1599,8 +1601,8 @@ RULES:
         autoFixSchema(fixedSchema);
         const fixedGraphArr = fixedSchema['@graph'] as Record<string, unknown>[] | undefined;
         if (Array.isArray(fixedGraphArr)) fixedSchema['@graph'] = fixedGraphArr.filter(n => !n['_remove']);
-        upgradeHealthcareType(fixedSchema, ctx);
         injectCrossReferences(fixedSchema, siteUrl, ctx.companyName, ctx);
+        upgradeHealthcareType(fixedSchema, ctx);
 
         // Re-validate
         const fixedErrors = validateUnifiedSchema(fixedSchema);
@@ -2226,6 +2228,8 @@ export async function generateSchemaSuggestions(
 
           const cmsNormalizedPath = (item.path.startsWith('/') ? item.path : `/${item.path}`).replace(/\/$/, '') || '/';
           const cmsInsightData = insightsMap?.get(item.url);
+          // Note: _existingErrors is not wired here — CMS pages are discovered via sitemap and have no
+          // Webflow page ID, so they cannot be looked up in validationsByPageId (keyed by page ID).
           const pageCtx: SchemaContext = {
             ...ctx,
             pageKeywords: getPageKeywords(slug),
