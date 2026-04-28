@@ -1442,7 +1442,10 @@ async function postProcessSchema(
   if (Array.isArray(graph) && siteId && ctx.workspaceId) {
     if (isHomepage) {
       // Homepage: extract full Org + WebSite and save as template for future subpages
-      const orgNode = graph.find(n => n['@type'] === 'Organization');
+      // Match by @id so healthcare-upgraded types (Dentist, Physician, etc.) are found too
+      const orgNode = graph.find(n =>
+        n['@type'] === 'Organization' || String(n['@id'] || '').endsWith('/#organization')
+      );
       const wsNode = graph.find(n => n['@type'] === 'WebSite');
       if (orgNode) {
         const websiteNode = wsNode || {
@@ -1460,7 +1463,10 @@ async function postProcessSchema(
       const template = getOrSeedSiteTemplate(siteId, ctx.workspaceId);
       if (template) {
         // Replace AI-generated Organization with stub from template (includes logo for consistency)
-        const orgIdx = graph.findIndex(n => n['@type'] === 'Organization');
+        // Match by @id so healthcare-upgraded types (Dentist, Physician, etc.) are found too
+        const orgIdx = graph.findIndex(n =>
+          n['@type'] === 'Organization' || String(n['@id'] || '').endsWith('/#organization')
+        );
         const orgStub: Record<string, unknown> = {
           '@type': 'Organization',
           '@id': `${siteUrl}/#organization`,
