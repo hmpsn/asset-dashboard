@@ -37,8 +37,10 @@ import { createLogger } from '../logger.js';
 import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking.js';
 import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { callOpenAI, parseAIJson } from '../openai-helpers.js';
+import { callAI } from '../ai.js';
 import { buildIntelPrompt } from '../workspace-intelligence.js';
 import { validate, z } from '../middleware/validate.js';
+import type { AiFixResult } from '../../shared/types/content.js';
 
 const log = createLogger('content-posts');
 
@@ -352,6 +354,144 @@ Return ONLY valid JSON like:
     res.status(500).json({ error: `AI review failed: ${msg}` });
   }
 });
+
+// AI fix — generates a targeted fix for a specific failed review item
+router.post('/api/content-posts/:workspaceId/:postId/ai-fix',
+  requireWorkspaceAccess('workspaceId'),
+  validate(z.object({
+    issueKey: z.enum(['factual_accuracy', 'brand_voice', 'internal_links', 'no_hallucinations', 'meta_optimized', 'word_count_target']),
+    reason: z.string().min(1).max(500),
+  })),
+  async (req, res) => {
+    const { issueKey, reason } = req.body as { issueKey: string; reason: string };
+    const post = getPost(req.params.workspaceId, req.params.postId);
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+
+    let field: AiFixResult['field'];
+    let sectionIndex: number | undefined;
+    let originalText: string;
+    let userPrompt: string;
+
+    switch (issueKey) {
+      case 'internal_links': {
+        const targetSection = post.sections.find(s => !s.content.includes('<a href'))
+          ?? post.sections[0];
+        if (!targetSection) return res.status(422).json({ error: 'No sections available' });
+        const brief = getBrief(req.params.workspaceId, post.briefId);
+        const suggestions = brief?.internalLinkSuggestions ?? [];
+        field = 'section';
+        sectionIndex = targetSection.index;
+        originalText = targetSection.content;
+        userPrompt = `Rewrite ONE sentence in this HTML section to include a relevant internal link using <a href="URL">anchor text</a>.
+Available internal link suggestions: ${suggestions.length > 0 ? suggestions.join(', ') : 'Use a plausible internal link like /blog or /services'}.
+Return the FULL SECTION HTML with exactly one new <a href="..."> tag added. Do not change any other content.
+
+Issue reason: ${reason}
+
+Section HTML:
+${originalText}`;
+        break;
+      }
+      case 'meta_optimized': {
+        field = 'meta';
+        originalText = JSON.stringify({
+          seoTitle: post.seoTitle || post.title,
+          seoMetaDescription: post.seoMetaDescription || post.metaDescription,
+        });
+        userPrompt = `Rewrite the SEO meta title and meta description for this blog post.
+Target keyword: "${post.targetKeyword}"
+Current title: "${post.seoTitle || post.title}"
+Current description: "${post.seoMetaDescription || post.metaDescription}"
+Requirements: Title 50-60 characters, description 150-160 characters, both include the target keyword.
+
+Issue reason: ${reason}
+
+Return ONLY valid JSON with no surrounding text:
+{ "seoTitle": "...", "seoMetaDescription": "..." }`;
+        break;
+      }
+      case 'word_count_target': {
+        const doneSections = post.sections.filter(s => s.status === 'done');
+        const candidates = doneSections.length > 0 ? doneSections : post.sections;
+        if (candidates.length === 0) return res.status(422).json({ error: 'No sections available' });
+        const targetSection = candidates.reduce((a, b) => a.wordCount < b.wordCount ? a : b);
+        field = 'section';
+        sectionIndex = targetSection.index;
+        originalText = targetSection.content;
+        userPrompt = `Expand this HTML section by approximately 20% to increase the post's overall word count.
+Add meaningful, relevant content — not filler. Maintain the same HTML structure and tone.
+Return the FULL EXPANDED SECTION HTML only.
+
+Post word count: ${post.totalWordCount} (target: ${post.targetWordCount})
+Issue reason: ${reason}
+
+Section HTML:
+${originalText}`;
+        break;
+      }
+      case 'brand_voice': {
+        field = 'introduction';
+        originalText = post.introduction;
+        userPrompt = `Rewrite this blog post introduction to better match a professional, authoritative brand voice.
+Keep the same topic, key points, and approximate length. Return the FULL INTRODUCTION HTML only.
+
+Issue reason: ${reason}
+
+Introduction HTML:
+${originalText}`;
+        break;
+      }
+      case 'factual_accuracy':
+      case 'no_hallucinations': {
+        const targetSection = post.sections[0];
+        if (!targetSection) return res.status(422).json({ error: 'No sections available' });
+        field = 'section';
+        sectionIndex = targetSection.index;
+        originalText = targetSection.content;
+        userPrompt = `Review this HTML section and rewrite any potentially inaccurate or unverifiable claims conservatively.
+Replace suspicious statistics or quotes with general, verifiable statements. Do NOT add new statistics.
+Return the FULL SECTION HTML with conservative rewrites applied.
+
+Issue reason: ${reason}
+
+Section HTML:
+${originalText}`;
+        break;
+      }
+      default:
+        return res.status(400).json({ error: 'Unknown issue key' });
+    }
+
+    try {
+      const aiResult = await callAI({
+        messages: [{ role: 'user', content: userPrompt }],
+        feature: 'content-fix',
+        workspaceId: req.params.workspaceId,
+        maxTokens: 2000,
+        temperature: 0.3,
+      });
+
+      const suggestedText = aiResult.text.trim();
+
+      if (field === 'meta') {
+        const parsed = parseAIJson<{ seoTitle: string; seoMetaDescription: string }>(suggestedText);
+        if (!parsed) return res.status(500).json({ error: 'Failed to parse AI meta response' });
+      }
+
+      const sectionLabel = field === 'section' && sectionIndex !== undefined
+        ? `section "${post.sections[sectionIndex]?.heading}"`
+        : field;
+      const explanation = `AI revised the ${sectionLabel} to address: ${reason.slice(0, 100)}`;
+
+      const result: AiFixResult = { field, sectionIndex, originalText, suggestedText, explanation };
+      res.json(result);
+    } catch (err) {
+      log.error({ err }, 'AI fix failed');
+      const msg = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: `AI fix failed: ${msg}` });
+    }
+  },
+);
 
 // --- Version History ---
 
