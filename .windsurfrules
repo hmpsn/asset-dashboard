@@ -389,7 +389,7 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
 | `StatCard` / `CompactStatBar` | `./ui` | Metric displays |
 | `PageHeader` | `./ui` | Page/tab header with title + actions |
 | `MetricRing` / `MetricRingSvg` | `./ui` | Score rings |
-| `Badge` | `./ui` | Status/category pills (9 colors) |
+| `Badge` | `./ui` | Status/category pills (7 colors) |
 | `TabBar` | `./ui` | Sub-navigation tabs |
 | `DateRangeSelector` | `./ui` | Segmented date pickers |
 | `DataList` | `./ui` | Ranked list displays |
