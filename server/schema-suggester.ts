@@ -379,7 +379,6 @@ export async function generateSchemaSuggestions(
   siteId: string,
   tokenOverride?: string,
   ctx: SchemaContext = {},
-  pageKeywordMap?: { pagePath: string; primaryKeyword: string; secondaryKeywords: string[]; searchIntent?: string; topicCluster?: string; contentGaps?: string[]; optimizationScore?: number }[],
   onProgress?: (partial: SchemaPageSuggestion[], done: boolean, message: string) => void,
   isCancelled?: () => boolean,
   gscMap?: Map<string, { clicks: number; impressions: number; position: number; ctr: number }>,
@@ -388,7 +387,7 @@ export async function generateSchemaSuggestions(
   insightsMap?: Map<string, { healthScore?: number; healthTrend?: string; isQuickWin?: boolean }>,
   validationsByPageId?: Map<string, SchemaValidation>,
 ): Promise<SchemaPageSuggestion[]> {
-  void pageKeywordMap; void gscMap; void ga4Map; void queryPageData; void insightsMap; void validationsByPageId;
+  void gscMap; void ga4Map; void queryPageData; void insightsMap; void validationsByPageId;
 
   const baseUrl = await resolveBaseUrl({ liveDomain: ctx.liveDomain, webflowSiteId: siteId }, tokenOverride);
   if (!baseUrl) return [];

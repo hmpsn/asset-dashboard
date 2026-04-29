@@ -340,7 +340,6 @@ export async function buildSchemaContext(
   options?: { includeAnalytics?: boolean },
 ): Promise<{
   ctx: SchemaContext;
-  pageKeywordMap?: { pagePath: string; primaryKeyword: string; secondaryKeywords: string[]; searchIntent?: string; topicCluster?: string; contentGaps?: string[]; optimizationScore?: number }[];
 } & SchemaAnalyticsMaps> {
   const allWs = listWorkspaces();
   const ws = allWs.find(w => w.webflowSiteId === siteId);
@@ -407,16 +406,6 @@ export async function buildSchemaContext(
     ctx._siteHasSearch = ws.siteHasSearch === true; // schema-context-direct-read-ok: Workspace identity field (DB-stored boolean flag, not on a slice).
 
   }
-  const pageKeywordMap = ws?.keywordStrategy?.pageMap?.map(p => ({
-    pagePath: p.pagePath,
-    primaryKeyword: p.primaryKeyword,
-    secondaryKeywords: p.secondaryKeywords || [],
-    searchIntent: p.searchIntent,
-    topicCluster: p.topicCluster,
-    contentGaps: p.contentGaps,
-    optimizationScore: p.optimizationScore,
-  }));
-
   // Fetch analytics maps when requested (for schema generation routes)
   let gscMap: SchemaAnalyticsMaps['gscMap'];
   let ga4Map: SchemaAnalyticsMaps['ga4Map'];
@@ -536,7 +525,7 @@ export async function buildSchemaContext(
     }
   }
 
-  return { ctx, pageKeywordMap, gscMap, ga4Map, queryPageData, insightsMap };
+  return { ctx, gscMap, ga4Map, queryPageData, insightsMap };
 }
 
 // ── Audit Traffic Cache ──

@@ -228,8 +228,8 @@ export function SchemaPageCard({
             </div>
           )}
 
-          {/* Validation findings — grouped by severity */}
-          {(page.validationFindings && page.validationFindings.length > 0) && (
+          {/* Validation findings — grouped by severity (with fallback for old-format validationErrors) */}
+          {(page.validationFindings && page.validationFindings.length > 0) ? (
             <div className="px-4 py-2 bg-amber-500/5 border-b border-amber-500/20">
               <div className="t-caption font-medium text-amber-400/80 mb-1">Validation findings</div>
               <div className="space-y-1">
@@ -250,6 +250,13 @@ export function SchemaPageCard({
                     </div>
                   ))}
               </div>
+            </div>
+          ) : hasErrors && (
+            <div className="px-4 py-2 bg-amber-500/5 border-b border-amber-500/20">
+              <div className="t-caption font-medium text-amber-400/80 mb-1">Validation warnings</div>
+              {page.validationErrors!.map((err, i) => (
+                <div key={i} className="t-caption-sm text-amber-300/80">• {err}</div>
+              ))}
             </div>
           )}
 
