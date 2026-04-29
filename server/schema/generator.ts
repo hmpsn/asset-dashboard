@@ -199,8 +199,14 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
     // (i.e. errors that weren't in the base set). Pre-existing base errors
     // remain — they're surfaced via validationFindings/validationErrors regardless.
     const postFaqFindings = validateLeanSchema(schema, classified.primaryType);
-    const baseRuleIdSet = new Set(baseValidationFindings.map(f => f.ruleId));
-    const faqIntroducedFindings = postFaqFindings.filter(f => !baseRuleIdSet.has(f.ruleId));
+    // Identity key combines ruleId (class) + type (@type of node) + field (specific field path)
+    // because ruleId alone is a class identifier (e.g. `required-field-missing` covers every
+    // missing-field error regardless of node/field). Without the composite key, a new FAQ-introduced
+    // finding of the same class as a pre-existing one would be incorrectly filtered out, leaving an
+    // invalid FAQPage node attached. See PR #372 review (BUG-0001).
+    const findingKey = (f: { ruleId: string; type: string; field?: string }) => `${f.ruleId}::${f.type}::${f.field ?? ''}`;
+    const baseFindingKeySet = new Set(baseValidationFindings.map(findingKey));
+    const faqIntroducedFindings = postFaqFindings.filter(f => !baseFindingKeySet.has(findingKey(f)));
     if (faqIntroducedFindings.length > 0) {
       log.debug({ pageId: input.pageId, errors: faqIntroducedFindings }, 'FAQPage extraction produced invalid schema; skipping');
       (schema['@graph'] as Array<Record<string, unknown>>).pop();
@@ -232,9 +238,13 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       },
     ],
     validationFindings: validationFindings.length > 0 ? validationFindings : undefined,
-    validationErrors: validationFindings.length > 0
-      ? validationFindings.filter(f => f.severity === 'error').map(f => f.message)
-      : undefined,
+    // Backwards-compat: undefined ⇔ no errors. Gate on errors.length, not findings.length —
+    // otherwise we emit `[]` when only warnings exist (latent today; surfaces the moment
+    // recommended-tier fields are populated). See PR #372 review (BUG-0002).
+    validationErrors: (() => {
+      const errors = validationFindings.filter(f => f.severity === 'error').map(f => f.message);
+      return errors.length > 0 ? errors : undefined;
+    })(),
     richResultsEligibility: richResultsEligibility.length > 0 ? richResultsEligibility : undefined,
   };
 }
