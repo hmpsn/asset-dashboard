@@ -159,7 +159,7 @@ function rowToEntry(row: ActivityRow): ActivityEntry {
 const CLIENT_VISIBLE_TYPES: Set<ActivityType> = new Set([
   'audit_completed', 'request_resolved', 'approval_applied', 'seo_updated',
   'images_optimized', 'links_fixed', 'content_updated', 'content_requested',
-  'brief_generated', 'brief_approved', 'briefing_published', 'content_upgraded', 'fix_completed',
+  'brief_generated', 'brief_approved', 'briefing_published', 'briefing_auto_published', 'content_upgraded', 'fix_completed',
   'content_published', 'copy_sent_to_client', 'post_approved', 'post_changes_requested',
   'post_client_edit', 'post_sent_for_review',
 ]);
