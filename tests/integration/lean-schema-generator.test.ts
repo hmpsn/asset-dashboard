@@ -98,4 +98,33 @@ describe('generateLeanSchema', () => {
     expect(out.url).not.toContain('//about');  // single slash only
     expect(out.url).toBe('https://example.com/about');
   });
+
+  it('appends FAQPage when page HTML contains accordion patterns', async () => {
+    const htmlWithFaq = `<html><body>
+      <details><summary>What is your turnaround time?</summary><p>Two weeks.</p></details>
+      <details><summary>Do you offer refunds?</summary><p>Yes, within 30 days.</p></details>
+    </body></html>`;
+    const out = await generateLeanSchema({
+      ...baseInput,
+      html: htmlWithFaq,
+      pageMeta: { ...baseInput.pageMeta, publishedPath: '/services/design' },
+    });
+    const graph = out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>;
+    const faqNode = graph.find(n => n['@type'] === 'FAQPage');
+    expect(faqNode).toBeDefined();
+    expect((faqNode!.mainEntity as unknown[])).toHaveLength(2);
+  });
+
+  it('does NOT append FAQPage when accordion has fewer than 2 pairs', async () => {
+    const htmlWithOneFaq = `<html><body>
+      <details><summary>Single Q</summary><p>Single A</p></details>
+    </body></html>`;
+    const out = await generateLeanSchema({
+      ...baseInput,
+      html: htmlWithOneFaq,
+      pageMeta: { ...baseInput.pageMeta, publishedPath: '/services/design' },
+    });
+    const graph = out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>;
+    expect(graph.find(n => n['@type'] === 'FAQPage')).toBeUndefined();
+  });
 });

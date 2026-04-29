@@ -15,6 +15,7 @@ import { classifyPage } from './classifier.js';
 import { extractPageData } from './data-sources.js';
 import type { PageMetaInput, WorkspaceSchemaInput } from './data-sources.js';
 import { extractDescription } from './extractors/description.js';
+import { extractFaq } from './extractors/faq.js';
 import { buildArticleSchema } from './templates/article.js';
 import { buildServiceSchema, buildProductSchema } from './templates/service.js';
 import { buildLocalBusinessSchema } from './templates/local-business.js';
@@ -170,6 +171,28 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
 
   // Validate
   const validationErrors = validateLeanSchema(schema, classified.primaryType);
+
+  // Surgical FAQ enrichment: if the page has accordion FAQ structure, append a FAQPage node.
+  const faqPairs = await extractFaq(input.html || '');
+  if (faqPairs.length >= 2) {
+    const faqNode = {
+      '@type': 'FAQPage',
+      '@id': `${pageData.canonicalUrl}#faq`,
+      'mainEntity': faqPairs.map(pair => ({
+        '@type': 'Question',
+        'name': pair.question,
+        'acceptedAnswer': { '@type': 'Answer', 'text': pair.answer },
+      })),
+    };
+    ((schema['@graph'] as Array<Record<string, unknown>>)).push(faqNode);
+    // Re-run validator to surface any FAQPage validation issues
+    const newErrors = validateLeanSchema(schema, classified.primaryType);
+    if (newErrors.length > 0) {
+      // FAQPage append broke something — log and don't include
+      log.debug({ pageId: input.pageId, errors: newErrors }, 'FAQPage extraction produced invalid schema; skipping');
+      (schema['@graph'] as Array<Record<string, unknown>>).pop();
+    }
+  }
 
   // Fix 3: compute rich results eligibility and pass through to caller
   const richResultsEligibility = checkRichResultsEligibility(schema);
