@@ -10,6 +10,7 @@ import type { ContentBrief } from '../shared/types/content.ts';
 import { buildPlanContextForPage } from './schema-plan.js';
 import { getAncestorChain, getParentNode, getSiblingNodes, getChildNodes } from './site-architecture.js';
 import { isProgrammingError } from './errors.js';
+import { getValidation } from './schema-validator.js';
 import type { SchemaValidation } from './schema-validator.js';
 import { fetchPageMeta } from './seo-audit.js';
 import { fetchPublishedHtml } from './helpers.js';
@@ -2010,6 +2011,22 @@ export async function generateSchemaForPage(
     ctx._faqOpportunities = extractFaqOpportunities(queryPageData, pageUrl);
   }
 
+  // Inject prior validation errors (avoids repeating mistakes from previous AI runs).
+  // generateSchemaForPage handles static Webflow pages — schema_validations.pageId is the
+  // Webflow UUID, which is exactly the `pageId` parameter to this function.
+  if (ctx.workspaceId && !ctx._existingErrors) {
+    try {
+      const existing = getValidation(ctx.workspaceId, pageId);
+      const rawErrors = existing?.errors;
+      const validated = Array.isArray(rawErrors)
+        ? (rawErrors as unknown[]).filter(
+            (e): e is { message: string } => typeof (e as { message?: unknown })?.message === 'string'
+          ).slice(0, 20)
+        : [];
+      if (validated.length > 0) ctx._existingErrors = validated;
+    } catch (err) { /* non-fatal: prior errors are an enrichment, not a requirement */ } // catch-ok
+  }
+
   // Try AI unified schema first
   const aiResult = await aiGenerateUnifiedSchema(
     meta.title, slug, seoTitle, seoDesc,
@@ -2245,11 +2262,19 @@ export async function generateSchemaSuggestions(
           const { types: existingSchemas, json: existingSchemaJson } = html ? extractExistingSchemas(html) : { types: [], json: [] };
 
           const cmsNormalizedPath = (item.path.startsWith('/') ? item.path : `/${item.path}`).replace(/\/$/, '') || '/';
+          const cmsPageId = toCmsPageId(item.path);
           // insightsMap is keyed by relative path (analytics_insights.page_id), not by full URL
           const cmsInsightData = insightsMap?.get(cmsNormalizedPath);
-          // Note: _existingErrors is not wired here — discoverCmsUrls only parses sitemap <loc> URLs
-          // and does not fetch Webflow item IDs. To wire this up we'd need to call listCollections +
-          // listCollectionItems to build a slug→itemId map, then look up validationsByPageId by that ID.
+          // schema_validations rows for CMS pages are keyed by cms-{path} (toCmsPageId).
+          // After migration 076 normalises legacy cms--* rows, this lookup hits.
+          const cmsPriorValidation = validationsByPageId?.get(cmsPageId);
+          const cmsRawErrors = cmsPriorValidation?.errors;
+          const cmsValidatedErrors = Array.isArray(cmsRawErrors)
+            ? (cmsRawErrors as unknown[]).filter(
+                (e): e is { message: string } => typeof (e as { message?: unknown })?.message === 'string'
+              ).slice(0, 20)
+            : [];
+          const cmsExistingErrors = cmsValidatedErrors.length > 0 ? cmsValidatedErrors : undefined;
           const pageCtx: SchemaContext = {
             ...ctx,
             pageKeywords: getPageKeywords(slug),
@@ -2261,6 +2286,7 @@ export async function generateSchemaSuggestions(
             _pageHealthTrend: cmsInsightData?.healthTrend as SchemaContext['_pageHealthTrend'],
             _quickWinStatus: cmsInsightData?.isQuickWin,
             _faqOpportunities: queryPageData ? extractFaqOpportunities(queryPageData, item.url) : undefined,
+            _existingErrors: cmsExistingErrors,
           };
 
           let suggestedSchemas: SchemaSuggestion[];
