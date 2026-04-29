@@ -17,6 +17,9 @@ export interface PageMetaInput {
   locale?: string | null;
   /** When this page is a Webflow CMS item, the resolved fieldData blob from /collections/:id/items/:itemId. */
   cmsFieldData?: Record<string, unknown> | null;
+  /** Per-page keyword strategy from seoContext slice. Populated when buildWorkspaceIntelligence
+   *  is called with opts.pagePath. Drives Article.keywords schema field emission. */
+  pageKeywords?: { primary: string; secondary: string[] };
 }
 
 export interface WorkspaceSchemaInput {
@@ -25,6 +28,11 @@ export interface WorkspaceSchemaInput {
   businessProfile: BusinessProfile | null;
   /** Default site-wide locale from Webflow site.locales[0] or "en" if absent. */
   defaultLocale: string;
+  /** Top-N siteKeywords (deduped, lowercased, declined-filter applied) for Organization.knowsAbout emission. */
+  siteKeywordsForKnowsAbout?: string[];
+  /** When true, schema generator emits WebSite.potentialAction (sitelinks SearchAction).
+   *  Mirrors Workspace.siteHasSearch DB column. PR2 ships the admin toggle UI. */
+  siteHasSearch?: boolean;
 }
 
 export interface BusinessProfile {
@@ -58,6 +66,14 @@ export interface PageData {
   /** BCP-47 language tag for this page. Always populated (workspace.defaultLocale fallback). */
   inLanguage: string;
   breadcrumbs: BreadcrumbItem[];
+  /** Comma-joined keywords string for Article.keywords schema field. Empty when no pageMap entry. */
+  keywords?: string;
+  /** AreaServed value derived from BusinessProfile.address.city/state for Service+LocalBusiness. */
+  areaServed?: string;
+  /** ServiceType derived from URL slug for Service template. */
+  serviceType?: string;
+  /** Top-N siteKeywords for Organization.knowsAbout — passed through from workspace. */
+  knowsAbout?: string[];
 }
 
 export interface ExtractInput {
@@ -106,6 +122,31 @@ function pickCmsField(fieldData: Record<string, unknown> | null | undefined, slu
   return undefined;
 }
 
+/** Capitalize a slug segment for human-readable output. */
+function capitalizeSlugSegment(slug: string): string {
+  return slug
+    .replace(/-/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+/** Derive the leaf URL slug (e.g. "/services/development" → "development"). */
+function leafSlug(publishedPath: string): string | undefined {
+  const segs = publishedPath.replace(/^\/|\/$/g, '').split('/').filter(Boolean);
+  if (segs.length === 0) return undefined;
+  return segs[segs.length - 1];
+}
+
+/** Format a Place name for areaServed. Returns "City, State" when both present, "City" or "State" if only one, undefined if neither. */
+function formatAreaServed(address: { city?: string; state?: string } | undefined): string | undefined {
+  if (!address) return undefined;
+  const city = address.city?.trim();
+  const state = address.state?.trim();
+  if (city && state) return `${city}, ${state}`;
+  if (city) return city;
+  if (state) return state;
+  return undefined;
+}
+
 export function extractPageData(input: ExtractInput): PageData {
   const $ = cheerio.load(input.html || '');
 
@@ -142,6 +183,19 @@ export function extractPageData(input: ExtractInput): PageData {
   const articleSection = deriveArticleSection(input.pageMeta.publishedPath);
   const canonicalUrl = `${input.baseUrl}${input.pageMeta.publishedPath}`;
 
+  // Derive Article.keywords (comma-joined) from per-page keywords.
+  const pageKeywords = input.pageMeta.pageKeywords;
+  const keywords = pageKeywords?.primary
+    ? [pageKeywords.primary, ...(pageKeywords.secondary ?? [])].filter(Boolean).join(', ')
+    : undefined;
+
+  // Derive Service.areaServed + LocalBusiness.areaServed from BusinessProfile address.
+  const areaServed = formatAreaServed(input.workspace.businessProfile?.address);
+
+  // Derive Service.serviceType from URL slug.
+  const slug = leafSlug(input.pageMeta.publishedPath);
+  const serviceType = slug ? capitalizeSlugSegment(slug) : undefined;
+
   return {
     title,
     cleanTitle,
@@ -158,5 +212,9 @@ export function extractPageData(input: ExtractInput): PageData {
     articleSection,
     inLanguage,
     breadcrumbs: buildBreadcrumbs(input.pageMeta.publishedPath, cleanTitle, input.baseUrl),
+    keywords,
+    areaServed,
+    serviceType,
+    knowsAbout: input.workspace.siteKeywordsForKnowsAbout?.slice(0, 5).map(s => s.toLowerCase()),
   };
 }

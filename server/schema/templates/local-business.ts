@@ -10,10 +10,12 @@ export interface LocalBusinessInput {
   baseUrl: string;
   pageData: PageData;
   businessProfile: BusinessProfile | null;
+  /** When true, WebSite.potentialAction (sitelinks SearchAction) is emitted. Mirrors Workspace.siteHasSearch. */
+  siteHasSearch?: boolean;
 }
 
 export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<string, unknown> {
-  const { pageData, businessProfile, baseUrl } = input;
+  const { pageData, businessProfile, baseUrl, siteHasSearch } = input;
 
   const address = businessProfile?.address
     ? dropUndefined({
@@ -36,6 +38,7 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
     'logo': pageData.publisher.logoUrl
       ? { '@type': 'ImageObject', 'url': pageData.publisher.logoUrl }
       : undefined,
+    'knowsAbout': pageData.knowsAbout?.length ? pageData.knowsAbout : undefined,
   });
 
   const localBusiness = dropUndefined({
@@ -53,12 +56,13 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
     'sameAs': businessProfile?.socialProfiles?.length ? businessProfile.socialProfiles : undefined,
     'foundedDate': businessProfile?.foundedDate,
     'parentOrganization': { '@id': `${baseUrl}/#organization` },
+    'areaServed': pageData.areaServed ? { '@type': 'Place' as const, name: pageData.areaServed } : undefined,
   });
 
   // Emit the same WebSite sitewide entity that buildHomepageSchema does — Google
   // uses this for the site-name display in search results.
-  // potentialAction (sitelinks SearchAction) intentionally omitted — see homepage.ts
-  // for rationale. Re-add when workspace.siteHasSearch confirms search endpoint.
+  // potentialAction (sitelinks SearchAction) gated on siteHasSearch — see homepage.ts
+  // for rationale. PR2 ships the admin toggle UI.
   const website = {
     '@type': 'WebSite',
     '@id': `${baseUrl}/#website`,
@@ -66,6 +70,13 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
     'url': baseUrl,
     'publisher': { '@id': `${baseUrl}/#organization` },
     'inLanguage': pageData.inLanguage,
+    ...(siteHasSearch ? {
+      'potentialAction': {
+        '@type': 'SearchAction',
+        'target': { '@type': 'EntryPoint', 'urlTemplate': `${baseUrl}/?s={search_term_string}` },
+        'query-input': 'required name=search_term_string',
+      },
+    } : {}),
   };
 
   return withBreadcrumb([organization, localBusiness, website], pageData);

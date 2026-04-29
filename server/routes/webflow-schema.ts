@@ -48,7 +48,7 @@ const log = createLogger('webflow-schema');
 router.get('/api/webflow/schema-suggestions/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
-    const { ctx, pageKeywordMap, gscMap, ga4Map, queryPageData, insightsMap } = await buildSchemaContext(req.params.siteId, { includeAnalytics: true });
+    const { ctx, gscMap, ga4Map, queryPageData, insightsMap } = await buildSchemaContext(req.params.siteId, { includeAnalytics: true });
     // Build per-page validation map so the AI can avoid repeating known mistakes
     const allValidations = ctx.workspaceId ? getValidations(ctx.workspaceId) : [];
     const validationsByPageId = new Map(allValidations.map(v => [v.pageId, v]));
@@ -59,7 +59,7 @@ router.get('/api/webflow/schema-suggestions/:siteId', requireWorkspaceAccessFrom
         ctx._architectureTree = arch.tree;
       } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-schema: GET /api/webflow/schema-suggestions/:siteId: programming error'); /* architecture not available — proceed without */ }
     }
-    const result = await generateSchemaSuggestions(req.params.siteId, token, ctx, pageKeywordMap, undefined, undefined, gscMap, ga4Map, queryPageData, insightsMap, validationsByPageId);
+    const result = await generateSchemaSuggestions(req.params.siteId, token, ctx, undefined, undefined, gscMap, ga4Map, queryPageData, insightsMap, validationsByPageId);
     res.json(result);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

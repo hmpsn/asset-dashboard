@@ -13,6 +13,7 @@ import { StatusBadge, Icon, cn } from '../ui';
 import { statusBorderClass, type PageEditStatus } from '../ui/statusConfig';
 import { SchemaEditor } from './SchemaEditor';
 import { SchemaVersionHistory } from './SchemaVersionHistory';
+import type { ValidationFinding } from '../../../shared/types/schema-validation';
 
 interface SchemaSuggestion {
   type: string;
@@ -37,6 +38,7 @@ interface SchemaPageSuggestion {
   existingSchemaJson?: Record<string, unknown>[];
   suggestedSchemas: SchemaSuggestion[];
   validationErrors?: string[];
+  validationFindings?: ValidationFinding[];
   richResultsEligibility?: RichResultEligibility[];
   lastPublishedAt?: string | null;
 }
@@ -226,8 +228,30 @@ export function SchemaPageCard({
             </div>
           )}
 
-          {/* Validation errors */}
-          {hasErrors && (
+          {/* Validation findings — grouped by severity (with fallback for old-format validationErrors) */}
+          {(page.validationFindings && page.validationFindings.length > 0) ? (
+            <div className="px-4 py-2 bg-amber-500/5 border-b border-amber-500/20">
+              <div className="t-caption font-medium text-amber-400/80 mb-1">Validation findings</div>
+              <div className="space-y-1">
+                {page.validationFindings
+                  .filter(f => f.severity === 'error')
+                  .map((f, i) => (
+                    <div key={`err-${i}`} className="t-caption-sm flex items-start gap-2">
+                      <span className="font-semibold uppercase tracking-wide text-red-400" style={{ fontSize: '10px' }}>Error</span>
+                      <span className="text-red-400/80">{f.message}</span>
+                    </div>
+                  ))}
+                {page.validationFindings
+                  .filter(f => f.severity === 'warning')
+                  .map((f, i) => (
+                    <div key={`warn-${i}`} className="t-caption-sm flex items-start gap-2">
+                      <span className="font-semibold uppercase tracking-wide text-amber-400" style={{ fontSize: '10px' }}>Recommended</span>
+                      <span className="text-amber-300/80">{f.message}</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          ) : hasErrors && (
             <div className="px-4 py-2 bg-amber-500/5 border-b border-amber-500/20">
               <div className="t-caption font-medium text-amber-400/80 mb-1">Validation warnings</div>
               {page.validationErrors!.map((err, i) => (

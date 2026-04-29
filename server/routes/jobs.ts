@@ -633,7 +633,7 @@ router.post('/api/jobs', async (req, res) => {
         (async () => {
           try {
             updateJob(job.id, { status: 'running', message: 'Scanning pages and generating unified schemas...' });
-            const { ctx, pageKeywordMap, gscMap, ga4Map, queryPageData, insightsMap } = await buildSchemaContext(schemaSiteId, { includeAnalytics: true });
+            const { ctx, gscMap, ga4Map, queryPageData, insightsMap } = await buildSchemaContext(schemaSiteId, { includeAnalytics: true });
             const schemaWsId = (params.workspaceId as string) || '';
             // Build per-page validation map so the AI can avoid repeating known mistakes
             const allValidations = ctx.workspaceId ? getValidations(ctx.workspaceId) : [];
@@ -648,7 +648,7 @@ router.post('/api/jobs', async (req, res) => {
             // Debounced incremental save — persist partial results every 10s
             let lastSaveTime = 0;
             const SAVE_INTERVAL = 10_000;
-            const result = await generateSchemaSuggestions(schemaSiteId, schemaToken, ctx, pageKeywordMap, (partial, _done, message) => {
+            const result = await generateSchemaSuggestions(schemaSiteId, schemaToken, ctx, (partial, _done, message) => {
               updateJob(job.id, { status: 'running', result: partial, message, progress: partial.length });
               const now = Date.now();
               if (partial.length > 0 && now - lastSaveTime >= SAVE_INTERVAL) {

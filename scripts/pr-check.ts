@@ -4653,6 +4653,140 @@ export const CHECKS: Check[] = [
     claudeMdRef: '#design-system--the-four-laws-of-color',
   },
   {
+    // ── No new direct workspace reads in buildSchemaContext outside identity allow-list ──
+    //
+    // `buildSchemaContext` in server/helpers.ts is the Trajectory 3 → 1 migration target
+    // (data/roadmap.json:schema-context-builder-pattern-b-migration). The plan is to move
+    // all direct ws.* reads to slice consumption via buildWorkspaceIntelligence({ slices }).
+    //
+    // Identity fields are allowed freely: ws.name, ws.id, ws.liveDomain, ws.brandLogoUrl,
+    // ws.siteHasSearch, siteId — these are cheap, stable, and not on any slice.
+    //
+    // Legacy direct reads (brandVoice, businessContext, knowledgeBase, personas,
+    // businessProfile) have been grandfathered in with `// schema-context-direct-read-ok`
+    // hatches and are tracked for opportunistic Pattern B migration.
+    //
+    // Escape hatch: add `// schema-context-direct-read-ok: <reason>` on the flagged line
+    // or the line immediately above for justified exceptions.
+    name: 'schema-context-direct-read-not-on-allowlist',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/helpers.ts',
+    message:
+      'Net-new direct reads in buildSchemaContext must use buildWorkspaceIntelligence({ slices: [...] }) per docs/superpowers/specs/2026-04-29-schema-yoast-parity-fields-design.md §6. ' +
+      'Identity fields (ws.name, ws.id, ws.liveDomain, ws.brandLogoUrl, ws.siteHasSearch, siteId) allowed. ' +
+      'Add // schema-context-direct-read-ok: <reason> for justified exceptions.',
+    severity: 'error',
+    rationale:
+      'Schema generation reads from workspace+intelligence data. Trajectory 3 → 1 migration ' +
+      '(data/roadmap.json:schema-context-builder-pattern-b-migration) ports legacy direct reads to ' +
+      'slice consumption. New direct reads bypass that migration; flag them at PR time.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const SCHEMA_CONTEXT_ALLOWLIST = new Set([
+        'ws.name',
+        'ws.id',
+        'ws.liveDomain',
+        'ws.brandLogoUrl',
+        'ws.siteHasSearch',
+        'siteId',
+      ]);
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('server/helpers.ts')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+
+        // Find the buildSchemaContext function start (the `export async function` line).
+        let funcStart = -1;
+        for (let i = 0; i < lines.length; i++) {
+          if (/export\s+async\s+function\s+buildSchemaContext\s*\(/.test(lines[i])) {
+            funcStart = i;
+            break;
+          }
+        }
+        if (funcStart === -1) continue;
+
+        // Find the body opener: the function signature may span multiple lines
+        // (parameter list with inline object types, return type annotation with
+        // generics). We track paren and angle depth starting from the `(` of the
+        // parameter list. A `{` is the function body opener only when paren=0
+        // AND angle=0 AND we have already closed the param list (i.e. paren has
+        // been >0 at some point and returned to 0).
+        //
+        // Concretely for `buildSchemaContext`:
+        //   line 338: `export async function buildSchemaContext(`  → paren=1
+        //   line 339: `  siteId: string,`                         → paren=1
+        //   line 340: `  options?: { includeAnalytics?: boolean },`→ paren=1 (inner {} ignored)
+        //   line 341: `): Promise<{`                              → `)` paren→0; seenParams=true; `<` angle=1; `{` inside angle — skip
+        //   line 342: `  ctx: SchemaContext;`                     → angle=1 still
+        //   line 343: `  pageKeywordMap?: ...;`                   → angle=1 still
+        //   line 344: `} & SchemaAnalyticsMaps> {`                → `}` (inside angle, ignored); `>` angle→0; ` {` paren=0 angle=0 seenParams=true → bodyStart
+        let bodyStart = -1;
+        {
+          let paren = 0;
+          let angle = 0;
+          let seenParams = false; // true once paren has gone >0 (we're past the `(`)
+          outer:
+          for (let i = funcStart; i < Math.min(funcStart + 30, lines.length); i++) {
+            const line = lines[i];
+            for (let k = 0; k < line.length; k++) {
+              const c = line[k];
+              if (c === '(') { paren++; seenParams = true; }
+              else if (c === ')') { if (paren > 0) paren--; }
+              else if (c === '<') { angle++; }
+              else if (c === '>') { if (angle > 0) angle--; }
+              else if (c === '{' && paren === 0 && angle === 0 && seenParams) {
+                // This {, at outer depth with the param list already closed,
+                // is the function body opener.
+                bodyStart = i;
+                break outer;
+              }
+            }
+          }
+        }
+        if (bodyStart === -1) continue;
+
+        // Walk forward from bodyStart with brace depth to find the matching close.
+        // Start depth=1 (we found the opening brace), end when depth returns to 0.
+        let depth = 1;
+        let funcEnd = lines.length;
+        for (let i = bodyStart + 1; i < lines.length; i++) {
+          for (const ch of lines[i]) {
+            if (ch === '{') depth++;
+            else if (ch === '}') depth--;
+          }
+          if (depth <= 0) { funcEnd = i; break; }
+        }
+
+        // Scan each line inside the function body.
+        for (let i = bodyStart + 1; i < funcEnd; i++) {
+          const line = lines[i];
+
+          // Skip lines with the inline hatch (same line or line above).
+          if (hasHatch(lines, i, '// schema-context-direct-read-ok')) continue;
+
+          // Pattern: assignment to ctx.X or local const that reads ws.Y or
+          // calls a helper that does direct DB/ws reads (getRawKnowledge,
+          // buildPersonasContext, getInsights, listSites, listSitesCached).
+          // ws.\w+ matches the first segment — ws.keywordStrategy?.businessContext
+          // is flagged via ws.keywordStrategy (which is not in the allow-list).
+          const m = line.match(
+            /(?:ctx\.\w+\s*=\s*|const\s+\w+\s*=\s*|if\s*\()(ws\.\w+|getRawKnowledge|buildPersonasContext|getInsights|listSites\b|listSitesCached)\b/,
+          );
+          if (!m) continue;
+
+          const rhs = m[1];
+          if (SCHEMA_CONTEXT_ALLOWLIST.has(rhs)) continue;
+
+          hits.push({ file, line: i + 1, text: line.trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
     // Catches HTML-naive word-counting on TipTap content fields. Post intro/conclusion
     // and section.content are stored as rich-text HTML, so `countWords(post.introduction)`
     // or `post.introduction.split(/\s+/)` treats `<p>` and `</p>` as words and inflates

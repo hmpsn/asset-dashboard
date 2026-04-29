@@ -2,6 +2,7 @@ import { getCollectionSchema, listCollections, discoverCmsItemsBySlug, buildStat
 import { getWorkspacePages } from './workspace-data.js';
 import { listWorkspaces } from './workspaces.js';
 import { generateLeanSchema } from './schema/index.js';
+import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
 import { callOpenAI } from './openai-helpers.js';
 import { createLogger } from './logger.js';
 import type { ContentBrief } from '../shared/types/content.ts';
@@ -119,12 +120,7 @@ export interface SchemaContext {
   knowledgeBase?: string;
   pageType?: SchemaPageType;
   _siteId?: string;  // Internal: passed through for site template storage
-  _planContext?: string;  // Internal: plan-based role/entity context for this page
   _architectureTree?: import('./site-architecture.js').SiteNode;    // Full site tree for breadcrumb + nav generation
-  _pageNode?: import('./site-architecture.js').SiteNode;            // Current page's node in the tree
-  _ancestors?: import('./site-architecture.js').SiteNode[];         // Ancestor chain [root, ..., parent, target]
-  _briefId?: string;  // Internal: linked content brief ID for E-E-A-T enrichment
-  _pageAnalysis?: { topicCluster?: string; contentGaps?: string[]; optimizationScore?: number };  // Internal: from Page Intelligence
   _personasBlock?: string;  // Internal: audience personas for richer schema targeting
   _gscPageData?: { clicks: number; impressions: number; position: number; ctr: number };  // Internal: GSC per-page metrics
   _ga4PageData?: { pageviews: number; users: number; avgEngagementTime: number };  // Internal: GA4 per-page metrics
@@ -143,6 +139,10 @@ export interface SchemaContext {
   };
   /** Default site-wide BCP-47 locale from Webflow site.locales.primary.tag. Defaults to 'en' when unset. */
   _defaultLocale?: string;
+  /** When true, WebSite.potentialAction (sitelinks SearchAction) is emitted.
+   *  Source: Workspace.siteHasSearch DB column. PR1 always reads as undefined
+   *  (DB column defaults to 0 / false); PR2 ships the admin toggle UI. */
+  _siteHasSearch?: boolean;
   /** Site-level SERP features from SEO data provider — used to steer schema type selection. */
   _serpFeatures?: { featuredSnippets: number; peopleAlsoAsk: number; localPack: boolean; videoCarousel: number };
   /** Referring-domain count from backlink profile — used to calibrate schema ambition. */
@@ -326,6 +326,22 @@ export async function generateSchemaForPage(
   const url = isHomepage ? baseUrl : `${baseUrl}${publishedPath}`;
   const html = await fetchPublishedHtml(url);
 
+  // Per-page slice fetch for pageKeywords (Audit Correction 4: pageKeywords is a PageKeywordMap
+  // populated only when buildWorkspaceIntelligence is called with opts.pagePath).
+  // 5-min LRU + single-flight dedup makes this cheap — no local cache needed.
+  let pageKeywords: { primary: string; secondary: string[] } | undefined;
+  if (ctx.workspaceId) {
+    try {
+      const perPageIntel = await buildWorkspaceIntelligence(ctx.workspaceId, { slices: ['seoContext'], pagePath: publishedPath });
+      if (perPageIntel?.seoContext?.pageKeywords) {
+        pageKeywords = {
+          primary: perPageIntel.seoContext.pageKeywords.primaryKeyword || '',
+          secondary: perPageIntel.seoContext.pageKeywords.secondaryKeywords || [],
+        };
+      }
+    } catch { /* intelligence not ready — pageKeywords stays undefined */ } // catch-ok
+  }
+
   const lean = await generateLeanSchema({
     pageId,
     pageMeta: {
@@ -337,6 +353,7 @@ export async function generateSchemaForPage(
       // The Webflow API may return these even though the local PageMeta interface omits them.
       lastPublished: (meta as unknown as Record<string, unknown>).lastPublished as string | undefined,
       createdOn: (meta as unknown as Record<string, unknown>).createdOn as string | undefined,
+      pageKeywords,
     },
     html: html || '',
     baseUrl,
@@ -345,6 +362,8 @@ export async function generateSchemaForPage(
       publisherLogoUrl: ctx.logoUrl ?? null,
       businessProfile: ctx._businessProfile ?? null,
       defaultLocale: ctx._defaultLocale ?? 'en',
+      siteKeywordsForKnowsAbout: ctx.siteKeywords, // NEW
+      siteHasSearch: ctx._siteHasSearch ?? false, // NEW
     },
   });
 
@@ -360,7 +379,6 @@ export async function generateSchemaSuggestions(
   siteId: string,
   tokenOverride?: string,
   ctx: SchemaContext = {},
-  pageKeywordMap?: { pagePath: string; primaryKeyword: string; secondaryKeywords: string[]; searchIntent?: string; topicCluster?: string; contentGaps?: string[]; optimizationScore?: number }[],
   onProgress?: (partial: SchemaPageSuggestion[], done: boolean, message: string) => void,
   isCancelled?: () => boolean,
   gscMap?: Map<string, { clicks: number; impressions: number; position: number; ctr: number }>,
@@ -369,7 +387,7 @@ export async function generateSchemaSuggestions(
   insightsMap?: Map<string, { healthScore?: number; healthTrend?: string; isQuickWin?: boolean }>,
   validationsByPageId?: Map<string, SchemaValidation>,
 ): Promise<SchemaPageSuggestion[]> {
-  void pageKeywordMap; void gscMap; void ga4Map; void queryPageData; void insightsMap; void validationsByPageId;
+  void gscMap; void ga4Map; void queryPageData; void insightsMap; void validationsByPageId;
 
   const baseUrl = await resolveBaseUrl({ liveDomain: ctx.liveDomain, webflowSiteId: siteId }, tokenOverride);
   if (!baseUrl) return [];
@@ -383,14 +401,31 @@ export async function generateSchemaSuggestions(
     if (isCancelled?.()) break;
     const slug = page.slug || '';
     const url = (!slug || slug === 'index') ? baseUrl : `${baseUrl}/${slug}`;
+    const publishedPath = page.publishedPath || (slug ? `/${slug}` : '/');
     const html = await fetchPublishedHtml(url);
+
+    // Per-page slice fetch for pageKeywords (5-min LRU + single-flight dedup — cheap).
+    let pageKeywords: { primary: string; secondary: string[] } | undefined;
+    if (wsId) {
+      try {
+        const perPageIntel = await buildWorkspaceIntelligence(wsId, { slices: ['seoContext'], pagePath: publishedPath });
+        if (perPageIntel?.seoContext?.pageKeywords) {
+          pageKeywords = {
+            primary: perPageIntel.seoContext.pageKeywords.primaryKeyword || '',
+            secondary: perPageIntel.seoContext.pageKeywords.secondaryKeywords || [],
+          };
+        }
+      } catch { /* intelligence not ready — pageKeywords stays undefined */ } // catch-ok
+    }
+
     const lean = await generateLeanSchema({
       pageId: page.id,
       pageMeta: {
         title: page.title || '',
         slug,
-        publishedPath: page.publishedPath || (slug ? `/${slug}` : '/'),
+        publishedPath,
         seo: page.seo,
+        pageKeywords,
       },
       html: html || '',
       baseUrl,
@@ -399,6 +434,8 @@ export async function generateSchemaSuggestions(
         publisherLogoUrl: ctx.logoUrl ?? null,
         businessProfile: ctx._businessProfile ?? null,
         defaultLocale: ctx._defaultLocale ?? 'en',
+        siteKeywordsForKnowsAbout: ctx.siteKeywords, // NEW
+        siteHasSearch: ctx._siteHasSearch ?? false, // NEW
       },
     });
     results.push(leanToSuggestion(lean));
@@ -412,6 +449,20 @@ export async function generateSchemaSuggestions(
     for (const item of cmsItems) {
       if (isCancelled?.()) break;
       const itemHtml = await fetchPublishedHtml(item.url);
+      // Per-page slice fetch for CMS item pageKeywords.
+      let cmsPageKeywords: { primary: string; secondary: string[] } | undefined;
+      if (wsId) {
+        try {
+          const cmsPerPageIntel = await buildWorkspaceIntelligence(wsId, { slices: ['seoContext'], pagePath: item.path });
+          if (cmsPerPageIntel?.seoContext?.pageKeywords) {
+            cmsPageKeywords = {
+              primary: cmsPerPageIntel.seoContext.pageKeywords.primaryKeyword || '',
+              secondary: cmsPerPageIntel.seoContext.pageKeywords.secondaryKeywords || [],
+            };
+          }
+        } catch { /* intelligence not ready — cmsPageKeywords stays undefined */ } // catch-ok
+      }
+
       const itemLean = await generateLeanSchema({
         pageId: toCmsPageId(item.path),
         pageMeta: {
@@ -422,6 +473,7 @@ export async function generateSchemaSuggestions(
           lastPublished: item.lastPublished,
           createdOn: item.createdOn,
           cmsFieldData: item.fieldData,
+          pageKeywords: cmsPageKeywords,
         },
         html: itemHtml || '',
         baseUrl,
@@ -430,6 +482,8 @@ export async function generateSchemaSuggestions(
           publisherLogoUrl: ctx.logoUrl ?? null,
           businessProfile: ctx._businessProfile ?? null,
           defaultLocale: ctx._defaultLocale ?? 'en',
+          siteKeywordsForKnowsAbout: ctx.siteKeywords, // NEW
+          siteHasSearch: ctx._siteHasSearch ?? false, // NEW
         },
       });
       results.push(leanToSuggestion(itemLean));

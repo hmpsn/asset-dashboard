@@ -98,6 +98,24 @@ describe('buildArticleSchema (BlogPosting)', () => {
     const node = (buildArticleSchema(baseInput, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>)[0];
     expect(node.author).toEqual({ '@type': 'Organization', 'name': 'Acme' });
   });
+
+  it('emits keywords as comma-joined string from pageData.keywords', () => {
+    const withKeywords = {
+      ...baseInput,
+      pageData: { ...baseInput.pageData, keywords: 'webflow development, brand strategy, web design' },
+    };
+    const node = (buildArticleSchema(withKeywords, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.keywords).toBe('webflow development, brand strategy, web design');
+  });
+
+  it('omits keywords when pageData.keywords is undefined', () => {
+    const noKeywords = {
+      ...baseInput,
+      pageData: { ...baseInput.pageData, keywords: undefined },
+    };
+    const node = (buildArticleSchema(noKeywords, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.keywords).toBeUndefined();
+  });
 });
 
 const serviceInput = {
@@ -147,6 +165,29 @@ describe('buildServiceSchema', () => {
     expect(node.isPartOf).toEqual({ '@id': 'https://example.com/#website' });
     expect(node.breadcrumb).toEqual({ '@id': 'https://example.com/services/web-design#breadcrumb' });
     expect(node.inLanguage).toBe('en');
+  });
+
+  it('Service emits areaServed as Place when populated', () => {
+    const withArea = {
+      ...serviceInput,
+      pageData: { ...serviceInput.pageData, areaServed: 'Austin, TX' },
+    };
+    const node = (buildServiceSchema(withArea)['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.areaServed).toEqual({ '@type': 'Place', name: 'Austin, TX' });
+  });
+
+  it('Service omits areaServed when undefined', () => {
+    const node = (buildServiceSchema(serviceInput)['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.areaServed).toBeUndefined();
+  });
+
+  it('Service emits serviceType from URL-derived slug', () => {
+    const withType = {
+      ...serviceInput,
+      pageData: { ...serviceInput.pageData, serviceType: 'Web Design' },
+    };
+    const node = (buildServiceSchema(withType)['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.serviceType).toBe('Web Design');
   });
 });
 
@@ -243,6 +284,25 @@ describe('buildLocalBusinessSchema', () => {
     const graph = buildLocalBusinessSchema(localInput)['@graph'] as Array<Record<string, unknown>>;
     const node = graph.find(n => n['@type'] === 'LocalBusiness') as Record<string, unknown>;
     expect(node.name).toBe('Acme Dental');
+  });
+
+  it('LocalBusiness sibling Organization emits knowsAbout when populated', () => {
+    const withKeywords = {
+      ...localInput,
+      pageData: { ...localInput.pageData, knowsAbout: ['dental care', 'cosmetic dentistry'] },
+    };
+    const schema = buildLocalBusinessSchema(withKeywords);
+    const org = (schema['@graph'] as Array<Record<string, unknown>>).find(n => n['@type'] === 'Organization');
+    expect(org?.knowsAbout).toEqual(['dental care', 'cosmetic dentistry']);
+  });
+
+  it('LocalBusiness emits areaServed as Place when populated', () => {
+    const withArea = {
+      ...localInput,
+      pageData: { ...localInput.pageData, areaServed: 'Austin, TX' },
+    };
+    const lb = (buildLocalBusinessSchema(withArea)['@graph'] as Array<Record<string, unknown>>).find(n => n['@type'] === 'LocalBusiness');
+    expect(lb?.areaServed).toEqual({ '@type': 'Place', name: 'Austin, TX' });
   });
 });
 
@@ -354,5 +414,40 @@ describe('buildHomepageSchema', () => {
     const website = (schema['@graph'] as Array<Record<string, unknown>>)[1];
     expect(website.inLanguage).toBe('en');
     expect(website.potentialAction).toBeUndefined();
+  });
+
+  it('Organization emits knowsAbout when knowsAbout is populated (top 5, lowercased)', () => {
+    const withKeywords = {
+      ...homepageInput,
+      pageData: { ...homepageInput.pageData, knowsAbout: ['web design', 'webflow', 'brand strategy'] },
+    };
+    const schema = buildHomepageSchema(withKeywords);
+    const org = (schema['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(org.knowsAbout).toEqual(['web design', 'webflow', 'brand strategy']);
+  });
+
+  it('Organization omits knowsAbout when knowsAbout is undefined or empty', () => {
+    const noKeywords = {
+      ...homepageInput,
+      pageData: { ...homepageInput.pageData, knowsAbout: undefined },
+    };
+    const org = (buildHomepageSchema(noKeywords)['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(org.knowsAbout).toBeUndefined();
+  });
+
+  it('WebSite emits potentialAction when siteHasSearch is true', () => {
+    const withSearch = {
+      ...homepageInput,
+      siteHasSearch: true,
+    };
+    const schema = buildHomepageSchema(withSearch);
+    const website = (schema['@graph'] as Array<Record<string, unknown>>).find(n => n['@type'] === 'WebSite');
+    expect((website?.potentialAction as Record<string, unknown>)?.['@type']).toBe('SearchAction');
+  });
+
+  it('WebSite omits potentialAction when siteHasSearch is false or undefined', () => {
+    const noSearch = { ...homepageInput, siteHasSearch: false };
+    const website = (buildHomepageSchema(noSearch)['@graph'] as Array<Record<string, unknown>>).find(n => n['@type'] === 'WebSite');
+    expect(website?.potentialAction).toBeUndefined();
   });
 });

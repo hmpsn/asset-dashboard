@@ -340,7 +340,6 @@ export async function buildSchemaContext(
   options?: { includeAnalytics?: boolean },
 ): Promise<{
   ctx: SchemaContext;
-  pageKeywordMap?: { pagePath: string; primaryKeyword: string; secondaryKeywords: string[]; searchIntent?: string; topicCluster?: string; contentGaps?: string[]; optimizationScore?: number }[];
 } & SchemaAnalyticsMaps> {
   const allWs = listWorkspaces();
   const ws = allWs.find(w => w.webflowSiteId === siteId);
@@ -348,10 +347,27 @@ export async function buildSchemaContext(
   if (ws) {
     ctx.companyName = ws.name;
     ctx.liveDomain = ws.liveDomain;
+    // schema-context-direct-read-ok: legacy; tracked in roadmap schema-context-builder-pattern-b-migration
     ctx.brandVoice = ws.brandVoice;
+    // schema-context-direct-read-ok: legacy; tracked in roadmap schema-context-builder-pattern-b-migration
     ctx.businessContext = ws.keywordStrategy?.businessContext;
-    const rawSiteKeywords = ws.keywordStrategy?.siteKeywords;
+
+    // Slice-migration starter (Trajectory 3 → 1; tracked in
+    // data/roadmap.json:schema-context-builder-pattern-b-migration).
+    // PR1 migrates `siteKeywords` and per-page `pageKeywords` to slice consumption.
+    // Other direct reads (brandVoice, businessContext, knowledgeBase, _businessProfile,
+    // _personasBlock) tracked for opportunistic migration; pr-check rule
+    // schema-context-direct-read-not-on-allowlist (Task 13) fires on any new
+    // non-identity direct read.
+    let schemaIntel: Awaited<ReturnType<typeof buildWorkspaceIntelligence>> | null = null;
+    try {
+      schemaIntel = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext'] });
+    } catch { /* intelligence layer not ready — siteKeywords falls back to undefined */ } // catch-ok
+
+    // Audit Correction 2: SeoContextSlice field is strategy.siteKeywords (not keywordStrategy.siteKeywords).
+    const rawSiteKeywords = schemaIntel?.seoContext?.strategy?.siteKeywords;
     if (rawSiteKeywords?.length) {
+      // Audit Correction 3: slice does NOT apply the declined filter — schema layer must.
       const declined = getDeclinedKeywords(ws.id);
       if (declined.length > 0) {
         const declinedSet = new Set(declined.map(k => k.toLowerCase()));
@@ -374,27 +390,22 @@ export async function buildSchemaContext(
     } catch { /* listSites failure: leave _defaultLocale undefined; downstream falls back to 'en' */ } // catch-ok
 
     // Knowledge base from unified seo-context builder (inline + knowledge-docs/ files)
+    // schema-context-direct-read-ok: legacy; tracked in roadmap schema-context-builder-pattern-b-migration
     const rawKB = getRawKnowledge(ws.id);
     if (rawKB) ctx.knowledgeBase = rawKB.slice(0, 4000);
 
     // Audience personas for richer schema targeting
+    // schema-context-direct-read-ok: legacy; tracked in roadmap schema-context-builder-pattern-b-migration
     const personasBlock = buildPersonasContext(ws.id);
     if (personasBlock) ctx._personasBlock = personasBlock;
 
     // Verified business profile for schema grounding (bypasses page content verification)
+    // schema-context-direct-read-ok: legacy; tracked in roadmap schema-context-builder-pattern-b-migration
     if (ws.businessProfile) ctx._businessProfile = ws.businessProfile;
 
-  }
-  const pageKeywordMap = ws?.keywordStrategy?.pageMap?.map(p => ({
-    pagePath: p.pagePath,
-    primaryKeyword: p.primaryKeyword,
-    secondaryKeywords: p.secondaryKeywords || [],
-    searchIntent: p.searchIntent,
-    topicCluster: p.topicCluster,
-    contentGaps: p.contentGaps,
-    optimizationScore: p.optimizationScore,
-  }));
+    ctx._siteHasSearch = ws.siteHasSearch === true; // schema-context-direct-read-ok: Workspace identity field (DB-stored boolean flag, not on a slice).
 
+  }
   // Fetch analytics maps when requested (for schema generation routes)
   let gscMap: SchemaAnalyticsMaps['gscMap'];
   let ga4Map: SchemaAnalyticsMaps['ga4Map'];
@@ -453,6 +464,7 @@ export async function buildSchemaContext(
 
       // Build insights map from intelligence layer (SQLite — synchronous)
       try {
+        // schema-context-direct-read-ok: legacy analytics read; tracked in roadmap schema-context-builder-pattern-b-migration
         const allInsights = getInsights(ws.id);
         insightsMap = new Map();
         // ranking_opportunity pageIds are stored as relative paths after the
@@ -513,7 +525,7 @@ export async function buildSchemaContext(
     }
   }
 
-  return { ctx, pageKeywordMap, gscMap, ga4Map, queryPageData, insightsMap };
+  return { ctx, gscMap, ga4Map, queryPageData, insightsMap };
 }
 
 // ── Audit Traffic Cache ──
