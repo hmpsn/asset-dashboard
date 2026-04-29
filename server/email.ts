@@ -184,6 +184,28 @@ export function notifyClientPostReady(opts: {
   }));
 }
 
+/**
+ * Phase 1b helper — invoked by briefing-cron.ts (T1.14) when a weekly briefing
+ * publishes (manual or auto). No-op until SMTP is configured. Phase 4 connects
+ * this helper to the autoReportFrequency='weekly' path in monthly-report.ts.
+ */
+export function notifyClientBriefingReady(opts: {
+  clientEmail: string;
+  workspaceName: string;
+  workspaceId: string;
+  weekOf: string;
+  storyCount: number;
+  heroHeadline: string;
+  dashboardUrl?: string;
+}): void {
+  if (!isEmailConfigured()) return;
+  queueEmail(makeEvent('client_briefing_ready', opts.clientEmail, opts.workspaceId, opts.workspaceName, opts.dashboardUrl, {
+    weekOf: opts.weekOf,
+    storyCount: opts.storyCount,
+    heroHeadline: opts.heroHeadline,
+  }));
+}
+
 export function notifyApprovalReady(opts: {
   clientEmail: string;
   workspaceName: string;
