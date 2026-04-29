@@ -4,7 +4,7 @@
  * Product never emits zero-price offers.
  */
 import type { PageData } from '../data-sources.js';
-import { dropUndefined, orgRef, withBreadcrumb } from './helpers.js';
+import { dropUndefined, orgRef, withBreadcrumb, webSiteRef, breadcrumbRef } from './helpers.js';
 
 export interface ServiceInput {
   baseUrl: string;
@@ -17,7 +17,7 @@ export function buildServiceSchema(input: ServiceInput): Record<string, unknown>
   const primary = dropUndefined({
     '@type': 'Service',
     '@id': `${pageData.canonicalUrl}#service`,
-    'name': pageData.title,
+    'name': pageData.cleanTitle,
     'description': pageData.description,
     'image': pageData.image,
     'url': pageData.canonicalUrl,
@@ -26,22 +26,28 @@ export function buildServiceSchema(input: ServiceInput): Record<string, unknown>
       ...orgRef(baseUrl),
       'name': pageData.publisher.name,
     }),
+    'isPartOf': webSiteRef(baseUrl),
+    'breadcrumb': breadcrumbRef(pageData.canonicalUrl),
+    'inLanguage': pageData.inLanguage,
   });
 
   return withBreadcrumb(primary, pageData);
 }
 
 export function buildProductSchema(input: ServiceInput): Record<string, unknown> {
-  const { pageData } = input;
+  const { pageData, baseUrl } = input;
 
   const primary = dropUndefined({
     '@type': 'Product',
     '@id': `${pageData.canonicalUrl}#product`,
-    'name': pageData.title,
+    'name': pageData.cleanTitle,
     'description': pageData.description,
     'image': pageData.image ? [pageData.image] : undefined,
     'url': pageData.canonicalUrl,
     'brand': { '@type': 'Brand', 'name': pageData.publisher.name },
+    'isPartOf': webSiteRef(baseUrl),
+    'breadcrumb': breadcrumbRef(pageData.canonicalUrl),
+    'inLanguage': pageData.inLanguage,
     // Intentionally NO offers — emitting offers without a verified price is spammy
     // and Google penalises it. Add via intelligence layer when business profile has price.
   });

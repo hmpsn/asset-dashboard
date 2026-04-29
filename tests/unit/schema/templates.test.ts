@@ -103,10 +103,12 @@ const serviceInput = {
   baseUrl: 'https://example.com',
   pageData: {
     title: 'Web Design Service',
+    cleanTitle: 'Web Design Service',
     description: 'Custom design',
     image: 'https://x/svc.jpg',
     canonicalUrl: 'https://example.com/services/web-design',
     publisher: { name: 'Acme', logoUrl: undefined },
+    inLanguage: 'en',
     breadcrumbs: [
       { name: 'Home', url: 'https://example.com' },
       { name: 'Services', url: 'https://example.com/services' },
@@ -137,6 +139,13 @@ describe('buildServiceSchema', () => {
     const input = { ...serviceInput, pageData: { ...serviceInput.pageData, image: undefined } };
     const node = (buildServiceSchema(input)['@graph'] as Array<Record<string, unknown>>)[0];
     expect(node.image).toBeUndefined();
+  });
+
+  it('Service primary node has isPartOf, breadcrumb, inLanguage', () => {
+    const node = (buildServiceSchema(serviceInput)['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.isPartOf).toEqual({ '@id': 'https://example.com/#website' });
+    expect(node.breadcrumb).toEqual({ '@id': 'https://example.com/services/web-design#breadcrumb' });
+    expect(node.inLanguage).toBe('en');
   });
 });
 
