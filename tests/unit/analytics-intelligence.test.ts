@@ -130,10 +130,12 @@ describe('computeRankingOpportunities', () => {
     expect(seoTips.data.pageUrl).toBe('https://example.com/blog/seo-tips');
   });
 
-  it('uses page URL only as pageId so DB UNIQUE constraint deduplicates per page', () => {
+  it('uses normalised relative path as pageId so insight lookup matches page_health pageIds', () => {
     const results = computeRankingOpportunities(queryPageData);
     const seoTips = results.find(r => r.data.query === 'seo tips for beginners')!;
-    expect(seoTips.pageId).toBe('https://example.com/blog/seo-tips');
+    // pageId must be the relative path, not the full URL — consumers compare against
+    // page_health insight pageIds which are stored as '/path', not 'https://...'.
+    expect(seoTips.pageId).toBe('/blog/seo-tips');
   });
 
   it('sorts by estimated traffic gain descending', () => {

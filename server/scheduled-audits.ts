@@ -5,7 +5,7 @@ import { runSeoAudit } from './seo-audit.js';
 import { saveSnapshot, getLatestSnapshotBefore } from './reports.js';
 import { addActivity } from './activity-log.js';
 import { notifyAuditAlert, notifyClientAuditComplete } from './email.js';
-import { applySuppressionsToAudit } from './helpers.js';
+import { applySuppressionsToAudit, toAuditFindingPageId } from './helpers.js';
 import { createLogger } from './logger.js';
 import { fireBridge } from './bridge-infrastructure.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
@@ -155,7 +155,7 @@ async function runScheduledAudit(schedule: AuditSchedule) {
       const pagesWithIssues = new Set<string>();
       for (const page of effectiveAudit.pages) {
         if (page.issues?.some(i => i.severity === 'error' || i.severity === 'warning')) {
-          pagesWithIssues.add(page.pageId);
+          pagesWithIssues.add(toAuditFindingPageId(page));
         }
       }
 
@@ -201,7 +201,7 @@ async function runScheduledAudit(schedule: AuditSchedule) {
         // and applies stored deltas on top. Mirror: Bridge #15. If the delta math changes,
         // replicate in both bridges. upsertInsight replaces `data` on conflict, so we
         // must read-before-write to avoid clobbering cross-bridge adjustments.
-        const existing = getInsight(ws.id, page.pageId, 'audit_finding');
+        const existing = getInsight(ws.id, toAuditFindingPageId(page), 'audit_finding');
         const prevAdj = existing?.data._scoreAdjustments as Record<string, number> | undefined;
         const totalDelta = prevAdj
           ? Object.values(prevAdj).reduce((s, d) => s + (Number.isFinite(d) ? d : 0), 0)
@@ -218,7 +218,7 @@ async function runScheduledAudit(schedule: AuditSchedule) {
         upsertInsight({
           workspaceId: ws.id,
           insightType: 'audit_finding',
-          pageId: page.pageId,
+          pageId: toAuditFindingPageId(page),
           pageTitle: page.page,
           severity: pageIssues.some(i => i.severity === 'error') ? 'critical' : 'warning',
           data,

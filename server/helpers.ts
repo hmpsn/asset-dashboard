@@ -427,8 +427,10 @@ export async function buildSchemaContext(
       try {
         const allInsights = getInsights(ws.id);
         insightsMap = new Map();
-        // Quick win pageIds are composite keys like "https://example.com/blog::seo tips"
-        // Extract the page URL prefix (before "::") for matching against page_health pageIds
+        // ranking_opportunity pageIds are stored as relative paths after the
+        // page-identity normalisation; legacy composite-key form ("path::query")
+        // may still exist in not-yet-migrated rows. split('::')[0] is a no-op
+        // for the new format and a safe extraction for the legacy form.
         const quickWinPageUrls = new Set(
           allInsights
             .filter(i => i.insightType === 'ranking_opportunity' && i.pageId)
@@ -597,4 +599,25 @@ export function stripCodeFences(text: string): string {
   return text
     .replace(/^```(?:json|html|xml)?\s*/i, '')
     .replace(/\s*```\s*$/i, '');
+}
+
+/**
+ * Normalise a URL to a relative path for `analytics_insights.page_id` storage.
+ * GSC/GA4 producers emit full URLs; insight `page_id` is stored as the URL pathname
+ * so consumers can compare against site-relative paths. Already-relative inputs
+ * (or non-URL strings) pass through unchanged.
+ */
+export function toInsightPageId(url: string): string {
+  try { return new URL(url).pathname; } catch { return url; }
+}
+
+/**
+ * Convert a Webflow audit page object to the canonical relative path used for
+ * `analytics_insights.page_id`. Prefers slug (→ /slug), falls back to URL pathname,
+ * and finally falls back to the raw pageId (Webflow UUID) as a last resort.
+ * Defensively strips leading slashes from slug to avoid `//foo` from a leading-slash slug.
+ */
+export function toAuditFindingPageId(page: { slug: string; url: string; pageId: string }): string {
+  if (page.slug) return `/${page.slug.replace(/^\/+/, '')}`;
+  try { return new URL(page.url).pathname; } catch { return page.pageId; }
 }

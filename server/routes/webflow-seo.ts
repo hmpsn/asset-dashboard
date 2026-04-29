@@ -34,7 +34,7 @@ import { getInsights } from '../analytics-insights-store.js';
 import type * as AnalyticsInsightsStore from '../analytics-insights-store.js';
 import { buildKeywordMapContext } from '../seo-context.js';
 import { isProgrammingError } from '../errors.js';
-import { applySuppressionsToAudit, stripHtmlToText, stripCodeFences, tryResolvePagePath, matchGscUrlToPath, applyBulkKeywordGuards, findPageMapEntryForPage } from '../helpers.js';
+import { applySuppressionsToAudit, stripHtmlToText, stripCodeFences, tryResolvePagePath, matchGscUrlToPath, applyBulkKeywordGuards, findPageMapEntryForPage, toAuditFindingPageId } from '../helpers.js';
 import { resolveBaseUrl } from '../url-helpers.js';
 import { createJob, updateJob, isJobCancelled, hasActiveJob, registerAbort } from '../jobs.js';
 import { broadcastToWorkspace } from '../broadcast.js';
@@ -108,7 +108,7 @@ router.get('/api/webflow/seo-audit/:siteId', requireWorkspaceAccessFromQuery(), 
         const pagesWithIssues = new Set<string>();
         for (const page of effectiveAudit.pages) {
           if (page.issues?.some((i: { severity: string }) => i.severity === 'error' || i.severity === 'warning')) {
-            pagesWithIssues.add(page.pageId);
+            pagesWithIssues.add(toAuditFindingPageId(page));
           }
         }
 
@@ -133,43 +133,55 @@ router.get('/api/webflow/seo-audit/:siteId', requireWorkspaceAccessFromQuery(), 
 
       // ── Bridge: Audit → audit_finding insights for pages with critical/warning issues ──
       fireBridge('bridge-audit-page-health', auditWs.id, async () => {
-        const { upsertInsight: upsert, getInsights: fetchInsights }: typeof AnalyticsInsightsStore = await import('../analytics-insights-store.js'); // dynamic-import-ok
-        const existing = fetchInsights(auditWs.id);
+        const { upsertInsight: upsert, getInsight }: typeof AnalyticsInsightsStore = await import('../analytics-insights-store.js'); // dynamic-import-ok
 
         // Map critical/warning audit issues to audit_finding insights
         const criticalPages = effectiveAudit.pages
           .filter((p: { issues?: Array<{ severity: string }> }) => p.issues?.some(i => i.severity === 'error' || i.severity === 'warning'));
 
-        let created = 0;
+        let modified = 0;
         for (const page of criticalPages.slice(0, 20)) { // Cap at 20 to avoid flooding
           const pageIssues = page.issues?.filter((i: { severity: string }) => i.severity === 'error' || i.severity === 'warning') ?? [];
           if (pageIssues.length === 0) continue;
 
-          // Deduplicate: skip if identical audit_finding insight exists for this page
-          const existingForPage = existing.find(
-            i => i.insightType === 'audit_finding' && i.pageId === page.pageId && i.resolutionStatus !== 'resolved',
-          );
-          if (existingForPage) continue;
+          const isCritical = pageIssues.some((i: { severity: string }) => i.severity === 'error');
+          const baseScore = isCritical ? 80 : 50;
+
+          // Base-score setter pattern — mirror of scheduled-audits.ts bridge-audit-page-health.
+          // upsertInsight replaces `data` on conflict, so we must read-before-write to
+          // avoid clobbering _scoreAdjustments written by other bridges (e.g. anomaly boosts).
+          const existing = getInsight(auditWs.id, toAuditFindingPageId(page), 'audit_finding');
+          if (existing && existing.resolutionStatus !== 'resolved' &&
+              existing.data?.issueCount === pageIssues.length &&
+              existing.data?.issueMessages === pageIssues.map((i: { message: string }) => i.message).join('; ')) {
+            // No content change since last write — skip to avoid bumping updated_at unnecessarily.
+            continue;
+          }
+          const prevAdj = existing?.data?._scoreAdjustments as Record<string, number> | undefined;
+          const totalDelta = prevAdj
+            ? Object.values(prevAdj).reduce((s, d) => s + (Number.isFinite(d) ? d : 0), 0)
+            : 0;
 
           upsert({
             workspaceId: auditWs.id,
             insightType: 'audit_finding',
-            pageId: page.pageId,
+            pageId: toAuditFindingPageId(page),
             pageTitle: page.page,
-            severity: pageIssues.some((i: { severity: string }) => i.severity === 'error') ? 'critical' : 'warning',
+            severity: isCritical ? 'critical' : 'warning',
             data: {
               scope: 'page',
               issueCount: pageIssues.length,
               issueMessages: pageIssues.map((i: { message: string }) => i.message).join('; '),
               source: 'bridge_12_audit_page_health',
+              ...(prevAdj ? { _originalBaseScore: baseScore, _scoreAdjustments: prevAdj } : {}),
             },
-            impactScore: pageIssues.some((i: { severity: string }) => i.severity === 'error') ? 80 : 50,
+            impactScore: prevAdj ? Math.max(0, Math.min(100, baseScore + totalDelta)) : baseScore,
             bridgeSource: 'bridge-audit-page-health',
           });
-          created++;
+          modified++;
         }
 
-        return { modified: created };
+        return { modified };
       });
 
       // ── Bridge #15: Audit → site-level audit_finding insight ──
@@ -332,14 +344,8 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
     if (workspaceId && pagePath) {
       try {
         const allInsights = getInsights(workspaceId);
-        // pageId is stored as a full URL (https://domain.com/path) or synthetic key.
-        // pagePath is a path like /services/seo (already has leading slash).
-        // Match if pageId ends with pagePath or equals it exactly.
         const pageInsights = allInsights.filter(i =>
-          i.pageId != null && (
-            i.pageId === pagePath ||
-            i.pageId.endsWith(pagePath)
-          )
+          i.pageId === pagePath
         );
 
         const cannibalization = pageInsights

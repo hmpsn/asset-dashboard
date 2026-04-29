@@ -1994,9 +1994,12 @@ export async function generateSchemaForPage(
   }
 
   // Inject intelligence layer data (health score, quick win, FAQ opportunities)
+  // insightsMap is keyed by analytics_insights.page_id (relative path) — match
+  // the lookup key already computed for gscMap/ga4Map above.
   const pageUrl = (!slug || slug === 'index') ? baseUrl : `${baseUrl}/${slug}`;
   if (insightsMap) {
-    const insightData = insightsMap.get(pageUrl);
+    const lookupPath = (isHomepage ? '/' : (slug ? `/${slug}` : '/')).replace(/\/$/, '') || '/';
+    const insightData = insightsMap.get(lookupPath);
     if (insightData) {
       ctx._pageHealthScore = insightData.healthScore;
       ctx._pageHealthTrend = insightData.healthTrend as SchemaContext['_pageHealthTrend'];
@@ -2142,7 +2145,8 @@ export async function generateSchemaSuggestions(
         const normalizedPath = (isHomepage ? '/' : lookupPath).replace(/\/$/, '') || '/';
         const planContext = sitePlan ? buildPlanContextForPage(sitePlan, isHomepage ? '/' : lookupPath) : '';
         const fullPageUrl = isHomepage ? baseUrl : `${baseUrl}${lookupPath}`;
-        const insightData = insightsMap?.get(fullPageUrl);
+        // insightsMap is keyed by relative path (analytics_insights.page_id), not by full URL
+        const insightData = insightsMap?.get(normalizedPath);
         const priorValidation = validationsByPageId?.get(page.id);
         const rawErrors = priorValidation?.errors;
         const validatedErrors = Array.isArray(rawErrors)
@@ -2241,7 +2245,8 @@ export async function generateSchemaSuggestions(
           const { types: existingSchemas, json: existingSchemaJson } = html ? extractExistingSchemas(html) : { types: [], json: [] };
 
           const cmsNormalizedPath = (item.path.startsWith('/') ? item.path : `/${item.path}`).replace(/\/$/, '') || '/';
-          const cmsInsightData = insightsMap?.get(item.url);
+          // insightsMap is keyed by relative path (analytics_insights.page_id), not by full URL
+          const cmsInsightData = insightsMap?.get(cmsNormalizedPath);
           // Note: _existingErrors is not wired here — discoverCmsUrls only parses sitemap <loc> URLs
           // and does not fetch Webflow item IDs. To wire this up we'd need to call listCollections +
           // listCollectionItems to build a slug→itemId map, then look up validationsByPageId by that ID.
