@@ -330,6 +330,14 @@ const KNOWN_UNHANDLED_BROADCASTS = new Set<string>([
   // invalidation is needed. Cross-referenced with LOCAL_ONLY_EVENTS in
   // tests/contract/ws-invalidation-coverage.test.ts.
   'schema:plan_sent',
+
+  // briefing:generated, briefing:published — Client Briefing v2 (in-progress).
+  // Constants land first as part of the foundation PR (T1.4); the broadcast
+  // call sites land with the routes/cron in T1.11 + T1.14, and the frontend
+  // handlers land with T1.19 (admin) and Phase 2 (client). Remove these
+  // entries when those tasks complete.
+  'briefing:generated',
+  'briefing:published',
 ]);
 
 /**
@@ -469,7 +477,12 @@ describe('broadcast ↔ handler pairing audit', () => {
 
   // ── WS_EVENTS definition coverage ─────────────────────────────────────────
 
-  const KNOWN_CONSTANTS_PENDING_ROUTES = new Set<string>([]);
+  const KNOWN_CONSTANTS_PENDING_ROUTES = new Set<string>([
+    // briefing:* — Client Briefing v2 (in-progress). Broadcasts land in
+    // T1.11 (admin routes) and T1.14 (cron). Remove when those ship.
+    'briefing:generated',
+    'briefing:published',
+  ]);
 
   it('every WS_EVENTS constant is actually used in a broadcastToWorkspace() call', () => {
     const definedValues = [...serverWsEventsMap.values()];

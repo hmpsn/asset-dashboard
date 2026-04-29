@@ -89,6 +89,10 @@ interface WorkspaceRow {
   intelligence_profile: string | null;
   business_priorities: string | null;
   custom_prompt_notes: string | null;
+  // NOT NULL DEFAULT 0 / 24 in migration 077 — never null on read
+  auto_publish_briefings: number;
+  auto_publish_after_hours: number;
+  last_briefing_run_week_of: string | null;
   created_at: string;
 }
 
@@ -188,6 +192,10 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
   if (row.site_intelligence_client_view != null) ws.siteIntelligenceClientView = !!row.site_intelligence_client_view;
   if (row.business_priorities) ws.businessPriorities = parseJsonSafeArray(row.business_priorities, z.string(), { workspaceId: row.id, field: 'business_priorities', table: 'workspaces' });
   if (row.custom_prompt_notes) ws.customPromptNotes = row.custom_prompt_notes;
+  // auto_publish_briefings + auto_publish_after_hours are NOT NULL in the schema; surface them unconditionally
+  ws.autoPublishBriefings = !!row.auto_publish_briefings;
+  ws.autoPublishAfterHours = row.auto_publish_after_hours;
+  ws.lastBriefingRunWeekOf = row.last_briefing_run_week_of ?? null;
   return ws;
 }
 
@@ -318,6 +326,10 @@ function workspaceToParams(ws: Workspace) {
     intelligence_profile: ws.intelligenceProfile ? JSON.stringify(ws.intelligenceProfile) : null,
     business_priorities: ws.businessPriorities ? JSON.stringify(ws.businessPriorities) : null,
     custom_prompt_notes: ws.customPromptNotes ?? null,
+    // Mirror migration 077 DEFAULTs (NOT NULL columns) so future INSERT-statement updates don't trip
+    auto_publish_briefings: ws.autoPublishBriefings === undefined ? 0 : (ws.autoPublishBriefings ? 1 : 0),
+    auto_publish_after_hours: ws.autoPublishAfterHours ?? 24,
+    last_briefing_run_week_of: ws.lastBriefingRunWeekOf ?? null,
     created_at: ws.createdAt,
   };
 }
@@ -380,7 +392,7 @@ export function createWorkspace(name: string, webflowSiteId?: string, webflowSit
   return workspace;
 }
 
-export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'competitorLastFetchedAt' | 'competitorDomainsAtLastFetch' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'billingMode' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile' | 'intelligenceProfile' | 'siteIntelligenceClientView' | 'businessPriorities' | 'customPromptNotes'>>): Workspace | null {
+export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'competitorLastFetchedAt' | 'competitorDomainsAtLastFetch' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'billingMode' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile' | 'intelligenceProfile' | 'siteIntelligenceClientView' | 'businessPriorities' | 'customPromptNotes' | 'autoPublishBriefings' | 'autoPublishAfterHours' | 'lastBriefingRunWeekOf'>>): Workspace | null {
   const row = stmts().getById.get(id) as WorkspaceRow | undefined;
   if (!row) return null;
 
@@ -412,6 +424,7 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
     publishTarget: 'publish_target', seoDataProvider: 'seo_data_provider',
     businessProfile: 'business_profile', intelligenceProfile: 'intelligence_profile',
     businessPriorities: 'business_priorities', customPromptNotes: 'custom_prompt_notes',
+    autoPublishBriefings: 'auto_publish_briefings', autoPublishAfterHours: 'auto_publish_after_hours', lastBriefingRunWeekOf: 'last_briefing_run_week_of',
   };
 
   const ALLOWED_COLUMNS = new Set(Object.values(columnMap));
