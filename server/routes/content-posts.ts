@@ -147,6 +147,7 @@ const updatePostSchema = z.object({
     targetWordCount: z.number().optional(),
     keywords: z.array(z.string()).optional(),
     status: z.enum(['pending', 'generating', 'done', 'error']).optional(),
+    error: z.string().optional(),
   })).optional(),
   conclusion: z.string().optional(),
   seoTitle: z.string().max(200).optional(),
