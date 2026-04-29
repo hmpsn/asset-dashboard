@@ -171,8 +171,8 @@ describe('buildLocalBusinessSchema', () => {
   const localInput = {
     baseUrl: 'https://acme.dental',
     pageData: {
-      title: 'Acme Dental — Austin',
-      cleanTitle: 'Acme Dental — Austin',
+      title: 'Home | Acme Dental',
+      cleanTitle: 'Home',
       description: 'Family dentistry',
       image: 'https://x/clinic.jpg',
       canonicalUrl: 'https://acme.dental',
@@ -236,6 +236,12 @@ describe('buildLocalBusinessSchema', () => {
     expect(websiteNode).toBeDefined();
     expect(websiteNode['@id']).toBe('https://acme.dental/#website');
     expect(websiteNode.publisher).toEqual({ '@id': 'https://acme.dental/#organization' });
+  });
+
+  it('uses publisher.name for LocalBusiness name, not cleanTitle (avoids stripped homepage titles)', () => {
+    const graph = buildLocalBusinessSchema(localInput)['@graph'] as Array<Record<string, unknown>>;
+    const node = graph.find(n => n['@type'] === 'LocalBusiness') as Record<string, unknown>;
+    expect(node.name).toBe('Acme Dental');
   });
 });
 

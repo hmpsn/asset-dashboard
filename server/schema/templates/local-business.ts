@@ -41,7 +41,7 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
   const localBusiness = dropUndefined({
     '@type': 'LocalBusiness',
     '@id': `${baseUrl}/#localbusiness`,
-    'name': pageData.cleanTitle ?? pageData.publisher.name,
+    'name': pageData.publisher.name,
     'description': pageData.description,
     'url': baseUrl,
     'image': pageData.image,

@@ -317,6 +317,24 @@ const analyticsCache: Record<string, {
 }> = {};
 const ANALYTICS_CACHE_TTL_MS = 5 * 60 * 1000;
 
+// 5-minute TTL cache for listSites() — prevents an extra Webflow API round-trip on every
+// single-page schema generation request. Keyed by workspace token (or '' for global).
+const sitesCache: Record<string, {
+  sites: Array<{ id: string; displayName: string; shortName: string; defaultLocale: string }>;
+  ts: number;
+}> = {};
+
+async function listSitesCached(
+  tokenOverride?: string,
+): Promise<Array<{ id: string; displayName: string; shortName: string; defaultLocale: string }>> {
+  const key = tokenOverride ?? '';
+  const cached = sitesCache[key];
+  if (cached && Date.now() - cached.ts < ANALYTICS_CACHE_TTL_MS) return cached.sites;
+  const sites = await listSites(tokenOverride);
+  sitesCache[key] = { sites, ts: Date.now() };
+  return sites;
+}
+
 export async function buildSchemaContext(
   siteId: string,
   options?: { includeAnalytics?: boolean },
@@ -350,7 +368,7 @@ export async function buildSchemaContext(
     // Pass the workspace's per-site token so this works for workspaces that don't
     // rely on the global WEBFLOW_API_TOKEN env var.
     try {
-      const sites = await listSites(ws.webflowToken || undefined);
+      const sites = await listSitesCached(ws.webflowToken || undefined);
       const matched = sites.find(s => s.id === siteId);
       if (matched?.defaultLocale) ctx._defaultLocale = matched.defaultLocale;
     } catch { /* listSites failure: leave _defaultLocale undefined; downstream falls back to 'en' */ } // catch-ok

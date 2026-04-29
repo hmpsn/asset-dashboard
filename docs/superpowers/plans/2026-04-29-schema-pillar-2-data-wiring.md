@@ -6,7 +6,7 @@
 
 **Architecture:** Three layers of edits, no new modules.
 1. **Data layer** — extend `PageData`, `PageMetaInput`, `WorkspaceSchemaInput` with the missing fields; pull `inLanguage` from Webflow `site.locales[]`; rewrite CMS discovery so each discovered URL is paired with its collection+item IDs and `fieldData` from `/collections/{id}/items/{itemId}`; add a `scrubBrandSuffix()` helper so the rest of the pipeline never sees `"Title | Brand"` strings.
-2. **Helper layer** — add `webSiteRef(baseUrl)`, `breadcrumbRef(canonicalUrl)`, and `scrubBrandSuffix(name, brand)` in `server/schema/templates/helpers.ts`. Refactor `withBreadcrumb` to accept the primary node already populated with cross-refs (no behavioural change for templates that don't pass them).
+2. **Helper layer** — add `webSiteRef(baseUrl)`, `breadcrumbRef(canonicalUrl, breadcrumbs)`, and `scrubBrandSuffix(name, brand)` in `server/schema/templates/helpers.ts`. `breadcrumbRef` returns `undefined` when `breadcrumbs.length < 2` to prevent dangling `@id` references. Refactor `withBreadcrumb` to accept the primary node already populated with cross-refs (no behavioural change for templates that don't pass them).
 3. **Template layer** — every non-homepage primary node gains `isPartOf` (→ `#website`), `breadcrumb` (→ `#breadcrumb`), and `inLanguage`. Article gains `author` (from CMS or workspace), `articleSection` (from URL path), and properly-shaped `image` array. Homepage `Organization` gains `sameAs` + `foundedDate` from `BusinessProfile`; `WebSite` gains `potentialAction` (sitelinks SearchAction).
 
 **Tech Stack:** TypeScript strict, vitest (unit + integration), Cheerio (already at `^1.2.0`), `webflowFetch` from `server/webflow-client.ts`, `getCollectionItem` / `listCollectionItems` / `listCollections` from `server/webflow-cms.ts` (all already exported).
@@ -76,7 +76,7 @@ Reviewers (per task): spec-compliance reviewer = opus, code-quality reviewer = o
 | Path | Modification |
 |---|---|
 | `server/schema/data-sources.ts` | Task 1 + Task 3: extend `PageData`, `PageMetaInput`, `WorkspaceSchemaInput`; add `scrubBrandSuffix()`; emit `inLanguage`, `author`, `articleSection`; rebuild breadcrumb names from scrubbed title. |
-| `server/schema/templates/helpers.ts` | Task 2: add `webSiteRef(baseUrl)`, `breadcrumbRef(canonicalUrl)`, `scrubBrandSuffix(name, brand)`. |
+| `server/schema/templates/helpers.ts` | Task 2: add `webSiteRef(baseUrl)`, `breadcrumbRef(canonicalUrl, breadcrumbs)`, `scrubBrandSuffix(name, brand)`. |
 | `server/schema/templates/static.ts` | Task 4: every primary node gains `isPartOf`, `breadcrumb`, `inLanguage`. |
 | `server/schema/templates/article.ts` | Task 5: add `isPartOf`, `breadcrumb`, `inLanguage`, `articleSection`, `author` (from CMS data when present, falls back to Organization). |
 | `server/schema/templates/service.ts` | Task 6: every primary node gains `isPartOf`, `breadcrumb`, `inLanguage`. |
@@ -188,7 +188,11 @@ export function webSiteRef(baseUrl: string): { '@id': string } {
  * Returns an @id reference to a page's BreadcrumbList node.
  * Every non-homepage primary node uses this for the back-reference `breadcrumb` property.
  */
-export function breadcrumbRef(canonicalUrl: string): { '@id': string } {
+export function breadcrumbRef(
+  canonicalUrl: string,
+  breadcrumbs: BreadcrumbItem[],
+): { '@id': string } | undefined {
+  if (breadcrumbs.length < 2) return undefined;
   return { '@id': `${canonicalUrl}#breadcrumb` };
 }
 
@@ -503,7 +507,7 @@ export function buildWebPageSchema(input: StaticInput): Record<string, unknown> 
     'description': pageData.description,
     'url': pageData.canonicalUrl,
     'isPartOf': webSiteRef(input.baseUrl),
-    'breadcrumb': breadcrumbRef(pageData.canonicalUrl),
+    'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
     'inLanguage': pageData.inLanguage,
   });
   return withBreadcrumb(primary, pageData);
@@ -608,7 +612,7 @@ export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Reco
         : undefined,
     }),
     'isPartOf': webSiteRef(input.baseUrl),
-    'breadcrumb': breadcrumbRef(pageData.canonicalUrl),
+    'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
     'inLanguage': pageData.inLanguage,
     'articleSection': pageData.articleSection,
     'about': kind === 'Article' ? 'Case study' : undefined,
@@ -680,7 +684,7 @@ export function buildServiceSchema(input: ServiceInput): Record<string, unknown>
     'url': pageData.canonicalUrl,
     'provider': { '@type': 'Organization', '@id': `${baseUrl}/#organization`, 'name': pageData.publisher.name },
     'isPartOf': webSiteRef(baseUrl),
-    'breadcrumb': breadcrumbRef(pageData.canonicalUrl),
+    'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
     'inLanguage': pageData.inLanguage,
   });
   return withBreadcrumb(primary, pageData);
