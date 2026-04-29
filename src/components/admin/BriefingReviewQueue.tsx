@@ -7,7 +7,7 @@ import {
   useSkipBriefing,
   useGenerateBriefingNow,
 } from '../../hooks/admin/useBriefingDrafts';
-import { SectionCard, Badge, EmptyState, LoadingState, Icon, Button, Modal } from '../ui';
+import { SectionCard, Badge, EmptyState, ErrorState, LoadingState, Icon, Button, Modal } from '../ui';
 import type { BriefingDraft, BriefingDraftStatus } from '../../../shared/types/briefing';
 
 function statusColor(s: BriefingDraftStatus): 'teal' | 'emerald' | 'zinc' {
@@ -21,7 +21,13 @@ interface BriefingReviewQueueProps {
 }
 
 export function BriefingReviewQueue({ workspaceId }: BriefingReviewQueueProps) {
-  const { data: drafts = [], isLoading } = useBriefingDrafts(workspaceId);
+  const {
+    data: drafts = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useBriefingDrafts(workspaceId);
   const approveM = useApproveBriefing(workspaceId);
   const publishM = usePublishBriefing(workspaceId);
   const skipM = useSkipBriefing(workspaceId);
@@ -54,6 +60,18 @@ export function BriefingReviewQueue({ workspaceId }: BriefingReviewQueueProps) {
     return (
       <SectionCard title="Weekly Briefings" titleIcon={<Icon as={Sparkles} size="md" className="text-teal-400" />} action={generateNowAction}>
         <LoadingState message="Loading briefings..." />
+      </SectionCard>
+    );
+  }
+
+  if (isError) {
+    return (
+      <SectionCard title="Weekly Briefings" titleIcon={<Icon as={Sparkles} size="md" className="text-teal-400" />} action={generateNowAction}>
+        <ErrorState
+          title="Couldn't load briefings"
+          message={error instanceof Error ? error.message : 'Try refetching, or check the server logs if the issue persists.'}
+          action={{ label: 'Retry', onClick: () => refetch() }}
+        />
       </SectionCard>
     );
   }

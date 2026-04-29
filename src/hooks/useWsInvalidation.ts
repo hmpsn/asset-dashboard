@@ -254,7 +254,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
     [WS_EVENTS.BRIEFING_PUBLISHED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.briefingDrafts(workspaceId) });
-      // Phase 2 will also invalidate queryKeys.client.briefing(workspaceId)
+      // TODO(phase-2): also invalidate queryKeys.client.briefing(workspaceId)
       // when the client-facing briefing component lands. For now, paid-tier
       // workspaces hit /api/public/briefing/:wsId on demand without caching.
     },

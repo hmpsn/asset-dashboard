@@ -40,7 +40,7 @@ export const briefingApi = {
     ).then(r => r.draft),
 
   generateNow: (workspaceId: string) =>
-    post<{ accepted: true }>(`/api/briefing/${workspaceId}/generate-now`, {}),
+    post<{ accepted: boolean; reason?: string }>(`/api/briefing/${workspaceId}/generate-now`, {}),
 
   // ── Client (public, read-only) ───────────────────────────────────────────
   getPublished: (workspaceId: string) =>
