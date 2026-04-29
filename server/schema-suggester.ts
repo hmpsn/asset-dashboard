@@ -326,6 +326,20 @@ export function extractEeatFromBrief(brief: ContentBrief): EeatData | null {
 
   return result;
 }
+/** Maps the lean generator's output shape to the public SchemaPageSuggestion. */
+function leanToSuggestion(lean: import('./schema/index.js').LeanGeneratorOutput): SchemaPageSuggestion {
+  return {
+    pageId: lean.pageId,
+    pageTitle: lean.pageTitle,
+    slug: lean.slug,
+    url: lean.url,
+    existingSchemas: lean.existingSchemas,
+    suggestedSchemas: lean.suggestedSchemas,
+    validationErrors: lean.validationErrors,
+    richResultsEligibility: lean.richResultsEligibility,
+  };
+}
+
 export async function generateSchemaForPage(
   siteId: string,
   pageId: string,
@@ -390,16 +404,7 @@ export async function generateSchemaForPage(
   // intelligence wiring; the lean generator does not use them in MVP scope.
   void gscMap; void ga4Map; void queryPageData; void insightsMap;
 
-  return {
-    pageId: lean.pageId,
-    pageTitle: lean.pageTitle,
-    slug: lean.slug,
-    url: lean.url,
-    existingSchemas: lean.existingSchemas,
-    suggestedSchemas: lean.suggestedSchemas,
-    validationErrors: lean.validationErrors,
-    richResultsEligibility: lean.richResultsEligibility,  // Fix 3: wire through
-  };
+  return leanToSuggestion(lean);
 }
 
 export async function generateSchemaSuggestions(
@@ -446,17 +451,7 @@ export async function generateSchemaSuggestions(
         businessProfile: ctx._businessProfile ?? null,
       },
     });
-    const suggestion: SchemaPageSuggestion = {
-      pageId: lean.pageId,
-      pageTitle: lean.pageTitle,
-      slug: lean.slug,
-      url: lean.url,
-      existingSchemas: lean.existingSchemas,
-      suggestedSchemas: lean.suggestedSchemas,
-      validationErrors: lean.validationErrors,
-      richResultsEligibility: lean.richResultsEligibility,  // Fix 3: wire through
-    };
-    results.push(suggestion);
+    results.push(leanToSuggestion(lean));
     onProgress?.(results, false, `Processed ${results.length} of ${pages.length} static pages...`);
   }
 
@@ -484,16 +479,7 @@ export async function generateSchemaSuggestions(
           businessProfile: ctx._businessProfile ?? null,
         },
       });
-      results.push({
-        pageId: itemLean.pageId,
-        pageTitle: itemLean.pageTitle,
-        slug: itemLean.slug,
-        url: itemLean.url,
-        existingSchemas: itemLean.existingSchemas,
-        suggestedSchemas: itemLean.suggestedSchemas,
-        validationErrors: itemLean.validationErrors,
-        richResultsEligibility: itemLean.richResultsEligibility,  // Fix 3: wire through
-      });
+      results.push(leanToSuggestion(itemLean));
     }
   }
 
