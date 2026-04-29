@@ -9,19 +9,21 @@ export interface PageMetaInput {
   title: string;
   slug: string;
   publishedPath: string;
-  /** Optional SEO metadata that Webflow exposes (title overrides, description, og image, etc.). */
   seo?: { title?: string | null; description?: string | null };
-  /** Webflow CMS publish timestamp (ISO 8601) — used as datePublished fallback when HTML lacks <time itemprop>. */
   lastPublished?: string | null;
-  /** Webflow CMS created-on timestamp (ISO 8601). */
   createdOn?: string | null;
+  /** Per-locale code (e.g. "en", "en-US") for this specific page. Falls back to workspace.defaultLocale. */
+  locale?: string | null;
+  /** When this page is a Webflow CMS item, the resolved fieldData blob from /collections/:id/items/:itemId. */
+  cmsFieldData?: Record<string, unknown> | null;
 }
 
 export interface WorkspaceSchemaInput {
   name: string;
   publisherLogoUrl: string | null;
-  /** Verified business contact info. Only emitted when present. */
   businessProfile: BusinessProfile | null;
+  /** Default site-wide locale from Webflow site.locales[0] or "en" if absent. */
+  defaultLocale: string;
 }
 
 export interface BusinessProfile {
@@ -40,12 +42,20 @@ export interface BreadcrumbItem {
 
 export interface PageData {
   title: string;
+  /** title with " | <brand>" suffix removed, used for schema name fields and breadcrumb labels. */
+  cleanTitle: string;
   description?: string;
   image?: string;
   canonicalUrl: string;
   publisher: { name: string; logoUrl?: string };
   datePublished?: string;
   dateModified?: string;
+  /** Article author name when known (CMS field or workspace name). undefined → template emits Organization fallback. */
+  author?: string;
+  /** Section derived from URL path (e.g. "/blog/foo" → "Blog"). undefined for homepage and root pages. */
+  articleSection?: string;
+  /** BCP-47 language tag for this page. Always populated (workspace.defaultLocale fallback). */
+  inLanguage: string;
   breadcrumbs: BreadcrumbItem[];
 }
 
