@@ -399,6 +399,8 @@ export async function buildSchemaContext(
     // Verified business profile for schema grounding (bypasses page content verification)
     if (ws.businessProfile) ctx._businessProfile = ws.businessProfile;
 
+    ctx._siteHasSearch = ws.siteHasSearch === true; // schema-context-direct-read-ok: Workspace identity field (DB-stored boolean flag, not on a slice).
+
   }
   const pageKeywordMap = ws?.keywordStrategy?.pageMap?.map(p => ({
     pagePath: p.pagePath,

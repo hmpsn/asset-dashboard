@@ -10,10 +10,12 @@ export interface HomepageInput {
   pageData: PageData;
   /** Optional — when present, sameAs and foundedDate are emitted on the Organization node. */
   businessProfile?: BusinessProfile | null;
+  /** When true, WebSite.potentialAction (sitelinks SearchAction) is emitted. Mirrors Workspace.siteHasSearch. */
+  siteHasSearch?: boolean;
 }
 
 export function buildHomepageSchema(input: HomepageInput): Record<string, unknown> {
-  const { baseUrl, pageData, businessProfile } = input;
+  const { baseUrl, pageData, businessProfile, siteHasSearch } = input;
 
   const organization = dropUndefined({
     '@type': 'Organization',
@@ -30,12 +32,10 @@ export function buildHomepageSchema(input: HomepageInput): Record<string, unknow
     'knowsAbout': pageData.knowsAbout?.length ? pageData.knowsAbout : undefined,
   });
 
-  // NOTE: WebSite.potentialAction (sitelinks SearchAction) is intentionally NOT emitted.
+  // NOTE: WebSite.potentialAction (sitelinks SearchAction) is gated on siteHasSearch.
   // Google requires the site actually expose a working search endpoint at the urlTemplate
   // before claiming this capability. Most workspaces have no site search, so emitting it
-  // unconditionally misrepresents capability to Google. Re-add when a workspace-level
-  // signal (Workspace.siteHasSearch or auto-detected <form action>) confirms search exists.
-  // Tracked: schema-yoast-parity-fields roadmap item.
+  // unconditionally misrepresents capability to Google. PR2 ships the admin toggle UI.
   const website = {
     '@type': 'WebSite',
     '@id': `${baseUrl}/#website`,
@@ -43,6 +43,13 @@ export function buildHomepageSchema(input: HomepageInput): Record<string, unknow
     'url': baseUrl,
     'publisher': { '@id': `${baseUrl}/#organization` },
     'inLanguage': pageData.inLanguage,
+    ...(siteHasSearch ? {
+      'potentialAction': {
+        '@type': 'SearchAction',
+        'target': { '@type': 'EntryPoint', 'urlTemplate': `${baseUrl}/?s={search_term_string}` },
+        'query-input': 'required name=search_term_string',
+      },
+    } : {}),
   };
 
   return { '@context': 'https://schema.org', '@graph': [organization, website] };

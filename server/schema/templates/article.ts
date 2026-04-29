@@ -41,6 +41,7 @@ export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Reco
     'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
     'inLanguage': pageData.inLanguage,
     'articleSection': pageData.articleSection,
+    'keywords': pageData.keywords,
     'about': kind === 'Article' ? 'Case study' : undefined,
   });
 

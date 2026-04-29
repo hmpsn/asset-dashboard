@@ -30,6 +30,9 @@ export interface WorkspaceSchemaInput {
   defaultLocale: string;
   /** Top-N siteKeywords (deduped, lowercased, declined-filter applied) for Organization.knowsAbout emission. */
   siteKeywordsForKnowsAbout?: string[];
+  /** When true, schema generator emits WebSite.potentialAction (sitelinks SearchAction).
+   *  Mirrors Workspace.siteHasSearch DB column. PR2 ships the admin toggle UI. */
+  siteHasSearch?: boolean;
 }
 
 export interface BusinessProfile {

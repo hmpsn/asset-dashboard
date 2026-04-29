@@ -98,6 +98,24 @@ describe('buildArticleSchema (BlogPosting)', () => {
     const node = (buildArticleSchema(baseInput, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>)[0];
     expect(node.author).toEqual({ '@type': 'Organization', 'name': 'Acme' });
   });
+
+  it('emits keywords as comma-joined string from pageData.keywords', () => {
+    const withKeywords = {
+      ...baseInput,
+      pageData: { ...baseInput.pageData, keywords: 'webflow development, brand strategy, web design' },
+    };
+    const node = (buildArticleSchema(withKeywords, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.keywords).toBe('webflow development, brand strategy, web design');
+  });
+
+  it('omits keywords when pageData.keywords is undefined', () => {
+    const noKeywords = {
+      ...baseInput,
+      pageData: { ...baseInput.pageData, keywords: undefined },
+    };
+    const node = (buildArticleSchema(noKeywords, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.keywords).toBeUndefined();
+  });
 });
 
 const serviceInput = {
@@ -415,5 +433,21 @@ describe('buildHomepageSchema', () => {
     };
     const org = (buildHomepageSchema(noKeywords)['@graph'] as Array<Record<string, unknown>>)[0];
     expect(org.knowsAbout).toBeUndefined();
+  });
+
+  it('WebSite emits potentialAction when siteHasSearch is true', () => {
+    const withSearch = {
+      ...homepageInput,
+      siteHasSearch: true,
+    };
+    const schema = buildHomepageSchema(withSearch);
+    const website = (schema['@graph'] as Array<Record<string, unknown>>).find(n => n['@type'] === 'WebSite');
+    expect((website?.potentialAction as Record<string, unknown>)?.['@type']).toBe('SearchAction');
+  });
+
+  it('WebSite omits potentialAction when siteHasSearch is false or undefined', () => {
+    const noSearch = { ...homepageInput, siteHasSearch: false };
+    const website = (buildHomepageSchema(noSearch)['@graph'] as Array<Record<string, unknown>>).find(n => n['@type'] === 'WebSite');
+    expect(website?.potentialAction).toBeUndefined();
   });
 });

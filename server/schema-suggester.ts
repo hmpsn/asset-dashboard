@@ -144,6 +144,10 @@ export interface SchemaContext {
   };
   /** Default site-wide BCP-47 locale from Webflow site.locales.primary.tag. Defaults to 'en' when unset. */
   _defaultLocale?: string;
+  /** When true, WebSite.potentialAction (sitelinks SearchAction) is emitted.
+   *  Source: Workspace.siteHasSearch DB column. PR1 always reads as undefined
+   *  (DB column defaults to 0 / false); PR2 ships the admin toggle UI. */
+  _siteHasSearch?: boolean;
   /** Site-level SERP features from SEO data provider — used to steer schema type selection. */
   _serpFeatures?: { featuredSnippets: number; peopleAlsoAsk: number; localPack: boolean; videoCarousel: number };
   /** Referring-domain count from backlink profile — used to calibrate schema ambition. */
@@ -364,6 +368,7 @@ export async function generateSchemaForPage(
       businessProfile: ctx._businessProfile ?? null,
       defaultLocale: ctx._defaultLocale ?? 'en',
       siteKeywordsForKnowsAbout: ctx.siteKeywords, // NEW
+      siteHasSearch: ctx._siteHasSearch ?? false, // NEW
     },
   });
 
@@ -436,6 +441,7 @@ export async function generateSchemaSuggestions(
         businessProfile: ctx._businessProfile ?? null,
         defaultLocale: ctx._defaultLocale ?? 'en',
         siteKeywordsForKnowsAbout: ctx.siteKeywords, // NEW
+        siteHasSearch: ctx._siteHasSearch ?? false, // NEW
       },
     });
     results.push(leanToSuggestion(lean));
@@ -483,6 +489,7 @@ export async function generateSchemaSuggestions(
           businessProfile: ctx._businessProfile ?? null,
           defaultLocale: ctx._defaultLocale ?? 'en',
           siteKeywordsForKnowsAbout: ctx.siteKeywords, // NEW
+          siteHasSearch: ctx._siteHasSearch ?? false, // NEW
         },
       });
       results.push(leanToSuggestion(itemLean));
