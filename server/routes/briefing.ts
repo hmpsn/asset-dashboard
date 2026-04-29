@@ -28,6 +28,7 @@ import { InvalidTransitionError } from '../state-machines.js';
 import { runBriefingForWorkspace } from '../briefing-cron.js';
 import { notifyClientBriefingReady } from '../email.js';
 import { getWorkspace, getClientPortalUrl } from '../workspaces.js';
+import { isFeatureEnabled } from '../feature-flags.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('routes:briefing');
@@ -152,17 +153,22 @@ router.post(
       });
       // Send the client email here too — auto-publish does it from the cron path,
       // but admin manual publishes were missing the notification entirely.
-      const ws = getWorkspace(req.params.workspaceId);
-      if (ws?.clientEmail) {
-        notifyClientBriefingReady({
-          clientEmail: ws.clientEmail,
-          workspaceName: ws.name,
-          workspaceId: ws.id,
-          weekOf: updated.weekOf,
-          storyCount: updated.stories.length,
-          heroHeadline: updated.stories.find((s) => s.isHeadline)?.headline ?? '',
-          dashboardUrl: getClientPortalUrl(ws),
-        });
+      // Gated on client-briefing-v2 flag: admin can publish drafts internally
+      // for testing without sending client-facing emails until the feature is
+      // dark-launched-off. (The flag is the single visibility switch.)
+      if (isFeatureEnabled('client-briefing-v2')) {
+        const ws = getWorkspace(req.params.workspaceId);
+        if (ws?.clientEmail) {
+          notifyClientBriefingReady({
+            clientEmail: ws.clientEmail,
+            workspaceName: ws.name,
+            workspaceId: ws.id,
+            weekOf: updated.weekOf,
+            storyCount: updated.stories.length,
+            heroHeadline: updated.stories.find((s) => s.isHeadline)?.headline ?? '',
+            dashboardUrl: getClientPortalUrl(ws),
+          });
+        }
       }
       return res.json({ draft: updated });
     } catch (err) {

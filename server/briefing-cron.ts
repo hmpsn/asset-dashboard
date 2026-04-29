@@ -322,7 +322,15 @@ async function runBriefingForWorkspaceInner(
   });
 
   // Auto-publish branch — only when admin opted in AND afterHours = 0 (immediate)
-  if (ws.autoPublishBriefings && (ws.autoPublishAfterHours ?? 24) === 0) {
+  // AND the global client-briefing-v2 flag is enabled. The flag gate prevents
+  // admin manual generate-now from sending client-facing emails / broadcasts
+  // for a feature that's still dark-launched. (The cron tick itself also
+  // checks the flag at the top of tick(), but generate-now bypasses tick().)
+  if (
+    isFeatureEnabled('client-briefing-v2') &&
+    ws.autoPublishBriefings &&
+    (ws.autoPublishAfterHours ?? 24) === 0
+  ) {
     const published = markPublished(workspaceId, draft.id, { autoPublished: true });
     if (published) {
       addActivity(
@@ -379,20 +387,24 @@ async function tick(now = new Date()): Promise<void> {
     if (computeEffectiveTier(ws) === 'free') continue;
     let result: RunBriefingResult | undefined;
     try {
-      result = await runBriefingForWorkspace(ws.id);
+      // Pass nowMs so runBriefingForWorkspace computes the SAME weekOf the tick
+      // captured — eliminates a theoretical drift if a tick spans a week boundary.
+      result = await runBriefingForWorkspace(ws.id, { nowMs: now.getTime() });
       log.info({ workspaceId: ws.id, ...result }, 'briefing tick');
     } catch (err) {
+      // Don't stamp the memo on error — a transient AI 5xx or DB hiccup would
+      // otherwise lock the workspace out of generation for the entire week.
+      // Hourly retries cost log volume but recover from transient failures;
+      // the DB-level lastBriefingRunWeekOf still prevents successful re-runs.
+      // (If chronic-failure log spam ever becomes a real problem, switch to
+      // a per-workspace consecutive-error counter that stamps after N>=3.)
       log.error({ err, workspaceId: ws.id }, 'briefing tick error');
+      continue;
     }
-    // Only stamp the in-memory memo for TERMINAL results. `deferred` must keep
+    // Stamp the in-memory memo only for TERMINAL results. `deferred` must keep
     // retrying on subsequent hourly ticks until either (a) data freshens and
     // generation succeeds, or (b) MAX_DEFERRALS triggers forced generation.
-    // Stamping `deferred` would lock the workspace out for the rest of the
-    // week and silently break the entire pre-flight retry mechanism.
-    // Errors stamp too — a permanently-failing workspace shouldn't retry every
-    // hour. The DB-level lastBriefingRunWeekOf still backstops cross-process.
-    const isTerminal = !result || result.status !== 'deferred';
-    if (isTerminal) lastTickRunWeek[ws.id] = weekOf;
+    if (result.status !== 'deferred') lastTickRunWeek[ws.id] = weekOf;
   }
 }
 
