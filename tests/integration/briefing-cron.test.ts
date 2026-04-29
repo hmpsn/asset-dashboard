@@ -167,6 +167,21 @@ describe('briefing-cron / runBriefingForWorkspace', () => {
     expect(r.reason).toContain('AI response invalid');
   });
 
+  it('strips Markdown ```json fences from the AI response before parsing', async () => {
+    // Sonnet sometimes wraps JSON in ```json fences despite the prompt
+    // instruction not to — this caught us on staging (PR #370 follow-up).
+    // The runner must defensively strip fences before JSON.parse.
+    const fenced = '```json\n' + JSON.stringify({ stories: validStoryFixture() }) + '\n```';
+    vi.mocked(callAI).mockResolvedValue({
+      text: fenced,
+      tokens: { prompt: 10, completion: 20, total: 30 },
+    });
+    const r = await runBriefingForWorkspace(wsId, { manual: true });
+    expect(r.status).toBe('generated');
+    const draft = getBriefingByWeek(wsId, r.weekOf);
+    expect(draft?.stories).toHaveLength(3);
+  });
+
   it('returns "skipped" when AI response fails Zod validation (only 2 stories)', async () => {
     vi.mocked(callAI).mockResolvedValue(makeAIResponse(validStoryFixture().slice(0, 2)));
     const r = await runBriefingForWorkspace(wsId, { manual: true });

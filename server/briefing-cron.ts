@@ -48,6 +48,7 @@ import { WS_EVENTS } from './ws-events.js';
 import { addActivity } from './activity-log.js';
 import { notifyClientBriefingReady } from './email.js';
 import { getWorkspaceLearnings, formatLearningsForPrompt } from './workspace-learnings.js';
+import { stripCodeFences } from './helpers.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('briefing-cron');
@@ -282,10 +283,12 @@ async function runBriefingForWorkspaceInner(
   });
   const generationMs = Date.now() - t0;
 
-  // Parse + validate
+  // Parse + validate. Sonnet sometimes wraps JSON in ```json fences despite the
+  // prompt instruction not to — stripCodeFences is a no-op when the fence is
+  // absent, so it's safe to apply unconditionally.
   let parsed;
   try {
-    parsed = briefingAIResponseSchema.parse(JSON.parse(result.text));
+    parsed = briefingAIResponseSchema.parse(JSON.parse(stripCodeFences(result.text).trim()));
   } catch (err) {
     log.error(
       { err, workspaceId, weekOf, raw: result.text.slice(0, 400) },
