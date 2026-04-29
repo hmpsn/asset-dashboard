@@ -113,8 +113,8 @@ const EXPECTED_HMAC_TOKEN = crypto
   .digest('hex');
 
 // A JWT signed with the server's JWT_SECRET — mimics what a client-portal
-// user receives from /api/auth/user-login. Its signature is valid, but the
-// userId doesn't exist in the DB, so requireAuth returns 401 "User not found".
+// user receives from /api/auth/user-login. Its signature is valid but
+// requireAdminAuth rejects all JWTs regardless.
 const VALID_CLIENT_JWT = jwt.sign(
   { userId: 'usr_client_attacker', email: 'client@attacker.test', role: 'member' },
   TEST_JWT_SECRET,
@@ -128,7 +128,7 @@ let testUserId = '';
 
 describe('Integration — Stripe config endpoints require HMAC admin auth', () => {
   beforeAll(async () => {
-    // Create the user in the shared DB so requireAuth's getUserById() finds them.
+    // Create a user so the JWT is fully valid (tests that JWT presence alone doesn't help).
     let user = getUserByEmail(TEST_OWNER_EMAIL);
     if (!user) {
       user = await createUser(TEST_OWNER_EMAIL, 'testpassword123', 'Stripe Admin Test Owner', 'owner');
