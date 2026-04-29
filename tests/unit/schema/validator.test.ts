@@ -212,32 +212,28 @@ describe('validateLeanSchema — Yoast-baseline required fields (Pillar 1)', () 
     expect(validateLeanSchema(article, 'Article')).toContain('Article missing required field: image');
   });
 
-  it('flags Organization missing logo', () => {
+  // Workspace-data-dependent fields are GOOGLE-RECOMMENDED but not in the required list
+  // (Organization.logo, LocalBusiness.address, LocalBusiness.telephone). Workspaces with
+  // partially-populated business profiles would otherwise show permanent validation errors
+  // even though the schema is valid. These tests assert the graceful-degradation behavior
+  // and will be replaced when schema-yoast-parity-fields adds a "recommended" tier.
+  it('does NOT flag Organization missing logo (recommended, not required)', () => {
     const org = {
       '@context': 'https://schema.org',
       '@graph': [{ '@type': 'Organization', '@id': 'https://x.com/#organization', 'name': 'X', 'url': 'https://x.com' }],
     };
-    expect(validateLeanSchema(org, 'Organization')).toContain('Organization missing required field: logo');
+    const errors = validateLeanSchema(org, 'Organization');
+    expect(errors.find(e => e.includes('logo'))).toBeUndefined();
   });
 
-  // Pillar 2.1 dropped the unconditional SearchAction emission, so the WebSite
-  // required-set no longer includes potentialAction. When schema-yoast-parity-fields
-  // re-introduces SearchAction behind a workspace flag, add a conditional test here.
-
-  it('flags LocalBusiness missing address', () => {
+  it('does NOT flag LocalBusiness missing address or telephone (recommended, not required)', () => {
     const lb = {
       '@context': 'https://schema.org',
-      '@graph': [{ '@type': 'LocalBusiness', '@id': 'https://x.com/#localbusiness', 'name': 'X', 'url': 'https://x.com', 'telephone': '+1-555-0100' }],
+      '@graph': [{ '@type': 'LocalBusiness', '@id': 'https://x.com/#localbusiness', 'name': 'X', 'url': 'https://x.com', 'inLanguage': 'en' }],
     };
-    expect(validateLeanSchema(lb, 'LocalBusiness')).toContain('LocalBusiness missing required field: address');
-  });
-
-  it('flags LocalBusiness missing telephone', () => {
-    const lb = {
-      '@context': 'https://schema.org',
-      '@graph': [{ '@type': 'LocalBusiness', '@id': 'https://x.com/#localbusiness', 'name': 'X', 'url': 'https://x.com', 'address': { '@type': 'PostalAddress', 'streetAddress': '1 Main St' } }],
-    };
-    expect(validateLeanSchema(lb, 'LocalBusiness')).toContain('LocalBusiness missing required field: telephone');
+    const errors = validateLeanSchema(lb, 'LocalBusiness');
+    expect(errors.find(e => e === 'LocalBusiness missing required field: address')).toBeUndefined();
+    expect(errors.find(e => e === 'LocalBusiness missing required field: telephone')).toBeUndefined();
   });
 });
 
@@ -296,29 +292,44 @@ describe('validateLeanSchema — value-shape validators (Pillar 1)', () => {
     expect(validateLeanSchema(article(), 'Article')).toEqual([]);
   });
 
-  it('flags Article.author missing @type', () => {
-    const broken = article({ author: { name: 'Jane Doe' } });
-    expect(validateLeanSchema(broken, 'Article')).toContain('Article.author must have @type ∈ {Person, Organization} and non-empty name');
-  });
-
-  it('flags Article.author missing name', () => {
-    const broken = article({ author: { '@type': 'Person' } });
-    expect(validateLeanSchema(broken, 'Article')).toContain('Article.author must have @type ∈ {Person, Organization} and non-empty name');
-  });
-
-  it('flags Article.author with bad @type', () => {
+  it('flags Article.author with bad @type (specific message)', () => {
     const broken = article({ author: { '@type': 'CreativeWork', 'name': 'X' } });
-    expect(validateLeanSchema(broken, 'Article')).toContain('Article.author must have @type ∈ {Person, Organization} and non-empty name');
+    expect(validateLeanSchema(broken, 'Article')).toContain('Article.author.@type must be "Person" or "Organization"');
   });
 
-  it('flags Article.publisher missing logo (Google Rich Results requires it)', () => {
+  it('flags Article.author missing name (specific message)', () => {
+    const broken = article({ author: { '@type': 'Person' } });
+    expect(validateLeanSchema(broken, 'Article')).toContain('Article.author.name required (non-empty string)');
+  });
+
+  it('flags Article.author empty-string name', () => {
+    const broken = article({ author: { '@type': 'Person', 'name': '   ' } });
+    expect(validateLeanSchema(broken, 'Article')).toContain('Article.author.name required (non-empty string)');
+  });
+
+  it('flags Article.publisher missing logo with specific message', () => {
     const broken = article({ publisher: { '@type': 'Organization', 'name': 'X' } });
-    expect(validateLeanSchema(broken, 'Article')).toContain('Article.publisher must have @type, name, and logo (ImageObject with url) — Google Article rich result requires the publisher logo');
+    expect(validateLeanSchema(broken, 'Article')).toContain('Article.publisher.logo required — Google Article rich result requires an ImageObject with url');
   });
 
-  it('flags Article.publisher.logo missing url', () => {
+  it('flags Article.publisher.logo missing url with specific message', () => {
     const broken = article({ publisher: { '@type': 'Organization', 'name': 'X', 'logo': { '@type': 'ImageObject' } } });
-    expect(validateLeanSchema(broken, 'Article')).toContain('Article.publisher must have @type, name, and logo (ImageObject with url) — Google Article rich result requires the publisher logo');
+    expect(validateLeanSchema(broken, 'Article')).toContain('Article.publisher.logo must be {"@type": "ImageObject", "url": "..."} with non-empty url');
+  });
+
+  it('flags Article.publisher missing name with specific message', () => {
+    const broken = article({ publisher: { '@type': 'Organization', 'logo': { '@type': 'ImageObject', 'url': 'https://x.com/l.png' } } });
+    expect(validateLeanSchema(broken, 'Article')).toContain('Article.publisher.name required (non-empty string)');
+  });
+
+  it('flags Article.image array containing ImageObject without url', () => {
+    const broken = article({ image: [{ '@type': 'ImageObject' }] });
+    expect(validateLeanSchema(broken, 'Article')).toContain('Article.image array items must each be a string URL or ImageObject with url');
+  });
+
+  it('flags Article.image as bare ImageObject without url', () => {
+    const broken = article({ image: { '@type': 'ImageObject' } });
+    expect(validateLeanSchema(broken, 'Article')).toContain('Article.image (ImageObject) requires a non-empty url');
   });
 
   it('flags Article.image as non-string non-array non-ImageObject', () => {
@@ -352,5 +363,50 @@ describe('validateLeanSchema — value-shape validators (Pillar 1)', () => {
   it('flags primary-node url field that is not absolute', () => {
     const broken = article({ url: '/a' });
     expect(validateLeanSchema(broken, 'Article')).toContain('Article.url must be an absolute URL (start with http:// or https://)');
+  });
+
+  it('does NOT double-report when ListItem.position is missing (validateBreadcrumb owns that error class)', () => {
+    const broken = JSON.parse(JSON.stringify(article()));
+    delete broken['@graph'][1].itemListElement[0].position;
+    const errors = validateLeanSchema(broken, 'Article');
+    expect(errors).toContain('BreadcrumbList ListItem missing position');
+    expect(errors.find(e => e.includes('positions must start at 1 and be contiguous'))).toBeUndefined();
+  });
+});
+
+describe('validateLeanSchema — LocalBusiness value-shape (Pillar 1)', () => {
+  const localBusiness = (overrides: Record<string, unknown> = {}) => ({
+    '@context': 'https://schema.org',
+    '@graph': [{
+      '@type': 'LocalBusiness',
+      '@id': 'https://x.com/#localbusiness',
+      'name': 'Acme Dental',
+      'url': 'https://x.com',
+      'inLanguage': 'en',
+      ...overrides,
+    }],
+  });
+
+  it('passes a fully-populated LocalBusiness with PostalAddress', () => {
+    const valid = localBusiness({
+      address: { '@type': 'PostalAddress', 'streetAddress': '1 Main St', 'addressLocality': 'Austin' },
+      telephone: '+1-555-0100',
+    });
+    expect(validateLeanSchema(valid, 'LocalBusiness')).toEqual([]);
+  });
+
+  it('flags LocalBusiness.address as a bare string', () => {
+    const broken = localBusiness({ address: '1 Main St, Austin, TX' });
+    expect(validateLeanSchema(broken, 'LocalBusiness')).toContain('LocalBusiness.address must be a PostalAddress object (got string)');
+  });
+
+  it('flags LocalBusiness.address with wrong @type', () => {
+    const broken = localBusiness({ address: { '@type': 'Place', 'name': 'Office' } });
+    expect(validateLeanSchema(broken, 'LocalBusiness')).toContain('LocalBusiness.address.@type must be "PostalAddress"');
+  });
+
+  it('flags LocalBusiness.address PostalAddress with no locator fields', () => {
+    const broken = localBusiness({ address: { '@type': 'PostalAddress', 'addressCountry': 'US' } });
+    expect(validateLeanSchema(broken, 'LocalBusiness')).toContain('LocalBusiness.address must have at least one of streetAddress, addressLocality, postalCode');
   });
 });

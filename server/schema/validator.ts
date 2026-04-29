@@ -31,10 +31,18 @@ const REQUIRED_BY_TYPE: Record<string, RequiredFields> = {
     required: ['name', 'description', 'isPartOf', 'breadcrumb', 'inLanguage'],
   },
   LocalBusiness: {
-    required: ['name', 'url', 'address', 'telephone', 'inLanguage'],
+    // address + telephone are GOOGLE-RECOMMENDED but workspace-data-dependent. A workspace
+    // whose BusinessProfile is null or partially populated would surface a permanent
+    // validation error today even though the schema is otherwise valid. Keep them off the
+    // required list until we add a "recommended" tier with admin-facing prompts to fix
+    // workspace settings. Tracked: schema-yoast-parity-fields will introduce that tier.
+    required: ['name', 'url', 'inLanguage'],
   },
   Organization: {
-    required: ['name', 'url', 'logo'],
+    // logo is GOOGLE-RECOMMENDED but tied to workspace.brandLogoUrl. Same rationale as
+    // LocalBusiness above — a workspace without an uploaded logo would otherwise show a
+    // permanent error. Defer to schema-yoast-parity-fields' recommended tier.
+    required: ['name', 'url'],
   },
   WebSite: {
     // potentialAction (sitelinks SearchAction) used to be in this list, but Pillar 2.1
@@ -90,6 +98,10 @@ function validateCrossRefs(node: Record<string, unknown>, allNodes: Record<strin
   if (node.isPartOf !== undefined && !isIdRef(node.isPartOf)) {
     errors.push(`${t}.isPartOf must be an @id reference (e.g. {"@id": "...#website"})`);
   }
+  // Note: we deliberately do NOT verify that isPartOf's @id resolves to a WebSite node.
+  // The lean output is per-page; the WebSite node is only emitted in the homepage's @graph,
+  // not on every other page's @graph. A whole-snapshot validator would catch this; the
+  // per-page validator here can't.
 
   if (node.breadcrumb !== undefined) {
     if (!isIdRef(node.breadcrumb)) {
@@ -117,41 +129,76 @@ function validateCrossRefs(node: Record<string, unknown>, allNodes: Record<strin
 
 const ISO_8601_RE = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
 
+function isImageObjectWithUrl(v: unknown): boolean {
+  return typeof v === 'object' && v !== null
+    && (v as Record<string, unknown>)['@type'] === 'ImageObject'
+    && typeof (v as Record<string, unknown>).url === 'string'
+    && ((v as Record<string, unknown>).url as string).trim().length > 0;
+}
+
 function validateArticleShape(node: Record<string, unknown>): string[] {
   const errors: string[] = [];
   const t = node['@type'] as string;
   if (t !== 'Article' && t !== 'BlogPosting') return errors;
 
-  // author: must have @type ∈ {Person, Organization} AND non-empty name.
+  // author: must be {@type: Person|Organization, name: string}. Split into discrete
+  // error messages so the admin UI can point at the specific cause.
   const author = node.author;
   if (author !== undefined) {
-    const ok = typeof author === 'object' && author !== null
-      && ((author as Record<string, unknown>)['@type'] === 'Person' || (author as Record<string, unknown>)['@type'] === 'Organization')
-      && typeof (author as Record<string, unknown>).name === 'string'
-      && ((author as Record<string, unknown>).name as string).trim().length > 0;
-    if (!ok) errors.push(`${t}.author must have @type ∈ {Person, Organization} and non-empty name`);
+    if (typeof author !== 'object' || author === null) {
+      errors.push(`${t}.author must be an object with @type ∈ {Person, Organization} and non-empty name`);
+    } else {
+      const a = author as Record<string, unknown>;
+      const validType = a['@type'] === 'Person' || a['@type'] === 'Organization';
+      if (!validType) errors.push(`${t}.author.@type must be "Person" or "Organization"`);
+      const name = a.name;
+      if (typeof name !== 'string' || !name.trim()) errors.push(`${t}.author.name required (non-empty string)`);
+    }
   }
 
-  // publisher: must have @type AND name AND logo (ImageObject with url).
-  const publisher = node.publisher as Record<string, unknown> | undefined;
+  // publisher: must have @type AND name AND logo (ImageObject with url). Discrete errors.
+  const publisher = node.publisher;
   if (publisher !== undefined) {
-    const logo = publisher.logo as Record<string, unknown> | undefined;
-    const ok = typeof publisher === 'object' && publisher !== null
-      && typeof publisher['@type'] === 'string'
-      && typeof publisher.name === 'string' && (publisher.name as string).trim().length > 0
-      && logo !== undefined && typeof logo === 'object'
-      && logo['@type'] === 'ImageObject'
-      && typeof logo.url === 'string' && (logo.url as string).trim().length > 0;
-    if (!ok) errors.push(`${t}.publisher must have @type, name, and logo (ImageObject with url) — Google Article rich result requires the publisher logo`);
+    if (typeof publisher !== 'object' || publisher === null) {
+      errors.push(`${t}.publisher must be an object with @type, name, and logo`);
+    } else {
+      const p = publisher as Record<string, unknown>;
+      if (typeof p['@type'] !== 'string') errors.push(`${t}.publisher.@type required (string)`);
+      if (typeof p.name !== 'string' || !(p.name as string).trim()) errors.push(`${t}.publisher.name required (non-empty string)`);
+      const logo = p.logo;
+      if (logo === undefined) {
+        errors.push(`${t}.publisher.logo required — Google Article rich result requires an ImageObject with url`);
+      } else if (typeof logo !== 'object' || logo === null) {
+        errors.push(`${t}.publisher.logo must be an ImageObject (got ${typeof logo})`);
+      } else if (!isImageObjectWithUrl(logo)) {
+        errors.push(`${t}.publisher.logo must be {"@type": "ImageObject", "url": "..."} with non-empty url`);
+      }
+    }
   }
 
-  // image: string | array | ImageObject.
+  // image: string URL | array of strings/ImageObjects | ImageObject. Each ImageObject
+  // (top-level OR inside an array) must have a url field — reviewer flagged that
+  // {@type:'ImageObject'} without url is technically allowed by the type guard but
+  // produces an unusable rich-result image.
   const image = node.image;
   if (image !== undefined) {
-    const ok = typeof image === 'string'
-      || Array.isArray(image)
-      || (typeof image === 'object' && image !== null && (image as Record<string, unknown>)['@type'] === 'ImageObject');
-    if (!ok) errors.push(`${t}.image must be a string URL, an array of strings/ImageObjects, or an ImageObject`);
+    let imageOk = false;
+    if (typeof image === 'string') {
+      imageOk = true;
+    } else if (Array.isArray(image)) {
+      imageOk = image.every(item =>
+        typeof item === 'string' || isImageObjectWithUrl(item),
+      );
+      if (!imageOk) errors.push(`${t}.image array items must each be a string URL or ImageObject with url`);
+      else imageOk = true;
+    } else if (typeof image === 'object' && image !== null && (image as Record<string, unknown>)['@type'] === 'ImageObject') {
+      imageOk = isImageObjectWithUrl(image);
+      if (!imageOk) errors.push(`${t}.image (ImageObject) requires a non-empty url`);
+      else imageOk = true;
+    }
+    if (!imageOk && !errors.some(e => e.startsWith(`${t}.image`))) {
+      errors.push(`${t}.image must be a string URL, an array of strings/ImageObjects, or an ImageObject`);
+    }
   }
 
   // datePublished / dateModified: ISO 8601.
@@ -165,10 +212,42 @@ function validateArticleShape(node: Record<string, unknown>): string[] {
   return errors;
 }
 
+/**
+ * LocalBusiness.address shape check. address is not in the required list (workspace-data
+ * dependent) but when it IS present it must be a PostalAddress with at least one of the
+ * three locator fields — Google rejects bare-string addresses.
+ */
+function validateLocalBusinessShape(node: Record<string, unknown>): string[] {
+  if (node['@type'] !== 'LocalBusiness') return [];
+  const errors: string[] = [];
+  const address = node.address;
+  if (address !== undefined) {
+    if (typeof address !== 'object' || address === null) {
+      errors.push(`LocalBusiness.address must be a PostalAddress object (got ${typeof address})`);
+    } else {
+      const a = address as Record<string, unknown>;
+      if (a['@type'] !== 'PostalAddress') {
+        errors.push(`LocalBusiness.address.@type must be "PostalAddress"`);
+      }
+      const hasLocator = typeof a.streetAddress === 'string' && (a.streetAddress as string).trim()
+        || typeof a.addressLocality === 'string' && (a.addressLocality as string).trim()
+        || typeof a.postalCode === 'string' && (a.postalCode as string).trim();
+      if (!hasLocator) {
+        errors.push(`LocalBusiness.address must have at least one of streetAddress, addressLocality, postalCode`);
+      }
+    }
+  }
+  return errors;
+}
+
 function validateBreadcrumbOrdering(node: Record<string, unknown>): string[] {
   if (node['@type'] !== 'BreadcrumbList') return [];
   const items = node.itemListElement as Array<Record<string, unknown>> | undefined;
   if (!Array.isArray(items)) return []; // existing validateBreadcrumb catches missing array
+  // Skip ordering check if any position is non-numeric — validateBreadcrumb owns that
+  // error class. Without this guard a missing position would produce two errors for
+  // the same root cause (missing position + non-contiguous ordering).
+  if (items.some(item => typeof item.position !== 'number')) return [];
   for (let i = 0; i < items.length; i++) {
     if (items[i].position !== i + 1) {
       return ['BreadcrumbList itemListElement positions must start at 1 and be contiguous-ascending'];
@@ -228,6 +307,7 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
     }
     errors.push(...validateCrossRefs(node, graph));
     errors.push(...validateArticleShape(node));
+    errors.push(...validateLocalBusinessShape(node));
     errors.push(...validateBreadcrumbOrdering(node));
     errors.push(...validateAbsoluteUrls(node));
   }
