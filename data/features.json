@@ -649,6 +649,16 @@
       "tier": "growth",
       "impact": "high",
       "clientFacing": true
+    },
+    {
+      "id": 66,
+      "title": "Weekly AI Briefing",
+      "oneLiner": "Every Monday, an AI-curated 5-minute editorial briefing — wins, risks, opportunities, competitive intel — replaces the data dashboard with a tight magazine-rhythm layout. Admin-reviewed before reaching the client.",
+      "category": "intelligence",
+      "painPoints": ["client-engagement", "reporting", "client-retention"],
+      "tier": "growth",
+      "impact": "high",
+      "clientFacing": true
     }
   ]
 }

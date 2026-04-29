@@ -1,7 +1,7 @@
 // CLIENT-FACING
 import { useNavigate } from 'react-router-dom';
 import { SectionCard } from '../../ui/SectionCard';
-import { clientPath, type ClientTab } from '../../../routes';
+import { renderDrillInUrl } from './drillIn';
 import type { BriefingStory, BriefingCategory } from '../../../../shared/types/briefing';
 
 interface HeroStoryCardProps {
@@ -30,20 +30,7 @@ export function HeroStoryCard({ story, workspaceId, betaMode }: HeroStoryCardPro
   const navigate = useNavigate();
 
   const categoryLabel = CATEGORY_LABELS[story.category];
-
-  // Build the deep-link URL using clientPath + ?tab= + queryParams.
-  // story.drillIn.page is typed as ExplorePage (constrained subset), but
-  // clientPath/ClientTab accept the broader string set — cast through ClientTab
-  // to satisfy the typed signature.
-  const baseUrl = clientPath(workspaceId, story.drillIn.page as ClientTab, betaMode);
-  const tabSuffix = story.drillIn.tab ? `?tab=${story.drillIn.tab}` : '';
-  const hasQueryParams =
-    story.drillIn.queryParams && Object.keys(story.drillIn.queryParams).length > 0;
-  const querySuffix = hasQueryParams
-    ? (story.drillIn.tab ? '&' : '?') +
-      new URLSearchParams(story.drillIn.queryParams).toString()
-    : '';
-  const url = baseUrl + tabSuffix + querySuffix;
+  const url = renderDrillInUrl(story, workspaceId, betaMode);
 
   return (
     <div className="border-l-2 border-teal-400 pl-3">

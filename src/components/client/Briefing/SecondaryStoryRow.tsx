@@ -9,7 +9,7 @@ import {
   TrendingUp,
   type LucideIcon,
 } from 'lucide-react';
-import { clientPath, type ClientTab } from '../../../routes';
+import { renderDrillInUrl } from './drillIn';
 import type { BriefingStory, BriefingCategory } from '../../../../shared/types/briefing';
 
 interface SecondaryStoryRowProps {
@@ -43,20 +43,7 @@ export function SecondaryStoryRow({ story, workspaceId, betaMode }: SecondarySto
   const navigate = useNavigate();
 
   const { Icon, colorClass } = CATEGORY_VISUALS[story.category];
-
-  // Build the deep-link URL using clientPath + ?tab= + queryParams.
-  // story.drillIn.page is typed as ExplorePage (constrained subset), but
-  // clientPath/ClientTab accept the broader string set — cast through ClientTab
-  // to satisfy the typed signature.
-  const baseUrl = clientPath(workspaceId, story.drillIn.page as ClientTab, betaMode);
-  const tabSuffix = story.drillIn.tab ? `?tab=${story.drillIn.tab}` : '';
-  const hasQueryParams =
-    story.drillIn.queryParams && Object.keys(story.drillIn.queryParams).length > 0;
-  const querySuffix = hasQueryParams
-    ? (story.drillIn.tab ? '&' : '?') +
-      new URLSearchParams(story.drillIn.queryParams).toString()
-    : '';
-  const url = baseUrl + tabSuffix + querySuffix;
+  const url = renderDrillInUrl(story, workspaceId, betaMode);
 
   return (
     <button

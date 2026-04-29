@@ -206,7 +206,11 @@ export function ClientChatWidget({
                   <div className="p-4 space-y-3">
                     <p className="t-caption-sm text-[var(--brand-text-muted)]">Ask anything about your site performance:</p>
                     <div className="grid grid-cols-1 gap-2">
-                      {(quickQuestions ?? QUICK_QUESTIONS).map((q, i) => (
+                      {/* `??` only short-circuits on null/undefined; an empty
+                          array is truthy and would render zero buttons.
+                          Length check ensures the constant fallback wins
+                          when callers pass an explicit []. */}
+                      {(quickQuestions && quickQuestions.length > 0 ? quickQuestions : QUICK_QUESTIONS).map((q, i) => (
                         <button
                           key={i}
                           onClick={() => askAi(q)}

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Inbox, ClipboardCheck, MessageSquare, FileText, PenLine, Layers, Flag, ExternalLink } from 'lucide-react';
 import { EmptyState, Icon} from '../ui';
 import { ApprovalsTab } from './ApprovalsTab';
@@ -13,6 +14,13 @@ import { post } from '../../api/client';
 import { useBetaMode } from './BetaContext';
 
 type InboxFilter = 'all' | 'approvals' | 'requests' | 'copy' | 'content' | 'content-plan';
+
+const VALID_INBOX_FILTERS: readonly InboxFilter[] =
+  ['all', 'approvals', 'requests', 'copy', 'content', 'content-plan'] as const;
+
+function isInboxFilter(value: string | null): value is InboxFilter {
+  return value !== null && (VALID_INBOX_FILTERS as readonly string[]).includes(value);
+}
 
 interface InboxTabProps {
   workspaceId: string;
@@ -73,7 +81,17 @@ export function InboxTab({
   hidePrices = false,
   pageMap,
 }: InboxTabProps) {
-  const [filter, setFilter] = useState<InboxFilter>(initialFilter || 'all');
+  // Two-halves deep-link contract — `<ActionQueueStrip>` (Phase 2 of
+  // client-briefing-v2) navigates to `?tab=<InboxFilter>` to deep-link into
+  // a specific filter. Without this `useSearchParams` reader the param would
+  // be silently dropped and every chip click would land on 'all'. See
+  // CLAUDE.md UI/UX rule 11 ("?tab= deep-link two-halves contract").
+  const [searchParams] = useSearchParams();
+  const [filter, setFilter] = useState<InboxFilter>(() => {
+    const param = searchParams.get('tab');
+    if (isInboxFilter(param)) return param;
+    return initialFilter || 'all';
+  });
   const [flaggingCell, setFlaggingCell] = useState<string | null>(null);
   const [flagComment, setFlagComment] = useState('');
   const [flagSubmitting, setFlagSubmitting] = useState(false);

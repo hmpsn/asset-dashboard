@@ -217,6 +217,31 @@ For inline styles and Recharts props that can't be overridden by CSS class rules
 | Welcome modal | `from-teal-500 to-emerald-500` icon/glow | Brand accent |
 | Payment modal | All teal (header, price, topic, CTA) | Unified teal |
 
+#### Client Insights — Magazine Briefing Layout (`Briefing/`, behind `client-briefing-v2`)
+
+When the `client-briefing-v2` feature flag is on, the client Insights tab swaps to a magazine-rhythm editorial briefing. Layout convention:
+
+| Element | Color | Rationale |
+|---------|-------|-----------|
+| **Action queue strip** (top) | `bg-amber-500/15 border-amber-500/30 text-amber-300` | Amber = "needs attention" — same hue as the existing inbox banner. Renders null when all 5 counts are zero. |
+| Action chip hover | `hover:text-amber-200` | Subtle one-step lift (avoids invisible-hover trap from CLAUDE.md memory) |
+| **Hero card** wrapper | `border-l-2 border-teal-400 pl-3` around `<SectionCard>` | Teal-accent left stripe (SectionCard has no built-in accent prop, so use a wrapper div) |
+| Hero category label | `t-label text-teal-400 font-semibold tracking-wider` | Teal = brand action / editorial accent |
+| Hero headline | `t-h2 font-bold text-[var(--brand-text-bright)]` | Largest type on the page |
+| Hero metric pills | `bg-teal-500/10 text-teal-400 rounded-full t-caption inline-flex` | 0–2 per story, max — supporting numbers, not data dump |
+| Hero "See the data →" | `t-caption text-teal-400 hover:text-teal-300` | Drill-in link, teal action |
+| **Secondary divider rows** | `border-b border-[var(--brand-border)] last:border-b-0 hover:bg-[var(--surface-3)]/50` | No card chrome — plain rows, hover state for affordance |
+| Secondary category icon | category-mapped: `win=star/emerald-400`, `risk=alert-triangle/amber-400`, `opportunity=lightbulb/blue-400`, `competitive=search/teal-400`, `period_change=trending-up/blue-400` | Color-codes the category at a glance |
+| **Free-tier upgrade CTA** | Same teal-accent wrapper as Hero, solid `bg-teal-500 hover:bg-teal-400` button | NEVER hand-rolled gradient (pr-check enforces) |
+
+**Magazine layout principles** (mirrors the spec's three rules):
+
+1. **No top-of-page health score, no stat row, no banner CTAs** when the flag is on. Numbers appear ONLY as inline metric badges inside the hero card.
+2. **Exactly one hero card** per briefing. The Phase 1 Zod schema enforces `isHeadline: true` on exactly one story.
+3. **Secondary stories are divider rows, not cards.** No card chrome. Whole row is a `<button>` so it's keyboard-accessible end-to-end.
+
+**Two-halves contract:** The action chips deep-link via `?tab=<InboxFilter>` to `<InboxTab>` — the Inbox MUST read `useSearchParams().get('tab')` and validate against the `InboxFilter` union for the deep-link to work. Same contract applies to hero/secondary `drillIn.tab` (currently optional / unused by receivers in Phase 2; Phase 4 will wire receivers as the briefing AI starts populating it).
+
 ### Admin Components
 
 | Component | Element | Color | Rationale |

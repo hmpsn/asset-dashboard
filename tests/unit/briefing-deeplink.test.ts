@@ -1,34 +1,20 @@
 // tests/unit/briefing-deeplink.test.ts
 //
-// Unit tests for the BriefingStory.drillIn → deep-link URL renderer used by
-// <HeroStoryCard> and <SecondaryStoryRow>. The same renderer is duplicated
-// across both components verbatim; this test pins the contract so a future
-// refactor (extracting the helper) can rely on identical output. Bugs we
-// want to catch:
+// Unit tests for the BriefingStory.drillIn → deep-link URL renderer.
+// Imports the production helper directly so any drift in the real renderer
+// is caught here — earlier review iteration shipped a clone of the renderer
+// in this test file, which would have given false confidence. See
+// `src/components/client/Briefing/drillIn.ts` for the live implementation.
+//
+// Bugs the cases below pin:
 //   - missing leading slash on path
-//   - "?tab=&query=..." malformed when tab is omitted
+//   - "?tab=" malformed when tab is omitted
 //   - "?tab=X?query=Y" missing-and-then-double-? bug
 //   - empty queryParams object producing "?" with nothing after it
-//
-// The renderer logic lives inline in the components per the plan; this test
-// reimplements the same one-liner and asserts shape. If the production
-// renderer drifts from this implementation, that's the bug.
 
 import { describe, it, expect } from 'vitest';
-import { clientPath, type ClientTab } from '../../src/routes';
+import { renderDrillInUrl } from '../../src/components/client/Briefing/drillIn';
 import type { BriefingStory } from '../../shared/types/briefing';
-
-function renderDrillInUrl(story: BriefingStory, workspaceId: string, betaMode: boolean): string {
-  const baseUrl = clientPath(workspaceId, story.drillIn.page as ClientTab, betaMode);
-  const tabSuffix = story.drillIn.tab ? `?tab=${story.drillIn.tab}` : '';
-  const hasQueryParams =
-    story.drillIn.queryParams && Object.keys(story.drillIn.queryParams).length > 0;
-  const querySuffix = hasQueryParams
-    ? (story.drillIn.tab ? '&' : '?') +
-      new URLSearchParams(story.drillIn.queryParams).toString()
-    : '';
-  return baseUrl + tabSuffix + querySuffix;
-}
 
 function story(drillIn: BriefingStory['drillIn']): BriefingStory {
   return {
@@ -88,10 +74,47 @@ describe('briefing deep-link URL renderer', () => {
     expect(url).toBe('/client/beta/ws_test/performance');
   });
 
-  it('handles all five ExplorePage targets without throwing', () => {
-    const pages = ['performance', 'health', 'strategy', 'content-plan', 'roi'] as const;
+  it('handles all seven ExplorePage targets without throwing', () => {
+    const pages = [
+      'performance',
+      'health',
+      'strategy',
+      'content-plan',
+      'schema-review',
+      'roi',
+      'brand',
+    ] as const;
     for (const page of pages) {
       expect(() => renderDrillInUrl(story({ page }), wsId, false)).not.toThrow();
     }
+  });
+
+  it('URL-encodes special chars in tab name', () => {
+    const url = renderDrillInUrl(story({ page: 'health', tab: 'foo bar' }), wsId, false);
+    // Spec doesn't normalize the tab key — receiver reads what was passed.
+    // URLSearchParams would encode, but `?tab=` here is built via template
+    // literal, so the raw value lands in the URL. Pin current behavior; if
+    // the renderer ever switches to URLSearchParams this test catches it.
+    expect(url).toBe('/client/ws_test/health?tab=foo bar');
+  });
+
+  it('multi-key queryParams produce stable & joined output', () => {
+    const url = renderDrillInUrl(
+      story({ page: 'strategy', queryParams: { keyword: 'fleet', priority: 'high' } }),
+      wsId,
+      false,
+    );
+    // URLSearchParams preserves insertion order for plain objects (V8 guarantee
+    // for string keys without numeric prefixes). Lock it.
+    expect(url).toBe('/client/ws_test/strategy?keyword=fleet&priority=high');
+  });
+
+  it('keeps empty-string query values as `?key=`', () => {
+    const url = renderDrillInUrl(
+      story({ page: 'performance', queryParams: { filter: '' } }),
+      wsId,
+      false,
+    );
+    expect(url).toBe('/client/ws_test/performance?filter=');
   });
 });

@@ -15,10 +15,18 @@ interface ActionQueueStripProps {
   };
 }
 
+/**
+ * The `section` value MUST be a real `InboxFilter` value — see
+ * `src/components/client/InboxTab.tsx` `type InboxFilter`. Briefs and posts
+ * both land on the `content` filter (the Inbox doesn't separate the two);
+ * replies land on `requests` (where team-note replies surface). Drift here
+ * silently sends users to the default 'all' filter — covered by the
+ * tab-deep-link-wiring contract test.
+ */
 interface Chip {
   count: number;
   label: string;
-  section: 'approvals' | 'briefs' | 'posts' | 'replies' | 'content-plan';
+  section: 'approvals' | 'content' | 'requests' | 'content-plan';
 }
 
 /**
@@ -43,21 +51,21 @@ export function ActionQueueStrip({ workspaceId, betaMode, counts }: ActionQueueS
     chips.push({
       count: counts.briefs,
       label: counts.briefs === 1 ? 'brief' : 'briefs',
-      section: 'briefs',
+      section: 'content',
     });
   }
   if (counts.posts > 0) {
     chips.push({
       count: counts.posts,
       label: counts.posts === 1 ? 'post' : 'posts',
-      section: 'posts',
+      section: 'content',
     });
   }
   if (counts.replies > 0) {
     chips.push({
       count: counts.replies,
       label: counts.replies === 1 ? 'reply' : 'replies',
-      section: 'replies',
+      section: 'requests',
     });
   }
   if (counts.contentPlan > 0) {
@@ -73,9 +81,11 @@ export function ActionQueueStrip({ workspaceId, betaMode, counts }: ActionQueueS
   return (
     <div className="flex flex-row flex-wrap items-center gap-3 bg-amber-500/15 border border-amber-500/30 px-4 py-3 rounded-[var(--radius-xl)]">
       <Clipboard className="w-4 h-4 text-amber-300 flex-shrink-0" aria-hidden="true" />
-      {chips.map((chip) => (
+      {chips.map((chip, idx) => (
         <button
-          key={chip.section}
+          // index-based key because briefs/posts both target section='content'
+          // — section alone is not unique once those two chips coexist.
+          key={`${chip.section}-${idx}`}
           type="button"
           onClick={() => navigate(`${clientPath(workspaceId, 'inbox', betaMode)}?tab=${chip.section}`)}
           className="t-caption font-medium text-amber-300 hover:text-amber-200 transition-colors"
