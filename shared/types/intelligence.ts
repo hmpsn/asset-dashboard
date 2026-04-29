@@ -5,6 +5,7 @@
 import type { AnalyticsInsight, InsightType, InsightSeverity } from './analytics.js';
 import type { DiagnosticStatus } from './diagnostics.js';
 import type { KeywordStrategy, AudiencePersona, PageKeywordMap } from './workspace.js';
+import type { BriefingSummary } from './briefing.js';
 import type {
   TrackedAction,
   ActionOutcome,
@@ -239,6 +240,12 @@ export interface ClientSignalsSlice {
     /** Signal types seen recently, most recent first (max 5) */
     recentTypes: Array<'service_interest' | 'content_interest'>;
   };
+  /**
+   * The most recent published briefing for the workspace, or null if none.
+   * Populated by `assembleClientSignals` from `getLatestPublishedBriefing()`.
+   * Always undefined until the assembler reads it (post-Phase 2 only).
+   */
+  latestBriefing?: BriefingSummary | null;
 }
 
 export interface OperationalSlice {

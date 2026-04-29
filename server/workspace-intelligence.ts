@@ -42,6 +42,7 @@ import type {
   SerpFeatures,
 } from '../shared/types/intelligence.js';
 import type { AnalyticsInsight, InsightType, InsightSeverity } from '../shared/types/analytics.js';
+import type { BriefingSummary } from '../shared/types/briefing.js';
 import type { TrackedAction } from '../shared/types/outcome-tracking.js';
 import type { Workspace, AudiencePersona } from '../shared/types/workspace.js';
 import type { PageKeywordMap } from '../shared/types/workspace.js';
@@ -1369,6 +1370,25 @@ async function assembleClientSignals(
     }
   }
 
+  // Latest published briefing summary — null if none published, undefined-tolerant
+  // for the chat AI context. Reads from the briefing-store; degrades gracefully
+  // if the table is unavailable (e.g., migration not applied).
+  let latestBriefing: BriefingSummary | null = null;
+  try {
+    const { getLatestPublishedBriefing } = await import('./briefing-store.js');
+    const draft = getLatestPublishedBriefing(workspaceId);
+    if (draft) {
+      latestBriefing = {
+        weekOf: draft.weekOf,
+        publishedAt: draft.publishedAt,
+        storyCount: draft.stories.length,
+        hasHero: draft.stories.some((s) => s.isHeadline),
+      };
+    }
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleClientSignals: latest briefing optional, degrading gracefully');
+  }
+
   return {
     keywordFeedback,
     contentGapVotes,
@@ -1383,6 +1403,7 @@ async function assembleClientSignals(
     feedbackItems,
     serviceRequests,
     intentSignals,
+    latestBriefing,
   };
 }
 
@@ -2227,6 +2248,12 @@ function formatClientSignalsSection(signals: ClientSignalsSlice, verbosity: Prom
   }
   if (signals.compositeHealthScore != null) {
     lines.push(`Health score: ${signals.compositeHealthScore}/100`);
+  }
+  if (signals.latestBriefing) {
+    const b = signals.latestBriefing;
+    lines.push(
+      `Latest briefing: ${b.storyCount} stor${b.storyCount === 1 ? 'y' : 'ies'} (week of ${b.weekOf})${b.hasHero ? ' with hero' : ''}`,
+    );
   }
 
   if (verbosity !== 'compact') {
