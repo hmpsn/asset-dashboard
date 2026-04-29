@@ -249,10 +249,9 @@ NODE_ENV=production npx tsx server/index.ts
 ## Build & Test Commands
 
 - Build: `npx vite build`
-- Tests: `npx vitest run` (005062+ tests across +339 test files)
-- TypeScript check: `npm run typecheck` (uses `m run typecheck` (uses `tsc -b -b --noEmit` with project references; do NOT use plain `npx tsc --noEmit` against root tsconfig as it checks zero files)
-- PR check: `npx tsx scripts/pr-c`; do NOT use plain `npx tsc --noEmit` as it checks zero files due to project references)
-- PR check: `npx tsx scripts/pr-check.ts.ts`
+- Tests: `npx vitest run` (5062+ tests across 339 test files)
+- TypeScript check: `npm run typecheck` (uses `tsc -b --noEmit` with project references; do NOT use plain `npx tsc --noEmit` against root tsconfig as it checks zero files)
+- PR check: `npx tsx scripts/pr-check.ts`
 
 ## Known Limitations
 
