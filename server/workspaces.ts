@@ -195,7 +195,7 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
   // auto_publish_briefings + auto_publish_after_hours are NOT NULL in the schema; surface them unconditionally
   ws.autoPublishBriefings = !!row.auto_publish_briefings;
   ws.autoPublishAfterHours = row.auto_publish_after_hours;
-  if (row.last_briefing_run_week_of !== null) ws.lastBriefingRunWeekOf = row.last_briefing_run_week_of;
+  ws.lastBriefingRunWeekOf = row.last_briefing_run_week_of ?? null;
   return ws;
 }
 
