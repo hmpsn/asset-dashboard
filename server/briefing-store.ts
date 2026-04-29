@@ -5,6 +5,7 @@ import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
 import { createLogger } from './logger.js';
+import { validateTransition, BRIEFING_DRAFT_TRANSITIONS } from './state-machines.js';
 import type {
   BriefingDraft,
   BriefingStory,
@@ -86,10 +87,21 @@ const briefingStmts = createStmtCache(() => ({
     WHERE workspace_id = ? AND status = 'published'
     ORDER BY published_at DESC, week_of DESC LIMIT 1
   `),
-  setStories: db.prepare('UPDATE briefing_drafts SET stories = ?, updated_at = ? WHERE id = ? RETURNING *'), // ws-scope-ok — id is a globally unique UUID PK
-  setStatus: db.prepare('UPDATE briefing_drafts SET status = ?, updated_at = ?, published_at = ?, auto_published = ?, admin_note = COALESCE(?, admin_note) WHERE id = ? RETURNING *'), // status-ok — lifecycle column, not a state machine; ws-scope-ok — id is a globally unique UUID PK
-  setNote: db.prepare('UPDATE briefing_drafts SET admin_note = ?, updated_at = ? WHERE id = ? RETURNING *'), // ws-scope-ok — id is a globally unique UUID PK
+  setStories: db.prepare('UPDATE briefing_drafts SET stories = ?, updated_at = ? WHERE id = ? AND workspace_id = ? RETURNING *'),
+  setStatus: db.prepare('UPDATE briefing_drafts SET status = ?, updated_at = ?, published_at = ?, auto_published = ?, admin_note = COALESCE(?, admin_note) WHERE id = ? AND workspace_id = ? RETURNING *'),
+  setNote: db.prepare('UPDATE briefing_drafts SET admin_note = ?, updated_at = ? WHERE id = ? AND workspace_id = ? RETURNING *'),
 }));
+
+/**
+ * Read the current draft strictly within a workspace.
+ * Returns null if the row doesn't exist OR belongs to a different workspace —
+ * never leaks "exists in another workspace" as a 404 vs 403 oracle.
+ */
+function getDraftScoped(workspaceId: string, id: string): BriefingRow | null {
+  const row = briefingStmts().getById.get(id) as BriefingRow | undefined;
+  if (!row || row.workspace_id !== workspaceId) return null;
+  return row;
+}
 
 // ── Mapper ──
 
@@ -164,8 +176,11 @@ export function getLatestPublishedBriefing(workspaceId: string): BriefingDraft |
   return row ? rowToDraft(row) : null;
 }
 
-export function updateBriefingStories(id: string, stories: BriefingStory[]): BriefingDraft | null {
-  const row = briefingStmts().setStories.get(JSON.stringify(stories), Date.now(), id) as BriefingRow | undefined;
+export function updateBriefingStories(workspaceId: string, id: string, stories: BriefingStory[]): BriefingDraft | null {
+  const current = getDraftScoped(workspaceId, id);
+  if (!current) return null;
+  if (current.status === 'published') return null;  // published is terminal — protect against silent overwrite
+  const row = briefingStmts().setStories.get(JSON.stringify(stories), Date.now(), id, workspaceId) as BriefingRow | undefined;
   return row ? rowToDraft(row) : null;
 }
 
@@ -174,46 +189,43 @@ export interface MarkPublishedOptions {
   adminNote?: string;
 }
 
-export function markPublished(id: string, opts: MarkPublishedOptions): BriefingDraft | null {
-  const now = Date.now();
+function setStatusScoped(
+  workspaceId: string,
+  id: string,
+  next: BriefingDraftStatus,
+  publishedAt: number | null,
+  autoPublished: boolean,
+  adminNote: string | null,
+): BriefingDraft | null {
+  const current = getDraftScoped(workspaceId, id);
+  if (!current) return null;
+  validateTransition<BriefingDraftStatus>('briefing_draft', BRIEFING_DRAFT_TRANSITIONS, current.status, next);
   const row = briefingStmts().setStatus.get(
-    'published',
-    now,
-    now,
-    opts.autoPublished ? 1 : 0,
-    opts.adminNote ?? null,
-    id,
-  ) as BriefingRow | undefined;
-  return row ? rowToDraft(row) : null;
-}
-
-export function markApproved(id: string, adminNote?: string): BriefingDraft | null {
-  const now = Date.now();
-  const row = briefingStmts().setStatus.get(
-    'approved',
-    now,
-    null,
-    0,
-    adminNote ?? null,
-    id,
-  ) as BriefingRow | undefined;
-  return row ? rowToDraft(row) : null;
-}
-
-export function markSkipped(id: string, adminNote: string): BriefingDraft | null {
-  const now = Date.now();
-  const row = briefingStmts().setStatus.get(
-    'skipped',
-    now,
-    null,
-    0,
+    next,
+    Date.now(),
+    publishedAt,
+    autoPublished ? 1 : 0,
     adminNote,
     id,
+    workspaceId,
   ) as BriefingRow | undefined;
   return row ? rowToDraft(row) : null;
 }
 
-export function setBriefingAdminNote(id: string, adminNote: string | null): BriefingDraft | null {
-  const row = briefingStmts().setNote.get(adminNote, Date.now(), id) as BriefingRow | undefined;
+export function markPublished(workspaceId: string, id: string, opts: MarkPublishedOptions): BriefingDraft | null {
+  return setStatusScoped(workspaceId, id, 'published', Date.now(), opts.autoPublished, opts.adminNote ?? null);
+}
+
+export function markApproved(workspaceId: string, id: string, adminNote?: string): BriefingDraft | null {
+  return setStatusScoped(workspaceId, id, 'approved', null, false, adminNote ?? null);
+}
+
+export function markSkipped(workspaceId: string, id: string, adminNote: string): BriefingDraft | null {
+  return setStatusScoped(workspaceId, id, 'skipped', null, false, adminNote);
+}
+
+export function setBriefingAdminNote(workspaceId: string, id: string, adminNote: string | null): BriefingDraft | null {
+  if (!getDraftScoped(workspaceId, id)) return null;
+  const row = briefingStmts().setNote.get(adminNote, Date.now(), id, workspaceId) as BriefingRow | undefined;
   return row ? rowToDraft(row) : null;
 }
