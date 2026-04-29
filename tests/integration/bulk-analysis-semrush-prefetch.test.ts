@@ -20,7 +20,7 @@ vi.doMock('../../server/seo-data-provider.js', async (orig) => {
 
 describe('prefetchSemrushForTopPages — bulk analysis enrichment', () => {
   let wsId: string;
-  let cleanup: () => void;
+  let cleanup: (() => void) | undefined;
   beforeAll(async () => {
     await ctx.startServer();
     const s = seedWorkspace();
@@ -29,7 +29,12 @@ describe('prefetchSemrushForTopPages — bulk analysis enrichment', () => {
     upsertPageKeyword(wsId, { pagePath: '/plumbing',  primaryKeyword: 'best plumber', secondaryKeywords: [] });
     upsertPageKeyword(wsId, { pagePath: '/hvac',      primaryKeyword: 'hvac service', secondaryKeywords: [] });
   });
-  afterAll(async () => { cleanup(); ctx.stopServer(); vi.resetModules(); });
+  // Null-guard `cleanup` so a beforeAll failure (e.g., EADDRINUSE on the test
+  // server port) doesn't throw out of afterAll before `ctx.stopServer()`
+  // runs — that's how the orphaned-server-holds-port feedback loop got created
+  // in the first place. Always reach stopServer + resetModules even on the
+  // sad path.
+  afterAll(async () => { cleanup?.(); ctx.stopServer(); vi.resetModules(); });
 
   it('returns a Map keyed by page path with REAL KEYWORD DATA blocks for pages with primary keywords', async () => {
     const { prefetchSemrushForTopPages } = await import('../../server/routes/jobs.js');
