@@ -16,6 +16,7 @@ import { listSnapshots, getLatestSnapshot, getLatestSnapshotBefore } from '../re
 import { getAllGscPages } from '../search-console.js';
 import { isStripeConfigured, listProducts } from '../stripe.js';
 import { updateWorkspace, getWorkspace } from '../workspaces.js';
+import { getLatestPublishedBriefing } from '../briefing-store.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
 import { parseJsonFallback } from '../db/json-validation.js';
@@ -786,6 +787,42 @@ router.post('/api/public/copy/:workspaceId/section/:sectionId/suggest', (req, re
   log.info({ wsId, sectionId }, 'Client suggested copy edit');
   // Strip internal-only fields before returning to client
   res.json({ section: toClientSection(section) });
+});
+
+// ── Client Briefing (Phase 1b) ────────────────────────────────────────────
+// GET /api/public/briefing/:workspaceId — latest published briefing for the
+// client portal. Tier-gated: free → 402. Returns { briefing: null } when no
+// briefing has been published yet (paid tier with cron not yet run).
+//
+// admin-only fields (sourceMetadata, adminNote) are intentionally stripped —
+// only weekOf, publishedAt, and the BriefingStory[] array reach the client.
+router.get('/api/public/briefing/:workspaceId', (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (ws.clientPortalEnabled != null && !ws.clientPortalEnabled) {
+    return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
+  }
+
+  // Trial-aware effective tier (matches /api/public/tier/:id semantics)
+  let effectiveTier: 'free' | 'growth' | 'premium' = (ws.tier as 'free' | 'growth' | 'premium') || 'free';
+  if (effectiveTier === 'free' && ws.trialEndsAt) {
+    const trialEnd = new Date(ws.trialEndsAt);
+    if (trialEnd > new Date()) effectiveTier = 'growth';
+  }
+  if (effectiveTier === 'free') {
+    return res.status(402).json({ error: 'Briefing requires Growth or Premium tier' });
+  }
+
+  const latest = getLatestPublishedBriefing(ws.id);
+  if (!latest) return res.json({ briefing: null });
+
+  res.json({
+    briefing: {
+      weekOf: latest.weekOf,
+      publishedAt: latest.publishedAt,
+      stories: latest.stories,
+    },
+  });
 });
 
 export default router;
