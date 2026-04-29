@@ -25,7 +25,7 @@ import {
   revertToVersion,
   getMostRecentPostVersion,
 } from '../content-posts.js';
-import { scoreVoiceMatch } from '../content-posts-ai.js';
+import { scoreVoiceMatch, countHtmlWords } from '../content-posts-ai.js';
 import { renderPostHTML } from '../post-export-html.js';
 import { assemblePostHtml, generateSlug } from '../html-to-richtext.js';
 import {
@@ -284,7 +284,20 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
       { postId: req.params.postId, fields: editedContentFields },
     );
   }
-  if (!isContentEdit || !withinEditCoalesceWindow) {
+  // Recompute totalWordCount server-side when content fields change (matches
+  // the pattern in the client-edit route at public-content.ts).
+  if (isContentEdit) {
+    const introWords = countHtmlWords(updated.introduction || '');
+    const conclusionWords = countHtmlWords(updated.conclusion || '');
+    const sectionWords = updated.sections.reduce((sum: number, s: { wordCount?: number }) => sum + (s.wordCount || 0), 0);
+    const newTotal = introWords + conclusionWords + sectionWords;
+    if (newTotal !== updated.totalWordCount) {
+      updatePostField(req.params.workspaceId, req.params.postId, { totalWordCount: newTotal });
+      updated.totalWordCount = newTotal;
+    }
+  }
+  const hasNonContentChange = Object.keys(req.body).some(f => !contentFields.includes(f));
+  if (!isContentEdit || !withinEditCoalesceWindow || hasNonContentChange) {
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: req.params.postId });
   }
   res.json(updated);
