@@ -1,4 +1,7 @@
-import { getCollectionSchema, listCollections } from './webflow.js';
+import { getCollectionSchema, listCollections, discoverCmsUrls, buildStaticPathSet, toCmsPageId } from './webflow.js';
+import { getWorkspacePages } from './workspace-data.js';
+import { listWorkspaces } from './workspaces.js';
+import { generateLeanSchema } from './schema/index.js';
 import { callOpenAI } from './openai-helpers.js';
 import { stripHtmlToText } from './helpers.js';
 import { createLogger } from './logger.js';
@@ -1983,7 +1986,6 @@ export async function generateSchemaForPage(
   // listPages does). Derive it from slug — homepage = '/', else '/<slug>'.
   const publishedPath = isHomepage ? '/' : `/${slug}`;
 
-  const { generateLeanSchema } = await import('./schema/index.js');
   const lean = await generateLeanSchema({
     pageId,
     pageMeta: {
@@ -2035,10 +2037,9 @@ export async function generateSchemaSuggestions(
   const baseUrl = await resolveBaseUrl({ liveDomain: ctx.liveDomain, webflowSiteId: siteId }, tokenOverride);
   if (!baseUrl) return [];
 
-  const { listPages, filterPublishedPages } = await import('./webflow-pages.js');
-  const pages = filterPublishedPages(await listPages(siteId, tokenOverride));
+  const wsId = ctx.workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
+  const pages = wsId ? await getWorkspacePages(wsId, siteId) : [];
 
-  const { generateLeanSchema } = await import('./schema/index.js');
   const results: SchemaPageSuggestion[] = [];
 
   for (const page of pages) {
@@ -2077,14 +2078,13 @@ export async function generateSchemaSuggestions(
 
   // CMS pages — same lean path
   {
-    const { discoverCmsUrls: _discoverCmsUrls, buildStaticPathSet: _buildStaticPathSet, toCmsPageId: _toCmsPageId } = await import('./webflow.js');
-    const staticPaths = _buildStaticPathSet(pages);
-    const { cmsUrls } = await _discoverCmsUrls(baseUrl, staticPaths, 1000);
+    const staticPaths = buildStaticPathSet(pages);
+    const { cmsUrls } = await discoverCmsUrls(baseUrl, staticPaths, 1000);
     for (const item of cmsUrls) {
       if (isCancelled?.()) break;
       const itemHtml = await fetchPublishedHtml(item.url);
       const itemLean = await generateLeanSchema({
-        pageId: _toCmsPageId(item.path),
+        pageId: toCmsPageId(item.path),
         pageMeta: {
           title: item.pageName,
           slug: item.path.replace(/^\//, ''),
