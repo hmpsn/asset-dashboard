@@ -4650,6 +4650,24 @@ export const CHECKS: Check[] = [
     rationale: 'Centralizes chart palette into CHART_SERIES_COLORS so series colors can be updated in one place.',
     claudeMdRef: '#design-system--the-four-laws-of-color',
   },
+  {
+    // Catches HTML-naive word-counting on TipTap content fields. Post intro/conclusion
+    // and section.content are stored as rich-text HTML, so `countWords(post.introduction)`
+    // or `post.introduction.split(/\s+/)` treats `<p>` and `</p>` as words and inflates
+    // the count. Use countHtmlWords() (server) or countWordsFromHtml() (client) instead.
+    name: 'HTML-naive word count on rich-text post field',
+    // POSIX-compatible regex (BSD grep -E on macOS — no \b, \w, \s).
+    // Catches `countWords(<anything>.introduction)` / `countWords(<anything>.conclusion)`
+    // and `(introduction|conclusion).split(` on a local variable named introduction/conclusion.
+    pattern: '(countWords\\([^()]*\\.(introduction|conclusion)|(introduction|conclusion)\\.split\\()',
+    fileGlobs: ['*.ts', '*.tsx'],
+    excludeLines: ['html-word-count-ok'],
+    message:
+      'introduction/conclusion are TipTap HTML — use countHtmlWords() (server, from content-posts-ai.ts) or countWordsFromHtml() (client, from src/lib/utils.ts) instead of countWords() / .split(/\\s+/). Tags inflate the count. Escape hatch: // html-word-count-ok',
+    severity: 'error',
+    rationale: 'Counting words on rich-text HTML treats `<p>` and `</p>` as words. The dedicated HTML-aware helpers strip tags first. Same root cause as the section.wordCount drift Devin flagged in PR #356.',
+    claudeMdRef: '#code-conventions',
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────

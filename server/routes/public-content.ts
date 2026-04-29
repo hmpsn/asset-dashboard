@@ -20,6 +20,7 @@ import { notifyTeamContentRequest } from '../email.js';
 import { getPost, updatePostField, snapshotPostVersion, getMostRecentPostVersion } from '../content-posts.js';
 import { sanitizeString, validateEnum } from '../helpers.js';
 import { sanitizeRichText, sanitizePlainText } from '../html-sanitize.js';
+import { countHtmlWords } from '../content-posts-ai.js';
 import { getPageKeyword, listPageKeywords } from '../page-keywords.js';
 import { getClientActor } from '../middleware.js';
 import { getPageTrend, getQueryPageData } from '../search-console.js';
@@ -557,8 +558,8 @@ router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', valid
     const finalIntro = updates.introduction !== undefined ? (updates.introduction as string) : post.introduction;
     const finalConclusion = updates.conclusion !== undefined ? (updates.conclusion as string) : post.conclusion;
     const finalSections = (updates.sections as { wordCount: number }[] | undefined) ?? post.sections;
-    const introWords = (finalIntro || '').split(/\s+/).filter(Boolean).length;
-    const conclusionWords = (finalConclusion || '').split(/\s+/).filter(Boolean).length;
+    const introWords = countHtmlWords(finalIntro || '');
+    const conclusionWords = countHtmlWords(finalConclusion || '');
     const sectionWords = finalSections.reduce((sum, s) => sum + (s.wordCount || 0), 0);
     updates.totalWordCount = introWords + conclusionWords + sectionWords;
   }

@@ -482,7 +482,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
               <div className="flex items-center gap-2">
                 <Icon as={Sparkles} size="md" className="text-teal-400" />
                 <span className="text-xs font-medium text-[var(--brand-text-bright)]">Introduction</span>
-                {post.introduction && <span className="t-caption-sm text-[var(--brand-text-muted)]">{post.introduction.split(/\s+/).filter(w => w).length}w</span>}
+                {post.introduction && <span className="t-caption-sm text-[var(--brand-text-muted)]">{countWordsFromHtml(post.introduction)}w</span>}
               </div>
               {post.introduction && !editingIntro && (
                 <button onClick={() => setEditingIntro(true)} className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
@@ -545,7 +545,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
               <div className="flex items-center gap-2">
                 <Icon as={Sparkles} size="md" className="text-teal-400" />
                 <span className="text-xs font-medium text-[var(--brand-text-bright)]">Conclusion</span>
-                {post.conclusion && <span className="t-caption-sm text-[var(--brand-text-muted)]">{post.conclusion.split(/\s+/).filter(w => w).length}w</span>}
+                {post.conclusion && <span className="t-caption-sm text-[var(--brand-text-muted)]">{countWordsFromHtml(post.conclusion)}w</span>}
               </div>
               {post.conclusion && !editingConclusion && (
                 <button onClick={() => setEditingConclusion(true)} className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
