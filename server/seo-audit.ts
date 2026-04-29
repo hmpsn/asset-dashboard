@@ -1,4 +1,4 @@
-import { discoverCmsUrls, buildStaticPathSet } from './webflow.js';
+import { discoverCmsUrls, buildStaticPathSet, toCmsPageId } from './webflow.js';
 import { getWorkspacePages } from './workspace-data.js';
 import { checkSiteLinks } from './link-checker.js';
 import type { DeadLink } from './link-checker.js';
@@ -192,8 +192,9 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
               desc: htmlMetaDesc.toLowerCase().trim(),
               page: item.pageName,
             });
-            if (html) htmlCache.set(`cms-${slug}`, html);
-            return auditPage(`cms-${slug}`, item.pageName, slug, item.url, null, html);
+            const cmsPageId = toCmsPageId(item.path);
+            if (html) htmlCache.set(cmsPageId, html);
+            return auditPage(cmsPageId, item.pageName, slug, item.url, null, html);
           })
         );
         results.push(...chunkResults);
