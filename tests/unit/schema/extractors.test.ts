@@ -6,6 +6,7 @@ vi.mock('../../../server/ai.js', () => ({
 
 import { callAI } from '../../../server/ai.js';
 import { extractDescription } from '../../../server/schema/extractors/description.js';
+import { extractFaq } from '../../../server/schema/extractors/faq.js';
 
 describe('extractDescription', () => {
   beforeEach(() => {
@@ -72,5 +73,53 @@ describe('extractDescription', () => {
       workspace: { name: 'A', publisherLogoUrl: null, businessProfile: null },
     });
     expect(result).toBeUndefined();
+  });
+});
+
+describe('extractFaq', () => {
+  beforeEach(() => {
+    vi.mocked(callAI).mockReset();
+  });
+
+  it('extracts FAQs from <details>/<summary> structure', async () => {
+    const html = `
+      <details>
+        <summary>What is your turnaround time?</summary>
+        <div>Usually 2 weeks.</div>
+      </details>
+      <details>
+        <summary>Do you offer refunds?</summary>
+        <p>Yes, within 30 days.</p>
+      </details>
+    `;
+    const result = await extractFaq(html);
+    expect(result).toEqual([
+      { question: 'What is your turnaround time?', answer: 'Usually 2 weeks.' },
+      { question: 'Do you offer refunds?', answer: 'Yes, within 30 days.' },
+    ]);
+    expect(callAI).not.toHaveBeenCalled();
+  });
+
+  it('returns empty array when no accordion structure', async () => {
+    const html = '<p>No FAQ here</p>';
+    const result = await extractFaq(html);
+    expect(result).toEqual([]);
+    expect(callAI).not.toHaveBeenCalled();
+  });
+
+  it('returns empty array when only one Q&A (FAQPage requires 2+)', async () => {
+    const html = '<details><summary>Q</summary><p>A</p></details>';
+    const result = await extractFaq(html);
+    expect(result).toEqual([]);
+  });
+
+  it('skips entries with empty question or answer', async () => {
+    const html = `
+      <details><summary></summary><p>Orphan answer</p></details>
+      <details><summary>Real Q</summary><p>Real A</p></details>
+      <details><summary>Q with empty answer</summary><p></p></details>
+    `;
+    const result = await extractFaq(html);
+    expect(result).toEqual([]); // < 2 valid pairs after filtering
   });
 });
