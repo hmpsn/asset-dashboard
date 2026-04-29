@@ -7,6 +7,7 @@ import {
   Globe, Clipboard, Flag, Clock, RefreshCw, Layers, DollarSign, Target,
 } from 'lucide-react';
 import { StatCard, SectionCard, PageHeader, MetricRing, TabBar, OnboardingChecklist, WorkspaceHealthBar, Icon, cn } from './ui';
+import { FeatureFlag } from './ui/FeatureFlag';
 import { themeColor } from './ui/constants';
 import { WorkspaceHealthBadge } from './admin/WorkspaceHealthBadge';
 import { BriefingReviewQueue } from './admin/BriefingReviewQueue';
@@ -545,9 +546,11 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       <AnomalyAlerts workspaceId={workspaceId} isAdmin={true} />
 
       {/* ── Weekly Briefings (admin review queue, dark-launched behind client-briefing-v2) ── */}
-      <ErrorBoundary label="Briefing Review Queue">
-        <BriefingReviewQueue workspaceId={workspaceId} />
-      </ErrorBoundary>
+      <FeatureFlag flag="client-briefing-v2">
+        <ErrorBoundary label="Briefing Review Queue">
+          <BriefingReviewQueue workspaceId={workspaceId} />
+        </ErrorBoundary>
+      </FeatureFlag>
 
       {/* ── SEO Pipeline (Work Status + Change Tracker) ── */}
       {seoStatus.total > 0 ? (
