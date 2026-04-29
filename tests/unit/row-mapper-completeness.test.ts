@@ -169,6 +169,7 @@ describe('rowToWorkspace mapper completeness', () => {
       onboardingCompleted: true,
       stripeCustomerId: 'cus_test',
       customPromptNotes: 'Per-workspace AI framing notes.',
+      lastBriefingRunWeekOf: '2026-04-27',
     });
 
     const result = getWorkspace(ws.id);
