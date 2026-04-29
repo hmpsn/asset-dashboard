@@ -115,6 +115,81 @@ function validateCrossRefs(node: Record<string, unknown>, allNodes: Record<strin
   return errors;
 }
 
+const ISO_8601_RE = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
+
+function validateArticleShape(node: Record<string, unknown>): string[] {
+  const errors: string[] = [];
+  const t = node['@type'] as string;
+  if (t !== 'Article' && t !== 'BlogPosting') return errors;
+
+  // author: must have @type ∈ {Person, Organization} AND non-empty name.
+  const author = node.author;
+  if (author !== undefined) {
+    const ok = typeof author === 'object' && author !== null
+      && ((author as Record<string, unknown>)['@type'] === 'Person' || (author as Record<string, unknown>)['@type'] === 'Organization')
+      && typeof (author as Record<string, unknown>).name === 'string'
+      && ((author as Record<string, unknown>).name as string).trim().length > 0;
+    if (!ok) errors.push(`${t}.author must have @type ∈ {Person, Organization} and non-empty name`);
+  }
+
+  // publisher: must have @type AND name AND logo (ImageObject with url).
+  const publisher = node.publisher as Record<string, unknown> | undefined;
+  if (publisher !== undefined) {
+    const logo = publisher.logo as Record<string, unknown> | undefined;
+    const ok = typeof publisher === 'object' && publisher !== null
+      && typeof publisher['@type'] === 'string'
+      && typeof publisher.name === 'string' && (publisher.name as string).trim().length > 0
+      && logo !== undefined && typeof logo === 'object'
+      && logo['@type'] === 'ImageObject'
+      && typeof logo.url === 'string' && (logo.url as string).trim().length > 0;
+    if (!ok) errors.push(`${t}.publisher must have @type, name, and logo (ImageObject with url) — Google Article rich result requires the publisher logo`);
+  }
+
+  // image: string | array | ImageObject.
+  const image = node.image;
+  if (image !== undefined) {
+    const ok = typeof image === 'string'
+      || Array.isArray(image)
+      || (typeof image === 'object' && image !== null && (image as Record<string, unknown>)['@type'] === 'ImageObject');
+    if (!ok) errors.push(`${t}.image must be a string URL, an array of strings/ImageObjects, or an ImageObject`);
+  }
+
+  // datePublished / dateModified: ISO 8601.
+  for (const field of ['datePublished', 'dateModified'] as const) {
+    const v = node[field];
+    if (v !== undefined && (typeof v !== 'string' || !ISO_8601_RE.test(v))) {
+      errors.push(`${t}.${field} must be ISO 8601 (e.g. "2026-01-15T00:00:00Z")`);
+    }
+  }
+
+  return errors;
+}
+
+function validateBreadcrumbOrdering(node: Record<string, unknown>): string[] {
+  if (node['@type'] !== 'BreadcrumbList') return [];
+  const items = node.itemListElement as Array<Record<string, unknown>> | undefined;
+  if (!Array.isArray(items)) return []; // existing validateBreadcrumb catches missing array
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].position !== i + 1) {
+      return ['BreadcrumbList itemListElement positions must start at 1 and be contiguous-ascending'];
+    }
+  }
+  return [];
+}
+
+function validateAbsoluteUrls(node: Record<string, unknown>): string[] {
+  const errors: string[] = [];
+  const t = node['@type'] as string;
+  // Only check primary nodes — BreadcrumbList's `item` URLs are inside ListItems and are
+  // already required by validateBreadcrumb to be non-empty strings; skip them here.
+  if (t === 'BreadcrumbList' || t === 'ListItem') return errors;
+  const url = node.url;
+  if (typeof url === 'string' && !/^https?:\/\//.test(url)) {
+    errors.push(`${t}.url must be an absolute URL (start with http:// or https://)`);
+  }
+  return errors;
+}
+
 export function validateLeanSchema(schema: Record<string, unknown>, _primaryType: string): string[] {
   const errors: string[] = [];
   if (schema['@context'] !== 'https://schema.org') errors.push('Schema missing @context');
@@ -152,6 +227,9 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
       errors.push(...validateBreadcrumb(node));
     }
     errors.push(...validateCrossRefs(node, graph));
+    errors.push(...validateArticleShape(node));
+    errors.push(...validateBreadcrumbOrdering(node));
+    errors.push(...validateAbsoluteUrls(node));
   }
 
   return errors;

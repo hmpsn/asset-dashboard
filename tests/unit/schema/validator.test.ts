@@ -233,3 +233,89 @@ describe('validateLeanSchema — cross-reference shape (Pillar 1)', () => {
     expect(validateLeanSchema(broken, 'WebPage')).toContain('WebPage.breadcrumb references @id "https://x.com/p#breadcrumb" but no BreadcrumbList with that @id is in the @graph');
   });
 });
+
+describe('validateLeanSchema — value-shape validators (Pillar 1)', () => {
+  const article = (overrides: Record<string, unknown> = {}) => ({
+    '@context': 'https://schema.org',
+    '@graph': [{
+      '@type': 'Article', '@id': 'https://x.com/a#article', 'headline': 'H',
+      'description': 'D', 'image': ['https://x.com/i.jpg'], 'url': 'https://x.com/a',
+      'datePublished': '2026-01-01T00:00:00Z', 'dateModified': '2026-01-02T00:00:00Z',
+      'mainEntityOfPage': { '@id': 'https://x.com/a' },
+      'author': { '@type': 'Person', 'name': 'Jane Doe' },
+      'publisher': { '@type': 'Organization', 'name': 'X', 'logo': { '@type': 'ImageObject', 'url': 'https://x.com/logo.png' } },
+      'isPartOf': { '@id': 'https://x.com/#website' },
+      'breadcrumb': { '@id': 'https://x.com/a#breadcrumb' },
+      'inLanguage': 'en',
+      ...overrides,
+    }, {
+      '@type': 'BreadcrumbList', '@id': 'https://x.com/a#breadcrumb',
+      'itemListElement': [
+        { '@type': 'ListItem', 'position': 1, 'name': 'Home', 'item': 'https://x.com' },
+        { '@type': 'ListItem', 'position': 2, 'name': 'A', 'item': 'https://x.com/a' },
+      ],
+    }],
+  });
+
+  it('passes a fully shape-correct Article', () => {
+    expect(validateLeanSchema(article(), 'Article')).toEqual([]);
+  });
+
+  it('flags Article.author missing @type', () => {
+    const broken = article({ author: { name: 'Jane Doe' } });
+    expect(validateLeanSchema(broken, 'Article')).toContain('Article.author must have @type ∈ {Person, Organization} and non-empty name');
+  });
+
+  it('flags Article.author missing name', () => {
+    const broken = article({ author: { '@type': 'Person' } });
+    expect(validateLeanSchema(broken, 'Article')).toContain('Article.author must have @type ∈ {Person, Organization} and non-empty name');
+  });
+
+  it('flags Article.author with bad @type', () => {
+    const broken = article({ author: { '@type': 'CreativeWork', 'name': 'X' } });
+    expect(validateLeanSchema(broken, 'Article')).toContain('Article.author must have @type ∈ {Person, Organization} and non-empty name');
+  });
+
+  it('flags Article.publisher missing logo (Google Rich Results requires it)', () => {
+    const broken = article({ publisher: { '@type': 'Organization', 'name': 'X' } });
+    expect(validateLeanSchema(broken, 'Article')).toContain('Article.publisher must have @type, name, and logo (ImageObject with url) — Google Article rich result requires the publisher logo');
+  });
+
+  it('flags Article.publisher.logo missing url', () => {
+    const broken = article({ publisher: { '@type': 'Organization', 'name': 'X', 'logo': { '@type': 'ImageObject' } } });
+    expect(validateLeanSchema(broken, 'Article')).toContain('Article.publisher must have @type, name, and logo (ImageObject with url) — Google Article rich result requires the publisher logo');
+  });
+
+  it('flags Article.image as non-string non-array non-ImageObject', () => {
+    const broken = article({ image: 123 });
+    expect(validateLeanSchema(broken, 'Article')).toContain('Article.image must be a string URL, an array of strings/ImageObjects, or an ImageObject');
+  });
+
+  it('flags Article.datePublished not in ISO 8601 format', () => {
+    const broken = article({ datePublished: 'January 1, 2026' });
+    expect(validateLeanSchema(broken, 'Article')).toContain('Article.datePublished must be ISO 8601 (e.g. "2026-01-15T00:00:00Z")');
+  });
+
+  it('flags Article.dateModified not in ISO 8601 format', () => {
+    const broken = article({ dateModified: '01/02/2026' });
+    expect(validateLeanSchema(broken, 'Article')).toContain('Article.dateModified must be ISO 8601 (e.g. "2026-01-15T00:00:00Z")');
+  });
+
+  it('flags BreadcrumbList positions not starting at 1', () => {
+    const broken = JSON.parse(JSON.stringify(article()));
+    broken['@graph'][1].itemListElement[0].position = 0;
+    broken['@graph'][1].itemListElement[1].position = 1;
+    expect(validateLeanSchema(broken, 'Article')).toContain('BreadcrumbList itemListElement positions must start at 1 and be contiguous-ascending');
+  });
+
+  it('flags BreadcrumbList positions with gaps', () => {
+    const broken = JSON.parse(JSON.stringify(article()));
+    broken['@graph'][1].itemListElement[1].position = 3;
+    expect(validateLeanSchema(broken, 'Article')).toContain('BreadcrumbList itemListElement positions must start at 1 and be contiguous-ascending');
+  });
+
+  it('flags primary-node url field that is not absolute', () => {
+    const broken = article({ url: '/a' });
+    expect(validateLeanSchema(broken, 'Article')).toContain('Article.url must be an absolute URL (start with http:// or https://)');
+  });
+});
