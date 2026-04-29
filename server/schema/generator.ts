@@ -22,8 +22,8 @@ import { buildLocalBusinessSchema } from './templates/local-business.js';
 import { buildAboutPageSchema, buildContactPageSchema, buildCollectionPageSchema, buildWebPageSchema } from './templates/static.js';
 import { buildHomepageSchema } from './templates/homepage.js';
 import { validateLeanSchema } from './validator.js';
-import { checkRichResultsEligibility } from '../schema-suggester.js';
-import type { RichResultEligibility } from '../schema-suggester.js';
+import { checkRichResultsEligibility } from './rich-results.js';
+import type { RichResultEligibility } from './rich-results.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('schema/generator');

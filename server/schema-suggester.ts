@@ -12,12 +12,13 @@ import { resolveBaseUrl } from './url-helpers.js';
 
 const log = createLogger('schema');
 
-export interface RichResultEligibility {
-  type: string;
-  eligible: boolean;
-  feature: string;
-  missingFields?: string[];
-}
+// Re-export from the standalone rich-results module so existing external callers
+// (e.g. frontend SchemaPageCard.tsx, route handlers) keep working. The actual
+// implementation lives in server/schema/rich-results.ts to break a circular
+// import between schema-suggester.ts and the schema/ package.
+export { checkRichResultsEligibility } from './schema/rich-results.js';
+export type { RichResultEligibility } from './schema/rich-results.js';
+import type { RichResultEligibility } from './schema/rich-results.js';
 
 export interface SchemaPageSuggestion {
   pageId: string;
@@ -99,66 +100,8 @@ export const PAGE_TYPE_SCHEMA_MAP: Record<SchemaPageType, { primary: string[]; s
   generic: { primary: ['WebPage'], secondary: ['BreadcrumbList'] },
 };
 
-// ── Rich Results Eligibility ──────────────────────────────────────────────────
-
-/** Google-supported rich result types and the fields they require. */
-const RICH_RESULTS_ELIGIBLE: Record<string, { feature: string; required: string[] }> = {
-  FAQPage:       { feature: 'FAQ accordion in search',        required: ['mainEntity'] },
-  HowTo:         { feature: 'How-to steps in search',         required: ['name', 'step'] },
-  VideoObject:   { feature: 'Video carousel',                 required: ['name', 'uploadDate', 'thumbnailUrl'] },
-  Article:       { feature: 'Article rich result',            required: ['headline', 'datePublished', 'author', 'image'] },
-  NewsArticle:   { feature: 'Article rich result',            required: ['headline', 'datePublished', 'author', 'image'] },
-  BlogPosting:   { feature: 'Article rich result',            required: ['headline', 'datePublished', 'author', 'image'] },
-  Product:       { feature: 'Product rich result',            required: ['name', 'offers'] },
-  LocalBusiness: { feature: 'Local business panel',           required: ['name', 'address'] },
-  Event:         { feature: 'Event listing',                  required: ['name', 'startDate', 'location'] },
-  Recipe:        { feature: 'Recipe rich result',             required: ['name', 'image', 'recipeIngredient', 'recipeInstructions'] },
-  JobPosting:    { feature: 'Job listing in search',          required: ['title', 'hiringOrganization', 'jobLocation', 'datePosted', 'description'] },
-  BreadcrumbList: { feature: 'Breadcrumb trail in search',    required: ['itemListElement'] },
-  Course:        { feature: 'Course info in search',          required: ['name', 'description', 'provider'] },
-  Review:        { feature: 'Review rich result',             required: ['itemReviewed', 'reviewRating', 'author'] },
-  ProfilePage:   { feature: 'Profile page in search',        required: ['mainEntity'] },
-  MedicalOrganization: { feature: 'Medical business panel',  required: ['name', 'address'] },
-  FinancialService:    { feature: 'Financial service panel',  required: ['name', 'address'] },
-  Speakable:     { feature: 'Speakable for voice assistants', required: ['cssSelector'] },
-};
-
-/**
- * Check which schema types in a @graph qualify for Google Rich Results,
- * and what fields are missing for those that don't yet qualify.
- */
-export function checkRichResultsEligibility(schema: Record<string, unknown>): RichResultEligibility[] {
-  const graph = schema['@graph'] as Record<string, unknown>[] | undefined;
-  if (!Array.isArray(graph)) return [];
-
-  const results: RichResultEligibility[] = [];
-
-  for (const node of graph) {
-    const rawType = node['@type'];
-    const types = Array.isArray(rawType) ? rawType as string[] : (rawType ? [rawType as string] : []);
-    for (const type of types) {
-      if (!type || !RICH_RESULTS_ELIGIBLE[type]) continue;
-
-      const { feature, required } = RICH_RESULTS_ELIGIBLE[type];
-      const missingFields = required.filter(field => {
-        const val = node[field];
-        if (val === undefined || val === null) return true;
-        if (Array.isArray(val) && val.length === 0) return true;
-        if (typeof val === 'string' && val.trim() === '') return true;
-        return false;
-      });
-
-      results.push({
-        type,
-        feature,
-        eligible: missingFields.length === 0,
-        missingFields: missingFields.length > 0 ? missingFields : undefined,
-      });
-    }
-  }
-
-  return results;
-}
+// (RICH_RESULTS_ELIGIBLE + checkRichResultsEligibility moved to ./schema/rich-results.ts
+//  to break circular import. Re-exports near the top of this file preserve the public API.)
 
 // Context from the workspace/strategy for richer schema generation
 export interface SchemaContext {

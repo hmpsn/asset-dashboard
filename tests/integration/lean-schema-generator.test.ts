@@ -124,6 +124,25 @@ describe('generateLeanSchema', () => {
     expect((faqNode!.mainEntity as unknown[])).toHaveLength(2);
   });
 
+  it('appends FAQPage on a BlogPosting page (covers re-validation path with required-field warnings)', async () => {
+    const htmlWithFaqAndDate = `<html><body>
+      <time itemprop="datePublished" datetime="2025-06-01T00:00:00Z">June 1</time>
+      <details><summary>What did you do?</summary><p>We launched.</p></details>
+      <details><summary>Why?</summary><p>Demand was strong.</p></details>
+    </body></html>`;
+    const out = await generateLeanSchema({
+      ...baseInput,
+      html: htmlWithFaqAndDate,
+      pageMeta: { ...baseInput.pageMeta, publishedPath: '/blog/launch-faq', seo: { description: 'desc' } },
+    });
+    const graph = out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>;
+    const types = graph.map(n => n['@type']);
+    expect(types).toContain('BlogPosting');
+    expect(types).toContain('FAQPage');
+    const faqNode = graph.find(n => n['@type'] === 'FAQPage');
+    expect((faqNode!.mainEntity as unknown[])).toHaveLength(2);
+  });
+
   it('does NOT append FAQPage when accordion has fewer than 2 pairs', async () => {
     const htmlWithOneFaq = `<html><body>
       <details><summary>Single Q</summary><p>Single A</p></details>
