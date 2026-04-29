@@ -339,6 +339,7 @@ export async function generateSchemaForPage(
       name: ctx.companyName || '',
       publisherLogoUrl: ctx.logoUrl ?? null,
       businessProfile: ctx._businessProfile ?? null,
+      defaultLocale: 'en',
     },
   });
 
@@ -392,6 +393,7 @@ export async function generateSchemaSuggestions(
         name: ctx.companyName || '',
         publisherLogoUrl: ctx.logoUrl ?? null,
         businessProfile: ctx._businessProfile ?? null,
+        defaultLocale: 'en',
       },
     });
     results.push(leanToSuggestion(lean));
@@ -420,6 +422,7 @@ export async function generateSchemaSuggestions(
           name: ctx.companyName || '',
           publisherLogoUrl: ctx.logoUrl ?? null,
           businessProfile: ctx._businessProfile ?? null,
+          defaultLocale: 'en',
         },
       });
       results.push(leanToSuggestion(itemLean));
