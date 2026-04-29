@@ -40,6 +40,29 @@ export function getBrandName(ws: Pick<Workspace, 'name' | 'webflowSiteName'> | n
   return '';
 }
 
+// ── Tier resolution ──
+
+export type EffectiveTier = 'free' | 'growth' | 'premium';
+
+/**
+ * Resolve the effective tier for a workspace, accounting for active free-trial
+ * promotion. Workspaces with `tier === 'free'` whose `trialEndsAt` is in the
+ * future are promoted to `'growth'` for access checks. Returns the canonical
+ * tier ('free' | 'growth' | 'premium') — never null/undefined.
+ *
+ * Use this anywhere a tier-gated feature needs to honor the trial period.
+ * Existing call sites: /api/public/workspace/:id, /api/public/tier/:id,
+ * /api/public/briefing/:wsId.
+ */
+export function computeEffectiveTier(ws: Pick<Workspace, 'tier' | 'trialEndsAt'>): EffectiveTier {
+  const base = (ws.tier as EffectiveTier | undefined) || 'free';
+  if (base === 'free' && ws.trialEndsAt) {
+    const trialEnd = new Date(ws.trialEndsAt);
+    if (!Number.isNaN(trialEnd.getTime()) && trialEnd > new Date()) return 'growth';
+  }
+  return base;
+}
+
 // ── Prepared statements (lazy) ──
 
 interface WorkspaceRow {

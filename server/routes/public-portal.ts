@@ -15,7 +15,7 @@ import { verifyClientSession } from '../middleware.js';
 import { listSnapshots, getLatestSnapshot, getLatestSnapshotBefore } from '../reports.js';
 import { getAllGscPages } from '../search-console.js';
 import { isStripeConfigured, listProducts } from '../stripe.js';
-import { updateWorkspace, getWorkspace } from '../workspaces.js';
+import { updateWorkspace, getWorkspace, computeEffectiveTier } from '../workspaces.js';
 import { getLatestPublishedBriefing } from '../briefing-store.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
@@ -62,13 +62,9 @@ router.get('/api/public/workspace/:id', (req, res) => {
     // Content pricing
     contentPricing: ws.contentPricing || null,
     // Monetization — trial-resolved tier
-    tier: (() => {
-      let t = ws.tier || 'free';
-      if (t === 'free' && ws.trialEndsAt && new Date(ws.trialEndsAt) > new Date()) t = 'growth';
-      return t;
-    })(),
+    tier: computeEffectiveTier(ws),
     baseTier: ws.tier || 'free',
-    isTrial: (ws.tier || 'free') === 'free' && !!ws.trialEndsAt && new Date(ws.trialEndsAt) > new Date(),
+    isTrial: computeEffectiveTier(ws) === 'growth' && (ws.tier || 'free') === 'free',
     trialDaysRemaining: ws.trialEndsAt
       ? Math.max(0, Math.ceil((new Date(ws.trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
       : 0,
@@ -200,13 +196,7 @@ router.get('/api/public/tier/:id', (req, res) => {
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
-  let effectiveTier = ws.tier || 'free';
-  // If in trial period, treat as growth
-  if (effectiveTier === 'free' && ws.trialEndsAt) {
-    const trialEnd = new Date(ws.trialEndsAt);
-    if (trialEnd > new Date()) effectiveTier = 'growth';
-  }
-
+  const effectiveTier = computeEffectiveTier(ws);
   const trialDaysRemaining = ws.trialEndsAt
     ? Math.max(0, Math.ceil((new Date(ws.trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : 0;
@@ -803,13 +793,8 @@ router.get('/api/public/briefing/:workspaceId', (req, res) => {
     return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
   }
 
-  // Trial-aware effective tier (matches /api/public/tier/:id semantics)
-  let effectiveTier: 'free' | 'growth' | 'premium' = (ws.tier as 'free' | 'growth' | 'premium') || 'free';
-  if (effectiveTier === 'free' && ws.trialEndsAt) {
-    const trialEnd = new Date(ws.trialEndsAt);
-    if (trialEnd > new Date()) effectiveTier = 'growth';
-  }
-  if (effectiveTier === 'free') {
+  // Trial-aware effective tier — shared helper used by /workspace/:id and /tier/:id too.
+  if (computeEffectiveTier(ws) === 'free') {
     return res.status(402).json({ error: 'Briefing requires Growth or Premium tier' });
   }
 
