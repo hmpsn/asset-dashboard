@@ -29,10 +29,10 @@ export type ActivityType =
   | 'brief_generated'
   | 'brief_approved'
   | 'changes_requested'
-  | 'briefing_generated'      // admin: cron wrote a new draft
-  | 'briefing_published'      // CLIENT-VISIBLE: a briefing landed in the client's portal
+  | 'briefing_generated'      // admin: cron wrote a new draft (admin review queue)
+  | 'briefing_published'      // CLIENT-VISIBLE: admin manually published a briefing
   | 'briefing_skipped'        // admin: a draft was skipped with note
-  | 'briefing_auto_published' // admin audit trail only — clients see briefing_published instead
+  | 'briefing_auto_published' // CLIENT-VISIBLE: cron auto-published a briefing (no admin review). Clients see this OR briefing_published per event — never both.
   | 'content_upgraded'
   | 'schema_generated'
   | 'schema_published'
