@@ -350,8 +350,23 @@ export async function buildSchemaContext(
     ctx.liveDomain = ws.liveDomain;
     ctx.brandVoice = ws.brandVoice;
     ctx.businessContext = ws.keywordStrategy?.businessContext;
-    const rawSiteKeywords = ws.keywordStrategy?.siteKeywords;
+
+    // Slice-migration starter (Trajectory 3 → 1; tracked in
+    // data/roadmap.json:schema-context-builder-pattern-b-migration).
+    // PR1 migrates `siteKeywords` and per-page `pageKeywords` to slice consumption.
+    // Other direct reads (brandVoice, businessContext, knowledgeBase, _businessProfile,
+    // _personasBlock) tracked for opportunistic migration; pr-check rule
+    // schema-context-direct-read-not-on-allowlist (Task 13) fires on any new
+    // non-identity direct read.
+    let schemaIntel: Awaited<ReturnType<typeof buildWorkspaceIntelligence>> | null = null;
+    try {
+      schemaIntel = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext'] });
+    } catch { /* intelligence layer not ready — siteKeywords falls back to undefined */ } // catch-ok
+
+    // Audit Correction 2: SeoContextSlice field is strategy.siteKeywords (not keywordStrategy.siteKeywords).
+    const rawSiteKeywords = schemaIntel?.seoContext?.strategy?.siteKeywords;
     if (rawSiteKeywords?.length) {
+      // Audit Correction 3: slice does NOT apply the declined filter — schema layer must.
       const declined = getDeclinedKeywords(ws.id);
       if (declined.length > 0) {
         const declinedSet = new Set(declined.map(k => k.toLowerCase()));
