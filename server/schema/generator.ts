@@ -173,8 +173,10 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
     }
   }
 
-  // Validate
-  const validationErrors = validateLeanSchema(schema, classified.primaryType);
+  // Validate the base schema BEFORE FAQ enrichment so we can distinguish FAQ-specific
+  // errors from pre-existing base errors (e.g. a BlogPosting missing datePublished
+  // shouldn't cause us to roll back a perfectly valid FAQPage append).
+  const baseValidationErrors = validateLeanSchema(schema, classified.primaryType);
 
   // Surgical FAQ enrichment: if the page has accordion FAQ structure, append a FAQPage node.
   const faqPairs = await extractFaq(input.html || '');
@@ -189,14 +191,20 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       })),
     };
     ((schema['@graph'] as Array<Record<string, unknown>>)).push(faqNode);
-    // Re-run validator to surface any FAQPage validation issues
-    const newErrors = validateLeanSchema(schema, classified.primaryType);
-    if (newErrors.length > 0) {
-      // FAQPage append broke something — log and don't include
-      log.debug({ pageId: input.pageId, errors: newErrors }, 'FAQPage extraction produced invalid schema; skipping');
+    // Re-validate and roll back ONLY if FAQ append introduced new errors
+    // (i.e. errors that weren't in the base set). Pre-existing base errors
+    // remain — they're surfaced via validationErrors regardless.
+    const postFaqErrors = validateLeanSchema(schema, classified.primaryType);
+    const baseErrorSet = new Set(baseValidationErrors);
+    const faqIntroducedErrors = postFaqErrors.filter(e => !baseErrorSet.has(e));
+    if (faqIntroducedErrors.length > 0) {
+      log.debug({ pageId: input.pageId, errors: faqIntroducedErrors }, 'FAQPage extraction produced invalid schema; skipping');
       (schema['@graph'] as Array<Record<string, unknown>>).pop();
     }
   }
+
+  // Surface validation errors of the FINAL schema (after FAQ resolution) to caller
+  const validationErrors = validateLeanSchema(schema, classified.primaryType);
 
   // Fix 3: compute rich results eligibility and pass through to caller
   const richResultsEligibility = checkRichResultsEligibility(schema);

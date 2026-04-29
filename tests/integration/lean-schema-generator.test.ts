@@ -124,23 +124,32 @@ describe('generateLeanSchema', () => {
     expect((faqNode!.mainEntity as unknown[])).toHaveLength(2);
   });
 
-  it('appends FAQPage on a BlogPosting page (covers re-validation path with required-field warnings)', async () => {
-    const htmlWithFaqAndDate = `<html><body>
-      <time itemprop="datePublished" datetime="2025-06-01T00:00:00Z">June 1</time>
+  it('appends FAQPage on a BlogPosting even when base schema has pre-existing validation errors (FAQ rollback uses error-diff, not absolute count)', async () => {
+    // BlogPosting REQUIRES datePublished. This HTML deliberately omits the
+    // <time itemprop="datePublished"> microformat AND no CMS dates are passed,
+    // so the base BlogPosting schema will have a 'missing datePublished' error.
+    // Pre-fix, the FAQ append would see post-validation errors > 0 and roll
+    // back the (perfectly valid) FAQPage. Post-fix, the rollback only fires
+    // when FAQ-introduced errors appear — base errors don't count.
+    const htmlNoDateWithFaq = `<html><body>
+      <p>Body content</p>
       <details><summary>What did you do?</summary><p>We launched.</p></details>
       <details><summary>Why?</summary><p>Demand was strong.</p></details>
     </body></html>`;
     const out = await generateLeanSchema({
       ...baseInput,
-      html: htmlWithFaqAndDate,
+      html: htmlNoDateWithFaq,
       pageMeta: { ...baseInput.pageMeta, publishedPath: '/blog/launch-faq', seo: { description: 'desc' } },
     });
     const graph = out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>;
     const types = graph.map(n => n['@type']);
     expect(types).toContain('BlogPosting');
-    expect(types).toContain('FAQPage');
+    expect(types).toContain('FAQPage');  // The bug-fix: FAQPage survives even with base errors
     const faqNode = graph.find(n => n['@type'] === 'FAQPage');
     expect((faqNode!.mainEntity as unknown[])).toHaveLength(2);
+    // The surfaced validation errors should still include the base error so admins see it.
+    expect(out.validationErrors).toBeDefined();
+    expect(out.validationErrors!.some(e => e.includes('datePublished'))).toBe(true);
   });
 
   it('does NOT append FAQPage when accordion has fewer than 2 pairs', async () => {
