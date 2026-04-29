@@ -493,10 +493,12 @@
           "id": "schema-pillar-1-validator-bar",
           "title": "Schema Pillar 1 — Raise the Validator Bar",
           "source": "docs/superpowers/plans/2026-04-29-schema-pillar-1-validator-bar.md",
-          "est": "0.5d",
+          "est": "1d",
           "priority": "P0",
-          "status": "pending",
-          "notes": "Tightens REQUIRED_BY_TYPE in validator.ts to enforce Yoast-baseline. Adds cross-reference shape validators (rejects malformed isPartOf, dangling breadcrumb pointers). Depends on Pillar 2 (PR #362) and Pillar 2.1 (SearchAction correctness)."
+          "sprint": "H",
+          "status": "done",
+          "shippedAt": "2026-04-29",
+          "notes": "REQUIRED_BY_TYPE in validator.ts now enforces Yoast/Google-baseline completeness. Article/BlogPosting require image+dateModified+articleSection+isPartOf+breadcrumb+inLanguage. WebPage variants require description+isPartOf+breadcrumb+inLanguage. LocalBusiness requires address+telephone+inLanguage. WebSite requires inLanguage (potentialAction is conditional, deferred to schema-yoast-parity-fields where it gates on Workspace.siteHasSearch). Organization requires logo. Cross-ref validators reject malformed isPartOf/breadcrumb shapes and dangling BreadcrumbList @id pointers. NEW value-shape validators reject malformed Article author/publisher/image, non-ISO 8601 dates, non-contiguous breadcrumb positions, and non-absolute URLs on primary nodes. Locks the bar Pillars 2 + 2.1 raised. 24 new test assertions across required-fields, cross-ref shape, and value-shape describe blocks."
         },
         {
           "id": "schema-yoast-parity-fields",
