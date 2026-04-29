@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { validate, z } from '../middleware/validate.js';
-import { requireAuth, requireRole } from '../auth.js';
+import { requireAdminAuth } from '../middleware/admin-auth.js';
 import { parseJsonFallback } from '../db/json-validation.js';
 import { getAllFlags, getAllFlagsWithMeta, setFlagOverride } from '../feature-flags.js';
 import { FEATURE_FLAGS } from '../../shared/types/feature-flags.js';
@@ -31,16 +31,15 @@ router.get('/api/feature-flags', (_req, res) => {
   res.json(getAllFlags());
 });
 
-/** Returns all flags with source metadata — admin only. */
-router.get('/api/admin/feature-flags', requireAuth, requireRole('owner', 'admin'), (_req, res) => { // auth-ok
+/** Returns all flags with source metadata. Admin-only — HMAC token required, JWT users rejected. */
+router.get('/api/admin/feature-flags', requireAdminAuth, (_req, res) => {
   res.json(getAllFlagsWithMeta());
 });
 
-/** Set or clear a DB override for a single flag — admin only. */
+/** Set or clear a DB override for a single flag. Admin-only — HMAC token required, JWT users rejected. */
 router.put(
   '/api/admin/feature-flags/:key',
-  requireAuth, // auth-ok
-  requireRole('owner', 'admin'),
+  requireAdminAuth,
   validate(z.object({
     enabled: z.boolean().nullable(),
   })),
