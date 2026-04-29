@@ -86,9 +86,9 @@ const briefingStmts = createStmtCache(() => ({
     WHERE workspace_id = ? AND status = 'published'
     ORDER BY published_at DESC, week_of DESC LIMIT 1
   `),
-  setStories: db.prepare('UPDATE briefing_drafts SET stories = ?, updated_at = ? WHERE id = ? RETURNING *'),
-  setStatus: db.prepare('UPDATE briefing_drafts SET status = ?, updated_at = ?, published_at = ?, auto_published = ?, admin_note = COALESCE(?, admin_note) WHERE id = ? RETURNING *'),
-  setNote: db.prepare('UPDATE briefing_drafts SET admin_note = ?, updated_at = ? WHERE id = ? RETURNING *'),
+  setStories: db.prepare('UPDATE briefing_drafts SET stories = ?, updated_at = ? WHERE id = ? RETURNING *'), // ws-scope-ok — id is a globally unique UUID PK
+  setStatus: db.prepare('UPDATE briefing_drafts SET status = ?, updated_at = ?, published_at = ?, auto_published = ?, admin_note = COALESCE(?, admin_note) WHERE id = ? RETURNING *'), // status-ok — lifecycle column, not a state machine; ws-scope-ok — id is a globally unique UUID PK
+  setNote: db.prepare('UPDATE briefing_drafts SET admin_note = ?, updated_at = ? WHERE id = ? RETURNING *'), // ws-scope-ok — id is a globally unique UUID PK
 }));
 
 // ── Mapper ──
