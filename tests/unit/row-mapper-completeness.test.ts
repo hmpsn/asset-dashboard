@@ -172,6 +172,7 @@ describe('rowToWorkspace mapper completeness', () => {
       autoPublishBriefings: true,
       autoPublishAfterHours: 12,
       lastBriefingRunWeekOf: '2026-04-27',
+      siteHasSearch: true,
     });
 
     const result = getWorkspace(ws.id);

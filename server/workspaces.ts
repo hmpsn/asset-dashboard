@@ -88,6 +88,7 @@ interface WorkspaceRow {
   seo_client_view: number;
   analytics_client_view: number;
   site_intelligence_client_view: number | null;
+  site_has_search: number | null;
   auto_reports: number;
   auto_report_frequency: string | null;
   brand_voice: string | null;
@@ -213,6 +214,7 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
   // Use loose != null (not !==) so undefined (column not yet in DB before migration 049) is also excluded,
   // preserving the "undefined = enabled by default" intent until migration 049 lands in Group 3.
   if (row.site_intelligence_client_view != null) ws.siteIntelligenceClientView = !!row.site_intelligence_client_view;
+  if (row.site_has_search != null) ws.siteHasSearch = !!row.site_has_search;
   if (row.business_priorities) ws.businessPriorities = parseJsonSafeArray(row.business_priorities, z.string(), { workspaceId: row.id, field: 'business_priorities', table: 'workspaces' });
   if (row.custom_prompt_notes) ws.customPromptNotes = row.custom_prompt_notes;
   // auto_publish_briefings + auto_publish_after_hours are NOT NULL in the schema; surface them unconditionally
@@ -261,7 +263,7 @@ const stmts = createStmtCache(() => ({
        gsc_property_url, ga4_property_id, client_password, client_email,
        live_domain, event_config, event_groups, keyword_strategy,
        competitor_domains, personas, client_portal_enabled, seo_client_view,
-       analytics_client_view, site_intelligence_client_view, auto_reports, auto_report_frequency,
+       analytics_client_view, site_intelligence_client_view, site_has_search, auto_reports, auto_report_frequency,
        brand_voice, knowledge_base, brand_logo_url, brand_accent_color,
        tier, trial_ends_at, stripe_customer_id, stripe_subscription_id, billing_mode,
        onboarding_enabled, onboarding_completed, content_pricing,
@@ -271,7 +273,7 @@ const stmts = createStmtCache(() => ({
        @gsc_property_url, @ga4_property_id, @client_password, @client_email,
        @live_domain, @event_config, @event_groups, @keyword_strategy,
        @competitor_domains, @personas, @client_portal_enabled, @seo_client_view,
-       @analytics_client_view, @site_intelligence_client_view, @auto_reports, @auto_report_frequency,
+       @analytics_client_view, @site_intelligence_client_view, @site_has_search, @auto_reports, @auto_report_frequency,
        @brand_voice, @knowledge_base, @brand_logo_url, @brand_accent_color,
        @tier, @trial_ends_at, @stripe_customer_id, @stripe_subscription_id, @billing_mode,
        @onboarding_enabled, @onboarding_completed, @content_pricing,
@@ -325,6 +327,7 @@ function workspaceToParams(ws: Workspace) {
     seo_client_view: ws.seoClientView === undefined ? null : (ws.seoClientView ? 1 : 0),
     analytics_client_view: ws.analyticsClientView === undefined ? null : (ws.analyticsClientView ? 1 : 0),
     site_intelligence_client_view: ws.siteIntelligenceClientView === undefined ? null : (ws.siteIntelligenceClientView ? 1 : 0),
+    site_has_search: ws.siteHasSearch === undefined ? null : (ws.siteHasSearch ? 1 : 0),
     auto_reports: ws.autoReports === undefined ? null : (ws.autoReports ? 1 : 0),
     auto_report_frequency: ws.autoReportFrequency ?? null,
     brand_voice: ws.brandVoice ?? null,
@@ -415,7 +418,7 @@ export function createWorkspace(name: string, webflowSiteId?: string, webflowSit
   return workspace;
 }
 
-export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'competitorLastFetchedAt' | 'competitorDomainsAtLastFetch' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'billingMode' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile' | 'intelligenceProfile' | 'siteIntelligenceClientView' | 'businessPriorities' | 'customPromptNotes' | 'autoPublishBriefings' | 'autoPublishAfterHours' | 'lastBriefingRunWeekOf'>>): Workspace | null {
+export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'competitorLastFetchedAt' | 'competitorDomainsAtLastFetch' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'billingMode' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile' | 'intelligenceProfile' | 'siteIntelligenceClientView' | 'siteHasSearch' | 'businessPriorities' | 'customPromptNotes' | 'autoPublishBriefings' | 'autoPublishAfterHours' | 'lastBriefingRunWeekOf'>>): Workspace | null {
   const row = stmts().getById.get(id) as WorkspaceRow | undefined;
   if (!row) return null;
 
@@ -435,7 +438,7 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
     eventConfig: 'event_config', eventGroups: 'event_groups', keywordStrategy: 'keyword_strategy',
     competitorDomains: 'competitor_domains', competitorLastFetchedAt: 'competitor_last_fetched_at', competitorDomainsAtLastFetch: 'competitor_domains_at_last_fetch', personas: 'personas',
     clientPortalEnabled: 'client_portal_enabled', seoClientView: 'seo_client_view',
-    analyticsClientView: 'analytics_client_view', siteIntelligenceClientView: 'site_intelligence_client_view', autoReports: 'auto_reports',
+    analyticsClientView: 'analytics_client_view', siteIntelligenceClientView: 'site_intelligence_client_view', siteHasSearch: 'site_has_search', autoReports: 'auto_reports',
     autoReportFrequency: 'auto_report_frequency', brandVoice: 'brand_voice',
     knowledgeBase: 'knowledge_base', rewritePlaybook: 'rewrite_playbook', brandLogoUrl: 'brand_logo_url',
     brandAccentColor: 'brand_accent_color', contentPricing: 'content_pricing',

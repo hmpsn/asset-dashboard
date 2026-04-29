@@ -228,6 +228,9 @@ export interface Workspace {
   analyticsClientView?: boolean;
   /** When false, the Site Intelligence module is hidden from this workspace's client dashboard. Default true (undefined treated as true). */
   siteIntelligenceClientView?: boolean;
+  /** When true, schema generation emits WebSite.potentialAction (sitelinks SearchAction).
+   *  Site must actually expose ?s={query} or equivalent search endpoint. */
+  siteHasSearch?: boolean;
   autoReports?: boolean;
   autoReportFrequency?: 'weekly' | 'monthly';
   // Branding
