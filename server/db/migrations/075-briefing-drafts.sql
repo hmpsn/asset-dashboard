@@ -3,7 +3,7 @@
 
 CREATE TABLE briefing_drafts (
   id              TEXT PRIMARY KEY,
-  workspace_id    TEXT NOT NULL,
+  workspace_id    TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
   week_of         TEXT NOT NULL,           -- YYYY-MM-DD (Monday of week, UTC)
   status          TEXT NOT NULL DEFAULT 'draft',  -- 'draft' | 'approved' | 'published' | 'skipped'
   stories         TEXT NOT NULL DEFAULT '[]',     -- JSON array: BriefingStory[]
@@ -15,7 +15,8 @@ CREATE TABLE briefing_drafts (
   published_at    INTEGER,
   UNIQUE(workspace_id, week_of)
 );
-CREATE INDEX briefing_drafts_workspace_week ON briefing_drafts(workspace_id, week_of);
+-- UNIQUE(workspace_id, week_of) above creates an implicit index on those columns,
+-- so an explicit briefing_drafts_workspace_week index would be redundant.
 CREATE INDEX briefing_drafts_status ON briefing_drafts(workspace_id, status);
 
 -- Per-workspace briefing toggles (column-on-workspaces convention)
