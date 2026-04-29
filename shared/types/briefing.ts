@@ -27,6 +27,16 @@ export interface BriefingDrillIn {
   queryParams?: Record<string, string>;
 }
 
+/**
+ * Traceability ref pointing to the underlying record that produced a story.
+ *
+ * NOTE: The original spec also lists 'prediction' (sourced from `weCalledIt` in
+ * the outcome-tracking pipeline). That source was deliberately dropped during
+ * planning — wins come exclusively from `analytics_insights` rows where
+ * `severity === 'positive'`. See the pre-plan audit (correction #2) and the
+ * user decision recorded in the plan's "User decisions" section. Do not add
+ * 'prediction' back to this union without revisiting that decision.
+ */
 export interface BriefingSourceRef {
   type: 'analytics_insight' | 'recommendation' | 'audit_delta';
   id: string;

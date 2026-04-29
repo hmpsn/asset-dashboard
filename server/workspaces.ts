@@ -89,8 +89,9 @@ interface WorkspaceRow {
   intelligence_profile: string | null;
   business_priorities: string | null;
   custom_prompt_notes: string | null;
-  auto_publish_briefings: number | null;
-  auto_publish_after_hours: number | null;
+  // NOT NULL DEFAULT 0 / 24 in migration 075 — never null on read
+  auto_publish_briefings: number;
+  auto_publish_after_hours: number;
   last_briefing_run_week_of: string | null;
   created_at: string;
 }
@@ -191,9 +192,10 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
   if (row.site_intelligence_client_view != null) ws.siteIntelligenceClientView = !!row.site_intelligence_client_view;
   if (row.business_priorities) ws.businessPriorities = parseJsonSafeArray(row.business_priorities, z.string(), { workspaceId: row.id, field: 'business_priorities', table: 'workspaces' });
   if (row.custom_prompt_notes) ws.customPromptNotes = row.custom_prompt_notes;
-  if (row.auto_publish_briefings !== null) ws.autoPublishBriefings = !!row.auto_publish_briefings;
-  if (row.auto_publish_after_hours !== null) ws.autoPublishAfterHours = row.auto_publish_after_hours as number;
-  if (row.last_briefing_run_week_of !== null) ws.lastBriefingRunWeekOf = row.last_briefing_run_week_of as string | null;
+  // auto_publish_briefings + auto_publish_after_hours are NOT NULL in the schema; surface them unconditionally
+  ws.autoPublishBriefings = !!row.auto_publish_briefings;
+  ws.autoPublishAfterHours = row.auto_publish_after_hours;
+  if (row.last_briefing_run_week_of !== null) ws.lastBriefingRunWeekOf = row.last_briefing_run_week_of;
   return ws;
 }
 
@@ -324,9 +326,10 @@ function workspaceToParams(ws: Workspace) {
     intelligence_profile: ws.intelligenceProfile ? JSON.stringify(ws.intelligenceProfile) : null,
     business_priorities: ws.businessPriorities ? JSON.stringify(ws.businessPriorities) : null,
     custom_prompt_notes: ws.customPromptNotes ?? null,
-    auto_publish_briefings: ws.autoPublishBriefings === undefined ? null : (ws.autoPublishBriefings ? 1 : 0),
-    auto_publish_after_hours: ws.autoPublishAfterHours === undefined ? null : ws.autoPublishAfterHours,
-    last_briefing_run_week_of: ws.lastBriefingRunWeekOf === undefined ? null : ws.lastBriefingRunWeekOf,
+    // Mirror migration 075 DEFAULTs (NOT NULL columns) so future INSERT-statement updates don't trip
+    auto_publish_briefings: ws.autoPublishBriefings === undefined ? 0 : (ws.autoPublishBriefings ? 1 : 0),
+    auto_publish_after_hours: ws.autoPublishAfterHours ?? 24,
+    last_briefing_run_week_of: ws.lastBriefingRunWeekOf ?? null,
     created_at: ws.createdAt,
   };
 }
@@ -389,7 +392,7 @@ export function createWorkspace(name: string, webflowSiteId?: string, webflowSit
   return workspace;
 }
 
-export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'competitorLastFetchedAt' | 'competitorDomainsAtLastFetch' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'billingMode' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile' | 'intelligenceProfile' | 'siteIntelligenceClientView' | 'businessPriorities' | 'customPromptNotes'>>): Workspace | null {
+export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'competitorLastFetchedAt' | 'competitorDomainsAtLastFetch' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'billingMode' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile' | 'intelligenceProfile' | 'siteIntelligenceClientView' | 'businessPriorities' | 'customPromptNotes' | 'autoPublishBriefings' | 'autoPublishAfterHours' | 'lastBriefingRunWeekOf'>>): Workspace | null {
   const row = stmts().getById.get(id) as WorkspaceRow | undefined;
   if (!row) return null;
 
