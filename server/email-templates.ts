@@ -179,7 +179,8 @@ export type EmailEventType =
   | 'content_published'
   | 'feedback_new'
   | 'audit_complete'
-  | 'client_signal';
+  | 'client_signal'
+  | 'client_briefing_ready';
 
 // ── Template renderers ──
 
@@ -255,6 +256,8 @@ export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subj
       result = renderAuditComplete(events[0], logoUrl); break;
     case 'client_signal':
       result = renderClientSignal(events, count, ws, dashUrl, logoUrl); break;
+    case 'client_briefing_ready':
+      result = renderClientBriefingReady(events, count, ws, dashUrl, logoUrl); break;
     default:
       result = { subject: 'Notification', html: '' };
   }
@@ -451,6 +454,30 @@ function renderContentPostReady(events: EmailEvent[], count: number, ws: string,
       subtitle: ws,
       body: (count > 1 ? countPill(count, 'post ready') : '') + items,
       cta: dashUrl ? { label: 'Review Post', url: dashUrl } : undefined,
+      logoUrl,
+    }),
+  };
+}
+
+function renderClientBriefingReady(events: EmailEvent[], count: number, ws: string, dashUrl?: string, logoUrl?: string) {
+  const items = events.map((e, i) => itemRow({
+    title: (e.data.heroHeadline as string) || `Briefing — ${(e.data.weekOf as string) || 'this week'}`,
+    detail: typeof e.data.storyCount === 'number'
+      ? `${e.data.storyCount} ${e.data.storyCount === 1 ? 'story' : 'stories'}`
+      : undefined,
+    isLast: i === events.length - 1,
+  })).join('');
+
+  return {
+    subject: count === 1
+      ? `Your ${ws} briefing is ready — ${(events[0].data.weekOf as string) || 'this week'}`
+      : `${count} new briefings ready — ${ws}`,
+    html: layout({
+      preheader: `Weekly briefing${count !== 1 ? 's' : ''} for ${ws}`,
+      headline: count === 1 ? "This Week's Briefing" : `${count} Weekly Briefings`,
+      subtitle: ws,
+      body: (count > 1 ? countPill(count, 'briefing ready') : '') + items,
+      cta: dashUrl ? { label: 'Read the Briefing', url: dashUrl } : undefined,
       logoUrl,
     }),
   };

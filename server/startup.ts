@@ -12,6 +12,7 @@ import { startOutcomeCrons } from './outcome-crons.js';
 import { startDataRetentionCrons } from './data-retention.js';
 import { startIntelligenceCrons, startCompetitorMonitoringCron } from './intelligence-crons.js';
 import { startRankTrackingScheduler } from './rank-tracking-scheduler.js';
+import { startBriefingCron } from './briefing-cron.js';
 
 /** Start all background schedulers and queues. */
 export function startSchedulers() {
@@ -30,4 +31,5 @@ export function startSchedulers() {
   startIntelligenceCrons();
   startCompetitorMonitoringCron();
   startRankTrackingScheduler();
+  startBriefingCron();
 }

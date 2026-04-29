@@ -81,6 +81,7 @@ import brandIdentityRoutes from './routes/brand-identity.js';
 import pageStrategyRoutes from './routes/page-strategy.js';
 import copyPipelineRoutes from './routes/copy-pipeline.js';
 import diagnosticsRoutes from './routes/diagnostics.js';
+import briefingRoutes from './routes/briefing.js';
 import { registerProvider } from './seo-data-provider.js';
 import { SemrushProvider } from './providers/semrush-provider.js';
 import { DataForSeoProvider } from './providers/dataforseo-provider.js';
@@ -326,6 +327,7 @@ export function createApp(): express.Express {
   app.use(pageStrategyRoutes);
   app.use(copyPipelineRoutes);
   app.use(diagnosticsRoutes);
+  app.use(briefingRoutes);
 
   // --- Sentry error handler (must be after all route mounts, before frontend catch-all) ---
   setupSentryErrorHandler(app);

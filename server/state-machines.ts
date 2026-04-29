@@ -68,6 +68,20 @@ export const CONTENT_SUB_TRANSITIONS: Record<string, readonly string[]> = {
 
 export type ContentSubStatus = 'active' | 'paused' | 'cancelled' | 'past_due' | 'pending';
 
+// ── Briefing Draft ──
+// Weekly client briefing lifecycle (server/briefing-store.ts).
+//   draft → approved → published   (admin reviewed + published)
+//   draft → published              (admin published without explicit approve step)
+//   draft|approved → skipped       (admin chose not to publish this week)
+//   approved → draft               (admin un-approved to edit again)
+// published and skipped are terminal.
+export const BRIEFING_DRAFT_TRANSITIONS: Record<string, readonly string[]> = {
+  draft:     ['approved', 'published', 'skipped'],
+  approved:  ['published', 'skipped', 'draft'],  // draft = "I changed my mind, let me edit"
+  published: [],   // terminal
+  skipped:   [],   // terminal
+};
+
 // ── Generic validator ──
 
 export class InvalidTransitionError extends Error {

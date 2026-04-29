@@ -15,7 +15,8 @@ import { verifyClientSession } from '../middleware.js';
 import { listSnapshots, getLatestSnapshot, getLatestSnapshotBefore } from '../reports.js';
 import { getAllGscPages } from '../search-console.js';
 import { isStripeConfigured, listProducts } from '../stripe.js';
-import { updateWorkspace, getWorkspace } from '../workspaces.js';
+import { updateWorkspace, getWorkspace, computeEffectiveTier } from '../workspaces.js';
+import { getLatestPublishedBriefing } from '../briefing-store.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
 import { parseJsonFallback } from '../db/json-validation.js';
@@ -61,13 +62,9 @@ router.get('/api/public/workspace/:id', (req, res) => {
     // Content pricing
     contentPricing: ws.contentPricing || null,
     // Monetization — trial-resolved tier
-    tier: (() => {
-      let t = ws.tier || 'free';
-      if (t === 'free' && ws.trialEndsAt && new Date(ws.trialEndsAt) > new Date()) t = 'growth';
-      return t;
-    })(),
+    tier: computeEffectiveTier(ws),
     baseTier: ws.tier || 'free',
-    isTrial: (ws.tier || 'free') === 'free' && !!ws.trialEndsAt && new Date(ws.trialEndsAt) > new Date(),
+    isTrial: computeEffectiveTier(ws) === 'growth' && (ws.tier || 'free') === 'free',
     trialDaysRemaining: ws.trialEndsAt
       ? Math.max(0, Math.ceil((new Date(ws.trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
       : 0,
@@ -199,13 +196,7 @@ router.get('/api/public/tier/:id', (req, res) => {
   const ws = getWorkspace(req.params.id);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
-  let effectiveTier = ws.tier || 'free';
-  // If in trial period, treat as growth
-  if (effectiveTier === 'free' && ws.trialEndsAt) {
-    const trialEnd = new Date(ws.trialEndsAt);
-    if (trialEnd > new Date()) effectiveTier = 'growth';
-  }
-
+  const effectiveTier = computeEffectiveTier(ws);
   const trialDaysRemaining = ws.trialEndsAt
     ? Math.max(0, Math.ceil((new Date(ws.trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : 0;
@@ -786,6 +777,37 @@ router.post('/api/public/copy/:workspaceId/section/:sectionId/suggest', (req, re
   log.info({ wsId, sectionId }, 'Client suggested copy edit');
   // Strip internal-only fields before returning to client
   res.json({ section: toClientSection(section) });
+});
+
+// ── Client Briefing (Phase 1b) ────────────────────────────────────────────
+// GET /api/public/briefing/:workspaceId — latest published briefing for the
+// client portal. Tier-gated: free → 402. Returns { briefing: null } when no
+// briefing has been published yet (paid tier with cron not yet run).
+//
+// admin-only fields (sourceMetadata, adminNote) are intentionally stripped —
+// only weekOf, publishedAt, and the BriefingStory[] array reach the client.
+router.get('/api/public/briefing/:workspaceId', (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (ws.clientPortalEnabled != null && !ws.clientPortalEnabled) {
+    return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
+  }
+
+  // Trial-aware effective tier — shared helper used by /workspace/:id and /tier/:id too.
+  if (computeEffectiveTier(ws) === 'free') {
+    return res.status(402).json({ error: 'Briefing requires Growth or Premium tier' });
+  }
+
+  const latest = getLatestPublishedBriefing(ws.id);
+  if (!latest) return res.json({ briefing: null });
+
+  res.json({
+    briefing: {
+      weekOf: latest.weekOf,
+      publishedAt: latest.publishedAt,
+      stories: latest.stories,
+    },
+  });
 });
 
 export default router;

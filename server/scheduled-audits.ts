@@ -271,6 +271,15 @@ async function runScheduledAudit(schedule: AuditSchedule) {
       return { modified: 0 };
     });
 
+    // Bridge #16 — briefing-candidate-refresh (T1.15 of Client Insights Briefing v2).
+    // No-op marker: the briefing cron's pre-flight reads `getSchedule().lastRunAt` directly,
+    // so a successful audit completion automatically counts as fresh on the next briefing run.
+    // This bridge fires for symmetry with the other audit bridges and gives us a hook for
+    // future event-driven candidate-pool invalidation (e.g., warm a cache, kick a stream).
+    fireBridge('bridge-briefing-candidate-refresh', ws.id, async () => {
+      return { modified: 0 };
+    });
+
     // Invalidate intelligence cache so next query gets fresh data
     invalidateIntelligenceCache(ws.id);
 
