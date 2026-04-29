@@ -47,6 +47,15 @@ export function ClientChatWidget({
 }: ClientChatWidgetProps) {
   const clientNavigate = useNavigate();
 
+  // Resolve once so empty-state and follow-up render sites can both refer
+  // to the same effective list. Length-aware so caller passing []
+  // doesn't render zero buttons. Per Devin review (PR #375): the prop's
+  // documented scope is the empty-chat state — the follow-up state at
+  // line ~280 deliberately uses the constant to keep the proactive-greeting
+  // suggestions stable across briefing-vs-non-briefing pages.
+  const effectiveQuickQuestions =
+    quickQuestions && quickQuestions.length > 0 ? quickQuestions : QUICK_QUESTIONS;
+
   const {
     chatOpen, setChatOpen,
     chatExpanded, setChatExpanded,
@@ -206,11 +215,7 @@ export function ClientChatWidget({
                   <div className="p-4 space-y-3">
                     <p className="t-caption-sm text-[var(--brand-text-muted)]">Ask anything about your site performance:</p>
                     <div className="grid grid-cols-1 gap-2">
-                      {/* `??` only short-circuits on null/undefined; an empty
-                          array is truthy and would render zero buttons.
-                          Length check ensures the constant fallback wins
-                          when callers pass an explicit []. */}
-                      {(quickQuestions && quickQuestions.length > 0 ? quickQuestions : QUICK_QUESTIONS).map((q, i) => (
+                      {effectiveQuickQuestions.map((q, i) => (
                         <button
                           key={i}
                           onClick={() => askAi(q)}

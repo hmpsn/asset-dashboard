@@ -73,31 +73,30 @@ export function InsightsBriefingPage({
           title="Your first briefing will arrive Monday"
           description="Each week we'll surface the wins, risks, and opportunities that matter — tailored to your business."
         />
-      ) : (
-        <>
-          {/* Hero story (the briefing always includes exactly one) */}
-          {briefing.stories
-            .filter((s) => s.isHeadline)
-            .map((s) => (
+      ) : (() => {
+        // Single-pass partition (replaces 3 .filter() iterations per render).
+        // Phase 1 Zod enforces exactly 1 headline; we use `find` for the
+        // hero so we don't pretend the data could ever return >1.
+        const hero = briefing.stories.find((s) => s.isHeadline);
+        const secondary = briefing.stories.filter((s) => !s.isHeadline);
+        return (
+          <>
+            {hero && (
               <HeroStoryCard
-                key={s.id}
-                story={s}
+                key={hero.id}
+                story={hero}
                 workspaceId={workspaceId}
                 betaMode={betaMode}
               />
-            ))}
-
-          {/* Secondary stories */}
-          {briefing.stories.filter((s) => !s.isHeadline).length > 0 && (
-            <div className="border-t border-[var(--brand-border)] pt-4">
-              <h3 className="t-label text-[var(--brand-text-muted)] tracking-wider mb-3 flex items-center gap-2">
-                <Icon as={Sparkles} size="sm" className="text-teal-400" />
-                Also this week
-              </h3>
-              <div className="space-y-0">
-                {briefing.stories
-                  .filter((s) => !s.isHeadline)
-                  .map((s) => (
+            )}
+            {secondary.length > 0 && (
+              <div className="border-t border-[var(--brand-border)] pt-4">
+                <h3 className="t-label text-[var(--brand-text-muted)] tracking-wider mb-3 flex items-center gap-2">
+                  <Icon as={Sparkles} size="sm" className="text-teal-400" />
+                  Also this week
+                </h3>
+                <div className="space-y-0">
+                  {secondary.map((s) => (
                     <SecondaryStoryRow
                       key={s.id}
                       story={s}
@@ -105,11 +104,12 @@ export function InsightsBriefingPage({
                       betaMode={betaMode}
                     />
                   ))}
+                </div>
               </div>
-            </div>
-          )}
-        </>
-      )}
+            )}
+          </>
+        );
+      })()}
     </div>
   );
 }
