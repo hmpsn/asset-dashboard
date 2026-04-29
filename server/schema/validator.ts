@@ -11,37 +11,50 @@ interface RequiredFields {
 
 const REQUIRED_BY_TYPE: Record<string, RequiredFields> = {
   BlogPosting: {
-    required: ['headline', 'datePublished', 'author', 'publisher', 'mainEntityOfPage'],
+    required: [
+      'headline', 'description', 'image', 'datePublished', 'dateModified',
+      'author', 'publisher', 'mainEntityOfPage',
+      'isPartOf', 'breadcrumb', 'inLanguage', 'articleSection',
+    ],
   },
   Article: {
-    required: ['headline', 'datePublished', 'author', 'publisher', 'mainEntityOfPage'],
+    required: [
+      'headline', 'description', 'image', 'datePublished', 'dateModified',
+      'author', 'publisher', 'mainEntityOfPage',
+      'isPartOf', 'breadcrumb', 'inLanguage',
+    ],
   },
   Service: {
-    required: ['name', 'provider'],
+    required: ['name', 'description', 'provider', 'isPartOf', 'breadcrumb', 'inLanguage'],
   },
   Product: {
-    required: ['name'],
+    required: ['name', 'description', 'isPartOf', 'breadcrumb', 'inLanguage'],
   },
   LocalBusiness: {
-    required: ['name', 'url'],
+    required: ['name', 'url', 'address', 'telephone', 'inLanguage'],
   },
   Organization: {
-    required: ['name', 'url'],
+    required: ['name', 'url', 'logo'],
   },
   WebSite: {
-    required: ['name', 'url'],
+    // potentialAction (sitelinks SearchAction) used to be in this list, but Pillar 2.1
+    // dropped the unconditional emission because the site may not have a search endpoint.
+    // schema-yoast-parity-fields will re-introduce SearchAction behind a workspace flag
+    // (Workspace.siteHasSearch); add potentialAction back here as a conditional required
+    // field at that time.
+    required: ['name', 'url', 'publisher', 'inLanguage'],
   },
   AboutPage: {
-    required: ['name', 'url'],
+    required: ['name', 'url', 'description', 'isPartOf', 'breadcrumb', 'inLanguage', 'mainEntity'],
   },
   ContactPage: {
-    required: ['name', 'url'],
+    required: ['name', 'url', 'description', 'isPartOf', 'breadcrumb', 'inLanguage'],
   },
   CollectionPage: {
-    required: ['name', 'url'],
+    required: ['name', 'url', 'description', 'isPartOf', 'breadcrumb', 'inLanguage'],
   },
   WebPage: {
-    required: ['name', 'url'],
+    required: ['name', 'url', 'description', 'isPartOf', 'breadcrumb', 'inLanguage'],
   },
 };
 
