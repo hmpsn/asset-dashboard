@@ -86,6 +86,47 @@ describe('migration 076: cms-- → cms- normalisation', () => {
     expect(row?.page_id).toBe('cms-lone-page');
   });
 
+  it('schema_validations: legacy schema-suggester format (cms-{slug-with-slashes}) normalises to canonical', () => {
+    const baseId = `pr2-${ws.workspaceId}`;
+    db.prepare(`DELETE FROM schema_validations WHERE workspace_id = ?`).run(ws.workspaceId);
+    db.prepare(`
+      INSERT INTO schema_validations (id, workspace_id, page_id, status, rich_results, errors, warnings, validated_at)
+      VALUES (?, ?, 'cms-blog/legacy-suggester', 'valid', '[]', '[]', '[]', datetime('now'))
+    `).run(`${baseId}-suggester`, ws.workspaceId);
+
+    db.exec(MIGRATION_076_SQL);
+
+    const row = db.prepare(
+      `SELECT page_id FROM schema_validations WHERE id = ?`,
+    ).get(`${baseId}-suggester`) as { page_id: string } | undefined;
+    expect(row?.page_id).toBe('cms-blog-legacy-suggester');
+  });
+
+  it('schema_validations: 3-way collision (cms--, cms-with-slashes, cms-canonical) keeps newest', () => {
+    const baseId = `pr2-${ws.workspaceId}`;
+    db.prepare(`DELETE FROM schema_validations WHERE workspace_id = ?`).run(ws.workspaceId);
+    db.prepare(`
+      INSERT INTO schema_validations (id, workspace_id, page_id, status, rich_results, errors, warnings, validated_at)
+      VALUES
+        (?, ?, 'cms--three-way',     'valid',    '[]', '[]', '[]', '2026-04-01 10:00:00'),
+        (?, ?, 'cms-three/way',      'warnings', '[]', '[]', '[]', '2026-04-15 10:00:00'),
+        (?, ?, 'cms-three-way',      'errors',   '[]', '[]', '[]', '2026-04-25 10:00:00')
+    `).run(
+      `${baseId}-3w-old`, ws.workspaceId,
+      `${baseId}-3w-mid`, ws.workspaceId,
+      `${baseId}-3w-new`, ws.workspaceId,
+    );
+
+    db.exec(MIGRATION_076_SQL);
+
+    const rows = db.prepare(
+      `SELECT id, page_id, status FROM schema_validations WHERE workspace_id = ? AND page_id = 'cms-three-way'`,
+    ).all(ws.workspaceId) as Array<{ id: string; page_id: string; status: string }>;
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe(`${baseId}-3w-new`);
+    expect(rows[0].status).toBe('errors');
+  });
+
   it('schema_publish_history: plain UPDATE normalises rows (no collision risk)', () => {
     const baseId = `pr2-${ws.workspaceId}`;
     db.prepare(`DELETE FROM schema_publish_history WHERE workspace_id = ?`).run(ws.workspaceId);
