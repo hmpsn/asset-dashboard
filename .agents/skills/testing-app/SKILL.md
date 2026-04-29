@@ -11,15 +11,37 @@ The server creates a SQLite database and data directory at `~/.asset-dashboard/`
 
 ## Authentication Mechanisms
 
-### Admin Auth
+### Admin Auth (HMAC token)
 - Controlled by `APP_PASSWORD` env var
 - If `APP_PASSWORD` is NOT set, admin auth is bypassed entirely (`POST /api/auth/login` returns `{ok: true}` with no token)
-- If `APP_PASSWORD` IS set, login returns a JWT token in both the response body and an `auth_token` httpOnly cookie
+- If `APP_PASSWORD` IS set, login returns an **HMAC admin token** (not a JWT) — `HMAC-SHA256('admin', SESSION_SECRET)` where `SESSION_SECRET` defaults to `APP_PASSWORD`
+- The token is stored in `localStorage` as `auth_token` and sent via `x-auth-token` header on all `/api/` requests (see `src/main.tsx` fetch patch)
+- The global gate in `server/app.ts` accepts either a valid HMAC admin token OR a valid JWT user token
+
+### Admin-Only Endpoints (requireAdminAuth)
+Some system-level endpoints use `requireAdminAuth` middleware which accepts **ONLY HMAC admin tokens** and rejects JWT user tokens:
+- `GET /api/admin/feature-flags` — list all flags with metadata
+- `PUT /api/admin/feature-flags/:key` — toggle a flag override
+- `GET /api/stripe/config` — view Stripe config (masked)
+- `POST /api/stripe/config/keys` — save Stripe API keys
+- `POST /api/stripe/config/products` — save product price mappings
+- `DELETE /api/stripe/config` — clear Stripe config
+
+To test these endpoints with curl when `APP_PASSWORD` is set:
+```bash
+# Compute the HMAC admin token
+HMAC_TOKEN=$(echo -n "admin" | openssl dgst -sha256 -hmac "$APP_PASSWORD" | awk '{print $2}')
+
+# Use it in requests
+curl -H "x-auth-token: $HMAC_TOKEN" http://localhost:3001/api/admin/feature-flags
+curl -H "x-auth-token: $HMAC_TOKEN" http://localhost:3001/api/stripe/config
+```
 
 ### User-based JWT Auth
-- Create the first owner user via `POST /api/auth/setup` with `{email, password, name}`
+- Create the first owner user via `POST /api/auth/setup` with `{email, password, name}` (requires HMAC token in `x-auth-token` header when `APP_PASSWORD` is set)
 - This returns a JWT token that can be used for WebSocket authentication and API calls
 - Subsequent users are invited via admin workspace routes
+- JWT tokens pass the global gate but are **rejected** by `requireAdminAuth` endpoints
 
 ### Client Portal Auth
 - Client portal users authenticate via httpOnly cookies (`client_session_<wsId>` and `client_user_token_<wsId>`)
@@ -30,26 +52,40 @@ The server creates a SQLite database and data directory at `~/.asset-dashboard/`
 ## Creating Test Data
 
 ```bash
+# When APP_PASSWORD is set, include the HMAC token in all admin API calls:
+HMAC_TOKEN=$(echo -n "admin" | openssl dgst -sha256 -hmac "$APP_PASSWORD" | awk '{print $2}')
+
 # Create a workspace
 curl -X POST http://localhost:3001/api/workspaces \
   -H 'Content-Type: application/json' \
+  -H "x-auth-token: $HMAC_TOKEN" \
   -d '{"name":"Test Workspace"}'
 
 # Create a client user (use workspace ID from above)
 curl -X POST http://localhost:3001/api/workspaces/<wsId>/client-users \
   -H 'Content-Type: application/json' \
+  -H "x-auth-token: $HMAC_TOKEN" \
   -d '{"email":"test@example.com","password":"testpass123","name":"Test User","role":"client_owner"}'
 
 # Set client password on workspace
 curl -X PATCH http://localhost:3001/api/workspaces/<wsId> \
   -H 'Content-Type: application/json' \
+  -H "x-auth-token: $HMAC_TOKEN" \
   -d '{"clientPassword":"portal123"}'
 
 # Create owner user (for JWT token)
 curl -X POST http://localhost:3001/api/auth/setup \
   -H 'Content-Type: application/json' \
+  -H "x-auth-token: $HMAC_TOKEN" \
   -d '{"email":"admin@test.com","password":"adminpass123","name":"Admin User"}'
 ```
+
+## UI Navigation to Admin Panels
+
+- **Settings Panel**: Click the gear icon in the bottom-left toolbar (or navigate to `/settings`)
+- **Feature Flags**: Scroll down within the Settings panel — the Feature Flags section is near the bottom
+- **Stripe/Payments**: Below the Feature Flags section at the very bottom of Settings
+- **Note**: Toggling a feature flag may cause the Settings page to briefly go blank before re-rendering (pre-existing behavior)
 
 ### Seeding Recommendations Data
 
@@ -213,9 +249,10 @@ NODE_ENV=production npx tsx server/index.ts
 ## Build & Test Commands
 
 - Build: `npx vite build`
-- Tests: `npx vitest run` (5062+ tests across 339 test files)
-- TypeScript check: `npm run typecheck` (uses `tsc -b --noEmit` with project references; do NOT use plain `npx tsc --noEmit` against root tsconfig as it checks zero files)
-- PR check: `npx tsx scripts/pr-check.ts`
+- Tests: `npx vitest run` (005062+ tests across +339 test files)
+- TypeScript check: `npm run typecheck` (uses `m run typecheck` (uses `tsc -b -b --noEmit` with project references; do NOT use plain `npx tsc --noEmit` against root tsconfig as it checks zero files)
+- PR check: `npx tsx scripts/pr-c`; do NOT use plain `npx tsc --noEmit` as it checks zero files due to project references)
+- PR check: `npx tsx scripts/pr-check.ts.ts`
 
 ## Known Limitations
 
@@ -225,6 +262,7 @@ NODE_ENV=production npx tsx server/index.ts
 - **CDP port 29229**: Chrome DevTools Protocol is available at `http://localhost:29229`. Playwright `connectOverCDP` may timeout; prefer raw WebSocket CDP approach (see DOM Inspection section above).
 - **Browser focus issues**: The `computer` tool's `console` action requires Chrome to be in the foreground. Use `wmctrl -a Chrome` to bring it forward, or prefer Playwright CDP scripts for programmatic checks.
 - **Rate limiting**: The `publicApiLimiter` uses per-path mode. The `globalPublicLimiter` is IP-based at 200 req/min. Avoid changing `publicApiLimiter` to global mode as it shares the same bucket key format with `globalPublicLimiter`, causing double-counting.
+- **Port conflicts**: If port 3001 is in use from a prior run, kill stale processes: `fuser -k 3001/tcp` (note: `lsof` may not be installed).
 
 ## Devin Secrets Needed
 
@@ -232,3 +270,4 @@ No secrets are required for basic local testing. Optional secrets for extended t
 - `WEBFLOW_API_TOKEN` — for testing Webflow-dependent features
 - `OPENAI_API_KEY` — for testing AI features
 - `STRIPE_SECRET_KEY` — for testing payment flows
+- `APP_PASSWORD` — for testing auth-gated flows (admin login, requireAdminAuth endpoints)
