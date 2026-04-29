@@ -91,9 +91,9 @@ export function breadcrumbRef(canonicalUrl: string): { '@id': string } {
  * to avoid stripping legitimate trailing words that look like brand pipes.
  *
  * Examples:
- *   scrubBrandSuffix("Privacy Policy | hmpsn studio", "hmpsn studio") → "Privacy Policy"
- *   scrubBrandSuffix("Privacy Policy", "hmpsn studio") → "Privacy Policy"
- *   scrubBrandSuffix("Acme | Other Co", "hmpsn studio") → "Acme | Other Co" (suffix doesn't match brand)
+ *   scrubBrandSuffix("Privacy Policy | Acme Studio", "Acme Studio") → "Privacy Policy"
+ *   scrubBrandSuffix("Privacy Policy", "Acme Studio") → "Privacy Policy"
+ *   scrubBrandSuffix("Acme | Other Co", "Acme Studio") → "Acme | Other Co" (suffix doesn't match brand)
  */
 export function scrubBrandSuffix(name: string, brand: string): string {
   if (!brand) return name;
