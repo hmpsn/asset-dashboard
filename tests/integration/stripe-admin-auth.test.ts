@@ -157,7 +157,7 @@ describe('Integration — Stripe config endpoints require HMAC admin auth', () =
   ];
 
   // ─────────────────────────────────────────────────────────────
-  // JWT member token — user not in DB → requireAuth returns 401
+  // JWT token — requireAdminAuth rejects all JWTs (401)
   // ─────────────────────────────────────────────────────────────
 
   for (const ep of endpoints) {
@@ -221,11 +221,11 @@ describe('Integration — Stripe config endpoints require HMAC admin auth', () =
   }
 
   // ─────────────────────────────────────────────────────────────
-  // Positive: JWT owner token passes through
+  // Positive: HMAC admin token with JWT also succeeds
   // ─────────────────────────────────────────────────────────────
 
   for (const ep of endpoints) {
-    it(`${ep.method} ${ep.path} accepts a JWT owner token (not 401/403)`, async () => {
+    it(`${ep.method} ${ep.path} accepts HMAC admin token with JWT (not 401/403)`, async () => {
       expect(ownerJwt, 'Owner JWT must be set from /api/auth/setup').toBeTruthy();
       const res = await gatedFetch(ep.path, {
         method: ep.method,
@@ -236,9 +236,9 @@ describe('Integration — Stripe config endpoints require HMAC admin auth', () =
           Authorization: `Bearer ${ownerJwt}`,
         },
       });
-      // Should pass auth — downstream may return 200/204 or 400 for empty bodies, but not 401/403.
-      expect(res.status, `${ep.method} ${ep.path} must accept JWT owner token`).not.toBe(401);
-      expect(res.status, `${ep.method} ${ep.path} must accept JWT owner token`).not.toBe(403);
+      // HMAC passes requireAdminAuth; downstream may return 200/204 or 400 for empty bodies, but not 401/403.
+      expect(res.status, `${ep.method} ${ep.path} must accept HMAC admin token`).not.toBe(401);
+      expect(res.status, `${ep.method} ${ep.path} must accept HMAC admin token`).not.toBe(403);
     });
   }
 
