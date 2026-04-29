@@ -6,7 +6,7 @@
 
 **Architecture:** A new `server/schema/` package with 6 single-responsibility modules — `classifier.ts` (URL→type), `data-sources.ts` (canonical data extraction), `templates/*.ts` (per-type compact templates), `extractors/*.ts` (surgical AI), `validator.ts` (Google rules), `generator.ts` (orchestrator). The old generation paths in `schema-suggester.ts` become thin compatibility wrappers that call the new generator; auto-fix, content-verification, post-processing, and the 1,500-token system prompt are deleted in the cleanup phase. The POC at `scripts/poc-lean-schema.ts` (already merged on this branch) proved the structural approach: 72% size reduction across 26 hmpsn studio pages, zero auto-fix loops, all duplicate-WebPage occurrences eliminated, wrong-type bugs (case-studies-as-Service, privacy-as-Article) fixed by classification.
 
-**Tech Stack:** TypeScript strict, vitest (unit + integration), better-sqlite3 (existing snapshot storage unchanged), Anthropic SDK via `callAI()` from `server/ai.ts` for surgical extractors, Cheerio (already a dependency) for HTML parsing, `schema-dts` types for compile-time validation of @type strings (will be added).
+**Tech Stack:** TypeScript strict, vitest (unit + integration), better-sqlite3 (existing snapshot storage unchanged), `callAI()` from `server/ai.ts` for surgical extractors (uses `{ system, messages, feature, maxTokens }` shape and returns `{ text, tokens }` — verified against actual signature in `server/ai.ts:12-34`), Cheerio (will be added — currently NOT in package.json) for HTML parsing.
 
 **MVP scope (what this plan ships):** BlogPosting, Article, Service, Product, LocalBusiness, AboutPage, ContactPage, CollectionPage, WebPage, plus Organization + WebSite for the homepage. Healthcare workspaces emit `LocalBusiness` (not Dentist/Physician subtypes — that escalation is the intelligence-layer follow-up).
 
@@ -333,8 +333,17 @@ git commit -m "feat(schema): add deterministic URL/CMS page classifier"
 **Files:**
 - Create: `server/schema/data-sources.ts`
 - Test: `tests/unit/schema/data-sources.test.ts`
+- Modify: `package.json` (add cheerio dependency)
 
 **Goal:** Extract canonical data (title, description, image, dates, author, breadcrumbs) from page HTML + Webflow page meta + workspace settings. No AI.
+
+- [ ] **Step 2.0: Install cheerio (NOT currently in package.json)**
+
+```bash
+npm install cheerio@^1.0.0
+```
+
+Verify it's added to `package.json` `dependencies`. Commit with the data-sources.ts in Step 2.5.
 
 - [ ] **Step 2.1: Write failing tests**
 
@@ -601,8 +610,8 @@ Expected: 9 tests pass.
 - [ ] **Step 2.5: Commit**
 
 ```bash
-git add server/schema/data-sources.ts tests/unit/schema/data-sources.test.ts
-git commit -m "feat(schema): add canonical page data extractor (HTML + meta + workspace)"
+git add server/schema/data-sources.ts tests/unit/schema/data-sources.test.ts package.json package-lock.json
+git commit -m "feat(schema): add canonical page data extractor + cheerio dep"
 ```
 
 ---
@@ -1697,12 +1706,8 @@ describe('extractDescription', () => {
 
   it('calls AI exactly once when body present and no existing description', async () => {
     vi.mocked(callAI).mockResolvedValueOnce({
-      content: 'A concise generated description.',
-      tokensIn: 100,
-      tokensOut: 20,
-      providerLatencyMs: 100,
-      provider: 'anthropic',
-      model: 'claude-haiku-4-5',
+      text: 'A concise generated description.',
+      tokens: { prompt: 100, completion: 20, total: 120 },
     });
     const result = await extractDescription({
       existingDescription: undefined,
@@ -1716,12 +1721,8 @@ describe('extractDescription', () => {
 
   it('truncates AI output longer than 200 characters', async () => {
     vi.mocked(callAI).mockResolvedValueOnce({
-      content: 'A'.repeat(300),
-      tokensIn: 100,
-      tokensOut: 20,
-      providerLatencyMs: 100,
-      provider: 'anthropic',
-      model: 'claude-haiku-4-5',
+      text: 'A'.repeat(300),
+      tokens: { prompt: 100, completion: 20, total: 120 },
     });
     const result = await extractDescription({
       existingDescription: undefined,
@@ -1783,7 +1784,7 @@ export async function extractDescription(input: DescriptionInput): Promise<strin
     return undefined;
   }
 
-  const systemPrompt = 'You write search-result meta descriptions: one sentence, under 160 characters, no keyword stuffing, no markdown, plain English.';
+  const system = 'You write search-result meta descriptions: one sentence, under 160 characters, no keyword stuffing, no markdown, plain English.';
   const userPrompt = `Write one search-result meta description (under 160 chars) for this page.
 
 Page title: ${input.title}
@@ -1795,13 +1796,12 @@ Output the description text only, no quotes, no explanation.`;
 
   try {
     const result = await callAI({
-      systemPrompt,
-      userPrompt,
+      system,
+      messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 100,
-      json: false,
-      task: 'schema-description',
+      feature: 'schema-description',
     });
-    const cleaned = result.content.trim().replace(/^["']|["']$/g, '');
+    const cleaned = result.text.trim().replace(/^["']|["']$/g, '');
     return cleaned.length > 0 ? cleaned.slice(0, MAX_LENGTH) : undefined;
   } catch (err) {
     log.debug({ err }, 'description extraction failed; degrading gracefully');
@@ -2324,16 +2324,21 @@ export async function generateSchemaForPage(
   if (!meta) return null;
 
   const slug = meta.slug || '';
-  const url = (!slug || slug === 'index') ? baseUrl : `${baseUrl}/${slug}`;
+  const isHomepage = !slug || slug === 'index' || slug === 'home';
+  const url = isHomepage ? baseUrl : `${baseUrl}/${slug}`;
   const html = await fetchPublishedHtml(url);
+
+  // PageMeta from fetchPageMeta does NOT include publishedPath (only WebflowPage from
+  // listPages does). Derive it from slug — homepage = '/', else '/<slug>'.
+  const publishedPath = isHomepage ? '/' : `/${slug}`;
 
   const { generateLeanSchema } = await import('./schema/index.js');
   const lean = await generateLeanSchema({
     pageId,
     pageMeta: {
-      title: meta.title || meta.name || '',
+      title: meta.title || '',
       slug,
-      publishedPath: meta.publishedPath || (slug ? `/${slug}` : '/'),
+      publishedPath,
       seo: meta.seo,
     },
     html: html || '',
@@ -2577,7 +2582,9 @@ Capture the line ranges of these symbols to delete:
 - `postProcessSchema`
 - `aiGenerateUnifiedSchema` (the 1500-token system prompt)
 - `buildFallbackSchema`
-- `RICH_RESULT_RULES`
+- `UTILITY_SLUGS` (only used by `injectCrossReferences` and the old `generateSchemaSuggestions` body — both gone)
+
+**Note:** `RICH_RESULT_RULES` lives in `server/schema-validator.ts`, not `schema-suggester.ts`. It stays. Likewise, `checkRichResultsEligibility` and `extractEeatFromBrief` are still imported by other code paths (frontend rendering, content briefs) — they stay. The verification pass confirmed all 10 deletion targets above are internal-only with zero external references outside `schema-suggester.ts`.
 
 - [ ] **Step 14.2: Delete the symbols, one logical group per commit**
 
@@ -2606,15 +2613,38 @@ npm run typecheck
 
 Expected after all deletions: zero errors. If a symbol still has a caller, restore the symbol and find/update the caller.
 
-- [ ] **Step 14.4: Run the full test suite**
+- [ ] **Step 14.4: Delete tests that import the now-deleted helpers**
+
+The verification pass identified one test file whose imports break after Step 14.2:
+
+- `tests/unit/schema-post-processing.test.ts` — imports `UTILITY_SLUGS, autoFixSchema, upgradeHealthcareType` (all three are now deleted)
+
+Two other tests import from `schema-suggester.ts` but ONLY the surviving symbols:
+- `tests/unit/schema-validation-pipeline.test.ts` — type imports (`RichResultEligibility`, `SchemaPageType`) + runtime `checkRichResultsEligibility` (all kept). **Do not delete.**
+- `tests/unit/schema-intelligence-enrichment.test.ts` — type-only import of `SchemaContext` (kept). **Do not delete.**
+
+Run a sanity check:
+
+```bash
+grep -E "from '../../server/schema-suggester" tests/unit/schema-validation-pipeline.test.ts tests/unit/schema-intelligence-enrichment.test.ts
+```
+
+If those two files only show `import type { ... }` lines or `checkRichResultsEligibility`, leave them alone. Then delete the broken file:
+
+```bash
+git rm tests/unit/schema-post-processing.test.ts
+git commit -m "refactor(schema): remove tests for deleted post-processing helpers"
+```
+
+- [ ] **Step 14.5: Run the full test suite**
 
 ```bash
 npx vitest run tests/unit/schema/ tests/integration/lean-schema-generator.test.ts tests/unit/page-identity-normalisation-pr1.test.ts tests/integration/page-identity-pr1.test.ts tests/integration/page-identity-pr2.test.ts
 ```
 
-Expected: all schema and page-identity tests pass. (Older `schema-suggester` tests that exercised the deleted helpers can be deleted in this same group of commits.)
+Expected: all schema and page-identity tests pass.
 
-- [ ] **Step 14.5: Verify file size reduction**
+- [ ] **Step 14.6: Verify file size reduction**
 
 ```bash
 wc -l server/schema-suggester.ts
