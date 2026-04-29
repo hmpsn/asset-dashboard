@@ -19,6 +19,7 @@ const log = createLogger('schema');
 export { checkRichResultsEligibility } from './schema/rich-results.js';
 export type { RichResultEligibility } from './schema/rich-results.js';
 import type { RichResultEligibility } from './schema/rich-results.js';
+import type { ValidationFinding } from '../shared/types/schema-validation.js';
 
 export interface SchemaPageSuggestion {
   pageId: string;
@@ -29,6 +30,7 @@ export interface SchemaPageSuggestion {
   existingSchemaJson?: Record<string, unknown>[];
   suggestedSchemas: SchemaSuggestion[];
   validationErrors?: string[];
+  validationFindings?: ValidationFinding[];
   richResultsEligibility?: RichResultEligibility[];
   savedPageType?: string;  // Persisted page type from DB
 }
@@ -281,6 +283,7 @@ function leanToSuggestion(lean: import('./schema/index.js').LeanGeneratorOutput)
     existingSchemas: lean.existingSchemas,
     suggestedSchemas: lean.suggestedSchemas,
     validationErrors: lean.validationErrors,
+    validationFindings: lean.validationFindings,
     richResultsEligibility: lean.richResultsEligibility,
   };
 }

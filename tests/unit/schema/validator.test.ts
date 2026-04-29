@@ -40,17 +40,36 @@ describe('validateLeanSchema', () => {
       '@context': 'https://schema.org',
       '@graph': [{ '@type': 'BlogPosting', 'datePublished': '2025-01-15T00:00:00Z' }],
     };
-    expect(validateLeanSchema(schema, 'BlogPosting')).toContain('BlogPosting missing required field: headline');
+    expect(validateLeanSchema(schema, 'BlogPosting')).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: 'BlogPosting',
+        field: 'headline',
+        ruleId: 'required-field-missing',
+      }),
+    );
   });
 
   it('flags missing @context', () => {
     const schema = { '@graph': [{ '@type': 'WebPage', 'name': 'x', 'url': 'https://x/y' }] };
-    expect(validateLeanSchema(schema, 'WebPage')).toContain('Schema missing @context');
+    expect(validateLeanSchema(schema, 'WebPage')).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: '@graph',
+        ruleId: 'context-missing',
+      }),
+    );
   });
 
   it('flags missing @graph', () => {
     const schema = { '@context': 'https://schema.org' };
-    expect(validateLeanSchema(schema, 'WebPage')).toContain('Schema missing @graph array');
+    expect(validateLeanSchema(schema, 'WebPage')).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: '@graph',
+        ruleId: 'graph-missing',
+      }),
+    );
   });
 
   it('flags Service missing required name + provider', () => {
@@ -58,9 +77,23 @@ describe('validateLeanSchema', () => {
       '@context': 'https://schema.org',
       '@graph': [{ '@type': 'Service' }],
     };
-    const errors = validateLeanSchema(schema, 'Service');
-    expect(errors).toContain('Service missing required field: name');
-    expect(errors).toContain('Service missing required field: provider');
+    const findings = validateLeanSchema(schema, 'Service');
+    expect(findings).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: 'Service',
+        field: 'name',
+        ruleId: 'required-field-missing',
+      }),
+    );
+    expect(findings).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: 'Service',
+        field: 'provider',
+        ruleId: 'required-field-missing',
+      }),
+    );
   });
 
   it('passes Article + BreadcrumbList combo', () => {
@@ -106,7 +139,14 @@ describe('validateLeanSchema', () => {
         },
       ],
     };
-    expect(validateLeanSchema(schema, 'WebPage')).toContain('BreadcrumbList ListItem missing position');
+    expect(validateLeanSchema(schema, 'WebPage')).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: 'BreadcrumbList',
+        field: 'itemListElement.position',
+        ruleId: 'breadcrumb-listitem-position-missing',
+      }),
+    );
   });
 
   it('flags duplicate @type nodes (the very bug we are fixing)', () => {
@@ -117,7 +157,13 @@ describe('validateLeanSchema', () => {
         { '@type': 'WebPage', 'name': 'y', 'url': 'https://y' },
       ],
     };
-    expect(validateLeanSchema(schema, 'WebPage')).toContain('Duplicate @type in @graph: WebPage (lean output must emit exactly one primary node + optional BreadcrumbList)');
+    expect(validateLeanSchema(schema, 'WebPage')).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: 'WebPage',
+        ruleId: 'duplicate-type',
+      }),
+    );
   });
 
   it('passes Homepage (Organization + WebSite)', () => {
@@ -177,19 +223,40 @@ describe('validateLeanSchema — Yoast-baseline required fields (Pillar 1)', () 
   it('flags WebPage missing isPartOf', () => {
     const broken = JSON.parse(JSON.stringify(cleanWebPage));
     delete broken['@graph'][0].isPartOf;
-    expect(validateLeanSchema(broken, 'WebPage')).toContain('WebPage missing required field: isPartOf');
+    expect(validateLeanSchema(broken, 'WebPage')).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: 'WebPage',
+        field: 'isPartOf',
+        ruleId: 'required-field-missing',
+      }),
+    );
   });
 
   it('flags WebPage missing breadcrumb back-reference', () => {
     const broken = JSON.parse(JSON.stringify(cleanWebPage));
     delete broken['@graph'][0].breadcrumb;
-    expect(validateLeanSchema(broken, 'WebPage')).toContain('WebPage missing required field: breadcrumb');
+    expect(validateLeanSchema(broken, 'WebPage')).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: 'WebPage',
+        field: 'breadcrumb',
+        ruleId: 'required-field-missing',
+      }),
+    );
   });
 
   it('flags WebPage missing inLanguage', () => {
     const broken = JSON.parse(JSON.stringify(cleanWebPage));
     delete broken['@graph'][0].inLanguage;
-    expect(validateLeanSchema(broken, 'WebPage')).toContain('WebPage missing required field: inLanguage');
+    expect(validateLeanSchema(broken, 'WebPage')).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: 'WebPage',
+        field: 'inLanguage',
+        ruleId: 'required-field-missing',
+      }),
+    );
   });
 
   it('flags Article missing image', () => {
@@ -209,7 +276,14 @@ describe('validateLeanSchema — Yoast-baseline required fields (Pillar 1)', () 
         'inLanguage': 'en',
       }],
     };
-    expect(validateLeanSchema(article, 'Article')).toContain('Article missing required field: image');
+    expect(validateLeanSchema(article, 'Article')).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: 'Article',
+        field: 'image',
+        ruleId: 'required-field-missing',
+      }),
+    );
   });
 
   // Workspace-data-dependent fields are GOOGLE-RECOMMENDED but not in the required list
@@ -222,8 +296,8 @@ describe('validateLeanSchema — Yoast-baseline required fields (Pillar 1)', () 
       '@context': 'https://schema.org',
       '@graph': [{ '@type': 'Organization', '@id': 'https://x.com/#organization', 'name': 'X', 'url': 'https://x.com' }],
     };
-    const errors = validateLeanSchema(org, 'Organization');
-    expect(errors.find(e => e.includes('logo'))).toBeUndefined();
+    const findings = validateLeanSchema(org, 'Organization');
+    expect(findings.find(f => f.field?.includes('logo') || f.message.includes('logo'))).toBeUndefined();
   });
 
   it('does NOT flag LocalBusiness missing address or telephone (recommended, not required)', () => {
@@ -231,9 +305,9 @@ describe('validateLeanSchema — Yoast-baseline required fields (Pillar 1)', () 
       '@context': 'https://schema.org',
       '@graph': [{ '@type': 'LocalBusiness', '@id': 'https://x.com/#localbusiness', 'name': 'X', 'url': 'https://x.com', 'inLanguage': 'en' }],
     };
-    const errors = validateLeanSchema(lb, 'LocalBusiness');
-    expect(errors.find(e => e === 'LocalBusiness missing required field: address')).toBeUndefined();
-    expect(errors.find(e => e === 'LocalBusiness missing required field: telephone')).toBeUndefined();
+    const findings = validateLeanSchema(lb, 'LocalBusiness');
+    expect(findings.find(f => f.type === 'LocalBusiness' && f.field === 'address' && f.ruleId === 'required-field-missing')).toBeUndefined();
+    expect(findings.find(f => f.type === 'LocalBusiness' && f.field === 'telephone' && f.ruleId === 'required-field-missing')).toBeUndefined();
   });
 });
 
@@ -248,7 +322,14 @@ describe('validateLeanSchema — cross-reference shape (Pillar 1)', () => {
         'breadcrumb': { '@id': 'https://x.com/p#breadcrumb' },
       }],
     };
-    expect(validateLeanSchema(broken, 'WebPage')).toContain('WebPage.isPartOf must be an @id reference (e.g. {"@id": "...#website"})');
+    expect(validateLeanSchema(broken, 'WebPage')).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: 'WebPage',
+        field: 'isPartOf',
+        ruleId: 'cross-ref-ispartof-shape',
+      }),
+    );
   });
 
   it('flags breadcrumb that points to a missing BreadcrumbList', () => {
@@ -261,7 +342,14 @@ describe('validateLeanSchema — cross-reference shape (Pillar 1)', () => {
         'breadcrumb': { '@id': 'https://x.com/p#breadcrumb' },
       }],
     };
-    expect(validateLeanSchema(broken, 'WebPage')).toContain('WebPage.breadcrumb references @id "https://x.com/p#breadcrumb" but no BreadcrumbList with that @id is in the @graph');
+    expect(validateLeanSchema(broken, 'WebPage')).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: 'WebPage',
+        field: 'breadcrumb',
+        ruleId: 'cross-ref-breadcrumb-dangling',
+      }),
+    );
   });
 });
 
@@ -294,83 +382,188 @@ describe('validateLeanSchema — value-shape validators (Pillar 1)', () => {
 
   it('flags Article.author with bad @type (specific message)', () => {
     const broken = article({ author: { '@type': 'CreativeWork', 'name': 'X' } });
-    expect(validateLeanSchema(broken, 'Article')).toContain('Article.author.@type must be "Person" or "Organization"');
+    expect(validateLeanSchema(broken, 'Article')).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: 'Article',
+        field: 'author.@type',
+        ruleId: 'article-author-type-invalid',
+      }),
+    );
   });
 
   it('flags Article.author missing name (specific message)', () => {
     const broken = article({ author: { '@type': 'Person' } });
-    expect(validateLeanSchema(broken, 'Article')).toContain('Article.author.name required (non-empty string)');
+    expect(validateLeanSchema(broken, 'Article')).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: 'Article',
+        field: 'author.name',
+        ruleId: 'article-author-name-missing',
+      }),
+    );
   });
 
   it('flags Article.author empty-string name', () => {
     const broken = article({ author: { '@type': 'Person', 'name': '   ' } });
-    expect(validateLeanSchema(broken, 'Article')).toContain('Article.author.name required (non-empty string)');
+    expect(validateLeanSchema(broken, 'Article')).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: 'Article',
+        field: 'author.name',
+        ruleId: 'article-author-name-missing',
+      }),
+    );
   });
 
   it('flags Article.publisher missing logo with specific message', () => {
     const broken = article({ publisher: { '@type': 'Organization', 'name': 'X' } });
-    expect(validateLeanSchema(broken, 'Article')).toContain('Article.publisher.logo required — Google Article rich result requires an ImageObject with url');
+    expect(validateLeanSchema(broken, 'Article')).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: 'Article',
+        field: 'publisher.logo',
+        ruleId: 'article-publisher-logo-missing',
+      }),
+    );
   });
 
   it('flags Article.publisher.logo missing url with specific message', () => {
     const broken = article({ publisher: { '@type': 'Organization', 'name': 'X', 'logo': { '@type': 'ImageObject' } } });
-    expect(validateLeanSchema(broken, 'Article')).toContain('Article.publisher.logo must be {"@type": "ImageObject", "url": "..."} with non-empty url');
+    expect(validateLeanSchema(broken, 'Article')).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: 'Article',
+        field: 'publisher.logo.url',
+        ruleId: 'article-publisher-logo-url-missing',
+      }),
+    );
   });
 
   it('flags Article.publisher missing name with specific message', () => {
     const broken = article({ publisher: { '@type': 'Organization', 'logo': { '@type': 'ImageObject', 'url': 'https://x.com/l.png' } } });
-    expect(validateLeanSchema(broken, 'Article')).toContain('Article.publisher.name required (non-empty string)');
+    expect(validateLeanSchema(broken, 'Article')).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: 'Article',
+        field: 'publisher.name',
+        ruleId: 'article-publisher-name-missing',
+      }),
+    );
   });
 
   it('flags Article.image array containing ImageObject without url', () => {
     const broken = article({ image: [{ '@type': 'ImageObject' }] });
-    expect(validateLeanSchema(broken, 'Article')).toContain('Article.image array items must each be a string URL or ImageObject with url');
+    expect(validateLeanSchema(broken, 'Article')).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: 'Article',
+        field: 'image',
+        ruleId: 'article-image-array-item-shape',
+      }),
+    );
   });
 
   it('flags Article.image as bare ImageObject without url', () => {
     const broken = article({ image: { '@type': 'ImageObject' } });
-    expect(validateLeanSchema(broken, 'Article')).toContain('Article.image (ImageObject) requires a non-empty url');
+    expect(validateLeanSchema(broken, 'Article')).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: 'Article',
+        field: 'image',
+        ruleId: 'article-image-imageobject-url-missing',
+      }),
+    );
   });
 
   it('flags Article.image as non-string non-array non-ImageObject', () => {
     const broken = article({ image: 123 });
-    expect(validateLeanSchema(broken, 'Article')).toContain('Article.image must be a string URL, an array of strings/ImageObjects, or an ImageObject');
+    expect(validateLeanSchema(broken, 'Article')).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: 'Article',
+        field: 'image',
+        ruleId: 'article-image-shape-invalid',
+      }),
+    );
   });
 
   it('flags Article.datePublished not in ISO 8601 format', () => {
     const broken = article({ datePublished: 'January 1, 2026' });
-    expect(validateLeanSchema(broken, 'Article')).toContain('Article.datePublished must be ISO 8601 (e.g. "2026-01-15T00:00:00Z")');
+    expect(validateLeanSchema(broken, 'Article')).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: 'Article',
+        field: 'datePublished',
+        ruleId: 'article-date-iso8601',
+      }),
+    );
   });
 
   it('flags Article.dateModified not in ISO 8601 format', () => {
     const broken = article({ dateModified: '01/02/2026' });
-    expect(validateLeanSchema(broken, 'Article')).toContain('Article.dateModified must be ISO 8601 (e.g. "2026-01-15T00:00:00Z")');
+    expect(validateLeanSchema(broken, 'Article')).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: 'Article',
+        field: 'dateModified',
+        ruleId: 'article-date-iso8601',
+      }),
+    );
   });
 
   it('flags BreadcrumbList positions not starting at 1', () => {
     const broken = JSON.parse(JSON.stringify(article()));
     broken['@graph'][1].itemListElement[0].position = 0;
     broken['@graph'][1].itemListElement[1].position = 1;
-    expect(validateLeanSchema(broken, 'Article')).toContain('BreadcrumbList itemListElement positions must start at 1 and be contiguous-ascending');
+    expect(validateLeanSchema(broken, 'Article')).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: 'BreadcrumbList',
+        field: 'itemListElement.position',
+        ruleId: 'breadcrumb-position-ordering',
+      }),
+    );
   });
 
   it('flags BreadcrumbList positions with gaps', () => {
     const broken = JSON.parse(JSON.stringify(article()));
     broken['@graph'][1].itemListElement[1].position = 3;
-    expect(validateLeanSchema(broken, 'Article')).toContain('BreadcrumbList itemListElement positions must start at 1 and be contiguous-ascending');
+    expect(validateLeanSchema(broken, 'Article')).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: 'BreadcrumbList',
+        field: 'itemListElement.position',
+        ruleId: 'breadcrumb-position-ordering',
+      }),
+    );
   });
 
   it('flags primary-node url field that is not absolute', () => {
     const broken = article({ url: '/a' });
-    expect(validateLeanSchema(broken, 'Article')).toContain('Article.url must be an absolute URL (start with http:// or https://)');
+    expect(validateLeanSchema(broken, 'Article')).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: 'Article',
+        field: 'url',
+        ruleId: 'url-must-be-absolute',
+      }),
+    );
   });
 
   it('does NOT double-report when ListItem.position is missing (validateBreadcrumb owns that error class)', () => {
     const broken = JSON.parse(JSON.stringify(article()));
     delete broken['@graph'][1].itemListElement[0].position;
-    const errors = validateLeanSchema(broken, 'Article');
-    expect(errors).toContain('BreadcrumbList ListItem missing position');
-    expect(errors.find(e => e.includes('positions must start at 1 and be contiguous'))).toBeUndefined();
+    const findings = validateLeanSchema(broken, 'Article');
+    expect(findings).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: 'BreadcrumbList',
+        field: 'itemListElement.position',
+        ruleId: 'breadcrumb-listitem-position-missing',
+      }),
+    );
+    expect(findings.find(f => f.ruleId === 'breadcrumb-position-ordering')).toBeUndefined();
   });
 });
 
@@ -397,16 +590,37 @@ describe('validateLeanSchema — LocalBusiness value-shape (Pillar 1)', () => {
 
   it('flags LocalBusiness.address as a bare string', () => {
     const broken = localBusiness({ address: '1 Main St, Austin, TX' });
-    expect(validateLeanSchema(broken, 'LocalBusiness')).toContain('LocalBusiness.address must be a PostalAddress object (got string)');
+    expect(validateLeanSchema(broken, 'LocalBusiness')).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: 'LocalBusiness',
+        field: 'address',
+        ruleId: 'localbusiness-address-not-object',
+      }),
+    );
   });
 
   it('flags LocalBusiness.address with wrong @type', () => {
     const broken = localBusiness({ address: { '@type': 'Place', 'name': 'Office' } });
-    expect(validateLeanSchema(broken, 'LocalBusiness')).toContain('LocalBusiness.address.@type must be "PostalAddress"');
+    expect(validateLeanSchema(broken, 'LocalBusiness')).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: 'LocalBusiness',
+        field: 'address.@type',
+        ruleId: 'localbusiness-address-type-invalid',
+      }),
+    );
   });
 
   it('flags LocalBusiness.address PostalAddress with no locator fields', () => {
     const broken = localBusiness({ address: { '@type': 'PostalAddress', 'addressCountry': 'US' } });
-    expect(validateLeanSchema(broken, 'LocalBusiness')).toContain('LocalBusiness.address must have at least one of streetAddress, addressLocality, postalCode');
+    expect(validateLeanSchema(broken, 'LocalBusiness')).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        type: 'LocalBusiness',
+        field: 'address',
+        ruleId: 'localbusiness-address-no-locator',
+      }),
+    );
   });
 });

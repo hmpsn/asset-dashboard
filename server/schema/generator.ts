@@ -24,6 +24,7 @@ import { buildHomepageSchema } from './templates/homepage.js';
 import { validateLeanSchema } from './validator.js';
 import { checkRichResultsEligibility } from './rich-results.js';
 import type { RichResultEligibility } from './rich-results.js';
+import type { ValidationFinding } from '../../shared/types/schema-validation.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('schema/generator');
@@ -41,6 +42,9 @@ export interface LeanGeneratorOutput {
     priority: 'high' | 'medium' | 'low';
     template: Record<string, unknown>;
   }>;
+  /** Typed validation findings — preferred consumer surface (PR2 completeness widget reads this). */
+  validationFindings?: ValidationFinding[];
+  /** Backwards-compat: severity=error findings flattened to messages. Snapshot storage + legacy frontend consume this. */
   validationErrors?: string[];
   richResultsEligibility?: RichResultEligibility[];
 }
@@ -176,7 +180,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
   // Validate the base schema BEFORE FAQ enrichment so we can distinguish FAQ-specific
   // errors from pre-existing base errors (e.g. a BlogPosting missing datePublished
   // shouldn't cause us to roll back a perfectly valid FAQPage append).
-  const baseValidationErrors = validateLeanSchema(schema, classified.primaryType);
+  const baseValidationFindings = validateLeanSchema(schema, classified.primaryType);
 
   // Surgical FAQ enrichment: if the page has accordion FAQ structure, append a FAQPage node.
   const faqPairs = await extractFaq(input.html || '');
@@ -193,18 +197,24 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
     ((schema['@graph'] as Array<Record<string, unknown>>)).push(faqNode);
     // Re-validate and roll back ONLY if FAQ append introduced new errors
     // (i.e. errors that weren't in the base set). Pre-existing base errors
-    // remain — they're surfaced via validationErrors regardless.
-    const postFaqErrors = validateLeanSchema(schema, classified.primaryType);
-    const baseErrorSet = new Set(baseValidationErrors);
-    const faqIntroducedErrors = postFaqErrors.filter(e => !baseErrorSet.has(e));
-    if (faqIntroducedErrors.length > 0) {
-      log.debug({ pageId: input.pageId, errors: faqIntroducedErrors }, 'FAQPage extraction produced invalid schema; skipping');
+    // remain — they're surfaced via validationFindings/validationErrors regardless.
+    const postFaqFindings = validateLeanSchema(schema, classified.primaryType);
+    // Identity key combines ruleId (class) + type (@type of node) + field (specific field path)
+    // because ruleId alone is a class identifier (e.g. `required-field-missing` covers every
+    // missing-field error regardless of node/field). Without the composite key, a new FAQ-introduced
+    // finding of the same class as a pre-existing one would be incorrectly filtered out, leaving an
+    // invalid FAQPage node attached. See PR #372 review (BUG-0001).
+    const findingKey = (f: { ruleId: string; type: string; field?: string }) => `${f.ruleId}::${f.type}::${f.field ?? ''}`;
+    const baseFindingKeySet = new Set(baseValidationFindings.map(findingKey));
+    const faqIntroducedFindings = postFaqFindings.filter(f => !baseFindingKeySet.has(findingKey(f)));
+    if (faqIntroducedFindings.length > 0) {
+      log.debug({ pageId: input.pageId, errors: faqIntroducedFindings }, 'FAQPage extraction produced invalid schema; skipping');
       (schema['@graph'] as Array<Record<string, unknown>>).pop();
     }
   }
 
-  // Surface validation errors of the FINAL schema (after FAQ resolution) to caller
-  const validationErrors = validateLeanSchema(schema, classified.primaryType);
+  // Surface validation findings of the FINAL schema (after FAQ resolution) to caller
+  const validationFindings = validateLeanSchema(schema, classified.primaryType);
 
   // Fix 3: compute rich results eligibility and pass through to caller
   const richResultsEligibility = checkRichResultsEligibility(schema);
@@ -227,7 +237,14 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
         template: schema,
       },
     ],
-    validationErrors: validationErrors.length > 0 ? validationErrors : undefined,
+    validationFindings: validationFindings.length > 0 ? validationFindings : undefined,
+    // Backwards-compat: undefined ⇔ no errors. Gate on errors.length, not findings.length —
+    // otherwise we emit `[]` when only warnings exist (latent today; surfaces the moment
+    // recommended-tier fields are populated). See PR #372 review (BUG-0002).
+    validationErrors: (() => {
+      const errors = validationFindings.filter(f => f.severity === 'error').map(f => f.message);
+      return errors.length > 0 ? errors : undefined;
+    })(),
     richResultsEligibility: richResultsEligibility.length > 0 ? richResultsEligibility : undefined,
   };
 }
