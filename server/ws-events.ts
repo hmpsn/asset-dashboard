@@ -93,6 +93,10 @@ export const WS_EVENTS = {
   COPY_INTELLIGENCE_UPDATED: 'copy:intelligence_updated',
   COPY_EXPORT_COMPLETE: 'copy:export_complete',
 
+  // Client Briefing (weekly editorial)
+  BRIEFING_GENERATED: 'briefing:generated',
+  BRIEFING_PUBLISHED: 'briefing:published',
+
   // Deep Diagnostics
   DIAGNOSTIC_COMPLETE: 'diagnostic:complete',
   DIAGNOSTIC_FAILED: 'diagnostic:failed',
