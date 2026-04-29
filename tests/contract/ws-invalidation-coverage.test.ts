@@ -56,6 +56,14 @@ const LOCAL_ONLY_EVENTS = new Set<string>([
   // event locally to show a success toast. Task 1 investigation confirmed no
   // client-visible React Query query is gated on this event.
   'SCHEMA_PLAN_SENT',
+
+  // BRIEFING_GENERATED, BRIEFING_PUBLISHED — Client Briefing v2 (in-progress).
+  // Constants land first as part of the foundation PR; centralized React Query
+  // handlers land with T1.19 (admin-briefing-drafts query) and Phase 2
+  // (client-briefing query). At that point these will be moved into
+  // useWsInvalidation.ts and removed from this list.
+  'BRIEFING_GENERATED',
+  'BRIEFING_PUBLISHED',
 ]);
 
 // ---------------------------------------------------------------------------
