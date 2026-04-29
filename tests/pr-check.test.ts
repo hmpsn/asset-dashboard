@@ -4431,7 +4431,7 @@ describe('Meta: customCheck rule name registry', () => {
     // Schema Yoast parity PR1 (2026-04-29) — Trajectory 3 → 1 migration guard.
     // Fires on any new direct ws.* read in buildSchemaContext outside the 6
     // identity-field allow-list. Grandfathered legacy reads carry inline hatches.
-    'no new direct reads in buildSchemaContext outside identity allow-list',
+    'schema-context-direct-read-not-on-allowlist',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -6141,7 +6141,7 @@ describe('Rule: styleguide-typography-parity', () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-// Rule: no new direct reads in buildSchemaContext outside identity allow-list
+// Rule: schema-context-direct-read-not-on-allowlist
 // ════════════════════════════════════════════════════════════════════════════
 //
 // Brace-walks buildSchemaContext in server/helpers.ts, skipping identity
@@ -6154,8 +6154,8 @@ describe('Rule: styleguide-typography-parity', () => {
 //
 // ════════════════════════════════════════════════════════════════════════════
 
-describe('Rule: no new direct reads in buildSchemaContext outside identity allow-list', () => {
-  const RULE = 'no new direct reads in buildSchemaContext outside identity allow-list';
+describe('Rule: schema-context-direct-read-not-on-allowlist', () => {
+  const RULE = 'schema-context-direct-read-not-on-allowlist';
 
   // Write a minimal helpers.ts fixture at a path ending in server/helpers.ts.
   // The function signature spans 3 lines (matching the real file's multi-line

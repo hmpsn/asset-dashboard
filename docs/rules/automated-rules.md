@@ -94,7 +94,7 @@ advisory but tracked.
 | 76 | No purple/violet in client domain | error | pattern | `src/components/client/` | — | Mechanizes Law 04 of the Four Laws of Color — purple is reserved for admin AI surfaces (AdminChat, SeoAudit). Client-facing views must never use purple or violet. |
 | 77 | score-color-law-parity | error | custom | `*.ts` | — | scoreColorClass() is called from 20+ components. If it drifts from emerald to green, every downstream consumer silently violates Law 03. |
 | 78 | Raw z-index class (use z-[var(--z-*)] tokens) | error | pattern | `src/` | `z-index-ok` | Ensures z-index values come from the centralized token scale in tokens.css, preventing stacking-context collisions. |
-| 79 | no new direct reads in buildSchemaContext outside identity allow-list | error | custom | `server/helpers.ts` | — | Schema generation reads from workspace+intelligence data. Trajectory 3 → 1 migration (data/roadmap.json:schema-context-builder-pattern-b-migration) ports legacy direct reads to slice consumption. New direct reads bypass that migration; flag them at PR time. |
+| 79 | schema-context-direct-read-not-on-allowlist | error | custom | `server/helpers.ts` | — | Schema generation reads from workspace+intelligence data. Trajectory 3 → 1 migration (data/roadmap.json:schema-context-builder-pattern-b-migration) ports legacy direct reads to slice consumption. New direct reads bypass that migration; flag them at PR time. |
 | 80 | HTML-naive word count on rich-text post field | error | pattern | `*.ts, *.tsx` | `html-word-count-ok` | Counting words on rich-text HTML treats `<p>` and `</p>` as words. The dedicated HTML-aware helpers strip tags first. Same root cause as the section.wordCount drift Devin flagged in PR #356. |
 
 ---

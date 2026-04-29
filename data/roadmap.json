@@ -499,6 +499,16 @@
           "notes": "Trajectory 3 → 1 migration. Direct reads in server/helpers.ts:buildSchemaContext → corresponding seoContext slice fields. Each migration is opportunistic — done when adjacent code is touched for other reasons. Completion gates Pillar 3 reactivation.\n\nRemaining queue (5 fields):\n  1. brandVoice            → seoContext.brandVoice\n  2. businessContext       → seoContext.strategy.businessContext  (NB: NOT keywordStrategy)\n  3. knowledgeBase         → seoContext.knowledgeBase\n  4. _businessProfile      → seoContext.businessProfile\n  5. _personasBlock        → seoContext.personas (AudiencePersona[]; formatting moves to schema layer)\n\nPR1 (schema-yoast-parity-fields) ports siteKeywords as the pattern anchor (committed outside this queue since it shipped with the PR). Identity fields (ws.name, ws.id, ws.liveDomain, ws.brandLogoUrl, ws.siteHasSearch, siteId) intentionally stay as direct reads — they're per-entity DB fields, not on a slice.\n\nMigration completion criterion: zero non-allowlisted direct reads in buildSchemaContext (verified by pr-check rule schema-context-direct-read-not-on-allowlist). At that point, Pillar 3 (compile-time + CI gates) reactivates."
         },
         {
+          "id": "schema-cleanup-dead-pageKeywordMap",
+          "title": "Remove dead pageKeywordMap from buildSchemaContext + generateSchemaSuggestions signature",
+          "source": "PR #376 Devin Review INFO-0001",
+          "est": "30m",
+          "priority": "P2",
+          "sprint": "future",
+          "status": "pending",
+          "notes": "After schema-yoast-parity-fields PR1, buildSchemaContext still computes pageKeywordMap from ws?.keywordStrategy?.pageMap and returns it (server/helpers.ts:343, :410-418, :539). Both callers (server/routes/webflow-schema.ts:51, server/routes/jobs.ts:636) destructure it and pass to generateSchemaSuggestions, which immediately voids it (server/schema-suggester.ts:391). Per-page keywords are now fetched via buildWorkspaceIntelligence inside the page loop. Cleanup: drop the pageKeywordMap return field, the parameter, and the void discard. While in there, audit the other 5 voided params on generateSchemaSuggestions (gscMap, ga4Map, queryPageData, insightsMap, validationsByPageId) — likely also dead. Devin Review explicitly recommended deferring to a follow-up PR; doesn't affect correctness."
+        },
+        {
           "id": "test-flake-aiLimiter-state-pollution",
           "title": "Reset aiLimiter in beforeEach for brandscript-hardening I14 burst-cap",
           "source": "docs/superpowers/audits/2026-04-29-pre-existing-test-failures-audit.md",

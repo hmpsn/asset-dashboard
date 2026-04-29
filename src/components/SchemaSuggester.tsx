@@ -776,9 +776,12 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
 
   const pagesWithExisting = data.filter(p => p.existingSchemas.length > 0).length;
   const pagesWithErrors = data.filter(p => (p.validationErrors?.length || 0) > 0).length;
-  const totalWarnings = data.reduce((sum, p) => {
-    return sum + (p.validationFindings?.filter(f => f.severity === 'warning').length ?? 0);
-  }, 0);
+  // Page count, not finding count — units must match `pagesWithErrors` since the display reads
+  // "${N} with warnings" sister to "${N} with errors". A page with 3 warning findings counts once.
+  // (Devin Review BUG-0001 on PR #376.)
+  const pagesWithWarnings = data.filter(p =>
+    (p.validationFindings?.some(f => f.severity === 'warning') ?? false),
+  ).length;
   const totalTypes = data.reduce((s, p) => {
     const schema = p.suggestedSchemas[0]?.template;
     const graph = schema?.['@graph'] as Record<string, unknown>[] | undefined;
@@ -906,7 +909,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
           <div className="t-caption text-[var(--brand-text-muted)] mb-1">Validated</div>
           <div className={cn('text-2xl font-bold', pagesWithErrors > 0 ? 'text-amber-400/80' : 'text-emerald-400/80')}>{data.length - pagesWithErrors}/{data.length}</div>
           <div className="t-caption text-[var(--brand-text-muted)]">
-            {pagesWithErrors > 0 ? `${pagesWithErrors} with errors` : totalWarnings > 0 ? `${totalWarnings} with warnings` : 'all passing'}
+            {pagesWithErrors > 0 ? `${pagesWithErrors} with errors` : pagesWithWarnings > 0 ? `${pagesWithWarnings} with warnings` : 'all passing'}
           </div>
         </div>
         <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature)' }}>

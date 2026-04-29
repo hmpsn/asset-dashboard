@@ -4668,7 +4668,7 @@ export const CHECKS: Check[] = [
     //
     // Escape hatch: add `// schema-context-direct-read-ok: <reason>` on the flagged line
     // or the line immediately above for justified exceptions.
-    name: 'no new direct reads in buildSchemaContext outside identity allow-list',
+    name: 'schema-context-direct-read-not-on-allowlist',
     pattern: '',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/helpers.ts',
