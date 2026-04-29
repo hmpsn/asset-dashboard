@@ -430,3 +430,13 @@ export function buildStaticPathSet(pages: WebflowPage[]): Set<string> {
   }
   return paths;
 }
+
+/**
+ * Canonical formula for synthetic CMS page IDs.
+ * All code that creates or looks up a CMS page ID must use this function.
+ * Format: cms-{path-with-slashes-replaced-by-dashes}
+ * Example: /blog/my-post → cms-blog-my-post
+ */
+export function toCmsPageId(path: string): string {
+  return `cms-${path.replace(/^\//, '').replace(/\//g, '-')}`;
+}
