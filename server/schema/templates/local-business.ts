@@ -56,8 +56,9 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
   });
 
   // Emit the same WebSite sitewide entity that buildHomepageSchema does — Google
-  // uses this for the sitelinks search box and site-name display in search results.
-  // Local business homepages need it just as much as regular homepages.
+  // uses this for the site-name display in search results.
+  // potentialAction (sitelinks SearchAction) intentionally omitted — see homepage.ts
+  // for rationale. Re-add when workspace.siteHasSearch confirms search endpoint.
   const website = {
     '@type': 'WebSite',
     '@id': `${baseUrl}/#website`,
@@ -65,11 +66,6 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
     'url': baseUrl,
     'publisher': { '@id': `${baseUrl}/#organization` },
     'inLanguage': pageData.inLanguage,
-    'potentialAction': {
-      '@type': 'SearchAction',
-      'target': { '@type': 'EntryPoint', 'urlTemplate': `${baseUrl}/?s={search_term_string}` },
-      'query-input': 'required name=search_term_string',
-    },
   };
 
   return withBreadcrumb([organization, localBusiness, website], pageData);

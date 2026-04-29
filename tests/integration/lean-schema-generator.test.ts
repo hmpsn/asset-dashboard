@@ -272,7 +272,9 @@ describe('paid-grade output (Pillar 2)', () => {
     expect(node.author).toEqual({ '@type': 'Person', 'name': 'Jane Doe' });
   });
 
-  it('homepage WebSite has potentialAction SearchAction', async () => {
+  it('homepage WebSite does NOT emit potentialAction (no site-search guarantee)', async () => {
+    // Pillar 2.1: SearchAction would misrepresent capability when site has no
+    // search endpoint. Re-add behind a workspace flag in schema-yoast-parity-fields.
     const out = await generateLeanSchema({
       ...baseInput,
       pageMeta: { title: 'Home', slug: '', publishedPath: '/', seo: undefined },
@@ -280,6 +282,7 @@ describe('paid-grade output (Pillar 2)', () => {
     });
     const graph = (out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>);
     const website = graph.find(n => n['@type'] === 'WebSite');
-    expect((website?.potentialAction as Record<string, unknown>)['@type']).toBe('SearchAction');
+    expect(website?.potentialAction).toBeUndefined();
+    expect(website?.inLanguage).toBe('en');
   });
 });

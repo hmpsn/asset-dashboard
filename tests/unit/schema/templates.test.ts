@@ -346,14 +346,12 @@ describe('buildHomepageSchema', () => {
     expect(org.foundedDate).toBe('2020-01-01');
   });
 
-  it('WebSite has potentialAction (sitelinks SearchAction)', () => {
+  it('WebSite emits inLanguage but NOT potentialAction (no site-search guarantee)', () => {
+    // Pillar 2.1: SearchAction misrepresents capability when the site has no
+    // search endpoint. Re-add when a workspace flag (siteHasSearch) confirms.
     const schema = buildHomepageSchema(homepageInput);
     const website = (schema['@graph'] as Array<Record<string, unknown>>)[1];
-    expect(website.potentialAction).toEqual({
-      '@type': 'SearchAction',
-      'target': { '@type': 'EntryPoint', 'urlTemplate': 'https://example.com/?s={search_term_string}' },
-      'query-input': 'required name=search_term_string',
-    });
     expect(website.inLanguage).toBe('en');
+    expect(website.potentialAction).toBeUndefined();
   });
 });

@@ -29,6 +29,12 @@ export function buildHomepageSchema(input: HomepageInput): Record<string, unknow
     'foundedDate': businessProfile?.foundedDate,
   });
 
+  // NOTE: WebSite.potentialAction (sitelinks SearchAction) is intentionally NOT emitted.
+  // Google requires the site actually expose a working search endpoint at the urlTemplate
+  // before claiming this capability. Most workspaces (including hmpsn studio) have no site
+  // search; emitting it unconditionally misrepresents capability to Google. Re-add when
+  // a workspace-level signal (Workspace.siteHasSearch or auto-detected <form action>)
+  // confirms search exists. Tracked: schema-yoast-parity-fields roadmap item.
   const website = {
     '@type': 'WebSite',
     '@id': `${baseUrl}/#website`,
@@ -36,11 +42,6 @@ export function buildHomepageSchema(input: HomepageInput): Record<string, unknow
     'url': baseUrl,
     'publisher': { '@id': `${baseUrl}/#organization` },
     'inLanguage': pageData.inLanguage,
-    'potentialAction': {
-      '@type': 'SearchAction',
-      'target': { '@type': 'EntryPoint', 'urlTemplate': `${baseUrl}/?s={search_term_string}` },
-      'query-input': 'required name=search_term_string',
-    },
   };
 
   return { '@context': 'https://schema.org', '@graph': [organization, website] };
