@@ -139,6 +139,8 @@ export interface SchemaContext {
     foundedDate?: string;
     numberOfEmployees?: string;
   };
+  /** Default site-wide BCP-47 locale from Webflow site.locales.primary.tag. Defaults to 'en' when unset. */
+  _defaultLocale?: string;
   /** Site-level SERP features from SEO data provider — used to steer schema type selection. */
   _serpFeatures?: { featuredSnippets: number; peopleAlsoAsk: number; localPack: boolean; videoCarousel: number };
   /** Referring-domain count from backlink profile — used to calibrate schema ambition. */
@@ -339,7 +341,7 @@ export async function generateSchemaForPage(
       name: ctx.companyName || '',
       publisherLogoUrl: ctx.logoUrl ?? null,
       businessProfile: ctx._businessProfile ?? null,
-      defaultLocale: 'en',
+      defaultLocale: ctx._defaultLocale ?? 'en',
     },
   });
 
@@ -393,7 +395,7 @@ export async function generateSchemaSuggestions(
         name: ctx.companyName || '',
         publisherLogoUrl: ctx.logoUrl ?? null,
         businessProfile: ctx._businessProfile ?? null,
-        defaultLocale: 'en',
+        defaultLocale: ctx._defaultLocale ?? 'en',
       },
     });
     results.push(leanToSuggestion(lean));
@@ -424,7 +426,7 @@ export async function generateSchemaSuggestions(
           name: ctx.companyName || '',
           publisherLogoUrl: ctx.logoUrl ?? null,
           businessProfile: ctx._businessProfile ?? null,
-          defaultLocale: 'en',
+          defaultLocale: ctx._defaultLocale ?? 'en',
         },
       });
       results.push(leanToSuggestion(itemLean));

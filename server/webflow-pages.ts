@@ -326,17 +326,27 @@ export async function retractSchemaFromPage(
   return { success: true, removed: removedCount };
 }
 
-export async function listSites(tokenOverride?: string): Promise<Array<{ id: string; displayName: string; shortName: string }>> {
+export async function listSites(
+  tokenOverride?: string,
+): Promise<Array<{ id: string; displayName: string; shortName: string; defaultLocale: string }>> {
   const token = tokenOverride || getToken();
   if (!token) return [];
 
   const res = await webflowFetch('/sites', {}, token);
   if (!res.ok) return [];
-  const data = await res.json() as { sites?: Array<{ id: string; displayName?: string; shortName: string }> };
+  const data = await res.json() as {
+    sites?: Array<{
+      id: string;
+      displayName?: string;
+      shortName: string;
+      locales?: { primary?: { tag?: string } };
+    }>;
+  };
   return (data.sites || []).map((s) => ({
     id: s.id,
     displayName: s.displayName || s.shortName,
     shortName: s.shortName,
+    defaultLocale: s.locales?.primary?.tag || 'en',
   }));
 }
 

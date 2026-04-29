@@ -13,6 +13,7 @@ import { getGA4TopPages } from './google-analytics.js';
 import { getRawKnowledge, buildPersonasContext } from './seo-context.js';
 import { getInsights } from './analytics-insights-store.js';
 import { getDeclinedKeywords } from './keyword-feedback.js';
+import { listSites } from './webflow-pages.js';
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
@@ -344,6 +345,13 @@ export async function buildSchemaContext(
     ctx.logoUrl = ws.brandLogoUrl;
     ctx.workspaceId = ws.id;
     ctx._siteId = siteId;
+
+    // Resolve site-wide default locale from Webflow (paid-grade `inLanguage`).
+    try {
+      const sites = await listSites();
+      const matched = sites.find(s => s.id === siteId);
+      if (matched?.defaultLocale) ctx._defaultLocale = matched.defaultLocale;
+    } catch { /* listSites failure: leave _defaultLocale undefined; downstream falls back to 'en' */ } // catch-ok
 
     // Knowledge base from unified seo-context builder (inline + knowledge-docs/ files)
     const rawKB = getRawKnowledge(ws.id);
