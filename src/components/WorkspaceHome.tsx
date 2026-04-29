@@ -9,6 +9,7 @@ import {
 import { StatCard, SectionCard, PageHeader, MetricRing, TabBar, OnboardingChecklist, WorkspaceHealthBar, Icon, cn } from './ui';
 import { themeColor } from './ui/constants';
 import { WorkspaceHealthBadge } from './admin/WorkspaceHealthBadge';
+import { BriefingReviewQueue } from './admin/BriefingReviewQueue';
 import { InsightsEngine } from './client/InsightsEngine';
 import { CartProvider } from './client/useCart';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -542,6 +543,11 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
 
       {/* ── Anomaly Alerts ── */}
       <AnomalyAlerts workspaceId={workspaceId} isAdmin={true} />
+
+      {/* ── Weekly Briefings (admin review queue, dark-launched behind client-briefing-v2) ── */}
+      <ErrorBoundary label="Briefing Review Queue">
+        <BriefingReviewQueue workspaceId={workspaceId} />
+      </ErrorBoundary>
 
       {/* ── SEO Pipeline (Work Status + Change Tracker) ── */}
       {seoStatus.total > 0 ? (
