@@ -67,4 +67,16 @@ describe('stripCodeFences', () => {
     const s = 'intro\n```json\n{"a":1}\n```';
     expect(stripCodeFences(s)).toBe(s); // no leading fence
   });
+
+  it('strips fence even when input has leading whitespace before the fence', () => {
+    // Devin follow-up to PR #371 — without the input.trim() defense, the `^`
+    // anchor in the fence regex would miss the backtick and the fence would
+    // remain, causing JSON.parse to choke downstream.
+    expect(stripCodeFences('\n```json\n{"a":1}\n```')).toBe('{"a":1}');
+    expect(stripCodeFences('  ```json\n{"a":1}\n```\n  ')).toBe('{"a":1}');
+  });
+
+  it('trims surrounding whitespace from non-fenced strings', () => {
+    expect(stripCodeFences('  {"a":1}  ')).toBe('{"a":1}');
+  });
 });

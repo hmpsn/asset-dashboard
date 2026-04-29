@@ -23,7 +23,14 @@ export const Toggle = React.forwardRef<HTMLInputElement, ToggleProps>(
       <label
         htmlFor={id}
         className={cn(
-          'inline-flex items-center gap-3',
+          // `relative` is REQUIRED — gives the `sr-only` input below an explicit
+          // positioned ancestor. Without it, the absolutely-positioned input
+          // anchors to the viewport (initial containing block), so when a label
+          // click focuses the input, the browser's auto-scrollIntoView scrolls
+          // the WINDOW instead of the nearest overflow:auto ancestor (e.g.
+          // <main>). On long-scrolled pages (FeatureFlagSettings) this blanks
+          // the screen until the user refreshes.
+          'relative inline-flex items-center gap-3',
           'cursor-pointer select-none',
           disabled && 'opacity-50 cursor-not-allowed',
           className,
@@ -52,7 +59,7 @@ export const Toggle = React.forwardRef<HTMLInputElement, ToggleProps>(
             'flex-shrink-0',
             'transition-colors duration-150',
             'peer-focus-visible:ring-2 peer-focus-visible:ring-teal-500',
-            checked ? 'bg-[var(--brand-mint)]' : 'bg-zinc-700',
+            checked ? 'bg-[var(--brand-mint)]' : 'bg-[var(--surface-3)]',
           )}
         >
           {/* Knob */}
@@ -69,7 +76,7 @@ export const Toggle = React.forwardRef<HTMLInputElement, ToggleProps>(
         </span>
 
         {/* Label text */}
-        <span className={cn('text-sm text-zinc-300', srOnlyLabel && 'sr-only')}>{label}</span>
+        <span className={cn('text-sm text-[var(--brand-text)]', srOnlyLabel && 'sr-only')}>{label}</span>
       </label>
     );
   }
