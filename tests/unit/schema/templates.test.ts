@@ -230,7 +230,7 @@ describe('buildLocalBusinessSchema', () => {
     expect(validateLeanSchema(buildLocalBusinessSchema(localInput), 'LocalBusiness')).toEqual([]);
   });
 
-  it('emits sibling WebSite node — local-business homepages still need sitelinks search box / site-name', () => {
+  it('emits sibling WebSite node — local-business homepages still need site-name + publisher reference', () => {
     const graph = buildLocalBusinessSchema(localInput)['@graph'] as Array<Record<string, unknown>>;
     const websiteNode = graph.find(n => n['@type'] === 'WebSite') as Record<string, unknown>;
     expect(websiteNode).toBeDefined();
