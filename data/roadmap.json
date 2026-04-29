@@ -484,8 +484,10 @@
           "source": "docs/superpowers/plans/2026-04-29-schema-pillar-2-data-wiring.md (post-merge correction)",
           "est": "1h",
           "priority": "P0",
-          "status": "pending",
-          "notes": "Pillar 2's homepage + LocalBusiness templates emit `potentialAction: SearchAction` unconditionally. Google's docs require the site actually expose a working search endpoint at the urlTemplate; emitting it on a site without search misrepresents capability. Fix: drop SearchAction emission until a workspace-level signal indicates site search is available. Re-add as opt-in via Workspace.siteHasSearch (or auto-detect from homepage HTML <form action=/search>) in the intelligence-layer follow-up."
+          "sprint": "H",
+          "status": "done",
+          "shippedAt": "2026-04-29",
+          "notes": "Pillar 2's homepage + LocalBusiness templates emitted `potentialAction: SearchAction` unconditionally. Google's docs require the site actually expose a working search endpoint at the urlTemplate; emitting it on a site without search misrepresents capability. Fix: dropped SearchAction emission until a workspace-level signal indicates site search is available. Re-add as opt-in via Workspace.siteHasSearch (or auto-detect from homepage HTML <form action=/search>) is queued under schema-yoast-parity-fields."
         },
         {
           "id": "schema-pillar-1-validator-bar",
