@@ -74,9 +74,11 @@ export function InsightsBriefingPage({
           description="Each week we'll surface the wins, risks, and opportunities that matter — tailored to your business."
         />
       ) : (() => {
-        // Single-pass partition (replaces 3 .filter() iterations per render).
-        // Phase 1 Zod enforces exactly 1 headline; we use `find` for the
-        // hero so we don't pretend the data could ever return >1.
+        // Two passes (find + filter) instead of three .filter() iterations.
+        // With typical briefing sizes (3-5 stories) the difference is
+        // negligible; the win is correctness — Phase 1 Zod enforces exactly
+        // 1 headline, so `find` matches the contract better than mapping
+        // over a filter that could theoretically return more.
         const hero = briefing.stories.find((s) => s.isHeadline);
         const secondary = briefing.stories.filter((s) => !s.isHeadline);
         return (
