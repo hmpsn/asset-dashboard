@@ -46,6 +46,8 @@ describe('classifyPage', () => {
   it('classifies legal pages as Legal (becomes plain WebPage)', () => {
     expect(classifyPage(`${BASE}/privacy-policy`, BASE).kind).toBe('Legal');
     expect(classifyPage(`${BASE}/terms-of-service`, BASE).kind).toBe('Legal');
+    expect(classifyPage(`${BASE}/privacy-policy`, BASE).primaryType).toBe('WebPage');
+    expect(classifyPage(`${BASE}/terms-of-service`, BASE).primaryType).toBe('WebPage');
   });
 
   it('strips query strings and fragments before matching', () => {

@@ -2,7 +2,7 @@
  * Integration test: lean schema generator end-to-end for each page kind.
  * Uses synthetic page meta + HTML; no DB or HTTP server.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../server/ai.js', () => ({
   callAI: vi.fn().mockResolvedValue({
@@ -12,6 +12,7 @@ vi.mock('../../server/ai.js', () => ({
 }));
 
 import { generateLeanSchema } from '../../server/schema/generator.js';
+import { callAI } from '../../server/ai.js';
 
 const baseInput = {
   pageId: 'p1',
@@ -22,6 +23,14 @@ const baseInput = {
 };
 
 describe('generateLeanSchema', () => {
+  beforeEach(() => {
+    vi.mocked(callAI).mockClear();
+    vi.mocked(callAI).mockResolvedValue({
+      text: 'A clean description.',
+      tokens: { prompt: 100, completion: 20, total: 120 },
+    });
+  });
+
   it('produces a SchemaPageSuggestion with one suggestion entry', async () => {
     const out = await generateLeanSchema(baseInput);
     expect(out.pageId).toBe('p1');
@@ -126,5 +135,60 @@ describe('generateLeanSchema', () => {
     });
     const graph = out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>;
     expect(graph.find(n => n['@type'] === 'FAQPage')).toBeUndefined();
+  });
+});
+
+describe('generateLeanSchema: per-kind primary @type', () => {
+  beforeEach(() => {
+    vi.mocked(callAI).mockClear();
+    vi.mocked(callAI).mockResolvedValue({
+      text: 'A clean description.',
+      tokens: { prompt: 100, completion: 20, total: 120 },
+    });
+  });
+
+  const cases = [
+    { path: '/', expectedFirstType: 'Organization', kind: 'Homepage' },
+    { path: '/blog/my-post', expectedFirstType: 'BlogPosting', kind: 'BlogPosting' },
+    { path: '/blog', expectedFirstType: 'CollectionPage', kind: 'BlogIndex' },
+    { path: '/services/web-design', expectedFirstType: 'Service', kind: 'Service' },
+    { path: '/services', expectedFirstType: 'CollectionPage', kind: 'ServiceIndex' },
+    { path: '/our-work/expero', expectedFirstType: 'Article', kind: 'CaseStudy' },
+    { path: '/our-work', expectedFirstType: 'CollectionPage', kind: 'CaseStudyIndex' },
+    { path: '/about', expectedFirstType: 'AboutPage', kind: 'AboutPage' },
+    { path: '/contact', expectedFirstType: 'ContactPage', kind: 'ContactPage' },
+    { path: '/privacy-policy', expectedFirstType: 'WebPage', kind: 'Legal' },
+    { path: '/random/deep/path', expectedFirstType: 'WebPage', kind: 'WebPage (fallback)' },
+  ];
+
+  it.each(cases)('emits $expectedFirstType for $kind ($path)', async ({ path, expectedFirstType }) => {
+    const out = await generateLeanSchema({
+      ...baseInput,
+      pageMeta: { ...baseInput.pageMeta, publishedPath: path },
+    });
+    const graph = out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>;
+    expect(graph[0]['@type']).toBe(expectedFirstType);
+  });
+
+  it('emits LocalBusiness as second graph node when workspace has business profile address', async () => {
+    const out = await generateLeanSchema({
+      ...baseInput,
+      pageMeta: { ...baseInput.pageMeta, publishedPath: '/' },
+      workspace: {
+        name: 'Acme',
+        publisherLogoUrl: null,
+        businessProfile: {
+          phone: '+1-555-0100',
+          email: 'hi@acme.com',
+          address: { street: '1 Main', city: 'Austin', state: 'TX', zip: '78701', country: 'US' },
+          socialProfiles: [],
+          openingHours: 'Mo-Fr 09:00-17:00',
+        },
+      },
+    });
+    const graph = out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>;
+    const types = graph.map(n => n['@type']);
+    expect(types).toContain('Organization');
+    expect(types).toContain('LocalBusiness');
   });
 });

@@ -159,10 +159,18 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       break;
     case 'Legal':
     case 'WebPage':
-    default:
       schema = buildWebPageSchema({ baseUrl, pageData });
       reason = 'Generic page — WebPage with breadcrumb.';
       break;
+    default: {
+      // Exhaustiveness check — TS will error here if a new PageKind value is added
+      // without a corresponding case above.
+      const _exhaustive: never = classified.kind;
+      void _exhaustive;
+      schema = buildWebPageSchema({ baseUrl, pageData });
+      reason = 'Generic page — WebPage (unreachable fallback).';
+      break;
+    }
   }
 
   // Validate

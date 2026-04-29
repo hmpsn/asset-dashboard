@@ -182,10 +182,12 @@ describe('buildLocalBusinessSchema', () => {
   it('omits all contact fields when business profile is null (no fabrication)', () => {
     const input = { ...localInput, businessProfile: null };
     const graph = buildLocalBusinessSchema(input)['@graph'] as Array<Record<string, unknown>>;
-    const node = graph.find(n => n['@type'] === 'LocalBusiness') as Record<string, unknown>;
-    expect(node.telephone).toBeUndefined();
-    expect(node.address).toBeUndefined();
-    expect(node.email).toBeUndefined();
+    const localBusinessNode = graph.find(n => n['@type'] === 'LocalBusiness') as Record<string, unknown>;
+    expect(localBusinessNode.telephone).toBeUndefined();
+    expect(localBusinessNode.address).toBeUndefined();
+    expect(localBusinessNode.email).toBeUndefined();
+    expect(localBusinessNode.openingHours).toBeUndefined();
+    expect(localBusinessNode.sameAs).toBeUndefined();
   });
 
   it('passes validator with full profile', () => {
