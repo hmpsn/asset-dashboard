@@ -88,7 +88,7 @@ const briefingStmts = createStmtCache(() => ({
     ORDER BY published_at DESC, week_of DESC LIMIT 1
   `),
   setStories: db.prepare('UPDATE briefing_drafts SET stories = ?, updated_at = ? WHERE id = ? AND workspace_id = ? RETURNING *'),
-  setStatus: db.prepare('UPDATE briefing_drafts SET status = ?, updated_at = ?, published_at = ?, auto_published = ?, admin_note = COALESCE(?, admin_note) WHERE id = ? AND workspace_id = ? RETURNING *'),
+  setStatus: db.prepare('UPDATE briefing_drafts SET status = ?, updated_at = ?, published_at = ?, auto_published = ?, admin_note = COALESCE(?, admin_note) WHERE id = ? AND workspace_id = ? RETURNING * -- status-ok: guarded by validateTransition() in setStatusScoped()'),
   setNote: db.prepare('UPDATE briefing_drafts SET admin_note = ?, updated_at = ? WHERE id = ? AND workspace_id = ? RETURNING *'),
 }));
 
