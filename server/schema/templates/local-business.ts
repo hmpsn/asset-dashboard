@@ -53,5 +53,16 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
     'parentOrganization': { '@id': `${baseUrl}/#organization` },
   });
 
-  return withBreadcrumb([organization, localBusiness], pageData);
+  // Emit the same WebSite sitewide entity that buildHomepageSchema does — Google
+  // uses this for the sitelinks search box and site-name display in search results.
+  // Local business homepages need it just as much as regular homepages.
+  const website = {
+    '@type': 'WebSite',
+    '@id': `${baseUrl}/#website`,
+    'name': pageData.publisher.name,
+    'url': baseUrl,
+    'publisher': { '@id': `${baseUrl}/#organization` },
+  };
+
+  return withBreadcrumb([organization, localBusiness, website], pageData);
 }

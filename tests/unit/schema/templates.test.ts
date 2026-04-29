@@ -193,6 +193,14 @@ describe('buildLocalBusinessSchema', () => {
   it('passes validator with full profile', () => {
     expect(validateLeanSchema(buildLocalBusinessSchema(localInput), 'LocalBusiness')).toEqual([]);
   });
+
+  it('emits sibling WebSite node — local-business homepages still need sitelinks search box / site-name', () => {
+    const graph = buildLocalBusinessSchema(localInput)['@graph'] as Array<Record<string, unknown>>;
+    const websiteNode = graph.find(n => n['@type'] === 'WebSite') as Record<string, unknown>;
+    expect(websiteNode).toBeDefined();
+    expect(websiteNode['@id']).toBe('https://acme.dental/#website');
+    expect(websiteNode.publisher).toEqual({ '@id': 'https://acme.dental/#organization' });
+  });
 });
 
 const staticInput = {
