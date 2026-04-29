@@ -21,7 +21,13 @@
 
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { listWorkspaces, getWorkspace, updateWorkspace } from './workspaces.js';
+import {
+  listWorkspaces,
+  getWorkspace,
+  updateWorkspace,
+  computeEffectiveTier,
+  getClientPortalUrl,
+} from './workspaces.js';
 import { getSchedule } from './scheduled-audits.js';
 import { callAI } from './ai.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
@@ -171,8 +177,12 @@ async function runBriefingForWorkspaceInner(
   const ws = getWorkspace(workspaceId);
   if (!ws) return { status: 'skipped', weekOf: '', reason: 'workspace not found' };
 
-  const tier = ws.tier ?? 'free';
-  if (tier === 'free') return { status: 'skipped', weekOf: '', reason: 'free tier' };
+  // Use effective tier so trial-period free-tier workspaces (with active trialEndsAt)
+  // are eligible — matches the public endpoint's gating in routes/public-portal.ts.
+  // Otherwise trial users would see briefing UI but never get content generated.
+  if (computeEffectiveTier(ws) === 'free') {
+    return { status: 'skipped', weekOf: '', reason: 'free tier' };
+  }
 
   const now = opts.nowMs ? new Date(opts.nowMs) : new Date();
   const weekOf = currentWeekOfUTC(now);
@@ -334,6 +344,9 @@ async function runBriefingForWorkspaceInner(
           weekOf,
           storyCount: published.stories.length,
           heroHeadline: published.stories.find((s) => s.isHeadline)?.headline ?? '',
+          // Without this, renderClientBriefingReady's CTA button never renders —
+          // client gets a "briefing ready" email with no way to click through.
+          dashboardUrl: getClientPortalUrl(ws),
         });
       }
     }
@@ -361,19 +374,25 @@ async function tick(now = new Date()): Promise<void> {
   const all = listWorkspaces();
   for (const ws of all) {
     if (lastTickRunWeek[ws.id] === weekOf) continue;
-    if ((ws.tier ?? 'free') === 'free') continue;
+    // Use effective tier so trial-period workspaces (tier='free' + active trialEndsAt)
+    // are eligible — matches the public endpoint's tier resolution.
+    if (computeEffectiveTier(ws) === 'free') continue;
+    let result: RunBriefingResult | undefined;
     try {
-      const r = await runBriefingForWorkspace(ws.id);
-      log.info({ workspaceId: ws.id, ...r }, 'briefing tick');
+      result = await runBriefingForWorkspace(ws.id);
+      log.info({ workspaceId: ws.id, ...result }, 'briefing tick');
     } catch (err) {
       log.error({ err, workspaceId: ws.id }, 'briefing tick error');
-    } finally {
-      // Stamp the in-memory memo even on error, so a permanently-failing workspace
-      // (e.g. malformed config) doesn't retry every hour for the rest of the week.
-      // The DB-level lastBriefingRunWeekOf still acts as the cross-process backstop;
-      // this just bounds in-process retries.
-      lastTickRunWeek[ws.id] = weekOf;
     }
+    // Only stamp the in-memory memo for TERMINAL results. `deferred` must keep
+    // retrying on subsequent hourly ticks until either (a) data freshens and
+    // generation succeeds, or (b) MAX_DEFERRALS triggers forced generation.
+    // Stamping `deferred` would lock the workspace out for the rest of the
+    // week and silently break the entire pre-flight retry mechanism.
+    // Errors stamp too — a permanently-failing workspace shouldn't retry every
+    // hour. The DB-level lastBriefingRunWeekOf still backstops cross-process.
+    const isTerminal = !result || result.status !== 'deferred';
+    if (isTerminal) lastTickRunWeek[ws.id] = weekOf;
   }
 }
 

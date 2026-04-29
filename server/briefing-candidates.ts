@@ -21,7 +21,14 @@ const MAX_AGE_DAYS: Record<BriefingCategory, number> = {
   period_change: 8,
 };
 
-const HALF_LIFE_DAYS: Record<BriefingCategory, number> = {
+/**
+ * Decay time-constant (τ) per category, in days. Used in `decay()` as
+ * `Math.exp(-ageDays / DECAY_TAU_DAYS[category])`. At ageDays = τ the score
+ * decays to ~0.368 (1/e), NOT 0.5 — this is exponential decay parameterized by
+ * its time-constant, not its half-life. (For reference: half-life = τ × ln 2 ≈
+ * τ × 0.693, so τ=7 days corresponds to a half-life of ~4.85 days.)
+ */
+const DECAY_TAU_DAYS: Record<BriefingCategory, number> = {
   win: 7,
   risk: 10,
   opportunity: 10,
@@ -70,7 +77,7 @@ function ageDays(ms: number): number {
 }
 
 function decay(category: BriefingCategory, ageD: number): number {
-  return Math.exp(-ageD / HALF_LIFE_DAYS[category]);
+  return Math.exp(-ageD / DECAY_TAU_DAYS[category]);
 }
 
 export function scoreCandidates(cs: Candidate[]): ScoredCandidate[] {

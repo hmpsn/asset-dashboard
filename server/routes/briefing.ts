@@ -26,6 +26,8 @@ import { WS_EVENTS } from '../ws-events.js';
 import { addActivity } from '../activity-log.js';
 import { InvalidTransitionError } from '../state-machines.js';
 import { runBriefingForWorkspace } from '../briefing-cron.js';
+import { notifyClientBriefingReady } from '../email.js';
+import { getWorkspace, getClientPortalUrl } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('routes:briefing');
@@ -61,8 +63,8 @@ router.patch(
     if (!draft || draft.workspaceId !== req.params.workspaceId) {
       return res.status(404).json({ error: 'Draft not found' });
     }
-    if (draft.status === 'published') {
-      return res.status(409).json({ error: 'Cannot edit published briefing' });
+    if (draft.status === 'published' || draft.status === 'skipped') {
+      return res.status(409).json({ error: `Cannot edit ${draft.status} briefing` });
     }
     const updated = updateBriefingStories(req.params.workspaceId, draft.id, req.body.stories);
     if (!updated) {
@@ -148,6 +150,20 @@ router.post(
         briefingId: updated.id,
         weekOf: updated.weekOf,
       });
+      // Send the client email here too — auto-publish does it from the cron path,
+      // but admin manual publishes were missing the notification entirely.
+      const ws = getWorkspace(req.params.workspaceId);
+      if (ws?.clientEmail) {
+        notifyClientBriefingReady({
+          clientEmail: ws.clientEmail,
+          workspaceName: ws.name,
+          workspaceId: ws.id,
+          weekOf: updated.weekOf,
+          storyCount: updated.stories.length,
+          heroHeadline: updated.stories.find((s) => s.isHeadline)?.headline ?? '',
+          dashboardUrl: getClientPortalUrl(ws),
+        });
+      }
       return res.json({ draft: updated });
     } catch (err) {
       if (err instanceof InvalidTransitionError) {
