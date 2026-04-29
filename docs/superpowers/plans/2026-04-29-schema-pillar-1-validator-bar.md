@@ -2,21 +2,30 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make `validateLeanSchema` enforce **Yoast/RankMath-baseline completeness** as required, not recommended. After Pillar 2 fills the data, this plan tightens the validator's `REQUIRED_BY_TYPE` so any future regression that drops `isPartOf`, `inLanguage`, `datePublished` (for Article), or `breadcrumb` cross-refs surfaces as a build-time error rather than a silent quality drop.
+**Goal:** Make `validateLeanSchema` enforce **Google Rich Results eligibility**, not just "field is present." After Pillar 2 fills the data, this plan tightens `REQUIRED_BY_TYPE` per type AND adds shape validators so any future regression that drops a cross-ref, malforms `Article.author`/`publisher`, breaks date format, or shuffles breadcrumb positions surfaces as a build-time error rather than a silent rich-result-eligibility loss.
 
-**Architecture:** Single-file change, no new modules. Extend `REQUIRED_BY_TYPE` in `server/schema/validator.ts` to encode the per-type required-field set documented at <https://developer.yoast.com/features/schema/functional-specification/>. Add a small set of `custom` validators for cross-reference shape checks (`isPartOf` must be a `{@id}` ref to the homepage WebSite, `breadcrumb` must point at a `BreadcrumbList` actually present in the same `@graph`). Update `tests/unit/schema/validator.test.ts` to assert the stricter rules. The existing generator and templates already emit the required fields after Pillar 2 ships; this plan locks the bar.
+**Architecture:** Single-file change, no new modules. Extend `REQUIRED_BY_TYPE` in `server/schema/validator.ts` for required fields and add two layers of `custom` validators:
+1. **Cross-reference validators** — `isPartOf` must be a `{@id}` ref; `breadcrumb` must reference a `BreadcrumbList` present in the same `@graph`; `mainEntityOfPage` must be a string URL or `{@id}` ref.
+2. **Shape validators** — `Article.author` must have `@type ∈ {Person,Organization}` AND non-empty `name`; `Article.publisher` must have `@type` AND `name` AND `logo` (with `@type: ImageObject` and non-empty `url`); `Article.image` must be string|array|ImageObject; `datePublished`/`dateModified` must match ISO 8601; `BreadcrumbList.itemListElement` positions must start at 1 and be contiguous-ascending; every `url`-shaped field on a primary node must be absolute (start with `http`).
+
+Update `tests/unit/schema/validator.test.ts` to assert all stricter rules. The generator and templates already emit shape-correct fields after Pillar 2 + Pillar 2.1 ship; this plan locks the bar.
 
 **Tech Stack:** TypeScript strict, vitest. No new dependencies.
 
-**MVP scope:** Tighten `REQUIRED_BY_TYPE` for the 8 lean templates, add 5 cross-reference shape validators, update tests. Validator still returns `string[]` of human-readable errors so the UI surface (`Validated 24/28`) keeps working.
+**MVP scope:** Tighten `REQUIRED_BY_TYPE` for the 8 lean templates, add 3 cross-reference validators + 6 shape validators, update tests. Validator still returns `string[]` of human-readable errors so the UI surface (`Validated 28/28`) keeps working.
 
-**Out of scope:** Type-level enforcement (Pillar 3 — `schema-dts`), `schemarama` shape validation (Pillar 3), pr-check static rule for "every template emits cross-refs" (Pillar 3).
+**Out of scope:**
+- Type-level enforcement (Pillar 3 — `schema-dts`).
+- `schemarama` shape validation (Pillar 3).
+- pr-check static rule for "every template emits cross-refs" (Pillar 3).
+- Cross-page `@id` consistency (e.g. asserting that `/#organization` is identical across every page in a workspace) — would require comparing schemas across the snapshot, not within a single document.
+- Field-completeness for `Service.areaServed` / `Organization.knowsAbout` / `Article.keywords` etc. — those are template-emission additions tracked under `schema-yoast-parity-fields` (next P0 after this PR). When parity-fields ships, this validator's required-set will be tightened again to mark those fields required.
 
 ---
 
 ## Pre-requisites
 
-- [ ] **Pillar 2 must be merged to staging first.** The validator can only require what the templates emit; tightening `REQUIRED_BY_TYPE` before Pillar 2 ships breaks every existing schema. Confirm `2026-04-29-schema-pillar-2-data-wiring.md` is marked `done` in `data/roadmap.json` before opening the Pillar 1 branch.
+- [ ] **Pillars 2 + 2.1 must both be merged to staging first.** Pillar 2 fills the data the validator will require; Pillar 2.1 (PR #366) drops the `potentialAction` emission this plan once required (now omitted from the WebSite required set — see Task 2). Confirm `schema-pillar-2-data-wiring` and `schema-pillar-2-1-searchaction-correctness` are both `status: done` in `data/roadmap.json` before opening the Pillar 1 branch.
 - [ ] Branch from latest staging: `git checkout staging && git pull && git checkout -b claude/schema-pillar-1`
 
 ---
@@ -25,12 +34,13 @@
 
 ```
 Sequential (single-file plan, single PR):
-  Task 1 (Failing tests for stricter rules)
+  Task 1 (Failing tests for stricter required-field rules)
   → Task 2 (Update REQUIRED_BY_TYPE per-type)
-  → Task 3 (Add cross-ref shape validators)
-  → Task 4 (Update existing template tests for new error counts)
-  → Task 5 (Run integration tests; fix any template gaps)
-  → Task 6 (Quality gates + docs)
+  → Task 3 (Add cross-reference shape validators: isPartOf, breadcrumb, mainEntityOfPage)
+  → Task 4 (Add value-shape validators: Article author/publisher/image, ISO 8601 dates, breadcrumb ordering, absolute URLs)
+  → Task 5 (Update existing template tests for new error counts)
+  → Task 6 (Run integration tests; fix any template gaps)
+  → Task 7 (Quality gates + docs)
 ```
 
 ## Model Assignments
@@ -40,9 +50,10 @@ Sequential (single-file plan, single PR):
 | 1 Failing tests | sonnet | Test naming + fixture choices need judgment |
 | 2 Update REQUIRED_BY_TYPE | sonnet | Per-type required-field decisions reference Yoast/Google docs |
 | 3 Cross-ref shape validators | sonnet | `custom` validator functions with @graph traversal |
-| 4 Update existing tests | sonnet | Several `validationErrors).toEqual([])` assertions need updating |
-| 5 Run integration; fix gaps | sonnet | Diagnostic — may surface a missed Pillar 2 field |
-| 6 Quality gates + docs | haiku | Doc transcription |
+| 4 Value-shape validators | sonnet | Date regex + nested-object checks + array shape; needs judgment for edge cases |
+| 5 Update existing tests | sonnet | Several `validationErrors).toEqual([])` assertions need updating |
+| 6 Run integration; fix gaps | sonnet | Diagnostic — may surface a missed Pillar 2 field |
+| 7 Quality gates + docs | haiku | Doc transcription |
 
 Reviewers: spec-compliance reviewer = opus, code-quality reviewer = opus.
 
@@ -54,12 +65,12 @@ Reviewers: spec-compliance reviewer = opus, code-quality reviewer = opus.
 
 | Path | Modification |
 |---|---|
-| `server/schema/validator.ts` | Tasks 2 + 3: extend `REQUIRED_BY_TYPE` per type; add `crossRefValidators` for `isPartOf`, `breadcrumb`, `mainEntityOfPage`; refactor `validateLeanSchema` to invoke them. |
-| `tests/unit/schema/validator.test.ts` | Tasks 1 + 4: extend with strict-rule assertions and update existing assertions where the old loose rules expected `[]` but now produce specific error strings. |
-| `tests/unit/schema/templates.test.ts` | Task 4: where templates pass into the validator, fixtures may need new fields to keep `validateLeanSchema(...)).toEqual([])` assertions green. Pillar 2 fixtures already include `cleanTitle` + `inLanguage`; this task verifies and patches if needed. |
-| `tests/integration/lean-schema-generator.test.ts` | Task 5: assert `validationErrors === undefined` for clean inputs; update the FAQ-on-BlogPosting test fixture if it now produces additional warnings. |
-| `FEATURE_AUDIT.md` | Task 6: append Pillar 1 paragraph to entry #319. |
-| `data/roadmap.json` | Task 6: add `schema-pillar-1-validator-bar` (status `done`). |
+| `server/schema/validator.ts` | Tasks 2 + 3 + 4: extend `REQUIRED_BY_TYPE` per type; add `validateCrossRefs` for `isPartOf`/`breadcrumb`/`mainEntityOfPage`; add `validateArticleAuthor`, `validateArticlePublisher`, `validateImageField`, `validateISO8601Date`, `validateBreadcrumbOrdering`, `validateAbsoluteUrls`; refactor `validateLeanSchema` to invoke all of them per node. |
+| `tests/unit/schema/validator.test.ts` | Tasks 1 + 5: extend with strict-rule assertions (required-fields, cross-ref shapes, value-shape rules) and update existing assertions where the old loose rules expected `[]` but now produce specific error strings. |
+| `tests/unit/schema/templates.test.ts` | Task 5: where templates pass into the validator, fixtures may need new fields to keep `validateLeanSchema(...)).toEqual([])` assertions green. Pillar 2 fixtures already include `cleanTitle` + `inLanguage`; this task verifies and patches if needed. |
+| `tests/integration/lean-schema-generator.test.ts` | Task 6: assert `validationErrors === undefined` for clean inputs; update the FAQ-on-BlogPosting test fixture if it now produces additional warnings. |
+| `FEATURE_AUDIT.md` | Task 7: append Pillar 1 paragraph to entry #319. |
+| `data/roadmap.json` | Task 7: mark `schema-pillar-1-validator-bar` as `done`. |
 
 ### Files left untouched
 
@@ -153,13 +164,9 @@ describe('validateLeanSchema — Yoast-baseline required fields (Pillar 1)', () 
     expect(validateLeanSchema(org, 'Organization')).toContain('Organization missing required field: logo');
   });
 
-  it('flags WebSite missing potentialAction', () => {
-    const site = {
-      '@context': 'https://schema.org',
-      '@graph': [{ '@type': 'WebSite', '@id': 'https://x.com/#website', 'name': 'X', 'url': 'https://x.com', 'publisher': { '@id': 'https://x.com/#organization' } }],
-    };
-    expect(validateLeanSchema(site, 'WebSite')).toContain('WebSite missing required field: potentialAction');
-  });
+  // Pillar 2.1 dropped the unconditional SearchAction emission, so the WebSite
+  // required-set no longer includes potentialAction. When schema-yoast-parity-fields
+  // re-introduces SearchAction behind a workspace flag, add a conditional test here.
 
   it('flags LocalBusiness missing address', () => {
     const lb = {
@@ -260,7 +267,12 @@ const REQUIRED_BY_TYPE: Record<string, RequiredFields> = {
     required: ['name', 'url', 'logo'],
   },
   WebSite: {
-    required: ['name', 'url', 'publisher', 'inLanguage', 'potentialAction'],
+    // potentialAction (sitelinks SearchAction) was originally in this list, but
+    // Pillar 2.1 dropped the unconditional emission because the site may not have
+    // a search endpoint. schema-yoast-parity-fields will re-introduce SearchAction
+    // behind a workspace flag (Workspace.siteHasSearch); when that ships, add
+    // potentialAction back here as a conditional required field.
+    required: ['name', 'url', 'publisher', 'inLanguage'],
   },
   AboutPage: {
     required: ['name', 'url', 'description', 'isPartOf', 'breadcrumb', 'inLanguage', 'mainEntity'],
@@ -296,7 +308,7 @@ git commit -m "feat(schema): tighten REQUIRED_BY_TYPE to Yoast-baseline (Pillar 
 Article/BlogPosting now require image, dateModified, isPartOf, breadcrumb, inLanguage.
 WebPage and variants require description, isPartOf, breadcrumb, inLanguage.
 LocalBusiness requires address, telephone, inLanguage.
-WebSite requires inLanguage and potentialAction.
+WebSite requires inLanguage (potentialAction conditional, deferred to parity-fields).
 Organization requires logo.
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
@@ -395,7 +407,225 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 
 ---
 
-### Task 4: Update existing template tests (sonnet)
+### Task 4: Value-shape validators (sonnet)
+
+**Owns:** `server/schema/validator.ts` (additive — six new helpers + extended main loop), `tests/unit/schema/validator.test.ts` (new test cases for each shape rule)
+**Must not touch:** templates.
+
+This task adds the shape-correctness validators that prevent silent regressions in the kinds of fields that matter for Google Rich Results eligibility but where the old "field is present" rule wouldn't catch malformations (e.g. `Article.author = "Jane Doe"` instead of `{ "@type": "Person", "name": "Jane Doe" }` would pass the existing required-fields rule but fail Google's Rich Results Test).
+
+- [ ] **Step 1: Append failing shape-validator tests to `tests/unit/schema/validator.test.ts`.**
+
+```typescript
+describe('validateLeanSchema — value-shape validators (Pillar 1)', () => {
+  const article = (overrides: Record<string, unknown> = {}) => ({
+    '@context': 'https://schema.org',
+    '@graph': [{
+      '@type': 'Article', '@id': 'https://x.com/a#article', 'headline': 'H',
+      'description': 'D', 'image': ['https://x.com/i.jpg'], 'url': 'https://x.com/a',
+      'datePublished': '2026-01-01T00:00:00Z', 'dateModified': '2026-01-02T00:00:00Z',
+      'mainEntityOfPage': { '@id': 'https://x.com/a' },
+      'author': { '@type': 'Person', 'name': 'Jane Doe' },
+      'publisher': { '@type': 'Organization', 'name': 'X', 'logo': { '@type': 'ImageObject', 'url': 'https://x.com/logo.png' } },
+      'isPartOf': { '@id': 'https://x.com/#website' },
+      'breadcrumb': { '@id': 'https://x.com/a#breadcrumb' },
+      'inLanguage': 'en',
+      ...overrides,
+    }, {
+      '@type': 'BreadcrumbList', '@id': 'https://x.com/a#breadcrumb',
+      'itemListElement': [
+        { '@type': 'ListItem', 'position': 1, 'name': 'Home', 'item': 'https://x.com' },
+        { '@type': 'ListItem', 'position': 2, 'name': 'A', 'item': 'https://x.com/a' },
+      ],
+    }],
+  });
+
+  it('passes a fully shape-correct Article', () => {
+    expect(validateLeanSchema(article(), 'Article')).toEqual([]);
+  });
+
+  it('flags Article.author missing @type', () => {
+    const broken = article({ author: { name: 'Jane Doe' } });
+    expect(validateLeanSchema(broken, 'Article')).toContain('Article.author must have @type ∈ {Person, Organization} and non-empty name');
+  });
+
+  it('flags Article.author missing name', () => {
+    const broken = article({ author: { '@type': 'Person' } });
+    expect(validateLeanSchema(broken, 'Article')).toContain('Article.author must have @type ∈ {Person, Organization} and non-empty name');
+  });
+
+  it('flags Article.author with bad @type', () => {
+    const broken = article({ author: { '@type': 'CreativeWork', 'name': 'X' } });
+    expect(validateLeanSchema(broken, 'Article')).toContain('Article.author must have @type ∈ {Person, Organization} and non-empty name');
+  });
+
+  it('flags Article.publisher missing logo (Google Rich Results requires it)', () => {
+    const broken = article({ publisher: { '@type': 'Organization', 'name': 'X' } });
+    expect(validateLeanSchema(broken, 'Article')).toContain('Article.publisher must have @type, name, and logo (ImageObject with url) — Google Article rich result requires the publisher logo');
+  });
+
+  it('flags Article.publisher.logo missing url', () => {
+    const broken = article({ publisher: { '@type': 'Organization', 'name': 'X', 'logo': { '@type': 'ImageObject' } } });
+    expect(validateLeanSchema(broken, 'Article')).toContain('Article.publisher must have @type, name, and logo (ImageObject with url) — Google Article rich result requires the publisher logo');
+  });
+
+  it('flags Article.image as non-string non-array non-ImageObject', () => {
+    const broken = article({ image: 123 });
+    expect(validateLeanSchema(broken, 'Article')).toContain('Article.image must be a string URL, an array of strings/ImageObjects, or an ImageObject');
+  });
+
+  it('flags Article.datePublished not in ISO 8601 format', () => {
+    const broken = article({ datePublished: 'January 1, 2026' });
+    expect(validateLeanSchema(broken, 'Article')).toContain('Article.datePublished must be ISO 8601 (e.g. "2026-01-15T00:00:00Z")');
+  });
+
+  it('flags Article.dateModified not in ISO 8601 format', () => {
+    const broken = article({ dateModified: '01/02/2026' });
+    expect(validateLeanSchema(broken, 'Article')).toContain('Article.dateModified must be ISO 8601 (e.g. "2026-01-15T00:00:00Z")');
+  });
+
+  it('flags BreadcrumbList positions not starting at 1', () => {
+    const broken = JSON.parse(JSON.stringify(article()));
+    broken['@graph'][1].itemListElement[0].position = 0;
+    broken['@graph'][1].itemListElement[1].position = 1;
+    expect(validateLeanSchema(broken, 'Article')).toContain('BreadcrumbList itemListElement positions must start at 1 and be contiguous-ascending');
+  });
+
+  it('flags BreadcrumbList positions with gaps', () => {
+    const broken = JSON.parse(JSON.stringify(article()));
+    broken['@graph'][1].itemListElement[1].position = 3; // 1, 3 — gap
+    expect(validateLeanSchema(broken, 'Article')).toContain('BreadcrumbList itemListElement positions must start at 1 and be contiguous-ascending');
+  });
+
+  it('flags primary-node url field that is not absolute', () => {
+    const broken = article({ url: '/a' });
+    expect(validateLeanSchema(broken, 'Article')).toContain('Article.url must be an absolute URL (start with http:// or https://)');
+  });
+});
+```
+
+- [ ] **Step 2: Run tests, confirm they fail.**
+
+Run: `npx vitest run tests/unit/schema/validator.test.ts -t 'value-shape validators'`
+Expected: every assertion FAILs except "passes a fully shape-correct Article" — the new validators don't exist yet.
+
+- [ ] **Step 3: Add the shape validators to `server/schema/validator.ts`.**
+
+Append before `validateLeanSchema`:
+
+```typescript
+const ISO_8601_RE = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
+
+function validateArticleShape(node: Record<string, unknown>): string[] {
+  const errors: string[] = [];
+  const t = node['@type'] as string;
+  if (t !== 'Article' && t !== 'BlogPosting') return errors;
+
+  // author: must have @type ∈ {Person, Organization} AND non-empty name.
+  const author = node.author;
+  if (author !== undefined) {
+    const ok = typeof author === 'object' && author !== null
+      && ((author as Record<string, unknown>)['@type'] === 'Person' || (author as Record<string, unknown>)['@type'] === 'Organization')
+      && typeof (author as Record<string, unknown>).name === 'string'
+      && ((author as Record<string, unknown>).name as string).trim().length > 0;
+    if (!ok) errors.push(`${t}.author must have @type ∈ {Person, Organization} and non-empty name`);
+  }
+
+  // publisher: must have @type AND name AND logo (ImageObject with url).
+  const publisher = node.publisher as Record<string, unknown> | undefined;
+  if (publisher !== undefined) {
+    const logo = publisher.logo as Record<string, unknown> | undefined;
+    const ok = typeof publisher === 'object' && publisher !== null
+      && typeof publisher['@type'] === 'string'
+      && typeof publisher.name === 'string' && (publisher.name as string).trim().length > 0
+      && logo !== undefined && typeof logo === 'object'
+      && logo['@type'] === 'ImageObject'
+      && typeof logo.url === 'string' && (logo.url as string).trim().length > 0;
+    if (!ok) errors.push(`${t}.publisher must have @type, name, and logo (ImageObject with url) — Google Article rich result requires the publisher logo`);
+  }
+
+  // image: string | array | ImageObject.
+  const image = node.image;
+  if (image !== undefined) {
+    const ok = typeof image === 'string'
+      || Array.isArray(image)
+      || (typeof image === 'object' && image !== null && (image as Record<string, unknown>)['@type'] === 'ImageObject');
+    if (!ok) errors.push(`${t}.image must be a string URL, an array of strings/ImageObjects, or an ImageObject`);
+  }
+
+  // datePublished / dateModified: ISO 8601.
+  for (const field of ['datePublished', 'dateModified'] as const) {
+    const v = node[field];
+    if (v !== undefined && (typeof v !== 'string' || !ISO_8601_RE.test(v))) {
+      errors.push(`${t}.${field} must be ISO 8601 (e.g. "2026-01-15T00:00:00Z")`);
+    }
+  }
+
+  return errors;
+}
+
+function validateBreadcrumbOrdering(node: Record<string, unknown>): string[] {
+  if (node['@type'] !== 'BreadcrumbList') return [];
+  const items = node.itemListElement as Array<Record<string, unknown>> | undefined;
+  if (!Array.isArray(items)) return []; // existing validateBreadcrumb catches missing array
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].position !== i + 1) {
+      return ['BreadcrumbList itemListElement positions must start at 1 and be contiguous-ascending'];
+    }
+  }
+  return [];
+}
+
+function validateAbsoluteUrls(node: Record<string, unknown>): string[] {
+  const errors: string[] = [];
+  const t = node['@type'] as string;
+  // Only check primary nodes — BreadcrumbList's `item` URLs are inside ListItems and are
+  // already required by validateBreadcrumb to be non-empty strings; skip them here.
+  if (t === 'BreadcrumbList' || t === 'ListItem') return errors;
+  const url = node.url;
+  if (typeof url === 'string' && !/^https?:\/\//.test(url)) {
+    errors.push(`${t}.url must be an absolute URL (start with http:// or https://)`);
+  }
+  return errors;
+}
+```
+
+Then update the per-node loop in `validateLeanSchema` to invoke them (after the existing `validateCrossRefs` call):
+
+```typescript
+    errors.push(...validateCrossRefs(node, graph));
+    errors.push(...validateArticleShape(node));
+    errors.push(...validateBreadcrumbOrdering(node));
+    errors.push(...validateAbsoluteUrls(node));
+```
+
+- [ ] **Step 4: Run, confirm all shape-validator tests pass.**
+
+Run: `npx vitest run tests/unit/schema/validator.test.ts -t 'value-shape validators'`
+Expected: all 12 assertions PASS.
+
+- [ ] **Step 5: Run the entire validator test file.**
+
+Run: `npx vitest run tests/unit/schema/validator.test.ts`
+Expected: PASS — Tasks 1, 3, 4 assertions all green.
+
+- [ ] **Step 6: Commit.**
+
+```bash
+git add server/schema/validator.ts tests/unit/schema/validator.test.ts
+git commit -m "feat(schema): value-shape validators (Pillar 1 Task 4)
+
+Article author/publisher/image shape; ISO 8601 dates; BreadcrumbList
+position ordering; absolute URLs on primary nodes. Catches the regression
+class where a future template change passes required-field-present but
+fails Google Rich Results due to malformed values.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
+```
+
+---
+
+### Task 5: Update existing template tests (sonnet)
 
 **Owns:** `tests/unit/schema/templates.test.ts`, `tests/integration/lean-schema-generator.test.ts`
 **Must not touch:** source files.
@@ -403,7 +633,7 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 - [ ] **Step 1: Run all schema tests and capture the new failures.**
 
 Run: `npx vitest run tests/unit/schema tests/integration/lean-schema-generator.test.ts`
-Expected: failures in places where old fixtures pass into the validator and assert `[]` — the validator now rejects fixtures that lack `isPartOf`/`breadcrumb`/`inLanguage` etc.
+Expected: failures in places where old fixtures pass into the validator and assert `[]` — the validator now rejects fixtures that lack `isPartOf`/`breadcrumb`/`inLanguage` or have malformed shapes.
 
 - [ ] **Step 2: Patch fixtures in `tests/unit/schema/templates.test.ts`.**
 
@@ -454,7 +684,7 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 
 ---
 
-### Task 5: Run the full suite and patch any template gap (sonnet)
+### Task 6: Run the full suite and patch any template gap (sonnet)
 
 **Owns:** any `server/schema/templates/*.ts` file that surfaces a missing required field
 **Must not touch:** validator.
@@ -490,7 +720,7 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 
 ---
 
-### Task 6: Quality gates + docs (haiku)
+### Task 7: Quality gates + docs (haiku)
 
 **Owns:** `FEATURE_AUDIT.md`, `data/roadmap.json`
 **Must not touch:** source files.
@@ -519,12 +749,12 @@ Add inside Sprint H, after `schema-pillar-2-data-wiring`:
   "id": "schema-pillar-1-validator-bar",
   "title": "Schema Pillar 1 — Raise the Validator Bar",
   "source": "docs/superpowers/plans/2026-04-29-schema-pillar-1-validator-bar.md",
-  "est": "0.5d",
+  "est": "1d",
   "priority": "P0",
   "sprint": "H",
   "status": "done",
-  "shippedAt": "2026-04-29",
-  "notes": "REQUIRED_BY_TYPE in validator.ts now enforces Yoast-baseline completeness. Article/BlogPosting require image+dateModified+articleSection+isPartOf+breadcrumb+inLanguage. WebPage variants require description+isPartOf+breadcrumb+inLanguage. LocalBusiness requires address+telephone. WebSite requires potentialAction. Organization requires logo. Cross-ref validators reject malformed isPartOf/breadcrumb shapes and dangling BreadcrumbList @id pointers. Locks the bar Pillar 2 raised."
+  "shippedAt": "<actual-ship-date>",
+  "notes": "REQUIRED_BY_TYPE in validator.ts now enforces Yoast/Google-baseline completeness. Article/BlogPosting require image+dateModified+articleSection+isPartOf+breadcrumb+inLanguage. WebPage variants require description+isPartOf+breadcrumb+inLanguage. LocalBusiness requires address+telephone+inLanguage. WebSite requires inLanguage (potentialAction is conditional and deferred to schema-yoast-parity-fields where it gates on Workspace.siteHasSearch). Organization requires logo. Cross-ref validators reject malformed isPartOf/breadcrumb shapes and dangling BreadcrumbList @id pointers. NEW value-shape validators reject malformed Article author/publisher/image, non-ISO 8601 dates, non-contiguous breadcrumb positions, and non-absolute URLs on primary nodes. Locks the bar Pillars 2 + 2.1 raised."
 }
 ```
 
@@ -593,10 +823,10 @@ After Pillar 1 ships, **every clean schema generated by the lean pipeline must v
 
 ## Self-Review
 
-1. **Spec coverage:** Pillar 1's job is to lock the Yoast-baseline bar in code. Tasks 1–3 do that. Tasks 4–5 absorb the test-fixture updates. Task 6 closes the loop.
+1. **Spec coverage:** Pillar 1's job is to lock the Yoast/Google-baseline bar in code. Tasks 1–4 do that (required-fields per type, cross-ref shapes, value shapes). Tasks 5–6 absorb the test-fixture updates. Task 7 closes the loop with quality gates and docs.
 
 2. **Placeholder scan:** Every task has explicit code or commands. Step 5 is conditional ("if Step 1 was clean") — the conditional path is documented.
 
 3. **Type consistency:** `REQUIRED_BY_TYPE` keys match exact `@type` strings emitted by templates. `isIdRef`, `validateCrossRefs` used consistently within validator.ts. No drift between fixtures and the keys they hit.
 
-4. **Order:** Test-first (Task 1 red), implementation (Tasks 2 + 3 green), fixture/template patching (Tasks 4 + 5), docs (Task 6).
+4. **Order:** Test-first (Task 1 red for required fields, Task 4 red for shape rules), implementation (Tasks 2 + 3 + 4 green), fixture/template patching (Tasks 5 + 6), docs (Task 7).

@@ -479,22 +479,42 @@
       "rationale": "Aspirational features and team-scale work deferred until the current sprint queue clears.",
       "items": [
         {
+          "id": "schema-pillar-2-1-searchaction-correctness",
+          "title": "Schema Pillar 2.1 — Stop emitting SearchAction on sites without search",
+          "source": "docs/superpowers/plans/2026-04-29-schema-pillar-2-data-wiring.md (post-merge correction)",
+          "est": "1h",
+          "priority": "P0",
+          "sprint": "H",
+          "status": "done",
+          "shippedAt": "2026-04-29",
+          "notes": "Pillar 2's homepage + LocalBusiness templates emitted `potentialAction: SearchAction` unconditionally. Google's docs require the site actually expose a working search endpoint at the urlTemplate; emitting it on a site without search misrepresents capability. Fix: dropped SearchAction emission until a workspace-level signal indicates site search is available. Re-add as opt-in via Workspace.siteHasSearch (or auto-detect from homepage HTML <form action=/search>) is queued under schema-yoast-parity-fields."
+        },
+        {
           "id": "schema-pillar-1-validator-bar",
           "title": "Schema Pillar 1 — Raise the Validator Bar",
           "source": "docs/superpowers/plans/2026-04-29-schema-pillar-1-validator-bar.md",
           "est": "0.5d",
           "priority": "P0",
           "status": "pending",
-          "notes": "Tightens REQUIRED_BY_TYPE in validator.ts to enforce Yoast-baseline. Adds cross-reference shape validators (rejects malformed isPartOf, dangling breadcrumb pointers). Depends on Pillar 2 (PR #362)."
+          "notes": "Tightens REQUIRED_BY_TYPE in validator.ts to enforce Yoast-baseline. Adds cross-reference shape validators (rejects malformed isPartOf, dangling breadcrumb pointers). Depends on Pillar 2 (PR #362) and Pillar 2.1 (SearchAction correctness)."
+        },
+        {
+          "id": "schema-yoast-parity-fields",
+          "title": "Schema Yoast-Parity Field Expansion (areaServed, serviceType, knowsAbout, keywords)",
+          "source": "TBD (brainstorm + plan after Pillar 1 merges)",
+          "est": "2-3d",
+          "priority": "P0",
+          "status": "pending",
+          "notes": "Promoted from informal Pillar 3 deferral. Reads from existing workspace data and wires high-leverage paid-grade fields into the lean templates: (1) Service.areaServed from BusinessProfile.address.city — local-SEO money for geo-targeted agencies. (2) Service.serviceType from URL slug or workspace siteKeywords. (3) Organization.knowsAbout from workspace siteKeywords + businessContext. (4) Article.keywords + mentions from keywordStrategy.pageMap. (5) Article.articleSection from a clean human label, not URL slug. (6) Article.about as typed entity (the page's primary topic) when intelligence layer provides one. All gains come from data the platform already has — no new admin UI required for the basics. Brainstorm + plan in dedicated session before implementation."
         },
         {
           "id": "schema-pillar-3-gates",
           "title": "Schema Pillar 3 — Compile-time + CI Gates",
           "source": "docs/superpowers/plans/2026-04-29-schema-pillar-3-gates.md",
           "est": "1d",
-          "priority": "P0",
-          "status": "pending",
-          "notes": "schema-dts typed return values across 8 templates, schemarama 6-fixture CI corpus, new pr-check rule for cross-ref helper imports. Three gates: compile / runtime / PR-time. Depends on Pillars 1 + 2."
+          "priority": "P2",
+          "status": "deferred",
+          "notes": "DEFERRED. Pillar 3 is regression-prevention hardening (schema-dts compile-time types + schemarama CI corpus + pr-check rule for cross-ref helper imports). It does not change schema output — it locks the bar Pillars 1 + 2 set. Decision (2026-04-29): defer until after schema-yoast-parity-fields ships, because the field expansion will reshape templates and Pillar 3's typed signatures would have to be rewritten. Reactivate after intelligence layer settles. Plan file remains committed for reference."
         },
         {
           "id": 16,
