@@ -18,6 +18,7 @@ const baseInput = {
     datePublished: '2025-01-15T00:00:00Z',
     dateModified: '2026-04-01T00:00:00Z',
     inLanguage: 'en',
+    articleSection: 'Blog',
     breadcrumbs: [
       { name: 'Home', url: 'https://example.com' },
       { name: 'Blog', url: 'https://example.com/blog' },
