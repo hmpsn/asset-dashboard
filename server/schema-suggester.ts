@@ -344,12 +344,25 @@ export async function generateSchemaForPage(
 
   const slug = meta.slug || '';
   const isHomepage = !slug || slug === 'index' || slug === 'home';
-  const url = isHomepage ? baseUrl : `${baseUrl}/${slug}`;
-  const html = await fetchPublishedHtml(url);
 
-  // PageMeta from fetchPageMeta does NOT include publishedPath (only WebflowPage from
-  // listPages does). Derive it from slug — homepage = '/', else '/<slug>'.
-  const publishedPath = isHomepage ? '/' : `/${slug}`;
+  // Fix 6: look up full publishedPath from getWorkspacePages — fetchPageMeta only
+  // returns the leaf slug, which loses parent folder for nested pages (e.g. the page
+  // published at /services/web-design would produce /web-design from slug alone).
+  // Fall back to derived path if page list fails or page is not found.
+  let publishedPath = isHomepage ? '/' : `/${slug}`;
+  try {
+    const wsId = ctx.workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
+    if (wsId) {
+      const allPages = await getWorkspacePages(wsId, siteId);
+      const matched = allPages.find(p => p.id === pageId);
+      if (matched?.publishedPath) {
+        publishedPath = matched.publishedPath;
+      }
+    }
+  } catch { /* page list failure — fall back to derived path */ } // catch-ok
+
+  const url = isHomepage ? baseUrl : `${baseUrl}${publishedPath}`;
+  const html = await fetchPublishedHtml(url);
 
   const lean = await generateLeanSchema({
     pageId,
@@ -358,6 +371,10 @@ export async function generateSchemaForPage(
       slug,
       publishedPath,
       seo: meta.seo,
+      // Fix 4: pass CMS timestamps for datePublished/dateModified fallback —
+      // The Webflow API may return these even though the local PageMeta interface omits them.
+      lastPublished: (meta as unknown as Record<string, unknown>).lastPublished as string | undefined,
+      createdOn: (meta as unknown as Record<string, unknown>).createdOn as string | undefined,
     },
     html: html || '',
     baseUrl,
@@ -381,6 +398,7 @@ export async function generateSchemaForPage(
     existingSchemas: lean.existingSchemas,
     suggestedSchemas: lean.suggestedSchemas,
     validationErrors: lean.validationErrors,
+    richResultsEligibility: lean.richResultsEligibility,  // Fix 3: wire through
   };
 }
 
@@ -436,6 +454,7 @@ export async function generateSchemaSuggestions(
       existingSchemas: lean.existingSchemas,
       suggestedSchemas: lean.suggestedSchemas,
       validationErrors: lean.validationErrors,
+      richResultsEligibility: lean.richResultsEligibility,  // Fix 3: wire through
     };
     results.push(suggestion);
     onProgress?.(results, false, `Processed ${results.length} of ${pages.length} static pages...`);
@@ -455,6 +474,7 @@ export async function generateSchemaSuggestions(
           slug: item.path.replace(/^\//, ''),
           publishedPath: item.path,
           seo: undefined,
+          // Fix 4: CMS item timestamps not available via sitemap discovery — no fallback here
         },
         html: itemHtml || '',
         baseUrl,
@@ -472,6 +492,7 @@ export async function generateSchemaSuggestions(
         existingSchemas: itemLean.existingSchemas,
         suggestedSchemas: itemLean.suggestedSchemas,
         validationErrors: itemLean.validationErrors,
+        richResultsEligibility: itemLean.richResultsEligibility,  // Fix 3: wire through
       });
     }
   }

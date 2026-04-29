@@ -83,4 +83,19 @@ describe('generateLeanSchema', () => {
       expect(webPageCount, `${p} should not have multiple WebPage nodes`).toBeLessThanOrEqual(1);
     }
   });
+
+  it('strips trailing slash from baseUrl to prevent //path canonical URLs', async () => {
+    const out = await generateLeanSchema({
+      ...baseInput,
+      baseUrl: 'https://example.com/',  // trailing slash
+      pageMeta: { ...baseInput.pageMeta, publishedPath: '/about' },
+    });
+    const graph = (out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>);
+    const node = graph[0];
+    // @id and url must not have double-slash after the domain (i.e., no //path)
+    const idStr = String(node['@id'] ?? '');
+    expect(idStr.replace(/^https?:\/\//, '')).not.toContain('//');
+    expect(out.url).not.toContain('//about');  // single slash only
+    expect(out.url).toBe('https://example.com/about');
+  });
 });

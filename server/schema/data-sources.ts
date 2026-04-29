@@ -11,6 +11,10 @@ export interface PageMetaInput {
   publishedPath: string;
   /** Optional SEO metadata that Webflow exposes (title overrides, description, og image, etc.). */
   seo?: { title?: string | null; description?: string | null };
+  /** Webflow CMS publish timestamp (ISO 8601) — used as datePublished fallback when HTML lacks <time itemprop>. */
+  lastPublished?: string | null;
+  /** Webflow CMS created-on timestamp (ISO 8601). */
+  createdOn?: string | null;
 }
 
 export interface WorkspaceSchemaInput {
@@ -96,9 +100,14 @@ export function extractPageData(input: ExtractInput): PageData {
   const linkImage = $('link[rel="image_src"]').attr('href') || undefined;
   const image = ogImage || twitterImage || linkImage;
 
-  // Dates from <time itemprop="datePublished|dateModified">
-  const datePublished = $('time[itemprop="datePublished"]').attr('datetime') || undefined;
-  const dateModified = $('time[itemprop="dateModified"]').attr('datetime') || undefined;
+  // Dates: HTML microformat → CMS timestamps (Webflow CMS templates often lack <time itemprop>)
+  const datePublished = $('time[itemprop="datePublished"]').attr('datetime')
+    || input.pageMeta.createdOn
+    || input.pageMeta.lastPublished
+    || undefined;
+  const dateModified = $('time[itemprop="dateModified"]').attr('datetime')
+    || input.pageMeta.lastPublished
+    || undefined;
 
   const canonicalUrl = `${input.baseUrl}${input.pageMeta.publishedPath}`;
 

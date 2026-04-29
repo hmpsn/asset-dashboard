@@ -155,14 +155,24 @@ describe('buildLocalBusinessSchema', () => {
 
   it('emits LocalBusiness with PostalAddress when business profile has address', () => {
     const schema = buildLocalBusinessSchema(localInput);
-    const node = (schema['@graph'] as Array<Record<string, unknown>>)[0];
-    expect(node['@type']).toBe('LocalBusiness');
-    expect((node.address as Record<string, unknown>)['@type']).toBe('PostalAddress');
-    expect((node.address as Record<string, unknown>).streetAddress).toBe('100 Main St');
+    const graph = schema['@graph'] as Array<Record<string, unknown>>;
+    const localBusinessNode = graph.find(n => n['@type'] === 'LocalBusiness') as Record<string, unknown>;
+    expect(localBusinessNode['@type']).toBe('LocalBusiness');
+    expect((localBusinessNode.address as Record<string, unknown>)['@type']).toBe('PostalAddress');
+    expect((localBusinessNode.address as Record<string, unknown>).streetAddress).toBe('100 Main St');
+  });
+
+  it('emits sibling Organization node so orgRef resolves on other pages', () => {
+    const schema = buildLocalBusinessSchema(localInput);
+    const graph = schema['@graph'] as Array<Record<string, unknown>>;
+    const orgNode = graph.find(n => n['@type'] === 'Organization') as Record<string, unknown>;
+    expect(orgNode).toBeDefined();
+    expect(orgNode['@id']).toBe('https://acme.dental/#organization');
   });
 
   it('emits telephone, email, openingHours, sameAs when present', () => {
-    const node = (buildLocalBusinessSchema(localInput)['@graph'] as Array<Record<string, unknown>>)[0];
+    const graph = buildLocalBusinessSchema(localInput)['@graph'] as Array<Record<string, unknown>>;
+    const node = graph.find(n => n['@type'] === 'LocalBusiness') as Record<string, unknown>;
     expect(node.telephone).toBe('+1-512-555-0100');
     expect(node.email).toBe('hi@acme.dental');
     expect(node.openingHours).toBe('Mo-Fr 09:00-17:00');
@@ -171,7 +181,8 @@ describe('buildLocalBusinessSchema', () => {
 
   it('omits all contact fields when business profile is null (no fabrication)', () => {
     const input = { ...localInput, businessProfile: null };
-    const node = (buildLocalBusinessSchema(input)['@graph'] as Array<Record<string, unknown>>)[0];
+    const graph = buildLocalBusinessSchema(input)['@graph'] as Array<Record<string, unknown>>;
+    const node = graph.find(n => n['@type'] === 'LocalBusiness') as Record<string, unknown>;
     expect(node.telephone).toBeUndefined();
     expect(node.address).toBeUndefined();
     expect(node.email).toBeUndefined();

@@ -26,24 +26,34 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
       })
     : undefined;
 
-  const primary = dropUndefined({
+  // Emit a sibling Organization node so orgRef (@id: /#organization) used by
+  // Service/AboutPage templates on other pages resolves to a real entity.
+  const organization = dropUndefined({
+    '@type': 'Organization',
+    '@id': `${baseUrl}/#organization`,
+    'name': pageData.publisher.name,
+    'url': baseUrl,
+    'logo': pageData.publisher.logoUrl
+      ? { '@type': 'ImageObject', 'url': pageData.publisher.logoUrl }
+      : undefined,
+  });
+
+  const localBusiness = dropUndefined({
     '@type': 'LocalBusiness',
     '@id': `${baseUrl}/#localbusiness`,
     'name': pageData.publisher.name,
     'description': pageData.description,
     'url': baseUrl,
     'image': pageData.image,
-    'logo': pageData.publisher.logoUrl
-      ? { '@type': 'ImageObject', 'url': pageData.publisher.logoUrl }
-      : undefined,
     'telephone': businessProfile?.phone,
     'email': businessProfile?.email,
     'openingHours': businessProfile?.openingHours,
     'address': address,
     'sameAs': businessProfile?.socialProfiles?.length ? businessProfile.socialProfiles : undefined,
+    'parentOrganization': { '@id': `${baseUrl}/#organization` },
   });
 
-  const graph: Array<Record<string, unknown>> = [primary];
+  const graph: Array<Record<string, unknown>> = [organization, localBusiness];
   const bc = buildBreadcrumb(pageData.breadcrumbs, pageData.canonicalUrl);
   if (bc) graph.push(bc);
 

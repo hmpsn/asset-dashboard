@@ -21,6 +21,11 @@ import { buildLocalBusinessSchema } from './templates/local-business.js';
 import { buildAboutPageSchema, buildContactPageSchema, buildCollectionPageSchema, buildWebPageSchema } from './templates/static.js';
 import { buildHomepageSchema } from './templates/homepage.js';
 import { validateLeanSchema } from './validator.js';
+import { checkRichResultsEligibility } from '../schema-suggester.js';
+import type { RichResultEligibility } from '../schema-suggester.js';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('schema/generator');
 
 /** Subset of SchemaPageSuggestion that the generator returns. */
 export interface LeanGeneratorOutput {
@@ -36,6 +41,7 @@ export interface LeanGeneratorOutput {
     template: Record<string, unknown>;
   }>;
   validationErrors?: string[];
+  richResultsEligibility?: RichResultEligibility[];
 }
 
 export interface LeanGeneratorInput {
@@ -75,14 +81,22 @@ function plainText(html: string): string {
 }
 
 export async function generateLeanSchema(input: LeanGeneratorInput): Promise<LeanGeneratorOutput> {
+  // Fix 1: strip trailing slashes from baseUrl to prevent //path canonical URLs
+  const baseUrl = input.baseUrl.replace(/\/+$/, '');
+
   const businessKind = input.workspace.businessProfile?.address ? 'local' : 'unknown';
-  const classified = classifyPage(`${input.baseUrl}${input.pageMeta.publishedPath}`, input.baseUrl, { businessKind });
+  const classified = classifyPage(`${baseUrl}${input.pageMeta.publishedPath}`, baseUrl, { businessKind });
+
+  // Fix 2: warn when HTML is empty — existing-schema detection returns [] silently
+  if (!input.html || input.html.trim().length === 0) {
+    log.debug({ pageId: input.pageId }, 'lean schema generated without HTML — existing-schema detection returned empty; downstream consumers should treat as best-effort');
+  }
 
   // Page data — deterministic
   let pageData = extractPageData({
     pageMeta: input.pageMeta,
     html: input.html,
-    baseUrl: input.baseUrl,
+    baseUrl,
     workspace: input.workspace,
   });
 
@@ -106,46 +120,46 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
     case 'Homepage':
       if (classified.primaryType === 'LocalBusiness') {
         schema = buildLocalBusinessSchema({
-          baseUrl: input.baseUrl,
+          baseUrl,
           pageData,
           businessProfile: input.workspace.businessProfile,
         });
         reason = 'Local business homepage — LocalBusiness with verified contact info.';
       } else {
-        schema = buildHomepageSchema({ baseUrl: input.baseUrl, pageData });
+        schema = buildHomepageSchema({ baseUrl, pageData });
         reason = 'Homepage — Organization + WebSite (sitewide entities).';
       }
       break;
     case 'BlogPosting':
-      schema = buildArticleSchema({ baseUrl: input.baseUrl, pageData }, 'BlogPosting');
+      schema = buildArticleSchema({ baseUrl, pageData }, 'BlogPosting');
       reason = 'Blog post — BlogPosting with author/publisher/dates.';
       break;
     case 'CaseStudy':
-      schema = buildArticleSchema({ baseUrl: input.baseUrl, pageData }, 'Article');
+      schema = buildArticleSchema({ baseUrl, pageData }, 'Article');
       reason = 'Case study — Article (not Service) with about="Case study".';
       break;
     case 'Service':
-      schema = buildServiceSchema({ baseUrl: input.baseUrl, pageData });
+      schema = buildServiceSchema({ baseUrl, pageData });
       reason = 'Service detail page — Service with provider reference.';
       break;
     case 'AboutPage':
-      schema = buildAboutPageSchema({ baseUrl: input.baseUrl, pageData });
+      schema = buildAboutPageSchema({ baseUrl, pageData });
       reason = 'About page — AboutPage referencing Organization.';
       break;
     case 'ContactPage':
-      schema = buildContactPageSchema({ baseUrl: input.baseUrl, pageData });
+      schema = buildContactPageSchema({ baseUrl, pageData });
       reason = 'Contact page — ContactPage.';
       break;
     case 'BlogIndex':
     case 'CaseStudyIndex':
     case 'ServiceIndex':
-      schema = buildCollectionPageSchema({ baseUrl: input.baseUrl, pageData });
+      schema = buildCollectionPageSchema({ baseUrl, pageData });
       reason = `${classified.kind.replace('Index', '')} index — CollectionPage.`;
       break;
     case 'Legal':
     case 'WebPage':
     default:
-      schema = buildWebPageSchema({ baseUrl: input.baseUrl, pageData });
+      schema = buildWebPageSchema({ baseUrl, pageData });
       reason = 'Generic page — WebPage with breadcrumb.';
       break;
   }
@@ -156,6 +170,9 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
 
   // Validate
   const validationErrors = validateLeanSchema(schema, classified.primaryType);
+
+  // Fix 3: compute rich results eligibility and pass through to caller
+  const richResultsEligibility = checkRichResultsEligibility(schema);
 
   // Determine declared types for the suggestion `type` field
   const graph = (schema['@graph'] as Array<Record<string, unknown>>) ?? [];
@@ -176,5 +193,6 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       },
     ],
     validationErrors: validationErrors.length > 0 ? validationErrors : undefined,
+    richResultsEligibility: richResultsEligibility.length > 0 ? richResultsEligibility : undefined,
   };
 }
