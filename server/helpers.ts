@@ -621,10 +621,16 @@ export function stripHtmlToText(
  * Strip Markdown code fences from AI responses.
  * Handles leading ```json, ```html, ```xml, or plain ``` fences.
  * Only strips the trailing fence when a leading fence was present.
+ *
+ * Trims leading/trailing whitespace from the input first — without this, an
+ * AI response like `"\n```json\n{...}\n```"` would skip the fence-strip path
+ * because the `^` anchor in the regex doesn't match the backtick. (Devin
+ * follow-up to PR #371.)
  */
 export function stripCodeFences(text: string): string {
-  if (!/^```(?:json|html|xml)?\s*/i.test(text)) return text;
-  return text
+  const trimmed = text.trim();
+  if (!/^```(?:json|html|xml)?\s*/i.test(trimmed)) return trimmed;
+  return trimmed
     .replace(/^```(?:json|html|xml)?\s*/i, '')
     .replace(/\s*```\s*$/i, '');
 }
