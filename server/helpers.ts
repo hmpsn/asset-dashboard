@@ -13,6 +13,7 @@ import { getGA4TopPages } from './google-analytics.js';
 import { getRawKnowledge, buildPersonasContext } from './seo-context.js';
 import { getInsights } from './analytics-insights-store.js';
 import { getDeclinedKeywords } from './keyword-feedback.js';
+import { listSites } from './webflow-pages.js';
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
@@ -316,6 +317,24 @@ const analyticsCache: Record<string, {
 }> = {};
 const ANALYTICS_CACHE_TTL_MS = 5 * 60 * 1000;
 
+// 5-minute TTL cache for listSites() — prevents an extra Webflow API round-trip on every
+// single-page schema generation request. Keyed by workspace token (or '' for global).
+const sitesCache: Record<string, {
+  sites: Array<{ id: string; displayName: string; shortName: string; defaultLocale: string }>;
+  ts: number;
+}> = {};
+
+async function listSitesCached(
+  tokenOverride?: string,
+): Promise<Array<{ id: string; displayName: string; shortName: string; defaultLocale: string }>> {
+  const key = tokenOverride ?? '';
+  const cached = sitesCache[key];
+  if (cached && Date.now() - cached.ts < ANALYTICS_CACHE_TTL_MS) return cached.sites;
+  const sites = await listSites(tokenOverride);
+  sitesCache[key] = { sites, ts: Date.now() };
+  return sites;
+}
+
 export async function buildSchemaContext(
   siteId: string,
   options?: { includeAnalytics?: boolean },
@@ -344,6 +363,15 @@ export async function buildSchemaContext(
     ctx.logoUrl = ws.brandLogoUrl;
     ctx.workspaceId = ws.id;
     ctx._siteId = siteId;
+
+    // Resolve site-wide default locale from Webflow (paid-grade `inLanguage`).
+    // Pass the workspace's per-site token so this works for workspaces that don't
+    // rely on the global WEBFLOW_API_TOKEN env var.
+    try {
+      const sites = await listSitesCached(ws.webflowToken || undefined);
+      const matched = sites.find(s => s.id === siteId);
+      if (matched?.defaultLocale) ctx._defaultLocale = matched.defaultLocale;
+    } catch { /* listSites failure: leave _defaultLocale undefined; downstream falls back to 'en' */ } // catch-ok
 
     // Knowledge base from unified seo-context builder (inline + knowledge-docs/ files)
     const rawKB = getRawKnowledge(ws.id);

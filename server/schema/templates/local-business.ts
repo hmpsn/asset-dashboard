@@ -45,11 +45,13 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
     'description': pageData.description,
     'url': baseUrl,
     'image': pageData.image,
+    'inLanguage': pageData.inLanguage,
     'telephone': businessProfile?.phone,
     'email': businessProfile?.email,
     'openingHours': businessProfile?.openingHours,
     'address': address,
     'sameAs': businessProfile?.socialProfiles?.length ? businessProfile.socialProfiles : undefined,
+    'foundedDate': businessProfile?.foundedDate,
     'parentOrganization': { '@id': `${baseUrl}/#organization` },
   });
 
@@ -62,6 +64,12 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
     'name': pageData.publisher.name,
     'url': baseUrl,
     'publisher': { '@id': `${baseUrl}/#organization` },
+    'inLanguage': pageData.inLanguage,
+    'potentialAction': {
+      '@type': 'SearchAction',
+      'target': { '@type': 'EntryPoint', 'urlTemplate': `${baseUrl}/?s={search_term_string}` },
+      'query-input': 'required name=search_term_string',
+    },
   };
 
   return withBreadcrumb([organization, localBusiness, website], pageData);

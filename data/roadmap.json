@@ -479,6 +479,24 @@
       "rationale": "Aspirational features and team-scale work deferred until the current sprint queue clears.",
       "items": [
         {
+          "id": "schema-pillar-1-validator-bar",
+          "title": "Schema Pillar 1 — Raise the Validator Bar",
+          "source": "docs/superpowers/plans/2026-04-29-schema-pillar-1-validator-bar.md",
+          "est": "0.5d",
+          "priority": "P0",
+          "status": "pending",
+          "notes": "Tightens REQUIRED_BY_TYPE in validator.ts to enforce Yoast-baseline. Adds cross-reference shape validators (rejects malformed isPartOf, dangling breadcrumb pointers). Depends on Pillar 2 (PR #362)."
+        },
+        {
+          "id": "schema-pillar-3-gates",
+          "title": "Schema Pillar 3 — Compile-time + CI Gates",
+          "source": "docs/superpowers/plans/2026-04-29-schema-pillar-3-gates.md",
+          "est": "1d",
+          "priority": "P0",
+          "status": "pending",
+          "notes": "schema-dts typed return values across 8 templates, schemarama 6-fixture CI corpus, new pr-check rule for cross-ref helper imports. Three gates: compile / runtime / PR-time. Depends on Pillars 1 + 2."
+        },
+        {
           "id": 16,
           "title": "Internal team management",
           "source": "AUTH_ROADMAP Phase 3",
@@ -4744,6 +4762,17 @@
           "status": "done",
           "shippedAt": "2026-04-29",
           "notes": "Replaces 2,558-line schema-suggester.ts pipeline with deterministic 6-module package at server/schema/. URL classifier + per-type templates + canonical data sources + 2 surgical AI extractors (description, FAQ) + per-type validator + thin orchestrator. Output ~72% smaller, validates first time, eliminates duplicate WebPage bug and wrong-type bug for case studies/privacy/index pages. Common types only (BlogPosting, Article, Service, Product, LocalBusiness, AboutPage, ContactPage, CollectionPage, WebPage, Organization, WebSite). Healthcare uses LocalBusiness fallback; subtype escalation deferred to schema-intelligence-layer-v2."
+        },
+        {
+          "id": "schema-pillar-2-data-wiring",
+          "title": "Schema Pillar 2 — Data Wiring & Cross-References",
+          "source": "docs/superpowers/plans/2026-04-29-schema-pillar-2-data-wiring.md",
+          "est": "1d",
+          "priority": "P0",
+          "sprint": "H",
+          "status": "done",
+          "shippedAt": "2026-04-29",
+          "notes": "Brand-suffix scrubber strips ' | Brand'/' - Brand'/' — Brand'/' · Brand' from name fields and breadcrumb leaves. Every non-homepage primary node emits isPartOf (→#website), breadcrumb (→#breadcrumb), inLanguage (Yoast-baseline @graph topology). Article emits articleSection (URL-derived) and Person author when CMS fieldData exposes one. New discoverCmsItemsBySlug joins sitemap URLs against /collections/:id/items so CMS pages get real datePublished + author from fieldData. Homepage Organization gains sameAs+foundedDate from BusinessProfile; WebSite gains potentialAction (sitelinks SearchAction). Default locale extracted from Webflow site.locales.primary.tag via extended listSites and SchemaContext._defaultLocale. Locks via 4 integration assertions. Closes wiring gaps from 2026-04-29 audits. Pillar 1 (validator bar) and Pillar 3 (compile + CI gates) ship next."
         }
       ]
     }

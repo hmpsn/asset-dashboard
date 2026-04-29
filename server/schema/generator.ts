@@ -127,7 +127,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
         });
         reason = 'Local business homepage — LocalBusiness with verified contact info.';
       } else {
-        schema = buildHomepageSchema({ baseUrl, pageData });
+        schema = buildHomepageSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile });
         reason = 'Homepage — Organization + WebSite (sitewide entities).';
       }
       break;

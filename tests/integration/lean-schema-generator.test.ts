@@ -19,7 +19,7 @@ const baseInput = {
   pageMeta: { title: 'X', slug: 'x', publishedPath: '/x', seo: { description: 'desc' } },
   html: '<html><body>Body content for the page.</body></html>',
   baseUrl: 'https://example.com',
-  workspace: { name: 'Acme', publisherLogoUrl: null, businessProfile: null },
+  workspace: { name: 'Acme', publisherLogoUrl: null, businessProfile: null, defaultLocale: 'en' },
 };
 
 describe('generateLeanSchema', () => {
@@ -212,11 +212,74 @@ describe('generateLeanSchema: per-kind primary @type', () => {
           socialProfiles: [],
           openingHours: 'Mo-Fr 09:00-17:00',
         },
+        defaultLocale: 'en',
       },
     });
     const graph = out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>;
     const types = graph.map(n => n['@type']);
     expect(types).toContain('Organization');
     expect(types).toContain('LocalBusiness');
+  });
+});
+
+describe('paid-grade output (Pillar 2)', () => {
+  beforeEach(() => {
+    vi.mocked(callAI).mockClear();
+    vi.mocked(callAI).mockResolvedValue({
+      text: 'A clean description.',
+      tokens: { prompt: 100, completion: 20, total: 120 },
+    });
+  });
+
+  it('strips brand suffix from name and breadcrumb leaf', async () => {
+    const out = await generateLeanSchema({
+      ...baseInput,
+      pageMeta: { ...baseInput.pageMeta, title: 'Privacy Policy | Acme', publishedPath: '/privacy-policy' },
+      workspace: { ...baseInput.workspace, name: 'Acme', defaultLocale: 'en' },
+    });
+    const graph = (out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>);
+    expect(graph[0].name).toBe('Privacy Policy');
+    const bc = graph.find(n => n['@type'] === 'BreadcrumbList');
+    const items = bc?.itemListElement as Array<Record<string, unknown>>;
+    expect(items[items.length - 1].name).toBe('Privacy Policy');
+  });
+
+  it('emits isPartOf, breadcrumb, inLanguage on the primary node', async () => {
+    const out = await generateLeanSchema({
+      ...baseInput,
+      pageMeta: { ...baseInput.pageMeta, publishedPath: '/services/design' },
+      workspace: { ...baseInput.workspace, defaultLocale: 'en' },
+    });
+    const node = (out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.isPartOf).toEqual({ '@id': 'https://example.com/#website' });
+    expect(node.breadcrumb).toEqual({ '@id': 'https://example.com/services/design#breadcrumb' });
+    expect(node.inLanguage).toBe('en');
+  });
+
+  it('CMS Article gets datePublished + author from cmsFieldData', async () => {
+    const out = await generateLeanSchema({
+      ...baseInput,
+      pageMeta: {
+        ...baseInput.pageMeta,
+        publishedPath: '/blog/my-post',
+        cmsFieldData: { 'published-on': '2026-01-15T00:00:00Z', 'author-name': 'Jane Doe' },
+      },
+      workspace: { ...baseInput.workspace, defaultLocale: 'en' },
+    });
+    const node = (out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node['@type']).toBe('BlogPosting');
+    expect(node.datePublished).toBe('2026-01-15T00:00:00Z');
+    expect(node.author).toEqual({ '@type': 'Person', 'name': 'Jane Doe' });
+  });
+
+  it('homepage WebSite has potentialAction SearchAction', async () => {
+    const out = await generateLeanSchema({
+      ...baseInput,
+      pageMeta: { title: 'Home', slug: '', publishedPath: '/', seo: undefined },
+      workspace: { ...baseInput.workspace, defaultLocale: 'en' },
+    });
+    const graph = (out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>);
+    const website = graph.find(n => n['@type'] === 'WebSite');
+    expect((website?.potentialAction as Record<string, unknown>)['@type']).toBe('SearchAction');
   });
 });

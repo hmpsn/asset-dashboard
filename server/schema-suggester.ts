@@ -1,4 +1,4 @@
-import { getCollectionSchema, listCollections, discoverCmsUrls, buildStaticPathSet, toCmsPageId } from './webflow.js';
+import { getCollectionSchema, listCollections, discoverCmsItemsBySlug, buildStaticPathSet, toCmsPageId } from './webflow.js';
 import { getWorkspacePages } from './workspace-data.js';
 import { listWorkspaces } from './workspaces.js';
 import { generateLeanSchema } from './schema/index.js';
@@ -139,6 +139,8 @@ export interface SchemaContext {
     foundedDate?: string;
     numberOfEmployees?: string;
   };
+  /** Default site-wide BCP-47 locale from Webflow site.locales.primary.tag. Defaults to 'en' when unset. */
+  _defaultLocale?: string;
   /** Site-level SERP features from SEO data provider — used to steer schema type selection. */
   _serpFeatures?: { featuredSnippets: number; peopleAlsoAsk: number; localPack: boolean; videoCarousel: number };
   /** Referring-domain count from backlink profile — used to calibrate schema ambition. */
@@ -339,6 +341,7 @@ export async function generateSchemaForPage(
       name: ctx.companyName || '',
       publisherLogoUrl: ctx.logoUrl ?? null,
       businessProfile: ctx._businessProfile ?? null,
+      defaultLocale: ctx._defaultLocale ?? 'en',
     },
   });
 
@@ -392,6 +395,7 @@ export async function generateSchemaSuggestions(
         name: ctx.companyName || '',
         publisherLogoUrl: ctx.logoUrl ?? null,
         businessProfile: ctx._businessProfile ?? null,
+        defaultLocale: ctx._defaultLocale ?? 'en',
       },
     });
     results.push(leanToSuggestion(lean));
@@ -401,8 +405,8 @@ export async function generateSchemaSuggestions(
   // CMS pages — same lean path
   {
     const staticPaths = buildStaticPathSet(pages);
-    const { cmsUrls } = await discoverCmsUrls(baseUrl, staticPaths, 1000);
-    for (const item of cmsUrls) {
+    const { items: cmsItems } = await discoverCmsItemsBySlug(siteId, baseUrl, staticPaths, 1000, tokenOverride);
+    for (const item of cmsItems) {
       if (isCancelled?.()) break;
       const itemHtml = await fetchPublishedHtml(item.url);
       const itemLean = await generateLeanSchema({
@@ -412,7 +416,9 @@ export async function generateSchemaSuggestions(
           slug: item.path.replace(/^\//, ''),
           publishedPath: item.path,
           seo: undefined,
-          // Fix 4: CMS item timestamps not available via sitemap discovery — no fallback here
+          lastPublished: item.lastPublished,
+          createdOn: item.createdOn,
+          cmsFieldData: item.fieldData,
         },
         html: itemHtml || '',
         baseUrl,
@@ -420,6 +426,7 @@ export async function generateSchemaSuggestions(
           name: ctx.companyName || '',
           publisherLogoUrl: ctx.logoUrl ?? null,
           businessProfile: ctx._businessProfile ?? null,
+          defaultLocale: ctx._defaultLocale ?? 'en',
         },
       });
       results.push(leanToSuggestion(itemLean));

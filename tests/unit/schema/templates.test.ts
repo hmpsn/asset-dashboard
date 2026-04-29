@@ -10,12 +10,14 @@ const baseInput = {
   baseUrl: 'https://example.com',
   pageData: {
     title: 'My Post',
+    cleanTitle: 'My Post',
     description: 'A great post',
     image: 'https://x/i.jpg',
     canonicalUrl: 'https://example.com/blog/my-post',
     publisher: { name: 'Acme', logoUrl: 'https://x/logo.png' },
     datePublished: '2025-01-15T00:00:00Z',
     dateModified: '2026-04-01T00:00:00Z',
+    inLanguage: 'en',
     breadcrumbs: [
       { name: 'Home', url: 'https://example.com' },
       { name: 'Blog', url: 'https://example.com/blog' },
@@ -72,16 +74,41 @@ describe('buildArticleSchema (BlogPosting)', () => {
     const schema = buildArticleSchema(input, 'BlogPosting');
     expect((schema['@graph'] as unknown[]).length).toBe(1);
   });
+
+  it('uses cleanTitle for headline, not raw title', () => {
+    const dirty = { ...baseInput, pageData: { ...baseInput.pageData, title: 'My Post | Acme', cleanTitle: 'My Post' } };
+    const node = (buildArticleSchema(dirty, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.headline).toBe('My Post');
+  });
+  it('emits isPartOf, breadcrumb, inLanguage, articleSection', () => {
+    const withSection = { ...baseInput, pageData: { ...baseInput.pageData, articleSection: 'Blog' } };
+    const node = (buildArticleSchema(withSection, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.isPartOf).toEqual({ '@id': 'https://example.com/#website' });
+    expect(node.breadcrumb).toEqual({ '@id': 'https://example.com/blog/my-post#breadcrumb' });
+    expect(node.inLanguage).toBe('en');
+    expect(node.articleSection).toBe('Blog');
+  });
+  it('uses CMS-derived author when pageData.author is set', () => {
+    const withAuthor = { ...baseInput, pageData: { ...baseInput.pageData, author: 'Jane Doe' } };
+    const node = (buildArticleSchema(withAuthor, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.author).toEqual({ '@type': 'Person', 'name': 'Jane Doe' });
+  });
+  it('falls back to Organization author when pageData.author is undefined', () => {
+    const node = (buildArticleSchema(baseInput, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.author).toEqual({ '@type': 'Organization', 'name': 'Acme' });
+  });
 });
 
 const serviceInput = {
   baseUrl: 'https://example.com',
   pageData: {
     title: 'Web Design Service',
+    cleanTitle: 'Web Design Service',
     description: 'Custom design',
     image: 'https://x/svc.jpg',
     canonicalUrl: 'https://example.com/services/web-design',
     publisher: { name: 'Acme', logoUrl: undefined },
+    inLanguage: 'en',
     breadcrumbs: [
       { name: 'Home', url: 'https://example.com' },
       { name: 'Services', url: 'https://example.com/services' },
@@ -113,6 +140,13 @@ describe('buildServiceSchema', () => {
     const node = (buildServiceSchema(input)['@graph'] as Array<Record<string, unknown>>)[0];
     expect(node.image).toBeUndefined();
   });
+
+  it('Service primary node has isPartOf, breadcrumb, inLanguage', () => {
+    const node = (buildServiceSchema(serviceInput)['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.isPartOf).toEqual({ '@id': 'https://example.com/#website' });
+    expect(node.breadcrumb).toEqual({ '@id': 'https://example.com/services/web-design#breadcrumb' });
+    expect(node.inLanguage).toBe('en');
+  });
 });
 
 describe('buildProductSchema', () => {
@@ -137,11 +171,13 @@ describe('buildLocalBusinessSchema', () => {
   const localInput = {
     baseUrl: 'https://acme.dental',
     pageData: {
-      title: 'Acme Dental — Austin',
+      title: 'Home | Acme Dental',
+      cleanTitle: 'Home',
       description: 'Family dentistry',
       image: 'https://x/clinic.jpg',
       canonicalUrl: 'https://acme.dental',
       publisher: { name: 'Acme Dental', logoUrl: 'https://x/logo.png' },
+      inLanguage: 'en',
       breadcrumbs: [{ name: 'Home', url: 'https://acme.dental' }],
     },
     businessProfile: {
@@ -201,15 +237,23 @@ describe('buildLocalBusinessSchema', () => {
     expect(websiteNode['@id']).toBe('https://acme.dental/#website');
     expect(websiteNode.publisher).toEqual({ '@id': 'https://acme.dental/#organization' });
   });
+
+  it('uses publisher.name for LocalBusiness name, not cleanTitle (avoids stripped homepage titles)', () => {
+    const graph = buildLocalBusinessSchema(localInput)['@graph'] as Array<Record<string, unknown>>;
+    const node = graph.find(n => n['@type'] === 'LocalBusiness') as Record<string, unknown>;
+    expect(node.name).toBe('Acme Dental');
+  });
 });
 
 const staticInput = {
   baseUrl: 'https://example.com',
   pageData: {
     title: 'About Us',
+    cleanTitle: 'About Us',
     description: 'Who we are',
     canonicalUrl: 'https://example.com/about',
     publisher: { name: 'Acme', logoUrl: undefined },
+    inLanguage: 'en',
     breadcrumbs: [
       { name: 'Home', url: 'https://example.com' },
       { name: 'About Us', url: 'https://example.com/about' },
@@ -238,6 +282,25 @@ describe('static page templates', () => {
     const schema = buildWebPageSchema(staticInput);
     expect(((schema['@graph'] as Array<Record<string, unknown>>)[0])['@type']).toBe('WebPage');
   });
+  it('AboutPage primary node has isPartOf, breadcrumb, inLanguage', () => {
+    const schema = buildAboutPageSchema(staticInput);
+    const node = (schema['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.isPartOf).toEqual({ '@id': 'https://example.com/#website' });
+    expect(node.breadcrumb).toEqual({ '@id': 'https://example.com/about#breadcrumb' });
+    expect(node.inLanguage).toBe('en');
+  });
+  it('WebPage primary node has isPartOf, breadcrumb, inLanguage', () => {
+    const schema = buildWebPageSchema(staticInput);
+    const node = (schema['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.isPartOf).toEqual({ '@id': 'https://example.com/#website' });
+    expect(node.breadcrumb).toEqual({ '@id': 'https://example.com/about#breadcrumb' });
+    expect(node.inLanguage).toBe('en');
+  });
+  it('uses cleanTitle, not raw title, for name', () => {
+    const dirty = { ...staticInput, pageData: { ...staticInput.pageData, title: 'About Us | Acme', cleanTitle: 'About Us' } };
+    const node = (buildWebPageSchema(dirty)['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.name).toBe('About Us');
+  });
 });
 
 describe('buildHomepageSchema', () => {
@@ -245,10 +308,12 @@ describe('buildHomepageSchema', () => {
     baseUrl: 'https://example.com',
     pageData: {
       title: 'Acme — Homepage',
+      cleanTitle: 'Acme — Homepage',
       description: 'Acme is a studio',
       image: 'https://x/hero.jpg',
       canonicalUrl: 'https://example.com',
       publisher: { name: 'Acme', logoUrl: 'https://x/logo.png' },
+      inLanguage: 'en',
       breadcrumbs: [{ name: 'Home', url: 'https://example.com' }],
     },
   };
@@ -269,5 +334,26 @@ describe('buildHomepageSchema', () => {
 
   it('passes validator', () => {
     expect(validateLeanSchema(buildHomepageSchema(homepageInput), 'Organization')).toEqual([]);
+  });
+
+  it('Organization includes sameAs from businessProfile.socialProfiles', () => {
+    const schema = buildHomepageSchema({
+      ...homepageInput,
+      businessProfile: { socialProfiles: ['https://twitter.com/acme'], foundedDate: '2020-01-01' },
+    });
+    const org = (schema['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(org.sameAs).toEqual(['https://twitter.com/acme']);
+    expect(org.foundedDate).toBe('2020-01-01');
+  });
+
+  it('WebSite has potentialAction (sitelinks SearchAction)', () => {
+    const schema = buildHomepageSchema(homepageInput);
+    const website = (schema['@graph'] as Array<Record<string, unknown>>)[1];
+    expect(website.potentialAction).toEqual({
+      '@type': 'SearchAction',
+      'target': { '@type': 'EntryPoint', 'urlTemplate': 'https://example.com/?s={search_term_string}' },
+      'query-input': 'required name=search_term_string',
+    });
+    expect(website.inLanguage).toBe('en');
   });
 });
