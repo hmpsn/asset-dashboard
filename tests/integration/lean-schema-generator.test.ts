@@ -148,8 +148,8 @@ describe('generateLeanSchema', () => {
     const faqNode = graph.find(n => n['@type'] === 'FAQPage');
     expect((faqNode!.mainEntity as unknown[])).toHaveLength(2);
     // The surfaced validation errors should still include the base error so admins see it.
-    expect(out.validationErrors).toBeDefined();
-    expect(out.validationErrors!.some(e => e.includes('datePublished'))).toBe(true);
+    expect(out.validationFindings).toBeDefined();
+    expect(out.validationFindings!.some(f => f.field === 'datePublished')).toBe(true);
   });
 
   it('does NOT append FAQPage when accordion has fewer than 2 pairs', async () => {
