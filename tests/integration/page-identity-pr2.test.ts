@@ -141,12 +141,13 @@ describe('migration 076: cms-- → cms- normalisation', () => {
     // After all prior tests, no cms-- rows should remain in any of the 4 tables.
     db.exec(MIGRATION_076_SQL);
 
-    const counts = [
-      db.prepare(`SELECT COUNT(*) as n FROM schema_validations WHERE page_id LIKE 'cms--%'`).get() as { n: number },
-      db.prepare(`SELECT COUNT(*) as n FROM schema_page_types WHERE page_id LIKE 'cms--%'`).get() as { n: number },
-      db.prepare(`SELECT COUNT(*) as n FROM schema_publish_history WHERE page_id LIKE 'cms--%'`).get() as { n: number },
-      db.prepare(`SELECT COUNT(*) as n FROM seo_changes WHERE page_id LIKE 'cms--%'`).get() as { n: number },
-    ];
-    expect(counts.every(c => c.n === 0)).toBe(true);
+    const cmsValidations = db.prepare(`SELECT COUNT(*) as n FROM schema_validations WHERE page_id LIKE 'cms--%'`).get() as { n: number };
+    const cmsPageTypes = db.prepare(`SELECT COUNT(*) as n FROM schema_page_types WHERE page_id LIKE 'cms--%'`).get() as { n: number };
+    const cmsPublishHistory = db.prepare(`SELECT COUNT(*) as n FROM schema_publish_history WHERE page_id LIKE 'cms--%'`).get() as { n: number };
+    const cmsSeoChanges = db.prepare(`SELECT COUNT(*) as n FROM seo_changes WHERE page_id LIKE 'cms--%'`).get() as { n: number };
+    expect(cmsValidations.n).toBe(0);
+    expect(cmsPageTypes.n).toBe(0);
+    expect(cmsPublishHistory.n).toBe(0);
+    expect(cmsSeoChanges.n).toBe(0);
   });
 });
