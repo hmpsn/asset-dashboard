@@ -41,15 +41,17 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
   const localBusiness = dropUndefined({
     '@type': 'LocalBusiness',
     '@id': `${baseUrl}/#localbusiness`,
-    'name': pageData.publisher.name,
+    'name': pageData.cleanTitle ?? pageData.publisher.name,
     'description': pageData.description,
     'url': baseUrl,
     'image': pageData.image,
+    'inLanguage': pageData.inLanguage,
     'telephone': businessProfile?.phone,
     'email': businessProfile?.email,
     'openingHours': businessProfile?.openingHours,
     'address': address,
     'sameAs': businessProfile?.socialProfiles?.length ? businessProfile.socialProfiles : undefined,
+    'foundedDate': businessProfile?.foundedDate,
     'parentOrganization': { '@id': `${baseUrl}/#organization` },
   });
 

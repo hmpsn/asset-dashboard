@@ -172,10 +172,12 @@ describe('buildLocalBusinessSchema', () => {
     baseUrl: 'https://acme.dental',
     pageData: {
       title: 'Acme Dental — Austin',
+      cleanTitle: 'Acme Dental — Austin',
       description: 'Family dentistry',
       image: 'https://x/clinic.jpg',
       canonicalUrl: 'https://acme.dental',
       publisher: { name: 'Acme Dental', logoUrl: 'https://x/logo.png' },
+      inLanguage: 'en',
       breadcrumbs: [{ name: 'Home', url: 'https://acme.dental' }],
     },
     businessProfile: {
@@ -300,10 +302,12 @@ describe('buildHomepageSchema', () => {
     baseUrl: 'https://example.com',
     pageData: {
       title: 'Acme — Homepage',
+      cleanTitle: 'Acme — Homepage',
       description: 'Acme is a studio',
       image: 'https://x/hero.jpg',
       canonicalUrl: 'https://example.com',
       publisher: { name: 'Acme', logoUrl: 'https://x/logo.png' },
+      inLanguage: 'en',
       breadcrumbs: [{ name: 'Home', url: 'https://example.com' }],
     },
   };
@@ -324,5 +328,26 @@ describe('buildHomepageSchema', () => {
 
   it('passes validator', () => {
     expect(validateLeanSchema(buildHomepageSchema(homepageInput), 'Organization')).toEqual([]);
+  });
+
+  it('Organization includes sameAs from businessProfile.socialProfiles', () => {
+    const schema = buildHomepageSchema({
+      ...homepageInput,
+      businessProfile: { socialProfiles: ['https://twitter.com/acme'], foundedDate: '2020-01-01' },
+    });
+    const org = (schema['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(org.sameAs).toEqual(['https://twitter.com/acme']);
+    expect(org.foundedDate).toBe('2020-01-01');
+  });
+
+  it('WebSite has potentialAction (sitelinks SearchAction)', () => {
+    const schema = buildHomepageSchema(homepageInput);
+    const website = (schema['@graph'] as Array<Record<string, unknown>>)[1];
+    expect(website.potentialAction).toEqual({
+      '@type': 'SearchAction',
+      'target': { '@type': 'EntryPoint', 'urlTemplate': 'https://example.com/?s={search_term_string}' },
+      'query-input': 'required name=search_term_string',
+    });
+    expect(website.inLanguage).toBe('en');
   });
 });
