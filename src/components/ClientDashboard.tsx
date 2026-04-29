@@ -195,6 +195,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       getOptional<WorkspaceInfo>(`/api/public/workspace/${workspaceId}`).then(data => { if (data?.id) setWs(data); }).catch((err) => { console.error('ClientDashboard operation failed:', err); });
     },
     'recommendations:updated': () => refetchClient('recommendations', ''),
+    'briefing:published': () => refetchClient('briefing', ''),
   }, wsIdentity);
 
   // ── Load workspace info first (includes requiresPassword flag) ──

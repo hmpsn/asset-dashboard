@@ -227,6 +227,10 @@ export function useClientData(workspaceId: string) {
       // Prefix key: invalidates ALL client.postPreview queries for the workspace
       // regardless of postId (we don't know postId from the WS event payload).
       'post-preview': ['client', 'post-preview', workspaceId],
+      // Phase 2 of client-briefing-v2: invalidate the cached published briefing
+      // when admin publishes (or auto-publish runs) so the magazine layout
+      // refreshes immediately without a manual reload.
+      briefing: queryKeys.client.briefing(workspaceId),
     };
     const qk = keyFns[key];
     if (qk) queryClient.invalidateQueries({ queryKey: qk });

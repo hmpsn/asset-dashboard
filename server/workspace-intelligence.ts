@@ -2249,6 +2249,12 @@ function formatClientSignalsSection(signals: ClientSignalsSlice, verbosity: Prom
   if (signals.compositeHealthScore != null) {
     lines.push(`Health score: ${signals.compositeHealthScore}/100`);
   }
+  if (signals.latestBriefing) {
+    const b = signals.latestBriefing;
+    lines.push(
+      `Latest briefing: ${b.storyCount} stor${b.storyCount === 1 ? 'y' : 'ies'} (week of ${b.weekOf})${b.hasHero ? ' with hero' : ''}`,
+    );
+  }
 
   if (verbosity !== 'compact') {
     if (signals.engagement) {

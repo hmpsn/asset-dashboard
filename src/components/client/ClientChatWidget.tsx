@@ -26,6 +26,14 @@ export interface ClientChatWidgetProps {
   onApiChange?: (api: ClientChatWidgetApi) => void;
   /** Called when the expanded state changes — used by FeedbackWidget. */
   onExpandedChange?: (expanded: boolean) => void;
+  /**
+   * Override the default quick-question buttons shown in the empty chat state.
+   * When omitted, the widget falls back to `QUICK_QUESTIONS` from `./types`.
+   * Set by `<InsightsBriefingPage>` (Phase 2 of client-briefing-v2) so the
+   * briefing-era home page can route its sidebar quick questions through the
+   * floating chat widget instead of a separate sidebar.
+   */
+  quickQuestions?: string[];
 }
 
 export function ClientChatWidget({
@@ -35,6 +43,7 @@ export function ClientChatWidget({
   ws,
   onApiChange,
   onExpandedChange,
+  quickQuestions,
 }: ClientChatWidgetProps) {
   const clientNavigate = useNavigate();
 
@@ -197,7 +206,7 @@ export function ClientChatWidget({
                   <div className="p-4 space-y-3">
                     <p className="t-caption-sm text-[var(--brand-text-muted)]">Ask anything about your site performance:</p>
                     <div className="grid grid-cols-1 gap-2">
-                      {QUICK_QUESTIONS.map((q, i) => (
+                      {(quickQuestions ?? QUICK_QUESTIONS).map((q, i) => (
                         <button
                           key={i}
                           onClick={() => askAi(q)}
