@@ -1,8 +1,8 @@
 /**
- * Integration test — Stripe config endpoints require JWT role-based auth.
+ * Integration test — Stripe config endpoints require HMAC admin auth.
  *
  * These four endpoints manage SYSTEM-level Stripe secrets and are restricted
- * to users with `owner` or `admin` JWT role via `requireAuth` + `requireRole`:
+ * to HMAC admin token holders via `requireAdminAuth`:
  *
  *   GET    /api/stripe/config
  *   POST   /api/stripe/config/keys
@@ -10,16 +10,16 @@
  *   DELETE /api/stripe/config
  *
  * Auth model: the global APP_PASSWORD gate in server/app.ts allows requests
- * with a valid HMAC token, raw APP_PASSWORD, or valid JWT through to routes.
- * These four routes then apply `requireAuth` (JWT extraction + verification +
- * user lookup) followed by `requireRole('owner', 'admin')`.
+ * with a valid HMAC token or valid JWT through to routes. These four routes
+ * then apply `requireAdminAuth` which accepts ONLY HMAC admin tokens and
+ * rejects JWT user tokens.
  *
  * These tests spawn a gated server (APP_PASSWORD set) and verify:
- *   - JWT member token   → 401 (user not in DB, or 403 if user exists with wrong role)
- *   - HMAC admin token   → 401 (requireAuth can't find a JWT)
- *   - Raw APP_PASSWORD   → 401 (requireAuth can't find a JWT)
+ *   - JWT member token   → 401 (requireAdminAuth rejects JWT)
+ *   - HMAC admin token   → not 401/403 (primary accepted credential)
+ *   - Raw APP_PASSWORD   → 401 (global gate no longer accepts raw password)
  *   - No auth            → 401 (global gate rejects)
- *   - JWT owner token    → not 401/403 (passes through)
+ *   - JWT owner token + HMAC → not 401/403 (HMAC passes through)
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { spawn, type ChildProcess } from 'child_process';
@@ -126,7 +126,7 @@ const TEST_OWNER_EMAIL = 'stripe_admin_owner@test.local';
 let ownerJwt = '';
 let testUserId = '';
 
-describe('Integration — Stripe config endpoints require JWT role-based auth', () => {
+describe('Integration — Stripe config endpoints require HMAC admin auth', () => {
   beforeAll(async () => {
     // Create the user in the shared DB so requireAuth's getUserById() finds them.
     let user = getUserByEmail(TEST_OWNER_EMAIL);
@@ -183,7 +183,7 @@ describe('Integration — Stripe config endpoints require JWT role-based auth', 
   }
 
   // ─────────────────────────────────────────────────────────────
-  // No auth / HMAC-only / raw password — all rejected by requireAuth
+  // No auth / raw password — rejected; HMAC admin — accepted
   // ─────────────────────────────────────────────────────────────
 
   for (const ep of endpoints) {
@@ -196,24 +196,26 @@ describe('Integration — Stripe config endpoints require JWT role-based auth', 
       expect(res.status).toBe(401);
     });
 
-    it(`${ep.method} ${ep.path} rejects HMAC admin token without JWT (401)`, async () => {
+    it(`${ep.method} ${ep.path} accepts HMAC admin token (not 401/403)`, async () => {
       const res = await gatedFetch(ep.path, {
         method: ep.method,
         headers: ep.body ? { 'Content-Type': 'application/json' } : undefined,
         body: ep.body ? JSON.stringify(ep.body) : undefined,
         extraHeaders: { 'x-auth-token': EXPECTED_HMAC_TOKEN },
       });
-      // HMAC passes the global APP_PASSWORD gate but requireAuth needs a JWT
-      expect(res.status, `${ep.method} ${ep.path} must reject HMAC-only auth`).toBe(401);
+      // HMAC passes both the global gate and requireAdminAuth
+      expect(res.status, `${ep.method} ${ep.path} must accept HMAC admin token`).not.toBe(401);
+      expect(res.status, `${ep.method} ${ep.path} must accept HMAC admin token`).not.toBe(403);
     });
 
-    it(`${ep.method} ${ep.path} rejects raw APP_PASSWORD without JWT (401)`, async () => {
+    it(`${ep.method} ${ep.path} rejects raw APP_PASSWORD (401)`, async () => {
       const res = await gatedFetch(ep.path, {
         method: ep.method,
         headers: ep.body ? { 'Content-Type': 'application/json' } : undefined,
         body: ep.body ? JSON.stringify(ep.body) : undefined,
         extraHeaders: { 'x-auth-token': TEST_APP_PASSWORD },
       });
+      // Raw APP_PASSWORD is no longer accepted by the global gate or requireAdminAuth
       expect(res.status, `${ep.method} ${ep.path} must reject raw APP_PASSWORD`).toBe(401);
     });
   }
