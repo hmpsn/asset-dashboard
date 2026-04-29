@@ -190,17 +190,26 @@ export function collectAuditDeltaCandidates(workspaceId: string): Candidate[] {
   }];
 }
 
+/**
+ * Collects candidates from all three sources. Each source is wrapped
+ * independently so a failure in one (e.g. a corrupted analytics_insights row)
+ * doesn't drop candidates from the other two — the caller gets a true partial
+ * result rather than silent total failure.
+ */
 export function collectAllCandidates(workspaceId: string): Candidate[] {
-  try {
-    return [
-      ...collectInsightCandidates(workspaceId),
-      ...collectRecommendationCandidates(workspaceId),
-      ...collectAuditDeltaCandidates(workspaceId),
-    ];
-  } catch (err) {
-    log.error({ err, workspaceId }, 'collectAllCandidates failed; returning partial');
-    return [];
+  const out: Candidate[] = [];
+  for (const [name, fn] of [
+    ['insights', collectInsightCandidates],
+    ['recommendations', collectRecommendationCandidates],
+    ['audit_delta', collectAuditDeltaCandidates],
+  ] as const) {
+    try {
+      out.push(...fn(workspaceId));
+    } catch (err) {
+      log.error({ err, workspaceId, source: name }, 'briefing candidate collector failed; skipping source');
+    }
   }
+  return out;
 }
 
 /** Render a numbered candidate block for the AI prompt. */

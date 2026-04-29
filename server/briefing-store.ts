@@ -75,7 +75,12 @@ const briefingStmts = createStmtCache(() => ({
     ON CONFLICT(workspace_id, week_of) DO UPDATE SET
       stories = excluded.stories,
       source_metadata = excluded.source_metadata,
-      status = CASE WHEN briefing_drafts.status = 'published' THEN briefing_drafts.status ELSE excluded.status END,
+      -- Both terminal statuses are protected — published cannot regenerate, skipped
+      -- cannot be silently overridden by a cron retry (admin's "do not publish" intent
+      -- must survive). approved (intermediate) DOES collapse back to draft on re-upsert,
+      -- which is acceptable: the cron only re-upserts after admin un-approval clears
+      -- the row OR after a defer cycle, both of which the admin initiated.
+      status = CASE WHEN briefing_drafts.status IN ('published', 'skipped') THEN briefing_drafts.status ELSE excluded.status END,
       updated_at = excluded.updated_at
     RETURNING *
   `),
@@ -179,7 +184,9 @@ export function getLatestPublishedBriefing(workspaceId: string): BriefingDraft |
 export function updateBriefingStories(workspaceId: string, id: string, stories: BriefingStory[]): BriefingDraft | null {
   const current = getDraftScoped(workspaceId, id);
   if (!current) return null;
-  if (current.status === 'published') return null;  // published is terminal — protect against silent overwrite
+  // Both terminal statuses block edits — published can't be rewritten and skipped is a
+  // committed admin decision that should not be reanimated via a stories patch.
+  if (current.status === 'published' || current.status === 'skipped') return null;
   const row = briefingStmts().setStories.get(JSON.stringify(stories), Date.now(), id, workspaceId) as BriefingRow | undefined;
   return row ? rowToDraft(row) : null;
 }

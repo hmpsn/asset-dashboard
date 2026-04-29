@@ -25,6 +25,7 @@ import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { addActivity } from '../activity-log.js';
 import { InvalidTransitionError } from '../state-machines.js';
+import { runBriefingForWorkspace } from '../briefing-cron.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('routes:briefing');
@@ -91,6 +92,9 @@ router.post(
       if (!updated) {
         return res.status(404).json({ error: 'Draft not found' });
       }
+      // activity-ok — approve is an intermediate admin state, not a durable client event.
+      // The publish path logs `briefing_published` and the cron logs `briefing_generated`;
+      // approve is an internal review step that doesn't warrant its own activity entry.
       broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRIEFING_GENERATED, {
         briefingId: updated.id,
         action: 'approved',
@@ -192,28 +196,21 @@ router.post(
 );
 
 // ── POST /api/briefing/:workspaceId/generate-now ─────────────────────────────
-// Admin manual trigger. Lazy-imports briefing-cron.ts (created in T1.14).
-// Returns 202 immediately; the cron runs in the background.
+// Admin manual trigger. Returns 202 immediately; the cron runs in the
+// background (mutex inside runBriefingForWorkspace prevents concurrent runs).
 
 router.post(
   '/api/briefing/:workspaceId/generate-now',
   requireWorkspaceAccess('workspaceId'),
-  async (req, res) => {
-    try {
-      // Lazy import — briefing-cron.ts is created in T1.14.
-      // Use a computed specifier so bundlers/Vite don't try to resolve it at build time.
-      // The try/catch handles MODULE_NOT_FOUND at runtime until T1.14 lands.
-      const cronSpecifier = `../briefing-cron.js`; // catch-ok: MODULE_NOT_FOUND expected until T1.14
-      const cronModule = await import(/* @vite-ignore */ cronSpecifier); // dynamic-import-ok: T1.14 module not yet present
-      const runFn = (cronModule as Record<string, unknown>).runBriefingForWorkspace as ((wsId: string, opts: { manual: boolean }) => Promise<void>);
-      runFn(req.params.workspaceId, { manual: true })
-        .then(() => log.info({ workspaceId: req.params.workspaceId }, 'manual briefing run complete'))
-        .catch((err: unknown) => log.error({ err, workspaceId: req.params.workspaceId }, 'manual briefing run failed'));
-      return res.status(202).json({ accepted: true });
-    } catch (err) { // catch-ok: MODULE_NOT_FOUND when briefing-cron.ts doesn't exist yet (T1.14)
-      log.warn({ err, workspaceId: req.params.workspaceId }, 'briefing cron module not yet available — accepting trigger as no-op');
-      return res.status(202).json({ accepted: true, note: 'cron module pending' });
-    }
+  (req, res) => {
+    runBriefingForWorkspace(req.params.workspaceId, { manual: true })
+      .then((r) =>
+        log.info({ workspaceId: req.params.workspaceId, ...r }, 'manual briefing run complete'),
+      )
+      .catch((err: unknown) =>
+        log.error({ err, workspaceId: req.params.workspaceId }, 'manual briefing run failed'),
+      );
+    return res.status(202).json({ accepted: true });
   },
 );
 

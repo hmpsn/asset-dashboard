@@ -20,6 +20,7 @@
 // here.
 
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 import { listWorkspaces, getWorkspace, updateWorkspace } from './workspaces.js';
 import { getSchedule } from './scheduled-audits.js';
 import { callAI } from './ai.js';
@@ -51,6 +52,14 @@ const TARGET_HOUR_UTC = 14;
 const FRESHNESS_AUDIT_DAYS = 8;
 const FRESHNESS_COMPETITOR_DAYS = 8;
 const MAX_DEFERRALS = 3;
+
+// ── Statement cache ──────────────────────────────────────────────────────────
+
+const briefingCronStmts = createStmtCache(() => ({
+  latestCompetitorSnapshot: db.prepare(
+    'SELECT MAX(created_at) AS m FROM competitor_snapshots WHERE workspace_id = ?',
+  ),
+}));
 
 // ── Time helpers ─────────────────────────────────────────────────────────────
 
@@ -92,9 +101,9 @@ function isAuditFresh(workspaceId: string): boolean {
  */
 function isCompetitorFresh(workspaceId: string): boolean {
   try {
-    const row = db
-      .prepare('SELECT MAX(created_at) AS m FROM competitor_snapshots WHERE workspace_id = ?')
-      .get(workspaceId) as { m: string | null } | undefined;
+    const row = briefingCronStmts().latestCompetitorSnapshot.get(workspaceId) as
+      | { m: string | null }
+      | undefined;
     if (!row?.m) return true;
     const last = new Date(row.m).getTime();
     if (Number.isNaN(last)) return true;
@@ -124,6 +133,16 @@ export interface RunBriefingResult {
 }
 
 /**
+ * Per-process mutex preventing concurrent runs for the same workspace.
+ * Mirrors the runningAudits Set pattern in scheduled-audits.ts. Two AI calls
+ * for the same workspace+week (e.g. cron tick racing with admin generate-now)
+ * would double-charge AI quota and double-broadcast. The DB-level
+ * lastBriefingRunWeekOf guard handles cross-process duplicates after the
+ * first one completes; this Set handles the in-process race.
+ */
+const runningBriefings = new Set<string>();
+
+/**
  * Run the briefing pipeline once for one workspace. Idempotent within an ISO
  * week unless `manual: true`. Returns a result object — never throws on
  * expected control-flow paths (free tier, duplicate, AI-invalid). Re-throws
@@ -132,6 +151,22 @@ export interface RunBriefingResult {
 export async function runBriefingForWorkspace(
   workspaceId: string,
   opts: RunBriefingOptions = {},
+): Promise<RunBriefingResult> {
+  // Mutex: refuse concurrent runs for the same workspace
+  if (runningBriefings.has(workspaceId)) {
+    return { status: 'duplicate', weekOf: '', reason: 'already running' };
+  }
+  runningBriefings.add(workspaceId);
+  try {
+    return await runBriefingForWorkspaceInner(workspaceId, opts);
+  } finally {
+    runningBriefings.delete(workspaceId);
+  }
+}
+
+async function runBriefingForWorkspaceInner(
+  workspaceId: string,
+  opts: RunBriefingOptions,
 ): Promise<RunBriefingResult> {
   const ws = getWorkspace(workspaceId);
   if (!ws) return { status: 'skipped', weekOf: '', reason: 'workspace not found' };
@@ -149,6 +184,15 @@ export async function runBriefingForWorkspace(
 
   // Pre-flight freshness check (defers up to MAX_DEFERRALS times)
   const existing = getBriefingByWeek(workspaceId, weekOf);
+
+  // Terminal-state guard — never overwrite admin's published or skipped decision.
+  // The store's ON CONFLICT clause ALSO protects these statuses, but short-
+  // circuiting here avoids the wasted AI call for manual generate-now triggered
+  // on a week the admin already finalized.
+  if (existing && (existing.status === 'published' || existing.status === 'skipped')) {
+    return { status: 'duplicate', weekOf, reason: `already ${existing.status}` };
+  }
+
   const deferrals = existing?.sourceMetadata?.preflightDeferralCount ?? 0;
   const auditOk = isAuditFresh(workspaceId);
   const compOk = isCompetitorFresh(workspaceId);
@@ -176,10 +220,14 @@ export async function runBriefingForWorkspace(
     };
   }
 
-  // Collect candidates
+  // Collect candidates. With zero candidates, skip regardless of manual flag —
+  // the AI prompt would otherwise instruct the model to hallucinate 3-5 stories
+  // from an empty pool, which auto-publish could then ship as fabricated content.
+  // (The plan's "always show ≥1 story" intent is for genuinely-quiet weeks where
+  // some signal exists but materiality is low, not for true-empty pools.)
   const candidates = collectAllCandidates(workspaceId);
-  if (candidates.length === 0 && !opts.manual) {
-    log.info({ workspaceId, weekOf }, 'briefing skipped — no candidates');
+  if (candidates.length === 0) {
+    log.info({ workspaceId, weekOf, manual: !!opts.manual }, 'briefing skipped — no candidates');
     return { status: 'skipped', weekOf, reason: 'no candidates' };
   }
   const top = topNByMateriality(candidates, 10);
@@ -316,10 +364,15 @@ async function tick(now = new Date()): Promise<void> {
     if ((ws.tier ?? 'free') === 'free') continue;
     try {
       const r = await runBriefingForWorkspace(ws.id);
-      lastTickRunWeek[ws.id] = weekOf;
       log.info({ workspaceId: ws.id, ...r }, 'briefing tick');
     } catch (err) {
       log.error({ err, workspaceId: ws.id }, 'briefing tick error');
+    } finally {
+      // Stamp the in-memory memo even on error, so a permanently-failing workspace
+      // (e.g. malformed config) doesn't retry every hour for the rest of the week.
+      // The DB-level lastBriefingRunWeekOf still acts as the cross-process backstop;
+      // this just bounds in-process retries.
+      lastTickRunWeek[ws.id] = weekOf;
     }
   }
 }
