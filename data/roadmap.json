@@ -774,6 +774,16 @@
           "priority": "P3",
           "notes": "Each new workspace requires: connect Webflow, connect GSC, connect GA4, run keyword analysis, run site audit, set up brand voice, configure competitors, set content pricing, enable client portal. Most steps are identical across workspaces. Add: workspace templates (clone config from existing workspace), batch analysis trigger (run audit + keyword analysis + decay analysis in one click), onboarding checklist with progress tracking, default competitor auto-discovery. Separate initiative from intelligence engine \u2014 scoped as its own spec.",
           "status": "pending"
+        },
+        {
+          "id": "schema-intelligence-layer-v2",
+          "title": "Schema Intelligence Layer (FAQ-from-GSC, E-E-A-T, healthcare subtypes)",
+          "source": "docs/superpowers/plans/2026-04-29-lean-schema-rewrite.md (deferred scope)",
+          "est": "2-3w",
+          "priority": "P1",
+          "sprint": "I",
+          "status": "pending",
+          "notes": "Follow-up to lean-schema-rewrite. Re-injects the platform's intelligence layer surgically into schema generation: (1) Healthcare type escalation \u2014 workspace businessContext \u2192 Dentist/Physician/Optician/Chiropractor/MedicalClinic/etc. when address+phone+hours are present, falls back to LocalBusiness otherwise. (2) FAQ enrichment from GSC question queries \u2014 extractFaqOpportunities (already exists in analytics-intelligence.ts) feeds FAQPage when \u22653 question queries match a page. (3) E-E-A-T author injection from content brief \u2014 extractEeatFromBrief (already exists) populates Article.author with Person.knowsAbout, sameAs from the brief's expert profile. (4) Service serviceType from voice profile + business profile. Reuses existing intelligence wiring; the lean rewrite kept the data flow intact, this task adds surgical injection points to the templates."
         }
       ]
     },
@@ -4723,6 +4733,17 @@
           "status": "done",
           "shippedAt": "2026-04-28",
           "notes": "7 targeted fixes to schema output quality and intelligence wiring. (1) UTILITY_SLUGS constant \u2014 single regex applied at hasPart/relatedLink injections and generation queue pre-filter. (2) SiteNavigationElement block deleted from postProcessSchema; removed from PAGE_TYPE_SCHEMA_MAP homepage secondary array. (3) CollectionPage injection guarded with pagePath !== '/'. (4) upgradeHealthcareType() deterministic fallback: businessContext \u2192 Dentist/Physician/Optician/Chiropractor/MedicalClinic/Hospital/MedicalBusiness. (5) autoFixSchema: knowsAbout trimmed \u22645, Product zero-price offers stripped, SiteNavigationElement nodes stripped. (6) INVALID_PROPERTIES expanded with Product: ['pricing', 'features', 'cost']. (7) Prompt: healthcare rule promoted to 3b with expanded trigger keywords; Product zero-price guard added as 9b; SiteNavigationElement removed from homepage instructions. (8) Intelligence context: _serpFeatures + _backlinkReferringDomains from workspace intelligence layer (non-blocking); _existingErrors from schema_validations at all 3 call sites. (9) Declined keywords filtered before context assembly. (10) BusinessProfileTab amber warning for empty profile on local-business workspace. Audit: docs/superpowers/audits/2026-04-28-schema-generator-audit.md."
+        },
+        {
+          "id": "lean-schema-rewrite",
+          "title": "Lean Schema Generation Rewrite",
+          "source": "docs/superpowers/plans/2026-04-29-lean-schema-rewrite.md",
+          "est": "5-7d",
+          "priority": "P0",
+          "sprint": "H",
+          "status": "done",
+          "shippedAt": "2026-04-29",
+          "notes": "Replaces 2,558-line schema-suggester.ts pipeline with deterministic 6-module package at server/schema/. URL classifier + per-type templates + canonical data sources + 2 surgical AI extractors (description, FAQ) + per-type validator + thin orchestrator. Output ~72% smaller, validates first time, eliminates duplicate WebPage bug and wrong-type bug for case studies/privacy/index pages. Common types only (BlogPosting, Article, Service, Product, LocalBusiness, AboutPage, ContactPage, CollectionPage, WebPage, Organization, WebSite). Healthcare uses LocalBusiness fallback; subtype escalation deferred to schema-intelligence-layer-v2."
         }
       ]
     }
