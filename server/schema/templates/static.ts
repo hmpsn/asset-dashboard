@@ -3,7 +3,7 @@
  * Each emits the typed primary node + BreadcrumbList only.
  */
 import type { PageData } from '../data-sources.js';
-import { dropUndefined, orgRef, withBreadcrumb } from './helpers.js';
+import { dropUndefined, orgRef, withBreadcrumb, webSiteRef, breadcrumbRef } from './helpers.js';
 
 export interface StaticInput {
   baseUrl: string;
@@ -15,46 +15,58 @@ export function buildAboutPageSchema(input: StaticInput): Record<string, unknown
   const primary = dropUndefined({
     '@type': 'AboutPage',
     '@id': `${pageData.canonicalUrl}#aboutpage`,
-    'name': pageData.title,
+    'name': pageData.cleanTitle,
     'description': pageData.description,
     'url': pageData.canonicalUrl,
     'mainEntity': orgRef(baseUrl),
+    'isPartOf': webSiteRef(baseUrl),
+    'breadcrumb': breadcrumbRef(pageData.canonicalUrl),
+    'inLanguage': pageData.inLanguage,
   });
   return withBreadcrumb(primary, pageData);
 }
 
 export function buildContactPageSchema(input: StaticInput): Record<string, unknown> {
-  const { pageData } = input;
+  const { pageData, baseUrl } = input;
   const primary = dropUndefined({
     '@type': 'ContactPage',
     '@id': `${pageData.canonicalUrl}#contactpage`,
-    'name': pageData.title,
+    'name': pageData.cleanTitle,
     'description': pageData.description,
     'url': pageData.canonicalUrl,
+    'isPartOf': webSiteRef(baseUrl),
+    'breadcrumb': breadcrumbRef(pageData.canonicalUrl),
+    'inLanguage': pageData.inLanguage,
   });
   return withBreadcrumb(primary, pageData);
 }
 
 export function buildCollectionPageSchema(input: StaticInput): Record<string, unknown> {
-  const { pageData } = input;
+  const { pageData, baseUrl } = input;
   const primary = dropUndefined({
     '@type': 'CollectionPage',
     '@id': `${pageData.canonicalUrl}#collection`,
-    'name': pageData.title,
+    'name': pageData.cleanTitle,
     'description': pageData.description,
     'url': pageData.canonicalUrl,
+    'isPartOf': webSiteRef(baseUrl),
+    'breadcrumb': breadcrumbRef(pageData.canonicalUrl),
+    'inLanguage': pageData.inLanguage,
   });
   return withBreadcrumb(primary, pageData);
 }
 
 export function buildWebPageSchema(input: StaticInput): Record<string, unknown> {
-  const { pageData } = input;
+  const { pageData, baseUrl } = input;
   const primary = dropUndefined({
     '@type': 'WebPage',
     '@id': `${pageData.canonicalUrl}#webpage`,
-    'name': pageData.title,
+    'name': pageData.cleanTitle,
     'description': pageData.description,
     'url': pageData.canonicalUrl,
+    'isPartOf': webSiteRef(baseUrl),
+    'breadcrumb': breadcrumbRef(pageData.canonicalUrl),
+    'inLanguage': pageData.inLanguage,
   });
   return withBreadcrumb(primary, pageData);
 }

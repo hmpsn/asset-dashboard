@@ -207,9 +207,11 @@ const staticInput = {
   baseUrl: 'https://example.com',
   pageData: {
     title: 'About Us',
+    cleanTitle: 'About Us',
     description: 'Who we are',
     canonicalUrl: 'https://example.com/about',
     publisher: { name: 'Acme', logoUrl: undefined },
+    inLanguage: 'en',
     breadcrumbs: [
       { name: 'Home', url: 'https://example.com' },
       { name: 'About Us', url: 'https://example.com/about' },
@@ -237,6 +239,25 @@ describe('static page templates', () => {
   it('WebPage fallback emits 2 nodes', () => {
     const schema = buildWebPageSchema(staticInput);
     expect(((schema['@graph'] as Array<Record<string, unknown>>)[0])['@type']).toBe('WebPage');
+  });
+  it('AboutPage primary node has isPartOf, breadcrumb, inLanguage', () => {
+    const schema = buildAboutPageSchema(staticInput);
+    const node = (schema['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.isPartOf).toEqual({ '@id': 'https://example.com/#website' });
+    expect(node.breadcrumb).toEqual({ '@id': 'https://example.com/about#breadcrumb' });
+    expect(node.inLanguage).toBe('en');
+  });
+  it('WebPage primary node has isPartOf, breadcrumb, inLanguage', () => {
+    const schema = buildWebPageSchema(staticInput);
+    const node = (schema['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.isPartOf).toEqual({ '@id': 'https://example.com/#website' });
+    expect(node.breadcrumb).toEqual({ '@id': 'https://example.com/about#breadcrumb' });
+    expect(node.inLanguage).toBe('en');
+  });
+  it('uses cleanTitle, not raw title, for name', () => {
+    const dirty = { ...staticInput, pageData: { ...staticInput.pageData, title: 'About Us | Acme', cleanTitle: 'About Us' } };
+    const node = (buildWebPageSchema(dirty)['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.name).toBe('About Us');
   });
 });
 
