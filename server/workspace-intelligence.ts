@@ -2476,7 +2476,7 @@ async function assemblePageProfile(
   }
 
   // Hoist workspace lookup so both auditIssues and schemaStatus blocks can reuse it.
-  let ws: Awaited<ReturnType<typeof import('./workspaces.js').getWorkspace>> | null = null;
+  let ws: Workspace | null = null;
   try {
     const { getWorkspace } = await import('./workspaces.js');
     ws = getWorkspace(workspaceId) ?? null;
@@ -2513,9 +2513,8 @@ async function assemblePageProfile(
     const validations: SchemaValidation[] = getValidations(workspaceId);
     const snapshot = ws?.webflowSiteId ? getSchemaSnapshot(ws.webflowSiteId) : null;
     const pagePathTrimmed = pagePath.replace(/^\//, '');
-    const resolvedPageId = snapshot?.results.find(r =>
-      r.slug === pagePathTrimmed || `/${r.slug}` === pagePath,
-    )?.pageId ?? toCmsPageId(pagePath);
+    const resolvedPageId = snapshot?.results.find(r => r.slug === pagePathTrimmed)?.pageId
+      ?? toCmsPageId(pagePath);
     const pageValidation = validations.find(v => v.pageId === resolvedPageId);
     if (pageValidation) {
       const status = pageValidation.status;

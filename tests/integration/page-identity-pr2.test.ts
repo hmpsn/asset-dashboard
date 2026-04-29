@@ -151,3 +151,42 @@ describe('migration 076: cms-- → cms- normalisation', () => {
     expect(cmsSeoChanges.n).toBe(0);
   });
 });
+
+describe('_existingErrors lookup by toCmsPageId key', () => {
+  it('schema_validations row written with toCmsPageId() key is findable via the same key', () => {
+    const cmsPath = '/blog/existing-errors-test';
+    const cmsKey = toCmsPageId(cmsPath);
+    expect(cmsKey).toBe('cms-blog-existing-errors-test');
+
+    db.prepare(`DELETE FROM schema_validations WHERE workspace_id = ? AND page_id = ?`).run(ws.workspaceId, cmsKey);
+    db.prepare(`
+      INSERT INTO schema_validations (id, workspace_id, page_id, status, rich_results, errors, warnings, validated_at)
+      VALUES (?, ?, ?, 'errors', '[]', ?, '[]', datetime('now'))
+    `).run(
+      `pr2-errs-${ws.workspaceId}`,
+      ws.workspaceId,
+      cmsKey,
+      JSON.stringify([
+        { type: 'MissingField', message: 'Missing required @type' },
+        { type: 'InvalidValue', message: 'Invalid datePublished format' },
+      ]),
+    );
+
+    // Build the same lookup map schema-suggester builds via getValidations() and look up by cmsKey.
+    const rows = db.prepare(
+      `SELECT page_id, errors FROM schema_validations WHERE workspace_id = ? AND page_id = ?`,
+    ).all(ws.workspaceId, cmsKey) as Array<{ page_id: string; errors: string }>;
+    expect(rows).toHaveLength(1);
+    expect(rows[0].page_id).toBe(cmsKey);
+
+    // Mirror the filter applied in schema-suggester before injection into the prompt.
+    const parsed = JSON.parse(rows[0].errors) as unknown[];
+    const validated = parsed.filter(
+      (e): e is { message: string } => typeof (e as { message?: unknown })?.message === 'string',
+    );
+    expect(validated.map(e => e.message)).toEqual([
+      'Missing required @type',
+      'Invalid datePublished format',
+    ]);
+  });
+});
