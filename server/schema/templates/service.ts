@@ -27,7 +27,7 @@ export function buildServiceSchema(input: ServiceInput): Record<string, unknown>
       'name': pageData.publisher.name,
     }),
     'isPartOf': webSiteRef(baseUrl),
-    'breadcrumb': breadcrumbRef(pageData.canonicalUrl),
+    'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
     'inLanguage': pageData.inLanguage,
   });
 
@@ -46,7 +46,7 @@ export function buildProductSchema(input: ServiceInput): Record<string, unknown>
     'url': pageData.canonicalUrl,
     'brand': { '@type': 'Brand', 'name': pageData.publisher.name },
     'isPartOf': webSiteRef(baseUrl),
-    'breadcrumb': breadcrumbRef(pageData.canonicalUrl),
+    'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
     'inLanguage': pageData.inLanguage,
     // Intentionally NO offers — emitting offers without a verified price is spammy
     // and Google penalises it. Add via intelligence layer when business profile has price.

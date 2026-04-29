@@ -347,8 +347,10 @@ export async function buildSchemaContext(
     ctx._siteId = siteId;
 
     // Resolve site-wide default locale from Webflow (paid-grade `inLanguage`).
+    // Pass the workspace's per-site token so this works for workspaces that don't
+    // rely on the global WEBFLOW_API_TOKEN env var.
     try {
-      const sites = await listSites();
+      const sites = await listSites(ws.webflowToken || undefined);
       const matched = sites.find(s => s.id === siteId);
       if (matched?.defaultLocale) ctx._defaultLocale = matched.defaultLocale;
     } catch { /* listSites failure: leave _defaultLocale undefined; downstream falls back to 'en' */ } // catch-ok

@@ -481,8 +481,17 @@ export async function discoverCmsItemsBySlug(
   const { listCollections, listCollectionItems } = await import('./webflow-cms.js'); // dynamic-import-ok
   const collections = await listCollections(siteId, tokenOverride);
 
-  const slugMap = new Map<string, Omit<CmsItemFull, 'url' | 'path' | 'pageName'>>();
+  // Key by `${collectionSlug}/${itemSlug}` to disambiguate items that share an item-slug
+  // across collections (e.g. /blog/expero AND /our-work/expero — same item-slug, different
+  // collection). A flat slug map would silently last-writer-wins. We also keep a fallback
+  // index by item-slug alone so URLs whose collection-prefix doesn't match the collection's
+  // listed slug (Webflow allows custom URL paths per collection) still resolve when the
+  // item-slug is globally unique — but never when ambiguous.
+  type CmsItemMeta = Omit<CmsItemFull, 'url' | 'path' | 'pageName'>;
+  const compoundMap = new Map<string, CmsItemMeta>();
+  const itemSlugIndex = new Map<string, CmsItemMeta[]>();
   for (const coll of collections) {
+    const collSlug = (coll.slug || '').toLowerCase();
     let offset = 0;
     const pageSize = 100;
     while (offset < limit) {
@@ -492,13 +501,18 @@ export async function discoverCmsItemsBySlug(
         const fieldData = (it.fieldData as Record<string, unknown> | undefined) ?? null;
         const slug = (fieldData?.slug as string | undefined) ?? undefined;
         if (!slug) continue;
-        slugMap.set(slug.toLowerCase(), {
+        const itemSlug = slug.toLowerCase();
+        const meta: CmsItemMeta = {
           collectionId: coll.id,
           itemId: (it.id as string) ?? '',
           lastPublished: (it.lastPublished as string | null | undefined) ?? null,
           createdOn: (it.createdOn as string | null | undefined) ?? null,
           fieldData,
-        });
+        };
+        if (collSlug) compoundMap.set(`${collSlug}/${itemSlug}`, meta);
+        const bucket = itemSlugIndex.get(itemSlug) ?? [];
+        bucket.push(meta);
+        itemSlugIndex.set(itemSlug, bucket);
       }
       offset += batch.length;
       if (offset >= total) break;
@@ -507,8 +521,17 @@ export async function discoverCmsItemsBySlug(
 
   const items: CmsItemFull[] = [];
   for (const u of cmsUrls) {
-    const lastSeg = u.path.replace(/\/$/, '').split('/').pop()?.toLowerCase() ?? '';
-    const meta = slugMap.get(lastSeg);
+    const segs = u.path.replace(/^\/|\/$/g, '').toLowerCase().split('/').filter(Boolean);
+    const itemSlug = segs[segs.length - 1] ?? '';
+    const collSeg = segs.length >= 2 ? segs[segs.length - 2] : '';
+    let meta: CmsItemMeta | undefined;
+    if (collSeg && compoundMap.has(`${collSeg}/${itemSlug}`)) {
+      meta = compoundMap.get(`${collSeg}/${itemSlug}`);
+    } else {
+      const candidates = itemSlugIndex.get(itemSlug) ?? [];
+      // Fallback only when the item-slug is globally unique — never when ambiguous.
+      if (candidates.length === 1) meta = candidates[0];
+    }
     if (!meta) {
       items.push({ ...u, collectionId: '', itemId: '', lastPublished: null, createdOn: null, fieldData: null });
     } else {

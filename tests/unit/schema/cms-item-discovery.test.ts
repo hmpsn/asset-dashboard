@@ -46,4 +46,38 @@ describe('discoverCmsItemsBySlug', () => {
     expect(out.items[0].itemId).toBe('');
     expect(out.items[0].fieldData).toBeNull();
   });
+
+  it('disambiguates same item-slug across collections via compound key', async () => {
+    // Two collections both have an item slugged "expero" — one in /blog, one in /our-work.
+    // The flat-slug map would last-writer-wins. The compound key resolves correctly.
+    vi.mocked(listCollections).mockResolvedValue([
+      { id: 'col-blog', displayName: 'Blog', slug: 'blog' },
+      { id: 'col-cases', displayName: 'Case Studies', slug: 'our-work' },
+    ]);
+    vi.mocked(listCollectionItems)
+      .mockResolvedValueOnce({
+        items: [{ id: 'blog-item', lastPublished: '2026-01-01T00:00:00Z', createdOn: null, fieldData: { slug: 'expero', name: 'Expero blog' } }],
+        total: 1,
+      })
+      .mockResolvedValueOnce({
+        items: [{ id: 'case-item', lastPublished: '2026-02-01T00:00:00Z', createdOn: null, fieldData: { slug: 'expero', name: 'Expero case study' } }],
+        total: 1,
+      });
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => `<?xml version="1.0"?><urlset>
+        <url><loc>https://acme.com/blog/expero</loc></url>
+        <url><loc>https://acme.com/our-work/expero</loc></url>
+      </urlset>`,
+    }) as unknown as typeof fetch;
+
+    const out = await discoverCmsItemsBySlug('site1', 'https://acme.com', new Set(['/']), 100);
+    expect(out.items).toHaveLength(2);
+    const blog = out.items.find(i => i.path === '/blog/expero');
+    const cs = out.items.find(i => i.path === '/our-work/expero');
+    expect(blog?.itemId).toBe('blog-item');
+    expect(blog?.fieldData?.name).toBe('Expero blog');
+    expect(cs?.itemId).toBe('case-item');
+    expect(cs?.fieldData?.name).toBe('Expero case study');
+  });
 });

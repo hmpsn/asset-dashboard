@@ -38,7 +38,7 @@ export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Reco
         : undefined,
     }),
     'isPartOf': webSiteRef(input.baseUrl),
-    'breadcrumb': breadcrumbRef(pageData.canonicalUrl),
+    'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
     'inLanguage': pageData.inLanguage,
     'articleSection': pageData.articleSection,
     'about': kind === 'Article' ? 'Case study' : undefined,

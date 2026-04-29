@@ -77,10 +77,16 @@ export function webSiteRef(baseUrl: string): { '@id': string } {
 }
 
 /**
- * Returns an @id reference to a page's BreadcrumbList node.
- * Every non-homepage primary node uses this for the back-reference `breadcrumb` property.
+ * Returns an @id reference to a page's BreadcrumbList node, or undefined when no
+ * BreadcrumbList will be emitted (single-item paths — root or one-segment URLs).
+ * Mirrors the buildBreadcrumb gating so a primary node never points at a
+ * BreadcrumbList @id that doesn't exist in the @graph.
  */
-export function breadcrumbRef(canonicalUrl: string): { '@id': string } {
+export function breadcrumbRef(
+  canonicalUrl: string,
+  breadcrumbs: BreadcrumbItem[],
+): { '@id': string } | undefined {
+  if (breadcrumbs.length < 2) return undefined;
   return { '@id': `${canonicalUrl}#breadcrumb` };
 }
 

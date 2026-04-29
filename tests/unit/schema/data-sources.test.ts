@@ -67,7 +67,7 @@ describe('extractPageData', () => {
       pageMeta: { title: 'Meta Title', slug: 'x', publishedPath: '/x' },
       html,
       baseUrl,
-      workspace: { name: 'Test', publisherLogoUrl: null, businessProfile: null },
+      workspace: { name: 'Test', publisherLogoUrl: null, businessProfile: null, defaultLocale: 'en' },
     });
     expect(data.title).toBe('Meta Title');
   });
@@ -78,7 +78,7 @@ describe('extractPageData', () => {
       pageMeta: { title: '', slug: 'x', publishedPath: '/x' },
       html,
       baseUrl,
-      workspace: { name: 'Test', publisherLogoUrl: null, businessProfile: null },
+      workspace: { name: 'Test', publisherLogoUrl: null, businessProfile: null, defaultLocale: 'en' },
     });
     expect(data.title).toBe('HTML Title');
   });
@@ -92,7 +92,7 @@ describe('extractPageData', () => {
       pageMeta: { title: 'T', slug: 'x', publishedPath: '/x' },
       html,
       baseUrl,
-      workspace: { name: 'Test', publisherLogoUrl: null, businessProfile: null },
+      workspace: { name: 'Test', publisherLogoUrl: null, businessProfile: null, defaultLocale: 'en' },
     });
     expect(data.description).toBe('Real description here');
   });
@@ -105,7 +105,7 @@ describe('extractPageData', () => {
       pageMeta: { title: 'T', slug: 'x', publishedPath: '/x' },
       html,
       baseUrl,
-      workspace: { name: 'Test', publisherLogoUrl: null, businessProfile: null },
+      workspace: { name: 'Test', publisherLogoUrl: null, businessProfile: null, defaultLocale: 'en' },
     });
     expect(data.image).toBe('https://cdn.example.com/og.jpg');
   });
@@ -115,7 +115,7 @@ describe('extractPageData', () => {
       pageMeta: { title: 'T', slug: 'x', publishedPath: '/x' },
       html: '<html><head></head></html>',
       baseUrl,
-      workspace: { name: 'Test', publisherLogoUrl: null, businessProfile: null },
+      workspace: { name: 'Test', publisherLogoUrl: null, businessProfile: null, defaultLocale: 'en' },
     });
     expect(data.description).toBeUndefined();
   });
@@ -125,7 +125,7 @@ describe('extractPageData', () => {
       pageMeta: { title: 'Final', slug: 'final', publishedPath: '/blog/cat/final' },
       html: '<html></html>',
       baseUrl,
-      workspace: { name: 'Test', publisherLogoUrl: null, businessProfile: null },
+      workspace: { name: 'Test', publisherLogoUrl: null, businessProfile: null, defaultLocale: 'en' },
     });
     expect(data.breadcrumbs).toEqual([
       { name: 'Home', url: 'https://example.com' },
@@ -140,7 +140,7 @@ describe('extractPageData', () => {
       pageMeta: { title: 'T', slug: 'x', publishedPath: '/services/design' },
       html: '<html></html>',
       baseUrl,
-      workspace: { name: 'Test', publisherLogoUrl: null, businessProfile: null },
+      workspace: { name: 'Test', publisherLogoUrl: null, businessProfile: null, defaultLocale: 'en' },
     });
     expect(data.canonicalUrl).toBe('https://example.com/services/design');
   });
@@ -154,7 +154,7 @@ describe('extractPageData', () => {
       pageMeta: { title: 'T', slug: 'x', publishedPath: '/blog/x' },
       html,
       baseUrl,
-      workspace: { name: 'Test', publisherLogoUrl: null, businessProfile: null },
+      workspace: { name: 'Test', publisherLogoUrl: null, businessProfile: null, defaultLocale: 'en' },
     });
     expect(data.datePublished).toBe('2025-01-15T10:00:00Z');
     expect(data.dateModified).toBe('2026-04-01T12:00:00Z');
@@ -165,7 +165,7 @@ describe('extractPageData', () => {
       pageMeta: { title: 'T', slug: 'x', publishedPath: '/blog/x' },
       html: '<html></html>',
       baseUrl,
-      workspace: { name: 'Acme Studio', publisherLogoUrl: null, businessProfile: null },
+      workspace: { name: 'Acme Studio', publisherLogoUrl: null, businessProfile: null, defaultLocale: 'en' },
     });
     expect(data.publisher).toEqual({ name: 'Acme Studio', logoUrl: undefined });
   });

@@ -20,7 +20,7 @@ export function buildAboutPageSchema(input: StaticInput): Record<string, unknown
     'url': pageData.canonicalUrl,
     'mainEntity': orgRef(baseUrl),
     'isPartOf': webSiteRef(baseUrl),
-    'breadcrumb': breadcrumbRef(pageData.canonicalUrl),
+    'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
     'inLanguage': pageData.inLanguage,
   });
   return withBreadcrumb(primary, pageData);
@@ -35,7 +35,7 @@ export function buildContactPageSchema(input: StaticInput): Record<string, unkno
     'description': pageData.description,
     'url': pageData.canonicalUrl,
     'isPartOf': webSiteRef(baseUrl),
-    'breadcrumb': breadcrumbRef(pageData.canonicalUrl),
+    'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
     'inLanguage': pageData.inLanguage,
   });
   return withBreadcrumb(primary, pageData);
@@ -50,7 +50,7 @@ export function buildCollectionPageSchema(input: StaticInput): Record<string, un
     'description': pageData.description,
     'url': pageData.canonicalUrl,
     'isPartOf': webSiteRef(baseUrl),
-    'breadcrumb': breadcrumbRef(pageData.canonicalUrl),
+    'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
     'inLanguage': pageData.inLanguage,
   });
   return withBreadcrumb(primary, pageData);
@@ -65,7 +65,7 @@ export function buildWebPageSchema(input: StaticInput): Record<string, unknown> 
     'description': pageData.description,
     'url': pageData.canonicalUrl,
     'isPartOf': webSiteRef(baseUrl),
-    'breadcrumb': breadcrumbRef(pageData.canonicalUrl),
+    'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
     'inLanguage': pageData.inLanguage,
   });
   return withBreadcrumb(primary, pageData);

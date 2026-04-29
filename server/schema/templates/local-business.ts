@@ -64,6 +64,12 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
     'name': pageData.publisher.name,
     'url': baseUrl,
     'publisher': { '@id': `${baseUrl}/#organization` },
+    'inLanguage': pageData.inLanguage,
+    'potentialAction': {
+      '@type': 'SearchAction',
+      'target': { '@type': 'EntryPoint', 'urlTemplate': `${baseUrl}/?s={search_term_string}` },
+      'query-input': 'required name=search_term_string',
+    },
   };
 
   return withBreadcrumb([organization, localBusiness, website], pageData);
