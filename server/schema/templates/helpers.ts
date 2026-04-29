@@ -67,3 +67,38 @@ export function withBreadcrumb(
   if (bc) graph.push(bc);
   return { '@context': 'https://schema.org', '@graph': graph };
 }
+
+/**
+ * Returns an @id reference to the homepage WebSite node.
+ * Every non-homepage primary node uses this for `isPartOf`.
+ */
+export function webSiteRef(baseUrl: string): { '@id': string } {
+  return { '@id': `${baseUrl}/#website` };
+}
+
+/**
+ * Returns an @id reference to a page's BreadcrumbList node.
+ * Every non-homepage primary node uses this for the back-reference `breadcrumb` property.
+ */
+export function breadcrumbRef(canonicalUrl: string): { '@id': string } {
+  return { '@id': `${canonicalUrl}#breadcrumb` };
+}
+
+/**
+ * Removes a trailing " | Brand", " - Brand", " — Brand", or " · Brand" suffix from a title.
+ * Schema.org `name` and breadcrumb labels should not duplicate the site name —
+ * Yoast/RankMath strip this; we match the brand against workspace.name (case-insensitive)
+ * to avoid stripping legitimate trailing words that look like brand pipes.
+ *
+ * Examples:
+ *   scrubBrandSuffix("Privacy Policy | hmpsn studio", "hmpsn studio") → "Privacy Policy"
+ *   scrubBrandSuffix("Privacy Policy", "hmpsn studio") → "Privacy Policy"
+ *   scrubBrandSuffix("Acme | Other Co", "hmpsn studio") → "Acme | Other Co" (suffix doesn't match brand)
+ */
+export function scrubBrandSuffix(name: string, brand: string): string {
+  if (!brand) return name;
+  // Match " | Brand", " - Brand", " — Brand", " · Brand" at the end, case-insensitive on the brand.
+  const escaped = brand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`\\s+[|\\-—·]\\s+${escaped}\\s*$`, 'i');
+  return name.replace(re, '').trim() || name;
+}
