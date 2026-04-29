@@ -3,6 +3,63 @@ import { extractPageData } from '../../../server/schema/data-sources.js';
 
 const baseUrl = 'https://example.com';
 
+const baseInput = {
+  pageMeta: { title: 'Privacy Policy | Acme Co', slug: 'privacy', publishedPath: '/privacy' },
+  html: '<html><head></head><body></body></html>',
+  baseUrl: 'https://acme.com',
+  workspace: { name: 'Acme Co', publisherLogoUrl: null, businessProfile: null, defaultLocale: 'en' },
+};
+
+describe('extractPageData — paid-grade fields', () => {
+  it('strips brand suffix from title into cleanTitle', () => {
+    const out = extractPageData(baseInput);
+    expect(out.title).toBe('Privacy Policy | Acme Co');
+    expect(out.cleanTitle).toBe('Privacy Policy');
+  });
+
+  it('uses cleanTitle for the breadcrumb leaf, not raw title', () => {
+    const out = extractPageData(baseInput);
+    const leaf = out.breadcrumbs[out.breadcrumbs.length - 1];
+    expect(leaf.name).toBe('Privacy Policy');
+  });
+
+  it('falls back to workspace.defaultLocale for inLanguage', () => {
+    const out = extractPageData(baseInput);
+    expect(out.inLanguage).toBe('en');
+  });
+
+  it('uses pageMeta.locale when present', () => {
+    const out = extractPageData({ ...baseInput, pageMeta: { ...baseInput.pageMeta, locale: 'fr-CA' } });
+    expect(out.inLanguage).toBe('fr-CA');
+  });
+
+  it('derives articleSection from first URL segment', () => {
+    const out = extractPageData({ ...baseInput, pageMeta: { ...baseInput.pageMeta, publishedPath: '/blog/foo' } });
+    expect(out.articleSection).toBe('Blog');
+  });
+
+  it('omits articleSection for homepage', () => {
+    const out = extractPageData({ ...baseInput, pageMeta: { ...baseInput.pageMeta, publishedPath: '/' } });
+    expect(out.articleSection).toBeUndefined();
+  });
+
+  it('uses CMS fieldData["published-on"] as datePublished when present', () => {
+    const out = extractPageData({
+      ...baseInput,
+      pageMeta: { ...baseInput.pageMeta, cmsFieldData: { 'published-on': '2026-01-15T00:00:00Z' } },
+    });
+    expect(out.datePublished).toBe('2026-01-15T00:00:00Z');
+  });
+
+  it('uses CMS fieldData["author-name"] as author when present', () => {
+    const out = extractPageData({
+      ...baseInput,
+      pageMeta: { ...baseInput.pageMeta, cmsFieldData: { 'author-name': 'Jane Doe' } },
+    });
+    expect(out.author).toBe('Jane Doe');
+  });
+});
+
 describe('extractPageData', () => {
   it('reads title from Webflow page meta first, then HTML <title>', () => {
     const html = '<html><head><title>HTML Title</title></head><body></body></html>';

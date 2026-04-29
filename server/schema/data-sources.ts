@@ -4,6 +4,7 @@
  * No AI calls.
  */
 import * as cheerio from 'cheerio';
+import { scrubBrandSuffix } from './templates/helpers.js';
 
 export interface PageMetaInput {
   title: string;
@@ -75,54 +76,75 @@ function capitalize(s: string): string {
   return s.replace(/\b\w/g, c => c.toUpperCase());
 }
 
-function buildBreadcrumbs(publishedPath: string, pageTitle: string, baseUrl: string): BreadcrumbItem[] {
+function buildBreadcrumbs(publishedPath: string, leafName: string, baseUrl: string): BreadcrumbItem[] {
   const segs = publishedPath.replace(/^\//, '').split('/').filter(Boolean);
   const items: BreadcrumbItem[] = [{ name: 'Home', url: baseUrl }];
   let acc = baseUrl;
   segs.forEach((s, i) => {
     acc = `${acc}/${s}`;
     items.push({
-      name: i === segs.length - 1 ? pageTitle : capitalize(s.replace(/-/g, ' ')),
+      name: i === segs.length - 1 ? leafName : capitalize(s.replace(/-/g, ' ')),
       url: acc,
     });
   });
   return items;
 }
 
+function deriveArticleSection(publishedPath: string): string | undefined {
+  const segs = publishedPath.replace(/^\//, '').split('/').filter(Boolean);
+  if (segs.length < 2) return undefined; // root or single-segment paths have no section
+  return capitalize(segs[0].replace(/-/g, ' '));
+}
+
+/** Reads common CMS field-data slugs in priority order; Webflow conventions vary by collection. */
+function pickCmsField(fieldData: Record<string, unknown> | null | undefined, slugs: string[]): string | undefined {
+  if (!fieldData) return undefined;
+  for (const slug of slugs) {
+    const v = fieldData[slug];
+    if (typeof v === 'string' && v.trim()) return v.trim();
+  }
+  return undefined;
+}
+
 export function extractPageData(input: ExtractInput): PageData {
   const $ = cheerio.load(input.html || '');
 
-  // Title precedence: page meta SEO title > page meta title > HTML <title>
   const seoTitle = input.pageMeta.seo?.title?.trim();
   const metaTitle = input.pageMeta.title?.trim();
   const htmlTitle = $('head > title').text().trim();
   const title = seoTitle || metaTitle || htmlTitle || input.pageMeta.slug;
+  const cleanTitle = scrubBrandSuffix(title, input.workspace.name);
 
-  // Description: SEO description > meta description > og:description
   const seoDesc = input.pageMeta.seo?.description?.trim();
   const metaDesc = metaContent($, 'meta[name="description"]');
   const ogDesc = metaContent($, 'meta[property="og:description"]');
   const description = seoDesc || metaDesc || ogDesc;
 
-  // Image: og:image > twitter:image > <link rel="image_src">
   const ogImage = metaContent($, 'meta[property="og:image"]');
   const twitterImage = metaContent($, 'meta[name="twitter:image"]');
   const linkImage = $('link[rel="image_src"]').attr('href') || undefined;
   const image = ogImage || twitterImage || linkImage;
 
-  // Dates: HTML microformat → CMS timestamps (Webflow CMS templates often lack <time itemprop>)
+  const cmsFieldData = input.pageMeta.cmsFieldData ?? null;
   const datePublished = $('time[itemprop="datePublished"]').attr('datetime')
+    || pickCmsField(cmsFieldData, ['published-on', 'published-date', 'date-published'])
     || input.pageMeta.createdOn
     || input.pageMeta.lastPublished
     || undefined;
   const dateModified = $('time[itemprop="dateModified"]').attr('datetime')
+    || pickCmsField(cmsFieldData, ['updated-on', 'last-updated'])
     || input.pageMeta.lastPublished
     || undefined;
 
+  const author = pickCmsField(cmsFieldData, ['author-name', 'author', 'written-by']) ?? undefined;
+
+  const inLanguage = input.pageMeta.locale?.trim() || input.workspace.defaultLocale || 'en';
+  const articleSection = deriveArticleSection(input.pageMeta.publishedPath);
   const canonicalUrl = `${input.baseUrl}${input.pageMeta.publishedPath}`;
 
   return {
     title,
+    cleanTitle,
     description,
     image,
     canonicalUrl,
@@ -132,6 +154,9 @@ export function extractPageData(input: ExtractInput): PageData {
     },
     datePublished,
     dateModified,
-    breadcrumbs: buildBreadcrumbs(input.pageMeta.publishedPath, title, input.baseUrl),
+    author,
+    articleSection,
+    inLanguage,
+    breadcrumbs: buildBreadcrumbs(input.pageMeta.publishedPath, cleanTitle, input.baseUrl),
   };
 }
