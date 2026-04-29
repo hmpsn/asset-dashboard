@@ -479,6 +479,16 @@
       "rationale": "Aspirational features and team-scale work deferred until the current sprint queue clears.",
       "items": [
         {
+          "id": "schema-page-element-catalog-v1",
+          "title": "Schema Page-Element Catalog (per-page structural inventory)",
+          "source": "Conversation 2026-04-29; precedes any client request",
+          "est": "2-3 sprints (full); 1 sprint MVP",
+          "priority": "P1",
+          "sprint": "J",
+          "status": "pending",
+          "notes": "Today the platform extracts page-level metadata (title, description, og:image, dates, author from CMS) but has NO structural element catalog — nothing walks the HTML and reports 'this page contains 3 tables, 5 images, 1 video, 2 testimonials.' Future clients will absolutely ask for this. Strategic answer: build a new PageElementSlice on buildWorkspaceIntelligence, populated by a Cheerio-based extractor that produces a typed catalog: tables (rows/cols/captions/pricing-like/comparison-like), images (src/alt/role: hero|informative|decorative/caption/dimensions — AI-assisted role classification), videos (provider: youtube|vimeo|native|other/thumbnailUrl/durationSec), lists (kind/itemCount/isHowToLike), testimonials (author/quote/selector), codeBlocks (language/lineCount), citations (url/text/isExternal), toc (level/text/id). Schema templates conditionally enrich based on catalog: list-with-howto-pattern → HowTo schema (Google HowTo rich result eligible); video presence → VideoObject (Google video rich result); testimonial detection → Review + AggregateRating on Service/LocalBusiness/Product; primary table → Table mainEntity for factsheet/pricing/comparison pages; image gallery → ImageGallery with rich ImageObject entries; citations → Article.citation array (E-E-A-T signal). Extractor module ~2-3 days; AI image role classifier ~1-2 days; slice plumbing ~0.5d (follows Pattern B established by schema-yoast-parity-fields PR1); per-element schema mapping ~1-2d each (parallelizable, MVP covers 4 highest-value: tables + videos + testimonials + HowTo lists); admin 'Page elements' reporting UI ~2-3d. Architectural prerequisite met by schema-yoast-parity-fields PR1: Pattern B (slice consumption) is the right home; PR1 plants the migration path. Doesn't block parity-fields PR1 or PR2 — purely additive on the same architecture."
+        },
+        {
           "id": "schema-pillar-2-1-searchaction-correctness",
           "title": "Schema Pillar 2.1 — Stop emitting SearchAction on sites without search",
           "source": "docs/superpowers/plans/2026-04-29-schema-pillar-2-data-wiring.md (post-merge correction)",
