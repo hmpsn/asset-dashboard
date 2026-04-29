@@ -23,8 +23,9 @@ import {
   listPostVersions,
   getPostVersion,
   revertToVersion,
+  getMostRecentPostVersion,
 } from '../content-posts.js';
-import { scoreVoiceMatch } from '../content-posts-ai.js';
+import { scoreVoiceMatch, countHtmlWords } from '../content-posts-ai.js';
 import { renderPostHTML } from '../post-export-html.js';
 import { assemblePostHtml, generateSlug } from '../html-to-richtext.js';
 import {
@@ -37,8 +38,13 @@ import { createLogger } from '../logger.js';
 import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking.js';
 import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { callOpenAI, parseAIJson } from '../openai-helpers.js';
+import { callAI } from '../ai.js';
 import { buildIntelPrompt } from '../workspace-intelligence.js';
 import { validate, z } from '../middleware/validate.js';
+import type { AiFixResult, IssueKey } from '../../shared/types/content.js';
+import { ISSUE_KEYS } from '../../shared/types/content.js';
+import { getVoiceProfile, buildVoiceCalibrationContext } from '../voice-calibration.js';
+import { sanitizeRichText, sanitizePlainText } from '../html-sanitize.js';
 
 const log = createLogger('content-posts');
 
@@ -141,6 +147,7 @@ const updatePostSchema = z.object({
     targetWordCount: z.number().optional(),
     keywords: z.array(z.string()).optional(),
     status: z.enum(['pending', 'generating', 'done', 'error']).optional(),
+    error: z.string().optional(),
   })).optional(),
   conclusion: z.string().optional(),
   seoTitle: z.string().max(200).optional(),
@@ -168,13 +175,25 @@ const updatePostSchema = z.object({
 router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('workspaceId'), validate(updatePostSchema), (req, res, next) => {
   const previous = getPost(req.params.workspaceId, req.params.postId);
 
-  // Snapshot before content-changing edits (not status-only changes)
-  if (previous) {
-    const contentFields = ['title', 'metaDescription', 'introduction', 'sections', 'conclusion', 'seoTitle', 'seoMetaDescription'];
-    const isContentEdit = contentFields.some(f => f in req.body);
-    if (isContentEdit) {
-      const detail = contentFields.filter(f => f in req.body).join(',');
-      snapshotPostVersion(previous, 'manual_edit', `field:${detail}`);
+  // Snapshot before content-changing edits (not status-only changes).
+  //
+  // Coalesce window: with auto-save firing every ~2s, a single editing session
+  // would otherwise create dozens of `manual_edit` snapshots and `content_updated`
+  // activity entries. Skip both if the newest snapshot is already a `manual_edit`
+  // from <60 s ago — same pattern as the public `client-edit` route.
+  const ADMIN_EDIT_COALESCE_WINDOW_MS = 60_000;
+  const contentFields = ['title', 'metaDescription', 'introduction', 'sections', 'conclusion', 'seoTitle', 'seoMetaDescription'];
+  const editedContentFields = contentFields.filter(f => f in req.body);
+  const isContentEdit = editedContentFields.length > 0;
+  let withinEditCoalesceWindow = false;
+  if (previous && isContentEdit) {
+    const recentVersion = getMostRecentPostVersion(req.params.workspaceId, req.params.postId);
+    withinEditCoalesceWindow = !!recentVersion
+      && recentVersion.trigger === 'manual_edit'
+      && recentVersion.triggerDetail !== 'client_edit'
+      && (Date.now() - new Date(recentVersion.createdAt).getTime()) < ADMIN_EDIT_COALESCE_WINDOW_MS;
+    if (!withinEditCoalesceWindow) {
+      snapshotPostVersion(previous, 'manual_edit', `field:${editedContentFields.join(',')}`);
     }
   }
 
@@ -254,6 +273,34 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
     }
   }
 
+  // Activity entry coalesced on the same 60s window as the snapshot above —
+  // we only want one `content_updated` entry per editing session, not one per
+  // 2s auto-save tick.
+  if (isContentEdit && !withinEditCoalesceWindow) {
+    addActivity(
+      req.params.workspaceId,
+      'content_updated',
+      `Edited post "${updated.title}"`,
+      `Fields: ${editedContentFields.join(', ')}`,
+      { postId: req.params.postId, fields: editedContentFields },
+    );
+  }
+  // Recompute totalWordCount server-side when content fields change (matches
+  // the pattern in the client-edit route at public-content.ts).
+  if (isContentEdit) {
+    const introWords = countHtmlWords(updated.introduction || '');
+    const conclusionWords = countHtmlWords(updated.conclusion || '');
+    const sectionWords = updated.sections.reduce((sum: number, s: { wordCount?: number }) => sum + (s.wordCount || 0), 0);
+    const newTotal = introWords + conclusionWords + sectionWords;
+    if (newTotal !== updated.totalWordCount) {
+      updatePostField(req.params.workspaceId, req.params.postId, { totalWordCount: newTotal });
+      updated.totalWordCount = newTotal;
+    }
+  }
+  const hasNonContentChange = Object.keys(req.body).some(f => !contentFields.includes(f));
+  if (!isContentEdit || !withinEditCoalesceWindow || hasNonContentChange) {
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: req.params.postId });
+  }
   res.json(updated);
 });
 
@@ -352,6 +399,167 @@ Return ONLY valid JSON like:
     res.status(500).json({ error: `AI review failed: ${msg}` });
   }
 });
+
+// AI fix — generates a targeted fix for a specific failed review item
+router.post('/api/content-posts/:workspaceId/:postId/ai-fix',
+  requireWorkspaceAccess('workspaceId'),
+  validate(z.object({
+    issueKey: z.enum([...ISSUE_KEYS] as [string, ...string[]]),
+    reason: z.string().min(1).max(500),
+  })),
+  async (req, res) => {
+    const { issueKey, reason } = req.body as { issueKey: IssueKey; reason: string };
+    const post = getPost(req.params.workspaceId, req.params.postId);
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+
+    let field: AiFixResult['field'];
+    let sectionIndex: number | undefined;
+    let originalText: string;
+    let userPrompt: string;
+
+    switch (issueKey) {
+      case 'internal_links': {
+        const targetSection = post.sections.find(s => !s.content.includes('<a href'))
+          ?? post.sections[0];
+        if (!targetSection) return res.status(422).json({ error: 'No sections available' });
+        const brief = getBrief(req.params.workspaceId, post.briefId);
+        const suggestions = brief?.internalLinkSuggestions ?? [];
+        field = 'section';
+        sectionIndex = targetSection.index;
+        originalText = targetSection.content;
+        userPrompt = `Rewrite ONE sentence in this HTML section to include a relevant internal link using <a href="URL">anchor text</a>.
+Available internal link suggestions: ${suggestions.length > 0 ? suggestions.join(', ') : 'Use a plausible internal link like /blog or /services'}.
+Return the FULL SECTION HTML with exactly one new <a href="..."> tag added. Do not change any other content.
+
+Issue reason: ${reason}
+
+Section HTML:
+${originalText}`;
+        break;
+      }
+      case 'meta_optimized': {
+        field = 'meta';
+        originalText = JSON.stringify({
+          seoTitle: post.seoTitle || post.title,
+          seoMetaDescription: post.seoMetaDescription || post.metaDescription,
+        });
+        userPrompt = `Rewrite the SEO meta title and meta description for this blog post.
+Target keyword: "${post.targetKeyword}"
+Current title: "${post.seoTitle || post.title}"
+Current description: "${post.seoMetaDescription || post.metaDescription}"
+Requirements: Title 50-60 characters, description 150-160 characters, both include the target keyword.
+
+Issue reason: ${reason}
+
+Return ONLY valid JSON with no surrounding text:
+{ "seoTitle": "...", "seoMetaDescription": "..." }`;
+        break;
+      }
+      case 'word_count_target': {
+        const doneSections = post.sections.filter(s => s.status === 'done');
+        const candidates = doneSections.length > 0 ? doneSections : post.sections;
+        if (candidates.length === 0) return res.status(422).json({ error: 'No sections available' });
+        const targetSection = candidates.reduce((a, b) => a.wordCount < b.wordCount ? a : b);
+        field = 'section';
+        sectionIndex = targetSection.index;
+        originalText = targetSection.content;
+        userPrompt = `Expand this HTML section by approximately 20% to increase the post's overall word count.
+Add meaningful, relevant content — not filler. Maintain the same HTML structure and tone.
+Return the FULL EXPANDED SECTION HTML only.
+
+Post word count: ${post.totalWordCount} (target: ${post.targetWordCount})
+Issue reason: ${reason}
+
+Section HTML:
+${originalText}`;
+        break;
+      }
+      case 'brand_voice': {
+        field = 'introduction';
+        originalText = post.introduction;
+        const voiceProfile = getVoiceProfile(req.params.workspaceId);
+        const voiceCtx = voiceProfile ? buildVoiceCalibrationContext(voiceProfile) : null;
+        const voiceBlock = voiceCtx
+          ? [voiceCtx.samplesText, voiceCtx.dnaText, voiceCtx.guardrailsText].filter(Boolean).join('\n')
+          : '';
+        userPrompt = `Rewrite this blog post introduction to better match the workspace's brand voice.
+Keep the same topic, key points, and approximate length. Return the FULL INTRODUCTION HTML only.
+
+Issue reason: ${reason}${voiceBlock ? `\n\nVoice guidelines:\n${voiceBlock}` : ''}
+
+Introduction HTML:
+${originalText}`;
+        break;
+      }
+      case 'factual_accuracy':
+      case 'no_hallucinations': {
+        const targetSection = post.sections[0];
+        if (!targetSection) return res.status(422).json({ error: 'No sections available' });
+        field = 'section';
+        sectionIndex = targetSection.index;
+        originalText = targetSection.content;
+        userPrompt = `Review this HTML section and rewrite any potentially inaccurate or unverifiable claims conservatively.
+Replace suspicious statistics or quotes with general, verifiable statements. Do NOT add new statistics.
+Return the FULL SECTION HTML with conservative rewrites applied.
+
+Issue reason: ${reason}
+
+Section HTML:
+${originalText}`;
+        break;
+      }
+      default:
+        return res.status(400).json({ error: 'Unknown issue key' });
+    }
+
+    try {
+      const aiResult = await callAI({
+        messages: [{ role: 'user', content: userPrompt }],
+        feature: 'content-fix',
+        workspaceId: req.params.workspaceId,
+        maxTokens: 2000,
+        temperature: 0.3,
+      });
+
+      const rawSuggested = aiResult.text.trim();
+      let suggestedText: string;
+
+      if (field === 'meta') {
+        let parsed: { seoTitle?: unknown; seoMetaDescription?: unknown } | null;
+        try {
+          parsed = parseAIJson<{ seoTitle?: unknown; seoMetaDescription?: unknown }>(rawSuggested);
+        } catch { // catch-ok: SyntaxError from malformed AI JSON — expected failure path
+          return res.status(500).json({ error: 'Failed to parse AI meta response' });
+        }
+        // Guard against AI returning literal `null` or a non-object (`'"a string"'`,
+        // `'42'`) — JSON.parse accepts both but destructuring would throw a TypeError
+        // that the outer catch turns into an opaque 500. Surface the real failure here.
+        if (!parsed || typeof parsed !== 'object') {
+          return res.status(500).json({ error: 'Failed to parse AI meta response' });
+        }
+        suggestedText = JSON.stringify({
+          seoTitle: sanitizePlainText(typeof parsed.seoTitle === 'string' ? parsed.seoTitle : ''),
+          seoMetaDescription: sanitizePlainText(typeof parsed.seoMetaDescription === 'string' ? parsed.seoMetaDescription : ''),
+        });
+      } else {
+        suggestedText = sanitizeRichText(rawSuggested);
+      }
+
+      const targetSection = field === 'section' && sectionIndex !== undefined
+        ? post.sections.find(s => s.index === sectionIndex)
+        : undefined;
+      const sectionLabel = targetSection ? `section "${targetSection.heading}"` : field;
+      const explanation = `AI revised the ${sectionLabel} to address: ${sanitizePlainText(reason).slice(0, 100)}`;
+
+      const result: AiFixResult = { field, sectionIndex, originalText, suggestedText, explanation };
+      res.json(result);
+    } catch (err) {
+      log.error({ err }, 'AI fix failed');
+      const msg = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: `AI fix failed: ${msg}` });
+    }
+  },
+);
 
 // --- Version History ---
 

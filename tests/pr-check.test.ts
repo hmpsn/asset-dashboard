@@ -5836,6 +5836,86 @@ describe('Rule: Raw rounded-* literal (use --radius-* token)', () => {
   });
 });
 
+describe('Rule: HTML-naive word count on rich-text post field', () => {
+  function makeRule(): Check {
+    const rule = CHECKS.find((c) => c.name === 'HTML-naive word count on rich-text post field');
+    if (!rule) throw new Error('rule not found in CHECKS');
+    return rule;
+  }
+
+  it('flags countWords(post.introduction)', () => {
+    const probe = write(
+      uniqPath('html-wc-intro', 'probe.ts'),
+      'const n = countWords(post.introduction);\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('flags countWords(post.conclusion)', () => {
+    const probe = write(
+      uniqPath('html-wc-conc', 'probe.ts'),
+      'const n = countWords(post.conclusion);\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('flags post.introduction.split(/\\s+/)', () => {
+    const probe = write(
+      uniqPath('html-wc-split-intro', 'probe.tsx'),
+      'const w = post.introduction.split(/\\s+/).filter(x => x).length;\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('flags introduction.split(/\\s+/) on a local variable named introduction', () => {
+    const probe = write(
+      uniqPath('html-wc-split-local', 'probe.ts'),
+      'const introduction = "<p>x</p>"; const n = introduction.split(/\\s+/).length;\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('does NOT flag countHtmlWords(post.introduction)', () => {
+    const probe = write(
+      uniqPath('html-wc-helper', 'probe.ts'),
+      'const n = countHtmlWords(post.introduction);\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBe(0);
+  });
+
+  it('does NOT flag countWords(stripHtml(post.introduction)) (already strips HTML)', () => {
+    const probe = write(
+      uniqPath('html-wc-stripped', 'probe.ts'),
+      'const n = countWords(stripHtml(post.introduction));\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBe(0);
+  });
+
+  it('does NOT flag countWords on plain-text fields like title', () => {
+    const probe = write(
+      uniqPath('html-wc-plain', 'probe.ts'),
+      'const n = countWords(post.title);\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBe(0);
+  });
+
+  it('respects // html-word-count-ok hatch', () => {
+    const probe = write(
+      uniqPath('html-wc-hatched', 'probe.ts'),
+      'const n = countWords(post.introduction); // html-word-count-ok\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBe(0);
+  });
+});
+
 describe('Rule: No purple/violet in client domain', () => {
   function makeRule(): Check {
     const rule = CHECKS.find((c) => c.name === 'No purple/violet in client domain');

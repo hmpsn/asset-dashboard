@@ -234,9 +234,13 @@ export function useWsInvalidation(workspaceId: string | undefined) {
     // SCHEMA_PLAN_SENT is intentionally NOT registered here — SchemaPlanPanel
     // fetches the plan directly (no React Query cache). Exemption is tracked
     // in tests/contract/ws-invalidation-coverage.test.ts LOCAL_ONLY_EVENTS.
-    [WS_EVENTS.POST_UPDATED]: () => {
+    [WS_EVENTS.POST_UPDATED]: (data: unknown) => {
       if (!workspaceId) return;
+      const payload = data as { postId?: string };
       qc.invalidateQueries({ queryKey: queryKeys.admin.posts(workspaceId) });
+      if (payload?.postId) {
+        qc.invalidateQueries({ queryKey: queryKeys.admin.post(workspaceId, payload.postId) });
+      }
     },
   });
 }

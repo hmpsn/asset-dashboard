@@ -541,6 +541,15 @@ export function stripHtml(html: string): string {
 }
 
 /**
+ * Count words in a TipTap/HTML string. Use this for any field that holds
+ * rich-text HTML (post.introduction, post.conclusion, section.content) —
+ * `countWords()` would miscount because it treats `<p>Hello</p>` as 4 words.
+ */
+export function countHtmlWords(html: string): number {
+  return countWords(stripHtml(html));
+}
+
+/**
  * Generate SEO-optimized title tag and meta description based on the final post content.
  * Runs after unification so it can reference the actual written content.
  */
@@ -626,7 +635,7 @@ export async function unifyPost(
   ].join('\n\n---\n\n');
 
   // If the post is very short, skip unification (not worth the cost)
-  const currentWords = countWords(post.introduction) + post.sections.reduce((sum, s) => sum + s.wordCount, 0) + countWords(post.conclusion);
+  const currentWords = countHtmlWords(post.introduction) + post.sections.reduce((sum, s) => sum + s.wordCount, 0) + countHtmlWords(post.conclusion);
   if (currentWords < 400) return null;
 
   const overBudget = currentWords > targetTotal * 1.1;

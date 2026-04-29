@@ -1,19 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Loader2, Copy, Download, FileText, Check,
   Pencil, X, Eye, Hash, Clock, Sparkles, AlertTriangle, Trash2, Globe, ExternalLink,
   History,
 } from 'lucide-react';
+import { useAutoSave } from '../hooks/useAutoSave';
 import { contentPosts } from '../api/content';
 import { getText } from '../api/client';
 import { useAdminPost, useAdminPostVersions, usePublishTarget } from '../hooks/admin';
 import { SectionCard, Icon } from './ui';
 import { SectionEditor } from './post-editor/SectionEditor';
+import { RichTextEditor } from './post-editor/RichTextEditor';
 import { PostPreview } from './post-editor/PostPreview';
 import { VersionHistory } from './post-editor/VersionHistory';
-import { ReviewChecklist } from './post-editor/ReviewChecklist';
+import { ReviewChecklist, CHECKLIST_ITEMS } from './post-editor/ReviewChecklist';
+import { FixDiffModal } from './post-editor/FixDiffModal';
+import type { AiFixResult, IssueKey } from '../../shared/types/content';
 import { queryKeys } from '../lib/queryKeys';
+import { countWordsFromHtml } from '../lib/utils';
 
 interface PostSection {
   index: number;
@@ -94,11 +99,8 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
 
   const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set());
   const [editingSection, setEditingSection] = useState<number | null>(null);
-  const [editBuffer, setEditBuffer] = useState('');
   const [editingIntro, setEditingIntro] = useState(false);
-  const [introBuffer, setIntroBuffer] = useState('');
   const [editingConclusion, setEditingConclusion] = useState(false);
-  const [conclusionBuffer, setConclusionBuffer] = useState('');
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleBuffer, setTitleBuffer] = useState('');
   const [regenerating, setRegenerating] = useState<number | null>(null);
@@ -110,6 +112,29 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   const [publishError, setPublishError] = useState('');
   const [showChecklist, setShowChecklist] = useState(false);
   const [reverting, setReverting] = useState<string | null>(null);
+  const [fixLoading, setFixLoading] = useState(false);
+  const [fixApplying, setFixApplying] = useState(false);
+  const [fixResult, setFixResult] = useState<AiFixResult | null>(null);
+  const [fixIssueLabel, setFixIssueLabel] = useState('');
+
+  // Auto-save for section editing via RichTextEditor (SectionEditor new interface)
+  const sectionAutoSaveFn = async (html: string) => {
+    if (editingSection === null || !post) return;
+    const sections = [...post.sections];
+    const idx = sections.findIndex(s => s.index === editingSection);
+    if (idx === -1) return;
+    sections[idx] = { ...sections[idx], content: html, wordCount: countWordsFromHtml(html) };
+    await saveField({ sections });
+  };
+  const { scheduleAutoSave: scheduleSectionSave, flush: flushSection, saveStatus: sectionSaveStatus } = useAutoSave(sectionAutoSaveFn);
+
+  const { scheduleAutoSave: scheduleIntroSave, flush: flushIntro, saveStatus: introSaveStatus } = useAutoSave(
+    async (html: string) => { await saveField({ introduction: html }); },
+  );
+
+  const { scheduleAutoSave: scheduleConclusionSave, flush: flushConclusion, saveStatus: conclusionSaveStatus } = useAutoSave(
+    async (html: string) => { await saveField({ conclusion: html }); },
+  );
 
   const invalidatePost = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.post(workspaceId, postId) });
   const invalidateVersions = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.postVersions(workspaceId, postId) });
@@ -160,30 +185,6 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
     setRegenerating(null);
   };
 
-  const saveSectionEdit = () => {
-    if (editingSection === null || !post) return;
-    const sections = [...post.sections];
-    sections[editingSection] = {
-      ...sections[editingSection],
-      content: editBuffer,
-      wordCount: editBuffer.split(/\s+/).filter(w => w.length > 0).length,
-    };
-    saveField({ sections });
-    setEditingSection(null);
-  };
-
-  const saveIntroEdit = () => {
-    if (!post) return;
-    saveField({ introduction: introBuffer });
-    setEditingIntro(false);
-  };
-
-  const saveConclusionEdit = () => {
-    if (!post) return;
-    saveField({ conclusion: conclusionBuffer });
-    setEditingConclusion(false);
-  };
-
   const saveTitleEdit = () => {
     if (!post) return;
     saveField({ title: titleBuffer });
@@ -229,6 +230,73 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
       invalidateVersions();
     } catch (err) { console.error('PostEditor operation failed:', err); }
     setReverting(null);
+  };
+
+  // Generation counter prevents a stale AI response (from a request whose modal
+  // the user already dismissed) from re-opening the modal when it eventually resolves.
+  const fixGenRef = useRef(0);
+
+  const handleRequestFix = async (issueKey: string, reason: string) => {
+    if (fixLoading) return;
+    const gen = ++fixGenRef.current;
+    setFixLoading(true);
+    setFixIssueLabel(CHECKLIST_ITEMS.find(i => i.key === issueKey)?.label ?? issueKey);
+    try {
+      const result = await contentPosts.aifix(workspaceId, postId, { issueKey: issueKey as IssueKey, reason });
+      if (gen === fixGenRef.current) setFixResult(result);
+    } catch (err) {
+      console.error('PostEditor operation failed:', err);
+    } finally {
+      if (gen === fixGenRef.current) setFixLoading(false);
+    }
+  };
+
+  const handleDismissFix = () => {
+    fixGenRef.current++;
+    setFixResult(null);
+    setFixLoading(false);
+  };
+
+  const handleApplyFix = async (result: AiFixResult) => {
+    if (!post) return;
+    setFixApplying(true);
+    try {
+      if (result.field === 'introduction') {
+        await saveField({ introduction: result.suggestedText });
+      } else if (result.field === 'section' && result.sectionIndex !== undefined) {
+        const idx = post.sections.findIndex(s => s.index === result.sectionIndex);
+        if (idx === -1) {
+          console.warn('PostEditor: AI fix section index no longer present', result.sectionIndex);
+        } else {
+          const sections = [...post.sections];
+          sections[idx] = {
+            ...sections[idx],
+            content: result.suggestedText,
+            wordCount: countWordsFromHtml(result.suggestedText),
+          };
+          await saveField({ sections });
+        }
+      } else if (result.field === 'conclusion') {
+        await saveField({ conclusion: result.suggestedText });
+      } else if (result.field === 'meta') {
+        let parsed: { seoTitle: string; seoMetaDescription: string };
+        try {
+          parsed = JSON.parse(result.suggestedText);
+        } catch (err) {
+          console.error('PostEditor: meta fix returned malformed JSON', err);
+          handleDismissFix();
+          setFixApplying(false);
+          return;
+        }
+        await saveField({ seoTitle: parsed.seoTitle, seoMetaDescription: parsed.seoMetaDescription });
+      }
+      handleDismissFix();
+      invalidatePost();
+    } catch (err) {
+      console.error('PostEditor operation failed:', err);
+    } finally {
+      setFixApplying(false);
+    }
   };
 
   const toggleSection = (i: number) => {
@@ -390,6 +458,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
             const res = await contentPosts.aiReview(workspaceId, postId);
             return res?.review ?? null;
           }}
+          onRequestFix={handleRequestFix}
         />
       )}
 
@@ -413,10 +482,10 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
               <div className="flex items-center gap-2">
                 <Icon as={Sparkles} size="md" className="text-teal-400" />
                 <span className="text-xs font-medium text-[var(--brand-text-bright)]">Introduction</span>
-                {post.introduction && <span className="t-caption-sm text-[var(--brand-text-muted)]">{post.introduction.split(/\s+/).filter(w => w).length}w</span>}
+                {post.introduction && <span className="t-caption-sm text-[var(--brand-text-muted)]">{countWordsFromHtml(post.introduction)}w</span>}
               </div>
               {post.introduction && !editingIntro && (
-                <button onClick={() => { setEditingIntro(true); setIntroBuffer(post.introduction); }} className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
+                <button onClick={() => setEditingIntro(true)} className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
                   <Icon as={Pencil} size="sm" /> Edit
                 </button>
               )}
@@ -426,14 +495,29 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                 <div className="flex items-center gap-2 text-xs text-[var(--brand-text-muted)]"><Icon as={Loader2} size="sm" className="animate-spin" /> Writing introduction...</div>
               ) : editingIntro ? (
                 <div className="space-y-2">
-                  <textarea value={introBuffer} onChange={e => setIntroBuffer(e.target.value)} className="w-full bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg px-3 py-2 text-xs text-[var(--brand-text-bright)] focus:border-teal-500/50 focus:outline-none resize-y min-h-[100px]" rows={6} />
+                  <RichTextEditor
+                    initialValue={post.introduction}
+                    onChange={scheduleIntroSave}
+                  />
                   <div className="flex items-center gap-2">
-                    <button onClick={saveIntroEdit} className="px-3 py-1.5 rounded-lg t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors flex items-center gap-1"><Icon as={Check} size="sm" /> Save</button>
-                    <button onClick={() => setEditingIntro(false)} className="px-3 py-1.5 rounded-lg t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">Cancel</button>
+                    <button
+                      onClick={async () => { await flushIntro(); setEditingIntro(false); }}
+                      className="px-3 py-1.5 rounded-lg t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors flex items-center gap-1"
+                    >
+                      <Icon as={Check} size="sm" /> Done
+                    </button>
+                    {introSaveStatus === 'saving' && (
+                      <span className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
+                        <Icon as={Loader2} size="sm" className="animate-spin" /> Saving…
+                      </span>
+                    )}
+                    {introSaveStatus === 'saved' && (
+                      <span className="t-caption-sm text-emerald-400/70">Saved</span>
+                    )}
                   </div>
                 </div>
               ) : (
-                <div className="text-xs text-[var(--brand-text-bright)] leading-relaxed [&_p]:mb-2 [&_strong]:text-white [&_a]:text-teal-400" dangerouslySetInnerHTML={{ __html: post.introduction }} />
+                <div className="text-xs text-[var(--brand-text-bright)] leading-relaxed [&_p]:mb-2 [&_strong]:text-[var(--brand-text-bright)] [&_a]:text-teal-400" dangerouslySetInnerHTML={{ __html: post.introduction }} />
               )}
             </div>
           </SectionCard>
@@ -444,15 +528,14 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
               key={section.index} section={section}
               expanded={expandedSections.has(section.index)}
               editing={editingSection === section.index}
-              editBuffer={editBuffer}
               regenerating={regenerating === section.index}
               isGenerating={isGenerating}
+              saveStatus={sectionSaveStatus}
               onToggleExpand={toggleSection}
-              onStartEdit={(index, content) => { setEditingSection(index); setEditBuffer(content); }}
-              onSaveEdit={saveSectionEdit}
-              onCancelEdit={() => setEditingSection(null)}
+              onStartEdit={async (index) => { await flushSection(); setEditingSection(index); }}
+              onChange={scheduleSectionSave}
+              onDone={async () => { await flushSection(); setEditingSection(null); }}
               onRegenerate={handleRegenerate}
-              onChangeBuffer={setEditBuffer}
             />
           ))}
 
@@ -462,10 +545,10 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
               <div className="flex items-center gap-2">
                 <Icon as={Sparkles} size="md" className="text-teal-400" />
                 <span className="text-xs font-medium text-[var(--brand-text-bright)]">Conclusion</span>
-                {post.conclusion && <span className="t-caption-sm text-[var(--brand-text-muted)]">{post.conclusion.split(/\s+/).filter(w => w).length}w</span>}
+                {post.conclusion && <span className="t-caption-sm text-[var(--brand-text-muted)]">{countWordsFromHtml(post.conclusion)}w</span>}
               </div>
               {post.conclusion && !editingConclusion && (
-                <button onClick={() => { setEditingConclusion(true); setConclusionBuffer(post.conclusion); }} className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
+                <button onClick={() => setEditingConclusion(true)} className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
                   <Icon as={Pencil} size="sm" /> Edit
                 </button>
               )}
@@ -475,14 +558,29 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                 <div className="flex items-center gap-2 text-xs text-[var(--brand-text-muted)]"><Icon as={Loader2} size="sm" className="animate-spin" /> Writing conclusion...</div>
               ) : editingConclusion ? (
                 <div className="space-y-2">
-                  <textarea value={conclusionBuffer} onChange={e => setConclusionBuffer(e.target.value)} className="w-full bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-lg px-3 py-2 text-xs text-[var(--brand-text-bright)] focus:border-teal-500/50 focus:outline-none resize-y min-h-[80px]" rows={4} />
+                  <RichTextEditor
+                    initialValue={post.conclusion}
+                    onChange={scheduleConclusionSave}
+                  />
                   <div className="flex items-center gap-2">
-                    <button onClick={saveConclusionEdit} className="px-3 py-1.5 rounded-lg t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors flex items-center gap-1"><Icon as={Check} size="sm" /> Save</button>
-                    <button onClick={() => setEditingConclusion(false)} className="px-3 py-1.5 rounded-lg t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">Cancel</button>
+                    <button
+                      onClick={async () => { await flushConclusion(); setEditingConclusion(false); }}
+                      className="px-3 py-1.5 rounded-lg t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors flex items-center gap-1"
+                    >
+                      <Icon as={Check} size="sm" /> Done
+                    </button>
+                    {conclusionSaveStatus === 'saving' && (
+                      <span className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
+                        <Icon as={Loader2} size="sm" className="animate-spin" /> Saving…
+                      </span>
+                    )}
+                    {conclusionSaveStatus === 'saved' && (
+                      <span className="t-caption-sm text-emerald-400/70">Saved</span>
+                    )}
                   </div>
                 </div>
               ) : (
-                <div className="text-xs text-[var(--brand-text-bright)] leading-relaxed [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:text-white [&_h2]:mb-2 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:text-[var(--brand-text-bright)] [&_p]:mb-2 [&_ul]:pl-4 [&_ul]:mb-2 [&_ol]:pl-4 [&_ol]:mb-2 [&_li]:mb-1 [&_strong]:text-white [&_a]:text-teal-400" dangerouslySetInnerHTML={{ __html: post.conclusion }} />
+                <div className="text-xs text-[var(--brand-text-bright)] leading-relaxed [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:text-[var(--brand-text-bright)] [&_h2]:mb-2 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:text-[var(--brand-text-bright)] [&_p]:mb-2 [&_ul]:pl-4 [&_ul]:mb-2 [&_ol]:pl-4 [&_ol]:mb-2 [&_li]:mb-1 [&_strong]:text-[var(--brand-text-bright)] [&_a]:text-teal-400" dangerouslySetInnerHTML={{ __html: post.conclusion }} />
               )}
             </div>
           </SectionCard>
@@ -551,6 +649,14 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
           </div>
         </div>
       )}
+      <FixDiffModal
+        issueLabel={fixIssueLabel}
+        result={fixResult}
+        loading={fixLoading}
+        applying={fixApplying}
+        onApply={handleApplyFix}
+        onDismiss={handleDismissFix}
+      />
     </div>
   );
 }

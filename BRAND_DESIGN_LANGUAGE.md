@@ -248,6 +248,16 @@ For inline styles and Recharts props that can't be overridden by CSS class rules
 | **AssetAudit.tsx** | Action buttons (Crawl, Export) | `bg-blue-700 hover:bg-blue-600` | Admin data-action context (acceptable) |
 | **SeoEditor.tsx** | "Unsaved" badge | `blue-500/10 text-blue-400` | State indicator |
 | **RequestManager.tsx** | "New" status | `blue-500/10 text-blue-400` | Info state |
+| **RichTextEditor.tsx** (BubbleMenu) | Active format button (B/I/H2/H3/Link) | `bg-teal-500/20 text-teal-300` | Teal = active interactive state (Law 1) |
+| **RichTextEditor.tsx** (BubbleMenu) | Inactive format button | `text-[var(--brand-text)] hover:bg-[var(--surface-3)]` | Standard hover pattern |
+| **RichTextEditor.tsx** (BubbleMenu) | Inline link input | `border-b border-teal-500/50` | Teal underline = actionable input |
+| **RichTextEditor.tsx** (ProseMirror) | Links in content | `text-teal-400 underline` | Teal = interactive/actionable |
+| **PostEditor.tsx** / **PostReviewCard.tsx** | Auto-save status "Saving…" | `t-caption-sm text-[var(--brand-text-muted)]` | Muted = passive state indicator |
+| **PostEditor.tsx** / **PostReviewCard.tsx** | Auto-save status "Saved" | `t-caption-sm text-emerald-400` | Emerald = success (Law 3) |
+| **FixDiffModal.tsx** | Backdrop | `bg-[var(--brand-overlay)] z-[var(--z-modal-backdrop)]` | Token-only — no raw `bg-black/X` |
+| **FixDiffModal.tsx** | "Before" column header | `text-[var(--brand-text-muted)]` | Muted = old/passive content |
+| **FixDiffModal.tsx** | "After" column header | `text-teal-300` | Teal = new/actionable suggestion |
+| **FixDiffModal.tsx** | "Apply Fix" CTA | `bg-teal-600 hover:bg-teal-500` | Teal = action (Law 1) |
 
 ### Outcome Tracking
 
@@ -523,6 +533,7 @@ When shipping UI changes that affect color or design patterns:
 | 2026-04-27 | **Design System Phase C — New pr-check rules** (PR #337): 5 new rules (`Raw rounded-* literal` warn, `No purple/violet in client domain` error, `Trend icon import outside TrendBadge` warn, `Hand-rolled fixed inset-0 outside overlay` warn, `score-color-law-parity` error) + promoted `styleguide-token-parity` warn→error. Rule count: 91→96 (52 error, 44 warn). |
 | 2026-04-27 | **Design System Phase D — Doc drift fixes**: Renamed "Three Laws" → "Four Laws" across all docs and pr-check rule messages. Added emerald Law 3 (success). Updated `DESIGN_SYSTEM.md` typography scale to match `.t-*` class definitions. Synced `automated-rules.md`. |
 | 2026-04-28 | **Design System Phase 6D — Blue-on-Button Law 02 Audit**: Audited blue usage on interactive elements per Law 02 ("Blue is read-only, never actionable"). Changed 4 actionable buttons from blue to teal: RequestList "View Brief" toggle, BriefDetail "Generate Full Post", SettingsPanel + ConnectionsTab "Connect Google". SettingsPanel Trash2 prune icon changed blue→red (destructive action). SeoAudit Info StatCard blue retained as severity-category color (consistent with Errors=red, Warnings=amber). |
+| 2026-04-28 | **Blog Editor — TipTap BubbleMenu + FixDiffModal patterns**: `RichTextEditor.tsx` BubbleMenu uses `bg-teal-500/20 text-teal-300` for active format buttons (Law 1), `hover:bg-[var(--surface-3)]` for inactive. Link text in ProseMirror content uses `text-teal-400 underline`. Auto-save status: "Saving…" = `text-[var(--brand-text-muted)]`, "Saved" = `text-emerald-400` (Law 3 success). `FixDiffModal` backdrop uses `bg-[var(--brand-overlay)]` (no raw `bg-black/X`), "After" suggestion header `text-teal-300`, "Apply Fix" CTA `bg-teal-600 hover:bg-teal-500`. Per-component entries added to color map table above. |
 
 ---
 
