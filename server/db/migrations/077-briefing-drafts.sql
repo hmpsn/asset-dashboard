@@ -1,4 +1,4 @@
--- 075-briefing-drafts.sql
+-- 077-briefing-drafts.sql
 -- Weekly client briefing drafts (admin review + publish lifecycle)
 
 CREATE TABLE briefing_drafts (

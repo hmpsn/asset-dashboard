@@ -89,7 +89,7 @@ interface WorkspaceRow {
   intelligence_profile: string | null;
   business_priorities: string | null;
   custom_prompt_notes: string | null;
-  // NOT NULL DEFAULT 0 / 24 in migration 075 — never null on read
+  // NOT NULL DEFAULT 0 / 24 in migration 077 — never null on read
   auto_publish_briefings: number;
   auto_publish_after_hours: number;
   last_briefing_run_week_of: string | null;
@@ -326,7 +326,7 @@ function workspaceToParams(ws: Workspace) {
     intelligence_profile: ws.intelligenceProfile ? JSON.stringify(ws.intelligenceProfile) : null,
     business_priorities: ws.businessPriorities ? JSON.stringify(ws.businessPriorities) : null,
     custom_prompt_notes: ws.customPromptNotes ?? null,
-    // Mirror migration 075 DEFAULTs (NOT NULL columns) so future INSERT-statement updates don't trip
+    // Mirror migration 077 DEFAULTs (NOT NULL columns) so future INSERT-statement updates don't trip
     auto_publish_briefings: ws.autoPublishBriefings === undefined ? 0 : (ws.autoPublishBriefings ? 1 : 0),
     auto_publish_after_hours: ws.autoPublishAfterHours ?? 24,
     last_briefing_run_week_of: ws.lastBriefingRunWeekOf ?? null,
