@@ -66,7 +66,7 @@ function validateBreadcrumb(node: Record<string, unknown>): string[] {
   return errors;
 }
 
-export function validateLeanSchema(schema: Record<string, unknown>, primaryType: string): string[] {
+export function validateLeanSchema(schema: Record<string, unknown>, _primaryType: string): string[] {
   const errors: string[] = [];
   if (schema['@context'] !== 'https://schema.org') errors.push('Schema missing @context');
   const graph = schema['@graph'] as Array<Record<string, unknown>> | undefined;
@@ -75,7 +75,9 @@ export function validateLeanSchema(schema: Record<string, unknown>, primaryType:
     return errors;
   }
 
-  // Duplicate @type detection — the lean rule: at most ONE primary node + at most one BreadcrumbList.
+  // Duplicate @type detection — the lean rule: at most one node per @type, except
+  // ListItem (legitimate breadcrumb children). Homepage may have BOTH Organization +
+  // WebSite (different @types), so the rule is per-type, not "exactly one primary".
   const typeCounts = new Map<string, number>();
   for (const node of graph) {
     const t = node['@type'] as string;
@@ -101,9 +103,6 @@ export function validateLeanSchema(schema: Record<string, unknown>, primaryType:
       errors.push(...validateBreadcrumb(node));
     }
   }
-
-  // Suppress unused-parameter warning — primaryType is reserved for future per-type rules.
-  void primaryType;
 
   return errors;
 }
