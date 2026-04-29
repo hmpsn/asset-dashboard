@@ -15,6 +15,7 @@ import {
   publishSite,
   discoverCmsUrls,
   buildStaticPathSet,
+  toCmsPageId,
 } from '../webflow.js';
 import {
   listWorkspaces,
@@ -149,7 +150,7 @@ router.get('/api/webflow/all-pages/:siteId', requireWorkspaceAccessFromQuery(), 
         const { cmsUrls } = await discoverCmsUrls(baseUrl, staticPaths, 500);
         for (const cms of cmsUrls) {
           result.push({
-            id: `cms-${cms.path.replace(/\//g, '-')}`,
+            id: toCmsPageId(cms.path),
             title: cms.pageName,
             slug: cms.path.replace(/^\//, ''),
             publishedPath: cms.path,

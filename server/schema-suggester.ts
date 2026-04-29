@@ -1,4 +1,4 @@
-import { discoverCmsUrls, buildStaticPathSet, getCollectionSchema, listCollections } from './webflow.js';
+import { discoverCmsUrls, buildStaticPathSet, getCollectionSchema, listCollections, toCmsPageId } from './webflow.js';
 import { getWorkspacePages } from './workspace-data.js';
 import { listWorkspaces } from './workspaces.js';
 import { callOpenAI } from './openai-helpers.js';
@@ -2304,7 +2304,7 @@ export async function generateSchemaSuggestions(
           }
 
           return {
-            pageId: `cms-${slug}`,
+            pageId: toCmsPageId(item.path),
             pageTitle: item.pageName,
             slug,
             url: item.url,

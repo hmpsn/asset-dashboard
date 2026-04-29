@@ -44,6 +44,7 @@ import {
   getSiteSubdomain,
   discoverCmsUrls,
   buildStaticPathSet,
+  toCmsPageId,
 } from '../webflow.js';
 import { getWorkspacePages } from '../workspace-data.js';
 import {
@@ -722,7 +723,7 @@ router.post('/api/jobs', async (req, res) => {
                 const { cmsUrls } = await discoverCmsUrls(baseUrl, staticPaths, 200);
                 for (const cms of cmsUrls) {
                   pages.push({
-                    id: `cms-${cms.path.replace(/\//g, '-')}`,
+                    id: toCmsPageId(cms.path),
                     title: cms.pageName,
                     slug: cms.path.replace(/^\//, ''),
                     path: cms.path,
