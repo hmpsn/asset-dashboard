@@ -17,7 +17,7 @@ import type { PageMetaInput, WorkspaceSchemaInput } from './data-sources.js';
 import { extractDescription } from './extractors/description.js';
 import { extractFaq } from './extractors/faq.js';
 import { buildArticleSchema } from './templates/article.js';
-import { buildServiceSchema, buildProductSchema } from './templates/service.js';
+import { buildServiceSchema } from './templates/service.js';
 import { buildLocalBusinessSchema } from './templates/local-business.js';
 import { buildAboutPageSchema, buildContactPageSchema, buildCollectionPageSchema, buildWebPageSchema } from './templates/static.js';
 import { buildHomepageSchema } from './templates/homepage.js';
@@ -164,10 +164,6 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       reason = 'Generic page — WebPage with breadcrumb.';
       break;
   }
-
-  // Suppress unused — buildProductSchema is exported but not yet wired into a kind.
-  // Reserved for future Product page kind in the intelligence-layer follow-up.
-  void buildProductSchema;
 
   // Validate
   const validationErrors = validateLeanSchema(schema, classified.primaryType);

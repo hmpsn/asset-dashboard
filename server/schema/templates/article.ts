@@ -13,7 +13,7 @@ export interface ArticleInput {
 export type ArticleKind = 'BlogPosting' | 'Article';
 
 export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Record<string, unknown> {
-  const { pageData, baseUrl } = input;
+  const { pageData } = input;
 
   const primary = dropUndefined({
     '@type': kind,
@@ -35,9 +35,6 @@ export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Reco
     }),
     'about': kind === 'Article' ? 'Case study' : undefined,
   });
-
-  // baseUrl is referenced for future Organization @id linkage; not currently emitted.
-  void baseUrl;
 
   return withBreadcrumb(primary, pageData);
 }
