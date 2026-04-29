@@ -89,6 +89,9 @@ interface WorkspaceRow {
   intelligence_profile: string | null;
   business_priorities: string | null;
   custom_prompt_notes: string | null;
+  auto_publish_briefings: number | null;
+  auto_publish_after_hours: number | null;
+  last_briefing_run_week_of: string | null;
   created_at: string;
 }
 
@@ -188,6 +191,9 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
   if (row.site_intelligence_client_view != null) ws.siteIntelligenceClientView = !!row.site_intelligence_client_view;
   if (row.business_priorities) ws.businessPriorities = parseJsonSafeArray(row.business_priorities, z.string(), { workspaceId: row.id, field: 'business_priorities', table: 'workspaces' });
   if (row.custom_prompt_notes) ws.customPromptNotes = row.custom_prompt_notes;
+  if (row.auto_publish_briefings !== null) ws.autoPublishBriefings = !!row.auto_publish_briefings;
+  if (row.auto_publish_after_hours !== null) ws.autoPublishAfterHours = row.auto_publish_after_hours as number;
+  if (row.last_briefing_run_week_of !== null) ws.lastBriefingRunWeekOf = row.last_briefing_run_week_of as string | null;
   return ws;
 }
 
@@ -318,6 +324,9 @@ function workspaceToParams(ws: Workspace) {
     intelligence_profile: ws.intelligenceProfile ? JSON.stringify(ws.intelligenceProfile) : null,
     business_priorities: ws.businessPriorities ? JSON.stringify(ws.businessPriorities) : null,
     custom_prompt_notes: ws.customPromptNotes ?? null,
+    auto_publish_briefings: ws.autoPublishBriefings === undefined ? null : (ws.autoPublishBriefings ? 1 : 0),
+    auto_publish_after_hours: ws.autoPublishAfterHours === undefined ? null : ws.autoPublishAfterHours,
+    last_briefing_run_week_of: ws.lastBriefingRunWeekOf === undefined ? null : ws.lastBriefingRunWeekOf,
     created_at: ws.createdAt,
   };
 }
@@ -412,6 +421,7 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
     publishTarget: 'publish_target', seoDataProvider: 'seo_data_provider',
     businessProfile: 'business_profile', intelligenceProfile: 'intelligence_profile',
     businessPriorities: 'business_priorities', customPromptNotes: 'custom_prompt_notes',
+    autoPublishBriefings: 'auto_publish_briefings', autoPublishAfterHours: 'auto_publish_after_hours', lastBriefingRunWeekOf: 'last_briefing_run_week_of',
   };
 
   const ALLOWED_COLUMNS = new Set(Object.values(columnMap));

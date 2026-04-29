@@ -315,6 +315,13 @@ export interface Workspace {
     goals?: string[];
     targetAudience?: string;
   };
+  // Client Briefing (weekly editorial)
+  /** Auto-publish briefings without admin review after N hours */
+  autoPublishBriefings?: boolean;
+  /** Hours after generation before auto-publish (default 24) */
+  autoPublishAfterHours?: number;
+  /** ISO-week marker (YYYY-MM-DD) of last briefing run, prevents duplicate runs */
+  lastBriefingRunWeekOf?: string | null;
   folder: string;
   createdAt: string;
 }
