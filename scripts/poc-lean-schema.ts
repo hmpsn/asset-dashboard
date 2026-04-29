@@ -1,21 +1,27 @@
 /**
  * POC: Lean schema generator vs. current generator.
  *
- * Reads the existing schema snapshot for a workspace, builds a deterministic
- * lean schema for each page using URL-pattern-driven type selection and compact
- * templates, then prints a side-by-side comparison.
+ * Reads the existing schema snapshot for a workspace, then calls the
+ * production `generateLeanSchema` (server/schema/index.ts) for each page
+ * using the snapshot's metadata (no live HTML fetch, no AI calls because
+ * descriptions are reused from the snapshot).  Prints a side-by-side
+ * comparison of character counts and node types.
  *
  * No AI calls. The lean version uses data already present in the snapshot
- * (pageTitle, slug, url, existing schema's description if any) so the comparison
- * isolates *prompt-design* differences, not AI quality differences.
+ * (pageTitle, slug, url, existing schema's description if any) so the
+ * comparison isolates *prompt-design* differences, not AI quality differences.
  *
  * Usage:
- *   npx tsx scripts/poc-lean-schema.ts <workspaceId>
+ *   npx tsx scripts/poc-lean-schema.ts [workspaceId]
  *
  * Default workspaceId is hmpsn studio (ws_dd68114e-283b-430b-a9c1-05afdbd30e0d).
+ *
+ * NOTE: Requires staging data to be present locally.
+ *   Run `npm run db:sync-staging` first if the workspace is not found.
  */
 
 import db from '../server/db/index.js';
+import { generateLeanSchema } from '../server/schema/index.js';
 
 // ──────────────────────────────────────────────────────────────
 // Types
@@ -44,38 +50,6 @@ interface Workspace {
 }
 
 // ──────────────────────────────────────────────────────────────
-// URL pattern → primary type
-// ──────────────────────────────────────────────────────────────
-
-type LeanPageType =
-  | 'Homepage'         // Organization + WebSite (sitewide entities)
-  | 'AboutPage'
-  | 'ContactPage'
-  | 'BlogPosting'      // /insights/*, /blog/*, /articles/*
-  | 'BlogIndex'        // /insights, /blog, /articles
-  | 'Service'          // /services/[name]
-  | 'ServiceIndex'     // /services
-  | 'CaseStudy'        // /our-work/[name], /case-studies/[name]
-  | 'CaseStudyIndex'   // /our-work, /case-studies
-  | 'Legal'            // /privacy*, /terms*
-  | 'WebPage';         // fallback
-
-function classifyPage(pagePath: string): LeanPageType {
-  const p = pagePath.replace(/\/$/, '') || '/';
-  if (p === '/' || p === '') return 'Homepage';
-  if (/^\/about(-us)?$/i.test(p)) return 'AboutPage';
-  if (/^\/contact(-us)?$/i.test(p)) return 'ContactPage';
-  if (/^\/(insights?|blog|articles?|news)$/i.test(p)) return 'BlogIndex';
-  if (/^\/(insights?|blog|articles?|news)\/.+/i.test(p)) return 'BlogPosting';
-  if (/^\/services?$/i.test(p)) return 'ServiceIndex';
-  if (/^\/services?\/[^/]+\/?$/i.test(p)) return 'Service';
-  if (/^\/(our-work|case-stud(y|ies)|portfolio|projects)$/i.test(p)) return 'CaseStudyIndex';
-  if (/^\/(our-work|case-stud(y|ies)|portfolio|projects)\/.+/i.test(p)) return 'CaseStudy';
-  if (/^\/(privacy(-policy)?|terms(-of-(service|use))?|legal|cookie(-policy)?)/i.test(p)) return 'Legal';
-  return 'WebPage';
-}
-
-// ──────────────────────────────────────────────────────────────
 // Helpers
 // ──────────────────────────────────────────────────────────────
 
@@ -83,6 +57,9 @@ function classifyPage(pagePath: string): LeanPageType {
  * Extract a description and image from the existing AI-generated schema, if available.
  * This avoids an AI call for the POC and keeps the comparison fair (we're testing
  * the structure of the OUTPUT, not the AI's content quality).
+ *
+ * We bake the description into a fake meta SEO field so the production extractor
+ * picks it up without needing to parse HTML.
  */
 function reuseAiContent(result: SnapshotResult): { description?: string; image?: string } {
   const tmpl = result.suggestedSchemas?.[0]?.template;
@@ -99,294 +76,6 @@ function reuseAiContent(result: SnapshotResult): { description?: string; image?:
   return { description, image };
 }
 
-function buildBreadcrumb(pagePath: string, baseUrl: string, pageTitle: string): Record<string, unknown> {
-  const segments = pagePath.replace(/^\//, '').split('/').filter(Boolean);
-  const items: Record<string, unknown>[] = [
-    {
-      '@type': 'ListItem',
-      'position': 1,
-      'name': 'Home',
-      'item': baseUrl,
-    },
-  ];
-  let acc = baseUrl;
-  segments.forEach((seg, i) => {
-    acc = `${acc}/${seg}`;
-    items.push({
-      '@type': 'ListItem',
-      'position': i + 2,
-      'name': i === segments.length - 1 ? pageTitle : capitalize(seg.replace(/-/g, ' ')),
-      'item': acc,
-    });
-  });
-  return {
-    '@type': 'BreadcrumbList',
-    'itemListElement': items,
-  };
-}
-
-function capitalize(s: string): string {
-  return s.replace(/\b\w/g, c => c.toUpperCase());
-}
-
-function dropUndefined<T extends Record<string, unknown>>(obj: T): T {
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(obj)) {
-    if (v !== undefined) out[k] = v;
-  }
-  return out as T;
-}
-
-// ──────────────────────────────────────────────────────────────
-// Lean schema templates
-// ──────────────────────────────────────────────────────────────
-
-interface BuildContext {
-  ws: Workspace;
-  baseUrl: string;
-  publisherLogoUrl?: string;
-}
-
-function buildOrgNode(ctx: BuildContext, asPrimary: boolean): Record<string, unknown> {
-  return dropUndefined({
-    '@type': 'Organization',
-    '@id': `${ctx.baseUrl}/#organization`,
-    'name': ctx.ws.name,
-    'url': ctx.baseUrl,
-    'logo': ctx.publisherLogoUrl
-      ? { '@type': 'ImageObject', 'url': ctx.publisherLogoUrl }
-      : undefined,
-    // Only emit description on Homepage to avoid duplication site-wide
-    'description': asPrimary && ctx.ws.businessContext ? ctx.ws.businessContext.slice(0, 250) : undefined,
-  });
-}
-
-function buildLeanSchema(
-  result: SnapshotResult,
-  ctx: BuildContext,
-): Record<string, unknown> {
-  const pagePath = result.url.replace(ctx.baseUrl, '') || '/';
-  const type = classifyPage(pagePath);
-  const { description, image } = reuseAiContent(result);
-  const url = result.url;
-  const title = result.pageTitle;
-
-  // Most page types share Article/WebPage shape — build the primary node, then add breadcrumb.
-  // Homepage is the only exception (no breadcrumb, sitewide entities only).
-
-  if (type === 'Homepage') {
-    return {
-      '@context': 'https://schema.org',
-      '@graph': [
-        dropUndefined({
-          '@type': 'Organization',
-          '@id': `${ctx.baseUrl}/#organization`,
-          'name': ctx.ws.name,
-          'url': ctx.baseUrl,
-          'logo': ctx.publisherLogoUrl
-            ? { '@type': 'ImageObject', 'url': ctx.publisherLogoUrl }
-            : undefined,
-          'description': description || ctx.ws.businessContext || undefined,
-          'image': image,
-        }),
-        {
-          '@type': 'WebSite',
-          '@id': `${ctx.baseUrl}/#website`,
-          'name': ctx.ws.name,
-          'url': ctx.baseUrl,
-          'publisher': { '@id': `${ctx.baseUrl}/#organization` },
-        },
-      ],
-    };
-  }
-
-  // For non-homepage types: ONE primary node + BreadcrumbList. No sitewide bloat.
-  const breadcrumb = buildBreadcrumb(pagePath, ctx.baseUrl, title);
-
-  if (type === 'BlogPosting') {
-    return {
-      '@context': 'https://schema.org',
-      '@graph': [
-        dropUndefined({
-          '@type': 'BlogPosting',
-          '@id': `${url}#article`,
-          'headline': title,
-          'description': description,
-          'image': image ? [image] : undefined,
-          'url': url,
-          'mainEntityOfPage': { '@type': 'WebPage', '@id': url },
-          'author': { '@type': 'Organization', 'name': ctx.ws.name },
-          'publisher': dropUndefined({
-            '@type': 'Organization',
-            'name': ctx.ws.name,
-            'logo': ctx.publisherLogoUrl
-              ? { '@type': 'ImageObject', 'url': ctx.publisherLogoUrl }
-              : undefined,
-          }),
-        }),
-        breadcrumb,
-      ],
-    };
-  }
-
-  if (type === 'CaseStudy') {
-    // Case studies are Articles, not Services — Service describes a thing you sell.
-    return {
-      '@context': 'https://schema.org',
-      '@graph': [
-        dropUndefined({
-          '@type': 'Article',
-          '@id': `${url}#article`,
-          'headline': title,
-          'description': description,
-          'image': image ? [image] : undefined,
-          'url': url,
-          'mainEntityOfPage': { '@type': 'WebPage', '@id': url },
-          'author': { '@type': 'Organization', 'name': ctx.ws.name },
-          'publisher': dropUndefined({
-            '@type': 'Organization',
-            'name': ctx.ws.name,
-            'logo': ctx.publisherLogoUrl
-              ? { '@type': 'ImageObject', 'url': ctx.publisherLogoUrl }
-              : undefined,
-          }),
-          'about': 'Case study',
-        }),
-        breadcrumb,
-      ],
-    };
-  }
-
-  if (type === 'Service') {
-    return {
-      '@context': 'https://schema.org',
-      '@graph': [
-        dropUndefined({
-          '@type': 'Service',
-          '@id': `${url}#service`,
-          'name': title,
-          'description': description,
-          'image': image,
-          'url': url,
-          'provider': { '@type': 'Organization', '@id': `${ctx.baseUrl}/#organization`, 'name': ctx.ws.name },
-        }),
-        breadcrumb,
-      ],
-    };
-  }
-
-  if (type === 'BlogIndex' || type === 'CaseStudyIndex' || type === 'ServiceIndex') {
-    return {
-      '@context': 'https://schema.org',
-      '@graph': [
-        dropUndefined({
-          '@type': 'CollectionPage',
-          '@id': `${url}#collection`,
-          'name': title,
-          'description': description,
-          'url': url,
-        }),
-        breadcrumb,
-      ],
-    };
-  }
-
-  if (type === 'AboutPage') {
-    return {
-      '@context': 'https://schema.org',
-      '@graph': [
-        dropUndefined({
-          '@type': 'AboutPage',
-          '@id': `${url}#aboutpage`,
-          'name': title,
-          'description': description,
-          'url': url,
-          'mainEntity': { '@id': `${ctx.baseUrl}/#organization` },
-        }),
-        breadcrumb,
-      ],
-    };
-  }
-
-  if (type === 'ContactPage') {
-    return {
-      '@context': 'https://schema.org',
-      '@graph': [
-        dropUndefined({
-          '@type': 'ContactPage',
-          '@id': `${url}#contactpage`,
-          'name': title,
-          'description': description,
-          'url': url,
-        }),
-        breadcrumb,
-      ],
-    };
-  }
-
-  // Legal pages and fallback WebPage — minimal: just a WebPage + Breadcrumb.
-  return {
-    '@context': 'https://schema.org',
-    '@graph': [
-      dropUndefined({
-        '@type': 'WebPage',
-        '@id': `${url}#webpage`,
-        'name': title,
-        'description': description,
-        'url': url,
-      }),
-      breadcrumb,
-    ],
-  };
-}
-
-// ──────────────────────────────────────────────────────────────
-// Validation (same checks as production validator)
-// ──────────────────────────────────────────────────────────────
-
-function validateLean(schema: Record<string, unknown>): string[] {
-  const errors: string[] = [];
-  if (schema['@context'] !== 'https://schema.org') errors.push('Missing or wrong @context');
-  const graph = schema['@graph'] as Array<Record<string, unknown>>;
-  if (!Array.isArray(graph)) {
-    errors.push('Missing @graph array');
-    return errors;
-  }
-  for (const node of graph) {
-    if (!node['@type']) errors.push('Node missing @type');
-  }
-  return errors;
-}
-
-// ──────────────────────────────────────────────────────────────
-// Comparison runner
-// ──────────────────────────────────────────────────────────────
-
-function loadWorkspace(workspaceId: string): Workspace | null {
-  const row = db
-    .prepare(`SELECT id, name, webflow_site_id, live_domain, business_context FROM workspaces WHERE id = ?`)
-    .get(workspaceId) as
-    | { id: string; name: string; webflow_site_id: string | null; live_domain: string | null; business_context: string | null }
-    | undefined;
-  if (!row) return null;
-  return {
-    id: row.id,
-    name: row.name,
-    webflowSiteId: row.webflow_site_id,
-    liveDomain: row.live_domain,
-    businessContext: row.business_context,
-  };
-}
-
-function loadSnapshot(siteId: string): { results: SnapshotResult[] } | null {
-  const row = db
-    .prepare(`SELECT results FROM schema_snapshots WHERE site_id = ?`)
-    .get(siteId) as { results: string } | undefined;
-  if (!row) return null;
-  const results = JSON.parse(row.results) as SnapshotResult[];
-  return { results };
-}
-
 function chars(obj: unknown): number {
   return JSON.stringify(obj).length;
 }
@@ -400,11 +89,47 @@ function pad(s: string, n: number): string {
   return s.length >= n ? s : s + ' '.repeat(n - s.length);
 }
 
+// ──────────────────────────────────────────────────────────────
+// DB helpers
+// ──────────────────────────────────────────────────────────────
+
+function loadWorkspace(workspaceId: string): Workspace | null {
+  // business_context was added in a later migration — query without it so the
+  // script works against both local and staging DBs.
+  const row = db
+    .prepare(`SELECT id, name, webflow_site_id, live_domain FROM workspaces WHERE id = ?`)
+    .get(workspaceId) as
+    | { id: string; name: string; webflow_site_id: string | null; live_domain: string | null }
+    | undefined;
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    webflowSiteId: row.webflow_site_id,
+    liveDomain: row.live_domain,
+    businessContext: null,
+  };
+}
+
+function loadSnapshot(siteId: string): { results: SnapshotResult[] } | null {
+  const row = db
+    .prepare(`SELECT results FROM schema_snapshots WHERE site_id = ?`)
+    .get(siteId) as { results: string } | undefined;
+  if (!row) return null;
+  const results = JSON.parse(row.results) as SnapshotResult[];
+  return { results };
+}
+
+// ──────────────────────────────────────────────────────────────
+// Comparison runner
+// ──────────────────────────────────────────────────────────────
+
 async function main() {
   const wsId = process.argv[2] || 'ws_dd68114e-283b-430b-a9c1-05afdbd30e0d';
   const ws = loadWorkspace(wsId);
   if (!ws) {
-    console.error(`Workspace ${wsId} not found`);
+    console.error(`\nWorkspace ${wsId} not found in local DB.`);
+    console.error(`Run \`npm run db:sync-staging\` to pull staging data first.\n`);
     process.exit(1);
   }
   if (!ws.webflowSiteId) {
@@ -413,83 +138,116 @@ async function main() {
   }
   const snap = loadSnapshot(ws.webflowSiteId);
   if (!snap) {
-    console.error(`No snapshot for site ${ws.webflowSiteId}`);
+    console.error(`No schema snapshot found for site ${ws.webflowSiteId}.`);
+    console.error(`Run \`npm run db:sync-staging\` to pull staging data first.\n`);
     process.exit(1);
   }
 
-  const baseUrl = ws.liveDomain ? (ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`) : `https://${ws.name}.com`;
-  const ctx: BuildContext = { ws, baseUrl };
+  const baseUrl = ws.liveDomain
+    ? ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`
+    : `https://${ws.name}.com`;
 
   console.log(`\nLean Schema POC — ${ws.name} (${snap.results.length} pages)\n`);
   console.log(`baseUrl: ${baseUrl}\n`);
 
-  const header = `${pad('Page', 60)} ${pad('Type', 18)} ${pad('Old', 30)} ${pad('Lean', 24)} Δ chars`;
+  const header = `${pad('Page', 60)} ${pad('Type', 20)} ${pad('Old', 30)} ${pad('Lean', 24)} Δ chars`;
   console.log(header);
   console.log('─'.repeat(header.length));
 
   let oldTotalChars = 0;
   let leanTotalChars = 0;
-  let oldTotalErrors = 0;
-  let leanTotalErrors = 0;
-  const samplesToFullDump: SnapshotResult[] = [];
+  const samplesToFullDump: Array<{ result: SnapshotResult; lean: Record<string, unknown>; leanType: string }> = [];
 
   for (const result of snap.results) {
     const oldSchema = result.suggestedSchemas?.[0]?.template ?? {};
     const oldGraph = (oldSchema['@graph'] as Array<Record<string, unknown>>) ?? [];
-    const leanSchema = buildLeanSchema(result, ctx);
-    const leanGraph = (leanSchema['@graph'] as Array<Record<string, unknown>>) ?? [];
+    const { description } = reuseAiContent(result);
 
-    const pagePath = result.url.replace(ctx.baseUrl, '') || '/';
-    const type = classifyPage(pagePath);
+    const publishedPath = result.url.replace(baseUrl, '') || '/';
+
+    // Call the production lean generator.
+    // html is empty — we reuse the description from the snapshot via pageMeta.seo.description
+    // so the AI path in extractDescription is skipped (description !== undefined short-circuits).
+    const leanOutput = await generateLeanSchema({
+      pageId: result.pageId,
+      pageMeta: {
+        title: result.pageTitle,
+        slug: result.slug,
+        publishedPath,
+        seo: description ? { description } : undefined,
+      },
+      html: '',
+      baseUrl,
+      workspace: {
+        name: ws.name,
+        publisherLogoUrl: null,
+        businessProfile: null,
+      },
+    });
+
+    const leanSchema = leanOutput.suggestedSchemas[0]?.template ?? {};
+    const leanGraph = (leanSchema['@graph'] as Array<Record<string, unknown>>) ?? [];
+    const leanType = leanOutput.suggestedSchemas[0]?.type ?? 'unknown';
 
     const oldChars = chars(oldSchema);
     const leanChars = chars(leanSchema);
     oldTotalChars += oldChars;
     leanTotalChars += leanChars;
 
-    const oldErrors = result.suggestedSchemas?.[0]?.reason?.match(/auto-fixed (\d+)/)?.[1];
-    const leanValidation = validateLean(leanSchema);
-    oldTotalErrors += Number(oldErrors ?? 0);
-    leanTotalErrors += leanValidation.length;
-
     const delta = leanChars - oldChars;
     const deltaPct = oldChars > 0 ? Math.round((delta / oldChars) * 100) : 0;
 
     console.log(
       `${pad(result.slug.slice(0, 58) || '/', 60)} ` +
-      `${pad(type, 18)} ` +
+      `${pad(leanType.slice(0, 18), 20)} ` +
       `${pad(`${oldGraph.length}n ${oldChars}c`, 14)}` +
-      `${pad(`(fix${oldErrors ?? '?'})`, 16)} ` +
+      `${pad('', 16)} ` +
       `${pad(`${leanGraph.length}n ${leanChars}c`, 24)} ` +
       `${delta < 0 ? '−' : '+'}${Math.abs(delta).toString().padStart(4)} (${deltaPct >= 0 ? '+' : ''}${deltaPct}%)`,
     );
 
-    if (samplesToFullDump.length < 3 && (type === 'BlogPosting' || type === 'CaseStudy' || type === 'Service')) {
-      samplesToFullDump.push(result);
+    // Collect samples for full JSON dump (one per notable type)
+    const isInteresting = leanType.includes('BlogPosting') || leanType.includes('Article') || leanType.includes('Service');
+    if (samplesToFullDump.length < 3 && isInteresting) {
+      samplesToFullDump.push({ result, lean: leanSchema, leanType });
+    }
+
+    // Print any validation errors
+    if (leanOutput.validationErrors && leanOutput.validationErrors.length > 0) {
+      for (const err of leanOutput.validationErrors) {
+        console.log(`  ⚠ validation: ${err}`);
+      }
     }
   }
 
   console.log('─'.repeat(header.length));
   console.log(
-    `\nTotals: old ${oldTotalChars} chars across ${snap.results.length} pages, ${oldTotalErrors} auto-fixes`,
+    `\nTotals: old ${oldTotalChars} chars across ${snap.results.length} pages`,
   );
   console.log(
-    `        lean ${leanTotalChars} chars, ${leanTotalErrors} validation issues`,
+    `        lean ${leanTotalChars} chars`,
   );
-  const reduction = Math.round(((oldTotalChars - leanTotalChars) / oldTotalChars) * 100);
+  const reduction = oldTotalChars > 0 ? Math.round(((oldTotalChars - leanTotalChars) / oldTotalChars) * 100) : 0;
   console.log(`        Δ ${oldTotalChars - leanTotalChars} chars (${reduction}% smaller)\n`);
 
+  if (reduction < 60) {
+    console.warn(`⚠  Reduction (${reduction}%) is below the 60% target. Investigate template bloat.\n`);
+  } else {
+    console.log(`✓  Reduction (${reduction}%) meets the ≥60% target (POC baseline: 72%).\n`);
+  }
+
   // Full JSON dumps for spot-check
-  console.log('═══════ FULL OUTPUTS — SPOT-CHECK SAMPLES ═══════\n');
-  for (const sample of samplesToFullDump) {
-    const pagePath = sample.url.replace(ctx.baseUrl, '') || '/';
-    const type = classifyPage(pagePath);
-    console.log(`\n──── ${sample.slug} (classified: ${type}) ────\n`);
-    console.log(`OLD (${chars(sample.suggestedSchemas?.[0]?.template ?? {})} chars, types: ${nodeTypes(sample.suggestedSchemas?.[0]?.template ?? {}).join(', ')}):`);
-    console.log(JSON.stringify(sample.suggestedSchemas?.[0]?.template, null, 2));
-    console.log(`\nLEAN (${chars(buildLeanSchema(sample, ctx))} chars, types: ${nodeTypes(buildLeanSchema(sample, ctx)).join(', ')}):`);
-    console.log(JSON.stringify(buildLeanSchema(sample, ctx), null, 2));
-    console.log('\n────────\n');
+  if (samplesToFullDump.length > 0) {
+    console.log('═══════ FULL OUTPUTS — SPOT-CHECK SAMPLES ═══════\n');
+    for (const { result, lean, leanType } of samplesToFullDump) {
+      console.log(`\n──── ${result.slug} (lean type: ${leanType}) ────\n`);
+      const oldTmpl = result.suggestedSchemas?.[0]?.template ?? {};
+      console.log(`OLD (${chars(oldTmpl)} chars, types: ${nodeTypes(oldTmpl).join(', ')}):`);
+      console.log(JSON.stringify(oldTmpl, null, 2));
+      console.log(`\nLEAN (${chars(lean)} chars, types: ${nodeTypes(lean).join(', ')}):`);
+      console.log(JSON.stringify(lean, null, 2));
+      console.log('\n────────\n');
+    }
   }
 }
 
