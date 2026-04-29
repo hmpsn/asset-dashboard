@@ -148,6 +148,29 @@ describe('buildServiceSchema', () => {
     expect(node.breadcrumb).toEqual({ '@id': 'https://example.com/services/web-design#breadcrumb' });
     expect(node.inLanguage).toBe('en');
   });
+
+  it('Service emits areaServed as Place when populated', () => {
+    const withArea = {
+      ...serviceInput,
+      pageData: { ...serviceInput.pageData, areaServed: 'Austin, TX' },
+    };
+    const node = (buildServiceSchema(withArea)['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.areaServed).toEqual({ '@type': 'Place', name: 'Austin, TX' });
+  });
+
+  it('Service omits areaServed when undefined', () => {
+    const node = (buildServiceSchema(serviceInput)['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.areaServed).toBeUndefined();
+  });
+
+  it('Service emits serviceType from URL-derived slug', () => {
+    const withType = {
+      ...serviceInput,
+      pageData: { ...serviceInput.pageData, serviceType: 'Web Design' },
+    };
+    const node = (buildServiceSchema(withType)['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.serviceType).toBe('Web Design');
+  });
 });
 
 describe('buildProductSchema', () => {
@@ -253,6 +276,15 @@ describe('buildLocalBusinessSchema', () => {
     const schema = buildLocalBusinessSchema(withKeywords);
     const org = (schema['@graph'] as Array<Record<string, unknown>>).find(n => n['@type'] === 'Organization');
     expect(org?.knowsAbout).toEqual(['dental care', 'cosmetic dentistry']);
+  });
+
+  it('LocalBusiness emits areaServed as Place when populated', () => {
+    const withArea = {
+      ...localInput,
+      pageData: { ...localInput.pageData, areaServed: 'Austin, TX' },
+    };
+    const lb = (buildLocalBusinessSchema(withArea)['@graph'] as Array<Record<string, unknown>>).find(n => n['@type'] === 'LocalBusiness');
+    expect(lb?.areaServed).toEqual({ '@type': 'Place', name: 'Austin, TX' });
   });
 });
 

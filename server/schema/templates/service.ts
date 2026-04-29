@@ -29,6 +29,8 @@ export function buildServiceSchema(input: ServiceInput): Record<string, unknown>
     'isPartOf': webSiteRef(baseUrl),
     'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
     'inLanguage': pageData.inLanguage,
+    'areaServed': pageData.areaServed ? { '@type': 'Place' as const, name: pageData.areaServed } : undefined,
+    'serviceType': pageData.serviceType,
   });
 
   return withBreadcrumb(primary, pageData);

@@ -54,6 +54,7 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
     'sameAs': businessProfile?.socialProfiles?.length ? businessProfile.socialProfiles : undefined,
     'foundedDate': businessProfile?.foundedDate,
     'parentOrganization': { '@id': `${baseUrl}/#organization` },
+    'areaServed': pageData.areaServed ? { '@type': 'Place' as const, name: pageData.areaServed } : undefined,
   });
 
   // Emit the same WebSite sitewide entity that buildHomepageSchema does — Google
