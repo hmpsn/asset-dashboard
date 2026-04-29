@@ -440,3 +440,70 @@ export function buildStaticPathSet(pages: WebflowPage[]): Set<string> {
 export function toCmsPageId(path: string): string {
   return `cms-${path.replace(/^\//, '').replace(/\//g, '-')}`;
 }
+
+export interface CmsItemFull extends CmsPageUrl {
+  collectionId: string;
+  itemId: string;
+  /** Webflow CMS publishing timestamp (ISO 8601). */
+  lastPublished: string | null;
+  /** Webflow CMS creation timestamp (ISO 8601). */
+  createdOn: string | null;
+  /** Raw fieldData blob from /collections/:id/items/:itemId — passed to extractPageData via pageMeta.cmsFieldData. */
+  fieldData: Record<string, unknown> | null;
+}
+
+/**
+ * Like discoverCmsUrls but joins the sitemap-discovered URLs against Webflow's
+ * collection items API to populate collectionId, itemId, timestamps, and fieldData.
+ * Cost: 1 listCollections + 1 listCollectionItems per collection — cached per call.
+ */
+export async function discoverCmsItemsBySlug(
+  siteId: string,
+  sitemapBaseUrl: string,
+  staticPaths: Set<string>,
+  limit: number,
+  tokenOverride?: string,
+): Promise<{ items: CmsItemFull[]; totalFound: number }> {
+  const { cmsUrls, totalFound } = await discoverCmsUrls(sitemapBaseUrl, staticPaths, limit);
+  if (cmsUrls.length === 0) return { items: [], totalFound };
+
+  // Lazy-import to avoid a circular module load at startup.
+  const { listCollections, listCollectionItems } = await import('./webflow-cms.js'); // dynamic-import-ok
+  const collections = await listCollections(siteId, tokenOverride);
+
+  const slugMap = new Map<string, Omit<CmsItemFull, 'url' | 'path' | 'pageName'>>();
+  for (const coll of collections) {
+    let offset = 0;
+    const pageSize = 100;
+    while (offset < limit) {
+      const { items: batch, total } = await listCollectionItems(coll.id, pageSize, offset, tokenOverride);
+      if (batch.length === 0) break;
+      for (const it of batch) {
+        const fieldData = (it.fieldData as Record<string, unknown> | undefined) ?? null;
+        const slug = (fieldData?.slug as string | undefined) ?? undefined;
+        if (!slug) continue;
+        slugMap.set(slug.toLowerCase(), {
+          collectionId: coll.id,
+          itemId: (it.id as string) ?? '',
+          lastPublished: (it.lastPublished as string | null | undefined) ?? null,
+          createdOn: (it.createdOn as string | null | undefined) ?? null,
+          fieldData,
+        });
+      }
+      offset += batch.length;
+      if (offset >= total) break;
+    }
+  }
+
+  const items: CmsItemFull[] = [];
+  for (const u of cmsUrls) {
+    const lastSeg = u.path.replace(/\/$/, '').split('/').pop()?.toLowerCase() ?? '';
+    const meta = slugMap.get(lastSeg);
+    if (!meta) {
+      items.push({ ...u, collectionId: '', itemId: '', lastPublished: null, createdOn: null, fieldData: null });
+    } else {
+      items.push({ ...u, ...meta });
+    }
+  }
+  return { items, totalFound };
+}
