@@ -2,18 +2,33 @@ import { describe, it, expect } from 'vitest';
 import { validateLeanSchema } from '../../../server/schema/validator.js';
 
 describe('validateLeanSchema', () => {
-  it('passes a minimal valid BlogPosting', () => {
+  it('passes a fully-populated BlogPosting', () => {
     const schema = {
       '@context': 'https://schema.org',
       '@graph': [
         {
           '@type': 'BlogPosting',
+          '@id': 'https://x/y#article',
           'headline': 'Title',
           'description': 'Body',
+          'image': 'https://x/i.jpg',
           'datePublished': '2025-01-15T00:00:00Z',
+          'dateModified': '2025-02-01T00:00:00Z',
           'author': { '@type': 'Organization', 'name': 'Acme' },
-          'publisher': { '@type': 'Organization', 'name': 'Acme', 'logo': { '@type': 'ImageObject', 'url': 'https://x/y.png' } },
+          'publisher': { '@type': 'Organization', 'name': 'Acme', 'logo': { '@type': 'ImageObject', 'url': 'https://x/logo.png' } },
           'mainEntityOfPage': { '@type': 'WebPage', '@id': 'https://x/y' },
+          'isPartOf': { '@id': 'https://x/#website' },
+          'breadcrumb': { '@id': 'https://x/y#breadcrumb' },
+          'inLanguage': 'en',
+          'articleSection': 'Blog',
+        },
+        {
+          '@type': 'BreadcrumbList',
+          '@id': 'https://x/y#breadcrumb',
+          'itemListElement': [
+            { '@type': 'ListItem', 'position': 1, 'name': 'Home', 'item': 'https://x' },
+            { '@type': 'ListItem', 'position': 2, 'name': 'Title', 'item': 'https://x/y' },
+          ],
         },
       ],
     };
@@ -54,15 +69,22 @@ describe('validateLeanSchema', () => {
       '@graph': [
         {
           '@type': 'Article',
+          '@id': 'https://x/y#article',
           'headline': 'X',
           'description': 'Y',
+          'image': 'https://x/i.jpg',
           'datePublished': '2025-01-15T00:00:00Z',
+          'dateModified': '2025-02-01T00:00:00Z',
           'author': { '@type': 'Organization', 'name': 'A' },
-          'publisher': { '@type': 'Organization', 'name': 'A' },
+          'publisher': { '@type': 'Organization', 'name': 'A', 'logo': { '@type': 'ImageObject', 'url': 'https://x/logo.png' } },
           'mainEntityOfPage': { '@type': 'WebPage', '@id': 'https://x/y' },
+          'isPartOf': { '@id': 'https://x/#website' },
+          'breadcrumb': { '@id': 'https://x/y#breadcrumb' },
+          'inLanguage': 'en',
         },
         {
           '@type': 'BreadcrumbList',
+          '@id': 'https://x/y#breadcrumb',
           'itemListElement': [
             { '@type': 'ListItem', 'position': 1, 'name': 'Home', 'item': 'https://x' },
             { '@type': 'ListItem', 'position': 2, 'name': 'Page', 'item': 'https://x/y' },
@@ -102,8 +124,21 @@ describe('validateLeanSchema', () => {
     const schema = {
       '@context': 'https://schema.org',
       '@graph': [
-        { '@type': 'Organization', '@id': 'https://x/#organization', 'name': 'X', 'url': 'https://x' },
-        { '@type': 'WebSite', '@id': 'https://x/#website', 'name': 'X', 'url': 'https://x', 'publisher': { '@id': 'https://x/#organization' } },
+        {
+          '@type': 'Organization',
+          '@id': 'https://x/#organization',
+          'name': 'X',
+          'url': 'https://x',
+          'logo': { '@type': 'ImageObject', 'url': 'https://x/logo.png' },
+        },
+        {
+          '@type': 'WebSite',
+          '@id': 'https://x/#website',
+          'name': 'X',
+          'url': 'https://x',
+          'publisher': { '@id': 'https://x/#organization' },
+          'inLanguage': 'en',
+        },
       ],
     };
     expect(validateLeanSchema(schema, 'Organization')).toEqual([]);
