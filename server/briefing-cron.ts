@@ -1,0 +1,352 @@
+// server/briefing-cron.ts
+//
+// Weekly client-briefing orchestrator (T1.14).
+//
+// - Polls every hour. Once it's past Monday 14:00 UTC for a given ISO week,
+//   eligible workspaces get one run of `runBriefingForWorkspace()` per week
+//   (idempotent on `workspaces.last_briefing_run_week_of`).
+// - Per-workspace eligibility: tier !== 'free' AND feature flag
+//   `client-briefing-v2` enabled.
+// - Pre-flight freshness check: if audit/competitor data is stale, defer up
+//   to MAX_DEFERRALS times by writing a placeholder draft with an incremented
+//   `preflightDeferralCount`. On the next run after MAX_DEFERRALS, generate
+//   anyway (better stale than silent).
+// - Soft-degrades when `outcome-ai-injection` is OFF: skip the learnings
+//   context block but still generate.
+// - Auto-publishes when ws.autoPublishBriefings && ws.autoPublishAfterHours === 0.
+//
+// Layer composition: instructions (briefing-prompt) → buildSystemPrompt
+// (prompt-assembly) injects voice DNA + guardrails. Do NOT inline voice DNA
+// here.
+
+import db from './db/index.js';
+import { listWorkspaces, getWorkspace, updateWorkspace } from './workspaces.js';
+import { getSchedule } from './scheduled-audits.js';
+import { callAI } from './ai.js';
+import { buildSystemPrompt } from './prompt-assembly.js';
+import { isFeatureEnabled } from './feature-flags.js';
+import {
+  collectAllCandidates,
+  formatCandidateBlock,
+  topNByMateriality,
+} from './briefing-candidates.js';
+import {
+  upsertBriefingDraft,
+  getBriefingByWeek,
+  markPublished,
+} from './briefing-store.js';
+import { briefingAIResponseSchema, buildBriefingInstructions } from './briefing-prompt.js';
+import { broadcastToWorkspace } from './broadcast.js';
+import { WS_EVENTS } from './ws-events.js';
+import { addActivity } from './activity-log.js';
+import { notifyClientBriefingReady } from './email.js';
+import { getWorkspaceLearnings, formatLearningsForPrompt } from './workspace-learnings.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('briefing-cron');
+
+const CHECK_INTERVAL_MS = 60 * 60 * 1000; // poll every hour
+const TARGET_DAY = 1; // Monday (UTC: Sunday=0, Monday=1)
+const TARGET_HOUR_UTC = 14;
+const FRESHNESS_AUDIT_DAYS = 8;
+const FRESHNESS_COMPETITOR_DAYS = 8;
+const MAX_DEFERRALS = 3;
+
+// ── Time helpers ─────────────────────────────────────────────────────────────
+
+/** ISO date (YYYY-MM-DD) of the Monday that anchors the week containing `d`. */
+function currentWeekOfUTC(d = new Date()): string {
+  const day = d.getUTCDay();
+  // Treat Sunday (0) as the *end* of last week so its Monday is 6 days back.
+  const diffToMonday = (day + 6) % 7;
+  const monday = new Date(Date.UTC(
+    d.getUTCFullYear(),
+    d.getUTCMonth(),
+    d.getUTCDate() - diffToMonday,
+  ));
+  return monday.toISOString().slice(0, 10);
+}
+
+/** Has this week's Monday 14:00 UTC already passed? */
+function isPastTargetThisWeek(now = new Date()): boolean {
+  const day = now.getUTCDay();
+  if (day === 0) return false; // Sunday — Monday hasn't arrived yet this week
+  if (day === TARGET_DAY && now.getUTCHours() < TARGET_HOUR_UTC) return false;
+  return true;
+}
+
+// ── Freshness checks ─────────────────────────────────────────────────────────
+
+function isAuditFresh(workspaceId: string): boolean {
+  const sched = getSchedule(workspaceId);
+  if (!sched?.lastRunAt) return false;
+  const last = new Date(sched.lastRunAt).getTime();
+  if (Number.isNaN(last)) return false;
+  return Date.now() - last < FRESHNESS_AUDIT_DAYS * 86_400_000;
+}
+
+/**
+ * Returns true if there are no competitor snapshots (workspace doesn't use
+ * competitor monitoring) OR the latest snapshot is fresh. Only blocks the
+ * briefing when the workspace HAS competitor monitoring AND it's stale.
+ */
+function isCompetitorFresh(workspaceId: string): boolean {
+  try {
+    const row = db
+      .prepare('SELECT MAX(created_at) AS m FROM competitor_snapshots WHERE workspace_id = ?')
+      .get(workspaceId) as { m: string | null } | undefined;
+    if (!row?.m) return true;
+    const last = new Date(row.m).getTime();
+    if (Number.isNaN(last)) return true;
+    return Date.now() - last < FRESHNESS_COMPETITOR_DAYS * 86_400_000;
+  } catch {
+    return true;
+  }
+}
+
+// ── Public runner API ────────────────────────────────────────────────────────
+
+export interface RunBriefingOptions {
+  /** Skip duplicate-week guard. Used by the manual "generate now" admin button. */
+  manual?: boolean;
+  /** Override "now" for testing. */
+  nowMs?: number;
+}
+
+export interface RunBriefingResult {
+  status: 'generated' | 'deferred' | 'skipped' | 'duplicate';
+  weekOf: string;
+  reason?: string;
+}
+
+/**
+ * Run the briefing pipeline once for one workspace. Idempotent within an ISO
+ * week unless `manual: true`. Returns a result object — never throws on
+ * expected control-flow paths (free tier, duplicate, AI-invalid). Re-throws
+ * unexpected errors so the cron loop logs them.
+ */
+export async function runBriefingForWorkspace(
+  workspaceId: string,
+  opts: RunBriefingOptions = {},
+): Promise<RunBriefingResult> {
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return { status: 'skipped', weekOf: '', reason: 'workspace not found' };
+
+  const tier = ws.tier ?? 'free';
+  if (tier === 'free') return { status: 'skipped', weekOf: '', reason: 'free tier' };
+
+  const now = opts.nowMs ? new Date(opts.nowMs) : new Date();
+  const weekOf = currentWeekOfUTC(now);
+
+  // Duplicate-week guard — manual bypasses
+  if (ws.lastBriefingRunWeekOf === weekOf && !opts.manual) {
+    return { status: 'duplicate', weekOf };
+  }
+
+  // Pre-flight freshness check (defers up to MAX_DEFERRALS times)
+  const existing = getBriefingByWeek(workspaceId, weekOf);
+  const deferrals = existing?.sourceMetadata?.preflightDeferralCount ?? 0;
+  const auditOk = isAuditFresh(workspaceId);
+  const compOk = isCompetitorFresh(workspaceId);
+  if ((!auditOk || !compOk) && deferrals < MAX_DEFERRALS && !opts.manual) {
+    upsertBriefingDraft({
+      workspaceId,
+      weekOf,
+      stories: existing?.stories ?? [],
+      sourceMetadata: {
+        candidateCount: 0,
+        model: 'n/a',
+        provider: 'anthropic',
+        generationMs: 0,
+        preflightDeferralCount: deferrals + 1,
+      },
+    });
+    log.info(
+      { workspaceId, weekOf, deferrals: deferrals + 1, auditOk, compOk },
+      'briefing pre-flight defer',
+    );
+    return {
+      status: 'deferred',
+      weekOf,
+      reason: !auditOk ? 'stale audit' : 'stale competitor data',
+    };
+  }
+
+  // Collect candidates
+  const candidates = collectAllCandidates(workspaceId);
+  if (candidates.length === 0 && !opts.manual) {
+    log.info({ workspaceId, weekOf }, 'briefing skipped — no candidates');
+    return { status: 'skipped', weekOf, reason: 'no candidates' };
+  }
+  const top = topNByMateriality(candidates, 10);
+  const candidateBlock = formatCandidateBlock(top);
+
+  // Optional learnings context (soft-degrade per outcome-ai-injection flag)
+  let learningsContext: string | undefined;
+  if (isFeatureEnabled('outcome-ai-injection')) {
+    try {
+      const learnings = getWorkspaceLearnings(workspaceId);
+      if (learnings) {
+        const block = formatLearningsForPrompt(learnings, 'all');
+        if (block) learningsContext = block;
+      }
+    } catch (err) {
+      log.debug({ err, workspaceId }, 'learnings injection failed; soft-degrading');
+    }
+  }
+
+  // Build prompt
+  const instructions = buildBriefingInstructions({
+    workspaceName: ws.name,
+    weekLabel: `Week of ${weekOf}`,
+    candidateBlock,
+    learningsContext,
+  });
+  const system = buildSystemPrompt(workspaceId, instructions);
+
+  // AI dispatch
+  const t0 = Date.now();
+  const provider = 'anthropic' as const;
+  const model = 'claude-sonnet-4-20250514';
+  const result = await callAI({
+    provider,
+    model,
+    system,
+    messages: [{ role: 'user', content: 'Generate the briefing JSON now.' }],
+    feature: 'client-briefing',
+    workspaceId,
+    maxTokens: 2000,
+    temperature: 0.5,
+  });
+  const generationMs = Date.now() - t0;
+
+  // Parse + validate
+  let parsed;
+  try {
+    parsed = briefingAIResponseSchema.parse(JSON.parse(result.text));
+  } catch (err) {
+    log.error(
+      { err, workspaceId, weekOf, raw: result.text.slice(0, 400) },
+      'briefing AI response invalid',
+    );
+    return { status: 'skipped', weekOf, reason: 'AI response invalid' };
+  }
+
+  // Persist
+  const draft = upsertBriefingDraft({
+    workspaceId,
+    weekOf,
+    stories: parsed.stories,
+    sourceMetadata: {
+      candidateCount: top.length,
+      model,
+      provider,
+      generationMs,
+      preflightDeferralCount: deferrals,
+    },
+  });
+  updateWorkspace(workspaceId, { lastBriefingRunWeekOf: weekOf });
+  addActivity(
+    workspaceId,
+    'briefing_generated',
+    `Briefing draft generated — ${weekOf}`,
+    `${parsed.stories.length} stories`,
+    { briefingId: draft.id },
+  );
+  broadcastToWorkspace(workspaceId, WS_EVENTS.BRIEFING_GENERATED, {
+    briefingId: draft.id,
+    weekOf,
+    action: 'generated',
+  });
+
+  // Auto-publish branch — only when admin opted in AND afterHours = 0 (immediate)
+  if (ws.autoPublishBriefings && (ws.autoPublishAfterHours ?? 24) === 0) {
+    const published = markPublished(workspaceId, draft.id, { autoPublished: true });
+    if (published) {
+      addActivity(
+        workspaceId,
+        'briefing_auto_published',
+        `Briefing auto-published — ${weekOf}`,
+        undefined,
+        { briefingId: published.id },
+      );
+      broadcastToWorkspace(workspaceId, WS_EVENTS.BRIEFING_PUBLISHED, {
+        briefingId: published.id,
+        weekOf,
+      });
+      if (ws.clientEmail) {
+        notifyClientBriefingReady({
+          clientEmail: ws.clientEmail,
+          workspaceName: ws.name,
+          workspaceId,
+          weekOf,
+          storyCount: published.stories.length,
+          heroHeadline: published.stories.find((s) => s.isHeadline)?.headline ?? '',
+        });
+      }
+    }
+  }
+
+  return { status: 'generated', weekOf };
+}
+
+// ── Cron loop ────────────────────────────────────────────────────────────────
+
+/**
+ * In-memory "we already ran this workspace this week" memo. Backstops the
+ * DB-level idempotency (workspaces.last_briefing_run_week_of) so we don't
+ * pound listWorkspaces() and the eligibility checks every hour for already-
+ * processed workspaces.
+ */
+const lastTickRunWeek: Record<string, string> = {};
+
+async function tick(now = new Date()): Promise<void> {
+  if (!isPastTargetThisWeek(now)) return;
+  const weekOf = currentWeekOfUTC(now);
+
+  if (!isFeatureEnabled('client-briefing-v2')) return;
+
+  const all = listWorkspaces();
+  for (const ws of all) {
+    if (lastTickRunWeek[ws.id] === weekOf) continue;
+    if ((ws.tier ?? 'free') === 'free') continue;
+    try {
+      const r = await runBriefingForWorkspace(ws.id);
+      lastTickRunWeek[ws.id] = weekOf;
+      log.info({ workspaceId: ws.id, ...r }, 'briefing tick');
+    } catch (err) {
+      log.error({ err, workspaceId: ws.id }, 'briefing tick error');
+    }
+  }
+}
+
+let startupTimeout: ReturnType<typeof setTimeout> | null = null;
+let tickInterval: ReturnType<typeof setInterval> | null = null;
+
+/** Idempotent — calling twice is a no-op. */
+export function startBriefingCron(): void {
+  if (tickInterval) return;
+
+  startupTimeout = setTimeout(() => {
+    tick().catch((err) => log.error({ err }, 'first briefing tick failed'));
+  }, 60_000);
+  startupTimeout.unref?.();
+
+  tickInterval = setInterval(() => {
+    tick().catch((err) => log.error({ err }, 'briefing tick failed'));
+  }, CHECK_INTERVAL_MS);
+  tickInterval.unref?.();
+
+  log.info('briefing cron started — checks hourly, target Monday 14:00 UTC');
+}
+
+export function stopBriefingCron(): void {
+  if (startupTimeout) {
+    clearTimeout(startupTimeout);
+    startupTimeout = null;
+  }
+  if (tickInterval) {
+    clearInterval(tickInterval);
+    tickInterval = null;
+  }
+}

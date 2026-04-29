@@ -19,6 +19,7 @@ import { stopAnomalyDetection } from './anomaly-detection.js';
 import { stopOutcomeCrons } from './outcome-crons.js';
 import { stopRankTrackingScheduler } from './rank-tracking-scheduler.js';
 import { stopMonthlyReports } from './monthly-report.js';
+import { stopBriefingCron } from './briefing-cron.js';
 import { stopThrottleCleanup } from './email-throttle.js';
 import { listWorkspaces } from './workspaces.js';
 import { isStripeConfigured } from './stripe.js';
@@ -80,6 +81,7 @@ function gracefulShutdown(signal: string) {
   stopOutcomeCrons();
   stopRankTrackingScheduler();
   stopMonthlyReports();
+  stopBriefingCron();
   stopThrottleCleanup();
 
   // 2. Mark any in-progress jobs as interrupted in SQLite before shutdown
