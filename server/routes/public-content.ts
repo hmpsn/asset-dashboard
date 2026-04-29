@@ -543,11 +543,12 @@ router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', valid
     updates.sections = post.sections.map(existing => {
       const edit = clientSections.find(s => s.index === existing.index);
       if (!edit) return existing; // unedited section — keep as-is
+      const sanitizedContent = sanitizeRichText(edit.content);
       return {
         ...existing,                           // preserves: targetWordCount, keywords, status, error
         heading: sanitizePlainText(edit.heading),
-        content: sanitizeRichText(edit.content),
-        wordCount: edit.wordCount,
+        content: sanitizedContent,
+        wordCount: countHtmlWords(sanitizedContent),
       };
     });
   }
