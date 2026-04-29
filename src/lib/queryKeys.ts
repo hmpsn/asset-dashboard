@@ -31,6 +31,8 @@ export const queryKeys = {
 
     // Content
     briefs: (wsId: string) => ['admin-briefs', wsId] as const,
+    briefingDrafts: (wsId: string) => ['admin-briefing-drafts', wsId] as const,
+    briefingDraft: (wsId: string, draftId: string) => ['admin-briefing-draft', wsId, draftId] as const,
     requests: (wsId: string) => ['admin-requests', wsId] as const,
     approvals: (wsId: string) => ['admin-approvals', wsId] as const,
     posts: (wsId: string) => ['admin-posts', wsId] as const,
@@ -165,6 +167,7 @@ export const queryKeys = {
     pageKeywords: (wsId: string) => ['client-page-keywords', wsId] as const,
     insights: (wsId: string) => ['client-insights', wsId] as const,
     clientInsights: (wsId: string) => ['client-narrative-insights', wsId] as const,
+    briefing: (wsId: string) => ['client-briefing', wsId] as const,
     monthlyDigest: (wsId: string) => ['client-monthly-digest', wsId] as const,
     outcomeSummary: (wsId: string) => ['client-outcome-summary', wsId] as const,
     outcomeWins: (wsId: string) => ['client-outcome-wins', wsId] as const,
