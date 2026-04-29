@@ -1,16 +1,12 @@
-import { discoverCmsUrls, buildStaticPathSet, getCollectionSchema, listCollections, toCmsPageId } from './webflow.js';
-import { getWorkspacePages } from './workspace-data.js';
-import { listWorkspaces } from './workspaces.js';
+import { getCollectionSchema, listCollections } from './webflow.js';
 import { callOpenAI } from './openai-helpers.js';
-import { resolvePagePath, stripHtmlToText } from './helpers.js';
+import { stripHtmlToText } from './helpers.js';
 import { createLogger } from './logger.js';
-import { saveSiteTemplate, getOrSeedSiteTemplate, getSchemaPlan } from './schema-store.js';
+import { saveSiteTemplate, getOrSeedSiteTemplate } from './schema-store.js';
 import { getBrief } from './content-brief.js';
 import type { ContentBrief } from '../shared/types/content.ts';
-import { buildPlanContextForPage } from './schema-plan.js';
 import { getAncestorChain, getParentNode, getSiblingNodes, getChildNodes } from './site-architecture.js';
 import { isProgrammingError } from './errors.js';
-import { getValidation } from './schema-validator.js';
 import type { SchemaValidation } from './schema-validator.js';
 import { fetchPageMeta } from './seo-audit.js';
 import { fetchPublishedHtml } from './helpers.js';
@@ -1073,6 +1069,8 @@ function verifySchemaContent(schema: Record<string, unknown>, pageText: string, 
 
 
 // Detect existing JSON-LD schemas in HTML
+// TODO(Task 14): delete this function — no longer called after lean-schema wiring
+// @ts-ignore TS6133: retained for Task 14 deletion batch
 function extractExistingSchemas(html: string): { types: string[]; json: Record<string, unknown>[] } {
   const types: string[] = [];
   const json: Record<string, unknown>[] = [];
@@ -1648,6 +1646,8 @@ RULES:
   };
 }
 
+// TODO(Task 14): delete this function — no longer called after lean-schema wiring
+// @ts-ignore TS6133: retained for Task 14 deletion batch
 async function aiGenerateUnifiedSchema(
   pageTitle: string,
   slug: string,
@@ -1892,6 +1892,8 @@ Return ONLY the JSON-LD object. No markdown, no explanation, no wrapping.`;
 }
 
 // Fallback: build a basic @graph schema without AI
+// TODO(Task 14): delete this function — no longer called after lean-schema wiring
+// @ts-ignore TS6133: retained for Task 14 deletion batch
 function buildFallbackSchema(
   pageTitle: string,
   slug: string,
@@ -1973,107 +1975,45 @@ export async function generateSchemaForPage(
   if (!meta) return null;
 
   const slug = meta.slug || '';
-  const url = (!slug || slug === 'index') ? baseUrl : `${baseUrl}/${slug}`;
-  const isHomepage = !slug || slug === '' || slug === 'home' || slug === 'index';
+  const isHomepage = !slug || slug === 'index' || slug === 'home';
+  const url = isHomepage ? baseUrl : `${baseUrl}/${slug}`;
   const html = await fetchPublishedHtml(url);
-  const seoTitle = meta.seo?.title || meta.title || '';
-  const seoDesc = meta.seo?.description || '';
-  const { types: existingSchemas, json: existingSchemaJson } = html ? extractExistingSchemas(html) : { types: [], json: [] };
 
-  // Inject plan context if a site plan exists
-  const sitePlan = getSchemaPlan(siteId);
-  if (sitePlan && !ctx._planContext) {
-    const pagePath = isHomepage ? '/' : (slug ? `/${slug}` : '/');
-    ctx._planContext = buildPlanContextForPage(sitePlan, pagePath) || undefined;
-  }
+  // PageMeta from fetchPageMeta does NOT include publishedPath (only WebflowPage from
+  // listPages does). Derive it from slug — homepage = '/', else '/<slug>'.
+  const publishedPath = isHomepage ? '/' : `/${slug}`;
 
-  // Inject per-page analytics if maps were provided
-  if (gscMap || ga4Map) {
-    const lookupPath = (isHomepage ? '/' : (slug ? `/${slug}` : '/')).replace(/\/$/, '') || '/';
-    if (gscMap) ctx._gscPageData = gscMap.get(lookupPath);
-    if (ga4Map) ctx._ga4PageData = ga4Map.get(lookupPath);
-  }
+  const { generateLeanSchema } = await import('./schema/index.js');
+  const lean = await generateLeanSchema({
+    pageId,
+    pageMeta: {
+      title: meta.title || '',
+      slug,
+      publishedPath,
+      seo: meta.seo,
+    },
+    html: html || '',
+    baseUrl,
+    workspace: {
+      name: ctx.companyName || '',
+      publisherLogoUrl: ctx.logoUrl ?? null,
+      businessProfile: ctx._businessProfile ?? null,
+    },
+  });
 
-  // Inject intelligence layer data (health score, quick win, FAQ opportunities)
-  // insightsMap is keyed by analytics_insights.page_id (relative path) — match
-  // the lookup key already computed for gscMap/ga4Map above.
-  const pageUrl = (!slug || slug === 'index') ? baseUrl : `${baseUrl}/${slug}`;
-  if (insightsMap) {
-    const lookupPath = (isHomepage ? '/' : (slug ? `/${slug}` : '/')).replace(/\/$/, '') || '/';
-    const insightData = insightsMap.get(lookupPath);
-    if (insightData) {
-      ctx._pageHealthScore = insightData.healthScore;
-      ctx._pageHealthTrend = insightData.healthTrend as SchemaContext['_pageHealthTrend'];
-      ctx._quickWinStatus = insightData.isQuickWin;
-    }
-  }
-  if (queryPageData) {
-    ctx._faqOpportunities = extractFaqOpportunities(queryPageData, pageUrl);
-  }
-
-  // Inject prior validation errors (avoids repeating mistakes from previous AI runs).
-  // generateSchemaForPage handles static Webflow pages — schema_validations.pageId is the
-  // Webflow UUID, which is exactly the `pageId` parameter to this function.
-  if (ctx.workspaceId && !ctx._existingErrors) {
-    try {
-      const existing = getValidation(ctx.workspaceId, pageId);
-      const rawErrors = existing?.errors;
-      const validated = Array.isArray(rawErrors)
-        ? (rawErrors as unknown[]).filter(
-            (e): e is { message: string } => typeof (e as { message?: unknown })?.message === 'string'
-          ).slice(0, 20)
-        : [];
-      if (validated.length > 0) ctx._existingErrors = validated;
-    } catch (err) { /* non-fatal: prior errors are an enrichment, not a requirement */ } // catch-ok
-  }
-
-  // Try AI unified schema first
-  const aiResult = await aiGenerateUnifiedSchema(
-    meta.title, slug, seoTitle, seoDesc,
-    html, existingSchemas, isHomepage, baseUrl, ctx,
-  );
-
-  let suggestedSchemas: SchemaSuggestion[];
-  let validationErrors: string[] = [];
-
-  if (aiResult) {
-    const types = ((aiResult.schema['@graph'] as Record<string, unknown>[]) || []).map(n => n['@type']).filter(Boolean);
-    suggestedSchemas = [{
-      type: types.join(' + '),
-      reason: aiResult.reason,
-      priority: 'high',
-      template: aiResult.schema,
-    }];
-    validationErrors = aiResult.errors;
-  } else {
-    // Fallback to basic @graph schema
-    const fallback = buildFallbackSchema(meta.title, slug, seoTitle, seoDesc, isHomepage, baseUrl, ctx);
-    const types = ((fallback['@graph'] as Record<string, unknown>[]) || []).map(n => n['@type']).filter(Boolean);
-    suggestedSchemas = [{
-      type: types.join(' + '),
-      reason: `Basic schema with ${types.join(', ')} (AI unavailable — add OPENAI_API_KEY for richer schemas)`,
-      priority: 'medium',
-      template: fallback,
-    }];
-    validationErrors = validateUnifiedSchema(fallback);
-  }
-
-  // Compute Rich Results eligibility from the generated schema
-  const richResultsEligibility = suggestedSchemas[0]?.template
-    ? checkRichResultsEligibility(suggestedSchemas[0].template)
-    : undefined;
+  // Surface unused parameters to satisfy TS noUnusedParameters via void casts.
+  // These are kept in the signature for backwards compatibility with PR #354's
+  // intelligence wiring; the lean generator does not use them in MVP scope.
+  void gscMap; void ga4Map; void queryPageData; void insightsMap;
 
   return {
-    pageId,
-    pageTitle: meta.title,
-    slug,
-    url,
-    existingSchemas,
-    existingSchemaJson: existingSchemaJson.length > 0 ? existingSchemaJson : undefined,
-    suggestedSchemas,
-    validationErrors: validationErrors.length > 0 ? validationErrors : undefined,
-    richResultsEligibility: richResultsEligibility?.length ? richResultsEligibility : undefined,
-    savedPageType: ctx.pageType && ctx.pageType !== 'auto' ? ctx.pageType : undefined,
+    pageId: lean.pageId,
+    pageTitle: lean.pageTitle,
+    slug: lean.slug,
+    url: lean.url,
+    existingSchemas: lean.existingSchemas,
+    suggestedSchemas: lean.suggestedSchemas,
+    validationErrors: lean.validationErrors,
   };
 }
 
@@ -2090,272 +2030,88 @@ export async function generateSchemaSuggestions(
   insightsMap?: Map<string, { healthScore?: number; healthTrend?: string; isQuickWin?: boolean }>,
   validationsByPageId?: Map<string, SchemaValidation>,
 ): Promise<SchemaPageSuggestion[]> {
+  void pageKeywordMap; void gscMap; void ga4Map; void queryPageData; void insightsMap; void validationsByPageId;
+
   const baseUrl = await resolveBaseUrl({ liveDomain: ctx.liveDomain, webflowSiteId: siteId }, tokenOverride);
-  log.info(`baseUrl=${baseUrl}, liveDomain=${ctx.liveDomain || '(none)'}`);
-  if (!baseUrl) {
-    log.error({ detail: siteId }, 'No subdomain or liveDomain found for site');
-    return [];
-  }
+  if (!baseUrl) return [];
 
-  const wsId = ctx.workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
-  const allPublished = wsId ? await getWorkspacePages(wsId, siteId) : [];
-  const pages = allPublished.filter(p => {
-    const slug = p.slug ? `/${p.slug.replace(/^\//, '')}` : '';
-    const title = (p.title || '').toLowerCase();
-    return !UTILITY_SLUGS.test(slug) && !title.includes('password');
-  });
-  log.info(`${pages.length} published pages to analyze`);
+  const { listPages, filterPublishedPages } = await import('./webflow-pages.js');
+  const pages = filterPublishedPages(await listPages(siteId, tokenOverride));
 
+  const { generateLeanSchema } = await import('./schema/index.js');
   const results: SchemaPageSuggestion[] = [];
-  const hasAI = !!process.env.OPENAI_API_KEY;
-  // gpt-4.1-mini has 4M TPM at Tier 3 — batch 8 AI calls at a time safely
-  const batch = hasAI ? 8 : 5;
 
-  // Look up active schema plan for site-aware generation
-  const sitePlan = getSchemaPlan(siteId);
-
-  // Helper: find keyword context for a page path (supports nested paths like /about/team)
-  const getPageKeywords = (pathOrSlug: string): SchemaContext['pageKeywords'] => {
-    if (!pageKeywordMap) return undefined;
-    const normalized = pathOrSlug.startsWith('/') ? pathOrSlug : `/${pathOrSlug}`;
-    const match = pageKeywordMap.find(p =>
-      p.pagePath === normalized || p.pagePath === `${normalized}/` || p.pagePath === pathOrSlug
-    );
-    if (match) return { primary: match.primaryKeyword, secondary: match.secondaryKeywords || [] };
-    return undefined;
-  };
-  const getPageIntent = (pathOrSlug: string): string | undefined => {
-    if (!pageKeywordMap) return undefined;
-    const normalized = pathOrSlug.startsWith('/') ? pathOrSlug : `/${pathOrSlug}`;
-    return pageKeywordMap.find(p => p.pagePath === normalized || p.pagePath === `${normalized}/`)?.searchIntent;
-  };
-  const getPageAnalysis = (pathOrSlug: string): SchemaContext['_pageAnalysis'] => {
-    if (!pageKeywordMap) return undefined;
-    const normalized = pathOrSlug.startsWith('/') ? pathOrSlug : `/${pathOrSlug}`;
-    const match = pageKeywordMap.find(p => p.pagePath === normalized || p.pagePath === `${normalized}/`);
-    if (!match || (!match.topicCluster && !match.contentGaps?.length && !match.optimizationScore)) return undefined;
-    return { topicCluster: match.topicCluster, contentGaps: match.contentGaps, optimizationScore: match.optimizationScore };
-  };
-
-  for (let i = 0; i < pages.length; i += batch) {
-    if (isCancelled?.()) { log.info('Cancelled by user'); return results; }
-    if (i > 0 && hasAI) await new Promise(r => setTimeout(r, 1500));
-    const chunk = pages.slice(i, i + batch);
-    log.info(`Processing static pages ${i + 1}-${Math.min(i + batch, pages.length)} of ${pages.length}`);
-    const chunkResults = await Promise.all(
-      chunk.map(async (page) => {
-        // Use publishedPath for full URL (handles nested pages like /about/team)
-        const pagePath = resolvePagePath(page);
-        const url = (!pagePath || pagePath === '/' || page.slug === 'index') ? baseUrl : `${baseUrl}${pagePath}`;
-        const isHomepage = !page.slug || page.slug === '' || page.slug === 'home' || page.slug === 'index';
-        const [meta, html] = await Promise.all([
-          fetchPageMeta(page.id, tokenOverride),
-          fetchPublishedHtml(url),
-        ]);
-
-        const seoTitle = meta?.seo?.title || page.title || '';
-        const seoDesc = meta?.seo?.description || '';
-        const { types: existingSchemas, json: existingSchemaJson } = html ? extractExistingSchemas(html) : { types: [], json: [] };
-
-        // Build page-specific context (use full path for nested pages)
-        const lookupPath = pagePath; // resolvePagePath always returns a non-empty string
-        const normalizedPath = (isHomepage ? '/' : lookupPath).replace(/\/$/, '') || '/';
-        const planContext = sitePlan ? buildPlanContextForPage(sitePlan, isHomepage ? '/' : lookupPath) : '';
-        const fullPageUrl = isHomepage ? baseUrl : `${baseUrl}${lookupPath}`;
-        // insightsMap is keyed by relative path (analytics_insights.page_id), not by full URL
-        const insightData = insightsMap?.get(normalizedPath);
-        const priorValidation = validationsByPageId?.get(page.id);
-        const rawErrors = priorValidation?.errors;
-        const validatedErrors = Array.isArray(rawErrors)
-          ? (rawErrors as unknown[]).filter(
-              (e): e is { message: string } => typeof (e as { message?: unknown })?.message === 'string'
-            ).slice(0, 20)
-          : [];
-        const existingErrors = validatedErrors.length > 0 ? validatedErrors : undefined;
-        const pageCtx: SchemaContext = {
-          ...ctx,
-          pageKeywords: getPageKeywords(lookupPath),
-          searchIntent: getPageIntent(lookupPath),
-          _planContext: planContext || undefined,
-          _pageAnalysis: getPageAnalysis(lookupPath),
-          _gscPageData: gscMap?.get(normalizedPath),
-          _ga4PageData: ga4Map?.get(normalizedPath),
-          _pageHealthScore: insightData?.healthScore,
-          _pageHealthTrend: insightData?.healthTrend as SchemaContext['_pageHealthTrend'],
-          _quickWinStatus: insightData?.isQuickWin,
-          _faqOpportunities: queryPageData ? extractFaqOpportunities(queryPageData, fullPageUrl) : undefined,
-          _existingErrors: existingErrors,
-        };
-
-        let suggestedSchemas: SchemaSuggestion[];
-        let validationErrors: string[] = [];
-
-        if (hasAI) {
-          const aiResult = await aiGenerateUnifiedSchema(
-            page.title, page.slug, seoTitle, seoDesc,
-            html, existingSchemas, isHomepage, baseUrl, pageCtx,
-          );
-          if (aiResult) {
-            const types = ((aiResult.schema['@graph'] as Record<string, unknown>[]) || []).map(n => n['@type']).filter(Boolean);
-            suggestedSchemas = [{
-              type: types.join(' + '),
-              reason: aiResult.reason,
-              priority: 'high',
-              template: aiResult.schema,
-            }];
-            validationErrors = aiResult.errors;
-          } else {
-            const fallback = buildFallbackSchema(page.title, page.slug, seoTitle, seoDesc, isHomepage, baseUrl, pageCtx);
-            const types = ((fallback['@graph'] as Record<string, unknown>[]) || []).map(n => n['@type']).filter(Boolean);
-            suggestedSchemas = [{
-              type: types.join(' + '),
-              reason: `Basic schema with ${types.join(', ')} (AI generation failed for this page)`,
-              priority: 'medium',
-              template: fallback,
-            }];
-            validationErrors = validateUnifiedSchema(fallback);
-          }
-        } else {
-          const fallback = buildFallbackSchema(page.title, page.slug, seoTitle, seoDesc, isHomepage, baseUrl, pageCtx);
-          const types = ((fallback['@graph'] as Record<string, unknown>[]) || []).map(n => n['@type']).filter(Boolean);
-          suggestedSchemas = [{
-            type: types.join(' + '),
-            reason: `Basic schema with ${types.join(', ')} (add OPENAI_API_KEY for richer schemas)`,
-            priority: 'medium',
-            template: fallback,
-          }];
-          validationErrors = validateUnifiedSchema(fallback);
-        }
-
-        return {
-          pageId: page.id,
-          pageTitle: page.title,
-          slug: pagePath ? pagePath.replace(/^\//, '') : page.slug,
-          url,
-          existingSchemas,
-          existingSchemaJson: existingSchemaJson.length > 0 ? existingSchemaJson : undefined,
-          suggestedSchemas,
-          validationErrors: validationErrors.length > 0 ? validationErrors : undefined,
-        } as SchemaPageSuggestion;
-      })
-    );
-    results.push(...chunkResults.filter(Boolean) as SchemaPageSuggestion[]);
-    onProgress?.(results, false, `Processed ${Math.min(i + batch, pages.length)} of ${pages.length} static pages...`);
+  for (const page of pages) {
+    if (isCancelled?.()) break;
+    const slug = page.slug || '';
+    const url = (!slug || slug === 'index') ? baseUrl : `${baseUrl}/${slug}`;
+    const html = await fetchPublishedHtml(url);
+    const lean = await generateLeanSchema({
+      pageId: page.id,
+      pageMeta: {
+        title: page.title || '',
+        slug,
+        publishedPath: page.publishedPath || (slug ? `/${slug}` : '/'),
+        seo: page.seo,
+      },
+      html: html || '',
+      baseUrl,
+      workspace: {
+        name: ctx.companyName || '',
+        publisherLogoUrl: ctx.logoUrl ?? null,
+        businessProfile: ctx._businessProfile ?? null,
+      },
+    });
+    const suggestion: SchemaPageSuggestion = {
+      pageId: lean.pageId,
+      pageTitle: lean.pageTitle,
+      slug: lean.slug,
+      url: lean.url,
+      existingSchemas: lean.existingSchemas,
+      suggestedSchemas: lean.suggestedSchemas,
+      validationErrors: lean.validationErrors,
+    };
+    results.push(suggestion);
+    onProgress?.(results, false, `Processed ${results.length} of ${pages.length} static pages...`);
   }
 
-  // ── Also analyze CMS/collection pages discovered via sitemap ──
-  const staticPaths = buildStaticPathSet(pages);
-  const { cmsUrls } = await discoverCmsUrls(baseUrl, staticPaths, 1000);
-  if (cmsUrls.length > 0) {
-    log.info(`Also analyzing ${cmsUrls.length} CMS pages`);
-    for (let i = 0; i < cmsUrls.length; i += batch) {
-      if (isCancelled?.()) { log.info('Cancelled by user'); return results; }
-      if (i > 0 && hasAI) await new Promise(r => setTimeout(r, 1500));
-      const chunk = cmsUrls.slice(i, i + batch);
-      log.info(`Processing CMS pages ${i + 1}-${Math.min(i + batch, cmsUrls.length)} of ${cmsUrls.length}`);
-      const chunkResults = await Promise.all(
-        chunk.map(async (item) => {
-          const slug = item.path.replace(/^\//, '');
-          const isHomepage = false;
-          const html = await fetchPublishedHtml(item.url);
-          const htmlTitle = html ? (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() || '') : '';
-          const { types: existingSchemas, json: existingSchemaJson } = html ? extractExistingSchemas(html) : { types: [], json: [] };
-
-          const cmsNormalizedPath = (item.path.startsWith('/') ? item.path : `/${item.path}`).replace(/\/$/, '') || '/';
-          const cmsPageId = toCmsPageId(item.path);
-          // insightsMap is keyed by relative path (analytics_insights.page_id), not by full URL
-          const cmsInsightData = insightsMap?.get(cmsNormalizedPath);
-          // schema_validations rows for CMS pages are keyed by cms-{path} (toCmsPageId).
-          // After migration 076 normalises legacy cms--* rows, this lookup hits.
-          const cmsPriorValidation = validationsByPageId?.get(cmsPageId);
-          const cmsRawErrors = cmsPriorValidation?.errors;
-          const cmsValidatedErrors = Array.isArray(cmsRawErrors)
-            ? (cmsRawErrors as unknown[]).filter(
-                (e): e is { message: string } => typeof (e as { message?: unknown })?.message === 'string'
-              ).slice(0, 20)
-            : [];
-          const cmsExistingErrors = cmsValidatedErrors.length > 0 ? cmsValidatedErrors : undefined;
-          const pageCtx: SchemaContext = {
-            ...ctx,
-            pageKeywords: getPageKeywords(slug),
-            searchIntent: getPageIntent(slug),
-            _pageAnalysis: getPageAnalysis(slug),
-            _gscPageData: gscMap?.get(cmsNormalizedPath),
-            _ga4PageData: ga4Map?.get(cmsNormalizedPath),
-            _pageHealthScore: cmsInsightData?.healthScore,
-            _pageHealthTrend: cmsInsightData?.healthTrend as SchemaContext['_pageHealthTrend'],
-            _quickWinStatus: cmsInsightData?.isQuickWin,
-            _faqOpportunities: queryPageData ? extractFaqOpportunities(queryPageData, item.url) : undefined,
-            _existingErrors: cmsExistingErrors,
-          };
-
-          let suggestedSchemas: SchemaSuggestion[];
-          let validationErrors: string[] = [];
-
-          if (hasAI) {
-            const aiResult = await aiGenerateUnifiedSchema(
-              item.pageName, slug, htmlTitle, '',
-              html, existingSchemas, isHomepage, baseUrl, pageCtx,
-            );
-            if (aiResult) {
-              const types = ((aiResult.schema['@graph'] as Record<string, unknown>[]) || []).map(n => n['@type']).filter(Boolean);
-              suggestedSchemas = [{
-                type: types.join(' + '),
-                reason: aiResult.reason,
-                priority: 'high',
-                template: aiResult.schema,
-              }];
-              validationErrors = aiResult.errors;
-            } else {
-              const fallback = buildFallbackSchema(item.pageName, slug, htmlTitle, '', isHomepage, baseUrl, pageCtx);
-              const types = ((fallback['@graph'] as Record<string, unknown>[]) || []).map(n => n['@type']).filter(Boolean);
-              suggestedSchemas = [{
-                type: types.join(' + '),
-                reason: `Basic schema with ${types.join(', ')}`,
-                priority: 'medium',
-                template: fallback,
-              }];
-              validationErrors = validateUnifiedSchema(fallback);
-            }
-          } else {
-            const fallback = buildFallbackSchema(item.pageName, slug, htmlTitle, '', isHomepage, baseUrl, pageCtx);
-            const types = ((fallback['@graph'] as Record<string, unknown>[]) || []).map(n => n['@type']).filter(Boolean);
-            suggestedSchemas = [{
-              type: types.join(' + '),
-              reason: `Basic schema with ${types.join(', ')}`,
-              priority: 'medium',
-              template: fallback,
-            }];
-            validationErrors = validateUnifiedSchema(fallback);
-          }
-
-          return {
-            pageId: toCmsPageId(item.path),
-            pageTitle: item.pageName,
-            slug,
-            url: item.url,
-            existingSchemas,
-            existingSchemaJson: existingSchemaJson.length > 0 ? existingSchemaJson : undefined,
-            suggestedSchemas,
-            validationErrors: validationErrors.length > 0 ? validationErrors : undefined,
-          } as SchemaPageSuggestion;
-        })
-      );
-      results.push(...chunkResults.filter(Boolean) as SchemaPageSuggestion[]);
-      onProgress?.(results, false, `Processed ${Math.min(i + batch, cmsUrls.length)} of ${cmsUrls.length} CMS pages...`);
+  // CMS pages — same lean path
+  {
+    const { discoverCmsUrls: _discoverCmsUrls, buildStaticPathSet: _buildStaticPathSet, toCmsPageId: _toCmsPageId } = await import('./webflow.js');
+    const staticPaths = _buildStaticPathSet(pages);
+    const { cmsUrls } = await _discoverCmsUrls(baseUrl, staticPaths, 1000);
+    for (const item of cmsUrls) {
+      if (isCancelled?.()) break;
+      const itemHtml = await fetchPublishedHtml(item.url);
+      const itemLean = await generateLeanSchema({
+        pageId: _toCmsPageId(item.path),
+        pageMeta: {
+          title: item.pageName,
+          slug: item.path.replace(/^\//, ''),
+          publishedPath: item.path,
+          seo: undefined,
+        },
+        html: itemHtml || '',
+        baseUrl,
+        workspace: {
+          name: ctx.companyName || '',
+          publisherLogoUrl: ctx.logoUrl ?? null,
+          businessProfile: ctx._businessProfile ?? null,
+        },
+      });
+      results.push({
+        pageId: itemLean.pageId,
+        pageTitle: itemLean.pageTitle,
+        slug: itemLean.slug,
+        url: itemLean.url,
+        existingSchemas: itemLean.existingSchemas,
+        suggestedSchemas: itemLean.suggestedSchemas,
+        validationErrors: itemLean.validationErrors,
+      });
     }
   }
 
-  // Sort: pages with validation errors last, homepage first
-  results.sort((a, b) => {
-    const aHome = a.slug === '' || a.slug === 'index' || a.slug === 'home' ? 0 : 1;
-    const bHome = b.slug === '' || b.slug === 'index' || b.slug === 'home' ? 0 : 1;
-    if (aHome !== bHome) return aHome - bHome;
-    const aErr = (a.validationErrors?.length || 0) > 0 ? 1 : 0;
-    const bErr = (b.validationErrors?.length || 0) > 0 ? 1 : 0;
-    return aErr - bErr;
-  });
-
+  onProgress?.(results, true, 'Done');
   return results;
 }
 
