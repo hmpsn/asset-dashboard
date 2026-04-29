@@ -58,6 +58,8 @@ export const FEATURE_FLAGS = {
   'smart-placeholders': false,       // System-wide smart placeholder hook (admin chips + prefill, client ghost text)
   'client-brand-section': false,     // Brand tab in client portal (business profile + brand positioning)
   'seo-editor-unified': false,       // Merged static+CMS SEO editor with collection filtering
+  // Client Insights Briefing (4-phase feature)
+  'client-briefing-v2': false,
   // Deep Diagnostics
   'deep-diagnostics': false,
 } as const;
