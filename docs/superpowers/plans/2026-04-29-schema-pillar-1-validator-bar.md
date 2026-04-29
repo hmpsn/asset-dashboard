@@ -749,12 +749,12 @@ Add inside Sprint H, after `schema-pillar-2-data-wiring`:
   "id": "schema-pillar-1-validator-bar",
   "title": "Schema Pillar 1 — Raise the Validator Bar",
   "source": "docs/superpowers/plans/2026-04-29-schema-pillar-1-validator-bar.md",
-  "est": "0.5d",
+  "est": "1d",
   "priority": "P0",
   "sprint": "H",
   "status": "done",
-  "shippedAt": "2026-04-29",
-  "notes": "REQUIRED_BY_TYPE in validator.ts now enforces Yoast-baseline completeness. Article/BlogPosting require image+dateModified+articleSection+isPartOf+breadcrumb+inLanguage. WebPage variants require description+isPartOf+breadcrumb+inLanguage. LocalBusiness requires address+telephone. WebSite requires potentialAction. Organization requires logo. Cross-ref validators reject malformed isPartOf/breadcrumb shapes and dangling BreadcrumbList @id pointers. Locks the bar Pillar 2 raised."
+  "shippedAt": "<actual-ship-date>",
+  "notes": "REQUIRED_BY_TYPE in validator.ts now enforces Yoast/Google-baseline completeness. Article/BlogPosting require image+dateModified+articleSection+isPartOf+breadcrumb+inLanguage. WebPage variants require description+isPartOf+breadcrumb+inLanguage. LocalBusiness requires address+telephone+inLanguage. WebSite requires inLanguage (potentialAction is conditional and deferred to schema-yoast-parity-fields where it gates on Workspace.siteHasSearch). Organization requires logo. Cross-ref validators reject malformed isPartOf/breadcrumb shapes and dangling BreadcrumbList @id pointers. NEW value-shape validators reject malformed Article author/publisher/image, non-ISO 8601 dates, non-contiguous breadcrumb positions, and non-absolute URLs on primary nodes. Locks the bar Pillars 2 + 2.1 raised."
 }
 ```
 
