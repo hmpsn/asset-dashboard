@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { buildArticleSchema } from '../../../server/schema/templates/article.js';
 import { buildServiceSchema, buildProductSchema } from '../../../server/schema/templates/service.js';
 import { buildLocalBusinessSchema } from '../../../server/schema/templates/local-business.js';
+import { buildAboutPageSchema, buildContactPageSchema, buildCollectionPageSchema, buildWebPageSchema } from '../../../server/schema/templates/static.js';
+import { buildHomepageSchema } from '../../../server/schema/templates/homepage.js';
 import { validateLeanSchema } from '../../../server/schema/validator.js';
 
 const baseInput = {
@@ -177,5 +179,74 @@ describe('buildLocalBusinessSchema', () => {
 
   it('passes validator with full profile', () => {
     expect(validateLeanSchema(buildLocalBusinessSchema(localInput), 'LocalBusiness')).toEqual([]);
+  });
+});
+
+const staticInput = {
+  baseUrl: 'https://example.com',
+  pageData: {
+    title: 'About Us',
+    description: 'Who we are',
+    canonicalUrl: 'https://example.com/about',
+    publisher: { name: 'Acme', logoUrl: undefined },
+    breadcrumbs: [
+      { name: 'Home', url: 'https://example.com' },
+      { name: 'About Us', url: 'https://example.com/about' },
+    ],
+  },
+};
+
+describe('static page templates', () => {
+  it('AboutPage emits 2 nodes, references Organization', () => {
+    const schema = buildAboutPageSchema(staticInput);
+    const graph = schema['@graph'] as Array<Record<string, unknown>>;
+    expect(graph).toHaveLength(2);
+    expect(graph[0]['@type']).toBe('AboutPage');
+    expect(graph[0].mainEntity).toEqual({ '@id': 'https://example.com/#organization' });
+  });
+  it('ContactPage emits 2 nodes', () => {
+    const schema = buildContactPageSchema(staticInput);
+    expect((schema['@graph'] as unknown[]).length).toBe(2);
+    expect(((schema['@graph'] as Array<Record<string, unknown>>)[0])['@type']).toBe('ContactPage');
+  });
+  it('CollectionPage emits 2 nodes for index pages', () => {
+    const schema = buildCollectionPageSchema(staticInput);
+    expect(((schema['@graph'] as Array<Record<string, unknown>>)[0])['@type']).toBe('CollectionPage');
+  });
+  it('WebPage fallback emits 2 nodes', () => {
+    const schema = buildWebPageSchema(staticInput);
+    expect(((schema['@graph'] as Array<Record<string, unknown>>)[0])['@type']).toBe('WebPage');
+  });
+});
+
+describe('buildHomepageSchema', () => {
+  const homepageInput = {
+    baseUrl: 'https://example.com',
+    pageData: {
+      title: 'Acme — Homepage',
+      description: 'Acme is a studio',
+      image: 'https://x/hero.jpg',
+      canonicalUrl: 'https://example.com',
+      publisher: { name: 'Acme', logoUrl: 'https://x/logo.png' },
+      breadcrumbs: [{ name: 'Home', url: 'https://example.com' }],
+    },
+  };
+
+  it('emits Organization + WebSite', () => {
+    const schema = buildHomepageSchema(homepageInput);
+    const graph = schema['@graph'] as Array<Record<string, unknown>>;
+    expect(graph).toHaveLength(2);
+    expect(graph[0]['@type']).toBe('Organization');
+    expect(graph[1]['@type']).toBe('WebSite');
+  });
+
+  it('WebSite publisher references Organization @id', () => {
+    const schema = buildHomepageSchema(homepageInput);
+    const website = (schema['@graph'] as Array<Record<string, unknown>>)[1];
+    expect(website.publisher).toEqual({ '@id': 'https://example.com/#organization' });
+  });
+
+  it('passes validator', () => {
+    expect(validateLeanSchema(buildHomepageSchema(homepageInput), 'Organization')).toEqual([]);
   });
 });
