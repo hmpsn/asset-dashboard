@@ -10,12 +10,14 @@ const baseInput = {
   baseUrl: 'https://example.com',
   pageData: {
     title: 'My Post',
+    cleanTitle: 'My Post',
     description: 'A great post',
     image: 'https://x/i.jpg',
     canonicalUrl: 'https://example.com/blog/my-post',
     publisher: { name: 'Acme', logoUrl: 'https://x/logo.png' },
     datePublished: '2025-01-15T00:00:00Z',
     dateModified: '2026-04-01T00:00:00Z',
+    inLanguage: 'en',
     breadcrumbs: [
       { name: 'Home', url: 'https://example.com' },
       { name: 'Blog', url: 'https://example.com/blog' },
@@ -71,6 +73,29 @@ describe('buildArticleSchema (BlogPosting)', () => {
     };
     const schema = buildArticleSchema(input, 'BlogPosting');
     expect((schema['@graph'] as unknown[]).length).toBe(1);
+  });
+
+  it('uses cleanTitle for headline, not raw title', () => {
+    const dirty = { ...baseInput, pageData: { ...baseInput.pageData, title: 'My Post | Acme', cleanTitle: 'My Post' } };
+    const node = (buildArticleSchema(dirty, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.headline).toBe('My Post');
+  });
+  it('emits isPartOf, breadcrumb, inLanguage, articleSection', () => {
+    const withSection = { ...baseInput, pageData: { ...baseInput.pageData, articleSection: 'Blog' } };
+    const node = (buildArticleSchema(withSection, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.isPartOf).toEqual({ '@id': 'https://example.com/#website' });
+    expect(node.breadcrumb).toEqual({ '@id': 'https://example.com/blog/my-post#breadcrumb' });
+    expect(node.inLanguage).toBe('en');
+    expect(node.articleSection).toBe('Blog');
+  });
+  it('uses CMS-derived author when pageData.author is set', () => {
+    const withAuthor = { ...baseInput, pageData: { ...baseInput.pageData, author: 'Jane Doe' } };
+    const node = (buildArticleSchema(withAuthor, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.author).toEqual({ '@type': 'Person', 'name': 'Jane Doe' });
+  });
+  it('falls back to Organization author when pageData.author is undefined', () => {
+    const node = (buildArticleSchema(baseInput, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.author).toEqual({ '@type': 'Organization', 'name': 'Acme' });
   });
 });
 
