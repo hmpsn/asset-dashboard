@@ -120,12 +120,7 @@ export interface SchemaContext {
   knowledgeBase?: string;
   pageType?: SchemaPageType;
   _siteId?: string;  // Internal: passed through for site template storage
-  _planContext?: string;  // Internal: plan-based role/entity context for this page
   _architectureTree?: import('./site-architecture.js').SiteNode;    // Full site tree for breadcrumb + nav generation
-  _pageNode?: import('./site-architecture.js').SiteNode;            // Current page's node in the tree
-  _ancestors?: import('./site-architecture.js').SiteNode[];         // Ancestor chain [root, ..., parent, target]
-  _briefId?: string;  // Internal: linked content brief ID for E-E-A-T enrichment
-  _pageAnalysis?: { topicCluster?: string; contentGaps?: string[]; optimizationScore?: number };  // Internal: from Page Intelligence
   _personasBlock?: string;  // Internal: audience personas for richer schema targeting
   _gscPageData?: { clicks: number; impressions: number; position: number; ctr: number };  // Internal: GSC per-page metrics
   _ga4PageData?: { pageviews: number; users: number; avgEngagementTime: number };  // Internal: GA4 per-page metrics
