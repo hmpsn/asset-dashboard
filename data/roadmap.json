@@ -551,13 +551,15 @@
           "notes": "REQUIRED_BY_TYPE in validator.ts now enforces Yoast/Google-baseline completeness. Article/BlogPosting require image+dateModified+articleSection+isPartOf+breadcrumb+inLanguage. WebPage variants require description+isPartOf+breadcrumb+inLanguage. LocalBusiness requires address+telephone+inLanguage. WebSite requires inLanguage (potentialAction is conditional, deferred to schema-yoast-parity-fields where it gates on Workspace.siteHasSearch). Organization requires logo. Cross-ref validators reject malformed isPartOf/breadcrumb shapes and dangling BreadcrumbList @id pointers. NEW value-shape validators reject malformed Article author/publisher/image, non-ISO 8601 dates, non-contiguous breadcrumb positions, and non-absolute URLs on primary nodes. Locks the bar Pillars 2 + 2.1 raised. 24 new test assertions across required-fields, cross-ref shape, and value-shape describe blocks."
         },
         {
-          "id": "schema-yoast-parity-fields",
-          "title": "Schema Yoast-Parity Field Expansion (areaServed, serviceType, knowsAbout, keywords)",
-          "source": "TBD (brainstorm + plan after Pillar 1 merges)",
-          "est": "2-3d",
+          "id": "schema-yoast-parity-fields-pr1",
+          "title": "Schema Yoast-Parity Fields PR1 — validator API + 6 fields + slice-migration starter",
+          "source": "docs/superpowers/plans/2026-04-29-schema-yoast-parity-fields-pr1.md",
+          "est": "2d",
           "priority": "P0",
-          "status": "pending",
-          "notes": "Promoted from informal Pillar 3 deferral. Reads from existing workspace data and wires high-leverage paid-grade fields into the lean templates: (1) Service.areaServed from BusinessProfile.address.city — local-SEO money for geo-targeted agencies. (2) Service.serviceType from URL slug or workspace siteKeywords. (3) Organization.knowsAbout from workspace siteKeywords + businessContext. (4) Article.keywords + mentions from keywordStrategy.pageMap. (5) Article.articleSection from a clean human label, not URL slug. (6) Article.about as typed entity (the page's primary topic) when intelligence layer provides one. All gains come from data the platform already has — no new admin UI required for the basics. Brainstorm + plan in dedicated session before implementation."
+          "sprint": "I",
+          "status": "done",
+          "shippedAt": "2026-04-29",
+          "notes": "ValidationFinding API (typed { severity, type, field?, ruleId, message }) + 6 new template fields (Service.areaServed, Service.serviceType, LocalBusiness.areaServed, Organization.knowsAbout, Article.keywords, gated WebSite.potentialAction) + Workspace.siteHasSearch field plumbing (default false) + slice-migration starter (siteKeywords + per-page pageKeywords moved to seoContext slice consumption) + new pr-check rule schema-context-direct-read-not-on-allowlist + CLAUDE.md convention paragraph + roadmap migration tracker entry (schema-context-builder-pattern-b-migration). 5 dead SchemaContext._* fields deleted (3 preserved per audit). Frontend renders findings grouped by severity (errors red, warnings amber 'Recommended'). PR2 ships admin discoverability surfaces. Spec: docs/superpowers/specs/2026-04-29-schema-yoast-parity-fields-design.md. Audit: docs/superpowers/audits/2026-04-29-schema-yoast-parity-fields-audit.md."
         },
         {
           "id": "schema-pillar-3-gates",
