@@ -85,10 +85,15 @@ Industry precedent: ESLint, TypeScript Compiler, RFC 7807 Problem Details. Strin
 
 ### 4.2 SchemaContext cleanup
 
-Delete unused leftover scaffolding fields confirmed unread by Agent 1's audit:
-- `_planContext`, `_architectureTree`, `_pageNode`, `_ancestors`, `_briefId`, `_pageAnalysis`, `_existingErrors`, `_faqOpportunities`
+Delete the 5 unused leftover scaffolding fields confirmed dead by the pre-plan audit (§2.3 of `docs/superpowers/audits/2026-04-29-schema-yoast-parity-fields-audit.md`):
+- `_planContext`, `_pageNode`, `_ancestors`, `_briefId`, `_pageAnalysis`
 
-Verify each is genuinely unread before deletion (grep all consumers in the codebase). Distinct from the §6 migration queue: these are dead code, not legacy patterns.
+**Preserve** these three (the architectural audit was incomplete; the pre-plan audit caught it):
+- `_architectureTree` — written 3 times in `server/jobs.ts` + `server/routes/webflow-schema.ts`; defer cleanup to a separate audit.
+- `_existingErrors` — written once + test fixture references; staged for planned validator-error-deduplication feature.
+- `_faqOpportunities` — **actively consumed** in `schema-suggester.ts:188-190` (FAQ enrichment branch).
+
+Distinct from the §6 migration queue: these are dead-code deletions, not legacy patterns.
 
 ### 4.3 Six new template fields
 
@@ -98,7 +103,7 @@ Verify each is genuinely unread before deletion (grep all consumers in the codeb
 | `LocalBusiness.areaServed` | Same source as Service.areaServed | recommended | No |
 | `Service.serviceType` | URL slug capitalized (e.g. `/services/development` → `"Development"`); omit when slug is generic (`/services` root) | recommended | No (deterministic) |
 | `Organization.knowsAbout` | Top 5 of `seoContext.keywordStrategy.siteKeywords` (deduped, lowercased; declined-keyword-filtered by the slice) | recommended | **YES — first slice migration** |
-| `Article.keywords` | `pageProfile.primaryKeyword + pageProfile.secondaryKeywords` for matching `pagePath`. Comma-joined string per Google docs. Omit when no pageMap entry. | recommended | **YES — second slice migration** |
+| `Article.keywords` | `intel.seoContext.pageKeywords.{primaryKeyword, secondaryKeywords}` from `seoContext` slice called with `pagePath`. Comma-joined string per Google docs. Omit when no pageMap entry. (Pre-plan audit correction: `PageProfileSlice` has no `secondaryKeywords` field — `seoContext.pageKeywords` is the canonical source per `shared/types/intelligence.ts:68-102`.) | recommended | **YES — second slice migration** |
 | `WebSite.potentialAction` (gated) | `Workspace.siteHasSearch === true` + `?s={search_term_string}` template | recommended (when flag true) | No (per-entity DB field) |
 
 Plus: new `Workspace.siteHasSearch?: boolean` field added to `shared/types/workspace.ts` + DB column via migration + Zod schema. Default `false` so output is unchanged on staging until PR2 ships the admin toggle.
@@ -106,8 +111,8 @@ Plus: new `Workspace.siteHasSearch?: boolean` field added to `shared/types/works
 ### 4.4 Slice-migration starter (Trajectory 3 plant)
 
 In `server/helpers.ts:buildSchemaContext`:
-- Replace `ws.keywordStrategy?.siteKeywords` direct read with `intel.seoContext.keywordStrategy.siteKeywords`. The slice already applies the declined-keyword filter; remove the separate `getDeclinedKeywords` call from helpers.ts.
-- For per-page schema generation, call `buildWorkspaceIntelligence({ slices: ['pageProfile'] })` once per workspace, build `Map<pagePath, PageProfile>`, populate per-page `PageMetaInput.pageKeywords` from the map (one slice fetch per generation pass, not per page).
+- Replace `ws.keywordStrategy?.siteKeywords` direct read with `intel.seoContext.strategy.siteKeywords`. **The slice does NOT apply the declined-keyword filter** (per pre-plan audit Q6 — confirmed via reading the assembler in `server/workspace-intelligence.ts:590`). The schema layer continues to call `getDeclinedKeywords(ws.id)` and apply the filter post-slice. Pushing the declined-filter into the slice itself is a separate roadmap follow-up (would benefit other slice consumers).
+- For per-page schema generation, call `buildWorkspaceIntelligence({ slices: ['seoContext'], pagePath })` per page (the cache makes this cheap — 5-min LRU dedup + single-flight). The returned `intel.seoContext.pageKeywords` is a `PageKeywordMap` with both `primaryKeyword` and `secondaryKeywords` populated for that path. To preserve a single fetch per generation pass, call once at workspace level (no `pagePath`) and read `seoContext.strategy.pageMap[]`, indexed by path; OR call per-page (cached) — both are valid; integration test enforces one underlying API call per page-data shape.
 
 Adds new fields to typed boundaries:
 - `WorkspaceSchemaInput.siteKeywordsForKnowsAbout?: string[]`
@@ -200,10 +205,10 @@ Roadmap entry `schema-context-builder-pattern-b-migration` (committed in PR1, st
 ```
 Direct reads in server/helpers.ts:buildSchemaContext to migrate:
   1. brandVoice            → seoContext.brandVoice
-  2. businessContext       → seoContext.keywordStrategy.businessContext
+  2. businessContext       → seoContext.strategy.businessContext  (NB: NOT keywordStrategy)
   3. knowledgeBase         → seoContext.knowledgeBase
   4. _businessProfile      → seoContext.businessProfile
-  5. _personasBlock        → seoContext.personas (formatting moves to schema layer)
+  5. _personasBlock        → seoContext.personas (AudiencePersona[]; formatting moves to schema layer)
 
 PR1 of schema-yoast-parity-fields ports siteKeywords as the pattern anchor
 (established outside this queue, since it ships with the PR rather than as
