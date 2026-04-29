@@ -7,7 +7,7 @@ import {
   useSkipBriefing,
   useGenerateBriefingNow,
 } from '../../hooks/admin/useBriefingDrafts';
-import { SectionCard, Badge, EmptyState, LoadingState, Icon } from '../ui';
+import { SectionCard, Badge, EmptyState, LoadingState, Icon, Button, Modal } from '../ui';
 import type { BriefingDraft, BriefingDraftStatus } from '../../../shared/types/briefing';
 
 function statusColor(s: BriefingDraftStatus): 'teal' | 'emerald' | 'zinc' {
@@ -151,51 +151,45 @@ export function BriefingReviewQueue({ workspaceId }: BriefingReviewQueueProps) {
         </div>
       )}
 
-      {/* Skip confirmation modal — inline because ConfirmDialog only accepts a plain string `message` prop */}
-      {skipping !== null && (
-        <div
-          className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center"
-          style={{ background: 'var(--brand-overlay, rgba(15,23,42,0.35))' }}
-          onClick={() => setSkipping(null)}
-        >
-          <div
-            className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] p-6 w-full max-w-sm mx-4 shadow-xl"
-            onClick={e => e.stopPropagation()}
+      {/* Skip confirmation modal — uses <Modal> + <Button> primitives */}
+      <Modal open={skipping !== null} onClose={() => setSkipping(null)} size="sm">
+        <Modal.Header title="Skip this briefing?" onClose={() => setSkipping(null)} />
+        <Modal.Body>
+          <p className="t-body text-[var(--brand-text)] mb-4">
+            Skipped briefings are not published to the client. This is terminal — the briefing for this week cannot be un-skipped. Note your reason:
+          </p>
+          <input
+            value={skipNote}
+            onChange={e => setSkipNote(e.target.value)}
+            className="w-full px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--surface-1)] border border-[var(--brand-border)] t-body text-[var(--brand-text-bright)] focus:outline-none focus:border-teal-500/50"
+            placeholder="e.g. quiet week, low confidence in stories"
+            autoFocus
+          />
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={() => setSkipping(null)}
           >
-            <h3 className="t-body font-semibold text-[var(--brand-text-bright)] mb-2">Skip this briefing?</h3>
-            <p className="t-body text-[var(--brand-text)] mb-4">
-              Skipped briefings are not published to the client. This is terminal — the briefing for this week cannot be un-skipped. Note your reason:
-            </p>
-            <input
-              value={skipNote}
-              onChange={e => setSkipNote(e.target.value)}
-              className="w-full px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--surface-1)] border border-[var(--brand-border)] t-body text-[var(--brand-text-bright)] mb-6 focus:outline-none focus:border-teal-500/50"
-              placeholder="e.g. quiet week, low confidence in stories"
-              autoFocus
-            />
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setSkipping(null)}
-                className="px-4 py-2 rounded-[var(--radius-lg)] t-body font-medium text-[var(--brand-text)] border border-[var(--brand-border)] hover:bg-[var(--surface-3)] transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  if (skipping && skipNote.trim()) {
-                    skipM.mutate({ draftId: skipping, adminNote: skipNote.trim() });
-                    setSkipping(null);
-                  }
-                }}
-                disabled={!skipNote.trim() || skipM.isPending}
-                className="px-4 py-2 rounded-[var(--radius-lg)] t-body font-semibold bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white transition-all disabled:opacity-50 disabled:pointer-events-none"
-              >
-                Skip
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            size="md"
+            disabled={!skipNote.trim() || skipM.isPending}
+            loading={skipM.isPending}
+            onClick={() => {
+              if (skipping && skipNote.trim()) {
+                skipM.mutate({ draftId: skipping, adminNote: skipNote.trim() });
+                setSkipping(null);
+              }
+            }}
+          >
+            Skip
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </SectionCard>
   );
 }
