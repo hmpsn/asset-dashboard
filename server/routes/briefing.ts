@@ -220,11 +220,17 @@ router.post(
 // ── POST /api/briefing/:workspaceId/generate-now ─────────────────────────────
 // Admin manual trigger. Returns 202 immediately; the cron runs in the
 // background (mutex inside runBriefingForWorkspace prevents concurrent runs).
+// Gated on client-briefing-v2 — when the flag is off, the entire feature is
+// dark-launched and admin manual trigger should also be unavailable. (The
+// cron tick() also gates on this; this route is the parallel admin entry.)
 
 router.post(
   '/api/briefing/:workspaceId/generate-now',
   requireWorkspaceAccess('workspaceId'),
   (req, res) => {
+    if (!isFeatureEnabled('client-briefing-v2')) {
+      return res.status(404).json({ error: 'Briefing feature not enabled' });
+    }
     runBriefingForWorkspace(req.params.workspaceId, { manual: true })
       .then((r) =>
         log.info({ workspaceId: req.params.workspaceId, ...r }, 'manual briefing run complete'),

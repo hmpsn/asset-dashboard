@@ -242,5 +242,21 @@ export function useWsInvalidation(workspaceId: string | undefined) {
         qc.invalidateQueries({ queryKey: queryKeys.admin.post(workspaceId, payload.postId) });
       }
     },
+    // ── Client Briefing v2 ──────────────────────────────────────────────
+    // Both events refresh the admin review queue. The cron generates +
+    // broadcasts BRIEFING_GENERATED on every successful run; routes/briefing.ts
+    // emits BRIEFING_PUBLISHED on publish (manual or auto) and reuses
+    // BRIEFING_GENERATED for approve/edit/skip with an action discriminator.
+    [WS_EVENTS.BRIEFING_GENERATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.briefingDrafts(workspaceId) });
+    },
+    [WS_EVENTS.BRIEFING_PUBLISHED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.briefingDrafts(workspaceId) });
+      // TODO(phase-2): also invalidate queryKeys.client.briefing(workspaceId)
+      // when the client-facing briefing component lands. For now, paid-tier
+      // workspaces hit /api/public/briefing/:wsId on demand without caching.
+    },
   });
 }

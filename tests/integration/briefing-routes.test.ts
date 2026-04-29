@@ -10,7 +10,13 @@
  * - POST  /api/briefing/:wsId/generate-now        manual trigger (202)
  *
  * Port: 13329 (verified free — highest used is 13328)
+ *
+ * Sets FEATURE_CLIENT_BRIEFING_V2=true at module load so the spawned test
+ * server sees the flag as ON — the generate-now route gates on it. Pattern
+ * mirrors tests/integration/outcome-pipeline.test.ts.
  */
+process.env.FEATURE_CLIENT_BRIEFING_V2 = 'true';
+
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
@@ -363,7 +369,12 @@ describe('POST /api/briefing/:wsId/drafts/:id/skip', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('POST /api/briefing/:wsId/generate-now', () => {
-  it('returns 202 (cron module pending — briefing-cron.ts created in T1.14)', async () => {
+  // The route gates on isFeatureEnabled('client-briefing-v2'). The env var
+  // set at the top of this file (FEATURE_CLIENT_BRIEFING_V2=true) ensures
+  // the spawned test server sees the flag as enabled. The dark-launch
+  // behavior (404 when flag is off) is exercised by the unit-level
+  // test on the route handler directly.
+  it('returns 202 when flag is ON', async () => {
     const res = await postJson(`/api/briefing/${wsId}/generate-now`, {});
     expect(res.status).toBe(202);
     const body = await res.json() as { accepted: boolean };

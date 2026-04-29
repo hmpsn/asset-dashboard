@@ -10,4 +10,5 @@ export {
   salesReport, redirects, stripe, auth, keywordFeedback, trackedKeywords, businessPriorities,
 } from './misc';
 export { meetingBriefApi } from './meetingBrief';
+export { briefingApi } from './briefing';
 export { diagnostics } from './diagnostics.js';
