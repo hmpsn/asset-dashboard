@@ -102,7 +102,7 @@ Distinct from the §6 migration queue: these are dead-code deletions, not legacy
 | `Service.areaServed` | `WorkspaceSchemaInput.businessProfile.address` (already wired Pillar 2) — emit `{ '@type': 'Place', name: '<city>, <state>' }` when both present, `{ name: '<city>' }` when only city, omit when neither | recommended | No (already typed boundary) |
 | `LocalBusiness.areaServed` | Same source as Service.areaServed | recommended | No |
 | `Service.serviceType` | URL slug capitalized (e.g. `/services/development` → `"Development"`); omit when slug is generic (`/services` root) | recommended | No (deterministic) |
-| `Organization.knowsAbout` | Top 5 of `seoContext.keywordStrategy.siteKeywords` (deduped, lowercased; declined-keyword-filtered by the slice) | recommended | **YES — first slice migration** |
+| `Organization.knowsAbout` | Top 5 of `seoContext.strategy.siteKeywords` (deduped, lowercased; declined-keyword filter applied post-slice by schema layer — the slice does NOT apply it, per pre-plan audit Q6) | recommended | **YES — first slice migration** |
 | `Article.keywords` | `intel.seoContext.pageKeywords.{primaryKeyword, secondaryKeywords}` from `seoContext` slice called with `pagePath`. Comma-joined string per Google docs. Omit when no pageMap entry. (Pre-plan audit correction: `PageProfileSlice` has no `secondaryKeywords` field — `seoContext.pageKeywords` is the canonical source per `shared/types/intelligence.ts:68-102`.) | recommended | **YES — second slice migration** |
 | `WebSite.potentialAction` (gated) | `Workspace.siteHasSearch === true` + `?s={search_term_string}` template | recommended (when flag true) | No (per-entity DB field) |
 
@@ -242,7 +242,7 @@ Added under "Code Conventions" → after the existing schema-context rules:
 | # | Field | Trigger | Effort |
 |---|---|---|---|
 | 1 | `brandVoice` → `seoContext.brandVoice` | Next AI rewrite or content brief work that touches the brand voice path | 1h |
-| 2 | `businessContext` → `seoContext.keywordStrategy.businessContext` | Next adjacent edit | 30min |
+| 2 | `businessContext` → `seoContext.strategy.businessContext` | Next adjacent edit | 30min |
 | 3 | `knowledgeBase` → `seoContext.knowledgeBase` | Next time knowledge-base related work happens | 1h |
 | 4 | `_businessProfile` → `seoContext.businessProfile` | Next BusinessProfileTab change | 30min |
 | 5 | `_personasBlock` → `seoContext.personas` (with formatting moving to schema layer) | Most disruptive — last | 2h |
@@ -281,7 +281,7 @@ When the roadmap entry flips to `status: done`:
 | Risk | Likelihood | Mitigation |
 |---|---|---|
 | Slice-fetch latency adds significant time to per-page generation loop | Medium | Workspace-wide `buildWorkspaceIntelligence` call once per generation pass, indexed by path for the per-page loop. 5-min cache per Agent 2's audit. Verified by integration test counting fetch calls. |
-| `seoContext.keywordStrategy.siteKeywords` slice doesn't apply the declined-keyword filter the same way the direct read does | Low | Verify slice impl applies filter before PR1 lands. If not, slice gets fixed (one-line change) or schema-side applies the filter post-slice. |
+| `seoContext.strategy.siteKeywords` slice doesn't apply the declined-keyword filter the same way the direct read does | Low | Verified: slice does NOT apply the filter (per pre-plan audit Q6). Schema layer applies the filter post-slice via `getDeclinedKeywords(ws.id)`. See §4.4. |
 | `validationFindings` consumers (existing snapshot UI, future Pillar 3 schemarama integration) require updates beyond the in-scope frontend changes | Low | Backward-compat field `validationErrors: string[]` stays alongside `validationFindings` for existing snapshot storage. Old snapshots unaffected. |
 | Migration stalls — opportunistic triggers don't surface | Medium | 4-6 week deadline → dedicated cleanup PR. Roadmap entry visible in project tracking. |
 | Two patterns coexist (direct reads + slice reads) confuses new contributors | Medium | CLAUDE.md paragraph + inline `// schema-context-direct-read-ok` hatches make the legacy reads explicit. Migration tracker is discoverable from roadmap.json. |
