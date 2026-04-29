@@ -36,6 +36,7 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
     'logo': pageData.publisher.logoUrl
       ? { '@type': 'ImageObject', 'url': pageData.publisher.logoUrl }
       : undefined,
+    'knowsAbout': pageData.knowsAbout?.length ? pageData.knowsAbout : undefined,
   });
 
   const localBusiness = dropUndefined({

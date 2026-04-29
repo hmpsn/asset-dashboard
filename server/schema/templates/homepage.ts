@@ -27,6 +27,7 @@ export function buildHomepageSchema(input: HomepageInput): Record<string, unknow
       : undefined,
     'sameAs': businessProfile?.socialProfiles?.length ? businessProfile.socialProfiles : undefined,
     'foundedDate': businessProfile?.foundedDate,
+    'knowsAbout': pageData.knowsAbout?.length ? pageData.knowsAbout : undefined,
   });
 
   // NOTE: WebSite.potentialAction (sitelinks SearchAction) is intentionally NOT emitted.

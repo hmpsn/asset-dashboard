@@ -244,6 +244,16 @@ describe('buildLocalBusinessSchema', () => {
     const node = graph.find(n => n['@type'] === 'LocalBusiness') as Record<string, unknown>;
     expect(node.name).toBe('Acme Dental');
   });
+
+  it('LocalBusiness sibling Organization emits knowsAbout when populated', () => {
+    const withKeywords = {
+      ...localInput,
+      pageData: { ...localInput.pageData, knowsAbout: ['dental care', 'cosmetic dentistry'] },
+    };
+    const schema = buildLocalBusinessSchema(withKeywords);
+    const org = (schema['@graph'] as Array<Record<string, unknown>>).find(n => n['@type'] === 'Organization');
+    expect(org?.knowsAbout).toEqual(['dental care', 'cosmetic dentistry']);
+  });
 });
 
 const staticInput = {
@@ -354,5 +364,24 @@ describe('buildHomepageSchema', () => {
     const website = (schema['@graph'] as Array<Record<string, unknown>>)[1];
     expect(website.inLanguage).toBe('en');
     expect(website.potentialAction).toBeUndefined();
+  });
+
+  it('Organization emits knowsAbout when knowsAbout is populated (top 5, lowercased)', () => {
+    const withKeywords = {
+      ...homepageInput,
+      pageData: { ...homepageInput.pageData, knowsAbout: ['web design', 'webflow', 'brand strategy'] },
+    };
+    const schema = buildHomepageSchema(withKeywords);
+    const org = (schema['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(org.knowsAbout).toEqual(['web design', 'webflow', 'brand strategy']);
+  });
+
+  it('Organization omits knowsAbout when knowsAbout is undefined or empty', () => {
+    const noKeywords = {
+      ...homepageInput,
+      pageData: { ...homepageInput.pageData, knowsAbout: undefined },
+    };
+    const org = (buildHomepageSchema(noKeywords)['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(org.knowsAbout).toBeUndefined();
   });
 });
