@@ -105,15 +105,22 @@ function ClientRoutes({ betaMode = false }: { betaMode?: boolean }) {
   const params = useParams<{ workspaceId: string; '*': string }>();
   const [searchParams] = useSearchParams();
   const workspaceId = params.workspaceId!;
-  // Backward-compat: redirect old ?tab=X URLs to path-based
+  const splatTab = params['*'] || undefined;
+  // Backward-compat: redirect old `/client/:id?tab=X` URLs to path-based
+  // `/client/:id/X`. ONLY fires when the splat is empty — when a tab path is
+  // already present (e.g. `/client/:id/inbox?tab=approvals`), `?tab=X` is a
+  // filter param for the inner page (e.g. <InboxTab>'s useSearchParams
+  // reader), NOT the tab name. Without this guard, `<ActionQueueStrip>`
+  // chips that deep-link to `/inbox?tab=approvals` get rewritten to
+  // `/approvals` (which renders nothing — see ClientDashboard.tsx tab
+  // dispatch) — silent navigation bug that would only manifest at click time.
   const queryTab = searchParams.get('tab');
-  if (queryTab && workspaceId) {
+  if (queryTab && workspaceId && !splatTab) {
     const remaining = new URLSearchParams(searchParams);
     remaining.delete('tab');
     const qs = remaining.toString();
     return <Navigate to={clientPath(workspaceId, queryTab, betaMode) + (qs ? '?' + qs : '')} replace />;
   }
-  const splatTab = params['*'] || undefined;
   return <ClientDashboard workspaceId={workspaceId} initialTab={splatTab} betaMode={betaMode} />;
 }
 
