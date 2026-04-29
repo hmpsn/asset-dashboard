@@ -4,7 +4,7 @@
  * (Dentist, Physician, etc.) is deferred to the intelligence-layer follow-up.
  */
 import type { PageData, BusinessProfile } from '../data-sources.js';
-import { dropUndefined, buildBreadcrumb } from './helpers.js';
+import { dropUndefined, withBreadcrumb } from './helpers.js';
 
 export interface LocalBusinessInput {
   baseUrl: string;
@@ -53,9 +53,5 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
     'parentOrganization': { '@id': `${baseUrl}/#organization` },
   });
 
-  const graph: Array<Record<string, unknown>> = [organization, localBusiness];
-  const bc = buildBreadcrumb(pageData.breadcrumbs, pageData.canonicalUrl);
-  if (bc) graph.push(bc);
-
-  return { '@context': 'https://schema.org', '@graph': graph };
+  return withBreadcrumb([organization, localBusiness], pageData);
 }

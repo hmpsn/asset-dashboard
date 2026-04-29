@@ -4,7 +4,7 @@
  * Product never emits zero-price offers.
  */
 import type { PageData } from '../data-sources.js';
-import { dropUndefined, buildBreadcrumb, orgRef } from './helpers.js';
+import { dropUndefined, orgRef, withBreadcrumb } from './helpers.js';
 
 export interface ServiceInput {
   baseUrl: string;
@@ -28,11 +28,7 @@ export function buildServiceSchema(input: ServiceInput): Record<string, unknown>
     }),
   });
 
-  const graph: Array<Record<string, unknown>> = [primary];
-  const bc = buildBreadcrumb(pageData.breadcrumbs, pageData.canonicalUrl);
-  if (bc) graph.push(bc);
-
-  return { '@context': 'https://schema.org', '@graph': graph };
+  return withBreadcrumb(primary, pageData);
 }
 
 export function buildProductSchema(input: ServiceInput): Record<string, unknown> {
@@ -50,9 +46,5 @@ export function buildProductSchema(input: ServiceInput): Record<string, unknown>
     // and Google penalises it. Add via intelligence layer when business profile has price.
   });
 
-  const graph: Array<Record<string, unknown>> = [primary];
-  const bc = buildBreadcrumb(pageData.breadcrumbs, pageData.canonicalUrl);
-  if (bc) graph.push(bc);
-
-  return { '@context': 'https://schema.org', '@graph': graph };
+  return withBreadcrumb(primary, pageData);
 }

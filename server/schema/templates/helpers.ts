@@ -3,7 +3,7 @@
  * Pure functions only.
  */
 
-import type { BreadcrumbItem } from '../data-sources.js';
+import type { BreadcrumbItem, PageData } from '../data-sources.js';
 
 /**
  * Removes keys whose value is undefined. Schema.org templates only emit fields
@@ -52,4 +52,18 @@ export function orgRef(baseUrl: string): { '@id': string } {
 export function imageNode(url: string | undefined): { '@type': 'ImageObject'; url: string } | undefined {
   if (!url) return undefined;
   return { '@type': 'ImageObject', url };
+}
+
+/**
+ * Wraps one or more primary nodes into a complete schema document, appending a
+ * BreadcrumbList when there are 2+ breadcrumb items. Used by all non-homepage templates.
+ */
+export function withBreadcrumb(
+  primary: Record<string, unknown> | Array<Record<string, unknown>>,
+  pageData: PageData,
+): Record<string, unknown> {
+  const graph: Array<Record<string, unknown>> = Array.isArray(primary) ? [...primary] : [primary];
+  const bc = buildBreadcrumb(pageData.breadcrumbs, pageData.canonicalUrl);
+  if (bc) graph.push(bc);
+  return { '@context': 'https://schema.org', '@graph': graph };
 }

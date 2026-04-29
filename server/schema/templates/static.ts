@@ -3,18 +3,11 @@
  * Each emits the typed primary node + BreadcrumbList only.
  */
 import type { PageData } from '../data-sources.js';
-import { dropUndefined, buildBreadcrumb, orgRef } from './helpers.js';
+import { dropUndefined, orgRef, withBreadcrumb } from './helpers.js';
 
 export interface StaticInput {
   baseUrl: string;
   pageData: PageData;
-}
-
-function withBreadcrumb(primary: Record<string, unknown>, pageData: PageData): Record<string, unknown> {
-  const graph: Array<Record<string, unknown>> = [primary];
-  const bc = buildBreadcrumb(pageData.breadcrumbs, pageData.canonicalUrl);
-  if (bc) graph.push(bc);
-  return { '@context': 'https://schema.org', '@graph': graph };
 }
 
 export function buildAboutPageSchema(input: StaticInput): Record<string, unknown> {

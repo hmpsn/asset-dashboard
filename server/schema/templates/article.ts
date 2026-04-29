@@ -3,7 +3,7 @@
  * Emits ONE primary node + optional BreadcrumbList. No multi-type @graph.
  */
 import type { PageData } from '../data-sources.js';
-import { dropUndefined, buildBreadcrumb } from './helpers.js';
+import { dropUndefined, withBreadcrumb } from './helpers.js';
 
 export interface ArticleInput {
   baseUrl: string;
@@ -36,12 +36,8 @@ export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Reco
     'about': kind === 'Article' ? 'Case study' : undefined,
   });
 
-  const graph: Array<Record<string, unknown>> = [primary];
-  const bc = buildBreadcrumb(pageData.breadcrumbs, pageData.canonicalUrl);
-  if (bc) graph.push(bc);
-
   // baseUrl is referenced for future Organization @id linkage; not currently emitted.
   void baseUrl;
 
-  return { '@context': 'https://schema.org', '@graph': graph };
+  return withBreadcrumb(primary, pageData);
 }
