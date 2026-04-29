@@ -345,6 +345,7 @@ export async function generateSchemaForPage(
       publisherLogoUrl: ctx.logoUrl ?? null,
       businessProfile: ctx._businessProfile ?? null,
       defaultLocale: ctx._defaultLocale ?? 'en',
+      siteKeywordsForKnowsAbout: ctx.siteKeywords, // NEW
     },
   });
 
@@ -399,6 +400,7 @@ export async function generateSchemaSuggestions(
         publisherLogoUrl: ctx.logoUrl ?? null,
         businessProfile: ctx._businessProfile ?? null,
         defaultLocale: ctx._defaultLocale ?? 'en',
+        siteKeywordsForKnowsAbout: ctx.siteKeywords, // NEW
       },
     });
     results.push(leanToSuggestion(lean));
@@ -430,6 +432,7 @@ export async function generateSchemaSuggestions(
           publisherLogoUrl: ctx.logoUrl ?? null,
           businessProfile: ctx._businessProfile ?? null,
           defaultLocale: ctx._defaultLocale ?? 'en',
+          siteKeywordsForKnowsAbout: ctx.siteKeywords, // NEW
         },
       });
       results.push(leanToSuggestion(itemLean));
