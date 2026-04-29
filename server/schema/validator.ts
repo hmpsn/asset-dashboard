@@ -79,6 +79,42 @@ function validateBreadcrumb(node: Record<string, unknown>): string[] {
   return errors;
 }
 
+function isIdRef(v: unknown): v is { '@id': string } {
+  return typeof v === 'object' && v !== null && typeof (v as Record<string, unknown>)['@id'] === 'string';
+}
+
+function validateCrossRefs(node: Record<string, unknown>, allNodes: Record<string, unknown>[]): string[] {
+  const errors: string[] = [];
+  const t = node['@type'] as string;
+
+  if (node.isPartOf !== undefined && !isIdRef(node.isPartOf)) {
+    errors.push(`${t}.isPartOf must be an @id reference (e.g. {"@id": "...#website"})`);
+  }
+
+  if (node.breadcrumb !== undefined) {
+    if (!isIdRef(node.breadcrumb)) {
+      errors.push(`${t}.breadcrumb must be an @id reference (e.g. {"@id": "...#breadcrumb"})`);
+    } else {
+      const target = (node.breadcrumb as { '@id': string })['@id'];
+      const found = allNodes.some(n => n['@type'] === 'BreadcrumbList' && n['@id'] === target);
+      if (!found) {
+        errors.push(`${t}.breadcrumb references @id "${target}" but no BreadcrumbList with that @id is in the @graph`);
+      }
+    }
+  }
+
+  if (node.mainEntityOfPage !== undefined && !isIdRef(node.mainEntityOfPage) && typeof node.mainEntityOfPage !== 'string') {
+    // mainEntityOfPage may be either a string URL or an @id-ref shape — both are accepted by Google.
+    // Reject only objects that are neither.
+    const v = node.mainEntityOfPage;
+    if (typeof v === 'object' && v !== null && !('@id' in v) && !('@type' in v)) {
+      errors.push(`${t}.mainEntityOfPage must be a URL string or {"@id": "..."} reference`);
+    }
+  }
+
+  return errors;
+}
+
 export function validateLeanSchema(schema: Record<string, unknown>, _primaryType: string): string[] {
   const errors: string[] = [];
   if (schema['@context'] !== 'https://schema.org') errors.push('Schema missing @context');
@@ -115,6 +151,7 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
     if (t === 'BreadcrumbList') {
       errors.push(...validateBreadcrumb(node));
     }
+    errors.push(...validateCrossRefs(node, graph));
   }
 
   return errors;
