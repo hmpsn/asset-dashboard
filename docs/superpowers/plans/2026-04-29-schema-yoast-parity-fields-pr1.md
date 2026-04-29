@@ -52,9 +52,12 @@ Phase 4 — Cleanup + forcing functions (parallel-safe; dispatch sequentially an
 Phase 5 — Frontend rendering + verification (sequential):
   → Task 15 (SchemaPageCard.tsx + SchemaSuggester.tsx render warnings)
   → Task 16 (Quality gates + open PR)
+
+Phase 6 — Pre-existing test-failure investigation (sequential, runs after Task 16 lands):
+  → Task 17 (Audit 8 pre-existing test failures, classify, file remediation roadmap entries)
 ```
 
-**Why mostly sequential:** the validator API change cascades through fixtures and consumers. Audit §5 explicitly recommends not over-parallelizing — conflicts cost more than the saved time.
+**Why mostly sequential:** the validator API change cascades through fixtures and consumers. Audit §5 explicitly recommends not over-parallelizing — conflicts cost more than the saved time. Phase 6 is appended as a follow-up investigation only — output is an audit doc + roadmap entries, no production code changes.
 
 ## Model Assignments
 
@@ -2028,6 +2031,186 @@ Return the PR URL.
 
 ---
 
+### Task 17: Investigate pre-existing test failures (haiku → sonnet escalation if needed)
+
+**Files:**
+- Create: `docs/superpowers/audits/2026-04-29-pre-existing-test-failures-audit.md`
+- Modify: `data/roadmap.json` (file new tasks for any actionable findings)
+
+**Context:** During PR1a (parity-fields validator + siteHasSearch plumbing), the full vitest suite reported 8 failures across 4 test files unrelated to schema work. The failures appear to predate this branch (last touch to the relevant modules was `b2c9dd65`/PR #357), but no one has formally diagnosed them. This task produces a structured audit so we can decide whether to fix, suppress, delete, or knowingly accept each failure.
+
+**Failing test files (from full-suite run on commit `67d68bef`):**
+
+| File | Failure signature(s) |
+|---|---|
+| `tests/integration/bulk-analysis-semrush-prefetch.test.ts` | Simulated external API errors (`SEMRush API unavailable`, `GSC API down`), mock incompletion (`No "listPageKeywords" export is defined on the "../server/page-keywords.js" mock`) |
+| `tests/integration/deep-diagnostic-jobs.test.ts` | Mock incompletion (`No "getActionsByWorkspace" export` / `No "getPendingActions" export` / `No "getTopWinsFromActions" export` on `outcome-tracking.js` mock), `Workspace not found`, `SEO context failed` |
+| `tests/integration/tier-gate-enforcement.test.ts` | Port collisions (`listen EADDRINUSE 0.0.0.0:13312`, `13261`, `13327`), test cleanup failures |
+| `tests/integration/content-decay-routes.test.ts` (per Pillar 1 baseline note) | Same baseline as Pillar 1 — confirm signature |
+
+**Hypothesis to test (don't assume true):**
+1. **Mock incompletion errors** — module exports were extended but `vi.mock()` call sites weren't updated. Fix is mechanical: add the missing exports to the mock factory.
+2. **Port collisions** — tests don't use unique ports per CLAUDE.md "Port uniqueness" rule, OR `afterAll` cleanup isn't releasing the port before the next test grabs it.
+3. **Simulated API errors** — these MAY be intentional (the test asserts behavior when the API is down). Verify by reading the test description and the assertion that follows the error.
+4. **`Workspace not found` / `SEO context failed`** — likely flaky test seeding. Verify by checking whether `seedWorkspace()` is called in `beforeAll` and cleaned up in `afterAll`.
+
+- [ ] **Step 1: Re-run failing tests in isolation**
+
+```bash
+npx vitest run tests/integration/bulk-analysis-semrush-prefetch.test.ts 2>&1 | tail -40
+npx vitest run tests/integration/deep-diagnostic-jobs.test.ts 2>&1 | tail -40
+npx vitest run tests/integration/tier-gate-enforcement.test.ts 2>&1 | tail -40
+npx vitest run tests/integration/content-decay-routes.test.ts 2>&1 | tail -40
+```
+
+For each file, record:
+- Whether the failure reproduces in isolation (vs only in full-suite mode — some flakes only appear when port pressure is real)
+- The exact failing test name(s) (not just the file)
+- The first error line for each failure (which is usually the root cause; subsequent errors are cascade)
+
+- [ ] **Step 2: Classify each failure**
+
+For every failing test, assign one category:
+
+| Category | Definition | Action |
+|---|---|---|
+| **MOCK_INCOMPLETE** | `vi.mock('X', () => ({...}))` call lacks an export the SUT now reads | Fix: add the missing export to the mock factory |
+| **MOCK_DRIFT** | Mock structure has shifted but assertion still references old shape | Fix: update assertion + mock together |
+| **PORT_COLLISION** | `EADDRINUSE` in isolation OR in suite | Fix: assign a unique port per CLAUDE.md, OR audit teardown |
+| **API_SIMULATION_OK** | Error string is from a deliberate `mockImplementation(() => { throw new Error(...) })` and the test asserts the failure path correctly | No action — confirm with assertion read |
+| **API_SIMULATION_BROKEN** | Test simulates an API failure but asserts something the SUT no longer does | Fix: update assertion to current SUT behavior |
+| **SEED_FLAKE** | `Workspace not found` / "No rank data" / similar — fixture wasn't seeded or was cleaned up too eagerly | Fix: align `beforeAll` / `afterAll` / shared fixture references |
+| **REAL_BUG** | Test correctly identifies a regression in production code | Fix: file as a P0 bug |
+| **DELETE_TEST** | Test exercises a feature that no longer exists or has been replaced | Delete the test |
+
+- [ ] **Step 3: Read the test descriptions and assertions for each failing test**
+
+For each failing test name from Step 1, open the file and read:
+- The `describe(...)` and `it(...)` text — what behavior is the test claiming to verify?
+- The `expect(...)` calls — what does it assert?
+- The setup (`beforeAll`, `vi.mock(...)`) — what mocks/fixtures are in play?
+
+Document this in the audit doc per failing test.
+
+- [ ] **Step 4: Cross-reference with `git log` for staleness**
+
+For each failing test file:
+
+```bash
+git log -5 --oneline -- <file>
+git log -5 --oneline -- $(grep -oE "from ['\"][./][^'\"]+['\"]" <file> | sed -E "s/from ['\"]//;s/['\"]//" | head -3)
+```
+
+Identify whether the SUT modules have been modified more recently than the test/mock — that's the typical drift signature. Note the last touch SHA per file.
+
+- [ ] **Step 5: Produce the audit document**
+
+Write `docs/superpowers/audits/2026-04-29-pre-existing-test-failures-audit.md` with this structure:
+
+```markdown
+# Pre-Existing Test Failures Audit
+
+**Date:** 2026-04-29
+**Triggered by:** schema-yoast-parity-fields PR1 full-suite run on commit `67d68bef`
+**Scope:** 8 failures across 4 test files unrelated to schema work
+
+## Summary
+- Total failing tests: N
+- Reproducible in isolation: M
+- Reproducible only in full-suite: K
+
+## Per-failure findings
+
+### `tests/integration/bulk-analysis-semrush-prefetch.test.ts`
+
+| Test name | Category | Root cause | Recommended action | Estimated effort |
+|---|---|---|---|---|
+| `<test 1>` | MOCK_INCOMPLETE | `listPageKeywords` not exported on `page-keywords.js` mock; SUT reads it via `<file:line>` | Add `listPageKeywords: vi.fn()` to mock factory | 5 min |
+| ... | ... | ... | ... | ... |
+
+(Repeat per file.)
+
+## Aggregate root causes
+- N × MOCK_INCOMPLETE on `page-keywords.js` mock
+- N × MOCK_INCOMPLETE on `outcome-tracking.js` mock
+- N × PORT_COLLISION
+- N × API_SIMULATION_OK (no action)
+
+## Recommended remediation
+1. **Quick wins (mechanical, ~30 min):** [list MOCK_INCOMPLETE fixes]
+2. **Infrastructure (~1-2h):** [list PORT_COLLISION fixes — may need a port allocator helper]
+3. **Investigation needed (~4h):** [list REAL_BUG candidates that warrant their own PR]
+4. **Confirm-and-document (no code change):** [list API_SIMULATION_OK that just need a comment]
+
+## Roadmap entries to file
+- `<id-1>` — fix N MOCK_INCOMPLETE failures, P1
+- `<id-2>` — fix port collision strategy across integration tests, P2
+- `<id-N>` — REAL_BUG investigation (if any)
+```
+
+- [ ] **Step 6: File roadmap entries for actionable findings**
+
+Open `data/roadmap.json`. For each "Recommended remediation" group in the audit:
+
+```json
+{
+  "id": "test-flake-mock-page-keywords",
+  "title": "Fix MOCK_INCOMPLETE failures: page-keywords.js mock + outcome-tracking.js mock",
+  "source": "docs/superpowers/audits/2026-04-29-pre-existing-test-failures-audit.md",
+  "est": "30m",
+  "priority": "P1",
+  "sprint": "future",
+  "status": "pending",
+  "notes": "Add missing exports to vi.mock factories. Identified during schema-yoast-parity-fields PR1 full-suite run."
+}
+```
+
+(Customize the entries based on what Step 5 surfaces. If the audit identifies REAL_BUG cases, file at P0.)
+
+Run: `npx tsx scripts/sort-roadmap.ts`
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add docs/superpowers/audits/2026-04-29-pre-existing-test-failures-audit.md data/roadmap.json
+git commit -m "$(cat <<'EOF'
+docs(audit): pre-existing test failures audit + remediation roadmap entries
+
+Diagnoses 8 test failures unrelated to schema work that surfaced during
+the parity-fields PR1 full-suite run. Categorizes each as MOCK_INCOMPLETE,
+PORT_COLLISION, API_SIMULATION_OK, SEED_FLAKE, REAL_BUG, or DELETE_TEST.
+Files roadmap entries for actionable groups.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+EOF
+)"
+```
+
+## Discipline
+
+- **Do NOT fix any test in this task.** Output is investigation + filing only. Fixes happen in dedicated PRs whose scope is exactly the audit's recommended remediation groups.
+- If a failure turns out to be REAL_BUG (production regression), report it immediately and pause — that may need a hotfix before continuing.
+- If you find a failure that's caused by THIS branch's changes (the schema work), STOP and report — it shouldn't be in this audit, it should be in PR1 fixup.
+
+## Self-Review
+
+- [ ] Every failing test from Step 1 appears in the audit doc with a Category, root cause, and recommended action
+- [ ] No "TBD" categories — every test classified
+- [ ] Roadmap entries filed for every Category that needs work (MOCK_INCOMPLETE, MOCK_DRIFT, PORT_COLLISION, SEED_FLAKE, REAL_BUG, DELETE_TEST). API_SIMULATION_OK gets no entry.
+- [ ] Audit doc commits cleanly; roadmap re-sorts cleanly
+
+## Report
+
+- **Status:** DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT
+- Commit SHA
+- Audit doc path
+- Categorization summary (N MOCK_INCOMPLETE, N PORT_COLLISION, ... totals)
+- Roadmap entries filed (count + IDs)
+- Any REAL_BUG findings — flag prominently
+- Any failure caused by THIS branch — flag prominently (BLOCKER if true)
+
+---
+
 ## Cross-Phase Contracts (PR1 → PR2)
 
 ### Exported from PR1 (PR2 will read)
@@ -2138,11 +2321,14 @@ Phase 4 — Cleanup + forcing functions (sequential, share roadmap.json):
 
 Phase 5 — Frontend rendering + verification (sequential):
   → Task 15 → Task 16
+
+Phase 6 — Pre-existing test-failure investigation (sequential, after Task 16):
+  → Task 17
 ```
 
 (Task numbering preserved for stability of references; ordering in execution is what matters.)
 
-This is the correct dependency order. The implementer should execute Tasks 1, 2, 3, 4, 5, 6, 8, 7, 9, 10, 11, 12, 13, 14, 15, 16 in that order.
+This is the correct dependency order. The implementer should execute Tasks 1, 2, 3, 4, 5, 6, 8, 7, 9, 10, 11, 12, 13, 14, 15, 16, 17 in that order.
 
 ---
 
@@ -2155,9 +2341,10 @@ This is the correct dependency order. The implementer should execute Tasks 1, 2,
 | Phase 3 | 6, 8, 7, 9, 10, 11 | 6-7 hours |
 | Phase 4 | 12, 13, 14 | 2 hours |
 | Phase 5 | 15, 16 | 2 hours |
-| **Total** | 16 | **~2 days subagent-driven** |
+| Phase 6 | 17 | 1-2 hours (audit + roadmap entries; no code) |
+| **Total** | 17 | **~2 days subagent-driven** |
 
-Reviewer overhead (per subagent-driven-development): ~30% on top, mostly absorbed by Phase 5 verification.
+Reviewer overhead (per subagent-driven-development): ~30% on top, mostly absorbed by Phase 5 verification. Phase 6 is review-light (audit doc only).
 
 ---
 
