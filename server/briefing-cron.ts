@@ -99,7 +99,11 @@ function isCompetitorFresh(workspaceId: string): boolean {
     const last = new Date(row.m).getTime();
     if (Number.isNaN(last)) return true;
     return Date.now() - last < FRESHNESS_COMPETITOR_DAYS * 86_400_000;
-  } catch {
+  } catch (err) {
+    // catch-ok — competitor_snapshots may not exist on workspaces without competitive
+    // monitoring; missing-table errors are expected degradation. Treat as "fresh"
+    // (i.e., not a freshness blocker) so the cron can proceed.
+    log.debug({ err, workspaceId }, 'isCompetitorFresh: snapshot read failed; treating as fresh');
     return true;
   }
 }
