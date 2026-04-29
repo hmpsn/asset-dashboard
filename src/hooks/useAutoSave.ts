@@ -38,10 +38,11 @@ export function useAutoSave(
         if (isMounted.current) setSaveStatus('idle');
       }
     })();
-    inFlight.current = run.finally(() => {
-      if (inFlight.current === run) inFlight.current = null;
+    const finalPromise = run.finally(() => {
+      if (inFlight.current === finalPromise) inFlight.current = null;
     });
-    return inFlight.current;
+    inFlight.current = finalPromise;
+    return finalPromise;
   }, []);
 
   const scheduleAutoSave = useCallback((html: string) => {

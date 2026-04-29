@@ -189,6 +189,7 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
     const recentVersion = getMostRecentPostVersion(req.params.workspaceId, req.params.postId);
     withinEditCoalesceWindow = !!recentVersion
       && recentVersion.trigger === 'manual_edit'
+      && recentVersion.triggerDetail !== 'client_edit'
       && (Date.now() - new Date(recentVersion.createdAt).getTime()) < ADMIN_EDIT_COALESCE_WINDOW_MS;
     if (!withinEditCoalesceWindow) {
       snapshotPostVersion(previous, 'manual_edit', `field:${editedContentFields.join(',')}`);
@@ -283,7 +284,9 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
       { postId: req.params.postId, fields: editedContentFields },
     );
   }
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: req.params.postId });
+  if (!isContentEdit || !withinEditCoalesceWindow) {
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: req.params.postId });
+  }
   res.json(updated);
 });
 

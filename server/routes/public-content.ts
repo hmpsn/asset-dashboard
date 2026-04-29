@@ -573,7 +573,9 @@ router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', valid
   if (!updated) return res.status(404).json({ error: 'Post not found' });
 
   const actor = getClientActor(req, req.params.workspaceId);
-  addActivity(req.params.workspaceId, 'post_client_edit', `${actor?.name || 'Client'} edited post content for "${post.targetKeyword}"`, '', { postId: post.id }, actor);
+  if (shouldSnapshot) {
+    addActivity(req.params.workspaceId, 'post_client_edit', `${actor?.name || 'Client'} edited post content for "${post.targetKeyword}"`, '', { postId: post.id }, actor);
+  }
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: updated.id, status: updated.status });
   res.json(updated);
 });
