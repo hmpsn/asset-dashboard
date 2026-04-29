@@ -39,7 +39,7 @@ The infrastructure is ready: `broadcastToWorkspace`, `useWorkspaceEvents`, `addA
 
 | Topic | File:Line | Notes |
 |---|---|---|
-| **Migration counter** | `server/db/migrations/074-sent-reminders.sql` | Next migration: **`075-briefing-drafts.sql`** |
+| **Migration counter** | `server/db/migrations/074-sent-reminders.sql` | Next migration: **`077-briefing-drafts.sql`** |
 | **Approval batch state machine** | `server/approvals.ts:10`, `:148-167` | `validateTransition(...)` + `recalcBatchStatus(batch)` — derives batch status from item statuses. Briefing has simpler state (single doc per week), so we use a flat enum, not derived. |
 | **Status enum (briefing — new)** | n/a | `'draft' \| 'approved' \| 'published' \| 'skipped'` per spec §4. We do NOT mirror approvals' `'pending' \| 'partial' \| 'approved' \| 'rejected' \| 'applied'`. |
 | **Routes pattern** | `server/routes/approvals.ts:74-78,108-129,179-251` | GET list, PATCH status, DELETE retract, POST remind. Briefing routes mirror: GET drafts list, PATCH approve/edit/skip, POST publish, optional POST regenerate. |
@@ -220,7 +220,7 @@ Each PR ships independently. The feature flag `client-briefing-v2` keeps the in-
 
 ```
 Pre-batch (sequential, MUST commit before any parallel work):
-  T1.0  Migration 075-briefing-drafts.sql + workspace columns                 [haiku]
+  T1.0  Migration 077-briefing-drafts.sql + workspace columns                 [haiku]
   T1.1  shared/types/briefing.ts (BriefingStory, BriefingDraft, BriefingSummary, BriefingCategory, ExplorePage) [haiku]
   T1.2  shared/types/feature-flags.ts add 'client-briefing-v2'                 [haiku]
   T1.3  shared/types/activity.ts add 4 new activity types                      [haiku]
@@ -354,7 +354,7 @@ Sequential:
 
 4. **Phase 1 admin review entry point** — does the admin briefing review queue land on the workspace home page (`WorkspaceHome.tsx`), the existing approvals area, or a new admin route `/ws/:id/briefing-review`? **Recommend:** new section on `WorkspaceHome.tsx` (alongside `<PendingApprovals>`), since briefing review is workspace-scoped admin work that should be visible at a glance. Confirm before T1.17.
 
-5. **Cron storage of "last run this week"** — `monthly-report.ts` uses an in-memory `sent[wsId] = currentWeek()` map; this is NOT persistent across restarts. **Decision:** for the briefing job, should we (a) reuse the in-memory pattern (acceptable since restarts are rare and the cron polls every Monday afternoon), or (b) persist `last_briefing_run_week_of` on the workspace row? **Recommend (b)** — durability matters for a once-weekly process. Adds one column to migration 075.
+5. **Cron storage of "last run this week"** — `monthly-report.ts` uses an in-memory `sent[wsId] = currentWeek()` map; this is NOT persistent across restarts. **Decision:** for the briefing job, should we (a) reuse the in-memory pattern (acceptable since restarts are rare and the cron polls every Monday afternoon), or (b) persist `last_briefing_run_week_of` on the workspace row? **Recommend (b)** — durability matters for a once-weekly process. Adds one column to migration 077.
 
 ---
 

@@ -6,7 +6,7 @@
 
 **Architecture:** A weekly Monday 14:00 UTC cron reads candidates from existing analytics_insights / recommendations / audit-delta stores, calls `callAI()` with `buildSystemPrompt()` (Anthropic Sonnet for editorial prose) to pick 3-5 stories + write narrative, persists to a new `briefing_drafts` table mirroring approval-batch UX patterns, surfaces in admin review queue, and publishes to a tier-gated client endpoint. Feature flag `client-briefing-v2` gates all client-visible changes; phases ship as separate PRs per CLAUDE.md.
 
-**Tech Stack:** SQLite (better-sqlite3) + new `briefing_drafts` table (migration 075), Express routes via Zod `validate()`, React Query hooks, `useWorkspaceEvents` for real-time invalidation, `<TierGate required="growth">` for UI gating, `callAI({ provider: 'anthropic' })` + `buildSystemPrompt()` for prose generation, nodemailer SMTP for the optional Phase 4 email convergence.
+**Tech Stack:** SQLite (better-sqlite3) + new `briefing_drafts` table (migration 077), Express routes via Zod `validate()`, React Query hooks, `useWorkspaceEvents` for real-time invalidation, `<TierGate required="growth">` for UI gating, `callAI({ provider: 'anthropic' })` + `buildSystemPrompt()` for prose generation, nodemailer SMTP for the optional Phase 4 email convergence.
 
 **Pre-plan audit:** `docs/superpowers/audits/2026-04-28-client-insights-briefing-refactor-audit.md` (8 spec corrections applied below; 5 user decisions resolved).
 
@@ -48,7 +48,7 @@ Backend pipeline + admin review UI. No client-visible changes. Feature flag `cli
 
 ```
 Pre-batch (sequential, MUST commit before any parallel work):
-  T1.0  Migration 075-briefing-drafts.sql + workspace columns
+  T1.0  Migration 077-briefing-drafts.sql + workspace columns
   T1.1  shared/types/briefing.ts
   T1.2  shared/types/feature-flags.ts add 'client-briefing-v2'
   T1.3  server/activity-log.ts add 4 new activity types
@@ -88,12 +88,12 @@ Sequential after batch B:
 ### T1.0 — Migration: `briefing_drafts` table + workspace columns (Model: haiku)
 
 **Files:**
-- Create: `server/db/migrations/075-briefing-drafts.sql`
+- Create: `server/db/migrations/077-briefing-drafts.sql`
 
 - [ ] **Step 1: Write the migration**
 
 ```sql
--- 075-briefing-drafts.sql
+-- 077-briefing-drafts.sql
 -- Weekly client briefing drafts (admin review + publish lifecycle)
 
 CREATE TABLE briefing_drafts (
@@ -131,8 +131,8 @@ Expected: table exists with all columns; workspaces shows the 3 new columns.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add server/db/migrations/075-briefing-drafts.sql
-git commit -m "feat(briefing): migration 075 — briefing_drafts table + workspace toggles"
+git add server/db/migrations/077-briefing-drafts.sql
+git commit -m "feat(briefing): migration 077 — briefing_drafts table + workspace toggles"
 ```
 
 ---
