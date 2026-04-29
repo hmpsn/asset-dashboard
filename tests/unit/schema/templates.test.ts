@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildArticleSchema } from '../../../server/schema/templates/article.js';
+import { buildServiceSchema, buildProductSchema } from '../../../server/schema/templates/service.js';
 import { validateLeanSchema } from '../../../server/schema/validator.js';
 
 const baseInput = {
@@ -67,5 +68,64 @@ describe('buildArticleSchema (BlogPosting)', () => {
     };
     const schema = buildArticleSchema(input, 'BlogPosting');
     expect((schema['@graph'] as unknown[]).length).toBe(1);
+  });
+});
+
+const serviceInput = {
+  baseUrl: 'https://example.com',
+  pageData: {
+    title: 'Web Design Service',
+    description: 'Custom design',
+    image: 'https://x/svc.jpg',
+    canonicalUrl: 'https://example.com/services/web-design',
+    publisher: { name: 'Acme', logoUrl: undefined },
+    breadcrumbs: [
+      { name: 'Home', url: 'https://example.com' },
+      { name: 'Services', url: 'https://example.com/services' },
+      { name: 'Web Design Service', url: 'https://example.com/services/web-design' },
+    ],
+  },
+};
+
+describe('buildServiceSchema', () => {
+  it('emits Service + BreadcrumbList', () => {
+    const schema = buildServiceSchema(serviceInput);
+    const graph = schema['@graph'] as Array<Record<string, unknown>>;
+    expect(graph).toHaveLength(2);
+    expect(graph[0]['@type']).toBe('Service');
+    expect(graph[1]['@type']).toBe('BreadcrumbList');
+  });
+
+  it('passes validator', () => {
+    expect(validateLeanSchema(buildServiceSchema(serviceInput), 'Service')).toEqual([]);
+  });
+
+  it('uses Organization @id reference for provider', () => {
+    const node = (buildServiceSchema(serviceInput)['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.provider).toEqual({ '@type': 'Organization', '@id': 'https://example.com/#organization', 'name': 'Acme' });
+  });
+
+  it('omits image when missing', () => {
+    const input = { ...serviceInput, pageData: { ...serviceInput.pageData, image: undefined } };
+    const node = (buildServiceSchema(input)['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.image).toBeUndefined();
+  });
+});
+
+describe('buildProductSchema', () => {
+  it('emits Product + BreadcrumbList', () => {
+    const input = {
+      ...serviceInput,
+      pageData: { ...serviceInput.pageData, canonicalUrl: 'https://example.com/products/x' },
+    };
+    const schema = buildProductSchema(input);
+    const graph = schema['@graph'] as Array<Record<string, unknown>>;
+    expect(graph).toHaveLength(2);
+    expect(graph[0]['@type']).toBe('Product');
+  });
+
+  it('does NOT emit offers when no price provided (no spammy zero-price offers)', () => {
+    const node = (buildProductSchema(serviceInput)['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(node.offers).toBeUndefined();
   });
 });
