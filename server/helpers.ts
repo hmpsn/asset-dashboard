@@ -348,7 +348,9 @@ export async function buildSchemaContext(
   if (ws) {
     ctx.companyName = ws.name;
     ctx.liveDomain = ws.liveDomain;
+    // schema-context-direct-read-ok: legacy; tracked in roadmap schema-context-builder-pattern-b-migration
     ctx.brandVoice = ws.brandVoice;
+    // schema-context-direct-read-ok: legacy; tracked in roadmap schema-context-builder-pattern-b-migration
     ctx.businessContext = ws.keywordStrategy?.businessContext;
 
     // Slice-migration starter (Trajectory 3 → 1; tracked in
@@ -389,14 +391,17 @@ export async function buildSchemaContext(
     } catch { /* listSites failure: leave _defaultLocale undefined; downstream falls back to 'en' */ } // catch-ok
 
     // Knowledge base from unified seo-context builder (inline + knowledge-docs/ files)
+    // schema-context-direct-read-ok: legacy; tracked in roadmap schema-context-builder-pattern-b-migration
     const rawKB = getRawKnowledge(ws.id);
     if (rawKB) ctx.knowledgeBase = rawKB.slice(0, 4000);
 
     // Audience personas for richer schema targeting
+    // schema-context-direct-read-ok: legacy; tracked in roadmap schema-context-builder-pattern-b-migration
     const personasBlock = buildPersonasContext(ws.id);
     if (personasBlock) ctx._personasBlock = personasBlock;
 
     // Verified business profile for schema grounding (bypasses page content verification)
+    // schema-context-direct-read-ok: legacy; tracked in roadmap schema-context-builder-pattern-b-migration
     if (ws.businessProfile) ctx._businessProfile = ws.businessProfile;
 
     ctx._siteHasSearch = ws.siteHasSearch === true; // schema-context-direct-read-ok: Workspace identity field (DB-stored boolean flag, not on a slice).
@@ -470,6 +475,7 @@ export async function buildSchemaContext(
 
       // Build insights map from intelligence layer (SQLite — synchronous)
       try {
+        // schema-context-direct-read-ok: legacy analytics read; tracked in roadmap schema-context-builder-pattern-b-migration
         const allInsights = getInsights(ws.id);
         insightsMap = new Map();
         // ranking_opportunity pageIds are stored as relative paths after the
