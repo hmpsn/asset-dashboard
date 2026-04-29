@@ -2475,11 +2475,18 @@ async function assemblePageProfile(
     log.debug({ err, workspaceId }, 'assemblePageProfile: page actions optional, degrading gracefully');
   }
 
+  // Hoist workspace lookup so both auditIssues and schemaStatus blocks can reuse it.
+  let ws: Awaited<ReturnType<typeof import('./workspaces.js').getWorkspace>> | null = null;
+  try {
+    const { getWorkspace } = await import('./workspaces.js');
+    ws = getWorkspace(workspaceId) ?? null;
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assemblePageProfile: workspace lookup optional, degrading gracefully');
+  }
+
   // Audit issues for this page
   let auditIssues: string[] = [];
   try {
-    const { getWorkspace } = await import('./workspaces.js');
-    const ws = getWorkspace(workspaceId);
     if (ws?.webflowSiteId) {
       const { getLatestSnapshot } = await import('./reports.js');
       const snap = getLatestSnapshot(ws.webflowSiteId);
@@ -2494,12 +2501,22 @@ async function assemblePageProfile(
     log.debug({ err, workspaceId }, 'assemblePageProfile: audit data optional, degrading gracefully');
   }
 
-  // Schema status
+  // Schema status — schema_validations.pageId is the Webflow UUID (static pages)
+  // or cms-{path} synthetic ID (CMS pages), never pagePath. Resolve pagePath →
+  // pageId via the schema snapshot (slug→pageId map for static pages), and fall
+  // back to toCmsPageId(pagePath) for CMS pages — works immediately post-migration.
   let schemaStatus: PageProfileSlice['schemaStatus'] = 'none';
   try {
     const { getValidations } = await import('./schema-validator.js');
+    const { getSchemaSnapshot } = await import('./schema-store.js');
+    const { toCmsPageId } = await import('./webflow-pages.js');
     const validations: SchemaValidation[] = getValidations(workspaceId);
-    const pageValidation = validations.find(v => v.pageId === pagePath);
+    const snapshot = ws?.webflowSiteId ? getSchemaSnapshot(ws.webflowSiteId) : null;
+    const pagePathTrimmed = pagePath.replace(/^\//, '');
+    const resolvedPageId = snapshot?.results.find(r =>
+      r.slug === pagePathTrimmed || `/${r.slug}` === pagePath,
+    )?.pageId ?? toCmsPageId(pagePath);
+    const pageValidation = validations.find(v => v.pageId === resolvedPageId);
     if (pageValidation) {
       const status = pageValidation.status;
       schemaStatus = status === 'valid' ? 'valid' : status === 'warnings' ? 'warnings' : status === 'errors' ? 'errors' : 'none';
