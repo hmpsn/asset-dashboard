@@ -280,7 +280,7 @@ function validateArticleShape(node: Record<string, unknown>): ValidationFinding[
         findings.push({
           severity: 'error',
           type: t,
-          field: 'publisher.logo',
+          field: 'publisher.logo.url',
           ruleId: 'article-publisher-logo-url-missing',
           message: `${t}.publisher.logo must be {"@type": "ImageObject", "url": "..."} with non-empty url`,
         });
