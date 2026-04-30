@@ -18,6 +18,7 @@ import { SchemaPageCard } from './schema/SchemaPageCard';
 import { BulkPublishPanel } from './schema/BulkPublishPanel';
 import { PagePicker } from './schema/PagePicker';
 import { SchemaPlanPanel } from './schema/SchemaPlanPanel';
+import { SchemaCompletenessWidget } from './schema/SchemaCompletenessWidget';
 import { PendingApprovals } from './PendingApprovals';
 import { SchemaWorkflowGuide } from './schema/SchemaWorkflowGuide';
 import { SCHEMA_ROLE_INDEX } from '../../shared/types/schema-plan';
@@ -896,6 +897,9 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
           onRetracted={() => setApprovalRefreshKey(k => k + 1)}
         />
       )}
+
+      {/* Schema completeness widget — aggregates validationFindings and deep-links to fix locations */}
+      <SchemaCompletenessWidget pages={data} workspaceId={workspaceId} />
 
       {/* Summary cards */}
       <div id="schema-suggestions-list" />
