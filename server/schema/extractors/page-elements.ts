@@ -17,6 +17,7 @@ import { extractCitations } from './page-elements/citation.js';
 import { extractImages } from './page-elements/images.js';
 import { extractTables } from './page-elements/tables.js';
 import { extractTestimonials } from './page-elements/testimonials.js';
+import { aiClassifyImages } from './page-elements/image-ai-classifier.js';
 import type { AiBudget } from './page-elements/ai-budget.js';
 import { createLogger } from '../../logger.js';
 
@@ -29,6 +30,8 @@ export interface ExtractPageElementsOpts {
   sourcePublishedAt: string | null;
   /** Per-regenerate AI budget. Used by AI-assisted extractors in PR2; ignored in PR1. */
   aiBudget: AiBudget;
+  /** Workspace ID for AI token-logging attribution. Undefined when called outside a workspace context. */
+  workspaceId?: string | undefined;
 }
 
 function emptyCatalog(opts: ExtractPageElementsOpts, errorMarker: 1 | 0 = 0): PageElementCatalog {
@@ -79,8 +82,12 @@ export async function extractPageElements(
     const lists = extractLists($);
     const citations = extractCitations($, opts.pageBaseUrl);
 
-    // PR2 elements — wired in PR2
-    const images = extractImages($);
+    // PR2 elements (images / tables / testimonials)
+    let images = extractImages($);
+    images = await aiClassifyImages(images, {
+      budget: opts.aiBudget,
+      workspaceId: opts.workspaceId,
+    });
     const tables = extractTables($);
     const testimonials = extractTestimonials($);
 
