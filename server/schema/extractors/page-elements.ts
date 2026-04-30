@@ -20,6 +20,7 @@ import { extractTestimonials } from './page-elements/testimonials.js';
 import { aiClassifyImages } from './page-elements/image-ai-classifier.js';
 import { aiDisambiguateHowTo } from './page-elements/howto-ai-fallback.js';
 import type { AiBudget } from './page-elements/ai-budget.js';
+import { contentScope } from './page-elements/content-scope.js';
 import { createLogger } from '../../logger.js';
 
 const log = createLogger('schema/extractors/page-elements');
@@ -87,7 +88,7 @@ export async function extractPageElements(
     // DOM order. The disambiguator slices itemsByList[i] per list — a flat
     // concat would silently send list-0's items as the prompt for every
     // subsequent list (review-caught data corruption bug).
-    const $listScope = $('article').length > 0 ? $('article ol, article ul') : $('ol, ul');
+    const $listScope = contentScope($).find('ol, ul');
     const itemsByList: string[][] = [];
     $listScope.each((_, el) => {
       const items = $(el).children('li').toArray().map(li => $(li).text().trim());
