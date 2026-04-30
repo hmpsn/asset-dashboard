@@ -643,3 +643,316 @@ describe('buildHomepageSchema', () => {
     expect(website?.potentialAction).toBeUndefined();
   });
 });
+
+describe('Article + BlogPosting — ImageGallery enrichment (PR2)', () => {
+  const baseElementCatalog = {
+    extractedAt: '2026-04-30T00:00:00.000Z',
+    sourcePublishedAt: null,
+    headings: [],
+    tables: [],
+    images: [],
+    videos: [],
+    lists: [],
+    testimonials: [],
+    codeBlocks: [],
+    citations: [],
+    diagnostics: { aiClassificationCalls: 0, hitAiBudgetCap: false, rawCounts: {} },
+  };
+  const baseInput = {
+    baseUrl: 'https://example.com',
+    pageData: {
+      title: 'X',
+      cleanTitle: 'X',
+      slug: 'x',
+      canonicalUrl: 'https://example.com/x',
+      datePublished: '2026-04-29T00:00:00Z',
+      dateModified: '2026-04-29T00:00:00Z',
+      description: 'X description',
+      publisher: { name: 'Acme', logoUrl: null },
+      breadcrumbs: [],
+      inLanguage: 'en',
+      articleSection: 'Blog',
+    } as Record<string, unknown>,
+  };
+
+  it('emits ImageGallery when ≥2 informative images present', () => {
+    const elements = {
+      ...baseElementCatalog,
+      images: [
+        { src: 'https://x/i1.jpg', alt: 'one', role: 'informative' as const, roleSource: 'rule' as const },
+        { src: 'https://x/i2.jpg', alt: 'two', role: 'informative' as const, roleSource: 'rule' as const },
+      ],
+    };
+    const input = { ...baseInput, pageData: { ...baseInput.pageData, elements } };
+    const graph = buildArticleSchema(input as never, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>;
+    const gallery = graph.find(n => n['@type'] === 'ImageGallery');
+    expect(gallery).toBeDefined();
+    expect(gallery!.name).toBeDefined();
+    expect(gallery!.image).toEqual(['https://x/i1.jpg', 'https://x/i2.jpg']);
+  });
+
+  it('does NOT emit ImageGallery when fewer than 2 informative images', () => {
+    const elements = {
+      ...baseElementCatalog,
+      images: [
+        { src: 'https://x/i1.jpg', alt: 'one', role: 'informative' as const, roleSource: 'rule' as const },
+      ],
+    };
+    const input = { ...baseInput, pageData: { ...baseInput.pageData, elements } };
+    const graph = buildArticleSchema(input as never, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>;
+    expect(graph.find(n => n['@type'] === 'ImageGallery')).toBeUndefined();
+  });
+
+  it('does NOT count hero or decorative images toward the ImageGallery threshold', () => {
+    const elements = {
+      ...baseElementCatalog,
+      images: [
+        { src: 'https://x/hero.jpg', alt: 'hero', role: 'hero' as const, roleSource: 'rule' as const },
+        { src: 'https://x/dec.jpg', alt: 'd', role: 'decorative' as const, roleSource: 'rule' as const },
+        { src: 'https://x/info.jpg', alt: 'i', role: 'informative' as const, roleSource: 'rule' as const },
+      ],
+    };
+    const input = { ...baseInput, pageData: { ...baseInput.pageData, elements } };
+    const graph = buildArticleSchema(input as never, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>;
+    expect(graph.find(n => n['@type'] === 'ImageGallery')).toBeUndefined();
+  });
+});
+
+describe('LocalBusiness — PR2 Review[] + AggregateRating', () => {
+  const baseElementCatalog = {
+    extractedAt: '2026-04-30T00:00:00.000Z',
+    sourcePublishedAt: null,
+    headings: [], tables: [], images: [], videos: [], lists: [],
+    testimonials: [], codeBlocks: [], citations: [],
+    diagnostics: { aiClassificationCalls: 0, hitAiBudgetCap: false, rawCounts: {} },
+  };
+  const baseInput = {
+    baseUrl: 'https://example.com',
+    businessProfile: { phone: '555-1234', email: 'x@y.com', address: { street: '1 Main', city: 'Town', state: 'CA', zip: '00000', country: 'US' }, openingHours: undefined, socialProfiles: undefined, foundedDate: undefined },
+    pageData: {
+      title: 'Acme', cleanTitle: 'Acme', canonicalUrl: 'https://example.com/',
+      description: 'A local business.', image: undefined,
+      publisher: { name: 'Acme', logoUrl: null }, breadcrumbs: [],
+      inLanguage: 'en', knowsAbout: undefined, areaServed: undefined,
+    } as Record<string, unknown>,
+  };
+
+  it('attaches AggregateRating to LocalBusiness node when ratings present', () => {
+    const elements = {
+      ...baseElementCatalog,
+      testimonials: [
+        { quote: 'A.', author: 'X', rating: 5, selector: 'bq' },
+        { quote: 'B.', author: 'Y', rating: 4, selector: 'bq' },
+      ],
+    };
+    const input = { ...baseInput, pageData: { ...baseInput.pageData, elements } };
+    const graph = buildLocalBusinessSchema(input as never)['@graph'] as Array<Record<string, unknown>>;
+    const lb = graph.find(n => n['@type'] === 'LocalBusiness')!;
+    expect(lb.aggregateRating).toMatchObject({ '@type': 'AggregateRating', ratingValue: 4.5, reviewCount: 2 });
+  });
+
+  it('skips AggregateRating when no testimonials have ratings', () => {
+    const elements = { ...baseElementCatalog, testimonials: [{ quote: 'A.', author: 'X', selector: 'bq' }] };
+    const input = { ...baseInput, pageData: { ...baseInput.pageData, elements } };
+    const graph = buildLocalBusinessSchema(input as never)['@graph'] as Array<Record<string, unknown>>;
+    const lb = graph.find(n => n['@type'] === 'LocalBusiness')!;
+    expect(lb.aggregateRating).toBeUndefined();
+  });
+
+  it('emits Review[] graph nodes pointing at LocalBusiness @id', () => {
+    const elements = {
+      ...baseElementCatalog,
+      testimonials: [
+        { quote: 'A.', author: 'X', rating: 5, selector: 'bq' },
+        { quote: 'B.', author: 'Y', rating: 4, selector: 'bq' },
+      ],
+    };
+    const input = { ...baseInput, pageData: { ...baseInput.pageData, elements } };
+    const graph = buildLocalBusinessSchema(input as never)['@graph'] as Array<Record<string, unknown>>;
+    const reviews = graph.filter(n => n['@type'] === 'Review');
+    expect(reviews).toHaveLength(2);
+    expect(reviews[0].itemReviewed).toEqual({ '@id': 'https://example.com/#localbusiness' });
+  });
+
+  it('skips Review without author', () => {
+    const elements = {
+      ...baseElementCatalog,
+      testimonials: [
+        { quote: 'No author.', rating: 5, selector: 'bq' },
+        { quote: 'With author.', author: 'X', rating: 4, selector: 'bq' },
+      ],
+    };
+    const input = { ...baseInput, pageData: { ...baseInput.pageData, elements } };
+    const graph = buildLocalBusinessSchema(input as never)['@graph'] as Array<Record<string, unknown>>;
+    expect(graph.filter(n => n['@type'] === 'Review')).toHaveLength(1);
+  });
+});
+
+describe('Service — PR2 enrichment (Review/AggregateRating/Gallery/Table)', () => {
+  const baseElementCatalog = {
+    extractedAt: '2026-04-30T00:00:00.000Z',
+    sourcePublishedAt: null,
+    headings: [], tables: [], images: [], videos: [], lists: [],
+    testimonials: [], codeBlocks: [], citations: [],
+    diagnostics: { aiClassificationCalls: 0, hitAiBudgetCap: false, rawCounts: {} },
+  };
+  const baseInput = {
+    baseUrl: 'https://example.com',
+    pageData: {
+      title: 'Web Design',
+      cleanTitle: 'Web Design',
+      slug: 'web-design',
+      canonicalUrl: 'https://example.com/services/web-design',
+      description: 'Premium Webflow.',
+      publisher: { name: 'Acme', logoUrl: null },
+      breadcrumbs: [],
+      inLanguage: 'en',
+      areaServed: undefined,
+      serviceType: undefined,
+    } as Record<string, unknown>,
+  };
+
+  it('emits Review[] when testimonials present (one per testimonial with author+rating)', () => {
+    const elements = {
+      ...baseElementCatalog,
+      testimonials: [
+        { quote: 'First.', author: 'Jane', rating: 4, selector: 'blockquote' },
+        { quote: 'Second.', author: 'Bob', rating: 5, selector: 'blockquote' },
+      ],
+    };
+    const input = { ...baseInput, pageData: { ...baseInput.pageData, elements } };
+    const graph = buildServiceSchema(input as never)['@graph'] as Array<Record<string, unknown>>;
+    const reviews = graph.filter(n => n['@type'] === 'Review');
+    expect(reviews).toHaveLength(2);
+    expect(reviews[0].itemReviewed).toEqual({ '@id': 'https://example.com/services/web-design#service' });
+    expect(reviews[0].reviewBody).toBe('First.');
+    expect((reviews[0].author as Record<string, unknown>).name).toBe('Jane');
+  });
+
+  it('skips Review emission for testimonials missing author', () => {
+    const elements = {
+      ...baseElementCatalog,
+      testimonials: [
+        { quote: 'No author here.', rating: 5, selector: 'blockquote' },
+        { quote: 'Has author.', author: 'Bob', rating: 4, selector: 'blockquote' },
+      ],
+    };
+    const input = { ...baseInput, pageData: { ...baseInput.pageData, elements } };
+    const graph = buildServiceSchema(input as never)['@graph'] as Array<Record<string, unknown>>;
+    expect(graph.filter(n => n['@type'] === 'Review')).toHaveLength(1);
+  });
+
+  it('emits AggregateRating only when ≥1 testimonial has a numeric rating', () => {
+    const noRatings = {
+      ...baseInput,
+      pageData: {
+        ...baseInput.pageData,
+        elements: { ...baseElementCatalog, testimonials: [{ quote: 'X.', author: 'Y', selector: 'bq' }] },
+      },
+    };
+    const withRatings = {
+      ...baseInput,
+      pageData: {
+        ...baseInput.pageData,
+        elements: {
+          ...baseElementCatalog,
+          testimonials: [
+            { quote: 'X.', author: 'Y', rating: 5, selector: 'bq' },
+            { quote: 'Z.', author: 'W', rating: 4, selector: 'bq' },
+          ],
+        },
+      },
+    };
+    const noAR = buildServiceSchema(noRatings as never)['@graph'] as Array<Record<string, unknown>>;
+    const withAR = buildServiceSchema(withRatings as never)['@graph'] as Array<Record<string, unknown>>;
+    const primaryNoAR = noAR.find(n => n['@type'] === 'Service')!;
+    const primaryWithAR = withAR.find(n => n['@type'] === 'Service')!;
+    expect(primaryNoAR.aggregateRating).toBeUndefined();
+    expect(primaryWithAR.aggregateRating).toMatchObject({
+      '@type': 'AggregateRating',
+      ratingValue: 4.5, // (5+4)/2
+      reviewCount: 2,    // count of testimonials with ratings
+      bestRating: 5,
+      worstRating: 1,
+    });
+  });
+
+  it('Review nodes carry reviewRating only when rating present', () => {
+    const elements = {
+      ...baseElementCatalog,
+      testimonials: [
+        { quote: 'X.', author: 'Y', rating: 5, selector: 'bq' },
+        { quote: 'Z.', author: 'W', selector: 'bq' },
+      ],
+    };
+    const input = { ...baseInput, pageData: { ...baseInput.pageData, elements } };
+    const graph = buildServiceSchema(input as never)['@graph'] as Array<Record<string, unknown>>;
+    const reviews = graph.filter(n => n['@type'] === 'Review');
+    expect(reviews[0].reviewRating).toMatchObject({ ratingValue: 5 });
+    // Review without rating is not emitted (Google requires reviewRating)
+    expect(reviews).toHaveLength(1);
+  });
+
+  it('emits ImageGallery from informative images on Service pages too', () => {
+    const elements = {
+      ...baseElementCatalog,
+      images: [
+        { src: 'https://x/i1.jpg', alt: 'a', role: 'informative' as const, roleSource: 'rule' as const },
+        { src: 'https://x/i2.jpg', alt: 'b', role: 'informative' as const, roleSource: 'rule' as const },
+      ],
+    };
+    const input = { ...baseInput, pageData: { ...baseInput.pageData, elements } };
+    const graph = buildServiceSchema(input as never)['@graph'] as Array<Record<string, unknown>>;
+    expect(graph.find(n => n['@type'] === 'ImageGallery')).toBeDefined();
+  });
+
+  it('emits Table mainEntity when isPricingLike OR isComparisonLike', () => {
+    const elements = {
+      ...baseElementCatalog,
+      tables: [{ rowCount: 4, colCount: 3, isPricingLike: true, isComparisonLike: true, caption: 'Pricing' }],
+    };
+    const input = { ...baseInput, pageData: { ...baseInput.pageData, elements } };
+    const graph = buildServiceSchema(input as never)['@graph'] as Array<Record<string, unknown>>;
+    const primary = graph.find(n => n['@type'] === 'Service')!;
+    expect(primary.mainEntity).toMatchObject({
+      '@type': 'Table',
+      about: 'Pricing',
+    });
+  });
+
+  it('skips Table emission for non-pricing/non-comparison tables', () => {
+    const elements = {
+      ...baseElementCatalog,
+      tables: [{ rowCount: 3, colCount: 2, isPricingLike: false, isComparisonLike: false }],
+    };
+    const input = { ...baseInput, pageData: { ...baseInput.pageData, elements } };
+    const graph = buildServiceSchema(input as never)['@graph'] as Array<Record<string, unknown>>;
+    const primary = graph.find(n => n['@type'] === 'Service')!;
+    expect(primary.mainEntity).toBeUndefined();
+  });
+
+  it('Service template emits all four PR2 enrichments simultaneously without @id collisions', () => {
+    const elements = {
+      ...baseElementCatalog,
+      images: [
+        { src: 'https://x/i1.jpg', alt: 'i1', role: 'informative' as const, roleSource: 'rule' as const },
+        { src: 'https://x/i2.jpg', alt: 'i2', role: 'informative' as const, roleSource: 'rule' as const },
+      ],
+      tables: [{ rowCount: 4, colCount: 3, isPricingLike: true, isComparisonLike: true, caption: 'Pricing' }],
+      testimonials: [
+        { quote: 'A.', author: 'X', rating: 5, selector: 'bq' },
+        { quote: 'B.', author: 'Y', rating: 4, selector: 'bq' },
+      ],
+    };
+    const input = { ...baseInput, pageData: { ...baseInput.pageData, elements } };
+    const graph = buildServiceSchema(input as never)['@graph'] as Array<Record<string, unknown>>;
+    const ids = graph.map(n => n['@id']).filter(Boolean) as string[];
+    expect(new Set(ids).size).toBe(ids.length); // unique
+    expect(graph.map(n => n['@type'])).toEqual(expect.arrayContaining([
+      'Service', 'Review', 'Review', 'ImageGallery',
+    ]));
+    const primary = graph.find(n => n['@type'] === 'Service')!;
+    expect(primary.aggregateRating).toBeDefined();
+    expect(primary.mainEntity).toBeDefined();
+  });
+});

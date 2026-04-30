@@ -74,6 +74,20 @@ const REQUIRED_BY_TYPE: Record<string, RequiredFields> = {
     required: ['name', 'step'],
     recommended: ['totalTime', 'estimatedCost'],
   },
+  Review: {
+    required: ['itemReviewed', 'reviewRating', 'author'],
+    recommended: ['datePublished', 'reviewBody'],
+  },
+  AggregateRating: {
+    required: ['ratingValue', 'reviewCount'],
+    recommended: ['bestRating', 'worstRating'],
+  },
+  Table: {
+    required: ['about'],
+  },
+  ImageGallery: {
+    required: ['name', 'image'],
+  },
 };
 
 function validateBreadcrumb(node: Record<string, unknown>): ValidationFinding[] {
@@ -470,16 +484,20 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
     return findings;
   }
 
-  // Duplicate @type detection — the lean rule: at most one node per @type, except
-  // ListItem (legitimate breadcrumb children). Homepage may have BOTH Organization +
-  // WebSite (different @types), so the rule is per-type, not "exactly one primary".
+  // Duplicate @type detection — the lean rule: at most one node per @type, except:
+  //  - ListItem (legitimate breadcrumb children)
+  //  - Review (PR2: a Service or LocalBusiness with N rated testimonials emits N
+  //    Review nodes — each pointing at the parent via itemReviewed.@id)
+  // Homepage may have BOTH Organization + WebSite (different @types), so the
+  // rule is per-type, not "exactly one primary".
+  const ALLOW_MULTIPLE = new Set(['ListItem', 'Review']);
   const typeCounts = new Map<string, number>();
   for (const node of graph) {
     const t = node['@type'] as string;
     typeCounts.set(t, (typeCounts.get(t) || 0) + 1);
   }
   for (const [t, count] of typeCounts) {
-    if (count > 1 && t !== 'ListItem') {
+    if (count > 1 && !ALLOW_MULTIPLE.has(t)) {
       findings.push({
         severity: 'error',
         type: t,
@@ -489,7 +507,15 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
     }
   }
 
+  // Helper to recursively validate nested objects with @type
+  // Only validates types that are explicitly in REQUIRED_BY_TYPE and are not primary types.
+  const PRIMARY_TYPES = new Set<string>();
   for (const node of graph) {
+    PRIMARY_TYPES.add(node['@type'] as string);
+  }
+  const NESTED_TYPES = new Set(['Table', 'ImageGallery', 'AggregateRating']);
+
+  function validateNodeRecursive(node: Record<string, unknown>) {
     const t = node['@type'] as string;
     const rules = REQUIRED_BY_TYPE[t];
     if (rules) {
@@ -516,6 +542,22 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
         }
       }
     }
+
+    // Walk nested objects with @type, but only validate those marked as NESTED_TYPES
+    for (const value of Object.values(node)) {
+      if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+        const nested = value as Record<string, unknown>;
+        const nestedType = nested['@type'];
+        if (typeof nestedType === 'string' && NESTED_TYPES.has(nestedType)) {
+          validateNodeRecursive(nested);
+        }
+      }
+    }
+  }
+
+  for (const node of graph) {
+    const t = node['@type'] as string;
+    validateNodeRecursive(node);
     if (t === 'BreadcrumbList') {
       findings.push(...validateBreadcrumb(node));
     }

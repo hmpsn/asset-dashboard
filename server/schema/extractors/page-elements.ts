@@ -14,6 +14,11 @@ import type { PageElementCatalog } from '../../../shared/types/page-elements.js'
 import { extractVideos } from './page-elements/video.js';
 import { extractLists } from './page-elements/howto.js';
 import { extractCitations } from './page-elements/citation.js';
+import { extractImages } from './page-elements/images.js';
+import { extractTables } from './page-elements/tables.js';
+import { extractTestimonials } from './page-elements/testimonials.js';
+import { aiClassifyImages } from './page-elements/image-ai-classifier.js';
+import { aiDisambiguateHowTo } from './page-elements/howto-ai-fallback.js';
 import type { AiBudget } from './page-elements/ai-budget.js';
 import { createLogger } from '../../logger.js';
 
@@ -26,6 +31,8 @@ export interface ExtractPageElementsOpts {
   sourcePublishedAt: string | null;
   /** Per-regenerate AI budget. Used by AI-assisted extractors in PR2; ignored in PR1. */
   aiBudget: AiBudget;
+  /** Workspace ID for AI token-logging attribution. Undefined when called outside a workspace context. */
+  workspaceId?: string | undefined;
 }
 
 function emptyCatalog(opts: ExtractPageElementsOpts, errorMarker: 1 | 0 = 0): PageElementCatalog {
@@ -73,14 +80,36 @@ export async function extractPageElements(
 
     // PR1 elements
     const videos = extractVideos($);
-    const lists = extractLists($);
+    let lists = extractLists($);
+    // Capture parallel raw item text for AI disambiguation (PR2).
+    // Scope must match extractLists EXACTLY (article ol+ul, with whole-document
+    // fallback) so the resulting itemsByList[i] is aligned with lists[i] by
+    // DOM order. The disambiguator slices itemsByList[i] per list — a flat
+    // concat would silently send list-0's items as the prompt for every
+    // subsequent list (review-caught data corruption bug).
+    const $listScope = $('article').length > 0 ? $('article ol, article ul') : $('ol, ul');
+    const itemsByList: string[][] = [];
+    $listScope.each((_, el) => {
+      const items = $(el).children('li').toArray().map(li => $(li).text().trim());
+      itemsByList.push(items);
+    });
+    lists = await aiDisambiguateHowTo(lists, itemsByList, {
+      budget: opts.aiBudget,
+      workspaceId: opts.workspaceId,
+    });
     const citations = extractCitations($, opts.pageBaseUrl);
 
-    // PR2/PR3 elements — empty arrays in PR1
+    // PR2 elements (images / tables / testimonials)
+    let images = extractImages($);
+    images = await aiClassifyImages(images, {
+      budget: opts.aiBudget,
+      workspaceId: opts.workspaceId,
+    });
+    const tables = extractTables($);
+    const testimonials = extractTestimonials($);
+
+    // PR3 elements — empty arrays until PR3
     const headings: PageElementCatalog['headings'] = [];
-    const tables: PageElementCatalog['tables'] = [];
-    const images: PageElementCatalog['images'] = [];
-    const testimonials: PageElementCatalog['testimonials'] = [];
     const codeBlocks: PageElementCatalog['codeBlocks'] = [];
 
     return {

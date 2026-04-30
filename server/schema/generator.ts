@@ -152,6 +152,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
           pageBaseUrl: baseUrl,
           sourcePublishedAt: input.pageMeta.sourcePublishedAt ?? null,
           aiBudget,
+          workspaceId,
         });
         upsertPageElements(workspaceId, pagePath, catalog);
       } catch (err) { // catch-ok: extraction or persistence failure — schema generation continues

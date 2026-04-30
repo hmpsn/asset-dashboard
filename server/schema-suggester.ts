@@ -10,8 +10,21 @@ import type { SchemaValidation } from './schema-validator.js';
 import { fetchPageMeta } from './seo-audit.js';
 import { fetchPublishedHtml } from './helpers.js';
 import { resolveBaseUrl } from './url-helpers.js';
+import { createAiBudget } from './schema/extractors/page-elements/ai-budget.js';
+import type { AiBudget } from './schema/extractors/page-elements/ai-budget.js';
+import { isFeatureEnabled } from './feature-flags.js';
 
 const log = createLogger('schema');
+
+/**
+ * AI budget allocation for the page-element AI extractors.
+ * 100 image classifications + 20 HowTo disambiguations = 120 total per regenerate-all.
+ * Returns a zero-cap budget when the feature flag is off so all consumers fall through to rule-based.
+ */
+function allocateElementAiBudget(): AiBudget {
+  const enabled = isFeatureEnabled('schema-ai-element-classifier');
+  return createAiBudget(enabled ? 120 : 0);
+}
 
 // Re-export from the standalone rich-results module so existing external callers
 // (e.g. frontend SchemaPageCard.tsx, route handlers) keep working. The actual
@@ -342,6 +355,7 @@ export async function generateSchemaForPage(
     } catch { /* intelligence not ready — pageKeywords stays undefined */ } // catch-ok
   }
 
+  const aiBudget = allocateElementAiBudget();
   const lean = await generateLeanSchema({
     pageId,
     pageMeta: {
@@ -370,6 +384,7 @@ export async function generateSchemaForPage(
       siteKeywordsForKnowsAbout: ctx.siteKeywords, // NEW
       siteHasSearch: ctx._siteHasSearch ?? false, // NEW
     },
+    aiBudget, // PR2: thread per-call budget so AI extractors can run within cap
   });
 
   // Surface unused parameters to satisfy TS noUnusedParameters via void casts.
@@ -399,6 +414,12 @@ export async function generateSchemaSuggestions(
 
   const wsId = ctx.workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
   const pages = wsId ? await getWorkspacePages(wsId, siteId) : [];
+
+  // PR2: ONE shared budget for the entire regenerate-all run (static + CMS loops).
+  // Allocates 120 slots when schema-ai-element-classifier is enabled; 0 when off.
+  // This enforces the per-run cap (100 image classifications + 20 HowTo calls)
+  // across all pages rather than resetting on each page.
+  const aiBudget = allocateElementAiBudget();
 
   const results: SchemaPageSuggestion[] = [];
 
@@ -453,6 +474,7 @@ export async function generateSchemaSuggestions(
         siteKeywordsForKnowsAbout: ctx.siteKeywords, // NEW
         siteHasSearch: ctx._siteHasSearch ?? false, // NEW
       },
+      aiBudget, // PR2: shared budget — drains across all static pages in this run
     });
     results.push(leanToSuggestion(lean));
     onProgress?.(results, false, `Processed ${results.length} of ${pages.length} static pages...`);
@@ -503,6 +525,7 @@ export async function generateSchemaSuggestions(
           siteKeywordsForKnowsAbout: ctx.siteKeywords, // NEW
           siteHasSearch: ctx._siteHasSearch ?? false, // NEW
         },
+        aiBudget, // PR2: same shared budget — drains across CMS pages in same run
       });
       results.push(leanToSuggestion(itemLean));
     }

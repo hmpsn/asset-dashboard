@@ -18,6 +18,29 @@ export function dropUndefined<T extends Record<string, unknown>>(obj: T): T {
 }
 
 /**
+ * Filters extracted URLs to http(s)-only — blocks `javascript:`, `data:`,
+ * `file:`, and other non-web schemes from landing in JSON-LD output.
+ *
+ * URLs in PageElementCatalog (image src, citation href, etc.) come from
+ * extracted page HTML and are attacker-influenced. Schema.org consumers
+ * may render or follow these URLs (Google's image carousel, for instance);
+ * emitting javascript:/data: URLs would fail validation at best, enable
+ * abuse at worst. Mirrors PR1's citation extractor allowlist.
+ */
+const ALLOWED_URL_PROTOCOLS = new Set(['http:', 'https:']);
+export function filterHttpUrls(urls: ReadonlyArray<string>): string[] {
+  const out: string[] = [];
+  for (const u of urls) {
+    if (!u) continue;
+    try {
+      const parsed = new URL(u);
+      if (ALLOWED_URL_PROTOCOLS.has(parsed.protocol)) out.push(u);
+    } catch { /* malformed/relative URL — skip */ } // catch-ok: URL parse failure means we drop the entry
+  }
+  return out;
+}
+
+/**
  * Builds a BreadcrumbList @graph node from breadcrumb items. Always emits
  * itemListElement as a positional array. Returns undefined if items.length < 2
  * (a single-item breadcrumb is just the homepage and adds no information).
