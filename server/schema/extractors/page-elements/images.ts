@@ -17,6 +17,7 @@
  */
 import type * as cheerio from 'cheerio';
 import type { PageImage } from '../../../../shared/types/page-elements.js';
+import { contentScope } from './content-scope.js';
 
 const MIN_INFORMATIVE_ALT_LENGTH = 20;
 const MIN_INFORMATIVE_DIMENSION = 200;
@@ -57,15 +58,15 @@ function classifyRole(
 
 /**
  * Returns true when no heading or paragraph element appears before `imgEl`
- * in document order within the given scope selector (e.g. 'article', 'body').
+ * in document order within the given content scope element.
  */
-function isBeforeFirstTextBlock($: cheerio.CheerioAPI, scopeSel: string, imgEl: { tagName: string }): boolean {
-  const allTextBlocks = $(scopeSel).find('h1,h2,h3,h4,h5,h6,p');
+function isBeforeFirstTextBlock($scopeEl: ReturnType<cheerio.CheerioAPI>, imgEl: { tagName: string }): boolean {
+  const allTextBlocks = $scopeEl.find('h1,h2,h3,h4,h5,h6,p');
   if (allTextBlocks.length === 0) return true;
   // Walk all nodes inside scope; stop at the first text block or this image.
   let hitImage = false;
   let hitText = false;
-  $(scopeSel).find('*').each((_, el) => {
+  $scopeEl.find('*').each((_, el) => {
     if (hitImage || hitText) return false; // early exit
     if (el === imgEl) { hitImage = true; return false; }
     const tag = el.tagName?.toLowerCase() ?? '';
@@ -75,10 +76,8 @@ function isBeforeFirstTextBlock($: cheerio.CheerioAPI, scopeSel: string, imgEl: 
 }
 
 export function extractImages($: cheerio.CheerioAPI): PageImage[] {
-  // Scope: <article> first; fall back to whole document for non-Webflow templates.
-  const hasArticle = $('article').length > 0;
-  const scopeSel = hasArticle ? 'article' : 'body';
-  const $scope = hasArticle ? $('article img') : $('img');
+  const $scopeEl = contentScope($);
+  const $scope = $scopeEl.find('img');
   const images: PageImage[] = [];
 
   let isFirstHero = true;
@@ -100,7 +99,7 @@ export function extractImages($: cheerio.CheerioAPI): PageImage[] {
 
     // Hero: image inside <header>, OR first image that appears before any heading/paragraph.
     const inHeader = $img.closest('header').length > 0;
-    const isLeadPosition = images.length === 0 && isBeforeFirstTextBlock($, scopeSel, el);
+    const isLeadPosition = images.length === 0 && isBeforeFirstTextBlock($scopeEl, el);
     const isHero = isFirstHero && (inHeader || isLeadPosition);
 
     const { role: classifiedRole, roleSource } = classifyRole(
