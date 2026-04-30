@@ -28,6 +28,18 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
       })
     : undefined;
 
+  // PR2: AggregateRating from rated testimonials
+  const ratedTestimonials = (pageData.elements?.testimonials ?? []).filter(t => t.rating != null);
+  const aggregateRating = ratedTestimonials.length > 0
+    ? dropUndefined({
+        '@type': 'AggregateRating' as const,
+        'ratingValue': Number((ratedTestimonials.reduce((s, t) => s + (t.rating ?? 0), 0) / ratedTestimonials.length).toFixed(2)),
+        'reviewCount': ratedTestimonials.length,
+        'bestRating': 5,
+        'worstRating': 1,
+      })
+    : undefined;
+
   // Emit a sibling Organization node so orgRef (@id: /#organization) used by
   // Service/AboutPage templates on other pages resolves to a real entity.
   const organization = dropUndefined({
@@ -57,6 +69,7 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
     'foundedDate': businessProfile?.foundedDate,
     'parentOrganization': { '@id': `${baseUrl}/#organization` },
     'areaServed': pageData.areaServed ? { '@type': 'Place' as const, name: pageData.areaServed } : undefined,
+    'aggregateRating': aggregateRating,
   });
 
   // Emit the same WebSite sitewide entity that buildHomepageSchema does — Google
@@ -79,5 +92,26 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
     } : {}),
   };
 
-  return withBreadcrumb([organization, localBusiness, website], pageData);
+  // PR2: Review[] graph nodes
+  const lbId = `${baseUrl}/#localbusiness`;
+  const reviews = (pageData.elements?.testimonials ?? [])
+    .map((t, idx) => {
+      if (!t.author || t.rating == null) return undefined;
+      return dropUndefined({
+        '@type': 'Review' as const,
+        '@id': `${baseUrl}/#review-${idx}`,
+        'itemReviewed': { '@id': lbId },
+        'reviewRating': dropUndefined({
+          '@type': 'Rating' as const,
+          'ratingValue': t.rating,
+          'bestRating': 5,
+          'worstRating': 1,
+        }),
+        'author': { '@type': 'Person' as const, 'name': t.author },
+        'reviewBody': t.quote,
+      });
+    })
+    .filter((r): r is Record<string, unknown> => r !== undefined);
+
+  return withBreadcrumb([organization, localBusiness, website, ...reviews], pageData);
 }

@@ -96,9 +96,23 @@ export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Reco
     'duration': video!.durationSec ? `PT${video!.durationSec}S` : undefined,
   }) : undefined;
 
+  // Build optional ImageGallery node from informative images (PR2).
+  // Pre-emission gate: name + image[] ≥1; must have ≥2 informative images
+  // (single informative image stays on the primary node's `image` field).
+  const informativeImages = (pageData.elements?.images ?? []).filter((i: { role: string }) => i.role === 'informative');
+  const galleryName = pageData.cleanTitle || pageData.title;
+  const canEmitGallery = informativeImages.length >= 2 && !!galleryName;
+  const imageGallery = canEmitGallery ? dropUndefined({
+    '@type': 'ImageGallery' as const,
+    '@id': `${pageData.canonicalUrl}#gallery`,
+    'name': galleryName,
+    'image': informativeImages.map((i: { src: string }) => i.src),
+  }) : undefined;
+
   const nodes: Array<Record<string, unknown>> = [primary];
   if (howTo) nodes.push(howTo);
   if (videoObject) nodes.push(videoObject);
+  if (imageGallery) nodes.push(imageGallery);
 
   return withBreadcrumb(nodes, pageData);
 }
