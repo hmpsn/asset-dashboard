@@ -748,4 +748,211 @@ describe('validateLeanSchema — LocalBusiness value-shape (Pillar 1)', () => {
       );
     });
   });
+
+  describe('Review required fields', () => {
+    const fullReview = {
+      '@context': 'https://schema.org',
+      '@graph': [{
+        '@type': 'Service',
+        '@id': 'https://x/y#service',
+        'name': 'Web Design',
+        'description': 'Premium Webflow.',
+        'provider': { '@type': 'Organization', 'name': 'Acme' },
+        'isPartOf': { '@id': 'https://x/#website' },
+        'breadcrumb': { '@id': 'https://x/y#breadcrumb' },
+        'inLanguage': 'en',
+      }, {
+        '@type': 'Review',
+        '@id': 'https://x/y#review-0',
+        'itemReviewed': { '@id': 'https://x/y#service' },
+        'reviewRating': { '@type': 'Rating', 'ratingValue': 5, 'bestRating': 5 },
+        'author': { '@type': 'Person', 'name': 'Jane' },
+        'reviewBody': 'Excellent service.',
+      }, {
+        '@type': 'BreadcrumbList',
+        '@id': 'https://x/y#breadcrumb',
+        'itemListElement': [
+          { '@type': 'ListItem', 'position': 1, 'name': 'Home', 'item': 'https://x' },
+          { '@type': 'ListItem', 'position': 2, 'name': 'Web Design', 'item': 'https://x/y' },
+        ],
+      }],
+    };
+
+    it('passes a fully-populated Review', () => {
+      const findings = validateLeanSchema(fullReview, 'Service').filter(f => f.type === 'Review');
+      expect(findings.filter(f => f.severity === 'error')).toEqual([]);
+    });
+
+    it('flags missing Review.itemReviewed as error', () => {
+      const broken = JSON.parse(JSON.stringify(fullReview));
+      delete broken['@graph'][1].itemReviewed;
+      const findings = validateLeanSchema(broken, 'Service');
+      expect(findings).toContainEqual(
+        expect.objectContaining({ severity: 'error', type: 'Review', field: 'itemReviewed' }),
+      );
+    });
+
+    it('flags missing Review.reviewRating as error', () => {
+      const broken = JSON.parse(JSON.stringify(fullReview));
+      delete broken['@graph'][1].reviewRating;
+      const findings = validateLeanSchema(broken, 'Service');
+      expect(findings).toContainEqual(
+        expect.objectContaining({ severity: 'error', type: 'Review', field: 'reviewRating' }),
+      );
+    });
+
+    it('flags missing Review.author as error', () => {
+      const broken = JSON.parse(JSON.stringify(fullReview));
+      delete broken['@graph'][1].author;
+      const findings = validateLeanSchema(broken, 'Service');
+      expect(findings).toContainEqual(
+        expect.objectContaining({ severity: 'error', type: 'Review', field: 'author' }),
+      );
+    });
+  });
+
+  describe('AggregateRating required fields', () => {
+    const fullAR = {
+      '@context': 'https://schema.org',
+      '@graph': [{
+        '@type': 'Service',
+        '@id': 'https://x/y#service',
+        'name': 'Web Design',
+        'description': 'Premium Webflow.',
+        'provider': { '@type': 'Organization', 'name': 'Acme' },
+        'isPartOf': { '@id': 'https://x/#website' },
+        'breadcrumb': { '@id': 'https://x/y#breadcrumb' },
+        'inLanguage': 'en',
+        'aggregateRating': {
+          '@type': 'AggregateRating',
+          'ratingValue': 4.8,
+          'reviewCount': 12,
+          'bestRating': 5,
+        },
+      }, {
+        '@type': 'BreadcrumbList',
+        '@id': 'https://x/y#breadcrumb',
+        'itemListElement': [
+          { '@type': 'ListItem', 'position': 1, 'name': 'Home', 'item': 'https://x' },
+          { '@type': 'ListItem', 'position': 2, 'name': 'Web Design', 'item': 'https://x/y' },
+        ],
+      }],
+    };
+
+    it('passes a fully-populated AggregateRating', () => {
+      const findings = validateLeanSchema(fullAR, 'Service').filter(f => f.type === 'AggregateRating');
+      expect(findings.filter(f => f.severity === 'error')).toEqual([]);
+    });
+
+    it('flags missing AggregateRating.ratingValue as error', () => {
+      const broken = JSON.parse(JSON.stringify(fullAR));
+      delete broken['@graph'][0].aggregateRating.ratingValue;
+      const findings = validateLeanSchema(broken, 'Service');
+      expect(findings).toContainEqual(
+        expect.objectContaining({ severity: 'error', type: 'AggregateRating', field: 'ratingValue' }),
+      );
+    });
+
+    it('flags missing AggregateRating.reviewCount as error', () => {
+      const broken = JSON.parse(JSON.stringify(fullAR));
+      delete broken['@graph'][0].aggregateRating.reviewCount;
+      const findings = validateLeanSchema(broken, 'Service');
+      expect(findings).toContainEqual(
+        expect.objectContaining({ severity: 'error', type: 'AggregateRating', field: 'reviewCount' }),
+      );
+    });
+  });
+
+  describe('Table required fields', () => {
+    const fullTable = {
+      '@context': 'https://schema.org',
+      '@graph': [{
+        '@type': 'Service',
+        '@id': 'https://x/y#service',
+        'name': 'Web Design',
+        'description': 'Premium Webflow.',
+        'provider': { '@type': 'Organization', 'name': 'Acme' },
+        'isPartOf': { '@id': 'https://x/#website' },
+        'breadcrumb': { '@id': 'https://x/y#breadcrumb' },
+        'inLanguage': 'en',
+        'mainEntity': {
+          '@type': 'Table',
+          '@id': 'https://x/y#table-0',
+          'about': 'Pricing tiers',
+        },
+      }, {
+        '@type': 'BreadcrumbList',
+        '@id': 'https://x/y#breadcrumb',
+        'itemListElement': [
+          { '@type': 'ListItem', 'position': 1, 'name': 'Home', 'item': 'https://x' },
+          { '@type': 'ListItem', 'position': 2, 'name': 'Web Design', 'item': 'https://x/y' },
+        ],
+      }],
+    };
+
+    it('passes a Table with about populated', () => {
+      const findings = validateLeanSchema(fullTable, 'Service').filter(f => f.type === 'Table');
+      expect(findings.filter(f => f.severity === 'error')).toEqual([]);
+    });
+
+    it('flags missing Table.about as error', () => {
+      const broken = JSON.parse(JSON.stringify(fullTable));
+      delete broken['@graph'][0].mainEntity.about;
+      const findings = validateLeanSchema(broken, 'Service');
+      expect(findings).toContainEqual(
+        expect.objectContaining({ severity: 'error', type: 'Table', field: 'about' }),
+      );
+    });
+  });
+
+  describe('ImageGallery required fields', () => {
+    const fullGallery = {
+      '@context': 'https://schema.org',
+      '@graph': [{
+        '@type': 'Service',
+        '@id': 'https://x/y#service',
+        'name': 'Web Design',
+        'description': 'Premium Webflow.',
+        'provider': { '@type': 'Organization', 'name': 'Acme' },
+        'isPartOf': { '@id': 'https://x/#website' },
+        'breadcrumb': { '@id': 'https://x/y#breadcrumb' },
+        'inLanguage': 'en',
+      }, {
+        '@type': 'ImageGallery',
+        '@id': 'https://x/y#gallery',
+        'name': 'Project gallery',
+        'image': ['https://x/img1.jpg', 'https://x/img2.jpg'],
+      }, {
+        '@type': 'BreadcrumbList',
+        '@id': 'https://x/y#breadcrumb',
+        'itemListElement': [
+          { '@type': 'ListItem', 'position': 1, 'name': 'Home', 'item': 'https://x' },
+          { '@type': 'ListItem', 'position': 2, 'name': 'Web Design', 'item': 'https://x/y' },
+        ],
+      }],
+    };
+
+    it('passes a fully-populated ImageGallery', () => {
+      const findings = validateLeanSchema(fullGallery, 'Service').filter(f => f.type === 'ImageGallery');
+      expect(findings.filter(f => f.severity === 'error')).toEqual([]);
+    });
+
+    it('flags missing ImageGallery.name as error', () => {
+      const broken = JSON.parse(JSON.stringify(fullGallery));
+      delete broken['@graph'][1].name;
+      const findings = validateLeanSchema(broken, 'Service');
+      expect(findings).toContainEqual(
+        expect.objectContaining({ severity: 'error', type: 'ImageGallery', field: 'name' }),
+      );
+    });
+
+    it('flags missing ImageGallery.image as error', () => {
+      const broken = JSON.parse(JSON.stringify(fullGallery));
+      delete broken['@graph'][1].image;
+      const findings = validateLeanSchema(broken, 'Service');
+      expect(findings).toContainEqual(
+        expect.objectContaining({ severity: 'error', type: 'ImageGallery', field: 'image' }),
+      );
+    });
+  });
 });

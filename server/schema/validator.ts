@@ -74,6 +74,20 @@ const REQUIRED_BY_TYPE: Record<string, RequiredFields> = {
     required: ['name', 'step'],
     recommended: ['totalTime', 'estimatedCost'],
   },
+  Review: {
+    required: ['itemReviewed', 'reviewRating', 'author'],
+    recommended: ['datePublished', 'reviewBody'],
+  },
+  AggregateRating: {
+    required: ['ratingValue', 'reviewCount'],
+    recommended: ['bestRating', 'worstRating'],
+  },
+  Table: {
+    required: ['about'],
+  },
+  ImageGallery: {
+    required: ['name', 'image'],
+  },
 };
 
 function validateBreadcrumb(node: Record<string, unknown>): ValidationFinding[] {
@@ -489,7 +503,15 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
     }
   }
 
+  // Helper to recursively validate nested objects with @type
+  // Only validates types that are explicitly in REQUIRED_BY_TYPE and are not primary types.
+  const PRIMARY_TYPES = new Set<string>();
   for (const node of graph) {
+    PRIMARY_TYPES.add(node['@type'] as string);
+  }
+  const NESTED_TYPES = new Set(['Table', 'ImageGallery', 'AggregateRating']);
+
+  function validateNodeRecursive(node: Record<string, unknown>) {
     const t = node['@type'] as string;
     const rules = REQUIRED_BY_TYPE[t];
     if (rules) {
@@ -516,6 +538,22 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
         }
       }
     }
+
+    // Walk nested objects with @type, but only validate those marked as NESTED_TYPES
+    for (const value of Object.values(node)) {
+      if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+        const nested = value as Record<string, unknown>;
+        const nestedType = nested['@type'];
+        if (typeof nestedType === 'string' && NESTED_TYPES.has(nestedType)) {
+          validateNodeRecursive(nested);
+        }
+      }
+    }
+  }
+
+  for (const node of graph) {
+    const t = node['@type'] as string;
+    validateNodeRecursive(node);
     if (t === 'BreadcrumbList') {
       findings.push(...validateBreadcrumb(node));
     }
