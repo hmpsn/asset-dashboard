@@ -45,5 +45,22 @@ export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Reco
     'about': kind === 'Article' ? 'Case study' : undefined,
   });
 
-  return withBreadcrumb(primary, pageData);
+  // Build optional VideoObject node from pageData.elements.videos[0].
+  // Multi-node @graph append per audit §2.6 (withBreadcrumb accepts arrays).
+  const video = pageData.elements?.videos?.[0];
+  const videoObject = video ? dropUndefined({
+    '@type': 'VideoObject' as const,
+    '@id': `${pageData.canonicalUrl}#video-0`,
+    'name': video.title ?? pageData.cleanTitle ?? pageData.title,
+    'description': pageData.description ?? `Video embedded in ${pageData.title}.`,
+    'thumbnailUrl': video.thumbnailUrl,
+    'uploadDate': pageData.datePublished,
+    'embedUrl': video.embedUrl,
+    'duration': video.durationSec ? `PT${video.durationSec}S` : undefined,
+  }) : undefined;
+
+  const nodes: Array<Record<string, unknown>> = [primary];
+  if (videoObject) nodes.push(videoObject);
+
+  return withBreadcrumb(nodes, pageData);
 }

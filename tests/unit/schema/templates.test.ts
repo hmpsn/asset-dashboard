@@ -364,6 +364,56 @@ describe('static page templates', () => {
   });
 });
 
+describe('Article + BlogPosting — VideoObject enrichment (PR1)', () => {
+  const videoElementCatalog = {
+    extractedAt: '2026-04-29T00:00:00.000Z',
+    sourcePublishedAt: null,
+    headings: [],
+    tables: [],
+    images: [],
+    videos: [{
+      provider: 'youtube' as const,
+      embedUrl: 'https://www.youtube.com/embed/abc12345678',
+      thumbnailUrl: 'https://img.youtube.com/vi/abc12345678/maxresdefault.jpg',
+      title: 'Web Vitals 101',
+    }],
+    lists: [],
+    testimonials: [],
+    codeBlocks: [],
+    citations: [],
+    diagnostics: { aiClassificationCalls: 0, hitAiBudgetCap: false, rawCounts: {} },
+  };
+
+  it('emits VideoObject graph node when pageData.elements.videos has 1+ entries', () => {
+    const input = {
+      ...baseInput,
+      pageData: { ...baseInput.pageData, elements: videoElementCatalog },
+    };
+    const graph = buildArticleSchema(input, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>;
+    const video = graph.find(n => n['@type'] === 'VideoObject');
+    expect(video).toBeDefined();
+    expect(video!.name).toBe('Web Vitals 101');
+    expect(video!.embedUrl).toBe('https://www.youtube.com/embed/abc12345678');
+    expect(video!.thumbnailUrl).toBe('https://img.youtube.com/vi/abc12345678/maxresdefault.jpg');
+    expect(video!.uploadDate).toBeDefined(); // falls back to article.datePublished
+    expect(video!.description).toBeDefined();
+  });
+
+  it('does NOT emit VideoObject when pageData.elements.videos is empty or missing', () => {
+    const emptyElements = { ...videoElementCatalog, videos: [] };
+    const inputEmpty = {
+      ...baseInput,
+      pageData: { ...baseInput.pageData, elements: emptyElements },
+    };
+    const graphEmpty = buildArticleSchema(inputEmpty, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>;
+    expect(graphEmpty.find(n => n['@type'] === 'VideoObject')).toBeUndefined();
+
+    const inputMissing = { ...baseInput };
+    const graphMissing = buildArticleSchema(inputMissing, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>;
+    expect(graphMissing.find(n => n['@type'] === 'VideoObject')).toBeUndefined();
+  });
+});
+
 describe('buildHomepageSchema', () => {
   const homepageInput = {
     baseUrl: 'https://example.com',

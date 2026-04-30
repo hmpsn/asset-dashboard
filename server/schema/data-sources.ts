@@ -5,6 +5,7 @@
  */
 import * as cheerio from 'cheerio';
 import { scrubBrandSuffix } from './templates/helpers.js';
+import type { PageElementCatalog } from '../../shared/types/page-elements.js';
 
 export interface PageMetaInput {
   title: string;
@@ -20,6 +21,10 @@ export interface PageMetaInput {
   /** Per-page keyword strategy from seoContext slice. Populated when buildWorkspaceIntelligence
    *  is called with opts.pagePath. Drives Article.keywords schema field emission. */
   pageKeywords?: { primary: string; secondary: string[] };
+  /** Per-page structural elements catalog. Populated by the generator
+   *  via extractPageElements() before the template is built. Empty when
+   *  the catalog has not been generated yet. */
+  elements?: PageElementCatalog;
 }
 
 export interface WorkspaceSchemaInput {
@@ -74,6 +79,9 @@ export interface PageData {
   serviceType?: string;
   /** Top-N siteKeywords for Organization.knowsAbout — passed through from workspace. */
   knowsAbout?: string[];
+  /** Catalog of structural elements detected on the page (videos, HowTo
+   *  lists, citations, etc.). Drives conditional schema enrichment. */
+  elements?: PageElementCatalog;
 }
 
 export interface ExtractInput {
@@ -216,5 +224,6 @@ export function extractPageData(input: ExtractInput): PageData {
     areaServed,
     serviceType,
     knowsAbout: input.workspace.siteKeywordsForKnowsAbout?.slice(0, 5).map(s => s.toLowerCase()),
+    elements: input.pageMeta.elements,
   };
 }
