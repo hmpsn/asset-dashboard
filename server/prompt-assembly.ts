@@ -15,6 +15,7 @@ import { parseJsonFallback } from './db/json-validation.js';
 import type { VoiceDNA, VoiceGuardrails } from '../shared/types/brand-engine.js';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
+import { PROSE_QUALITY_RULES } from './writing-quality.js';
 
 
 const log = createLogger('prompt-assembly');
@@ -132,6 +133,7 @@ export function buildSystemPrompt(
   workspaceId: string,
   baseInstructions: string,
   customNotes?: string | null,
+  opts?: { skipProseRules?: boolean },
 ): string {
   const parts: string[] = [baseInstructions];
 
@@ -172,6 +174,12 @@ export function buildSystemPrompt(
 
   if (notes) {
     parts.push(`Additional context for this client:\n${notes}`);
+  }
+
+  // Layer 4: universal prose quality rules (anti-AI-writing patterns)
+  // Skipped when the caller already includes WRITING_QUALITY_RULES in baseInstructions (e.g. copy-generation).
+  if (!opts?.skipProseRules) {
+    parts.push(PROSE_QUALITY_RULES);
   }
 
   return parts.join('\n\n');

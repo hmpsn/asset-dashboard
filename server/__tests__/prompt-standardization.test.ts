@@ -17,7 +17,9 @@ describe('prompt standardization pass — integration', () => {
 
   it('buildSystemPrompt returns base instructions for fresh workspace', () => {
     const result = buildSystemPrompt(TEST_WS, 'You are a helpful assistant.');
-    expect(result).toBe('You are a helpful assistant.');
+    expect(result).toContain('You are a helpful assistant.');
+    // Layer 4 (prose quality rules) is always injected
+    expect(result).toContain('PROSE QUALITY');
   });
 
   it('buildSystemPrompt appends custom notes when passed as parameter', () => {
@@ -29,7 +31,10 @@ describe('prompt standardization pass — integration', () => {
 
   it('buildSystemPrompt skips notes when customNotes is null', () => {
     const result = buildSystemPrompt(TEST_WS, 'Base instructions', null);
-    expect(result).toBe('Base instructions');
+    expect(result).toContain('Base instructions');
+    expect(result).not.toContain('Additional context');
+    // Layer 4 (prose quality rules) is always injected
+    expect(result).toContain('PROSE QUALITY');
   });
 
   it('OpenAIChatOptions accepts responseFormat', () => {

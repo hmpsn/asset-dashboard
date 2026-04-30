@@ -9,6 +9,8 @@ import { callAnthropic, isAnthropicConfigured } from './anthropic-helpers.js';
 import type { ContentBrief } from './content-brief.js';
 import type { GeneratedPost } from '../shared/types/content.ts';
 import { createLogger } from './logger.js';
+import { WRITING_QUALITY_RULES } from './writing-quality.js';
+export { WRITING_QUALITY_RULES } from './writing-quality.js';
 
 const log = createLogger('content-posts-ai');
 
@@ -215,69 +217,6 @@ const PAGE_TYPE_CONCLUSION_INSTRUCTIONS: Record<string, string> = {
 - CTA for downloading, saving, or applying the resource
 - Invite feedback or questions to build engagement`,
 };
-
-// --- Shared anti-cliché and writing quality rules (injected into every prompt) ---
-
-export const WRITING_QUALITY_RULES = `
-WRITING QUALITY RULES (apply to ALL content — violations will be rejected):
-
-FORBIDDEN PHRASES — never use these AI clichés:
-- Opening clichés: "Did you know...", "In today's [digital/fast-paced/competitive] world...", "Have you ever wondered...", "When it comes to...", "Picture this..."
-- "If you're like most" pattern: NEVER start any sentence with "If you're like most" followed by ANY word. This includes "If you're like most people", "If you're like most Texans", "If you're like most business owners", "If you're like most homeowners", etc. Rewrite as a direct statement instead (e.g., "Most Texans have dental insurance but aren't sure how it works" instead of "If you're like most Texans, you have dental insurance but aren't sure how it works")
-- Filler transitions: "Let's dive in", "Let's dive into", "Without further ado", "Let's explore", "Let's take a closer look", "Now let's talk about...", "With that said...", "That being said...", "Moving on...", "Let's get started", "Let's start with...". NEVER use "Let's" followed by a verb anywhere in the content.
-- "Ready to" rhetorical questions: NEVER write "Ready to [verb]...?" or "Ready for [noun]?" anywhere in the content. Examples of BANNED phrases: "Ready to build...", "Ready to move beyond...", "Ready for the full toolkit?", "Ready to get started?", "Ready to take your...". Use direct statements instead (e.g., "Download the guide" not "Ready to download the guide?").
-- Hollow intensifiers: "incredibly", "absolutely", "truly", "extremely", "revolutionize", "game-changing", "cutting-edge", "world-class", "best-in-class", "next-level", "top-notch"
-- Corporate buzzwords: "leverage", "utilize", "optimize", "streamline", "empower", "harness", "navigate the landscape", "unlock the power of", "take your X to the next level", "in the realm of"
-- Emotional hedging: "It's important to note that...", "It's worth mentioning that...", "It goes without saying...", "Needless to say...", "At the end of the day...", "The reality is that...", "X is key to Y", "The key is...", "X is crucial for Y", "X is essential for Y", "X is the foundation for Y"
-- Vague attribution: "Studies show...", "Research suggests...", "Experts agree...", "According to industry data...", "Many businesses have found..." — if you cite something, name the specific source or don't cite at all
-- Conclusion starters: "In conclusion...", "To sum up...", "In summary...", "All in all...", "At the end of the day..."
-- Metaphor clichés: "growth engine", "game changer", "secret sauce", "silver bullet", "deep dive", "move the needle", "from X to Y" (e.g., "from brochure to growth engine"), "powerful [noun]", "trusted [noun] hub", "one-stop shop"
-
-STRUCTURAL ANTI-PATTERNS — avoid these:
-- Do NOT end every section with a one-sentence summary of what the section just said
-- Do NOT start every bullet point with the same verb form (e.g., "Improve X", "Improve Y", "Improve Z")
-- Do NOT use exactly 3 or 5 items in every list — vary list lengths naturally (2, 4, 6, 7 are all fine)
-- Do NOT repeat the same point from the intro in the conclusion using synonyms — add NEW value in the conclusion
-- Do NOT use "Conclusion" as the final heading — use a specific, action-oriented heading instead
-- Do NOT give every section the same structure (intro paragraph → bullet list → summary). Vary it: some sections should be all prose, some should lead with a list, some should use a numbered process, some should use a comparison or example-first approach
-- Do NOT reference the same case study, example, or data point more than twice in the entire article. Spread different examples across sections. If you only have one example, use it once or twice max and fill other sections with actionable advice instead
-- Do NOT use examples from the same industry in every section. If a dental case study is mentioned in section 2, use a different industry (tech, finance, retail, etc.) for examples in sections 3, 4, and 5 — even if the knowledge base only has one case study. Invent plausible hypothetical examples from other industries rather than repeating the same one
-- Do NOT repeat any phrase, metaphor, or sentence structure across sections. If you used "transforms your X into a Y" in one section, never use that pattern again
-- Do NOT mention the business/brand name in every section — limit to 2-3 mentions in the entire article (intro and conclusion). The middle sections should focus on teaching, not selling
-- Do NOT put the brand name in the first paragraph of the introduction. The intro should hook the reader with their problem/opportunity, not lead with "At [Brand], we..."
-- CONCLUSION/CLOSING SECTION: Include at most ONE linked call-to-action (<a> tag) in the closing section. Do not stack 3-4 links in the final paragraph — pick the single most important action for the reader. Other internal links belong in body sections, not the conclusion
-- Do NOT repeat the same specific statistic, dollar amount, or data point more than twice in the entire article. If you've already mentioned "$1,000-$2,000 annual maximum" twice, reference it indirectly ("your annual cap", "this yearly limit") in subsequent mentions
-- BRAND MENTIONS IN CONCLUSION: The closing section should lead with editorial value (takeaways, fresh insight, forward-looking perspective) BEFORE any brand mention or CTA. The brand mention should appear only in the final 1-2 sentences, not throughout the conclusion
-
-FABRICATION RULES:
-- NEVER invent statistics, case study results, percentages, or data points. Only reference specific numbers if they were provided in the brief context or knowledge base
-- NEVER fabricate quotes, client testimonials, or attributed statements
-- If no specific data is available, give actionable advice instead of making up numbers
-- It's better to say "this approach typically improves conversion rates" than to invent "this approach improved conversion rates by 47%"
-- CASE STUDIES: When writing case study sections, describe directional outcomes ("saw a notable increase in organic traffic") unless specific numbers were provided in the knowledge base. NEVER invent percentages like "65% increase" or "30% rise" — these sound authoritative but are fabricated and damage credibility
-
-WHAT TO DO INSTEAD:
-- Use concrete specifics: real numbers (only if provided), named tools, actual processes, specific examples
-- Vary sentence length: mix short punchy sentences with longer explanatory ones
-- Use active voice and direct language: "do X" not "it is recommended that one should consider doing X"
-- Let evidence speak: instead of "incredibly effective", reference specific outcomes from the brief's knowledge base
-- Write like a knowledgeable colleague explaining over coffee, not a brochure or a textbook
-- Vary paragraph structure: some short (1-2 sentences), some medium (3-4), occasional longer ones for complex points
-- Go deeper than surface-level advice. Instead of "optimize your site speed", explain HOW: specific tools, settings, thresholds, and tradeoffs. The reader should learn something they didn't know before
-- Each section should teach ONE thing well rather than listing 5 things superficially
-- DEPTH OVER BREADTH: Even in short sections (150-250 words), go deep on ONE specific example rather than listing generic tips. Include a concrete scenario with dollar amounts, timelines, or step-by-step actions. The reader should learn something they couldn't get from a Google snippet
-- If a section is titled "FAQ" or "Frequently Asked Questions", format it as individual Q&A pairs: each question as an <h3> followed by a short answer paragraph. NEVER combine multiple questions into a single paragraph
-- Vary examples across industries. If the knowledge base only has one case study, reference it once (max twice), then use hypothetical examples from other industries for remaining sections
-- ANCHOR TEXT ACCURACY: When linking to internal pages, the anchor text must accurately describe the linked page. Do NOT use an external brand name (e.g., "Webflow University", "Google") as anchor text for an internal link. If linking to /services/strategy, use text like "our strategy services" or "brand and web strategy" — not an unrelated third-party name
-
-AEO (ANSWER ENGINE OPTIMIZATION) — CITATION-WORTHY WRITING:
-- Write content that AI systems want to cite: encyclopedic, neutral, precise, defensible
-- CLAIM DISCIPLINE: Replace superlatives with evidence. "This is the safest option" → "Safety depends on factors X, Y, and Z; evidence from [source] suggests…". Replace "We're the best" → "Common factors to evaluate include…"
-- EVIDENCE FRAMING: Use "According to [specific source]…", "In general…", "Common factors include…", "Limitations include…". Ground claims in evidence, not marketing assertions
-- For medical/health content: adopt an encyclopedic neutral tone. Write like a medical reference, not a brochure. Every factual medical claim should cite or reference a specific source (journal, professional association, .gov)
-- DEFINITION BLOCKS: When introducing a technical term, use the pattern: define it in 1-2 sentences → note common misconceptions → list related terms. These blocks are disproportionately cited by LLMs
-- COMPARISON CONTENT: When comparing options, use measurable fields (costs, percentages, timeframes) with stated units. Include "Data as of [date]" notes. Tables with vague adjectives ("good", "excellent") are not citeable — use numbers
-`;
 
 /** Build a rich context block from all available brief fields */
 export function buildBriefContextBlock(brief: ContentBrief, siteDomain?: string): string {

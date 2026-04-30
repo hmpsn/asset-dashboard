@@ -26,7 +26,9 @@ afterAll(() => {
 describe('buildSystemPrompt', () => {
   it('returns base instructions when no enrichments exist', () => {
     const result = buildSystemPrompt(TEST_WS, 'Base instructions');
-    expect(result).toBe('Base instructions');
+    expect(result).toContain('Base instructions');
+    // Layer 4 (prose quality rules) is always injected
+    expect(result).toContain('PROSE QUALITY');
   });
 
   it('appends custom notes when set', () => {

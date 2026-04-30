@@ -144,7 +144,7 @@ export function InsightsBriefingPage({
         }
       : null;
 
-  // ── Data spread (wins/risks) — derived from non-headline stories ──
+  // ── Data spread (wins/risks) — derived from all stories including headline ──
   const spreadColumns = (briefing && !isFree) ? buildSpread(briefing.stories, workspaceId, betaMode) : { wins: [], risks: [] };
 
   // ── Recommended for You — handler navigates to the strategy tab where the
@@ -282,10 +282,10 @@ export function InsightsBriefingPage({
 }
 
 /**
- * Project the briefing's non-headline stories into wins/risks columns for the
- * <DataSpread> section. Pre-resolves drill-in URLs so spreadItemFromStory can
- * stay a pure helper. Caller is responsible for capping at 3 each (DataSpread
- * does that internally).
+ * Project the briefing's stories into wins/risks columns for the <DataSpread>
+ * section. Pre-resolves drill-in URLs so spreadItemFromStory can stay a pure
+ * helper. Caller is responsible for capping at 3 each (DataSpread does that
+ * internally).
  */
 function buildSpread(
   stories: BriefingStory[],
@@ -295,7 +295,6 @@ function buildSpread(
   const wins: SpreadItem[] = [];
   const risks: SpreadItem[] = [];
   for (const story of stories) {
-    if (story.isHeadline) continue;
     const url = renderDrillInUrl(story, workspaceId, betaMode);
     const item = spreadItemFromStory(story, url ?? null);
     if (!item) continue;
