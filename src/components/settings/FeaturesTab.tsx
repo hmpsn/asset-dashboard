@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   BarChart3, Mail, Image as ImageIcon, Sparkles,
   Users, Shield, SlidersHorizontal, Brain, CreditCard,
@@ -35,6 +35,15 @@ interface FeaturesTabProps {
 
 export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: FeaturesTabProps) {
   const [sendingReport, setSendingReport] = useState(false);
+  // Controlled mirrors of branding inputs — sync from ws so deep-links that
+  // render this tab before ws loads still show the persisted values once they
+  // arrive. (Devin Review ANALYSIS-0005 round 3 on PR #379.)
+  const [logoUrlDraft, setLogoUrlDraft] = useState<string>(ws?.brandLogoUrl ?? '');
+  const [accentColorDraft, setAccentColorDraft] = useState<string>(ws?.brandAccentColor ?? '#2dd4bf');
+  useEffect(() => {
+    setLogoUrlDraft(ws?.brandLogoUrl ?? '');
+    setAccentColorDraft(ws?.brandAccentColor ?? '#2dd4bf');
+  }, [ws?.brandLogoUrl, ws?.brandAccentColor]);
   useDeepLinkFocus();
 
   return (
@@ -342,9 +351,10 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
           <div>
             <div className="t-caption-sm font-medium mb-1.5 text-[var(--brand-text-muted)]">Logo URL</div>
             <div className="flex items-center gap-2">
-              <input type="url" defaultValue={ws?.brandLogoUrl || ''}
+              <input type="url" value={logoUrlDraft}
                 data-schema-deeplink="brandLogoUrl"
                 placeholder="https://example.com/logo.svg"
+                onChange={e => setLogoUrlDraft(e.target.value)}
                 onBlur={async (e) => {
                   const val = e.target.value.trim();
                   if (val !== (ws?.brandLogoUrl || '')) {
@@ -362,13 +372,14 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
           <div>
             <div className="t-caption-sm font-medium mb-1.5 text-[var(--brand-text-muted)]">Accent Color</div>
             <div className="flex items-center gap-2">
-              <input type="color" defaultValue={ws?.brandAccentColor || '#2dd4bf'}
+              <input type="color" value={accentColorDraft}
                 onChange={async (e) => {
                   const val = e.target.value;
+                  setAccentColorDraft(val);
                   await patchWorkspace({ brandAccentColor: val });
                 }}
                 className="w-8 h-8 rounded-[var(--radius-lg)] border border-[var(--brand-border)] cursor-pointer bg-transparent" />
-              <code className="t-caption text-[var(--brand-text)]">{ws?.brandAccentColor || '#2dd4bf'}</code>
+              <code className="t-caption text-[var(--brand-text)]">{accentColorDraft}</code>
               <span className="t-caption-sm text-[var(--brand-text-muted)]">Used in reports and the client portal header</span>
             </div>
           </div>
