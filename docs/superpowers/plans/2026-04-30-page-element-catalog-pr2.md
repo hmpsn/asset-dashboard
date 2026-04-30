@@ -6,10 +6,24 @@
 
 **Architecture:**
 - Pattern-based extractors mirror PR1's `video.ts` / `howto.ts` / `citation.ts` shape (Cheerio in, typed array out, scoped to `<article>` with whole-document fallback for non-Webflow templates).
-- AI extractors are wrapped per-element under a single feature flag `schema-ai-element-classifier` (default OFF). When on, they consume from the shared `AiBudget` (100 image classifications + 20 HowTo disambiguations per regenerate-all) and inherit token logging via `callAI({ feature: 'schema-ai-element-classifier', workspaceId })`.
+- AI extractors are wrapped per-element under a single feature flag `schema-ai-element-classifier` (default OFF). When on, they consume from the shared `AiBudget` (100 image classifications + 20 HowTo disambiguations per regenerate-all).
+- **Image classifier (vision)** bypasses `callAI`/`callOpenAI` and calls the OpenAI SDK directly via `openai.chat.completions.create()` — same pattern as `server/alttext.ts:120-136`. The `callAI` dispatcher's `messages` type is `content: string` only (no array support), and `callOpenAI` line 53 stringifies array content via `JSON.stringify` for cache-key purposes (which would mangle vision payloads). Path forward for future PRs: widen the helpers; PR2 takes the simpler bypass + manual `logTokenUsage()` call to inherit telemetry.
+- **HowTo disambiguator** (text-only) DOES use `callAI` — the dispatcher handles text prompts cleanly.
 - Schema templates extend `withBreadcrumb([primary, ...newNodes], pageData)` (verified array-accepting in PR1). Each new node has a synchronous pre-emission gate that requires every Google-required field to be populated before the node is added — same pattern as PR1's `canEmitVideo` gate.
 
-**Tech Stack:** TypeScript strict, Cheerio (HTML extraction), better-sqlite3 (page_elements table reused from PR1), Zod (PR1's `pageElementCatalogSchema` already covers PR2 fields), `callAI` dispatcher (server/ai.ts), `gpt-4.1-mini` (vision), Vitest, the existing `AiBudget` helper from PR1.
+**Tech Stack:** TypeScript strict, Cheerio (HTML extraction), better-sqlite3 (page_elements table reused from PR1), Zod (PR1's `pageElementCatalogSchema` already covers PR2 fields), `openai` SDK directly for vision (mirrors `server/alttext.ts`), `callAI` dispatcher for text-only AI prompts (`server/ai.ts`), `gpt-4.1-mini` (vision), Vitest, the existing `AiBudget` helper from PR1.
+
+**Verified-against-codebase corrections (caught before execution):**
+- `LeanGeneratorInput.aiBudget?` exists at line 66 of `server/schema/generator.ts` — already optional from PR1. ✅
+- `pageData.elements?: PageElementCatalog` exists at line 89 of `server/schema/data-sources.ts`. ✅
+- `workspaces` table has `(id, name, folder, created_at)` — NO `updated_at` column. INSERT statements in tests use only those 4 columns. ✅
+- `withBreadcrumb` already accepts arrays AND single objects (`local-business.ts:82` uses array form; `service.ts:36` uses single-object form). ✅
+- `ValidationFinding` shape is `{ severity, type, field, ruleId }` — confirmed at `shared/types/schema-validation.ts:9`. ✅
+- **Import paths from `server/schema/extractors/page-elements/`** are THREE `..` to reach `server/`: `'../../../feature-flags.js'`, `'../../../logger.js'`, `'../../../ai.js'` (verified against PR1's howto.ts which uses `'../../../../shared/types/...'` — four `..` to reach repo root + shared). ✅
+- `callAI.messages` type at `server/ai.ts:20` is `Array<{ role: 'user' | 'assistant'; content: string }>` — narrows content to string. **Vision MUST bypass.** ✅
+- `callOpenAI` accepts `content: string | Array<...>` per the interface BUT stringifies it at line 53 for cache-key calculation. Practical effect: vision payloads through the helper become a JSON-encoded string body, NOT an OpenAI message-content array. **Vision MUST bypass.** ✅
+- `openai` SDK initialization pattern: `client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })` per `server/alttext.ts:15`. PR2's image classifier mirrors this. ✅
+- `logTokenUsage()` is exported from `server/openai-helpers.ts:53` and accepts `{ promptTokens, completionTokens, totalTokens, model, feature, workspaceId, durationMs }`. PR2's image classifier calls it manually after each successful AI request. ✅
 
 **PR1 lessons applied throughout:**
 - Every new schema node has a pre-emission gate (Devin r2 BUG-0001 lesson) — never emit a node missing a required field.
@@ -1530,7 +1544,8 @@ git commit -m "feat(schema/extractors): wire images + tables + testimonials into
 **Model:** Sonnet
 
 **Behavior:**
-- Walks `images[]` produced by `extractImages($)`. For each image with `roleSource === 'fallback'` (ambiguous), tries to consume from `AiBudget`. If allowed, fetches the image (via `fetchImageAsBase64`) and calls `callAI({ provider: 'openai', model: 'gpt-4.1-mini', feature: 'schema-ai-element-classifier', workspaceId, messages: [vision content] })`. The reply is parsed for the role label.
+- Walks `images[]` produced by `extractImages($)`. For each image with `roleSource === 'fallback'` (ambiguous), tries to consume from `AiBudget`. If allowed, fetches the image (via `fetchImageAsBase64`) and calls `openai.chat.completions.create()` directly with vision message content (mirrors `server/alttext.ts:120-136` precedent — bypasses `callAI`/`callOpenAI` because both stringify array content). The reply is parsed for the role label.
+- After each successful call, manually invokes `logTokenUsage({ feature: 'schema-ai-element-classifier', workspaceId, ... })` so cost telemetry still flows into the existing pipeline.
 - Failure modes: budget exhausted → leave image as `roleSource:'fallback'`. Fetch returns null → same. AI returns invalid → same. AI returns valid role → upgrade to `roleSource:'ai'` with the new role.
 - Gated by `isFeatureEnabled('schema-ai-element-classifier')` — when off, the function is a no-op and returns the input unchanged.
 
@@ -1543,20 +1558,34 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createAiBudget } from '../../../../server/schema/extractors/page-elements/ai-budget.js';
 import type { PageImage } from '../../../../shared/types/page-elements.js';
 
+// We mock the OpenAI client + image-fetch + feature-flag at the boundary the
+// classifier uses. The classifier imports a `getOpenAIClient` lazy accessor
+// (defined in image-ai-classifier.ts) so the test can swap in a fake.
 vi.mock('../../../../server/feature-flags.js', () => ({
   isFeatureEnabled: vi.fn(),
-}));
-vi.mock('../../../../server/ai.js', () => ({
-  callAI: vi.fn(),
 }));
 vi.mock('../../../../server/schema/extractors/page-elements/image-fetch.js', () => ({
   fetchImageAsBase64: vi.fn(),
 }));
 
+const mockCreate = vi.fn();
+vi.mock('../../../../server/schema/extractors/page-elements/image-ai-classifier.js', async () => {
+  const actual = await vi.importActual<typeof import('../../../../server/schema/extractors/page-elements/image-ai-classifier.js')>(
+    '../../../../server/schema/extractors/page-elements/image-ai-classifier.js',
+  );
+  return {
+    ...actual,
+    // Override the internal openai client accessor so the test can intercept calls.
+    __setOpenAIClientForTest: (client: { chat: { completions: { create: typeof mockCreate } } }) => actual.__setOpenAIClientForTest(client),
+  };
+});
+
 import { isFeatureEnabled } from '../../../../server/feature-flags.js';
-import { callAI } from '../../../../server/ai.js';
 import { fetchImageAsBase64 } from '../../../../server/schema/extractors/page-elements/image-fetch.js';
-import { aiClassifyImages } from '../../../../server/schema/extractors/page-elements/image-ai-classifier.js';
+import { aiClassifyImages, __setOpenAIClientForTest } from '../../../../server/schema/extractors/page-elements/image-ai-classifier.js';
+
+// Inject a fake OpenAI client into the classifier module
+__setOpenAIClientForTest({ chat: { completions: { create: mockCreate } } });
 
 const ambiguousImage: PageImage = {
   src: 'https://example.com/img.jpg',
@@ -1567,9 +1596,18 @@ const ambiguousImage: PageImage = {
   height: 400,
 };
 
+function fakeChatResponse(text: string) {
+  return {
+    choices: [{ message: { content: text } }],
+    usage: { prompt_tokens: 100, completion_tokens: 5, total_tokens: 105 },
+    model: 'gpt-4.1-mini',
+  };
+}
+
 describe('aiClassifyImages', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockCreate.mockReset();
   });
 
   it('returns unchanged when feature flag is OFF (no AI calls)', async () => {
@@ -1577,7 +1615,7 @@ describe('aiClassifyImages', () => {
     const budget = createAiBudget(100);
     const result = await aiClassifyImages([ambiguousImage], { budget, workspaceId: 'ws-1' });
     expect(result).toEqual([ambiguousImage]);
-    expect(callAI).not.toHaveBeenCalled();
+    expect(mockCreate).not.toHaveBeenCalled();
   });
 
   it('returns unchanged when budget is 0', async () => {
@@ -1585,7 +1623,7 @@ describe('aiClassifyImages', () => {
     const budget = createAiBudget(0);
     const result = await aiClassifyImages([ambiguousImage], { budget, workspaceId: 'ws-1' });
     expect(result).toEqual([ambiguousImage]);
-    expect(callAI).not.toHaveBeenCalled();
+    expect(mockCreate).not.toHaveBeenCalled();
   });
 
   it('skips images that are not ambiguous (roleSource !== "fallback")', async () => {
@@ -1594,17 +1632,14 @@ describe('aiClassifyImages', () => {
     const budget = createAiBudget(100);
     const result = await aiClassifyImages([ruleClassified], { budget, workspaceId: 'ws-1' });
     expect(result).toEqual([ruleClassified]);
-    expect(callAI).not.toHaveBeenCalled();
+    expect(mockCreate).not.toHaveBeenCalled();
     expect(budget.used).toBe(0);
   });
 
   it('upgrades roleSource to "ai" + uses returned role on successful call', async () => {
     vi.mocked(isFeatureEnabled).mockReturnValue(true);
     vi.mocked(fetchImageAsBase64).mockResolvedValue('data:image/jpeg;base64,abc');
-    vi.mocked(callAI).mockResolvedValue({
-      text: '{"role":"informative"}',
-      tokens: { prompt: 100, completion: 5, total: 105 },
-    });
+    mockCreate.mockResolvedValue(fakeChatResponse('{"role":"informative"}'));
     const budget = createAiBudget(100);
     const result = await aiClassifyImages([ambiguousImage], { budget, workspaceId: 'ws-1' });
     expect(result[0].role).toBe('informative');
@@ -1615,10 +1650,7 @@ describe('aiClassifyImages', () => {
   it('reclassifies decorative based on AI response', async () => {
     vi.mocked(isFeatureEnabled).mockReturnValue(true);
     vi.mocked(fetchImageAsBase64).mockResolvedValue('data:image/jpeg;base64,abc');
-    vi.mocked(callAI).mockResolvedValue({
-      text: '{"role":"decorative"}',
-      tokens: { prompt: 100, completion: 5, total: 105 },
-    });
+    mockCreate.mockResolvedValue(fakeChatResponse('{"role":"decorative"}'));
     const budget = createAiBudget(100);
     const result = await aiClassifyImages([ambiguousImage], { budget, workspaceId: 'ws-1' });
     expect(result[0].role).toBe('decorative');
@@ -1628,7 +1660,7 @@ describe('aiClassifyImages', () => {
   it('leaves image unchanged on AI parse error (invalid JSON)', async () => {
     vi.mocked(isFeatureEnabled).mockReturnValue(true);
     vi.mocked(fetchImageAsBase64).mockResolvedValue('data:image/jpeg;base64,abc');
-    vi.mocked(callAI).mockResolvedValue({ text: 'not json', tokens: { prompt: 100, completion: 5, total: 105 } });
+    mockCreate.mockResolvedValue(fakeChatResponse('not json'));
     const budget = createAiBudget(100);
     const result = await aiClassifyImages([ambiguousImage], { budget, workspaceId: 'ws-1' });
     expect(result[0]).toEqual(ambiguousImage);
@@ -1639,10 +1671,7 @@ describe('aiClassifyImages', () => {
   it('leaves image unchanged on invalid role label', async () => {
     vi.mocked(isFeatureEnabled).mockReturnValue(true);
     vi.mocked(fetchImageAsBase64).mockResolvedValue('data:image/jpeg;base64,abc');
-    vi.mocked(callAI).mockResolvedValue({
-      text: '{"role":"nonsense"}',
-      tokens: { prompt: 100, completion: 5, total: 105 },
-    });
+    mockCreate.mockResolvedValue(fakeChatResponse('{"role":"nonsense"}'));
     const budget = createAiBudget(100);
     const result = await aiClassifyImages([ambiguousImage], { budget, workspaceId: 'ws-1' });
     expect(result[0]).toEqual(ambiguousImage);
@@ -1654,7 +1683,7 @@ describe('aiClassifyImages', () => {
     const budget = createAiBudget(100);
     const result = await aiClassifyImages([ambiguousImage], { budget, workspaceId: 'ws-1' });
     expect(result[0]).toEqual(ambiguousImage);
-    expect(callAI).not.toHaveBeenCalled();
+    expect(mockCreate).not.toHaveBeenCalled();
     // Budget NOT consumed — fetch failed before AI call
     expect(budget.used).toBe(0);
   });
@@ -1662,14 +1691,11 @@ describe('aiClassifyImages', () => {
   it('stops calling AI once budget exhausts mid-loop', async () => {
     vi.mocked(isFeatureEnabled).mockReturnValue(true);
     vi.mocked(fetchImageAsBase64).mockResolvedValue('data:image/jpeg;base64,abc');
-    vi.mocked(callAI).mockResolvedValue({
-      text: '{"role":"informative"}',
-      tokens: { prompt: 100, completion: 5, total: 105 },
-    });
+    mockCreate.mockResolvedValue(fakeChatResponse('{"role":"informative"}'));
     const budget = createAiBudget(2);
     const inputs = [ambiguousImage, ambiguousImage, ambiguousImage, ambiguousImage];
     const result = await aiClassifyImages(inputs, { budget, workspaceId: 'ws-1' });
-    expect(callAI).toHaveBeenCalledTimes(2);
+    expect(mockCreate).toHaveBeenCalledTimes(2);
     expect(result.filter(i => i.roleSource === 'ai').length).toBe(2);
     expect(result.filter(i => i.roleSource === 'fallback').length).toBe(2);
     expect(budget.exhausted).toBe(true);
@@ -1693,6 +1719,14 @@ Create `server/schema/extractors/page-elements/image-ai-classifier.ts`:
  * (roleSource === 'fallback'). Budgeted: consumes one AiBudget slot
  * per image. Behind the schema-ai-element-classifier feature flag.
  *
+ * Calls OpenAI's chat.completions.create() directly with vision content.
+ * Bypasses callAI/callOpenAI because both stringify message content arrays
+ * (callAI's `messages.content` is typed `string`-only; callOpenAI line 53
+ * JSON.stringify's array content for cache-key purposes — both mangle vision
+ * payloads). Mirrors server/alttext.ts:120-136 precedent. Manually invokes
+ * logTokenUsage() after each successful call so cost telemetry still flows
+ * into the standard pipeline.
+ *
  * Failure modes (all leave the image unchanged):
  *   - feature flag off
  *   - budget exhausted
@@ -1700,9 +1734,10 @@ Create `server/schema/extractors/page-elements/image-ai-classifier.ts`:
  *   - AI returns non-JSON
  *   - AI returns a role outside the {hero, informative, decorative} set
  */
+import OpenAI from 'openai';
 import type { PageImage } from '../../../../shared/types/page-elements.js';
-import { isFeatureEnabled } from '../../feature-flags.js';
-import { callAI } from '../../../ai.js';
+import { isFeatureEnabled } from '../../../feature-flags.js';
+import { logTokenUsage } from '../../../openai-helpers.js';
 import { fetchImageAsBase64 } from './image-fetch.js';
 import { tryConsumeAiBudget } from './ai-budget.js';
 import type { AiBudget } from './ai-budget.js';
@@ -1711,6 +1746,7 @@ import { createLogger } from '../../../logger.js';
 const log = createLogger('schema/extractors/image-ai-classifier');
 
 const VALID_ROLES = new Set<PageImage['role']>(['hero', 'informative', 'decorative']);
+const MODEL = 'gpt-4.1-mini' as const;
 
 const CLASSIFIER_PROMPT = `Classify this image into ONE of three roles for SEO schema markup:
 - "hero": the page's lead image, conveying the primary subject. Usually large and visually prominent.
@@ -1718,6 +1754,20 @@ const CLASSIFIER_PROMPT = `Classify this image into ONE of three roles for SEO s
 - "decorative": background patterns, spacers, brand watermarks, or stock photography that adds no factual content.
 
 Respond with strict JSON only: {"role":"hero"|"informative"|"decorative"}. No prose.`;
+
+// Lazy-initialized client + test injection seam.
+type OpenAIClient = { chat: { completions: { create: (...args: unknown[]) => Promise<unknown> } } };
+let _client: OpenAIClient | null = null;
+function getClient(): OpenAIClient {
+  if (_client) return _client;
+  _client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) as unknown as OpenAIClient;
+  return _client;
+}
+
+/** Test-only: inject a fake OpenAI client. Not exported in production builds. */
+export function __setOpenAIClientForTest(client: OpenAIClient): void {
+  _client = client;
+}
 
 export interface AiClassifyImagesOpts {
   budget: AiBudget;
@@ -1757,13 +1807,11 @@ export async function aiClassifyImages(
       continue;
     }
 
+    const startedAt = Date.now();
     try {
-      const response = await callAI({
-        provider: 'openai',
-        model: 'gpt-4.1-mini',
-        feature: 'schema-ai-element-classifier',
-        workspaceId: opts.workspaceId,
-        maxTokens: 50,
+      const response = await getClient().chat.completions.create({
+        model: MODEL,
+        max_tokens: 50,
         temperature: 0,
         messages: [{
           role: 'user',
@@ -1772,8 +1820,27 @@ export async function aiClassifyImages(
             { type: 'text', text: CLASSIFIER_PROMPT },
           ],
         }],
-      });
-      const parsed: AiResponse = JSON.parse(response.text);
+      }) as {
+        choices?: Array<{ message?: { content?: string | null } }>;
+        usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+      };
+
+      // Manual token logging — bypassed callAI, so we plug into telemetry directly.
+      const usage = response.usage;
+      if (usage && opts.workspaceId !== undefined) {
+        logTokenUsage({
+          promptTokens: usage.prompt_tokens ?? 0,
+          completionTokens: usage.completion_tokens ?? 0,
+          totalTokens: usage.total_tokens ?? 0,
+          model: MODEL,
+          feature: 'schema-ai-element-classifier',
+          workspaceId: opts.workspaceId,
+          durationMs: Date.now() - startedAt,
+        });
+      }
+
+      const text = response.choices?.[0]?.message?.content ?? '';
+      const parsed: AiResponse = JSON.parse(text);
       if (parsed.role && VALID_ROLES.has(parsed.role as PageImage['role'])) {
         result.push({
           ...image,
@@ -2035,7 +2102,7 @@ Create `server/schema/extractors/page-elements/howto-ai-fallback.ts`:
  * the disambiguator falls through to no-op.
  */
 import type { PageList, HowToStep } from '../../../../shared/types/page-elements.js';
-import { isFeatureEnabled } from '../../feature-flags.js';
+import { isFeatureEnabled } from '../../../feature-flags.js';
 import { callAI } from '../../../ai.js';
 import { tryConsumeAiBudget } from './ai-budget.js';
 import type { AiBudget } from './ai-budget.js';
