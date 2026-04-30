@@ -17,6 +17,7 @@
  */
 import type * as cheerio from 'cheerio';
 import type { PageList, HowToStep } from '../../../../shared/types/page-elements.js';
+import { contentScope } from './content-scope.js';
 
 const HOWTO_RE = /\b(how\s+to|step-by-step|tutorial|walkthrough)\b/i;
 const MIN_HOWTO_STEPS = 3;
@@ -40,11 +41,7 @@ function findNearbyHowToHeading($: cheerio.CheerioAPI, $list: ReturnType<cheerio
 export function extractLists($: cheerio.CheerioAPI): PageList[] {
   const lists: PageList[] = [];
 
-  // Scope to <article> for consistency with citation extractor — keeps
-  // navigational/footer lists out of diagnostics and HowTo candidates.
-  // Falls back to whole document if no <article> is present (so we still
-  // capture lists on landing pages that don't use the <article> tag).
-  const $scope = $('article').length > 0 ? $('article ol, article ul') : $('ol, ul');
+  const $scope = contentScope($).find('ol, ul');
   $scope.each((_, el) => {
     const $list = $(el);
     const kind = el.tagName === 'ol' ? 'ordered' : 'unordered';
