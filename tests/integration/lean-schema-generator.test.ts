@@ -572,3 +572,48 @@ describe('lean schema generator — page-element enrichment (PR1)', () => {
     db.prepare('DELETE FROM page_elements WHERE workspace_id = ?').run(wsId);
   });
 });
+
+describe('lean schema generator — PR2 enrichment', () => {
+  beforeEach(() => {
+    vi.mocked(callAI).mockClear();
+    vi.mocked(callAI).mockResolvedValue({
+      text: 'A clean description.',
+      tokens: { prompt: 100, completion: 20, total: 120 },
+    });
+    const wsId = 'ws_test_pr2_service_mixed';
+    db.prepare(`INSERT OR IGNORE INTO workspaces (id, name, folder, created_at) VALUES (?, ?, ?, ?)`)
+      .run(wsId, 'Test PR2 mixed', wsId, new Date().toISOString());
+    db.prepare('DELETE FROM page_elements WHERE workspace_id = ?').run(wsId);
+  });
+
+  it('Service page emits Review[] + AggregateRating + ImageGallery + Table + BreadcrumbList together with unique @ids', async () => {
+    const html = fixturePageElementsHtml('webflow-mixed-elements-pr2.html');
+    const wsId = 'ws_test_pr2_service_mixed';
+    const out = await generateLeanSchema({
+      ...baseInput,
+      pageId: 'pe-pr2-service',
+      pageMeta: {
+        title: 'Web Design Service',
+        slug: 'web-design',
+        publishedPath: '/services/web-design',
+        seo: { description: 'Premium Webflow build engagement.' },
+        sourcePublishedAt: null,
+        lastPublished: '2026-04-30T00:00:00Z', // datePublished available for VideoObject gate (not relevant here, but keeps Article/Service emit happy)
+      },
+      html,
+      baseUrl: 'https://example.com',
+      workspace: { ...baseInput.workspace, id: wsId },
+    });
+    const tpl = out.suggestedSchemas[0].template as Record<string, unknown>;
+    const graph = tpl['@graph'] as Array<Record<string, unknown>>;
+    const types = graph.map(n => n['@type']);
+    expect(types).toEqual(expect.arrayContaining(['Service', 'Review', 'ImageGallery', 'BreadcrumbList']));
+    const ids = graph.map(n => n['@id']).filter(Boolean) as string[];
+    expect(new Set(ids).size).toBe(ids.length); // all unique
+    const service = graph.find(n => n['@type'] === 'Service')!;
+    expect(service.aggregateRating).toBeDefined();
+    expect(service.mainEntity).toMatchObject({ '@type': 'Table' });
+    expect(graph.filter(n => n['@type'] === 'Review')).toHaveLength(2);
+    db.prepare('DELETE FROM page_elements WHERE workspace_id = ?').run(wsId);
+  });
+});
