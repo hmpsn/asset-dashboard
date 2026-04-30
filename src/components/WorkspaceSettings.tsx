@@ -81,6 +81,15 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
     const param = searchParams.get('tab');
     return (VALID_SECTION_TABS as readonly string[]).includes(param ?? '') ? (param as SectionTab) : 'connections';
   });
+  // Sync tab state with subsequent ?tab= URL changes (e.g., when SchemaImpactRow's
+  // Edit→ link navigates to ?tab=features while already on this page).
+  // (Devin Review BUG-0001 round 3 on PR #379.)
+  useEffect(() => {
+    const param = searchParams.get('tab');
+    if (param && (VALID_SECTION_TABS as readonly string[]).includes(param) && param !== tab) {
+      setTab(param as SectionTab);
+    }
+  }, [searchParams, tab]);
   const [ws, setWs] = useState<WorkspaceData | null>(null);
   const [googleStatus, setGoogleStatus] = useState<{ connected: boolean; configured: boolean } | null>(null);
   const [gscSites, setGscSites] = useState<GscSite[]>([]);

@@ -383,19 +383,20 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
             <input
               type="checkbox"
               data-schema-deeplink="siteHasSearch"
-              defaultChecked={!!ws?.siteHasSearch}
+              // Controlled — reads current ws state on every render so the box
+              // reflects the loaded value even if FeaturesTab mounts before ws
+              // resolves (e.g. via deep-link). (Devin Review BUG-0002 round 3.)
+              checked={!!ws?.siteHasSearch}
               onChange={async (e) => {
-                // Capture sync values before await — currentTarget access after await
-                // is implementation-defined in React's synthetic event lifecycle.
-                const target = e.currentTarget;
-                const nextChecked = target.checked;
+                // Capture sync value before await — currentTarget access after
+                // await is implementation-defined in React's synthetic event lifecycle.
+                const nextChecked = e.currentTarget.checked;
                 try {
                   await patchWorkspace({ siteHasSearch: nextChecked });
                   toast(nextChecked ? 'SearchAction will emit on next regenerate' : 'SearchAction emission disabled');
                 } catch (err) {
                   toast('Failed to update — please try again');
-                  // Revert visual state on failure
-                  target.checked = !nextChecked;
+                  // No manual revert needed — controlled component re-reads ws on next render.
                   throw err;
                 }
               }}
