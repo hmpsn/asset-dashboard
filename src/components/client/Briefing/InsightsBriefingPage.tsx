@@ -3,8 +3,8 @@
 //
 // Reading rhythm (paid tier):
 //   [WeeklyOpener — Premium 2.5e, optional] → DateLine → IssueSummaryLine
-//     → ActionQueueStrip → PulseStrip → HeroStoryCard → DataSpread
-//     → RecommendedForYou → SecondaryStoryRow list
+//     → ActionQueueStrip → PulseStrip → MonthlyDigestContent (snapshot)
+//     → DataSpread → RecommendedForYou → SecondaryStoryRow list (incl. hero)
 //
 // Free tier renders unchanged from Phase 2:
 //   ActionQueueStrip → FreeTierUpgradeCTA → MonthlyDigestContent
@@ -26,7 +26,6 @@ import { useClientSearch } from '../../../hooks/client/useClientSearch';
 import { clientPath } from '../../../routes';
 import type { BriefingRecommendation, BriefingStory } from '../../../../shared/types/briefing';
 import { ActionQueueStrip, computeStaleness } from './ActionQueueStrip';
-import { HeroStoryCard } from './HeroStoryCard';
 import { SecondaryStoryRow } from './SecondaryStoryRow';
 import { FreeTierUpgradeCTA } from './FreeTierUpgradeCTA';
 import { MonthlyDigestContent } from '../MonthlyDigest';
@@ -66,8 +65,13 @@ export function InsightsBriefingPage({
   // ── Briefing draft (paid only) ──
   const { data: briefing, isLoading } = useClientBriefing(workspaceId, !isFree);
 
-  // ── Free-tier digest tease ──
-  const { data: digest, isLoading: digestLoading } = useMonthlyDigest(isFree ? workspaceId : '');
+  // ── Monthly digest snapshot (BOTH tiers) ──
+  // Phase 2.5b shipped with the digest fetched only on the free branch
+  // (un-gated tease). Per user direction, the snapshot replaces the
+  // single-story `<HeroStoryCard>` at the top of the paid magazine —
+  // matches the legacy InsightsDigest UX clients were used to. Both
+  // tiers now fetch; the composer's render path branches on tier.
+  const { data: digest, isLoading: digestLoading } = useMonthlyDigest(workspaceId);
 
   // ── Pulse data sources (paid only) ──
   // Audit summary drives Site Health; GSC drives clicks/impressions/avg-position;
@@ -210,11 +214,19 @@ export function InsightsBriefingPage({
   }
 
   // ── Paid-tier full magazine layout ──
-  // Two passes (find + filter) instead of three .filter() iterations. Phase 1
-  // Zod enforces exactly 1 headline story per briefing.
-  const hero = briefing.stories.find((s) => s.isHeadline);
-  const secondary = briefing.stories.filter((s) => !s.isHeadline);
+  //
+  // Per-user direction (post-2.5e): the single-story `<HeroStoryCard>`
+  // spotlight is replaced with a monthly `<MonthlyDigestContent>`
+  // snapshot — a high-level period overview matching the legacy
+  // InsightsDigest UX clients were already accustomed to. The hero
+  // story doesn't disappear: it folds back into the watch list below
+  // so the in-depth deterministic story still surfaces. The Phase
+  // 2.5e AI hero punch still mutates `stories[heroIdx].headline`
+  // server-side; the punched headline now appears in the watch-list
+  // row instead of the hero card.
+  const allStories = briefing.stories;
   const recommendations: BriefingRecommendation[] = briefing.recommendations ?? [];
+  const hasDigest = !!digest && !!digest.month;
 
   return (
     <div className="space-y-6">
@@ -232,38 +244,39 @@ export function InsightsBriefingPage({
         oldestDaysPending={staleness.oldestDaysPending}
       />
       <PulseStrip data={pulseData} isLoading={!pulseData && (ga4.isLoading || search.isLoading)} />
-      {hero && (
-        <HeroStoryCard
-          key={hero.id}
-          story={hero}
-          workspaceId={workspaceId}
-          betaMode={betaMode}
-        />
-      )}
+      {/* High-level snapshot — replaces the prior `<HeroStoryCard>` slot.
+          Loading state during digest fetch; silently omitted if the
+          backend returns the empty-digest sentinel (no `month`). */}
+      {digestLoading ? (
+        <LoadingState message="Loading this period's snapshot..." />
+      ) : hasDigest ? (
+        <MonthlyDigestContent digest={digest} />
+      ) : null}
       <DataSpread wins={spreadColumns.wins} risks={spreadColumns.risks} />
       <RecommendedForYou
         recommendations={recommendations}
         tier={effectiveTier}
         onRequestBrief={onRequestBrief}
       />
-      {secondary.length > 0 && (
-        <div className="border-t border-[var(--brand-border)] pt-4">
-          <h3 className="t-label text-[var(--brand-text-muted)] tracking-wider mb-3 flex items-center gap-2">
-            <Icon as={Sparkles} size="sm" className="text-teal-400" />
-            Also this week
-          </h3>
-          <div className="space-y-0">
-            {secondary.map((s) => (
-              <SecondaryStoryRow
-                key={s.id}
-                story={s}
-                workspaceId={workspaceId}
-                betaMode={betaMode}
-              />
-            ))}
-          </div>
+      {/* allStories is briefing.stories — the early-return at the top
+          of the paid-tier block guarantees length ≥ 1 here, so no
+          conditional wrapper is needed. */}
+      <div className="border-t border-[var(--brand-border)] pt-4">
+        <h3 className="t-label text-[var(--brand-text-muted)] tracking-wider mb-3 flex items-center gap-2">
+          <Icon as={Sparkles} size="sm" className="text-teal-400" />
+          Also this week
+        </h3>
+        <div className="space-y-0">
+          {allStories.map((s) => (
+            <SecondaryStoryRow
+              key={s.id}
+              story={s}
+              workspaceId={workspaceId}
+              betaMode={betaMode}
+            />
+          ))}
         </div>
-      )}
+      </div>
     </div>
   );
 }
