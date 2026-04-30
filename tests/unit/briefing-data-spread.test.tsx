@@ -65,9 +65,19 @@ describe('spreadItemFromStory', () => {
         expect(item?.tone).toBe('risk');
       });
 
-      it('infers "risk" when first metric value is unsigned (e.g., "#11→#15")', () => {
+      it('returns null when first metric value is unsigned (e.g., raw counts like "2")', () => {
+        // Unsigned numeric metrics carry no tone signal; the helper drops
+        // them from the spread rather than mis-classifying as 'risk'.
         const item = spreadItemFromStory(
-          story({ category: 'period_change', metrics: [metric('#11→#15', 'position')] }),
+          story({ category: 'period_change', metrics: [metric('2', 'new pages indexed')] }),
+          null,
+        );
+        expect(item).toBeNull();
+      });
+
+      it('infers "risk" when first metric value uses unicode minus (U+2212)', () => {
+        const item = spreadItemFromStory(
+          story({ category: 'period_change', metrics: [metric('−8%', 'MoM clicks')] }),
           null,
         );
         expect(item?.tone).toBe('risk');

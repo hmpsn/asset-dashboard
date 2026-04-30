@@ -42,7 +42,10 @@ export function generateIssueSummary(
 ): string {
   const hero = stories.find((s) => s.isHeadline);
   const heroCategory = hero?.category;
-  const leadPhrase = heroCategory ? LEAD_PHRASES[heroCategory] : NEUTRAL_LEAD;
+  // `?? NEUTRAL_LEAD` guards a future BriefingCategory addition that hasn't
+  // been wired into LEAD_PHRASES yet — without it the lookup would return
+  // `undefined` and render "undefined, …" in the summary.
+  const leadPhrase = (heroCategory && LEAD_PHRASES[heroCategory]) ?? NEUTRAL_LEAD;
 
   // Watch-list (non-headline) breakdown — risks vs everything-else. We treat
   // "risk" + "competitive" as risks; "win" + "opportunity" + "period_change"

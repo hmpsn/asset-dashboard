@@ -9,8 +9,8 @@
 //   premium → "Generate Brief (included) →" teal CTA with check icon per row
 
 import { useState, type ReactNode } from 'react';
-import { BarChart3, Eye, ArrowUpRight, Sparkles, Lock, Check, Swords, MessageCircleQuestion } from 'lucide-react';
-import { SectionCard, Icon } from '../../ui';
+import { BarChart3, Eye, ArrowUpRight, Sparkles, Check, Swords, MessageCircleQuestion } from 'lucide-react';
+import { SectionCard, Icon, TierGate } from '../../ui';
 import { TrendBadge } from '../../ui/TrendBadge';
 import { fmtNum } from '../../../utils/formatNumbers';
 import { kdFraming, kdTooltip } from '../../../lib/kdFraming';
@@ -26,10 +26,6 @@ export interface RecommendedForYouProps {
    * client pricing modal flow. Receives the recommendation that was clicked.
    */
   onRequestBrief: (rec: BriefingRecommendation) => void;
-  /**
-   * Called when a Free-tier user clicks the upgrade CTA.
-   */
-  onUpgrade?: () => void;
 }
 
 // File-local helpers — NOT shared utils (exclusive file ownership).
@@ -66,7 +62,6 @@ export function RecommendedForYou({
   recommendations,
   tier,
   onRequestBrief,
-  onUpgrade,
 }: RecommendedForYouProps): ReactNode {
   const [expanded, setExpanded] = useState(false);
 
@@ -75,44 +70,20 @@ export function RecommendedForYou({
   const visible = expanded ? recommendations : recommendations.slice(0, VISIBLE_COUNT);
   const hiddenCount = recommendations.length - VISIBLE_COUNT;
 
-  // Free tier: replace row list with locked upgrade CTA
-  if (tier === 'free') {
-    return (
-      <SectionCard
-        title="RECOMMENDED FOR YOU"
-        titleIcon={<Icon as={Lock} size="sm" className="text-teal-400" />}
-        variant="default"
-      >
-        <div className="flex flex-col items-center gap-4 py-6 text-center">
-          <div className="w-10 h-10 rounded-full bg-teal-500/10 flex items-center justify-center">
-            <Icon as={Lock} size="lg" className="text-teal-400" />
-          </div>
-          <div>
-            <p className="t-body font-semibold text-[var(--brand-text-bright)] mb-1">
-              {recommendations.length} content {recommendations.length === 1 ? 'opportunity' : 'opportunities'} locked
-            </p>
-            <p className="t-caption text-[var(--brand-text-muted)] max-w-sm">
-              Upgrade to Growth to access content briefs and rank for these keywords.
-            </p>
-          </div>
-          {onUpgrade && (
-            <button
-              onClick={onUpgrade}
-              className="flex items-center gap-2 px-4 py-2 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-ui font-medium text-teal-300 hover:bg-teal-600/40 transition-all"
-            >
-              <Icon as={Sparkles} size="sm" className="text-teal-300" />
-              Upgrade to Growth
-            </button>
-          )}
-        </div>
-      </SectionCard>
-    );
-  }
-
+  // Free tier wraps the SAME render path in <TierGate>, which blurs the rows
+  // and overlays the canonical upgrade CTA. The Reuse Map mandates
+  // <TierGate> for free-tier gating; rolling our own block bypasses the
+  // platform's tier-upgrade event flow.
   return (
-    <SectionCard title="RECOMMENDED FOR YOU" variant="default">
+    <TierGate
+      tier={tier}
+      required="growth"
+      feature="Recommended content opportunities"
+      teaser={`${recommendations.length} content ${recommendations.length === 1 ? 'opportunity' : 'opportunities'} ready when you upgrade.`}
+    >
+      <SectionCard title="RECOMMENDED FOR YOU" variant="default">
       <div className="space-y-2">
-        {visible.map((rec, i) => {
+        {visible.map((rec) => {
           const prioColor =
             rec.priority === 'high'
               ? 'text-red-400 bg-red-500/10 border-red-500/20'
@@ -122,7 +93,7 @@ export function RecommendedForYou({
 
           return (
             <div
-              key={i}
+              key={rec.targetKeyword}
               className="px-3 py-2.5 bg-[var(--surface-3)]/40 rounded-[var(--radius-lg)] border border-[var(--brand-border)]"
             >
               {/* Row 1: topic + opportunity score + intent/priority/pageType badges */}
@@ -239,22 +210,22 @@ export function RecommendedForYou({
                 {Array.isArray(rec.serpFeatures) && rec.serpFeatures.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {rec.serpFeatures.includes('featured_snippet') && (
-                      <span className="t-micro px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 text-blue-400 border border-blue-500/20">
                         ⬜ Snippet
                       </span>
                     )}
                     {rec.serpFeatures.includes('people_also_ask') && (
-                      <span className="t-micro px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 text-blue-400 border border-blue-500/20">
                         ❓ PAA
                       </span>
                     )}
                     {rec.serpFeatures.includes('video') && (
-                      <span className="t-micro px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 text-blue-400 border border-blue-500/20">
                         ▶ Video
                       </span>
                     )}
                     {rec.serpFeatures.includes('local_pack') && (
-                      <span className="t-micro px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 text-blue-400 border border-blue-500/20">
                         📍 Local
                       </span>
                     )}
@@ -268,23 +239,27 @@ export function RecommendedForYou({
                 )}
               </div>
 
-              {/* Row 4: SERP targeting tips */}
+              {/* Row 4: SERP targeting tips. Amber = warning/medium-priority
+                  per the palette; replaces admin's yellow which isn't on the
+                  Four Laws palette for client-facing components. */}
               {rec.serpTargeting && rec.serpTargeting.length > 0 && (
-                <div className="mt-1.5 pl-2 border-l-2 border-yellow-500/20">
-                  {rec.serpTargeting.map((tip, ri) => (
-                    <div key={ri} className="t-caption-sm text-yellow-400/80 leading-relaxed">
+                <div className="mt-1.5 pl-2 border-l-2 border-amber-500/20">
+                  {rec.serpTargeting.map((tip) => (
+                    <div key={tip} className="t-caption-sm text-amber-400/80 leading-relaxed">
                       &rarr; {tip}
                     </div>
                   ))}
                 </div>
               )}
 
-              {/* Row 5: question keywords */}
+              {/* Row 5: question keywords. Muted text — these are content
+                  metadata, not navigational data (cyan would mis-key the
+                  semantic per BRAND_DESIGN_LANGUAGE). */}
               {rec.questionKeywords && rec.questionKeywords.length > 0 && (
                 <div className="flex items-center gap-1.5 flex-wrap mt-1">
-                  <Icon as={MessageCircleQuestion} size="sm" className="text-cyan-400 flex-shrink-0" />
-                  {rec.questionKeywords.map((q, qi) => (
-                    <span key={qi} className="t-caption-sm text-cyan-400/80 italic">
+                  <Icon as={MessageCircleQuestion} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
+                  {rec.questionKeywords.map((q) => (
+                    <span key={q} className="t-caption-sm text-[var(--brand-text-muted)] italic">
                       &ldquo;{q}&rdquo;
                     </span>
                   ))}
@@ -318,6 +293,7 @@ export function RecommendedForYou({
           )}
         </div>
       )}
-    </SectionCard>
+      </SectionCard>
+    </TierGate>
   );
 }

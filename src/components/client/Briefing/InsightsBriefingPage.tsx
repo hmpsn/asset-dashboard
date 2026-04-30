@@ -18,7 +18,6 @@ import { useMonthlyDigest } from '../../../hooks/client/useMonthlyDigest';
 import {
   useClientApprovals,
   useClientContentRequests,
-  useClientContentPlan,
   useClientAuditSummary,
 } from '../../../hooks/client';
 import { useClientGA4 } from '../../../hooks/client/useClientGA4';
@@ -77,34 +76,26 @@ export function InsightsBriefingPage({
   const search = useClientSearch(workspaceId, PULSE_DAYS, undefined, !isFree);
 
   // ── Stale-item escalation sources (paid only) ──
-  // Each hook returns timestamped raw items. The composer computes staleness
-  // (>7d age) for the action strip's escalation pill. Free tier skips this —
-  // the strip would render but with no escalation.
+  // Approvals expose `createdAt`; content requests expose `requestedAt`. The
+  // composer collects ms-epoch timestamps for both and lets `computeStaleness`
+  // count items >7d old + the oldest age. Content-plan review cells don't
+  // expose timestamps via the public endpoint today, so they're omitted from
+  // the staleness signal. Free tier skips this — the strip renders unchanged.
   const { data: approvals = [] } = useClientApprovals(workspaceId, !isFree);
   const { data: contentRequests = [] } = useClientContentRequests(workspaceId, !isFree);
-  const { data: contentPlan } = useClientContentPlan(workspaceId, !isFree);
 
-  // Approvals expose `createdAt` (ISO string) — convert to ms epoch.
-  // Content requests expose `createdAt` (ISO). Content-plan review cells don't
-  // expose timestamps via the public endpoint today; fall back to "no stale
-  // signal" for that bucket. (When the public endpoint surfaces cell timestamps,
-  // it lands here without a prop change.)
   const staleTimestamps: number[] = [];
   for (const a of approvals) {
-    const ts = parseTs((a as { createdAt?: string | number }).createdAt);
+    const ts = parseTs(a.createdAt);
     if (ts !== null) staleTimestamps.push(ts);
   }
   for (const r of contentRequests) {
     if (r.status === 'client_review' || r.status === 'post_review') {
-      const ts = parseTs((r as { createdAt?: string | number }).createdAt);
+      const ts = parseTs(r.requestedAt);
       if (ts !== null) staleTimestamps.push(ts);
     }
   }
   const staleness = computeStaleness(staleTimestamps);
-  // contentPlan.summary.reviewCells contributes count but no timestamp; if any
-  // are present we still want at least baseline staleness (assume just-now,
-  // safe default). We deliberately do not estimate ages we don't know.
-  void contentPlan;
 
   // ── Pulse data assembly ──
   const pulseData: PulseStripData | null =
@@ -131,13 +122,13 @@ export function InsightsBriefingPage({
           },
           avgPosition: {
             current: search.overview?.avgPosition ?? null,
-            // GSC change.position is the raw delta (current - previous). Lower
-            // position is better, so the StatCard's invertDelta=true flips the
-            // sign for color rendering. We pass the raw delta unchanged.
-            delta:
-              search.comparison?.change.position != null
-                ? -search.comparison.change.position // negate so positive = improvement
-                : null,
+            // GSC's `change.position` is `current - previous` — negative means
+            // rank improved (lower number = better). PulseStrip passes this
+            // raw delta to <StatCard invertDelta>, which flips the color
+            // semantics: negative→emerald (improvement), positive→red. Do
+            // NOT pre-negate here; that would double-invert and render
+            // improvements red.
+            delta: search.comparison?.change.position ?? null,
           },
         }
       : null;
@@ -149,12 +140,11 @@ export function InsightsBriefingPage({
   // existing brief-request flow lives. We keep the modal trigger out of this
   // composer (no new state machine in 2.5b); the strategy tab's content-gap
   // section has its own request flow that the user lands in.
+  // Free-tier upgrade is handled by <TierGate>'s built-in 'tier-upgrade'
+  // custom event — no inline callback needed here.
   const onRequestBrief = (rec: BriefingRecommendation) => {
     void rec;
     navigate(`${clientPath(workspaceId, 'strategy', betaMode)}?tab=content-gaps`);
-  };
-  const onUpgrade = () => {
-    navigate(`${clientPath(workspaceId, 'inbox', betaMode)}?tab=upgrade`);
   };
 
   // ── Free-tier branch: unchanged from Phase 2 ──
@@ -244,7 +234,6 @@ export function InsightsBriefingPage({
         recommendations={recommendations}
         tier={effectiveTier}
         onRequestBrief={onRequestBrief}
-        onUpgrade={onUpgrade}
       />
       {secondary.length > 0 && (
         <div className="border-t border-[var(--brand-border)] pt-4">

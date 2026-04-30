@@ -73,12 +73,18 @@ export function spreadItemFromStory(
       tone = 'risk';
       break;
     case 'period_change': {
+      // The metric's leading sign is the only stable tone signal:
+      //   '+12%'  → win
+      //   '-8%'   → risk
+      //   '2'     → unsigned (e.g. raw count) — no clear tone, drop from spread
+      // An unsigned numeric metric like "2" or "8.6K" used to fall through to
+      // 'risk' which mis-classified neutral counts. Now drops cleanly.
       const firstMetric = story.metrics[0];
-      if (!firstMetric) {
-        // No metrics → drop from spread
-        return null;
-      }
-      tone = firstMetric.value.startsWith('+') ? 'win' : 'risk';
+      if (!firstMetric) return null;
+      const lead = firstMetric.value.charAt(0);
+      if (lead === '+') tone = 'win';
+      else if (lead === '−' || lead === '-') tone = 'risk'; // U+2212 minus + ASCII hyphen
+      else return null;
       break;
     }
     default: {
@@ -152,10 +158,11 @@ function SpreadItemRow({ item }: SpreadItemRowProps): ReactNode {
   );
 
   if (item.drillInUrl) {
+    const target = item.drillInUrl;
     return (
       <button
         type="button"
-        onClick={() => navigate(item.drillInUrl as string)}
+        onClick={() => navigate(target)}
         className="w-full text-left flex flex-col gap-0.5 px-2 py-1.5 rounded-[var(--radius-lg)] hover:bg-[var(--surface-3)]/60 transition-colors cursor-pointer"
       >
         {content}

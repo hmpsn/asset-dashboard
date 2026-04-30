@@ -8,10 +8,14 @@ interface DateLineProps {
 }
 
 export function DateLine({ weekOf, issueNumber }: DateLineProps): ReactNode {
+  // `new Date('bad-stringT00:00:00Z')` returns Invalid Date WITHOUT throwing,
+  // and `toLocaleDateString` on it returns the literal "Invalid Date". A
+  // try/catch can't catch this — only an explicit isNaN(timestamp) check
+  // detects the malformed input. Falls back to the raw uppercased string so
+  // the dateline still renders something the reader can recognize.
   let formatted = weekOf.toUpperCase();
-
-  try {
-    const d = new Date(`${weekOf}T00:00:00Z`);
+  const d = new Date(`${weekOf}T00:00:00Z`);
+  if (!Number.isNaN(d.getTime())) {
     const dateStr = d.toLocaleDateString('en-US', {
       month: 'short',
       day: '2-digit',
@@ -19,9 +23,6 @@ export function DateLine({ weekOf, issueNumber }: DateLineProps): ReactNode {
       timeZone: 'UTC',
     });
     formatted = `WEEK OF ${dateStr}`.toUpperCase();
-  } catch {
-    // If parse fails, render raw string uppercase
-    formatted = weekOf.toUpperCase();
   }
 
   return (

@@ -58,7 +58,7 @@ function PulseSkeletonCell() {
  */
 export function PulseStrip({ data, isLoading }: PulseStripProps): ReactNode {
   // Loading state: render 4 skeleton cells
-  if (data === null && isLoading === true) {
+  if (data === null && isLoading) {
     return (
       <SectionCard
         title="THE PULSE"
@@ -121,7 +121,7 @@ export function PulseStrip({ data, isLoading }: PulseStripProps): ReactNode {
                 {siteHealth.delta !== null && siteHealth.delta !== 0 && (
                   <span
                     className={`t-caption-sm font-medium ${
-                      siteHealth.delta > 0 ? 'text-emerald-400/80' : 'text-red-400/80'
+                      siteHealth.delta > 0 ? 'text-emerald-400' : 'text-red-400'
                     }`}
                   >
                     {siteHealth.delta > 0 ? '+' : ''}

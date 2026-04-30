@@ -815,16 +815,37 @@ router.get('/api/public/briefing/:workspaceId', (req, res) => {
   // Score-fallback: when a gap is missing `opportunityScore` we compute it
   // here using the same formula as keyword-strategy.ts so ranking is stable
   // across stored vs newly-collected gaps. Top 5 by score are returned.
+  //
+  // Defense-in-depth: explicit field projection rather than spread. ContentGap
+  // is workspace-scoped strategy data with no admin-only fields TODAY, but a
+  // future field added there must NOT silently leak through `...gap`. Any
+  // change to the public projection now requires touching this list.
   const gaps = ws.keywordStrategy?.contentGaps ?? [];
   const recommendations: BriefingRecommendation[] = gaps
     .map((gap) => ({
-      ...gap,
+      topic: gap.topic,
+      targetKeyword: gap.targetKeyword,
+      intent: gap.intent,
+      priority: gap.priority,
+      rationale: gap.rationale,
+      suggestedPageType: gap.suggestedPageType,
+      volume: gap.volume,
+      difficulty: gap.difficulty,
+      trendDirection: gap.trendDirection,
+      serpFeatures: gap.serpFeatures,
+      impressions: gap.impressions,
+      competitorProof: gap.competitorProof,
+      questionKeywords: gap.questionKeywords,
+      serpTargeting: gap.serpTargeting,
       opportunityScore: gap.opportunityScore ?? computeOpportunityScore(gap),
     }))
     .sort((a, b) => (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0))
     .slice(0, 5);
 
-  const issueSummary = generateIssueSummary(latest.stories, recommendations.length);
+  // The summary's "N opportunities to consider" reflects the FULL gap pool,
+  // not the post-cap render set. If 23 gaps exist, the summary still says
+  // "23 opportunities to consider" even though the briefing only renders 5.
+  const issueSummary = generateIssueSummary(latest.stories, gaps.length);
 
   res.json({
     briefing: {

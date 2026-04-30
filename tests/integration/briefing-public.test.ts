@@ -364,12 +364,15 @@ describe('GET /api/public/briefing/:workspaceId — Phase 2.5b serve-time fields
     ]);
   });
 
-  it('issueSummary reflects the recommendation count when gaps exist', async () => {
-    // contentGaps still set from the previous test → 5 capped recommendations
+  it('issueSummary reflects the FULL recommendation pool, not the post-cap render set', async () => {
+    // Previous test injected 7 gaps. The recommendations array is capped at 5
+    // for rendering, but the summary's "N opportunities" must still reflect
+    // the full pool (otherwise it understates what's available). 7 gaps were
+    // injected in the prior test case.
     const res = await api(`/api/public/briefing/${summaryWsId}`);
     expect(res.status).toBe(200);
     const body = await res.json() as { briefing: { issueSummary?: string } | null };
-    expect(body.briefing!.issueSummary).toContain('5 opportunities to consider');
+    expect(body.briefing!.issueSummary).toContain('7 opportunities to consider');
   });
 
   it('computes opportunityScore on-the-fly when the stored value is null', async () => {
