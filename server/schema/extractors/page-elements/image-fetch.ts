@@ -39,7 +39,9 @@ const DEFAULT_TIMEOUT_MS = 5000;
  * by default. Re-evaluate when the flag flips on for production.
  */
 function isPrivateOrLoopbackHost(hostname: string): boolean {
-  const h = hostname.toLowerCase();
+  // WHATWG URL preserves brackets around IPv6 (`new URL('http://[::1]/').hostname`
+  // returns `'[::1]'`). Strip them so the IPv6 prefix checks match.
+  const h = hostname.toLowerCase().replace(/^\[|\]$/g, '');
   if (h === 'localhost' || h === 'ip6-localhost' || h.endsWith('.localhost')) return true;
   if (h === '0.0.0.0' || h === '::' || h === '::1') return true;
   if (h === '169.254.169.254') return true; // AWS / GCP / Azure IMDS
@@ -53,8 +55,10 @@ function isPrivateOrLoopbackHost(hostname: string): boolean {
     const second = parseInt(m172[1], 10);
     if (second >= 16 && second <= 31) return true;
   }
-  // IPv6 unique-local / link-local
-  if (h.startsWith('fe80:') || h.startsWith('fc00:') || h.startsWith('fd')) return true;
+  // IPv6 unique-local / link-local. The `fd` check requires a colon to avoid
+  // false-blocking public domains like `fdic.gov`, `fd.io`, etc.
+  if (h.startsWith('fe80:') || h.startsWith('fc00:')) return true;
+  if (h.startsWith('fd') && h.includes(':')) return true;
   return false;
 }
 

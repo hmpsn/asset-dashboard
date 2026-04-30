@@ -28,8 +28,11 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
       })
     : undefined;
 
-  // PR2: AggregateRating from rated testimonials
-  const ratedTestimonials = (pageData.elements?.testimonials ?? []).filter(t => t.rating != null);
+  // PR2: AggregateRating from rated testimonials.
+  // Filter must match the Review[] emission gate below — both require author + rating.
+  // Review nodes are skipped when either is missing, so AggregateRating.reviewCount
+  // must use the same filter or it can exceed the visible Review count in @graph.
+  const ratedTestimonials = (pageData.elements?.testimonials ?? []).filter(t => t.rating != null && !!t.author);
   const aggregateRating = ratedTestimonials.length > 0
     ? dropUndefined({
         '@type': 'AggregateRating' as const,

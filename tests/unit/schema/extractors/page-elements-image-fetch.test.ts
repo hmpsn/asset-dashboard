@@ -145,6 +145,24 @@ describe('fetchImageAsBase64', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('does NOT falsely block legitimate domains starting with "fd" (fdic.gov, fd.io)', async () => {
+    globalThis.fetch = vi.fn(async () => new Response(new Uint8Array([1]), {
+      status: 200, headers: { 'Content-Type': 'image/jpeg' },
+    })) as typeof globalThis.fetch;
+    expect(await fetchImageAsBase64('https://fdic.gov/img.jpg')).not.toBeNull();
+    expect(await fetchImageAsBase64('https://fd.io/img.jpg')).not.toBeNull();
+    expect(await fetchImageAsBase64('https://fds.com/img.jpg')).not.toBeNull();
+  });
+
+  it('still blocks IPv6 fd:: unique-local addresses (with colon)', async () => {
+    const fetchMock = vi.fn();
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+    // IPv6 must be wrapped in [ ] in URLs; the `fd` prefix + colon match the unique-local range
+    expect(await fetchImageAsBase64('http://[fd00::1]/img.jpg')).toBeNull();
+    expect(await fetchImageAsBase64('http://[fd12:abcd::1]/img.jpg')).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('does NOT block 172.15 or 172.32 (just outside RFC1918)', async () => {
     globalThis.fetch = vi.fn(async () => new Response(new Uint8Array([1]), {
       status: 200, headers: { 'Content-Type': 'image/jpeg' },
