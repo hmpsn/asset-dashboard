@@ -92,8 +92,8 @@ PROSE QUALITY (applies to all written output):
 - No concession-positive pattern: never write "It's not just X; it's Y", "Not only X but also Y", or "not X, but Y".
 - No filler openers: "Let's dive in", "Let's explore", "Without further ado", "Here's what you need to know".
 - No hollow intensifiers: "incredibly", "truly", "revolutionize", "game-changing", "cutting-edge", "pivotal", "testament".
-- No copula avoidance: write "is" and "has" — not "serves as", "stands as", "functions as", "represents a".
-- No vague attribution: name the specific source or omit — never "studies show", "experts agree", "research suggests".
+- No copula avoidance: write "is" and "has", not "serves as", "stands as", "functions as", "represents a".
+- No vague attribution: name the specific source or omit. Never "studies show", "experts agree", "research suggests".
 - No repeated structural moves: don't follow the same arc (concession → positive, short-sentence burst, em dash) paragraph after paragraph. Vary structure naturally.
 - Have a point of view. React to what is notable rather than neutrally assembling facts.
 `;

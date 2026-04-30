@@ -100,7 +100,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown fences, no prose before or after.
 Context:
 ${context}`;
 
-  const systemPrompt = buildSystemPrompt(wsId, baseInstructions);
+  const systemPrompt = buildSystemPrompt(wsId, baseInstructions, undefined, { skipProseRules: true });
 
   const response = await callAnthropic({
     model: 'claude-sonnet-4-20250514',
@@ -200,7 +200,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown fences, no prose before or after.
 Context:
 ${context}`;
 
-  const systemPrompt = buildSystemPrompt(wsId, baseInstructions);
+  const systemPrompt = buildSystemPrompt(wsId, baseInstructions, undefined, { skipProseRules: true });
 
   const response = await callAnthropic({
     model: 'claude-sonnet-4-20250514',

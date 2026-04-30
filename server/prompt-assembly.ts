@@ -133,6 +133,7 @@ export function buildSystemPrompt(
   workspaceId: string,
   baseInstructions: string,
   customNotes?: string | null,
+  opts?: { skipProseRules?: boolean },
 ): string {
   const parts: string[] = [baseInstructions];
 
@@ -176,7 +177,10 @@ export function buildSystemPrompt(
   }
 
   // Layer 4: universal prose quality rules (anti-AI-writing patterns)
-  parts.push(PROSE_QUALITY_RULES);
+  // Skipped when the caller already includes WRITING_QUALITY_RULES in baseInstructions (e.g. copy-generation).
+  if (!opts?.skipProseRules) {
+    parts.push(PROSE_QUALITY_RULES);
+  }
 
   return parts.join('\n\n');
 }
