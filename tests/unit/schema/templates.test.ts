@@ -364,6 +364,198 @@ describe('static page templates', () => {
   });
 });
 
+describe('Article + BlogPosting — VideoObject enrichment (PR1)', () => {
+  const videoElementCatalog = {
+    extractedAt: '2026-04-29T00:00:00.000Z',
+    sourcePublishedAt: null,
+    headings: [],
+    tables: [],
+    images: [],
+    videos: [{
+      provider: 'youtube' as const,
+      embedUrl: 'https://www.youtube.com/embed/abc12345678',
+      thumbnailUrl: 'https://img.youtube.com/vi/abc12345678/maxresdefault.jpg',
+      title: 'Web Vitals 101',
+    }],
+    lists: [],
+    testimonials: [],
+    codeBlocks: [],
+    citations: [],
+    diagnostics: { aiClassificationCalls: 0, hitAiBudgetCap: false, rawCounts: {} },
+  };
+
+  it('emits VideoObject graph node when pageData.elements.videos has 1+ entries', () => {
+    const input = {
+      ...baseInput,
+      pageData: { ...baseInput.pageData, elements: videoElementCatalog },
+    };
+    const graph = buildArticleSchema(input, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>;
+    const video = graph.find(n => n['@type'] === 'VideoObject');
+    expect(video).toBeDefined();
+    expect(video!.name).toBe('Web Vitals 101');
+    expect(video!.embedUrl).toBe('https://www.youtube.com/embed/abc12345678');
+    expect(video!.thumbnailUrl).toBe('https://img.youtube.com/vi/abc12345678/maxresdefault.jpg');
+    expect(video!.uploadDate).toBeDefined(); // falls back to article.datePublished
+    expect(video!.description).toBeDefined();
+  });
+
+  it('does NOT emit VideoObject when pageData.elements.videos is empty or missing', () => {
+    const emptyElements = { ...videoElementCatalog, videos: [] };
+    const inputEmpty = {
+      ...baseInput,
+      pageData: { ...baseInput.pageData, elements: emptyElements },
+    };
+    const graphEmpty = buildArticleSchema(inputEmpty, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>;
+    expect(graphEmpty.find(n => n['@type'] === 'VideoObject')).toBeUndefined();
+
+    const inputMissing = { ...baseInput };
+    const graphMissing = buildArticleSchema(inputMissing, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>;
+    expect(graphMissing.find(n => n['@type'] === 'VideoObject')).toBeUndefined();
+  });
+
+  it('does NOT emit VideoObject when pageData.datePublished is undefined (pre-emission gate prevents invalid uploadDate)', () => {
+    // VideoObject.uploadDate is required by Google. If pageData.datePublished
+    // is undefined (static page without date metadata), emitting the node
+    // would produce invalid schema. The template pre-emission gate skips it
+    // entirely instead of emitting a node missing a required field.
+    const noDateInput = {
+      ...baseInput,
+      pageData: { ...baseInput.pageData, datePublished: undefined, elements: videoElementCatalog },
+    };
+    const graph = buildArticleSchema(noDateInput, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>;
+    expect(graph.find(n => n['@type'] === 'VideoObject')).toBeUndefined();
+  });
+});
+
+describe('Article + BlogPosting — HowTo enrichment (PR1)', () => {
+  const baseElementCatalog = {
+    extractedAt: '2026-04-29T00:00:00.000Z',
+    sourcePublishedAt: null,
+    headings: [],
+    tables: [],
+    images: [],
+    videos: [],
+    testimonials: [],
+    codeBlocks: [],
+    citations: [],
+    diagnostics: { aiClassificationCalls: 0, hitAiBudgetCap: false, rawCounts: {} },
+  };
+
+  it('emits HowTo graph node when pageData.elements.lists has an isHowToLike entry', () => {
+    const input = {
+      ...baseInput,
+      pageData: {
+        ...baseInput.pageData,
+        elements: {
+          ...baseElementCatalog,
+          lists: [{
+            kind: 'ordered' as const,
+            itemCount: 3,
+            isHowToLike: true,
+            steps: [
+              { name: 'Mix flour, water, salt.', text: 'Mix flour, water, salt.', position: 1 },
+              { name: 'Knead for 10 minutes.', text: 'Knead for 10 minutes.', position: 2 },
+              { name: 'Bake at 450°F.', text: 'Bake at 450°F.', position: 3 },
+            ],
+          }],
+        },
+      },
+    };
+    const graph = buildArticleSchema(input as never, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>;
+    const howTo = graph.find(n => n['@type'] === 'HowTo');
+    expect(howTo).toBeDefined();
+    expect(howTo!.name).toBeDefined();
+    expect(Array.isArray(howTo!.step)).toBe(true);
+    expect((howTo!.step as Array<Record<string, unknown>>)).toHaveLength(3);
+    expect((howTo!.step as Array<Record<string, unknown>>)[0]['@type']).toBe('HowToStep');
+    expect((howTo!.step as Array<Record<string, unknown>>)[0].position).toBe(1);
+    expect((howTo!.step as Array<Record<string, unknown>>)[0].text).toBe('Mix flour, water, salt.');
+  });
+
+  it('does NOT emit HowTo when no list has isHowToLike: true', () => {
+    const input = {
+      ...baseInput,
+      pageData: {
+        ...baseInput.pageData,
+        elements: {
+          ...baseElementCatalog,
+          lists: [{ kind: 'ordered' as const, itemCount: 3, isHowToLike: false }],
+        },
+      },
+    };
+    const graph = buildArticleSchema(input as never, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>;
+    expect(graph.find(n => n['@type'] === 'HowTo')).toBeUndefined();
+  });
+
+  it('does NOT emit HowTo when isHowToLike list has no steps', () => {
+    const input = {
+      ...baseInput,
+      pageData: {
+        ...baseInput.pageData,
+        elements: {
+          ...baseElementCatalog,
+          lists: [{ kind: 'ordered' as const, itemCount: 3, isHowToLike: true }],
+        },
+      },
+    };
+    const graph = buildArticleSchema(input as never, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>;
+    expect(graph.find(n => n['@type'] === 'HowTo')).toBeUndefined();
+  });
+});
+
+describe('Article + BlogPosting — citation[] enrichment (PR1)', () => {
+  const baseElementCatalogForCitations = {
+    extractedAt: '2026-04-29T00:00:00.000Z',
+    sourcePublishedAt: null,
+    headings: [],
+    tables: [],
+    images: [],
+    videos: [],
+    lists: [],
+    testimonials: [],
+    codeBlocks: [],
+    diagnostics: { aiClassificationCalls: 0, hitAiBudgetCap: false, rawCounts: {} },
+  };
+
+  it('adds citation[] field to primary node when pageData.elements.citations has entries', () => {
+    const input = {
+      ...baseInput,
+      pageData: {
+        ...baseInput.pageData,
+        elements: {
+          ...baseElementCatalogForCitations,
+          citations: [
+            { url: 'https://web.dev/vitals', text: 'Google Web Vitals docs', isExternal: true },
+            { url: 'https://developer.mozilla.org/web/api', text: 'MDN guide', isExternal: true },
+          ],
+        },
+      },
+    };
+    const graph = buildArticleSchema(input as never, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>;
+    const primary = graph[0];
+    const citations = primary.citation as Array<Record<string, unknown>>;
+    expect(citations).toHaveLength(2);
+    expect(citations[0]['@type']).toBe('WebPage');
+    expect(citations[0].url).toBe('https://web.dev/vitals');
+    expect(citations[0].name).toBe('Google Web Vitals docs');
+  });
+
+  it('does NOT add citation[] when no citations present', () => {
+    const input = {
+      ...baseInput,
+      pageData: {
+        ...baseInput.pageData,
+        elements: {
+          ...baseElementCatalogForCitations,
+          citations: [],
+        },
+      },
+    };
+    const graph = buildArticleSchema(input as never, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>;
+    expect(graph[0].citation).toBeUndefined();
+  });
+});
+
 describe('buildHomepageSchema', () => {
   const homepageInput = {
     baseUrl: 'https://example.com',

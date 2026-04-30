@@ -493,6 +493,7 @@ const SLICE_FORMATTER_MAP: Array<{ sliceName: string; formatterName: string }> =
   { sliceName: 'InsightsSlice', formatterName: 'formatInsightsSection' },
   { sliceName: 'LearningsSlice', formatterName: 'formatLearningsSection' },
   { sliceName: 'PageProfileSlice', formatterName: 'formatPageProfileSection' },
+  { sliceName: 'PageElementSlice', formatterName: 'formatPageElementsSection' },
   { sliceName: 'ContentPipelineSlice', formatterName: 'formatContentPipelineSection' },
   { sliceName: 'SiteHealthSlice', formatterName: 'formatSiteHealthSection' },
   { sliceName: 'ClientSignalsSlice', formatterName: 'formatClientSignalsSection' },
@@ -519,6 +520,11 @@ const KNOWN_UNRENDERED_FIELDS = new Set([
   // ClientSignalsSlice — these are rendered but may not appear by field name
   // OperationalSlice
   // none
+  // PageElementSlice top-level fields (`pagePath`, `catalog`) are both
+  // referenced in formatPageElementsSection. The `catalog`'s own nested
+  // diagnostic fields (extractedAt, sourcePublishedAt, diagnostics) are
+  // PageElementCatalog members, not slice fields, so the rule's interface-
+  // level field extractor never flags them — no allowlist entry needed.
 ]);
 
 function extractInterfaceFields(typeFileContent: string, interfaceName: string): string[] {

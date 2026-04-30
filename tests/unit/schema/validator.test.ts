@@ -623,4 +623,129 @@ describe('validateLeanSchema — LocalBusiness value-shape (Pillar 1)', () => {
       }),
     );
   });
+
+  // ---------------------------------------------------------------------------
+  // VideoObject + HowTo REQUIRED_BY_TYPE coverage (PR1 page-element catalog).
+  // VideoObject thumbnailUrl is intentionally `recommended` not `required` —
+  // Vimeo + native videos cannot supply a thumbnail without an API call, and
+  // promoting that to required would emit validator errors on every Vimeo page.
+  // ---------------------------------------------------------------------------
+  describe('VideoObject required fields', () => {
+    const fullVideoObject = {
+      '@context': 'https://schema.org',
+      '@graph': [
+        {
+          '@type': 'VideoObject',
+          '@id': 'https://x/y#video-0',
+          'name': 'Demo video',
+          'description': 'A walkthrough',
+          'uploadDate': '2025-01-15',
+          'embedUrl': 'https://www.youtube.com/embed/abc',
+          'thumbnailUrl': 'https://img.youtube.com/vi/abc/maxresdefault.jpg',
+        },
+      ],
+    };
+
+    it('passes a VideoObject with all required fields', () => {
+      const findings = validateLeanSchema(fullVideoObject, 'BlogPosting').filter(f => f.type === 'VideoObject');
+      // No required-field errors (recommended thumbnailUrl IS present here, so no warning either).
+      expect(findings.filter(f => f.severity === 'error')).toEqual([]);
+    });
+
+    it('flags missing VideoObject.uploadDate as error', () => {
+      const broken = JSON.parse(JSON.stringify(fullVideoObject));
+      delete broken['@graph'][0].uploadDate;
+      const findings = validateLeanSchema(broken, 'BlogPosting');
+      expect(findings).toContainEqual(
+        expect.objectContaining({
+          severity: 'error',
+          type: 'VideoObject',
+          field: 'uploadDate',
+        }),
+      );
+    });
+
+    it('flags missing VideoObject.name as error', () => {
+      const broken = JSON.parse(JSON.stringify(fullVideoObject));
+      delete broken['@graph'][0].name;
+      const findings = validateLeanSchema(broken, 'BlogPosting');
+      expect(findings).toContainEqual(
+        expect.objectContaining({
+          severity: 'error',
+          type: 'VideoObject',
+          field: 'name',
+        }),
+      );
+    });
+
+    it('flags missing VideoObject.description as error', () => {
+      const broken = JSON.parse(JSON.stringify(fullVideoObject));
+      delete broken['@graph'][0].description;
+      const findings = validateLeanSchema(broken, 'BlogPosting');
+      expect(findings).toContainEqual(
+        expect.objectContaining({
+          severity: 'error',
+          type: 'VideoObject',
+          field: 'description',
+        }),
+      );
+    });
+
+    it('does NOT flag missing VideoObject.thumbnailUrl as error (Vimeo + native fallback)', () => {
+      const noThumb = JSON.parse(JSON.stringify(fullVideoObject));
+      delete noThumb['@graph'][0].thumbnailUrl;
+      const findings = validateLeanSchema(noThumb, 'BlogPosting');
+      const errors = findings.filter(f => f.type === 'VideoObject' && f.severity === 'error' && f.field === 'thumbnailUrl');
+      expect(errors).toEqual([]);
+    });
+  });
+
+  describe('HowTo required fields', () => {
+    const fullHowTo = {
+      '@context': 'https://schema.org',
+      '@graph': [
+        {
+          '@type': 'HowTo',
+          '@id': 'https://x/y#howto',
+          'name': 'How to deploy',
+          'step': [
+            { '@type': 'HowToStep', 'position': 1, 'name': 'Connect domain', 'text': 'Connect domain' },
+            { '@type': 'HowToStep', 'position': 2, 'name': 'Configure DNS', 'text': 'Configure DNS' },
+            { '@type': 'HowToStep', 'position': 3, 'name': 'Publish', 'text': 'Publish' },
+          ],
+        },
+      ],
+    };
+
+    it('passes a HowTo with name + step', () => {
+      const findings = validateLeanSchema(fullHowTo, 'BlogPosting').filter(f => f.type === 'HowTo');
+      expect(findings.filter(f => f.severity === 'error')).toEqual([]);
+    });
+
+    it('flags missing HowTo.name as error', () => {
+      const broken = JSON.parse(JSON.stringify(fullHowTo));
+      delete broken['@graph'][0].name;
+      const findings = validateLeanSchema(broken, 'BlogPosting');
+      expect(findings).toContainEqual(
+        expect.objectContaining({
+          severity: 'error',
+          type: 'HowTo',
+          field: 'name',
+        }),
+      );
+    });
+
+    it('flags missing HowTo.step as error', () => {
+      const broken = JSON.parse(JSON.stringify(fullHowTo));
+      delete broken['@graph'][0].step;
+      const findings = validateLeanSchema(broken, 'BlogPosting');
+      expect(findings).toContainEqual(
+        expect.objectContaining({
+          severity: 'error',
+          type: 'HowTo',
+          field: 'step',
+        }),
+      );
+    });
+  });
 });

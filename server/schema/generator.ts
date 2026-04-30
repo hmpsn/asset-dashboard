@@ -16,6 +16,11 @@ import { extractPageData } from './data-sources.js';
 import type { PageMetaInput, WorkspaceSchemaInput } from './data-sources.js';
 import { extractDescription } from './extractors/description.js';
 import { extractFaq } from './extractors/faq.js';
+import { extractPageElements } from './extractors/page-elements.js';
+import { createAiBudget } from './extractors/page-elements/ai-budget.js';
+import type { AiBudget } from './extractors/page-elements/ai-budget.js';
+import { getPageElements, upsertPageElements } from '../page-elements-store.js';
+import type { PageElementCatalog } from '../../shared/types/page-elements.js';
 import { buildArticleSchema } from './templates/article.js';
 import { buildServiceSchema } from './templates/service.js';
 import { buildLocalBusinessSchema } from './templates/local-business.js';
@@ -57,6 +62,8 @@ export interface LeanGeneratorInput {
   workspace: WorkspaceSchemaInput;
   /** Optional override for existing schema detection (saves Cheerio re-parsing in batch). */
   existingSchemas?: string[];
+  /** Per-regenerate AI budget passed by the schema-suggester orchestrator. PR1 always zero. */
+  aiBudget?: AiBudget;
 }
 
 function detectExistingSchemas(html: string): string[] {
@@ -85,6 +92,30 @@ function plainText(html: string): string {
   return $('body').text().replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * Lazy-refresh staleness check for the page-element catalog.
+ *
+ * Refresh policy (preserves work, never freezes the cache):
+ *   1. If both timestamps present and parseable → refresh iff input > stored.
+ *   2. If presence differs (one null, one set) → refresh (CMS↔static migration
+ *      or first-time republish acquisition).
+ *   3. If either timestamp is unparseable (NaN) → refresh (corrupted row should
+ *      not freeze the catalog forever).
+ *   4. If both null → no refresh signal; rely on caller to invalidate
+ *      (typical for static pages with no published-at metadata).
+ */
+export function isCatalogStale(
+  storedSourcePublishedAt: string | null,
+  inputSourcePublishedAt: string | null,
+): boolean {
+  if (storedSourcePublishedAt === null && inputSourcePublishedAt === null) return false;
+  if (storedSourcePublishedAt === null || inputSourcePublishedAt === null) return true;
+  const storedMs = new Date(storedSourcePublishedAt).getTime();
+  const inputMs = new Date(inputSourcePublishedAt).getTime();
+  if (!Number.isFinite(storedMs) || !Number.isFinite(inputMs)) return true;
+  return inputMs > storedMs;
+}
+
 export async function generateLeanSchema(input: LeanGeneratorInput): Promise<LeanGeneratorOutput> {
   // Fix 1: strip trailing slashes from baseUrl to prevent //path canonical URLs
   const baseUrl = input.baseUrl.replace(/\/+$/, '');
@@ -104,6 +135,44 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
     baseUrl,
     workspace: input.workspace,
   });
+
+  // Lazy-refresh element catalog: read from store; if missing or
+  // stale-vs-Webflow-lastPublished, extract from current HTML + persist.
+  // Per audit §2.4 — HTML is already in scope (input.html). Per spec §3.4 —
+  // 100% lazy; no cron, no eager extraction.
+  const workspaceId = input.workspace.id;
+  const pagePath = input.pageMeta.publishedPath;
+  let catalog: PageElementCatalog | undefined;
+  if (workspaceId && pagePath) {
+    const stored = getPageElements(workspaceId, pagePath);
+    if (!stored || isCatalogStale(stored.sourcePublishedAt, input.pageMeta.sourcePublishedAt ?? null)) {
+      try {
+        const aiBudget = input.aiBudget ?? createAiBudget(0); // PR1: zero AI calls
+        catalog = await extractPageElements(input.html ?? '', {
+          pageBaseUrl: baseUrl,
+          sourcePublishedAt: input.pageMeta.sourcePublishedAt ?? null,
+          aiBudget,
+        });
+        upsertPageElements(workspaceId, pagePath, catalog);
+      } catch (err) { // catch-ok: extraction or persistence failure — schema generation continues
+        // The catch covers two distinct failure modes:
+        //   1. extractPageElements throws → catalog is undefined; schema falls
+        //      back to non-enriched behavior (this is the "skipped" path).
+        //   2. extractPageElements succeeds but upsertPageElements throws (FK
+        //      violation, disk error, etc.) → catalog IS populated and the
+        //      enrichment proceeds in-memory; only persistence is skipped.
+        // The log distinguishes the two so operators can tell which path fired.
+        if (catalog) {
+          log.warn({ err, workspaceId, pagePath }, 'page-element persistence failed; schema enrichment proceeds with in-memory catalog');
+        } else {
+          log.warn({ err, workspaceId, pagePath }, 'page-element extraction failed; schema enrichment skipped');
+        }
+      }
+    } else {
+      catalog = stored.catalog;
+    }
+  }
+  pageData = { ...pageData, elements: catalog };
 
   // Surgical AI: only if no description was found
   if (!pageData.description) {

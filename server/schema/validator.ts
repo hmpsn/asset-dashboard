@@ -66,6 +66,14 @@ const REQUIRED_BY_TYPE: Record<string, RequiredFields> = {
   WebPage: {
     required: ['name', 'url', 'description', 'isPartOf', 'breadcrumb', 'inLanguage'],
   },
+  VideoObject: {
+    required: ['name', 'description', 'uploadDate'],
+    recommended: ['thumbnailUrl', 'duration', 'embedUrl', 'contentUrl'],
+  },
+  HowTo: {
+    required: ['name', 'step'],
+    recommended: ['totalTime', 'estimatedCost'],
+  },
 };
 
 function validateBreadcrumb(node: Record<string, unknown>): ValidationFinding[] {

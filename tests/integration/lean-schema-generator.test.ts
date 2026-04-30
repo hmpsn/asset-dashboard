@@ -3,6 +3,9 @@
  * Uses synthetic page meta + HTML; no DB or HTTP server.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import db from '../../server/db/index.js';
 
 vi.mock('../../server/ai.js', () => ({
   callAI: vi.fn().mockResolvedValue({
@@ -284,5 +287,288 @@ describe('paid-grade output (Pillar 2)', () => {
     const website = graph.find(n => n['@type'] === 'WebSite');
     expect(website?.potentialAction).toBeUndefined();
     expect(website?.inLanguage).toBe('en');
+  });
+});
+
+// Fixture helpers for page-element enrichment tests.
+// Paths are relative to this test file: tests/integration/ → tests/fixtures/page-elements/
+function fixturePageElementsHtml(name: string): string {
+  return readFileSync(join(__dirname, `../fixtures/page-elements/${name}`), 'utf-8');
+}
+
+// Unique workspace IDs per test so page_elements writes don't collide across tests.
+const PE_WS_IDS = {
+  video: 'ws_test_pe_video',
+  howto: 'ws_test_pe_howto',
+  citation: 'ws_test_pe_citation',
+  noElements: 'ws_test_pe_none',
+  mixed: 'ws_test_pe_mixed',
+  cacheHit: 'ws_test_pe_cache_hit',
+  refresh: 'ws_test_pe_refresh',
+  nullToSet: 'ws_test_pe_null_to_set',
+};
+
+describe('lean schema generator — page-element enrichment (PR1)', () => {
+  beforeEach(() => {
+    vi.mocked(callAI).mockClear();
+    vi.mocked(callAI).mockResolvedValue({
+      text: 'A clean description.',
+      tokens: { prompt: 100, completion: 20, total: 120 },
+    });
+    // Seed workspace rows so the FK on page_elements.workspace_id holds. Without
+    // this, upsertPageElements throws SQLITE_CONSTRAINT_FOREIGNKEY and the
+    // generator's catch silently falls back to in-memory enrichment — the tests
+    // would still pass for emission shape but would not exercise the persistence
+    // path. Seeding lets cache-hit / staleness tests verify real DB behavior.
+    for (const wsId of Object.values(PE_WS_IDS)) {
+      db.prepare(`
+        INSERT OR IGNORE INTO workspaces (id, name, folder, created_at)
+        VALUES (?, ?, ?, ?)
+      `).run(wsId, `Test PE WS ${wsId}`, wsId, new Date().toISOString());
+      db.prepare('DELETE FROM page_elements WHERE workspace_id = ?').run(wsId);
+    }
+  });
+
+  it('emits VideoObject in @graph when HTML contains a YouTube embed', async () => {
+    const html = fixturePageElementsHtml('webflow-blog-with-youtube.html');
+    const out = await generateLeanSchema({
+      ...baseInput,
+      pageId: 'pe-video-test',
+      pageMeta: {
+        title: 'Blog Post with YouTube',
+        slug: 'how-web-vitals-affect-seo',
+        publishedPath: '/blog/how-web-vitals-affect-seo',
+        seo: { description: 'A blog post about web vitals and YouTube.' },
+        sourcePublishedAt: null,
+        // VideoObject pre-emission gate requires datePublished — supplied via lastPublished fallback in extractPageData.
+        lastPublished: '2026-04-15T00:00:00Z',
+      },
+      html,
+      baseUrl: 'https://example.com',
+      workspace: { ...baseInput.workspace, id: PE_WS_IDS.video },
+    });
+    const tpl = out.suggestedSchemas[0].template as Record<string, unknown>;
+    const graph = tpl['@graph'] as Array<Record<string, unknown>>;
+    const video = graph.find(n => n['@type'] === 'VideoObject');
+    expect(video).toBeDefined();
+    expect(video!.embedUrl).toBe('https://www.youtube.com/embed/dQw4w9WgXcQ?rel=0');
+  });
+
+  it('emits HowTo in @graph when HTML contains a how-to ordered list', async () => {
+    const html = fixturePageElementsHtml('webflow-blog-howto.html');
+    const out = await generateLeanSchema({
+      ...baseInput,
+      pageId: 'pe-howto-test',
+      pageMeta: {
+        title: 'How to Bake Sourdough',
+        slug: 'how-to-bake-sourdough',
+        publishedPath: '/blog/how-to-bake-sourdough',
+        seo: { description: 'Learn how to bake sourdough in 5 steps.' },
+        sourcePublishedAt: null,
+      },
+      html,
+      baseUrl: 'https://example.com',
+      workspace: { ...baseInput.workspace, id: PE_WS_IDS.howto },
+    });
+    const tpl = out.suggestedSchemas[0].template as Record<string, unknown>;
+    const graph = tpl['@graph'] as Array<Record<string, unknown>>;
+    const howTo = graph.find(n => n['@type'] === 'HowTo');
+    expect(howTo).toBeDefined();
+    expect((howTo!.step as Array<Record<string, unknown>>)).toHaveLength(5);
+  });
+
+  it('emits Article.citation[] when HTML contains outbound external links', async () => {
+    const html = fixturePageElementsHtml('webflow-blog-with-citations.html');
+    const out = await generateLeanSchema({
+      ...baseInput,
+      pageId: 'pe-citation-test',
+      pageMeta: {
+        title: 'The state of Core Web Vitals in 2026',
+        slug: 'core-web-vitals-2026',
+        publishedPath: '/blog/core-web-vitals-2026',
+        seo: { description: 'A survey of CWV metrics in 2026.' },
+        sourcePublishedAt: null,
+      },
+      html,
+      baseUrl: 'https://www.hmpsn.studio',
+      workspace: { ...baseInput.workspace, id: PE_WS_IDS.citation },
+    });
+    const tpl = out.suggestedSchemas[0].template as Record<string, unknown>;
+    const graph = tpl['@graph'] as Array<Record<string, unknown>>;
+    const primary = graph[0];
+    const citations = primary.citation as Array<Record<string, unknown>>;
+    expect(citations).toHaveLength(2);
+    expect(citations[0].url).toBe('https://web.dev/articles/vitals');
+  });
+
+  it('falls back to no-enrichment schema when HTML has no detectable elements', async () => {
+    const html = fixturePageElementsHtml('webflow-no-elements.html');
+    const out = await generateLeanSchema({
+      ...baseInput,
+      pageId: 'pe-none-test',
+      pageMeta: {
+        title: 'Plain Page',
+        slug: 'plain-page',
+        publishedPath: '/blog/plain-page',
+        seo: { description: 'A plain page with no structured elements.' },
+        sourcePublishedAt: null,
+      },
+      html,
+      baseUrl: 'https://example.com',
+      workspace: { ...baseInput.workspace, id: PE_WS_IDS.noElements },
+    });
+    const tpl = out.suggestedSchemas[0].template as Record<string, unknown>;
+    const graph = tpl['@graph'] as Array<Record<string, unknown>>;
+    expect(graph.find(n => n['@type'] === 'VideoObject')).toBeUndefined();
+    expect(graph.find(n => n['@type'] === 'HowTo')).toBeUndefined();
+    expect(graph[0].citation).toBeUndefined();
+  });
+
+  it('emits Article + BreadcrumbList + VideoObject + HowTo + citations all in the same @graph with unique @ids', async () => {
+    const html = fixturePageElementsHtml('webflow-mixed-elements.html');
+    const wsId = PE_WS_IDS.mixed;
+    const out = await generateLeanSchema({
+      ...baseInput,
+      pageId: 'pe-mixed-test',
+      pageMeta: {
+        title: 'How to set up Webflow + GSC',
+        slug: 'webflow-gsc-setup',
+        publishedPath: '/blog/webflow-gsc-setup',
+        seo: { description: 'Combined video + how-to + citation example.' },
+        sourcePublishedAt: null,
+        // datePublished required for VideoObject pre-emission gate.
+        lastPublished: '2026-04-15T00:00:00Z',
+      },
+      html,
+      baseUrl: 'https://www.example.com',
+      workspace: { ...baseInput.workspace, id: wsId },
+    });
+    const graph = (out.suggestedSchemas[0].template as Record<string, unknown>)['@graph'] as Array<Record<string, unknown>>;
+    const types = graph.map(n => n['@type']);
+    expect(types).toEqual(expect.arrayContaining(['BlogPosting', 'BreadcrumbList', 'VideoObject', 'HowTo']));
+    const ids = graph.map(n => n['@id']).filter(Boolean) as string[];
+    expect(new Set(ids).size).toBe(ids.length); // unique
+    const primary = graph.find(n => n['@type'] === 'BlogPosting')!;
+    expect(primary.citation).toBeDefined();
+    db.prepare('DELETE FROM page_elements WHERE workspace_id = ?').run(wsId);
+  });
+
+  it('cache hit: second call with same sourcePublishedAt re-uses stored catalog (no re-extraction)', async () => {
+    // Use a fixture that produces a deterministic, non-empty catalog.
+    const html = fixturePageElementsHtml('webflow-blog-with-youtube.html');
+    const wsId = PE_WS_IDS.cacheHit;
+    const baseMeta = {
+      title: 'Cache hit test',
+      slug: 'cache-hit',
+      publishedPath: '/blog/cache-hit',
+      seo: { description: 'desc' },
+      sourcePublishedAt: '2026-04-01T00:00:00Z',
+    };
+
+    await generateLeanSchema({
+      ...baseInput,
+      pageId: 'cache-1',
+      pageMeta: baseMeta,
+      html,
+      baseUrl: 'https://example.com',
+      workspace: { ...baseInput.workspace, id: wsId },
+    });
+    const row1 = db.prepare('SELECT updated_at FROM page_elements WHERE workspace_id = ? AND page_path = ?').get(wsId, '/blog/cache-hit') as { updated_at: string };
+    expect(row1).toBeDefined();
+    const firstExtractedAt = row1.updated_at;
+
+    // Second call with the SAME sourcePublishedAt should not refresh the row.
+    await generateLeanSchema({
+      ...baseInput,
+      pageId: 'cache-2',
+      pageMeta: baseMeta,
+      html,
+      baseUrl: 'https://example.com',
+      workspace: { ...baseInput.workspace, id: wsId },
+    });
+    const row2 = db.prepare('SELECT updated_at FROM page_elements WHERE workspace_id = ? AND page_path = ?').get(wsId, '/blog/cache-hit') as { updated_at: string };
+    expect(row2.updated_at).toBe(firstExtractedAt); // same row, untouched
+
+    db.prepare('DELETE FROM page_elements WHERE workspace_id = ?').run(wsId);
+  });
+
+  it('staleness: third call with NEWER sourcePublishedAt triggers re-extraction', async () => {
+    const html = fixturePageElementsHtml('webflow-blog-with-youtube.html');
+    const wsId = PE_WS_IDS.refresh;
+    const baseMeta = {
+      title: 'Refresh test',
+      slug: 'refresh',
+      publishedPath: '/blog/refresh',
+      seo: { description: 'desc' },
+    };
+
+    await generateLeanSchema({
+      ...baseInput,
+      pageId: 'r1',
+      pageMeta: { ...baseMeta, sourcePublishedAt: '2026-04-01T00:00:00Z' },
+      html,
+      baseUrl: 'https://example.com',
+      workspace: { ...baseInput.workspace, id: wsId },
+    });
+    const row1 = db.prepare('SELECT updated_at, source_published_at FROM page_elements WHERE workspace_id = ? AND page_path = ?').get(wsId, '/blog/refresh') as { updated_at: string; source_published_at: string };
+    expect(row1.source_published_at).toBe('2026-04-01T00:00:00Z');
+
+    // Wait one millisecond so a fresh ISO timestamp differs.
+    await new Promise(r => setTimeout(r, 5));
+
+    await generateLeanSchema({
+      ...baseInput,
+      pageId: 'r2',
+      pageMeta: { ...baseMeta, sourcePublishedAt: '2026-05-01T00:00:00Z' },
+      html,
+      baseUrl: 'https://example.com',
+      workspace: { ...baseInput.workspace, id: wsId },
+    });
+    const row2 = db.prepare('SELECT updated_at, source_published_at FROM page_elements WHERE workspace_id = ? AND page_path = ?').get(wsId, '/blog/refresh') as { updated_at: string; source_published_at: string };
+    expect(row2.source_published_at).toBe('2026-05-01T00:00:00Z');
+    expect(row2.updated_at).not.toBe(row1.updated_at); // re-extracted
+
+    db.prepare('DELETE FROM page_elements WHERE workspace_id = ?').run(wsId);
+  });
+
+  it('staleness: stored.sourcePublishedAt=null + input.sourcePublishedAt=set triggers re-extraction (CMS migration scenario)', async () => {
+    const html = fixturePageElementsHtml('webflow-blog-with-youtube.html');
+    const wsId = PE_WS_IDS.nullToSet;
+    const baseMeta = {
+      title: 'Null→set test',
+      slug: 'null-to-set',
+      publishedPath: '/blog/null-to-set',
+      seo: { description: 'desc' },
+    };
+
+    // First call: stored will have sourcePublishedAt=null (static page).
+    await generateLeanSchema({
+      ...baseInput,
+      pageId: 'n1',
+      pageMeta: { ...baseMeta, sourcePublishedAt: null },
+      html,
+      baseUrl: 'https://example.com',
+      workspace: { ...baseInput.workspace, id: wsId },
+    });
+    const row1 = db.prepare('SELECT updated_at, source_published_at FROM page_elements WHERE workspace_id = ? AND page_path = ?').get(wsId, '/blog/null-to-set') as { updated_at: string; source_published_at: string | null };
+    expect(row1.source_published_at).toBeNull();
+
+    await new Promise(r => setTimeout(r, 5));
+
+    // Second call: page now has a published-at timestamp (CMS conversion).
+    // Pre-fix this would have NEVER refreshed, freezing the catalog forever.
+    await generateLeanSchema({
+      ...baseInput,
+      pageId: 'n2',
+      pageMeta: { ...baseMeta, sourcePublishedAt: '2026-05-01T00:00:00Z' },
+      html,
+      baseUrl: 'https://example.com',
+      workspace: { ...baseInput.workspace, id: wsId },
+    });
+    const row2 = db.prepare('SELECT updated_at, source_published_at FROM page_elements WHERE workspace_id = ? AND page_path = ?').get(wsId, '/blog/null-to-set') as { updated_at: string; source_published_at: string };
+    expect(row2.source_published_at).toBe('2026-05-01T00:00:00Z');
+    expect(row2.updated_at).not.toBe(row1.updated_at);
+
+    db.prepare('DELETE FROM page_elements WHERE workspace_id = ?').run(wsId);
   });
 });
