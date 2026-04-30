@@ -5,7 +5,7 @@ import { SectionCard } from '../ui/SectionCard';
 import { adminPath } from '../../routes';
 import { fieldToTarget } from './fieldTargets';
 
-interface PageWithFindings {
+export interface PageWithFindings {
   pageId?: string;
   validationFindings?: ValidationFinding[];
   validationErrors?: string[];
@@ -49,8 +49,9 @@ export function SchemaCompletenessWidget({ pages, workspaceId }: SchemaCompleten
 
     const groups: FieldGroup[] = [];
     for (const [field, info] of findingsByField) {
-      const target = fieldToTarget(field);
-      if (!target) continue;
+      // Every entry in findingsByField passed the fieldToTarget guard above,
+      // so the lookup is guaranteed to resolve. The non-null assertion is safe.
+      const target = fieldToTarget(field)!;
       groups.push({ field, target, pageCount: info.pages.size, severity: info.severity });
     }
     groups.sort((a, b) => {
@@ -71,7 +72,7 @@ export function SchemaCompletenessWidget({ pages, workspaceId }: SchemaCompleten
     return (
       <SectionCard title="Schema profile completeness" className="mb-6">
         <div className="flex items-center gap-2">
-          <span className="text-emerald-400 text-lg">✓</span>
+          <span aria-hidden="true" className="text-emerald-400 text-lg">✓</span>
           <span className="t-body text-[var(--brand-text)]">Schema profile complete — all pages emit recommended fields.</span>
         </div>
       </SectionCard>
@@ -90,6 +91,7 @@ export function SchemaCompletenessWidget({ pages, workspaceId }: SchemaCompleten
           className="h-full bg-emerald-500 transition-all duration-300"
           style={{ width: `${completenessPct}%` }}
           role="progressbar"
+          aria-label="Schema profile completeness"
           aria-valuenow={completenessPct}
           aria-valuemin={0}
           aria-valuemax={100}
@@ -101,6 +103,7 @@ export function SchemaCompletenessWidget({ pages, workspaceId }: SchemaCompleten
         {groups.map(g => (
           <button
             key={g.field}
+            type="button"
             onClick={() => {
               if (!workspaceId) return;
               navigate(`${adminPath(workspaceId, 'settings')}?tab=${g.target.tab}&focus=${g.target.focus}`);
@@ -108,7 +111,7 @@ export function SchemaCompletenessWidget({ pages, workspaceId }: SchemaCompleten
             className="flex items-center justify-between gap-3 w-full px-3 py-2 rounded text-left hover:bg-[var(--surface-3)] transition-colors group"
           >
             <span className="flex items-center gap-2 min-w-0">
-              <span className={g.severity === 'error' ? 'text-red-400' : 'text-amber-400'}>
+              <span aria-hidden="true" className={g.severity === 'error' ? 'text-red-400' : 'text-amber-400'}>
                 {g.severity === 'error' ? '✗' : '⚠'}
               </span>
               <span className="t-body text-[var(--brand-text)] truncate">{g.target.label}</span>

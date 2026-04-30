@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, act } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
 import { MemoryRouter, useSearchParams } from 'react-router-dom';
 import { useDeepLinkFocus } from '../../src/hooks/useDeepLinkFocus';
 
@@ -26,8 +26,9 @@ describe('useDeepLinkFocus', () => {
         <Probe />
       </MemoryRouter>,
     );
-    await act(async () => { await new Promise(r => setTimeout(r, 80)); });
-    expect(document.activeElement).toBe(getByTestId('logo-input'));
+    await waitFor(() => {
+      expect(document.activeElement).toBe(getByTestId('logo-input'));
+    });
     expect(getByTestId('focus-param').textContent).toBe('none');
   });
 
@@ -37,8 +38,9 @@ describe('useDeepLinkFocus', () => {
         <Probe />
       </MemoryRouter>,
     );
-    await act(async () => { await new Promise(r => setTimeout(r, 80)); });
-    expect(getByTestId('address-row').scrollIntoView).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(getByTestId('address-row').scrollIntoView).toHaveBeenCalled();
+    });
     expect(getByTestId('focus-param').textContent).toBe('none');
   });
 
@@ -48,7 +50,8 @@ describe('useDeepLinkFocus', () => {
         <Probe />
       </MemoryRouter>,
     );
-    await act(async () => { await new Promise(r => setTimeout(r, 80)); });
+    // Wait long enough for the hook's 50ms timer to have fired
+    await new Promise(r => setTimeout(r, 100));
     expect(getByTestId('focus-param').textContent).toBe('nothingMatching');
   });
 });

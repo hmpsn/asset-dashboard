@@ -379,13 +379,21 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
       <SectionCard title="Site capabilities">
         <div className="space-y-3">
           <p className="t-caption-sm text-[var(--brand-text-muted)]">Tell schema what your live site supports.</p>
-          <label className="flex items-start gap-3 cursor-pointer" data-schema-deeplink="siteHasSearch">
+          <label className="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
+              data-schema-deeplink="siteHasSearch"
               defaultChecked={!!ws?.siteHasSearch}
               onChange={async (e) => {
-                await patchWorkspace({ siteHasSearch: e.currentTarget.checked });
-                toast(e.currentTarget.checked ? 'SearchAction will emit on next regenerate' : 'SearchAction emission disabled');
+                try {
+                  await patchWorkspace({ siteHasSearch: e.currentTarget.checked });
+                  toast(e.currentTarget.checked ? 'SearchAction will emit on next regenerate' : 'SearchAction emission disabled');
+                } catch (err) {
+                  toast('Failed to update — please try again');
+                  // Revert visual state on failure
+                  e.currentTarget.checked = !e.currentTarget.checked;
+                  throw err;
+                }
               }}
               className="mt-0.5"
             />

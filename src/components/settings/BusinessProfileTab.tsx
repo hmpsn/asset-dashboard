@@ -61,11 +61,13 @@ function SchemaImpactRow({
     <div className="flex items-center justify-between gap-3 py-1.5">
       <div className="flex items-center gap-2 min-w-0 flex-1">
         {filled ? (
-          <span className="text-emerald-400 text-sm shrink-0">✓</span>
+          <span aria-hidden="true" className="text-emerald-400 text-sm shrink-0">✓</span>
         ) : (
-          <span className="text-amber-400 text-sm shrink-0">✗</span>
+          <span aria-hidden="true" className="text-amber-400 text-sm shrink-0">✗</span>
         )}
-        <span className="t-body text-[var(--brand-text)] truncate">{field}</span>
+        <span className="t-body text-[var(--brand-text)] truncate">
+          <span className="sr-only">{filled ? 'Filled: ' : 'Missing: '}</span>{field}
+        </span>
         {hint && <span className="t-caption-sm text-[var(--brand-text-muted)] truncate">{hint}</span>}
       </div>
       {linkTarget && (
@@ -222,6 +224,13 @@ export function BusinessProfileTab({ workspaceId, businessProfile, businessConte
             filled={!!(businessProfile?.socialProfiles?.length)}
             scrollTo="socialProfiles"
             hint={businessProfile?.socialProfiles?.length ? null : 'Populates Organization.sameAs'}
+            workspaceId={workspaceId}
+          />
+          <SchemaImpactRow
+            field="Founded date"
+            filled={!!businessProfile?.foundedDate}
+            scrollTo="foundedDate"
+            hint={businessProfile?.foundedDate ? null : 'Populates Organization.foundedDate'}
             workspaceId={workspaceId}
           />
           <SchemaImpactRow
@@ -406,6 +415,7 @@ export function BusinessProfileTab({ workspaceId, businessProfile, businessConte
                 <div>
                   <label className={labelClass}>Founded</label>
                   <input
+                    data-schema-deeplink="foundedDate"
                     className={fieldClass}
                     placeholder="2015"
                     value={form.foundedDate || ''}

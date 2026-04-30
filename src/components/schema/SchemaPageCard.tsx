@@ -256,14 +256,29 @@ export function SchemaPageCard({
                   const colorClass = severity === 'error' ? 'text-red-400' : 'text-amber-400';
                   const badge = severity === 'error' ? 'Error' : 'Recommended';
 
-                  // Single-finding rows or un-grouped (__noField) — render flat
-                  if (field === '__noField' || findings.length === 1) {
+                  // Single-finding rows — render flat
+                  if (field !== '__noField' && findings.length === 1) {
                     return (
-                      <div key={field} className={`${colorClass} text-xs flex items-start gap-2`}>
-                        <span className="font-semibold uppercase tracking-wide shrink-0" style={{ fontSize: '10px' }}>{badge}</span>
+                      <div key={field} className={`${colorClass} t-caption-sm flex items-start gap-2`}>
+                        <span aria-hidden="true" className="font-semibold uppercase tracking-wide shrink-0" style={{ fontSize: '10px' }}>{badge}</span>
                         <span>{findings[0].message}</span>
                       </div>
                     );
+                  }
+
+                  // Un-grouped (__noField) — render each message flat (no aggregation possible without a key)
+                  if (field === '__noField') {
+                    return findings.map((f, i) => {
+                      const fSeverity = f.severity === 'error' ? 'error' : 'warning';
+                      const fColor = fSeverity === 'error' ? 'text-red-400' : 'text-amber-400';
+                      const fBadge = fSeverity === 'error' ? 'Error' : 'Recommended';
+                      return (
+                        <div key={`__noField-${i}`} className={`${fColor} t-caption-sm flex items-start gap-2`}>
+                          <span aria-hidden="true" className="font-semibold uppercase tracking-wide shrink-0" style={{ fontSize: '10px' }}>{fBadge}</span>
+                          <span>{f.message}</span>
+                        </div>
+                      );
+                    });
                   }
 
                   return (
@@ -271,16 +286,17 @@ export function SchemaPageCard({
                       <button
                         type="button"
                         onClick={() => setExpandedField(expanded ? null : field)}
-                        className={`flex items-center gap-2 w-full text-left ${colorClass} text-xs hover:opacity-80`}
+                        aria-expanded={expanded}
+                        className={`flex items-center gap-2 w-full text-left ${colorClass} t-caption-sm hover:opacity-80`}
                       >
-                        <span className="font-semibold uppercase tracking-wide shrink-0" style={{ fontSize: '10px' }}>{badge}</span>
+                        <span aria-hidden="true" className="font-semibold uppercase tracking-wide shrink-0" style={{ fontSize: '10px' }}>{badge}</span>
                         <span className="truncate">{field} ({findings.length})</span>
-                        <span className="text-[var(--brand-text-muted)] shrink-0">{expanded ? '▾' : '▸'}</span>
+                        <span aria-hidden="true" className="text-[var(--brand-text-muted)] shrink-0">{expanded ? '▾' : '▸'}</span>
                       </button>
                       {expanded && (
                         <div className="ml-4 mt-1 space-y-0.5">
                           {findings.map((f, i) => (
-                            <div key={i} className={`${colorClass} text-xs`}>
+                            <div key={i} className={`${colorClass} t-caption-sm`}>
                               {f.message}
                             </div>
                           ))}

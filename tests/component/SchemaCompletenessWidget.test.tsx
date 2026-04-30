@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
-import { SchemaCompletenessWidget } from '../../src/components/schema/SchemaCompletenessWidget';
+import { SchemaCompletenessWidget, type PageWithFindings } from '../../src/components/schema/SchemaCompletenessWidget';
 import type { ValidationFinding } from '../../shared/types/schema-validation';
 
 function LocationCapture({ onLocation }: { onLocation: (loc: string) => void }) {
@@ -20,7 +20,7 @@ function renderWithRouter(pages: unknown[], workspaceId = 'ws_test') {
           path="/ws/:workspaceId/*"
           element={
             <>
-              <SchemaCompletenessWidget pages={pages as never} workspaceId={workspaceId} />
+              <SchemaCompletenessWidget pages={pages as PageWithFindings[]} workspaceId={workspaceId} />
               <LocationCapture onLocation={loc => { capturedLocation = loc; }} />
             </>
           }
