@@ -252,7 +252,12 @@ describe('briefing template: content_gap', () => {
       competitorProof: 'Plumber Pros ranks #2 for this term.',
       opportunityScore: 88,
     };
-    expectStoryShape(buildStoryFromContentGap(gap, ctx));
+    const story = buildStoryFromContentGap(gap, ctx);
+    expectStoryShape(story);
+    // Content assertions for hasImpressions && hasCompetitorProof branch:
+    // competitorProof ends with "." — the template must strip it to avoid "..".
+    expect(story!.narrative).not.toMatch(/\.\./);
+    expect(story!.narrative).toContain('while Plumber Pros ranks #2 for this term.');
   });
   it('returns null without targetKeyword', () => {
     const gap = { topic: 'x', targetKeyword: '', volume: 1000, intent: 'informational', priority: 'low', rationale: '' } as ContentGap;

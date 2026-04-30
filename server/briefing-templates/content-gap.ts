@@ -77,9 +77,10 @@ export function buildStoryFromContentGap(
   // OR (when neither is present) a numeric restatement that pins the gap.
   let sentence2: string;
   if (hasImpressions && hasCompetitorProof) {
+    const proof = (gap.competitorProof as string).replace(/\.$/, '');
     sentence2 =
       `Your site already shows ${fmtNum(gap.impressions as number)} impressions/mo for the term ` +
-      `without a dedicated page, while ${gap.competitorProof}.`;
+      `without a dedicated page, while ${proof}.`;
   } else if (hasImpressions) {
     sentence2 =
       `Your site already shows ${fmtNum(gap.impressions as number)} impressions/mo for the term ` +
