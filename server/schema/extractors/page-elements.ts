@@ -18,6 +18,7 @@ import { extractImages } from './page-elements/images.js';
 import { extractTables } from './page-elements/tables.js';
 import { extractTestimonials } from './page-elements/testimonials.js';
 import { aiClassifyImages } from './page-elements/image-ai-classifier.js';
+import { aiDisambiguateHowTo } from './page-elements/howto-ai-fallback.js';
 import type { AiBudget } from './page-elements/ai-budget.js';
 import { createLogger } from '../../logger.js';
 
@@ -79,7 +80,18 @@ export async function extractPageElements(
 
     // PR1 elements
     const videos = extractVideos($);
-    const lists = extractLists($);
+    let lists = extractLists($);
+    // Capture parallel raw item text for AI disambiguation (PR2). Same scope rules as extractLists.
+    const $listScope = $('article').length > 0 ? $('article ol') : $('ol');
+    const orderedItemsRaw: string[] = [];
+    $listScope.each((_, ol) => {
+      const items = $(ol).children('li').toArray().map(li => $(li).text().trim());
+      orderedItemsRaw.push(...items);
+    });
+    lists = await aiDisambiguateHowTo(lists, orderedItemsRaw, {
+      budget: opts.aiBudget,
+      workspaceId: opts.workspaceId,
+    });
     const citations = extractCitations($, opts.pageBaseUrl);
 
     // PR2 elements (images / tables / testimonials)
