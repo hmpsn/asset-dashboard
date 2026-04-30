@@ -213,6 +213,11 @@ describe('GET /api/public/briefing/:workspaceId — paid tier, published briefin
     expect(body.briefing).not.toHaveProperty('updatedAt');
   });
 
+  // Phase 2.5e weeklyOpener tests live in their own describe block below
+  // so they can use a dedicated workspace — otherwise their weekOf values
+  // (later than 2026-04-27) would win the "most recently published" query
+  // and break the assertion at line 282.
+
   it('returns the most recently published briefing when multiple are published', async () => {
     // 2026-04-20 was published earlier in the suite; publish 2026-04-27 too.
     // Latest should win.
@@ -405,5 +410,81 @@ describe('GET /api/public/briefing/:workspaceId — Phase 2.5b serve-time fields
     expect(typeof score).toBe('number');
     expect(score).toBeGreaterThan(0);
     expect(score).toBeLessThanOrEqual(100);
+  });
+});
+
+// ── Phase 2.5e — weeklyOpener serialization ────────────────────────────────
+
+describe('GET /api/public/briefing/:workspaceId — Phase 2.5e weeklyOpener', () => {
+  let aiWsId = '';
+  const localCleanups: Array<() => void> = [];
+
+  beforeAll(() => {
+    const ws = seedWorkspace({ tier: 'premium', clientPassword: '' });
+    aiWsId = ws.workspaceId;
+    localCleanups.push(ws.cleanup);
+  });
+
+  afterAll(() => {
+    for (const c of localCleanups) c();
+  });
+
+  it('exposes weeklyOpener but strips originalHeroHeadline + aiMs from sourceMetadata.aiPolish', async () => {
+    const draft = upsertBriefingDraft({
+      workspaceId: aiWsId,
+      weekOf: '2026-04-20',
+      stories: makeStories(3),
+      sourceMetadata: {
+        ...adminMetadata(),
+        // Full aiPolish blob — only `weeklyOpener` should cross the public boundary.
+        aiPolish: {
+          weeklyOpener: 'A consolidation week with 945 monthly impressions in play.',
+          originalHeroHeadline: 'Pre-punch deterministic headline that should NOT reach client',
+          aiMs: 1234,
+        },
+      },
+    });
+    markPublished(aiWsId, draft.id, { autoPublished: false });
+
+    const res = await api(`/api/public/briefing/${aiWsId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { briefing: Record<string, unknown> | null };
+    expect(body.briefing).not.toBeNull();
+
+    // Whitelist: weeklyOpener appears alongside the existing public fields.
+    const keys = Object.keys(body.briefing!).sort();
+    expect(keys).toEqual([
+      'issueNumber',
+      'issueSummary',
+      'publishedAt',
+      'recommendations',
+      'stories',
+      'weekOf',
+      'weeklyOpener',
+    ]);
+    expect(body.briefing!.weeklyOpener).toBe('A consolidation week with 945 monthly impressions in play.');
+
+    // Admin-only aiPolish sub-fields must NOT leak.
+    const briefingStr = JSON.stringify(body.briefing);
+    expect(briefingStr).not.toContain('Pre-punch deterministic headline');
+    expect(briefingStr).not.toContain('originalHeroHeadline');
+    expect(briefingStr).not.toContain('aiMs');
+    expect(briefingStr).not.toContain('aiPolish');
+  });
+
+  it('omits weeklyOpener key entirely when sourceMetadata.aiPolish is absent (pre-2.5e drafts)', async () => {
+    const draft = upsertBriefingDraft({
+      workspaceId: aiWsId,
+      weekOf: '2026-04-27',
+      stories: makeStories(2),
+      sourceMetadata: adminMetadata(), // no aiPolish field
+    });
+    markPublished(aiWsId, draft.id, { autoPublished: false });
+
+    const res = await api(`/api/public/briefing/${aiWsId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { briefing: Record<string, unknown> | null };
+    expect(body.briefing).not.toBeNull();
+    expect(body.briefing).not.toHaveProperty('weeklyOpener');
   });
 });

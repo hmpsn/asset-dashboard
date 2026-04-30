@@ -2,7 +2,7 @@
 **Date:** 2026-04-29
 **Status:** Draft (awaiting user review)
 **Builds on:** `2026-04-28-client-insights-briefing-refactor-design.md` (Phase 1 + 2 — merged)
-**Phasing:** Four sub-phases (2.5a / 2.5b / 2.5c / 2.5d). One PR per phase. Reuse-first. No new feature flags — `client-briefing-v2` continues to gate everything.
+**Phasing:** Five sub-phases (2.5a / 2.5b / 2.5c / 2.5d / 2.5e). One PR per phase. Reuse-first. The optional AI-polish sub-flag `client-briefing-v2-ai-polish` lands in 2.5e; `client-briefing-v2` gates the rest. **Reorder note (2026-04-29):** AI hero-punch + weekly-opener moved from 2.5c → 2.5e (post-cleanup) so they land on a tidy `briefing-prompt.ts` rather than next to the dead full-narrative path.
 
 ---
 
@@ -30,7 +30,9 @@ The redesign is divided into three phases, each shippable on its own:
 
 - **Phase 2.5a** — Server-side template rebuild. **Zero frontend changes.** Magazine layout stays; content becomes data-rooted. Validates the thesis at minimum risk.
 - **Phase 2.5b** — Add new layout sections (Pulse, Data Spread, Recommended for You, Issue Summary, Date Line) using existing primitives.
-- **Phase 2.5c** — Historical anchors + optional Premium AI polish + milestone attribution.
+- **Phase 2.5c** — Historical anchors + milestone attribution + weCalledIt outcome stories.
+- **Phase 2.5d** — Cleanup of dead Phase 1/2 AI narrative code (housekeeping, net deletions).
+- **Phase 2.5e** — Optional Premium AI polish (hero-headline punch + weekly opener), gated behind `client-briefing-v2-ai-polish`. Runs AFTER 2.5d so it builds on a clean `briefing-prompt.ts`.
 
 The whole redesign is gated behind the existing `client-briefing-v2` feature flag. Workspaces with the flag off see the legacy `<OverviewTab>`. No data migration required at any phase.
 
@@ -105,7 +107,7 @@ This redesign is contract-bound to reuse the following existing code. New implem
 | `server/briefing-anchors.ts` | 2.5c | ~150 | "Best week since" formatter. |
 | `weCalledIt` client allowlist edit | 2.5c | ~50 | `summarizeInsightsForClient` extension. |
 | `milestone_attribution` story type | 2.5c | ~100 | Reuses `tracked_actions` table — no new state. |
-| Optional AI hero-punch + weekly-opener (Premium, fail-soft) | 2.5c | ~200 | Two small AI passes. |
+| Optional AI hero-punch + weekly-opener (Premium, fail-soft) | 2.5e | ~200 | Two small AI passes. Reordered out of 2.5c on 2026-04-29 so they land on a clean `briefing-prompt.ts` after 2.5d's deletion pass. |
 | Tests across all phases | each | ~1,200 total | Golden tests per template + component tests + integration |
 
 **Revised total: ~3,650 LOC across three PRs.**
@@ -377,11 +379,11 @@ The prediction we made on Mar 14 just landed.
 
 **Default state: zero AI calls per briefing render.** Pure deterministic projection.
 
-Two optional AI passes, both gated behind sub-flags, both fail-soft to deterministic templates, both Premium-only:
+Two optional AI passes, both gated behind the `client-briefing-v2-ai-polish` flag, both fail-soft to deterministic templates, both Premium-only. Both ship in **Phase 2.5e** (post-cleanup) — see the phasing reorder note at the top of this spec:
 
-1. **Hero headline punch** (Phase 2.5c) — given the deterministic headline + the underlying typed insight, request a punchier 5–12-word version. Cost: ~50 tokens per briefing. Fail-soft: original deterministic headline.
+1. **Hero headline punch** (Phase 2.5e) — given the deterministic headline + the underlying typed insight, request a punchier 5–12-word version. Cost: ~50 tokens per briefing. Fail-soft: original deterministic headline.
 
-2. **Weekly opener line** (Phase 2.5c) — one short narrative line above the Pulse strip ("A quiet week on the rankings front, with momentum building in fleet content"). Cost: ~80 tokens per briefing. Fail-soft: omit.
+2. **Weekly opener line** (Phase 2.5e) — one short narrative line above the Pulse strip ("A quiet week on the rankings front, with momentum building in fleet content"). Cost: ~80 tokens per briefing. Fail-soft: omit.
 
 Both AI passes:
 - Require `client-briefing-v2-ai-polish` sub-flag (default off)
@@ -443,8 +445,11 @@ Each phase plan must verify before committing to file changes:
 2. **Existing weekly cron** — find the right cron to piggyback on for snapshot writes (likely `intelligence-crons.ts` or `briefing-cron.ts`'s tick).
 3. **`tracked_actions` reuse for `milestone_attribution`** — confirm we can write a baseline_snapshot at brief delivery time without breaking the existing outcome-tracking flow.
 4. **`weCalledIt` client allowlist path** — decide between (a) `summarizeInsightsForClient` extension and (b) `latestBriefing` slice path-through. Plan documents the choice with reasoning.
-5. **AI sub-flag** — `client-briefing-v2-ai-polish`. Add to `shared/types/feature-flags.ts` before any AI code lands.
-6. **Fail-soft testing** — golden tests that exercise the AI-error path and confirm deterministic fallback renders.
+
+### Phase 2.5e plan must verify (AI polish, post-cleanup):
+1. **`client-briefing-v2-ai-polish` sub-flag** — add to `shared/types/feature-flags.ts` before any AI code lands.
+2. **Fail-soft testing** — golden tests that exercise every AI-error path (timeout, rate-limit, hedge-word violation, word-count violation) and confirm deterministic fallback renders.
+3. **`briefing-prompt.ts` clean slate** — confirm 2.5d's deletion pass left the file empty (or fully removed). 2.5e re-adds only `punchHeroHeadline` + `writeWeeklyOpener`.
 
 ---
 
@@ -488,25 +493,43 @@ Each phase plan must verify before committing to file changes:
 
 **Soak:** Same workspaces. One more week. Then decide on 2.5c.
 
-### Phase 2.5c — Anchors + Premium polish (OPTIONAL)
+### Phase 2.5c — Anchors + outcome stories
 
-**PR scope:** Backend infra + optional AI passes.
+**PR scope:** Backend infra. Anchors + two new story types (weCalledIt, milestone_attribution).
 
 **Files touched:**
-- NEW: migration `NNN-workspace-metrics-snapshots.sql`
+- NEW: migration `079-workspace-metrics-snapshots.sql`
 - NEW: `server/workspace-metrics-snapshots.ts`
 - NEW: `server/briefing-anchors.ts`
-- MODIFIED: `server/insight-to-story.ts` (wire anchors)
-- NEW: `client-briefing-v2-ai-polish` flag
-- MODIFIED: `server/briefing-prompt.ts` (hero punch + opener helpers)
-- MODIFIED: `summarizeInsightsForClient` (weCalledIt allowlist) OR `latestBriefing` slice path
-- NEW: `milestone_attribution` story type + tracked_actions baseline capture
+- NEW: `server/briefing-templates/we-called-it.ts`
+- NEW: `server/briefing-templates/milestone-attribution.ts`
+- MODIFIED: per-template anchor wiring (e.g. `ranking-mover.ts`, `audit-finding.ts` — others opt-in incrementally)
+- MODIFIED: `briefing-candidates.ts` (collectors) + `briefing-cron.ts` (dispatch)
+- NEW: `milestone_attribution` InsightType (4-place lockstep)
 - Tests
 
-**Validates:** Editorial polish. Premium tier upgrade.
+**Validates:** Historical anchor framing + outcome attribution.
 
-**Optional:** If 2.5a + 2.5b feel done, skip or defer indefinitely. Anchors are the only piece that genuinely improves the editorial voice; AI passes are tier-polish.
+### Phase 2.5d — Cleanup (housekeeping, NET DELETIONS)
+
+**PR scope:** Delete the dead Phase 1/2 AI narrative path. See plan §"Phase 2.5d" for the full audit list.
+
+### Phase 2.5e — Premium AI polish (OPTIONAL)
+
+**PR scope:** AI hero-headline punch + weekly opener, both gated behind `client-briefing-v2-ai-polish` AND `tier === 'premium'`. Built fresh on the cleaned-up `briefing-prompt.ts` from 2.5d.
+
+**Files touched:**
+- MODIFIED: `shared/types/feature-flags.ts` (new sub-flag)
+- NEW content in: `server/briefing-prompt.ts` (`punchHeroHeadline`, `writeWeeklyOpener`)
+- MODIFIED: `server/briefing-cron.ts` (post-template AI block, fail-soft)
+- MODIFIED: `shared/types/briefing.ts` (`weeklyOpener?: string` on `PublishedBriefingResponse`)
+- MODIFIED: `src/components/client/Briefing/InsightsBriefingPage.tsx` (renders opener above DateLine)
+- Tests
+
+**Validates:** Editorial polish for Premium. Flag-flip is the rollback.
+
+**Optional:** If 2.5c feels done at the soak interval, skip or defer indefinitely. Anchors are the only piece that genuinely improves the editorial voice; AI passes are tier-polish.
 
 ---
 
-**End of spec.** Three plan docs follow: `2026-04-29-client-insights-redesign-2.5a-plan.md`, `...2.5b-plan.md`, `...2.5c-plan.md`. Each references this document.
+**End of spec.** Five plan PRs are tracked in the master plan document (`docs/superpowers/plans/2026-04-29-client-insights-redesign.md`).

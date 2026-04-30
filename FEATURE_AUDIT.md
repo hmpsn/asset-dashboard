@@ -3949,7 +3949,7 @@ Current feature count: **310**. Last updated: April 2026.
 
 ---
 
-### 325. Schema Page-Element Catalog PR2 (PR #TBD, 2026-04-30)
+### 326. Schema Page-Element Catalog PR2 (PR #388, 2026-04-30)
 
 **What it does:** Builds on PR1's catalog infrastructure to ship 3 new pattern-based extractors (images with rule-based hero/informative/decorative role classification, tables with pricing/comparison heuristics, testimonials with author + optional rating extraction) plus 2 AI-assisted extractors (image role classifier with vision via gpt-4.1-mini, HowTo-list disambiguation via gpt-4.1-mini text) behind a single feature flag `schema-ai-element-classifier` (default OFF, 120-call shared `AiBudget` per regenerate-all run). Adds 4 validator `REQUIRED_BY_TYPE` entries (Review, AggregateRating, Table, ImageGallery) and 3 schema integrations: `ImageGallery` node on Article + Service templates from informative images; `Review[]` graph nodes + `AggregateRating` aggregate on Service + LocalBusiness templates from rated testimonials; `Table` mainEntity sub-graph on Service templates from pricing/comparison tables. Each new node has a synchronous pre-emission gate (Devin PR1 r2 BUG-0001 lesson): Review requires `itemReviewed.@id` + `reviewRating` + `author` all present; AggregateRating only emits when ≥1 testimonial has a rating; Table requires `about` populated; ImageGallery requires `name` + ≥2 informative images.
 
@@ -4052,3 +4052,79 @@ Current feature count: **310**. Last updated: April 2026.
 **Agency value (when flag flipped):** The reader gets a 5-minute investor-briefing read with a clear stopping rhythm — vital signs in 10s, headline in 30s, "what should I invest in next" upsell in 60s. The "Recommended for You" section surfaces the agency's per-brief monetization in-flow rather than buried 3 clicks deep on the Strategy tab.
 
 **Files added (~1,200 LOC):** `server/briefing-summary.ts`; `src/components/client/Briefing/{PulseStrip,DataSpread,RecommendedForYou,IssueSummaryLine,DateLine}.tsx`; `tests/unit/briefing-summary.test.ts`; `tests/unit/briefing-data-spread.test.tsx`; `tests/unit/briefing-action-staleness.test.tsx`. **Files modified:** `shared/types/briefing.ts` (BriefingRecommendation + PublishedBriefingResponse extension); `server/briefing-store.ts` (count helper); `server/routes/public-portal.ts` (endpoint computes serve-time fields); `src/components/client/Briefing/InsightsBriefingPage.tsx` (composer mounts new sections + computes pulseData/staleness); `src/components/client/Briefing/HeroStoryCard.tsx` (dataReceipt rendering); `src/components/client/Briefing/ActionQueueStrip.tsx` (stale escalation + computeStaleness export); `src/index.css` (.t-caption typography update); `tests/integration/briefing-public.test.ts` (extended).
+
+---
+
+### 324. Client Insights Briefing v2 — Phase 2.5c (Anchors + Outcome Stories)
+**What it does:** Adds historical anchors ("best week since Mar 17") to existing 2.5a template `dataReceipt` lines and introduces two new story types: `weCalledIt` (the prediction-landed trust play) and `milestone_attribution` (a delivered brief crossed a clicks threshold). All gated by the existing `client-briefing-v2` flag — no new flags. The optional AI passes (hero-headline punch + weekly opener) are deferred to a separate small PR per the spec's "Premium polish" framing.
+
+**Server side:**
+- `server/db/migrations/079-workspace-metrics-snapshots.sql` (NEW): one row per `(workspace_id, snapshot_date)` UNIQUE, nullable metric columns (`total_clicks`, `total_impressions`, `avg_position`, `audit_score`, `organic_traffic_value`).
+- `server/workspace-metrics-snapshots.ts` (NEW): read/write helpers + cron orchestrator.
+  - `recordSnapshot` (idempotent INSERT … ON CONFLICT DO UPDATE)
+  - `getSnapshots(workspaceId, days = 90)`
+  - `getBestValueSinceDate(workspaceId, metricName, current, windowDays)` — metric-aware comparator (lower-is-better for `avg_position`, higher-is-better for the rest)
+  - `pruneOld(workspaceId, retentionDays = 90)`
+  - `recordWeeklyBriefingSnapshot(workspaceId, weekOf)` — async, pulls GSC overview + audit score + ROI value, each in independent try/catch
+- `server/briefing-cron.ts`: piggyback `recordWeeklyBriefingSnapshot` after `upsertBriefingDraft`. Plus a NEW dispatch path: candidates with `wci-` and `milestone-` id prefixes route through dedicated templates, with a synthetic `AnalyticsInsight<'milestone_attribution'>` constructed in-memory from the action + ROI content-item.
+- `server/briefing-anchors.ts` (NEW): `findBestWeekSince(workspaceId, metricName, current, windowDays?)` — phrase formatter. Returns `{ sinceDate, phrase }`. Phrases pre-vetted for the pr-check banned-hedge-words rule.
+- `server/briefing-templates/_helpers.ts`: NEW `appendAnchor(receipt, workspaceId, metricName, current)` helper. Templates call this when they have a snapshot-worthy metric on hand.
+- `server/briefing-templates/we-called-it.ts` (NEW): projects a `TrackedAction + ActionOutcome (strong_win)` into a hero-eligible win story. Action-type-aware verb labels (10 ActionType variants). Three narrative shapes (page+keyword / page-only / keyword-only).
+- `server/briefing-templates/milestone-attribution.ts` (NEW): projects a `MilestoneAttributionData` insight into a hero-eligible win story. Threshold-aware framing per `first_clicks | fifty_clicks | hundred_clicks`.
+- `server/briefing-templates/index.ts`: registers `milestone_attribution` in `INSIGHT_DISPATCHERS`. Re-exports `buildStoryFromWeCalledIt`. Extends `TemplateContext` with optional `pulseMetrics` (forward-looking — anchor wiring uses the helper today, the context field lets templates query their own metric without a workspace fetch in future).
+- `server/briefing-candidates.ts`: NEW `collectWeCalledItCandidates` (reads tracked_actions + recent strong_win outcomes, 14-day recency cap) and `collectMilestoneAttributionCandidates` (reads ROI contentItems + tracked_actions baselines, 90-day delivery cap, "tight band above threshold" detection to avoid weekly re-firing).
+- `server/briefing-templates/{ranking-mover,audit-finding}.ts`: anchors wired — `total_clicks` for `ranking_mover`, `audit_score` for `audit_finding`. The pattern is `let receipt = '...'; receipt = appendAnchor(receipt, ctx.workspaceId, 'metric_name', currentValue)`. Other templates can opt in incrementally — `appendAnchor` is fail-soft (no anchor → receipt unchanged).
+
+**Type registration (4-place lockstep per CLAUDE.md):**
+1. `shared/types/analytics.ts` — `'milestone_attribution'` added to `InsightType` union; `MilestoneAttributionData extends InsightDataBase` interface; `InsightDataMap` entry.
+2. `server/schemas/insight-schemas.ts` — `milestoneAttributionDataSchema` Zod schema with `thresholdCrossed` enum + map entry.
+3. `server/analytics-insights-store.ts` — `getInsight` made GENERIC on `InsightType` so callers reading by specific type get the narrowed `AnalyticsInsight<T>` shape (drops the need for `as` casts at consumer sites). Was needed because the leaner `MilestoneAttributionData` would have broken the existing audit-finding consumers' field-access pattern.
+4. `src/components/client/InsightsDigest.tsx` — `INSIGHT_TYPE_ICONS` entry → `Trophy`.
+
+**Tests:**
+- `tests/unit/briefing-anchors.test.ts` (NEW, 8 cases) — phrase shapes per metric, lower-vs-higher-is-better mapping, no banned hedge words.
+- `tests/unit/workspace-metrics-snapshots.test.ts` (NEW, 14 cases) — record/upsert/getSnapshots/getBestValueSinceDate (newest-first, lower-is-better, null-skip), pruneOld retention.
+- `tests/unit/briefing-templates.test.ts` (extended, +8 cases) — milestone_attribution dispatch + threshold framing + voice contract; weCalledIt eligibility guards + win story shape + voice contract.
+
+**Constraint compliance:**
+- ✅ Migration number 079 verified next available
+- ✅ No new feature flag (per plan T2.5c.3 clarification)
+- ✅ AI passes (T2.5c.10/.11) deferred to a separate PR per spec
+- ✅ 4-place lockstep for new InsightType
+- ✅ typecheck + 1,978 tests pass
+
+**Files added:** `server/db/migrations/079-workspace-metrics-snapshots.sql`; `server/workspace-metrics-snapshots.ts`; `server/briefing-anchors.ts`; `server/briefing-templates/{we-called-it,milestone-attribution}.ts`; `tests/unit/{briefing-anchors,workspace-metrics-snapshots}.test.ts`. **Files modified:** `shared/types/analytics.ts`; `server/schemas/insight-schemas.ts`; `server/analytics-insights-store.ts`; `server/briefing-cron.ts`; `server/briefing-candidates.ts`; `server/briefing-templates/{index,_helpers,ranking-mover,audit-finding}.ts`; `src/components/client/InsightsDigest.tsx`; `tests/unit/briefing-templates.test.ts`.
+
+---
+
+### 325. Client Insights Briefing v2 — Phase 2.5e (Premium AI Polish)
+**What it does:** Adds two optional AI passes to the deterministic briefing pipeline — `punchHeroHeadline` (rewrites the hero headline 5–12 words, definite tense, no hedges) and `writeWeeklyOpener` (one-line "letter from the editor" rendered above the dateline). Both gated behind the new `client-briefing-v2-ai-polish` sub-flag AND `tier === 'premium'`. Both fail-soft to the deterministic original (or null for the opener) on any error path. Cleanup of the legacy AI narrative path stays scoped to Phase 2.5d. Spec: `docs/superpowers/specs/2026-04-29-client-insights-redesign-design.md`. Plan: `docs/superpowers/plans/2026-04-29-client-insights-redesign.md` Phase 2.5e section.
+
+**Server side:**
+- `shared/types/feature-flags.ts`: new `'client-briefing-v2-ai-polish'` flag, default off. Sub-flag composes with `client-briefing-v2` and the workspace tier check — both must clear before either AI call fires.
+- `shared/types/briefing.ts`: extended `BriefingSourceMetadata.aiPolish` (admin-only sub-object: `weeklyOpener?`, `originalHeroHeadline?`, `aiMs?`). Extended `PublishedBriefingResponse.weeklyOpener?` (the only piece that crosses the public boundary).
+- `server/briefing-store.ts`: Zod schema mirrors the optional `aiPolish` shape so existing pre-2.5e drafts round-trip cleanly.
+- `server/briefing-prompt.ts`: NEW `punchHeroHeadline(deterministicHeadline, insightHint, workspaceId)` and `writeWeeklyOpener(stories, ctx)`. Both use `callAI({ provider: 'anthropic' })` against tight prompts; ~50/~80 tokens per call.
+- `server/briefing-cron.ts`: post-template-projection AI block. Punched headline mutates `stories[heroIndex].headline` IN PLACE before persist; opener stored in `sourceMetadata.aiPolish`. Total polish budget logged as `aiMs`. Fail-soft helpers + outer try/catch double up so the AI path can never fail the briefing run.
+- `server/routes/public-portal.ts`: pulls `weeklyOpener` from `sourceMetadata.aiPolish` and exposes it on the wire response. Rest of `aiPolish` stays admin-only.
+
+**Fail-soft contract (load-bearing):**
+- `punchHeroHeadline` validates each AI response against four guards: no hedge words, no embedded newlines, 5–12 words inclusive, non-empty after unquoting. Any failure → returns the deterministic original.
+- `writeWeeklyOpener` adds three more: ≤25 words, period-terminated, no quotation marks (clash with magazine chrome), at least one number cited (`/\d/`). Any failure → returns null. The composer skips the section entirely when the field is absent.
+- Both helpers wrap every error in `try/catch` and log at `debug` level — opt-in polish, not a critical path.
+
+**Frontend:**
+- `src/components/client/Briefing/WeeklyOpener.tsx` (NEW, 24 LOC): single italic muted body line. Renders nothing for empty input.
+- `src/components/client/Briefing/InsightsBriefingPage.tsx`: composer renders `<WeeklyOpener>` ABOVE `<DateLine>` when `briefing.weeklyOpener` is present. Reading-rhythm comment updated.
+
+**Tests (20 new cases in briefing-prompt-ai-polish.test.ts):**
+- punchHeroHeadline: happy path, quote-stripping, < 5 words, > 12 words, hedge-word violation, multiline response, AI throws, empty input (no AI call), insightHint passed through, insightHint omitted.
+- writeWeeklyOpener: happy path, quote-stripping, empty stories (no AI call), internal quote rejection, hedge-word, > 25 words, missing period, no numbers cited, AI throws, headlines + first-metric values flow into prompt.
+
+**Constraint compliance:**
+- ✅ No new DB migration (opener persisted in existing `source_metadata` JSON column)
+- ✅ No frontend regression — composer renders identically when flag/tier blocks the AI call
+- ✅ Pre-2.5e drafts round-trip cleanly (aiPolish optional in Zod schema)
+- ✅ typecheck + 109 briefing tests pass
+
+**Files added:** `src/components/client/Briefing/WeeklyOpener.tsx`; `tests/unit/briefing-prompt-ai-polish.test.ts`. **Files modified:** `shared/types/feature-flags.ts`; `shared/types/briefing.ts`; `server/briefing-store.ts`; `server/briefing-prompt.ts`; `server/briefing-cron.ts`; `server/routes/public-portal.ts`; `src/components/client/Briefing/InsightsBriefingPage.tsx`.

@@ -44,13 +44,18 @@ import { WS_EVENTS } from './ws-events.js';
 import { addActivity } from './activity-log.js';
 import { notifyClientBriefingReady } from './email.js';
 import { computeROI } from './roi.js';
+import { recordWeeklyBriefingSnapshot } from './workspace-metrics-snapshots.js';
+import { punchHeroHeadline, writeWeeklyOpener } from './briefing-prompt.js';
 import {
   buildStoryFromInsight,
   buildStoryFromContentGap,
+  buildStoryFromWeCalledIt,
   SUPPORTED_INSIGHT_TYPES,
 } from './briefing-templates/index.js';
 import { getInsightById } from './analytics-insights-store.js';
-import type { BriefingStory } from '../shared/types/briefing.js';
+import { getAction, getOutcomesForAction } from './outcome-tracking.js';
+import type { BriefingStory, BriefingSourceMetadata } from '../shared/types/briefing.js';
+import type { AnalyticsInsight, MilestoneAttributionData } from '../shared/types/analytics.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('briefing-cron');
@@ -259,6 +264,11 @@ async function runBriefingForWorkspaceInner(
   //
   // Filter THEN score — same materiality math, fewer wasted slots.
   const dispatchableCandidates = candidates.filter((c) => {
+    // Phase 2.5c — wci- / milestone- prefixed candidates have dedicated
+    // dispatch paths in the projection loop below. They don't read from
+    // analytics_insights, so the SUPPORTED_INSIGHT_TYPES check doesn't apply.
+    if (c.id.startsWith('wci-')) return true;
+    if (c.id.startsWith('milestone-')) return true;
     if (c.referenceType === 'analytics_insight') {
       return SUPPORTED_INSIGHT_TYPES.includes(
         // The candidate doesn't carry the insightType directly; we look up
@@ -306,7 +316,67 @@ async function runBriefingForWorkspaceInner(
   for (const candidate of top) {
     let story: BriefingStory | null = null;
     try {
-      if (candidate.referenceType === 'recommendation' && candidate.id.startsWith('gap-')) {
+      if (candidate.id.startsWith('wci-')) {
+        // Phase 2.5c — weCalledIt. Candidate.referenceId is the action id;
+        // re-fetch the action + most-recent strong_win outcome and dispatch
+        // through the dedicated template.
+        const action = getAction(candidate.referenceId);
+        if (action) {
+          const outcomes = getOutcomesForAction(action.id);
+          const latest = outcomes.length
+            ? outcomes.reduce(
+                (acc, o) => (Date.parse(o.measuredAt) > Date.parse(acc.measuredAt) ? o : acc),
+                outcomes[0],
+              )
+            : null;
+          if (latest) {
+            story = buildStoryFromWeCalledIt({ action, outcome: latest }, templateContext);
+          }
+        }
+      } else if (candidate.id.startsWith('milestone-')) {
+        // Phase 2.5c — milestone_attribution. Construct a synthetic
+        // AnalyticsInsight<'milestone_attribution'> in-memory from the
+        // tracked_action + ROI content-item, then route through the same
+        // INSIGHT_DISPATCHERS map other types use. No persisted insight row
+        // — the dispatch is purely in-memory for this story type.
+        const action = getAction(candidate.referenceId);
+        if (action && action.pageUrl && roiData?.contentItems) {
+          const item = roiData.contentItems.find((ci) => {
+            const ciAny = ci as { contentRequestId?: string; pageUrl?: string };
+            if (action.sourceId && ciAny.contentRequestId === action.sourceId) return true;
+            return ciAny.pageUrl === action.pageUrl;
+          }) as { currentClicks?: number; trafficValue?: number; title?: string } | undefined;
+          if (item && typeof item.currentClicks === 'number' && item.currentClicks > 0) {
+            const cc = item.currentClicks;
+            const threshold: MilestoneAttributionData['thresholdCrossed'] =
+              cc >= 100 ? 'hundred_clicks' : cc >= 50 ? 'fifty_clicks' : 'first_clicks';
+            const daysSinceDelivery = Math.floor(
+              (Date.now() - Date.parse(action.createdAt)) / 86400_000,
+            );
+            const data: MilestoneAttributionData = {
+              briefId: action.sourceId ?? action.id,
+              briefTitle: item.title ?? action.targetKeyword ?? 'this brief',
+              pageUrl: action.pageUrl,
+              thresholdCrossed: threshold,
+              currentClicks: cc,
+              daysSinceDelivery: Math.max(0, daysSinceDelivery),
+              trafficValue: typeof item.trafficValue === 'number' ? item.trafficValue : 0,
+            };
+            const synthetic: AnalyticsInsight<'milestone_attribution'> = {
+              id: `milestone-${data.briefId}`,
+              workspaceId,
+              insightType: 'milestone_attribution',
+              pageId: null,
+              pageTitle: data.briefTitle,
+              data,
+              severity: 'positive',
+              impactScore: candidate.impact,
+              computedAt: new Date().toISOString(),
+            };
+            story = buildStoryFromInsight(synthetic, templateContext);
+          }
+        }
+      } else if (candidate.referenceType === 'recommendation' && candidate.id.startsWith('gap-')) {
         const gap = ws.keywordStrategy?.contentGaps?.find(
           (g) => g.targetKeyword === candidate.referenceId,
         );
@@ -357,6 +427,63 @@ async function runBriefingForWorkspaceInner(
     stories[0].isHeadline = true;
   }
 
+  // Phase 2.5e — Premium AI polish (hero headline punch + weekly opener).
+  // Two-part contract:
+  //   1. Both AI calls fire only when the sub-flag is on AND tier === premium.
+  //   2. Both fail-soft: punchHeroHeadline returns the original on any error,
+  //      writeWeeklyOpener returns null. The cron's surrounding try/catch is
+  //      a backup but the helpers should never throw on their own.
+  // The punched headline mutates `stories[heroIndex]` IN PLACE before the
+  // upsert so the persisted draft stores the polished version. The opener
+  // is persisted in `sourceMetadata.aiPolish` to avoid a schema change.
+  let aiPolishPayload: NonNullable<BriefingSourceMetadata['aiPolish']> | undefined;
+  const aiPolishEnabled = isFeatureEnabled('client-briefing-v2-ai-polish') && ws.tier === 'premium';
+  if (aiPolishEnabled && stories.length > 0) {
+    const aiStart = Date.now();
+    const heroIdx = stories.findIndex((s) => s.isHeadline);
+    const hero = heroIdx >= 0 ? stories[heroIdx] : null;
+    const originalHeroHeadline = hero?.headline;
+    let weeklyOpener: string | null = null;
+    let headlineWasPunched = false;
+    try {
+      // Hero headline punch — fail-soft inside the helper; this try/catch is
+      // a backup so a malformed module never fails the briefing.
+      if (hero) {
+        const insightHint = hero.metrics.length > 0
+          ? `${hero.category}: ${hero.metrics.map((m) => `${m.value} ${m.label}`).join(', ')}`
+          : null;
+        const punched = await punchHeroHeadline(hero.headline, insightHint, workspaceId);
+        if (punched && punched !== hero.headline) {
+          stories[heroIdx].headline = punched;
+          headlineWasPunched = true;
+        }
+      }
+      // Weekly opener is ORDER-DEPENDENT on the headline punch above —
+      // it sees the polished headline (when present) in the stories
+      // array. Do NOT parallelise via Promise.all; the opener prompt
+      // benefits from quoting the punched line.
+      weeklyOpener = await writeWeeklyOpener(stories, {
+        workspaceName: ws.name,
+        weekOf,
+        workspaceId,
+      });
+    } catch (err) {
+      log.debug({ workspaceId, err: String(err) }, 'briefing AI polish: helper threw, treating as fail-soft');
+    }
+    // Only persist the aiPolish payload when at least one AI call produced
+    // a useful output. A `{ aiMs: 1234 }`-only payload is noisy telemetry
+    // (records "we tried" but conveys nothing actionable). When both AI
+    // calls fall back fully, leave aiPolishPayload undefined so the draft
+    // looks identical to a flag-off run.
+    if (weeklyOpener || headlineWasPunched) {
+      aiPolishPayload = {
+        ...(weeklyOpener ? { weeklyOpener } : {}),
+        ...(headlineWasPunched && originalHeroHeadline ? { originalHeroHeadline } : {}),
+        aiMs: Date.now() - aiStart,
+      };
+    }
+  }
+
   // Persist
   const draft = upsertBriefingDraft({
     workspaceId,
@@ -368,6 +495,7 @@ async function runBriefingForWorkspaceInner(
       provider: 'anthropic', // unused but Zod-required
       generationMs,
       preflightDeferralCount: deferrals,
+      ...(aiPolishPayload ? { aiPolish: aiPolishPayload } : {}),
     },
   });
   updateWorkspace(workspaceId, { lastBriefingRunWeekOf: weekOf });
@@ -383,6 +511,17 @@ async function runBriefingForWorkspaceInner(
     weekOf,
     action: 'generated',
   });
+
+  // Phase 2.5c — piggyback metric snapshot on the weekly tick. Captures the
+  // metrics that drove this week's pulse data (GSC clicks/impressions/avg-pos,
+  // audit score, ROI traffic value) so future briefings can anchor against
+  // them ("best week since Mar 17"). Failures are logged but don't fail the
+  // cron run — the briefing is already persisted by this point.
+  try {
+    await recordWeeklyBriefingSnapshot(workspaceId, weekOf);
+  } catch (err) {
+    log.warn({ workspaceId, weekOf, err: String(err) }, 'snapshot record failed');
+  }
 
   // Auto-publish branch — only when admin opted in AND afterHours = 0 (immediate)
   // AND the global client-briefing-v2 flag is enabled. The flag gate prevents

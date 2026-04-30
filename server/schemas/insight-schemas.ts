@@ -201,6 +201,20 @@ export const freshnessAlertDataSchema = z.object({
   clicks: z.number().optional(),
 });
 
+// Phase 2.5c — milestone_attribution. Fired when a delivered brief crosses
+// a clicks threshold (first / 50 / 100). Pairs the brief metadata with the
+// post-delivery measurement window so the briefing can frame the win as
+// attributable to the brief.
+export const milestoneAttributionDataSchema = z.object({
+  briefId: z.string(),
+  briefTitle: z.string(),
+  pageUrl: z.string(),
+  thresholdCrossed: z.enum(['first_clicks', 'fifty_clicks', 'hundred_clicks']),
+  currentClicks: z.number().nonnegative(),
+  daysSinceDelivery: z.number().nonnegative(),
+  trafficValue: z.number().nonnegative(),
+});
+
 /**
  * Maps each InsightType to its DB-stored Zod schema.
  * Used by rowToInsight to validate the data JSON column via parseJsonSafe.
@@ -227,4 +241,5 @@ export const INSIGHT_DATA_SCHEMA_MAP: Record<InsightType, ZodTypeAny> = {
   emerging_keyword: emergingKeywordDataSchema.partial().passthrough(),
   competitor_alert: competitorAlertDataSchema.partial().passthrough(),
   freshness_alert: freshnessAlertDataSchema.partial().passthrough(),
+  milestone_attribution: milestoneAttributionDataSchema.partial().passthrough(),
 };

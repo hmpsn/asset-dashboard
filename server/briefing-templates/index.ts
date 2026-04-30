@@ -28,7 +28,14 @@ import { buildStoryFromInsight as contentDecay } from './content-decay.js';
 import { buildStoryFromInsight as auditFinding } from './audit-finding.js';
 import { buildStoryFromInsight as competitorAlert } from './competitor-alert.js';
 import { buildStoryFromInsight as pageHealth } from './page-health.js';
+import { buildStoryFromInsight as milestoneAttribution } from './milestone-attribution.js';
 import { buildStoryFromContentGap as contentGapBuilder } from './content-gap.js';
+
+// Phase 2.5c — weCalledIt isn't routed through INSIGHT_DISPATCHERS because
+// its input is a TrackedAction + ActionOutcome, not an AnalyticsInsight row.
+// Re-exported here so the cron can dispatch wci-prefixed candidates from a
+// single entrypoint.
+export { buildStoryFromWeCalledIt, type WeCalledItInput } from './we-called-it.js';
 
 /**
  * Unified context passed to every template. `tier` enables tier-aware
@@ -47,6 +54,19 @@ export interface TemplateContext {
    * workspace yet (no keyword strategy).
    */
   avgCPC?: number;
+  /**
+   * Phase 2.5c — pre-computed pulse data the cron has on hand. Templates
+   * use these to query `findBestWeekSince` and append "best week since X"
+   * anchor phrases to their `dataReceipt`. Optional — when missing the
+   * anchor block degrades silently (no anchor appended).
+   */
+  pulseMetrics?: {
+    totalClicks?: number;
+    totalImpressions?: number;
+    avgPosition?: number;
+    auditScore?: number;
+    organicTrafficValue?: number;
+  };
 }
 
 /**
@@ -70,6 +90,7 @@ const INSIGHT_DISPATCHERS: Partial<Record<InsightType, InsightDispatcher>> = {
   audit_finding: auditFinding as InsightDispatcher,
   competitor_alert: competitorAlert as InsightDispatcher,
   page_health: pageHealth as InsightDispatcher,
+  milestone_attribution: milestoneAttribution as InsightDispatcher, // Phase 2.5c
   // Intentionally not mapped — admin-only or planned for later phases:
   //   keyword_cluster, competitor_gap, conversion_attribution,
   //   serp_opportunity, strategy_alignment, site_health, emerging_keyword
