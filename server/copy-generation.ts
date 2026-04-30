@@ -17,7 +17,7 @@ import {
   formatKnowledgeBaseForPrompt,
 } from './workspace-intelligence.js';
 import { getActivePatterns } from './copy-intelligence.js';
-import { WRITING_QUALITY_RULES } from './content-posts-ai.js';
+import { WRITING_QUALITY_RULES } from './writing-quality.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import db from './db/index.js';
 import {
