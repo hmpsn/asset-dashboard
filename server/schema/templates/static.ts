@@ -3,7 +3,7 @@
  * Each emits the typed primary node + BreadcrumbList only.
  */
 import type { PageData, BusinessProfile } from '../data-sources.js';
-import { dropUndefined, orgRef, withBreadcrumb, webSiteRef, breadcrumbRef } from './helpers.js';
+import { dropUndefined, orgRef, localBusinessRef, withBreadcrumb, webSiteRef, breadcrumbRef } from './helpers.js';
 
 export interface StaticInput {
   baseUrl: string;
@@ -20,7 +20,7 @@ export function buildAboutPageSchema(input: StaticInput): Record<string, unknown
     'description': pageData.description,
     'url': pageData.canonicalUrl,
     'mainEntity': input.businessProfile?.address
-      ? { '@id': `${baseUrl}/#localbusiness` }
+      ? localBusinessRef(baseUrl)
       : orgRef(baseUrl),
     'isPartOf': webSiteRef(baseUrl),
     'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
@@ -38,7 +38,7 @@ export function buildContactPageSchema(input: StaticInput): Record<string, unkno
     'description': pageData.description,
     'url': pageData.canonicalUrl,
     'mainEntity': input.businessProfile?.address
-      ? { '@id': `${baseUrl}/#localbusiness` }
+      ? localBusinessRef(baseUrl)
       : undefined,
     'isPartOf': webSiteRef(baseUrl),
     'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
