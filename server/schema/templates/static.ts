@@ -2,12 +2,13 @@
  * Static page templates: AboutPage, ContactPage, CollectionPage, WebPage.
  * Each emits the typed primary node + BreadcrumbList only.
  */
-import type { PageData } from '../data-sources.js';
+import type { PageData, BusinessProfile } from '../data-sources.js';
 import { dropUndefined, orgRef, withBreadcrumb, webSiteRef, breadcrumbRef } from './helpers.js';
 
 export interface StaticInput {
   baseUrl: string;
   pageData: PageData;
+  businessProfile?: BusinessProfile | null;
 }
 
 export function buildAboutPageSchema(input: StaticInput): Record<string, unknown> {
@@ -18,7 +19,9 @@ export function buildAboutPageSchema(input: StaticInput): Record<string, unknown
     'name': pageData.cleanTitle,
     'description': pageData.description,
     'url': pageData.canonicalUrl,
-    'mainEntity': orgRef(baseUrl),
+    'mainEntity': input.businessProfile?.address
+      ? { '@id': `${baseUrl}/#localbusiness` }
+      : orgRef(baseUrl),
     'isPartOf': webSiteRef(baseUrl),
     'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
     'inLanguage': pageData.inLanguage,
@@ -34,6 +37,9 @@ export function buildContactPageSchema(input: StaticInput): Record<string, unkno
     'name': pageData.cleanTitle,
     'description': pageData.description,
     'url': pageData.canonicalUrl,
+    'mainEntity': input.businessProfile?.address
+      ? { '@id': `${baseUrl}/#localbusiness` }
+      : undefined,
     'isPartOf': webSiteRef(baseUrl),
     'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
     'inLanguage': pageData.inLanguage,
