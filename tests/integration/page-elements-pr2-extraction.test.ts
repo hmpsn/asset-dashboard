@@ -56,9 +56,8 @@ describe('PR2 page-element extraction (integration)', () => {
     expect(catalog.images.filter(i => i.role === 'informative').length).toBeGreaterThanOrEqual(2);
     expect(catalog.tables).toHaveLength(1);
     expect(catalog.tables[0].isPricingLike).toBe(true);
-    expect(catalog.testimonials).toHaveLength(2);
-    expect(catalog.testimonials.length).toBeGreaterThan(0); // guard for .every() below
-    expect(catalog.testimonials.every(t => t.rating === 5)).toBe(true);
+    expect(catalog.testimonials).toHaveLength(2); // length guard for .every() below
+    expect(catalog.testimonials.every(t => t.rating === 5)).toBe(true); // every-ok: toHaveLength(2) above is the non-empty guard
   });
 
   it('extractor never throws on malformed HTML', async () => {
