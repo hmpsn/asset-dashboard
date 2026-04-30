@@ -94,10 +94,10 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
 
   // PR2: Review[] graph nodes
   const lbId = `${baseUrl}/#localbusiness`;
-  const reviews = (pageData.elements?.testimonials ?? [])
-    .map((t, idx) => {
-      if (!t.author || t.rating == null) return undefined;
-      return dropUndefined({
+  const reviews: Array<Record<string, unknown>> = (pageData.elements?.testimonials ?? [])
+    .reduce<Array<Record<string, unknown>>>((acc, t, idx) => {
+      if (!t.author || t.rating == null) return acc;
+      acc.push(dropUndefined({
         '@type': 'Review' as const,
         '@id': `${baseUrl}/#review-${idx}`,
         'itemReviewed': { '@id': lbId },
@@ -109,9 +109,9 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
         }),
         'author': { '@type': 'Person' as const, 'name': t.author },
         'reviewBody': t.quote,
-      });
-    })
-    .filter((r): r is Record<string, unknown> => r !== undefined);
+      }) as Record<string, unknown>);
+      return acc;
+    }, []);
 
   return withBreadcrumb([organization, localBusiness, website, ...reviews], pageData);
 }
