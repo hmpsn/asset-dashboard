@@ -6,6 +6,7 @@ import type { AnalyticsInsight, InsightType, InsightSeverity } from './analytics
 import type { DiagnosticStatus } from './diagnostics.js';
 import type { KeywordStrategy, AudiencePersona, PageKeywordMap } from './workspace.js';
 import type { BriefingSummary } from './briefing.js';
+import type { PageElementCatalog } from './page-elements.js';
 import type {
   TrackedAction,
   ActionOutcome,
@@ -26,7 +27,8 @@ export type IntelligenceSlice =
   | 'contentPipeline'
   | 'siteHealth'
   | 'clientSignals'
-  | 'operational';
+  | 'operational'
+  | 'pageElements';
 
 // ── Options ─────────────────────────────────────────────────────────────
 
@@ -58,6 +60,9 @@ export interface WorkspaceIntelligence {
   insights?: InsightsSlice;
   learnings?: LearningsSlice;
   pageProfile?: PageProfileSlice;
+  /** Per-page structural element catalog (videos, HowTo lists, citations, etc.).
+   *  Populated when buildWorkspaceIntelligence is called with opts.pagePath. */
+  pageElements?: PageElementSlice;
   contentPipeline?: ContentPipelineSlice;
   siteHealth?: SiteHealthSlice;
   clientSignals?: ClientSignalsSlice;
@@ -261,6 +266,20 @@ export interface OperationalSlice {
   detectedPlaybooks?: string[];
   workOrders?: { active: number; pending: number };
   insightAcceptanceRate?: InsightAcceptanceRate | null;
+}
+
+/**
+ * Per-page structural-element catalog. Populated by assemblePageElements
+ * when buildWorkspaceIntelligence is called with opts.pagePath. Schema
+ * templates conditionally enrich JSON-LD based on the catalog.
+ *
+ * Empty when no page-path provided OR when the page has no detected elements.
+ */
+export interface PageElementSlice {
+  /** The page path this slice was assembled for. */
+  pagePath: string;
+  /** The catalog itself. EMPTY_CATALOG-shape when extraction yielded nothing. */
+  catalog: PageElementCatalog;
 }
 
 // ── Client Intelligence API types (Phase 4C) ────────────────────────────────

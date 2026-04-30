@@ -21,6 +21,7 @@ import type {
   InsightsSlice,
   LearningsSlice,
   PageProfileSlice,
+  PageElementSlice,
   ContentPipelineSlice,
   SiteHealthSlice,
   RedirectDetail,
@@ -41,6 +42,7 @@ import type {
   CopyPipelineSummary,
   SerpFeatures,
 } from '../shared/types/intelligence.js';
+import { getPageElements } from './page-elements-store.js';
 import type { AnalyticsInsight, InsightType, InsightSeverity } from '../shared/types/analytics.js';
 import type { BriefingSummary } from '../shared/types/briefing.js';
 import type { TrackedAction } from '../shared/types/outcome-tracking.js';
@@ -128,7 +130,7 @@ const INTELLIGENCE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 // ── Assembly ────────────────────────────────────────────────────────────
 
 const ALL_SLICES: IntelligenceSlice[] = [
-  'seoContext', 'insights', 'learnings', 'pageProfile',
+  'seoContext', 'insights', 'learnings', 'pageProfile', 'pageElements',
   'contentPipeline', 'siteHealth', 'clientSignals', 'operational',
 ];
 
@@ -227,6 +229,10 @@ async function assembleSlice(
       if (opts?.pagePath) {
         result.pageProfile = await assemblePageProfile(workspaceId, opts.pagePath, opts);
       }
+      break;
+    case 'pageElements':
+      if (!opts?.pagePath) break; // pageElements is per-page; no-op without pagePath
+      result.pageElements = await assemblePageElements(workspaceId, opts.pagePath);
       break;
   }
 }
@@ -1677,6 +1683,11 @@ export function formatForPrompt(
     sections.push(formatPageProfileSection(intelligence.pageProfile, verbosity));
   }
 
+  // Page Elements
+  if (intelligence.pageElements && (!include || include.has('pageElements'))) {
+    sections.push(formatPageElementsSection(intelligence.pageElements));
+  }
+
   // Content Pipeline
   if (intelligence.contentPipeline && (!include || include.has('contentPipeline'))) {
     sections.push(formatContentPipelineSection(intelligence.contentPipeline, verbosity));
@@ -2360,6 +2371,23 @@ function formatOperationalSection(ops: OperationalSlice, verbosity: PromptVerbos
   return lines.join('\n');
 }
 
+function formatPageElementsSection(slice: PageElementSlice | undefined): string {
+  if (!slice) return '';
+  const c = slice.catalog;
+  const summary: string[] = [];
+  if (c.videos.length > 0) summary.push(`${c.videos.length} video${c.videos.length === 1 ? '' : 's'}`);
+  const howToCount = c.lists.filter(l => l.isHowToLike).length;
+  if (howToCount > 0) summary.push(`${howToCount} HowTo list${howToCount === 1 ? '' : 's'}`);
+  if (c.citations.length > 0) summary.push(`${c.citations.length} citation${c.citations.length === 1 ? '' : 's'}`);
+  if (c.tables.length > 0) summary.push(`${c.tables.length} table${c.tables.length === 1 ? '' : 's'}`);
+  if (c.images.length > 0) summary.push(`${c.images.length} image${c.images.length === 1 ? '' : 's'}`);
+  if (c.testimonials.length > 0) summary.push(`${c.testimonials.length} testimonial${c.testimonials.length === 1 ? '' : 's'}`);
+  if (c.headings.length > 0) summary.push(`${c.headings.length} heading${c.headings.length === 1 ? '' : 's'}`);
+  if (c.codeBlocks.length > 0) summary.push(`${c.codeBlocks.length} code block${c.codeBlocks.length === 1 ? '' : 's'}`);
+  if (summary.length === 0) return '';
+  return `\n## Page elements (${slice.pagePath})\n${summary.join(' · ')}\n`;
+}
+
 function formatPageProfileSection(profile: PageProfileSlice, verbosity: PromptVerbosity): string {
   const lines: string[] = [`## Page Profile: ${profile.pagePath}`];
 
@@ -2423,6 +2451,29 @@ function formatPageProfileSection(profile: PageProfileSlice, verbosity: PromptVe
 }
 
 // ── Page Profile assembler ──────────────────────────────────────────────
+
+async function assemblePageElements(
+  workspaceId: string,
+  pagePath: string,
+): Promise<PageElementSlice | undefined> {
+  try {
+    const record = getPageElements(workspaceId, pagePath);
+    if (!record) {
+      // No persisted catalog — extraction will happen during the next
+      // generator pass (Task 13 wires lazy refresh inside generator.ts).
+      // Returning undefined here is correct; consumers gracefully
+      // degrade (no schema enrichment until catalog exists).
+      return undefined;
+    }
+    return {
+      pagePath: record.pagePath,
+      catalog: record.catalog,
+    };
+  } catch (err) { // catch-ok: graceful degrade — slice stays undefined
+    log.warn({ err, workspaceId, pagePath }, 'assemblePageElements: store read failed, slice unavailable');
+    return undefined;
+  }
+}
 
 async function assemblePageProfile(
   workspaceId: string,

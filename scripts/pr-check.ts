@@ -493,6 +493,7 @@ const SLICE_FORMATTER_MAP: Array<{ sliceName: string; formatterName: string }> =
   { sliceName: 'InsightsSlice', formatterName: 'formatInsightsSection' },
   { sliceName: 'LearningsSlice', formatterName: 'formatLearningsSection' },
   { sliceName: 'PageProfileSlice', formatterName: 'formatPageProfileSection' },
+  { sliceName: 'PageElementSlice', formatterName: 'formatPageElementsSection' },
   { sliceName: 'ContentPipelineSlice', formatterName: 'formatContentPipelineSection' },
   { sliceName: 'SiteHealthSlice', formatterName: 'formatSiteHealthSection' },
   { sliceName: 'ClientSignalsSlice', formatterName: 'formatClientSignalsSection' },
@@ -519,6 +520,10 @@ const KNOWN_UNRENDERED_FIELDS = new Set([
   // ClientSignalsSlice — these are rendered but may not appear by field name
   // OperationalSlice
   // none
+  // PageElementSlice diagnostic fields — not in formatPageElementsSection by design.
+  'extractedAt',
+  'sourcePublishedAt',
+  'diagnostics',
 ]);
 
 function extractInterfaceFields(typeFileContent: string, interfaceName: string): string[] {
