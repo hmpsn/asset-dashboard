@@ -242,6 +242,39 @@ When the `client-briefing-v2` feature flag is on, the client Insights tab swaps 
 
 **Two-halves contract:** The action chips deep-link via `?tab=<InboxFilter>` to `<InboxTab>` — the Inbox MUST read `useSearchParams().get('tab')` and validate against the `InboxFilter` union for the deep-link to work. Same contract applies to hero/secondary `drillIn.tab` (currently optional / unused by receivers in Phase 2; Phase 4 will wire receivers as the briefing AI starts populating it).
 
+##### Phase 2.5b — investor-briefing reading rhythm
+
+Phase 2.5b extends the magazine layout with five new sections in the 8-stop reading rhythm: Dateline → Issue Summary → Action Strip → **Pulse** → Lead → **Data Spread** → **Recommended for You** → Watch List. New layout conventions:
+
+| Element | Color | Rationale |
+|---------|-------|-----------|
+| **DateLine** ("WEEK OF MMM DD · ISSUE N") | `t-label tracking-wider text-[var(--brand-text-muted)]` + hairline divider below | Anchors the reader; "ISSUE N" parallels print briefings. Issue badge omitted when null. |
+| **IssueSummaryLine** | `t-body text-[var(--brand-text-muted)] leading-relaxed` | One-line investor-briefing prose; deterministic from story composition. |
+| **ActionQueueStrip stale pill** (Phase 2.5b extension) | `bg-amber-500/30 border-amber-400/50 text-amber-200` + Clock icon | Brighter amber than the regular chips — escalation step for items >7d old. Renders only when `staleCount > 0`. |
+| **PulseStrip** wrapper | `<SectionCard variant="subtle">` titled "THE PULSE", `titleExtra` "vs prev 28d" | Subtle chrome — Pulse is a snapshot, not the story |
+| Pulse cell — Site Health | `<MetricRing size={56}>` (built-in score color: emerald ≥80 / amber ≥60 / red <60) + label/delta to the right | Ring is the canonical health visualisation |
+| Pulse cell — Visitors / Clicks / Avg Position | `<StatCard size="hero" valueColor="text-blue-400">` (data hue) | Blue = data; default delta colors handle direction |
+| Pulse cell — Avg Position | StatCard with `invertDelta` | Lower position number = better; invert flips the sign for color rendering |
+| **DataSpread** wrapper | Two `<SectionCard variant="subtle" noPadding>` columns in a `grid grid-cols-1 md:grid-cols-2 gap-6` | `noPadding` prevents the SectionCard inner wrapper from doubling internal padding |
+| Data Spread "WINS" icon | `text-emerald-400` (TrendingUp) | Emerald — success / positive change |
+| Data Spread "RISKS" icon | `text-amber-400` (TrendingDown) | Amber — needs attention |
+| Data Spread row hover (clickable) | `hover:bg-[var(--surface-3)]/60 transition-colors` | One-step surface lift; cursor pointer when `drillInUrl` present |
+| **RecommendedForYou** wrapper | `<SectionCard variant="default">` titled "RECOMMENDED FOR YOU" | Default chrome — primary upsell moment |
+| RecommendedForYou row | `bg-[var(--surface-3)]/40 border-[var(--brand-border)] rounded-[var(--radius-lg)]` | Surface-3 inside surface-2 (SectionCard) — visible separation |
+| Opportunity score badge | `bg-blue-500/10 text-blue-400 rounded-full` | Blue — read-only data metric (0/100 score) |
+| Generate Brief CTA (Growth/Premium) | `bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/40` + Sparkles icon (Growth) / Check icon (Premium) | Teal — primary action; Premium variant signals "included" |
+| Free-tier upgrade block (replaces row list) | Locked icon + "{N} opportunities locked" + Upgrade button | Free tier never sees individual rows — single CTA simplifies the choice |
+| **HeroStoryCard dataReceipt line** (Phase 2.5b extension) | `border-t border-[var(--brand-border)]/30 pt-3` + `t-caption-sm text-[var(--brand-text-muted)] leading-relaxed` | Citation prose ("─ Source: GSC last-28-day vs prior-28-day window…"); rendered only when `story.dataReceipt` is populated by Phase 2.5a templates |
+
+**Phase 2.5b principles:**
+
+1. **Compose, don't duplicate.** PulseStrip uses existing `<StatCard size="hero">` + `<MetricRing>` primitives, not new variants. RecommendedForYou ports the admin `<ContentGaps>` row layout verbatim, swapping only the CTAs.
+2. **Reuse existing data sources.** `pulseData` is computed client-side from `useClientAuditSummary` / `useClientGA4` / `useClientSearch` (the same hooks the Performance/Health tabs use). `recommendations` are sourced live from `keywordStrategy.contentGaps[]` at endpoint serve-time. No new tables, no migrations in 2.5b.
+3. **Stale-item escalation is opt-in.** The ActionQueueStrip's escalation pill renders only when the composer passes `staleCount > 0`. Callers without staleness data (free tier, older code paths) see no escalation — back-compat preserved.
+4. **Free tier is unchanged.** Phase 2.5b explicitly does NOT extend the free-tier branch; it stays at `<ActionQueueStrip>` + `<FreeTierUpgradeCTA>` + un-gated `<MonthlyDigestContent>` per the Phase 2 contract.
+
+**Typography update (Phase 2.5b):** `.t-caption` switched from `'Inter' 400` to `'DIN Pro' 600` — global typography refresh aligning caption text with the rest of the DIN Pro hierarchy.
+
 ### Admin Components
 
 | Component | Element | Color | Rationale |
