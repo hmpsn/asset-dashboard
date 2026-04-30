@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { post, put, getSafe } from '../api/client';
 import { schema as schemaApi, schemaImpact as schemaImpactApi, type SchemaImpactData, type SchemaDeploymentImpact } from '../api/seo';
 import type { FixContext } from '../App';
@@ -858,12 +859,12 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
               Add your address to unlock LocalBusiness schema on your homepage, /contact, and /about — the highest-value schema type for local businesses.
             </p>
             {workspaceId && (
-              <a
-                href={adminPath(workspaceId, 'workspace-settings') + '?tab=business-profile'}
+              <Link
+                to={adminPath(workspaceId, 'workspace-settings') + '?tab=business-profile'}
                 className="t-caption text-teal-400 hover:text-teal-300 mt-2 inline-block"
               >
                 Complete business profile →
-              </a>
+              </Link>
             )}
           </div>
           <button
