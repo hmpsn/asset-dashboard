@@ -124,7 +124,7 @@ export function buildStoryFromWeCalledIt(
       `The prediction recorded on ${predictedDate} landed. ` +
       `${action.pageUrl} reached ${currentValue} ${primaryMetric} for ` +
       `"${action.targetKeyword}" — a ${deltaSign}${deltaAbsolute} (${deltaSign}${deltaPercent}%) change from baseline. ` +
-      `${interventionPhrase} on ${predictedDate} was the trigger.`;
+      `${interventionPhrase.charAt(0).toUpperCase() + interventionPhrase.slice(1)} on ${predictedDate} was the trigger.`;
   } else if (action.pageUrl) {
     // Page-only variant — cite metric on the page.
     narrative =

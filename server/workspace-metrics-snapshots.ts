@@ -98,18 +98,10 @@ const stmts = createStmtCache(() => ({
     WHERE workspace_id = ? AND snapshot_date >= ?
     ORDER BY snapshot_date DESC
   `),
-  // Find the most recent snapshot date STRICTLY BEFORE which the workspace's
-  // current value would be a new high (or new low for avg_position) — i.e.
-  // the date that bounds the "best since X" window. Implementation: select
-  // the latest snapshot in the retention window whose value beats `current`,
-  // then return its date. The anchor's `sinceDate` is that row's date + 1
-  // (the next snapshot is the first time current was the best). Caller
-  // handles the +1 day arithmetic; this query just returns the comparator row.
-  //
-  // We return ALL rows in the window so the caller can apply min/max with
-  // the right comparator (lower-is-better for avg_position vs higher-is-
-  // better for clicks/impressions/score/value). Keeps the SQL simple and
-  // correct across metric semantics.
+  // Returns ALL rows in the retention window so `getBestValueSinceDate` can
+  // walk them with the correct comparator (lower-is-better for avg_position
+  // vs higher-is-better for clicks/impressions/score/value) and return the
+  // date of the most recent row that beats the current value.
   listInWindow: db.prepare(`
     SELECT * FROM workspace_metrics_snapshots
     WHERE workspace_id = ? AND snapshot_date >= ?
@@ -147,7 +139,7 @@ function toDateKey(d: Date): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-/** Subtract `days` days from a YYYY-MM-DD key, return YYYY-MM-DD. */
+/** Shift a YYYY-MM-DD key by `days` (positive = forward, negative = back). */
 function shiftDateKey(dateKey: string, days: number): string {
   const t = Date.parse(`${dateKey}T00:00:00Z`);
   return toDateKey(new Date(t + days * DAY_MS));
@@ -231,9 +223,9 @@ export function getBestValueSinceDate(
     const v = readMetric(rows[i], metricName);
     if (v == null) continue;
     if (beats(v, current)) {
-      // This older snapshot already beat current — anchor is the day AFTER
-      // this row's date. Caller computes "best since {sinceDate}" where
-      // sinceDate is exclusive (most recently surpassed).
+      // This older snapshot already beat current — the returned sinceDate
+      // IS this row's date. The anchor reads "best since {sinceDate}"
+      // meaning this was the last time the metric was this good.
       bestSinceDate = rows[i].snapshot_date;
       break;
     }
