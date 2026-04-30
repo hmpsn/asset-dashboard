@@ -85,7 +85,15 @@ export function buildStoryFromContentGap(
       `Your site already shows ${fmtNum(gap.impressions as number)} impressions/mo for the term ` +
       `without a dedicated page — proof of real demand from your audience.`;
   } else if (hasCompetitorProof) {
-    sentence2 = `${gap.competitorProof} is capturing the ${volumeLabel}/mo while you have 0 impressions for it.`;
+    // `competitorProof` is a full descriptive clause from the keyword-strategy
+    // generator (e.g. "Plumber Pros ranks #2 for this term."), not a bare
+    // noun. Splicing it into the subject position would produce garbled prose
+    // ("Plumber Pros ranks #2 for this term. is capturing the 8.6k/mo..."),
+    // so we wrap it as a parenthetical clause and put the action verb on a
+    // sentence-level subject the reader controls. Devin caught this on
+    // PR #380 — branch was untested because all unit fixtures set impressions.
+    const proofClause = (gap.competitorProof as string).replace(/\.$/, '');
+    sentence2 = `A competitor is already ranking for the term (${proofClause}), capturing the ${volumeLabel}/mo demand while your site has 0 impressions.`;
   } else {
     sentence2 = `Your site captures 0 of the ${volumeLabel} monthly searches today.`;
   }

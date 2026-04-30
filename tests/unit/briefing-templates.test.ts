@@ -258,6 +258,30 @@ describe('briefing template: content_gap', () => {
     const gap = { topic: 'x', targetKeyword: '', volume: 1000, intent: 'informational', priority: 'low', rationale: '' } as ContentGap;
     expect(buildStoryFromContentGap(gap, ctx)).toBeNull();
   });
+
+  it('produces grammatical narrative when competitorProof is present but impressions is absent (Devin PR #380)', () => {
+    // Previously untested branch — competitorProof is a full clause, not a
+    // bare noun; the template now wraps it as a parenthetical to avoid the
+    // "Plumber Pros ranks #2. is capturing..." garbled-prose bug.
+    const gap: ContentGap = {
+      topic: 'Fleet maintenance scheduling',
+      targetKeyword: 'best fleet maintenance schedule',
+      intent: 'informational',
+      priority: 'high',
+      rationale: 'High volume, low competition.',
+      volume: 8600,
+      difficulty: 27,
+      competitorProof: 'Plumber Pros ranks #2 for this term.',
+    };
+    const story = buildStoryFromContentGap(gap, ctx);
+    expect(story).not.toBeNull();
+    if (!story) return;
+    // Sentence 2 must NOT start with the competitorProof clause directly.
+    expect(story.narrative).not.toMatch(/Plumber Pros ranks #2 for this term\. is capturing/);
+    // It SHOULD wrap the proof as a parenthetical inside a properly-subjected sentence.
+    expect(story.narrative).toMatch(/\(Plumber Pros ranks #2 for this term\)/);
+    expectStoryShape(story);
+  });
 });
 
 // ── Dispatcher ────────────────────────────────────────────────────────────────
