@@ -105,41 +105,55 @@ export type BriefingAIResponse = z.infer<typeof briefingAIResponseSchema>;
  * Banned hedge-word regex — mirrors the pr-check rule scoped to
  * `server/briefing-templates/`, with one extension: we ALSO reject the
  * standalone "appears" (without "to") because the prompt instruction
- * lists "appears" as banned and the AI shouldn't be able to slip
- * `Traffic appears strong this week` past validation when the prompt
- * explicitly forbade it.
+ * lists "appears" as banned and the AI shouldn't slip
+ * `Traffic appears strong this week` past validation.
+ *
+ * Split into two halves to avoid `may` matching the month name "May":
+ * the case-insensitive set covers hedges that are unambiguous in any
+ * case ("could", "might", etc.); the case-sensitive `may` regex catches
+ * the lowercase hedge while letting "May 12" / "since May." through.
+ * Devin caught the calendar-month false-positive in PR #387 review.
  *
  * KEEP IN SYNC with `BANNED_WORDS_TEXT` below — both must list the same
  * forbidden tokens or the prompt instruction and the runtime guard
  * will diverge (model expects to obey one set, validator enforces another).
  */
-const HEDGE_WORDS_RE = /\b(potentially|could|may|appears(?:\s+to)?|suggests|might|seems)\b/i;
+const HEDGE_WORDS_CI_RE = /\b(potentially|could|appears(?:\s+to)?|suggests|might|seems)\b/i;
+/** Lowercase-only — leaves "May" (month name) untouched. */
+const HEDGE_MAY_RE = /\bmay\b/;
 
-/** Display string for the "BANNED words:" line in AI prompts. KEEP IN SYNC with HEDGE_WORDS_RE. */
+/** Returns true when `s` contains any banned hedge token in either casing rule. */
+function containsHedge(s: string): boolean {
+  return HEDGE_WORDS_CI_RE.test(s) || HEDGE_MAY_RE.test(s);
+}
+
+/** Display string for the "BANNED words:" line in AI prompts. KEEP IN SYNC with HEDGE_WORDS_CI_RE + HEDGE_MAY_RE. */
 const BANNED_WORDS_TEXT = 'potentially, could, may, appears, suggests, might, seems';
 
 /**
- * Detect paired quotation marks in `s`. Returns true when the string
- * contains a `"` (always rejected — clashes with magazine chrome that
- * already wraps query strings) OR a `'` used as a quotation mark
- * (opening at word-boundary start OR closing at word-boundary end —
- * NOT mid-word, where it's a contraction like "it's" / "this week's").
+ * Detect paired quotation marks in `s`. Returns true when:
+ *   - the string contains a `"` (always rejected — clashes with magazine
+ *     chrome that already wraps query strings), OR
+ *   - the string contains BOTH an opening single-quote `(^|\s)'\w` AND a
+ *     closing single-quote `\w'(\s|$)` — i.e. a real paired quote.
  *
- * Devin caught the previous strict `includes("'")` check rejecting valid
- * editorial prose with contractions. We narrow to the paired-quote
- * shape so contractions pass through.
+ * Requiring BOTH branches (not either) means:
+ *   - Contractions ("it's", "don't") → neither matches → accepted ✓
+ *   - Plural possessives ("pages' rankings", "Swish's clients") → only
+ *     the closer matches; no opener → not paired → accepted ✓
+ *   - Real paired quotes ("'consolidate'") → both match → rejected ✓
+ *
+ * Devin caught two false-positive patterns in this guard:
+ *   1. `includes("'")` rejecting all single-quotes (PR #387 round 1)
+ *   2. either-branch match rejecting plural possessives (PR #387 round 2)
+ * This is the third iteration — narrow enough to admit natural
+ * editorial prose, strict enough to catch quoted phrases.
  */
 function hasPairedQuotes(s: string): boolean {
   if (s.includes('"')) return true;
-  // Single-quote at the start of a word OR end of a word marks a
-  // quotation-mark usage. `\B` prevents matching mid-word apostrophes.
-  // Examples that match (rejected):
-  //   "'opener text'"  →  '<word> at word start
-  //   "she said 'yes'" →  'yes' both bounded
-  // Examples that DON'T match (accepted):
-  //   "it's a great week"   → 'mid-word
-  //   "this week's results" → 'mid-word
-  return /(^|\s)'\w|\w'(\s|$)/.test(s);
+  const hasOpener = /(^|\s)'\w/.test(s);
+  const hasCloser = /\w'(\s|$)/.test(s);
+  return hasOpener && hasCloser;
 }
 
 /**
@@ -234,7 +248,7 @@ export async function punchHeroHeadline(
     }
     const candidate = raw.trim();
     if (!candidate) return deterministicHeadline;
-    if (HEDGE_WORDS_RE.test(candidate)) {
+    if (containsHedge(candidate)) {
       log.debug({ workspaceId, candidate }, 'hero-punch: hedge-word violation, falling back');
       return deterministicHeadline;
     }
@@ -325,7 +339,7 @@ export async function writeWeeklyOpener(
       log.debug({ workspaceId: ctx.workspaceId, candidate }, 'weekly-opener: contains paired quotes, falling back');
       return null;
     }
-    if (HEDGE_WORDS_RE.test(candidate)) {
+    if (containsHedge(candidate)) {
       log.debug({ workspaceId: ctx.workspaceId, candidate }, 'weekly-opener: hedge-word violation, falling back');
       return null;
     }

@@ -221,6 +221,28 @@ describe('writeWeeklyOpener (Phase 2.5e)', () => {
     expect(out).toBeNull();
   });
 
+  it('accepts plural possessives ending in apostrophe-s ("pages\' rankings")', async () => {
+    // Devin PR #387 round-2: prior `(^|\s)'\w | \w'(\s|$)` either-branch
+    // regex incorrectly flagged plural possessives because only the
+    // closer matched. Now requires BOTH opener AND closer for a
+    // paired-quote rejection. Plural possessive has only the closer.
+    callAI.mockResolvedValue(aiResponse(`Three pages' rankings improved — 945 monthly impressions captured.`));
+    const out = await writeWeeklyOpener(stories, ctx);
+    expect(out).not.toBeNull();
+    expect(out).toContain("pages'");
+  });
+
+  it('accepts the calendar month "May" without false-positive on "may" hedge', async () => {
+    callAI.mockResolvedValue(aiResponse(
+      'Three pages compete for 945 impressions since May 12 — consolidate to consolidate gains.',
+    ));
+    // Note: "consolidate to consolidate" is intentionally clunky to dodge the
+    // "no quotation marks" guard while keeping the test focused on May.
+    const out = await writeWeeklyOpener(stories, ctx);
+    expect(out).not.toBeNull();
+    expect(out).toContain('May 12');
+  });
+
   it('uses the system field for instructions (codebase idiom)', async () => {
     callAI.mockResolvedValue(aiResponse('945 impressions split across 3 dentist austin pages this week.'));
     await writeWeeklyOpener(stories, ctx);
@@ -275,5 +297,23 @@ describe('punchHeroHeadline (Phase 2.5e review fixes)', () => {
     expect(call.messages[0].content).not.toContain('BANNED words:');
     expect(call.messages[0].content).toContain('Original headline:');
     expect(call.messages[0].content).toContain('Underlying data:');
+  });
+
+  // ── Devin PR #387 round-2 fixes ──
+
+  it('accepts the calendar month "May" (was false-positive on "may" hedge)', async () => {
+    // Devin: HEDGE_WORDS_RE with /i matched "May" the month name. The
+    // regex is now split — case-insensitive set excludes "may", and a
+    // separate case-sensitive `/\bmay\b/` catches the lowercase hedge
+    // while letting the month through.
+    callAI.mockResolvedValue(aiResponse('Fleet page broke top 5 since May 12 launch.'));
+    const out = await punchHeroHeadline(ORIGINAL_HEADLINE, HINT, WORKSPACE_ID);
+    expect(out).toBe('Fleet page broke top 5 since May 12 launch.');
+  });
+
+  it('still rejects lowercase "may" as a hedge', async () => {
+    callAI.mockResolvedValue(aiResponse('Fleet page may crack the top five with growth.'));
+    const out = await punchHeroHeadline(ORIGINAL_HEADLINE, HINT, WORKSPACE_ID);
+    expect(out).toBe(ORIGINAL_HEADLINE);
   });
 });
