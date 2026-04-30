@@ -8,15 +8,17 @@
  */
 import type * as cheerio from 'cheerio';
 import type { Video } from '../../../../shared/types/page-elements.js';
+import { contentScope } from './content-scope.js';
 
 const YOUTUBE_RE = /(?:youtube\.com\/embed\/|youtu\.be\/|youtube\.com\/watch\?v=)([\w-]{11})/i;
 const VIMEO_RE = /vimeo\.com\/(?:video\/)?(\d+)/i;
 
 export function extractVideos($: cheerio.CheerioAPI): Video[] {
+  const $scope = contentScope($);
   const videos: Video[] = [];
 
   // iframe-based: YouTube + Vimeo
-  $('iframe[src]').each((_, el) => {
+  $scope.find('iframe[src]').each((_, el) => {
     const $el = $(el);
     const src = $el.attr('src') ?? '';
     const title = $el.attr('title') ?? undefined;
@@ -46,7 +48,7 @@ export function extractVideos($: cheerio.CheerioAPI): Video[] {
   });
 
   // Native <video>
-  $('video').each((_, el) => {
+  $scope.find('video').each((_, el) => {
     const $el = $(el);
     // <video src="..."> OR <video><source src="..."></video>
     const src = $el.attr('src') ?? $el.find('source[src]').first().attr('src');
