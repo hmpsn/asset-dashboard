@@ -83,13 +83,18 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
   });
   // Sync tab state with subsequent ?tab= URL changes (e.g., when SchemaImpactRow's
   // Edit→ link navigates to ?tab=features while already on this page).
-  // (Devin Review BUG-0001 round 3 on PR #379.)
+  // CRITICAL: do NOT include `tab` in deps. Manual tab clicks (the nav buttons at
+  // line ~207 call setTab without updating the URL) would otherwise trigger this
+  // effect to revert the tab back to the stale URL value, trapping the user.
+  // setTab(sameValue) is a React no-op so re-firing on every searchParams change
+  // is safe. (Devin Review BUG-0001 round 4 on PR #379.)
   useEffect(() => {
     const param = searchParams.get('tab');
-    if (param && (VALID_SECTION_TABS as readonly string[]).includes(param) && param !== tab) {
+    if (param && (VALID_SECTION_TABS as readonly string[]).includes(param)) {
       setTab(param as SectionTab);
     }
-  }, [searchParams, tab]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
   const [ws, setWs] = useState<WorkspaceData | null>(null);
   const [googleStatus, setGoogleStatus] = useState<{ connected: boolean; configured: boolean } | null>(null);
   const [gscSites, setGscSites] = useState<GscSite[]>([]);
