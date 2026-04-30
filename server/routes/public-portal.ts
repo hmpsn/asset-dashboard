@@ -847,6 +847,13 @@ router.get('/api/public/briefing/:workspaceId', (req, res) => {
   // "23 opportunities to consider" even though the briefing only renders 5.
   const issueSummary = generateIssueSummary(latest.stories, gaps.length);
 
+  // Phase 2.5e — surface the AI-generated weekly opener when present.
+  // The rest of `sourceMetadata` (model, generationMs, ai timing, original
+  // hero headline) stays admin-only — only the opener string crosses the
+  // public boundary. Defensive: pull via optional chaining so older drafts
+  // without `aiPolish` round-trip cleanly.
+  const weeklyOpener = latest.sourceMetadata?.aiPolish?.weeklyOpener;
+
   res.json({
     briefing: {
       weekOf: latest.weekOf,
@@ -855,6 +862,7 @@ router.get('/api/public/briefing/:workspaceId', (req, res) => {
       issueSummary,
       issueNumber,
       recommendations,
+      ...(weeklyOpener ? { weeklyOpener } : {}),
     },
   });
 });

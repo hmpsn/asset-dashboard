@@ -45,6 +45,7 @@ import { addActivity } from './activity-log.js';
 import { notifyClientBriefingReady } from './email.js';
 import { computeROI } from './roi.js';
 import { recordWeeklyBriefingSnapshot } from './workspace-metrics-snapshots.js';
+import { punchHeroHeadline, writeWeeklyOpener } from './briefing-prompt.js';
 import {
   buildStoryFromInsight,
   buildStoryFromContentGap,
@@ -53,7 +54,7 @@ import {
 } from './briefing-templates/index.js';
 import { getInsightById } from './analytics-insights-store.js';
 import { getAction, getOutcomesForAction } from './outcome-tracking.js';
-import type { BriefingStory } from '../shared/types/briefing.js';
+import type { BriefingStory, BriefingSourceMetadata } from '../shared/types/briefing.js';
 import type { AnalyticsInsight, MilestoneAttributionData } from '../shared/types/analytics.js';
 import { createLogger } from './logger.js';
 
@@ -426,6 +427,63 @@ async function runBriefingForWorkspaceInner(
     stories[0].isHeadline = true;
   }
 
+  // Phase 2.5e — Premium AI polish (hero headline punch + weekly opener).
+  // Two-part contract:
+  //   1. Both AI calls fire only when the sub-flag is on AND tier === premium.
+  //   2. Both fail-soft: punchHeroHeadline returns the original on any error,
+  //      writeWeeklyOpener returns null. The cron's surrounding try/catch is
+  //      a backup but the helpers should never throw on their own.
+  // The punched headline mutates `stories[heroIndex]` IN PLACE before the
+  // upsert so the persisted draft stores the polished version. The opener
+  // is persisted in `sourceMetadata.aiPolish` to avoid a schema change.
+  let aiPolishPayload: NonNullable<BriefingSourceMetadata['aiPolish']> | undefined;
+  const aiPolishEnabled = isFeatureEnabled('client-briefing-v2-ai-polish') && ws.tier === 'premium';
+  if (aiPolishEnabled && stories.length > 0) {
+    const aiStart = Date.now();
+    const heroIdx = stories.findIndex((s) => s.isHeadline);
+    const hero = heroIdx >= 0 ? stories[heroIdx] : null;
+    const originalHeroHeadline = hero?.headline;
+    let weeklyOpener: string | null = null;
+    let headlineWasPunched = false;
+    try {
+      // Hero headline punch — fail-soft inside the helper; this try/catch is
+      // a backup so a malformed module never fails the briefing.
+      if (hero) {
+        const insightHint = hero.metrics.length > 0
+          ? `${hero.category}: ${hero.metrics.map((m) => `${m.value} ${m.label}`).join(', ')}`
+          : null;
+        const punched = await punchHeroHeadline(hero.headline, insightHint, workspaceId);
+        if (punched && punched !== hero.headline) {
+          stories[heroIdx].headline = punched;
+          headlineWasPunched = true;
+        }
+      }
+      // Weekly opener is ORDER-DEPENDENT on the headline punch above —
+      // it sees the polished headline (when present) in the stories
+      // array. Do NOT parallelise via Promise.all; the opener prompt
+      // benefits from quoting the punched line.
+      weeklyOpener = await writeWeeklyOpener(stories, {
+        workspaceName: ws.name,
+        weekOf,
+        workspaceId,
+      });
+    } catch (err) {
+      log.debug({ workspaceId, err: String(err) }, 'briefing AI polish: helper threw, treating as fail-soft');
+    }
+    // Only persist the aiPolish payload when at least one AI call produced
+    // a useful output. A `{ aiMs: 1234 }`-only payload is noisy telemetry
+    // (records "we tried" but conveys nothing actionable). When both AI
+    // calls fall back fully, leave aiPolishPayload undefined so the draft
+    // looks identical to a flag-off run.
+    if (weeklyOpener || headlineWasPunched) {
+      aiPolishPayload = {
+        ...(weeklyOpener ? { weeklyOpener } : {}),
+        ...(headlineWasPunched && originalHeroHeadline ? { originalHeroHeadline } : {}),
+        aiMs: Date.now() - aiStart,
+      };
+    }
+  }
+
   // Persist
   const draft = upsertBriefingDraft({
     workspaceId,
@@ -437,6 +495,7 @@ async function runBriefingForWorkspaceInner(
       provider: 'anthropic', // unused but Zod-required
       generationMs,
       preflightDeferralCount: deferrals,
+      ...(aiPolishPayload ? { aiPolish: aiPolishPayload } : {}),
     },
   });
   updateWorkspace(workspaceId, { lastBriefingRunWeekOf: weekOf });

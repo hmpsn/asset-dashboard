@@ -1,9 +1,10 @@
 // CLIENT-FACING
 // Composes the magazine briefing on the client Insights tab — Phase 2.5b.
 //
-// 8-stop reading rhythm (paid tier):
-//   DateLine → IssueSummaryLine → ActionQueueStrip → PulseStrip
-//     → HeroStoryCard → DataSpread → RecommendedForYou → SecondaryStoryRow list
+// Reading rhythm (paid tier):
+//   [WeeklyOpener — Premium 2.5e, optional] → DateLine → IssueSummaryLine
+//     → ActionQueueStrip → PulseStrip → HeroStoryCard → DataSpread
+//     → RecommendedForYou → SecondaryStoryRow list
 //
 // Free tier renders unchanged from Phase 2:
 //   ActionQueueStrip → FreeTierUpgradeCTA → MonthlyDigestContent
@@ -31,6 +32,7 @@ import { FreeTierUpgradeCTA } from './FreeTierUpgradeCTA';
 import { MonthlyDigestContent } from '../MonthlyDigest';
 import { DateLine } from './DateLine';
 import { IssueSummaryLine } from './IssueSummaryLine';
+import { WeeklyOpener } from './WeeklyOpener';
 import { PulseStrip, type PulseStripData } from './PulseStrip';
 import { DataSpread, spreadItemFromStory, type SpreadItem } from './DataSpread';
 import { RecommendedForYou } from './RecommendedForYou';
@@ -216,6 +218,10 @@ export function InsightsBriefingPage({
 
   return (
     <div className="space-y-6">
+      {/* Phase 2.5e — Premium-only AI weekly opener. Renders above the
+          dateline when the wire response carries the field; otherwise
+          omitted (free/growth tiers, flag off, fail-soft). */}
+      {briefing.weeklyOpener && <WeeklyOpener text={briefing.weeklyOpener} />}
       <DateLine weekOf={briefing.weekOf} issueNumber={briefing.issueNumber} />
       <IssueSummaryLine text={briefing.issueSummary ?? ''} />
       <ActionQueueStrip

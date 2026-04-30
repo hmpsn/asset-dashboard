@@ -58,6 +58,13 @@ const sourceMetadataSchema: z.ZodType<BriefingSourceMetadata> = z.object({
   provider: z.enum(['anthropic', 'openai']),
   generationMs: z.number().int().nonnegative(),
   preflightDeferralCount: z.number().int().nonnegative().optional(),
+  // Phase 2.5e — Premium AI polish telemetry. Optional; absent on
+  // pre-2.5e drafts and on workspaces where the polish flag is off.
+  aiPolish: z.object({
+    weeklyOpener: z.string().optional(),
+    originalHeroHeadline: z.string().optional(),
+    aiMs: z.number().int().nonnegative().optional(),
+  }).optional(),
 });
 
 // ── Row shape ──

@@ -6,7 +6,7 @@
 
 This is one master plan covering all five PRs. Each PR section below is independently shippable with its own task graph, file list, and verification gates.
 
-**Phase reorder note (2026-04-29):** the original plan placed the AI hero-punch + weekly-opener inside 2.5c. After the user's call to ship cleanup BEFORE the AI passes, those moved to a new **Phase 2.5e** that runs AFTER **Phase 2.5d**. Cleaner foundation — the AI passes get to live in a `briefing-prompt.ts` that 2.5d emptied of dead full-narrative code, rather than landing alongside it. **2.5d is housekeeping** — only opens after 2.5a/b/c have soaked for ≥4 weeks with no rollback or incident.
+**Phase reorder note (2026-04-29 → revised 2026-04-30):** the original plan placed the AI hero-punch + weekly-opener inside 2.5c. We reordered them out into a new **Phase 2.5e** (cleaner mental separation: 2.5c is anchors + outcome stories, 2.5e is editorial polish). The original reorder put 2.5e AFTER **2.5d** so the AI passes would land on a `briefing-prompt.ts` already cleaned of dead full-narrative code. **Re-revised 2026-04-30:** user opted to ship 2.5e BEFORE 2.5d to keep momentum — 2.5e is purely additive (new exports alongside the unused `buildBriefingInstructions`/`briefingAIResponseSchema`), 2.5d cleanup runs on its own ≥4-week soak clock and will preserve the 2.5e helpers when it deletes the dead path. **2.5d is housekeeping** — only opens after 2.5a/b/c/e have soaked for ≥4 weeks with no rollback or incident.
 
 ---
 
@@ -790,7 +790,7 @@ Render in `<InsightsBriefingPage>` only when present in the draft response.
    - The system-prompt builder for the multi-story narrative generation
    - The `briefingAIResponseSchema` Zod schema (was for parsing AI's full briefing JSON)
    - The instructions block that asked the AI to pick + write 3-5 stories
-   - **Phase reorder note:** the original plan kept `punchHeroHeadline` + `writeWeeklyOpener` here for 2.5c. After the reorder, those land in **Phase 2.5e** (built fresh on the cleaned-up `briefing-prompt.ts`). Phase 2.5d deletes the file's content wholesale.
+   - **Phase reorder note (revised):** the original plan kept `punchHeroHeadline` + `writeWeeklyOpener` in 2.5c. The first reorder moved them to a new **Phase 2.5e** that ran AFTER 2.5d. The user then opted to ship 2.5e FIRST (PR #387, merged 2026-04-30 timeframe) so the helpers landed alongside the dead path. **2.5d MUST PRESERVE the 2.5e helpers** — only delete the multi-story narrative generation logic + `briefingAIResponseSchema` Zod schema + `buildBriefingInstructions`. Keep `punchHeroHeadline` + `writeWeeklyOpener` + their shared helpers (`HEDGE_WORDS_RE`, `BANNED_WORDS_TEXT`, `unquote`, `hasPairedQuotes`, `sanitizeForPrompt`, `countWords`).
 
 2. **`stripCodeFences` call in `briefing-cron.ts`**
    - Was needed because Sonnet wrapped JSON in `\`\`\`json` fences
@@ -831,7 +831,7 @@ Before any deletion, run a grep audit:
 ### T2.5d.1 — Remove AI narrative path (Model: sonnet)
 
 **Files modified:**
-- `server/briefing-prompt.ts` — remove ALL of the multi-story narrative generation logic. Phase 2.5c shipped without `punchHeroHeadline` / `writeWeeklyOpener` (deferred to Phase 2.5e per the plan's reorder), so 2.5d can delete the entire file's invocation path. Re-evaluate at plan-write whether the file should be deleted entirely or left as a stub for 2.5e to extend.
+- `server/briefing-prompt.ts` — remove ONLY the multi-story narrative generation logic: the `buildBriefingInstructions()` builder and the `briefingAIResponseSchema` Zod schema (+ its `BriefingAIResponse` type alias). PRESERVE `punchHeroHeadline` + `writeWeeklyOpener` + their shared module-level helpers (regex / banned-words list / quote-handling functions / countWords / sanitizeForPrompt). Phase 2.5e shipped these helpers in the same file alongside the dead code; 2.5d's job is the surgical removal of the dead path only.
 - `server/briefing-cron.ts` — remove the `stripCodeFences` call + the JSON.parse step + the Zod validation against `briefingAIResponseSchema`
 
 ### T2.5d.2 — Test cleanup (Model: haiku)
@@ -878,10 +878,7 @@ If `client-briefing-v2` is now the default-on flag and we're confident: remove t
 **LOC budget:** ~400 (≤500 hard cap)
 **Soak after merge:** None — opt-in flag-gated; rollback is the flag flip.
 
-**Phase reorder rationale:** the original plan put these inside 2.5c. We
-moved them to 2.5e (after 2.5d's cleanup pass) so the AI passes land on a
-tidy `briefing-prompt.ts` rather than living next to the dead full-
-narrative path. Cleaner foundation, smaller diff, easier to review.
+**Phase reorder rationale (revised 2026-04-30):** original plan put these inside 2.5c. First reorder moved them to 2.5e AFTER 2.5d. User then opted to ship 2.5e BEFORE 2.5d to keep momentum — the helpers land alongside the dead path; 2.5d's cleanup pass will surgically preserve the 2.5e helpers. Status: **shipped in PR #387 (~2026-04-30)**.
 
 ## Task Dependencies (2.5e)
 
@@ -906,16 +903,19 @@ Add `'client-briefing-v2-ai-polish': false`. Both AI passes gate on this flag AN
 
 ### T2.5e.1 — punchHeroHeadline (Model: sonnet)
 
-**Files:** `server/briefing-prompt.ts` (new content — Phase 2.5d emptied this file)
+**Files:** `server/briefing-prompt.ts` (additive — alongside the dead full-narrative path that 2.5d will surgically remove later)
+
+**As shipped (PR #387):**
 
 ```ts
 export async function punchHeroHeadline(
   deterministicHeadline: string,
-  insight: AnalyticsInsight | { headline: string; data: unknown },
+  insightHint: string | null, // pre-stringified hint, not typed AnalyticsInsight
+  workspaceId: string,         // for callAI cost attribution
 ): Promise<string>
 ```
 
-Calls `callAI({ provider: 'anthropic' })` with a tight prompt: "Rewrite this headline to be 5-12 words, more memorable, definite tense, NO hedge words (potentially / could / may / appears / suggests / might / seems). Return only the rewritten headline." Word-count guard at the response (5-12 words inclusive); banned-word regex check; on either failure → return original.
+The original plan's signature accepted a typed `AnalyticsInsight | { headline; data }` as the second arg. Shipped impl uses a pre-built string hint instead — avoids threading `AnalyticsInsight` through the cron's story loop (cron has the typed insight; converting to a hint at the call site keeps `briefing-prompt.ts` data-shape agnostic). The `workspaceId` third parameter feeds `callAI`'s cost-attribution path. Calls `callAI({ provider: 'anthropic', system: <rules>, messages: [{ role: 'user', content: <data> }] })` with rules in the **system field** (codebase idiom — see `server/copy-generation.ts`, `server/content-posts-ai.ts`).
 
 **Fail-soft contract:**
 - Catch every error (timeout, rate-limit, malformed response, hedge-word violation, word-count violation) → return the original deterministic headline
@@ -939,31 +939,43 @@ Prompt rules: no hedges; cite a number from at least one story; ≤25 words; per
 
 ### T2.5e.3 — Cron wiring (Model: sonnet)
 
-In `briefing-cron.ts`, AFTER `upsertBriefingDraft` and BEFORE the snapshot piggyback:
+**As shipped (PR #387):** the AI block runs **BEFORE** `upsertBriefingDraft`, not after. Original plan suggested running it after persist + re-persisting via `updateBriefingStories`. The shipped flow avoids the second DB write by mutating `stories[heroIdx].headline` IN PLACE pre-upsert, so the persisted draft already carries the polished headline. The opener persists in `sourceMetadata.aiPolish.weeklyOpener` (no schema change — packs into the existing JSON column).
 
 ```ts
-const aiPolishEnabled = isFeatureEnabled('client-briefing-v2-ai-polish');
-const isPremium = ws.tier === 'premium';
-if (aiPolishEnabled && isPremium) {
-  // Hero headline punch
-  const hero = stories.find((s) => s.isHeadline);
-  if (hero) {
-    const punched = await punchHeroHeadline(hero.headline, /* underlying insight */).catch(() => hero.headline);
-    if (punched !== hero.headline) {
-      hero.headline = punched;
-      // Re-persist the updated story array
-      updateBriefingStories(workspaceId, draft.id, stories);
+let aiPolishPayload: NonNullable<BriefingSourceMetadata['aiPolish']> | undefined;
+const aiPolishEnabled = isFeatureEnabled('client-briefing-v2-ai-polish') && ws.tier === 'premium';
+if (aiPolishEnabled && stories.length > 0) {
+  const aiStart = Date.now();
+  const heroIdx = stories.findIndex((s) => s.isHeadline);
+  const hero = heroIdx >= 0 ? stories[heroIdx] : null;
+  const originalHeroHeadline = hero?.headline;
+  let weeklyOpener: string | null = null;
+  let headlineWasPunched = false;
+  try {
+    if (hero) {
+      const insightHint = hero.metrics.length > 0
+        ? `${hero.category}: ${hero.metrics.map(m => `${m.value} ${m.label}`).join(', ')}`
+        : null;
+      const punched = await punchHeroHeadline(hero.headline, insightHint, workspaceId);
+      if (punched && punched !== hero.headline) {
+        stories[heroIdx].headline = punched;
+        headlineWasPunched = true;
+      }
     }
-  }
-  // Weekly opener
-  const opener = await writeWeeklyOpener(stories, { workspaceName: ws.name, weekOf }).catch(() => null);
-  if (opener) {
-    // Persist via a new column or via source_metadata extension — TBD at plan-write
+    // ORDER-DEPENDENT: writeWeeklyOpener sees the polished headline
+    // when present. Don't parallelise via Promise.all.
+    weeklyOpener = await writeWeeklyOpener(stories, { workspaceName: ws.name, weekOf, workspaceId });
+  } catch (err) { /* fail-soft, log at debug */ }
+  // Skip the payload entirely when both AI calls fully fell back —
+  // {aiMs: N}-only blob is noisy telemetry with no actionable signal.
+  if (weeklyOpener || headlineWasPunched) {
+    aiPolishPayload = { ...(weeklyOpener && {weeklyOpener}), ...(headlineWasPunched && originalHeroHeadline && {originalHeroHeadline}), aiMs: Date.now() - aiStart };
   }
 }
+// then upsertBriefingDraft({ ..., sourceMetadata: { ..., ...(aiPolishPayload && {aiPolish: aiPolishPayload}) } })
 ```
 
-Both AI calls are awaited but failure is silent. The cron's outer try/catch around the entire AI block ensures even a thrown error doesn't fail the briefing run.
+Both AI calls are awaited but failure is silent. The cron's outer try/catch around the AI block is a backup so a malformed module never fails the briefing run.
 
 ### T2.5e.4 — Wire opener through PublishedBriefingResponse (Model: haiku)
 
