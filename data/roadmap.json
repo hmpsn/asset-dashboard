@@ -509,6 +509,56 @@
           "notes": "After schema-yoast-parity-fields PR1, buildSchemaContext still computes pageKeywordMap from ws?.keywordStrategy?.pageMap and returns it (server/helpers.ts:343, :410-418, :539). Both callers (server/routes/webflow-schema.ts:51, server/routes/jobs.ts:636) destructure it and pass to generateSchemaSuggestions, which immediately voids it (server/schema-suggester.ts:391). Per-page keywords are now fetched via buildWorkspaceIntelligence inside the page loop. Cleanup: drop the pageKeywordMap return field, the parameter, and the void discard. While in there, audit the other 5 voided params on generateSchemaSuggestions (gscMap, ga4Map, queryPageData, insightsMap, validationsByPageId) — likely also dead. Devin Review explicitly recommended deferring to a follow-up PR; doesn't affect correctness."
         },
         {
+          "id": "schema-engagement-signals",
+          "title": "Schema engagement signals — wordCount, timeRequired, speakable, educationalLevel",
+          "source": "Strategic landscape brainstorm 2026-04-29 (post-PR1 merge)",
+          "est": "2d",
+          "priority": "P1",
+          "sprint": "future",
+          "status": "pending",
+          "notes": "Quick-win Tier-4 fields with data the platform already has. Article.wordCount (already computed in TipTap on every save). Article.timeRequired = wordCount/250wpm rounded. WebPage.speakable with cssSelector pointing to .lead/.intro/first-paragraph — voice-assistant rich result; almost nobody implements correctly. Article.educationalLevel via AI classification (Beginner/Intermediate/Advanced). All wire through existing PageData typed boundary. No new admin UI required for the basics; speakable cssSelector is a per-template constant. Independent rich-result eligibility unlock for Google Article + voice-search amplification."
+        },
+        {
+          "id": "schema-eeat-amplifiers",
+          "title": "Schema E-E-A-T amplifiers — publishingPrinciples, reviewedBy, copyrightHolder, isAccessibleForFree, Person.jobTitle",
+          "source": "Strategic landscape brainstorm 2026-04-29 (post-PR1 merge)",
+          "est": "1w",
+          "priority": "P1",
+          "sprint": "future",
+          "status": "pending",
+          "notes": "Tier-3 trust signals Google increasingly weighs. Add 4 new optional Workspace fields: publishingPrinciplesUrl, actionableFeedbackPolicyUrl (both → Organization.publishingPrinciples + actionableFeedbackPolicy on every page's @graph). Article.copyrightHolder ref to Organization, copyrightYear from datePublished. Article.reviewedBy as Person from new CMS field 'fact_checker' (optional). Article.isAccessibleForFree from per-tier content gating. Person.jobTitle + worksFor on author when CMS author records have those fields (currently they're just string names). Mostly admin Settings UI work + template emission. Each field is an additive E-E-A-T signal — non-breaking, immediate ranking benefit on YMYL content."
+        },
+        {
+          "id": "schema-entity-grounding-wikidata",
+          "title": "Schema entity grounding — typed Thing/Place entities + Wikidata sameAs disambiguation",
+          "source": "Strategic landscape brainstorm 2026-04-29 (post-PR1 merge)",
+          "est": "2-3w",
+          "priority": "P1",
+          "sprint": "future",
+          "status": "pending",
+          "notes": "Tier-2 / biggest competitive moat. Replace string knowsAbout (currently ['brand strategy','webflow']) with typed Thing entities linked to Wikidata Q-numbers via sameAs. Same upgrade for Article.about (typed Thing — what is this article about?), Article.mentions[] (entities referenced in body), Place entities for areaServed (Austin, TX → Wikidata Q16559), Organization.sameAs extended with Wikidata identifier. Architecture: new EntityResolutionSlice on buildWorkspaceIntelligence, populated by a Cheerio-based extractor that runs entity recognition (likely via OpenAI structured-output prompt against curated entity types) + Wikidata SPARQL lookup for top candidates, cached per-entity. Most agencies don't do this; Google's knowledge graph rewards disambiguation heavily. Architectural prerequisite met by parity-fields PR1 Pattern B starter. Can ship after schema-page-element-catalog-v1 (the catalog feeds Article.mentions extraction)."
+        },
+        {
+          "id": "schema-commerce-types",
+          "title": "Schema commerce types — Service.offers (PriceSpecification), Product, Course, Event",
+          "source": "Strategic landscape brainstorm 2026-04-29 (post-PR1 merge)",
+          "est": "1-2w per type, parallelizable",
+          "priority": "P2",
+          "sprint": "future",
+          "status": "pending",
+          "notes": "Tier-5 monetization opportunity for agencies with productized services / paid content. Service.offers with Offer { price, priceCurrency, availability } — Google's 'service prices' SERP feature. Product schema for templates/digital products. Course for educational content/training. Event for webinars/launches with eventStatus + eventAttendanceMode (Online/Offline/Mixed). Each is independent rich-result eligibility unlock. Workspace.contentPricing already exists (used for content-purchase tiers); Service.offers can reuse the pricing infra. Per-type effort similar to parity-fields PR1's per-template additions; parallelizable across template files. Default-off; admin opts in per-workspace. Most useful for agencies with packaged services (web-design + brand audit + content retainer); skip for service-only sites without published prices."
+        },
+        {
+          "id": "schema-trust-authority-graph",
+          "title": "Schema trust/authority — Organization.award, member, hasCredential, numberOfEmployees",
+          "source": "Strategic landscape brainstorm 2026-04-29 (post-PR1 merge)",
+          "est": "2-3d",
+          "priority": "P2",
+          "sprint": "future",
+          "status": "pending",
+          "notes": "Tier-6 reputation graph fields. New Workspace.organizationAwards (string[] of Award names → Award entity[]), Workspace.organizationMemberships (industry orgs → ProgramMembership/Organization references), Workspace.organizationCredentials (certifications → EducationalOccupationalCredential), Workspace.numberOfEmployees (QuantitativeValue { minValue, maxValue, unitText: 'employee' }). Each emitted on Organization sibling node in homepage + local-business templates. Pure admin Settings UI + template extension; no AI/intelligence dependencies. Agency credibility in SERP, especially for B2B competitive queries."
+        },
+        {
           "id": "test-flake-aiLimiter-state-pollution",
           "title": "Reset aiLimiter in beforeEach for brandscript-hardening I14 burst-cap",
           "source": "docs/superpowers/audits/2026-04-29-pre-existing-test-failures-audit.md",
