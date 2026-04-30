@@ -496,8 +496,8 @@
           "est": "4d",
           "priority": "P1",
           "sprint": "J",
-          "status": "pending",
-          "notes": "Adds 3 element types (images with role classification, tables, testimonials) + 3 schema integrations (ImageGallery/role-classified image, Table mainEntity, Review+AggregateRating). Optional GPT-4.1-mini AI image classifier behind feature flag with 100-call budget per regenerate. Builds on PR1 foundation."
+          "status": "done",
+          "notes": "Shipped 3 pattern extractors (images w/ rule-based hero/informative/decorative + AI vision classifier; tables w/ pricing+comparison heuristics; testimonials w/ author+rating) + 2 AI extractors (vision image-role classifier via openai SDK direct, HowTo disambiguation via callAI) behind schema-ai-element-classifier flag (default off, 120-call shared per-run AiBudget). Threaded one AiBudget per regenerate-all through generateSchemaSuggestions's 3 generateLeanSchema sites (Devin r5 follow-up). Added 4 validator REQUIRED_BY_TYPE entries (Review/AggregateRating/Table/ImageGallery) + 3 schema integrations: ImageGallery (Article+Service), Review[]+AggregateRating (Service+LocalBusiness), Table mainEntity (Service). Pre-emission gates on every new node type (synchronous, per PR1 Devin r2 lesson). 4 new HTML fixtures + 6 new test files + extended integration tests."
         },
         {
           "id": "schema-page-element-catalog-pr3",
