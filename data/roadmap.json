@@ -622,6 +622,17 @@
           "notes": "ValidationFinding API (typed { severity, type, field?, ruleId, message }) + 6 new template fields (Service.areaServed, Service.serviceType, LocalBusiness.areaServed, Organization.knowsAbout, Article.keywords, gated WebSite.potentialAction) + Workspace.siteHasSearch field plumbing (default false) + slice-migration starter (siteKeywords + per-page pageKeywords moved to seoContext slice consumption) + new pr-check rule schema-context-direct-read-not-on-allowlist + CLAUDE.md convention paragraph + roadmap migration tracker entry (schema-context-builder-pattern-b-migration). 5 dead SchemaContext._* fields deleted (3 preserved per audit). Frontend renders findings grouped by severity (errors red, warnings amber 'Recommended'). PR2 ships admin discoverability surfaces. Spec: docs/superpowers/specs/2026-04-29-schema-yoast-parity-fields-design.md. Audit: docs/superpowers/audits/2026-04-29-schema-yoast-parity-fields-audit.md."
         },
         {
+          "id": "schema-yoast-parity-fields-pr2",
+          "title": "Schema Yoast-Parity Fields PR2 — admin discoverability surfaces",
+          "source": "docs/superpowers/plans/2026-04-29-schema-yoast-parity-fields-pr2.md",
+          "est": "1.5d",
+          "priority": "P0",
+          "sprint": "I",
+          "status": "done",
+          "shippedAt": "2026-04-29",
+          "notes": "Admin discoverability layer atop PR1's typed validationFindings. SchemaCompletenessWidget on the Schema page aggregates findings across all pages with progress bar + missing-field deep-link buttons. BusinessProfileTab gains a 'Schema impact' read-only mirror SectionCard listing 5 schema-impacting fields with ✓/✗ status + deep-links (cross-tab via Link with ?tab=...&focus=..., in-tab via scroll-to-element). FeaturesTab gains Logo URL microcopy + new 'Site capabilities' SectionCard with the siteHasSearch checkbox (toggling on activates PR1's gated WebSite.potentialAction emission). SchemaPageCard now groups findings by field with click-to-expand collapsible rows when a single field has 2+ findings on a page. SchemaSuggester header gains 'X fixes available' annotation. New shared useDeepLinkFocus hook + data-schema-deeplink attribute convention establishes the field-level deep-link two-halves contract. New fieldTargets.ts module is the single source of truth mapping ValidationFinding.field → Settings deep-link. Frontend-only; no backend changes. 8 new component tests (3 hook + 5 widget). Plan: docs/superpowers/plans/2026-04-29-schema-yoast-parity-fields-pr2.md."
+        },
+        {
           "id": "schema-pillar-3-gates",
           "title": "Schema Pillar 3 — Compile-time + CI Gates",
           "source": "docs/superpowers/plans/2026-04-29-schema-pillar-3-gates.md",
