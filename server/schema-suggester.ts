@@ -400,8 +400,8 @@ export async function generateSchemaSuggestions(
   for (const page of pages) {
     if (isCancelled?.()) break;
     const slug = page.slug || '';
-    const url = (!slug || slug === 'index') ? baseUrl : `${baseUrl}/${slug}`;
     const publishedPath = page.publishedPath || (slug ? `/${slug}` : '/');
+    const url = (!slug || slug === 'index') ? baseUrl : `${baseUrl}${publishedPath}`;
     const html = await fetchPublishedHtml(url);
 
     // Per-page slice fetch for pageKeywords (5-min LRU + single-flight dedup — cheap).
