@@ -4075,3 +4075,37 @@ Current feature count: **310**. Last updated: April 2026.
 - ✅ typecheck + 1,978 tests pass
 
 **Files added:** `server/db/migrations/079-workspace-metrics-snapshots.sql`; `server/workspace-metrics-snapshots.ts`; `server/briefing-anchors.ts`; `server/briefing-templates/{we-called-it,milestone-attribution}.ts`; `tests/unit/{briefing-anchors,workspace-metrics-snapshots}.test.ts`. **Files modified:** `shared/types/analytics.ts`; `server/schemas/insight-schemas.ts`; `server/analytics-insights-store.ts`; `server/briefing-cron.ts`; `server/briefing-candidates.ts`; `server/briefing-templates/{index,_helpers,ranking-mover,audit-finding}.ts`; `src/components/client/InsightsDigest.tsx`; `tests/unit/briefing-templates.test.ts`.
+
+---
+
+### 325. Client Insights Briefing v2 — Phase 2.5e (Premium AI Polish)
+**What it does:** Adds two optional AI passes to the deterministic briefing pipeline — `punchHeroHeadline` (rewrites the hero headline 5–12 words, definite tense, no hedges) and `writeWeeklyOpener` (one-line "letter from the editor" rendered above the dateline). Both gated behind the new `client-briefing-v2-ai-polish` sub-flag AND `tier === 'premium'`. Both fail-soft to the deterministic original (or null for the opener) on any error path. Cleanup of the legacy AI narrative path stays scoped to Phase 2.5d. Spec: `docs/superpowers/specs/2026-04-29-client-insights-redesign-design.md`. Plan: `docs/superpowers/plans/2026-04-29-client-insights-redesign.md` Phase 2.5e section.
+
+**Server side:**
+- `shared/types/feature-flags.ts`: new `'client-briefing-v2-ai-polish'` flag, default off. Sub-flag composes with `client-briefing-v2` and the workspace tier check — both must clear before either AI call fires.
+- `shared/types/briefing.ts`: extended `BriefingSourceMetadata.aiPolish` (admin-only sub-object: `weeklyOpener?`, `originalHeroHeadline?`, `aiMs?`). Extended `PublishedBriefingResponse.weeklyOpener?` (the only piece that crosses the public boundary).
+- `server/briefing-store.ts`: Zod schema mirrors the optional `aiPolish` shape so existing pre-2.5e drafts round-trip cleanly.
+- `server/briefing-prompt.ts`: NEW `punchHeroHeadline(deterministicHeadline, insightHint, workspaceId)` and `writeWeeklyOpener(stories, ctx)`. Both use `callAI({ provider: 'anthropic' })` against tight prompts; ~50/~80 tokens per call.
+- `server/briefing-cron.ts`: post-template-projection AI block. Punched headline mutates `stories[heroIndex].headline` IN PLACE before persist; opener stored in `sourceMetadata.aiPolish`. Total polish budget logged as `aiMs`. Fail-soft helpers + outer try/catch double up so the AI path can never fail the briefing run.
+- `server/routes/public-portal.ts`: pulls `weeklyOpener` from `sourceMetadata.aiPolish` and exposes it on the wire response. Rest of `aiPolish` stays admin-only.
+
+**Fail-soft contract (load-bearing):**
+- `punchHeroHeadline` validates each AI response against four guards: no hedge words, no embedded newlines, 5–12 words inclusive, non-empty after unquoting. Any failure → returns the deterministic original.
+- `writeWeeklyOpener` adds three more: ≤25 words, period-terminated, no quotation marks (clash with magazine chrome), at least one number cited (`/\d/`). Any failure → returns null. The composer skips the section entirely when the field is absent.
+- Both helpers wrap every error in `try/catch` and log at `debug` level — opt-in polish, not a critical path.
+
+**Frontend:**
+- `src/components/client/Briefing/WeeklyOpener.tsx` (NEW, 24 LOC): single italic muted body line. Renders nothing for empty input.
+- `src/components/client/Briefing/InsightsBriefingPage.tsx`: composer renders `<WeeklyOpener>` ABOVE `<DateLine>` when `briefing.weeklyOpener` is present. Reading-rhythm comment updated.
+
+**Tests (20 new cases in briefing-prompt-ai-polish.test.ts):**
+- punchHeroHeadline: happy path, quote-stripping, < 5 words, > 12 words, hedge-word violation, multiline response, AI throws, empty input (no AI call), insightHint passed through, insightHint omitted.
+- writeWeeklyOpener: happy path, quote-stripping, empty stories (no AI call), internal quote rejection, hedge-word, > 25 words, missing period, no numbers cited, AI throws, headlines + first-metric values flow into prompt.
+
+**Constraint compliance:**
+- ✅ No new DB migration (opener persisted in existing `source_metadata` JSON column)
+- ✅ No frontend regression — composer renders identically when flag/tier blocks the AI call
+- ✅ Pre-2.5e drafts round-trip cleanly (aiPolish optional in Zod schema)
+- ✅ typecheck + 109 briefing tests pass
+
+**Files added:** `src/components/client/Briefing/WeeklyOpener.tsx`; `tests/unit/briefing-prompt-ai-polish.test.ts`. **Files modified:** `shared/types/feature-flags.ts`; `shared/types/briefing.ts`; `server/briefing-store.ts`; `server/briefing-prompt.ts`; `server/briefing-cron.ts`; `server/routes/public-portal.ts`; `src/components/client/Briefing/InsightsBriefingPage.tsx`.

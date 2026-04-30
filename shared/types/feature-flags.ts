@@ -59,10 +59,17 @@ export const FEATURE_FLAGS = {
   'smart-placeholders': false,       // System-wide smart placeholder hook (admin chips + prefill, client ghost text)
   'client-brand-section': false,     // Brand tab in client portal (business profile + brand positioning)
   'seo-editor-unified': false,       // Merged static+CMS SEO editor with collection filtering
-  // Client Insights Briefing (4-phase feature)
+  // Client Insights Briefing (5-phase feature)
   'client-briefing-v2': false,
+  // Phase 2.5e — Premium-only AI polish (hero-headline punch + weekly opener).
+  // Sub-flag: gates BOTH AI passes ON TOP OF the workspace's tier (must be
+  // 'premium' for either to run). Default off; flag-flip is the rollback.
+  'client-briefing-v2-ai-polish': false,
   // Deep Diagnostics
   'deep-diagnostics': false,
+
+  // Page Element Catalog (AI-assisted extraction & classification)
+  'schema-ai-element-classifier': false,
 } as const;
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;

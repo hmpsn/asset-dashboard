@@ -101,6 +101,21 @@ export interface BriefingSourceMetadata {
   provider: 'anthropic' | 'openai';
   generationMs: number;
   preflightDeferralCount?: number;
+  /**
+   * Phase 2.5e — Premium AI polish output. Persisted in source_metadata to
+   * avoid a DB schema change. Read by the public-portal serializer to
+   * surface `weeklyOpener` on `PublishedBriefingResponse`. The whole
+   * sub-object is stripped from the public response except for the
+   * `weeklyOpener` string.
+   */
+  aiPolish?: {
+    /** Premium-only AI-generated "letter from the editor". Null/undefined when fail-soft skipped. */
+    weeklyOpener?: string;
+    /** Hero headline before the AI punch (for audit / observability). */
+    originalHeroHeadline?: string;
+    /** ms it took for the AI passes (combined). */
+    aiMs?: number;
+  };
 }
 
 /** Client-visible summary embedded in ClientSignalsSlice */
@@ -163,4 +178,13 @@ export interface PublishedBriefingResponse {
    * state, not a snapshot at briefing-publish time.
    */
   recommendations?: BriefingRecommendation[];
+  /**
+   * Phase 2.5e — Premium-only AI-generated "letter from the editor". One
+   * concise sentence rendered above the dateline on premium briefings.
+   * Optional — absent when the `client-briefing-v2-ai-polish` flag is off,
+   * the workspace tier isn't premium, or the AI call failed (fail-soft).
+   * Sourced from `sourceMetadata.aiPolish.weeklyOpener` and exposed here
+   * (the rest of `aiPolish` stays admin-only).
+   */
+  weeklyOpener?: string;
 }

@@ -275,6 +275,22 @@ Phase 2.5b extends the magazine layout with five new sections in the 8-stop read
 
 **Typography update (Phase 2.5b):** `.t-caption` switched from `'Inter' 400` to `'DIN Pro' 600` — global typography refresh aligning caption text with the rest of the DIN Pro hierarchy.
 
+##### Phase 2.5e — Premium AI polish (`<WeeklyOpener>`)
+
+Premium-only one-line "letter from the editor" rendered ABOVE the dateline when the `client-briefing-v2-ai-polish` flag is on. Free/Growth tiers and any fail-soft path → component is omitted entirely; the dateline remains the first element.
+
+| Element | Treatment | Rationale |
+|---|---|---|
+| `<WeeklyOpener>` text | `t-body italic text-[var(--brand-text-muted)] leading-relaxed mb-2` | Italic body — visually distinct from the deterministic IssueSummaryLine that follows the dateline. Muted color signals "editorial overlay, not the lede." |
+| Position | Above DateLine | Sets the tone before the reader anchors on the date. Mirrors a magazine's pull-quote intro. |
+| Render guard | `briefing.weeklyOpener && <WeeklyOpener>` | Component itself returns null on empty input (defensive); composer skips the render when the wire field is absent (the common case). |
+
+**2.5e principles:**
+
+1. **Fail-soft is the default.** Both AI passes (`punchHeroHeadline`, `writeWeeklyOpener`) catch every error and return the deterministic original / null. The cron's surrounding try/catch is a backup, not the primary safety net. A flag-flip is the only rollback needed — no schema migration, no frontend conditional.
+2. **Premium-only by tier check.** The flag gates the AI call; the workspace's `tier === 'premium'` is a second gate. Both must clear. A workspace flipping to Growth mid-week would cleanly stop receiving polish on the next cron tick.
+3. **No quotes inside the opener.** The model is instructed to omit quote characters and the helper rejects responses that contain them. Quote characters clash with magazine chrome (story headlines already use `"`-wrapped queries).
+
 ### Admin Components
 
 | Component | Element | Color | Rationale |
