@@ -60,6 +60,9 @@ export function buildStoryFromContentGap(
 
   const hasImpressions = typeof gap.impressions === 'number' && gap.impressions > 0;
   const hasCompetitorProof = typeof gap.competitorProof === 'string' && gap.competitorProof.length > 0;
+  const normalizedProof = hasCompetitorProof
+    ? (gap.competitorProof as string).replace(/\.$/, '')
+    : '';
   const hasCPC = typeof context.avgCPC === 'number' && context.avgCPC > 0;
 
   // Headline — the keyword and its monthly volume, framed as untargeted demand.
@@ -77,10 +80,9 @@ export function buildStoryFromContentGap(
   // OR (when neither is present) a numeric restatement that pins the gap.
   let sentence2: string;
   if (hasImpressions && hasCompetitorProof) {
-    const proof = (gap.competitorProof as string).replace(/\.$/, '');
     sentence2 =
       `Your site already shows ${fmtNum(gap.impressions as number)} impressions/mo for the term ` +
-      `without a dedicated page, while ${proof}.`;
+      `without a dedicated page, while ${normalizedProof}.`;
   } else if (hasImpressions) {
     sentence2 =
       `Your site already shows ${fmtNum(gap.impressions as number)} impressions/mo for the term ` +
@@ -93,8 +95,7 @@ export function buildStoryFromContentGap(
     // so we wrap it as a parenthetical clause and put the action verb on a
     // sentence-level subject the reader controls. Devin caught this on
     // PR #380 — branch was untested because all unit fixtures set impressions.
-    const proofClause = (gap.competitorProof as string).replace(/\.$/, '');
-    sentence2 = `A competitor is already ranking for the term (${proofClause}), capturing the ${volumeLabel}/mo demand while your site has 0 impressions.`;
+    sentence2 = `A competitor is already ranking for the term (${normalizedProof}), capturing the ${volumeLabel}/mo demand while your site has 0 impressions.`;
   } else {
     sentence2 = `Your site captures 0 of the ${volumeLabel} monthly searches today.`;
   }
@@ -120,9 +121,7 @@ export function buildStoryFromContentGap(
     `Source: SEMrush volume ${volumeLabel}/mo${hasDifficulty ? ` · KD ${gap.difficulty} (${framing})` : ''}.`,
   );
   if (hasCompetitorProof) {
-    // `competitorProof` is sometimes terminated, sometimes not — normalize with a period.
-    const proof = (gap.competitorProof as string).replace(/\.$/, '');
-    receiptParts.push(`${proof}.`);
+    receiptParts.push(`${normalizedProof}.`);
   }
   if (hasImpressions) {
     receiptParts.push(
