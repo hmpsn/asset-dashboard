@@ -88,3 +88,52 @@ describe('findBestWeekSince', () => {
     }
   });
 });
+
+// ── appendAnchor punctuation contract ──
+// The helper is shared via _helpers.ts but lives in the briefing-templates
+// directory; it consumes findBestWeekSince via the same mocked module so
+// the punctuation contract can be exercised without DB.
+import { appendAnchor } from '../../server/briefing-templates/_helpers.js';
+
+describe('appendAnchor punctuation contract', () => {
+  beforeEach(() => {
+    getBestValueSinceDate.mockReset();
+  });
+
+  it('always returns a period-terminated string when no anchor available', () => {
+    getBestValueSinceDate.mockReturnValue(null);
+    const out = appendAnchor('Source: GSC last-28-day window', 'ws_test', 'total_clicks', 100);
+    // No anchor → close the body with a single period.
+    expect(out).toBe('Source: GSC last-28-day window.');
+  });
+
+  it('joins body and anchor with a period separator (both sentences punctuated)', () => {
+    getBestValueSinceDate.mockReturnValue({ sinceDate: '2026-03-17' });
+    const out = appendAnchor('...samples since Apr 14', 'ws_test', 'total_clicks', 250);
+    // Both clauses get their own period — the bug Devin caught was a single
+    // space joining them, producing "...Apr 14 Best week since Mar 17."
+    expect(out).toBe('...samples since Apr 14. Best week since Mar 17.');
+  });
+
+  it('is idempotent on receipt punctuation (caller may pass with or without trailing period)', () => {
+    getBestValueSinceDate.mockReturnValue({ sinceDate: '2026-03-17' });
+    const withPeriod = appendAnchor('body.', 'ws_test', 'total_clicks', 250);
+    const withoutPeriod = appendAnchor('body', 'ws_test', 'total_clicks', 250);
+    expect(withPeriod).toBe(withoutPeriod);
+    expect(withPeriod).toBe('body. Best week since Mar 17.');
+  });
+
+  it('returns a period-terminated body when current is non-finite', () => {
+    const out = appendAnchor('body', 'ws_test', 'total_clicks', NaN);
+    expect(out).toBe('body.');
+    // findBestWeekSince must NOT be called when current is non-finite.
+    expect(getBestValueSinceDate).not.toHaveBeenCalled();
+  });
+
+  it('capitalizes the first letter of the appended phrase', () => {
+    getBestValueSinceDate.mockReturnValue({ sinceDate: '2026-04-01' });
+    const out = appendAnchor('body', 'ws_test', 'avg_position', 8);
+    // "lowest avg position since Apr 1" → "Lowest avg position since Apr 1"
+    expect(out).toContain('Lowest avg position since Apr 1');
+  });
+});

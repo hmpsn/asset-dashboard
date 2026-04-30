@@ -308,10 +308,14 @@ export async function recordWeeklyBriefingSnapshot(
   };
 
   // GSC overview (28-day window matches the client Pulse strip default —
-  // anchors compare like to like). Skip silently when GSC isn't connected.
-  if (ws.gscPropertyUrl) {
+  // anchors compare like to like). Skip silently when GSC isn't connected
+  // OR when there's no webflowSiteId (token lookup uses webflowSiteId, not
+  // workspaceId — a Devin-flagged bug from the original 2.5c diff that
+  // would have silently nulled every GSC metric capture). Mirror the
+  // guard pattern used by routes/workspace-home.ts and admin-chat-context.
+  if (ws.webflowSiteId && ws.gscPropertyUrl) {
     try {
-      const overview = await getSearchOverview(workspaceId, ws.gscPropertyUrl, 28);
+      const overview = await getSearchOverview(ws.webflowSiteId, ws.gscPropertyUrl, 28);
       metrics.totalClicks = overview.totalClicks;
       metrics.totalImpressions = overview.totalImpressions;
       metrics.avgPosition = overview.avgPosition;

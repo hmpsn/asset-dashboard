@@ -14,6 +14,11 @@
 --   - UNIQUE(workspace_id, snapshot_date) lets `recordSnapshot` use
 --     INSERT … ON CONFLICT DO UPDATE for idempotent writes if the cron fires
 --     twice in the same week.
+-- The UNIQUE(workspace_id, snapshot_date) constraint below implicitly
+-- creates an index covering the (workspace_id, snapshot_date) range scans
+-- used by listRecent / listInWindow / pruneBefore. No explicit index
+-- needed — Devin caught a redundant `CREATE INDEX wms_workspace_date` in
+-- the original draft of this migration.
 CREATE TABLE workspace_metrics_snapshots (
   id                    INTEGER PRIMARY KEY AUTOINCREMENT,
   workspace_id          TEXT NOT NULL,
@@ -26,5 +31,3 @@ CREATE TABLE workspace_metrics_snapshots (
   computed_at           INTEGER NOT NULL,
   UNIQUE(workspace_id, snapshot_date)
 );
-
-CREATE INDEX wms_workspace_date ON workspace_metrics_snapshots(workspace_id, snapshot_date);

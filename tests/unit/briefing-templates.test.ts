@@ -480,4 +480,25 @@ describe('we-called-it template', () => {
     expect(r!.narrative).not.toMatch(HEDGES);
     expect(r!.dataReceipt).not.toMatch(HEDGES);
   });
+
+  it('says "ahead of schedule" only when daysToDeliver <= measurementWindow', () => {
+    // Action created 2026-03-14, outcome measured 2026-04-22 = 39 days.
+    // measurementWindow = 60 → 39 <= 60 → "ahead of schedule".
+    const ahead = buildStoryFromWeCalledIt({ action: baseAction(), outcome: baseOutcome() }, ctx);
+    expect(ahead!.dataReceipt).toMatch(/ahead of schedule/);
+  });
+
+  it('drops "ahead of schedule" when daysToDeliver exceeds measurementWindow', () => {
+    // Action created 2026-03-14, outcome measured 2026-06-01 = 79 days.
+    // measurementWindow = 60 → 79 > 60 → just the day count, no
+    // "ahead of schedule" claim. Devin caught the original code asserting
+    // the claim unconditionally, which would be factually wrong copy in a
+    // client-facing trust-play story.
+    const r = buildStoryFromWeCalledIt({
+      action: baseAction({ measurementWindow: 60 }),
+      outcome: baseOutcome({ measuredAt: '2026-06-01T00:00:00Z' }),
+    }, ctx);
+    expect(r!.dataReceipt).not.toMatch(/ahead of schedule/);
+    expect(r!.dataReceipt).toMatch(/79 days/);
+  });
 });

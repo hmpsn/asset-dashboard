@@ -149,8 +149,22 @@ export function buildStoryFromWeCalledIt(
   ];
 
   // --- Data receipt ---
-  const scheduleLabel =
-    daysToDeliver !== null ? `${daysToDeliver} days, ahead of schedule` : `within ${outcome.checkpointDays}-day window`;
+  // "ahead of schedule" is a factual claim — only assert it when daysToDeliver
+  // actually beats the measurement window. Devin caught us claiming "75 days,
+  // ahead of schedule" against a 60-day window in the original 2.5c diff —
+  // factually wrong client-facing copy in a trust-play story. Now: under-
+  // window → "ahead of schedule"; equal/over-window → just the day count.
+  let scheduleLabel: string;
+  if (daysToDeliver !== null) {
+    const window = action.measurementWindow;
+    if (typeof window === 'number' && Number.isFinite(window) && daysToDeliver <= window) {
+      scheduleLabel = `${daysToDeliver} days, ahead of schedule`;
+    } else {
+      scheduleLabel = `${daysToDeliver} days`;
+    }
+  } else {
+    scheduleLabel = `within ${outcome.checkpointDays}-day window`;
+  }
   const dataReceipt =
     `Original prediction recorded ${predictedDate || action.createdAt.slice(0, 10)}. ` +
     `First crossed ${measuredDate || outcome.measuredAt.slice(0, 10)} — ${scheduleLabel}.`;

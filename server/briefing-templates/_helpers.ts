@@ -70,19 +70,24 @@ export function fmtLongDateUTC(input: string | Date | number): string {
 
 /**
  * Phase 2.5c — append an anchor phrase to an existing dataReceipt when one
- * is editorially meaningful for the workspace's metric history. Pure
- * concatenation; the input dataReceipt should NOT already end in a period
- * (this helper adds one with the anchor sentence appended).
+ * is editorially meaningful for the workspace's metric history.
+ *
+ * Punctuation contract (the helper is idempotent — callers can pass a
+ * receipt body with OR without a trailing period and the output is
+ * always well-formed):
+ *
+ *   - When an anchor IS available, both clauses get their own period:
+ *     `"...since Apr 14. Best week since Mar 17."`
+ *   - When NO anchor is available (insufficient history, current isn't a
+ *     new best), a single period is added so the receipt is still
+ *     well-formed: `"...since Apr 14."`
  *
  * Templates call this when they have a snapshot-worthy metric on hand:
  *
  *   ```ts
- *   let receipt = `Source: GSC last-28-day window. Verified across 7 daily samples since ${dateStr}.`;
+ *   let receipt = `Source: GSC last-28-day window. Verified across 7 daily samples since ${dateStr}`;
  *   receipt = appendAnchor(receipt, ctx.workspaceId, 'total_clicks', currentClicks);
  *   ```
- *
- * When `findBestWeekSince` returns null (insufficient history, current
- * isn't a new best, etc.) the input is returned unchanged.
  *
  * Defined here rather than in briefing-anchors.ts to keep the templates'
  * import surface small — they already pull from _helpers.
@@ -93,10 +98,14 @@ export function appendAnchor(
   metricName: SnapshotMetricName,
   current: number,
 ): string {
-  if (!Number.isFinite(current)) return receipt;
+  // Strip trailing whitespace/period the caller passed in so the
+  // punctuation contract is idempotent regardless of how the receipt was
+  // assembled. Both branches re-add the closing period.
+  const body = receipt.replace(/[.\s]+$/, '');
+  if (!Number.isFinite(current)) return `${body}.`;
   const anchor = findBestWeekSince(workspaceId, metricName, current);
-  if (!anchor) return receipt;
+  if (!anchor) return `${body}.`;
   // Capitalize first letter of phrase for sentence-start position.
   const sentence = anchor.phrase.charAt(0).toUpperCase() + anchor.phrase.slice(1);
-  return `${receipt} ${sentence}.`;
+  return `${body}. ${sentence}.`;
 }
