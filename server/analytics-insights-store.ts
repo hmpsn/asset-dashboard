@@ -211,13 +211,13 @@ export function getInsights(workspaceId: string, insightType?: InsightType): Ana
   return rows.map(rowToInsight);
 }
 
-export function getInsight(
+export function getInsight<T extends InsightType>(
   workspaceId: string,
   pageId: string | null,
-  insightType: InsightType,
-): AnalyticsInsight | undefined {
+  insightType: T,
+): AnalyticsInsight<T> | undefined {
   const row = stmts().selectOne.get(workspaceId, pageId, insightType) as InsightRow | undefined;
-  return row ? rowToInsight(row) : undefined;
+  return row ? (rowToInsight(row) as AnalyticsInsight<T>) : undefined;
 }
 
 export function deleteInsightsForWorkspace(workspaceId: string): number {

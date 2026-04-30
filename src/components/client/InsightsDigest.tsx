@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import {
   TrendingUp, TrendingDown, Users, MousePointer, Shield, Zap,
   Target, FileText, Globe, Sparkles, CheckCircle2, Layers,
-  ArrowRight, ChevronDown, Activity, HeartPulse, AlertCircle, Clock, type LucideIcon,
+  ArrowRight, ChevronDown, Activity, HeartPulse, AlertCircle, Clock, Trophy,
+  type LucideIcon,
 } from 'lucide-react';
 import { clientPath } from '../../routes';
 import { scoreColorClass } from '../ui/constants';
@@ -391,6 +392,7 @@ const INSIGHT_TYPE_ICONS: Record<InsightType, LucideIcon> = {
   emerging_keyword: TrendingUp,
   competitor_alert: AlertCircle,
   freshness_alert: Clock,
+  milestone_attribution: Trophy, // Phase 2.5c: brief crossed a traffic threshold
 };
 
 const SEVERITY_TO_SENTIMENT: Record<string, DigestInsight['sentiment']> = {
