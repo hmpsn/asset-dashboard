@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sparkles, ChevronDown, ChevronRight, Send, X, RefreshCw, Check, FileText } from 'lucide-react';
+import { Sparkles, ChevronDown, ChevronRight, Send, X, RefreshCw, Check, FileText, Star } from 'lucide-react';
 import {
   useBriefingDrafts,
   useApproveBriefing,
@@ -8,13 +8,26 @@ import {
   useGenerateBriefingNow,
 } from '../../hooks/admin/useBriefingDrafts';
 import { SectionCard, Badge, EmptyState, ErrorState, LoadingState, Icon, Button, Modal } from '../ui';
-import type { BriefingDraft, BriefingDraftStatus } from '../../../shared/types/briefing';
+import type { BriefingCategory, BriefingDraft, BriefingDraftStatus } from '../../../shared/types/briefing';
 
 function statusColor(s: BriefingDraftStatus): 'teal' | 'emerald' | 'zinc' {
   if (s === 'draft') return 'teal';
   if (s === 'approved' || s === 'published') return 'emerald';
   return 'zinc'; // skipped
 }
+
+// Mirrors the client-side SecondaryStoryRow category-color map so admins
+// preview-review with the same palette the client will see. Title-cased
+// labels read better than the raw enum values ("Period change" vs
+// "period_change"). Mirrors the legacy InsightsDigest severity → color
+// pattern (the old cards' source of truth) for win/risk/opportunity.
+const CATEGORY_BADGE: Record<BriefingCategory, { label: string; color: 'emerald' | 'amber' | 'blue' | 'teal' }> = {
+  win:           { label: 'Win',          color: 'emerald' },
+  risk:          { label: 'Risk',         color: 'amber'   },
+  opportunity:   { label: 'Opportunity',  color: 'blue'    },
+  competitive:   { label: 'Competitive',  color: 'teal'    },
+  period_change: { label: 'Period change', color: 'blue'   },
+};
 
 interface BriefingReviewQueueProps {
   workspaceId: string;
@@ -114,20 +127,21 @@ export function BriefingReviewQueue({ workspaceId }: BriefingReviewQueueProps) {
 
                 {isExpanded && (
                   <div className="border-t border-[var(--brand-border)] p-3 space-y-3 bg-[var(--surface-3)]">
-                    {d.stories.map(s => (
+                    {d.stories.map(s => {
+                      const cat = CATEGORY_BADGE[s.category];
+                      return (
                       <div key={s.id} className="space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <Badge label={s.category} color={s.isHeadline ? 'teal' : 'zinc'} />
+                          <Badge label={cat.label} color={cat.color} />
                           {s.isHeadline && (
-                            <span className="t-caption-sm uppercase tracking-wide text-teal-400 font-medium">
-                              Headline
-                            </span>
+                            <Icon as={Star} size="sm" className="text-teal-400" aria-label="Headline story" />
                           )}
                         </div>
                         <div className="t-body text-[var(--brand-text-bright)] font-medium">{s.headline}</div>
                         <div className="t-caption text-[var(--brand-text)]">{s.narrative}</div>
                       </div>
-                    ))}
+                      );
+                    })}
 
                     {!isTerminal && (
                       <div className="flex flex-wrap gap-2 pt-2 border-t border-[var(--brand-border)]">
