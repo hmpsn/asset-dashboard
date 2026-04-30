@@ -21,12 +21,11 @@ describe('contentScope', () => {
     expect($scope.is('main')).toBe(true);
   });
 
-  it('returns <main> (or empty Cheerio) when page has no recognised container', () => {
+  it('returns empty Cheerio set (safe for .find()) when page has no recognised container', () => {
     const $ = cheerio.load('<body><p>Just a paragraph</p></body>');
     const $scope = contentScope($);
-    // Should return a Cheerio object that can be used with .find() even if <main> doesn't exist
-    expect($scope.length >= 0).toBe(true);
-    expect($scope.find).toBeDefined();
+    expect($scope.length).toBe(0);
+    expect($scope.find('p').length).toBe(0);
   });
 
   it('<article> wins over .w-richtext when both present (no double-counting)', () => {
