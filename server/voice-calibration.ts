@@ -311,7 +311,7 @@ Each variation should be meaningfully different in approach while staying on-bra
 
 Return valid JSON: { "variations": ["variation 1 text", "variation 2 text", "variation 3 text"] }`;
 
-  const system = buildSystemPrompt(workspaceId, 'You are a copywriter matching a specific brand voice. Generate copy that sounds like this brand, not generic marketing language.');
+  const system = buildSystemPrompt(workspaceId, 'You are a copywriter matching a specific brand voice. Generate copy that sounds like this brand, not generic marketing language. Apply the style quality rules that follow, but if the provided voice samples demonstrate a pattern those rules discourage (em dashes, concession constructions, etc.), reproduce that pattern — brand accuracy takes precedence over style guidelines.');
 
   // This handler is provably single-writer per request. Each call
   // generates a fresh `cal_<randomUUID>` primary key AFTER the AI
@@ -364,7 +364,7 @@ DIRECTION: ${direction}
 
 Return valid JSON: { "refined": "the refined text" }`;
 
-  const system = buildSystemPrompt(workspaceId, 'You are a copywriter refining copy based on feedback. Adjust precisely as directed.');
+  const system = buildSystemPrompt(workspaceId, 'You are a copywriter refining copy based on feedback. Adjust precisely as directed. Apply the style quality rules that follow, but if the original copy uses a pattern those rules discourage, preserve it — brand accuracy takes precedence over style guidelines.');
 
   const text = await callCreativeAI({
     systemPrompt: system,
