@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   BarChart3, Mail, Image as ImageIcon, Sparkles,
   Users, Shield, SlidersHorizontal, Brain, CreditCard,
@@ -40,10 +40,25 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
   // arrive. (Devin Review ANALYSIS-0005 round 3 on PR #379.)
   const [logoUrlDraft, setLogoUrlDraft] = useState<string>(ws?.brandLogoUrl ?? '');
   const [accentColorDraft, setAccentColorDraft] = useState<string>(ws?.brandAccentColor ?? '#2dd4bf');
+  // Track values WE've submitted so the resync effect doesn't overwrite the
+  // user's draft with a stale server response from an in-flight patch.
+  // (Devin Review BUG-0001 round 5 on PR #379 — color picker drag flicker.)
+  const lastSubmittedLogoRef = useRef<string | null>(null);
+  const lastSubmittedColorRef = useRef<string | null>(null);
+  // Debounce timer for accent color — color pickers fire onChange continuously
+  // during drag; debouncing collapses N patches into 1 final patch when the
+  // user stops dragging.
+  const accentColorPatchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    setLogoUrlDraft(ws?.brandLogoUrl ?? '');
-    setAccentColorDraft(ws?.brandAccentColor ?? '#2dd4bf');
+    const wsLogo = ws?.brandLogoUrl ?? '';
+    if (wsLogo !== lastSubmittedLogoRef.current) setLogoUrlDraft(wsLogo);
+    const wsColor = ws?.brandAccentColor ?? '#2dd4bf';
+    if (wsColor !== lastSubmittedColorRef.current) setAccentColorDraft(wsColor);
   }, [ws?.brandLogoUrl, ws?.brandAccentColor]);
+  // Cleanup pending debounce on unmount.
+  useEffect(() => () => {
+    if (accentColorPatchTimerRef.current) clearTimeout(accentColorPatchTimerRef.current);
+  }, []);
   useDeepLinkFocus();
 
   return (
@@ -358,6 +373,7 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
                 onBlur={async (e) => {
                   const val = e.target.value.trim();
                   if (val !== (ws?.brandLogoUrl || '')) {
+                    lastSubmittedLogoRef.current = val;
                     await patchWorkspace({ brandLogoUrl: val });
                     toast('Logo URL saved');
                   }
@@ -373,10 +389,18 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
             <div className="t-caption-sm font-medium mb-1.5 text-[var(--brand-text-muted)]">Accent Color</div>
             <div className="flex items-center gap-2">
               <input type="color" value={accentColorDraft}
-                onChange={async (e) => {
+                onChange={(e) => {
                   const val = e.target.value;
                   setAccentColorDraft(val);
-                  await patchWorkspace({ brandAccentColor: val });
+                  // Debounce the patch — color pickers fire onChange continuously
+                  // during drag. We collapse N patches into 1 fired 250ms after
+                  // the user stops dragging. Combined with lastSubmittedColorRef
+                  // this also prevents the stale-response → draft-overwrite flicker.
+                  if (accentColorPatchTimerRef.current) clearTimeout(accentColorPatchTimerRef.current);
+                  accentColorPatchTimerRef.current = setTimeout(() => {
+                    lastSubmittedColorRef.current = val;
+                    void patchWorkspace({ brandAccentColor: val });
+                  }, 250);
                 }}
                 className="w-8 h-8 rounded-[var(--radius-lg)] border border-[var(--brand-border)] cursor-pointer bg-transparent" />
               <code className="t-caption text-[var(--brand-text)]">{accentColorDraft}</code>
