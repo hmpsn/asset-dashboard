@@ -354,7 +354,10 @@ export async function generateSchemaForPage(
       lastPublished: (meta as unknown as Record<string, unknown>).lastPublished as string | undefined,
       createdOn: (meta as unknown as Record<string, unknown>).createdOn as string | undefined,
       pageKeywords,
-      sourcePublishedAt: null, // static page — no Webflow lastPublished signal
+      // Static pages can carry a Webflow `lastPublished` timestamp too — pass
+      // it through so isCatalogStale can drive lazy refresh on republish.
+      // Falls back to null when the Webflow response omits the field.
+      sourcePublishedAt: ((meta as unknown as Record<string, unknown>).lastPublished as string | undefined) ?? null,
     },
     html: html || '',
     baseUrl,
@@ -428,7 +431,16 @@ export async function generateSchemaSuggestions(
         publishedPath,
         seo: page.seo,
         pageKeywords,
-        sourcePublishedAt: null, // static page — no Webflow lastPublished signal
+        // Pass Webflow `lastPublished` through when available — drives
+        // isCatalogStale-based refresh on static-page republish. The
+        // WebflowPage interface uses [key: string]: unknown so we read
+        // the field via index access.
+        lastPublished: typeof (page as Record<string, unknown>).lastPublished === 'string'
+          ? ((page as Record<string, unknown>).lastPublished as string)
+          : undefined,
+        sourcePublishedAt: typeof (page as Record<string, unknown>).lastPublished === 'string'
+          ? ((page as Record<string, unknown>).lastPublished as string)
+          : null,
       },
       html: html || '',
       baseUrl,

@@ -111,17 +111,29 @@ export const pageElementCatalogSchema = z.object({
  * Sentinel empty catalog used as parseJsonSafe fallback when stored
  * blob is malformed or missing. Schema rendering falls through to
  * existing behavior when the catalog is empty.
+ *
+ * Frozen (shallow + inner arrays via unknown-cast) so any consumer that
+ * mistakenly mutates a fallback-returned catalog (e.g.
+ * `catalog.videos.push(...)`) throws in strict mode rather than
+ * corrupting the singleton for all subsequent fallback returns. The
+ * casts are necessary because the TypeScript interface declares the
+ * arrays as mutable; we trade a one-line cast for runtime safety.
  */
-export const EMPTY_CATALOG: PageElementCatalog = {
+const _EMPTY_CATALOG_RAW = {
   extractedAt: new Date(0).toISOString(),
-  sourcePublishedAt: null,
-  headings: [],
-  tables: [],
-  images: [],
-  videos: [],
-  lists: [],
-  testimonials: [],
-  codeBlocks: [],
-  citations: [],
-  diagnostics: { aiClassificationCalls: 0, hitAiBudgetCap: false, rawCounts: {} },
+  sourcePublishedAt: null as string | null,
+  headings: Object.freeze([]),
+  tables: Object.freeze([]),
+  images: Object.freeze([]),
+  videos: Object.freeze([]),
+  lists: Object.freeze([]),
+  testimonials: Object.freeze([]),
+  codeBlocks: Object.freeze([]),
+  citations: Object.freeze([]),
+  diagnostics: Object.freeze({
+    aiClassificationCalls: 0,
+    hitAiBudgetCap: false,
+    rawCounts: Object.freeze({}) as Record<string, number>,
+  }),
 };
+export const EMPTY_CATALOG: PageElementCatalog = Object.freeze(_EMPTY_CATALOG_RAW) as unknown as PageElementCatalog;
