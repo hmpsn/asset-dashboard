@@ -57,6 +57,27 @@ export interface BriefingStory {
   drillIn: BriefingDrillIn;
   /** Traceability — which source records produced this story */
   sourceRefs: BriefingSourceRef[];
+  /**
+   * Optional citation line rendered below metric badges in the
+   * `<HeroStoryCard>`. Plain prose, references data sources +
+   * comparisons (e.g. "Source: GSC last-28-day vs prior-28-day window.
+   * Verified across 7 daily samples since Apr 14"). Added in Phase 2.5a
+   * (deterministic story templates) — older briefings rendered without
+   * this field. When present the hero card renders it; when absent no
+   * receipt line is shown.
+   */
+  dataReceipt?: string;
+  /**
+   * Whether this story is eligible to be promoted to hero
+   * (`isHeadline: true`). Default behavior: undefined === eligible.
+   * Templates set this to `false` for story types that the spec marks
+   * as Watch List only (`competitor_alert`, `page_health`,
+   * `ctr_opportunity`, `freshness_alert`, `cannibalization`). The cron's
+   * hero-promotion logic respects this field — a story with
+   * `leadEligible: false` is NEVER flipped to `isHeadline: true`,
+   * regardless of category or materiality rank. Phase 2.5a addition.
+   */
+  leadEligible?: boolean;
 }
 
 export interface BriefingDraft {

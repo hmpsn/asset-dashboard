@@ -40,6 +40,16 @@ export const briefingStorySchema: z.ZodType<BriefingStory> = z.object({
     type: z.enum(['analytics_insight', 'recommendation', 'audit_delta']),
     id: z.string().min(1),
   })),
+  // Optional citation line below metric pills in <HeroStoryCard>. Added
+  // by Phase 2.5a deterministic templates; older briefings render without
+  // it. .max(800) matches the narrative cap so the receipt + narrative
+  // together stay readable.
+  dataReceipt: z.string().min(1).max(800).optional(),
+  // Phase 2.5a: lead-eligibility flag respected by the cron's hero-promotion
+  // logic. Templates marked Watch List only set `leadEligible: false` so they
+  // never flip to `isHeadline: true` even when their category (e.g. 'risk' or
+  // 'opportunity') overlaps with lead-eligible types.
+  leadEligible: z.boolean().optional(),
 });
 
 const sourceMetadataSchema: z.ZodType<BriefingSourceMetadata> = z.object({
