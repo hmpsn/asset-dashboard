@@ -354,10 +354,12 @@ export async function generateSchemaForPage(
       lastPublished: (meta as unknown as Record<string, unknown>).lastPublished as string | undefined,
       createdOn: (meta as unknown as Record<string, unknown>).createdOn as string | undefined,
       pageKeywords,
+      sourcePublishedAt: null, // static page — no Webflow lastPublished signal
     },
     html: html || '',
     baseUrl,
     workspace: {
+      id: ctx.workspaceId,
       name: ctx.companyName || '',
       publisherLogoUrl: ctx.logoUrl ?? null,
       businessProfile: ctx._businessProfile ?? null,
@@ -426,10 +428,12 @@ export async function generateSchemaSuggestions(
         publishedPath,
         seo: page.seo,
         pageKeywords,
+        sourcePublishedAt: null, // static page — no Webflow lastPublished signal
       },
       html: html || '',
       baseUrl,
       workspace: {
+        id: wsId,
         name: ctx.companyName || '',
         publisherLogoUrl: ctx.logoUrl ?? null,
         businessProfile: ctx._businessProfile ?? null,
@@ -474,10 +478,12 @@ export async function generateSchemaSuggestions(
           createdOn: item.createdOn,
           cmsFieldData: item.fieldData,
           pageKeywords: cmsPageKeywords,
+          sourcePublishedAt: item.lastPublished ?? null, // CMS items carry Webflow lastPublished
         },
         html: itemHtml || '',
         baseUrl,
         workspace: {
+          id: wsId,
           name: ctx.companyName || '',
           publisherLogoUrl: ctx.logoUrl ?? null,
           businessProfile: ctx._businessProfile ?? null,

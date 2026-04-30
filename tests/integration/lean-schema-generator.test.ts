@@ -3,6 +3,9 @@
  * Uses synthetic page meta + HTML; no DB or HTTP server.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import db from '../../server/db/index.js';
 
 vi.mock('../../server/ai.js', () => ({
   callAI: vi.fn().mockResolvedValue({
@@ -284,5 +287,126 @@ describe('paid-grade output (Pillar 2)', () => {
     const website = graph.find(n => n['@type'] === 'WebSite');
     expect(website?.potentialAction).toBeUndefined();
     expect(website?.inLanguage).toBe('en');
+  });
+});
+
+// Fixture helpers for page-element enrichment tests.
+// Paths are relative to this test file: tests/integration/ → tests/fixtures/page-elements/
+function fixturePageElementsHtml(name: string): string {
+  return readFileSync(join(__dirname, `../fixtures/page-elements/${name}`), 'utf-8');
+}
+
+// Unique workspace IDs per test so page_elements writes don't collide across tests.
+const PE_WS_IDS = {
+  video: 'ws_test_pe_video',
+  howto: 'ws_test_pe_howto',
+  citation: 'ws_test_pe_citation',
+  noElements: 'ws_test_pe_none',
+};
+
+describe('lean schema generator — page-element enrichment (PR1)', () => {
+  beforeEach(() => {
+    vi.mocked(callAI).mockClear();
+    vi.mocked(callAI).mockResolvedValue({
+      text: 'A clean description.',
+      tokens: { prompt: 100, completion: 20, total: 120 },
+    });
+    // Clean up page_elements rows written by these tests so each run starts fresh.
+    for (const wsId of Object.values(PE_WS_IDS)) {
+      db.prepare('DELETE FROM page_elements WHERE workspace_id = ?').run(wsId);
+    }
+  });
+
+  it('emits VideoObject in @graph when HTML contains a YouTube embed', async () => {
+    const html = fixturePageElementsHtml('webflow-blog-with-youtube.html');
+    const out = await generateLeanSchema({
+      ...baseInput,
+      pageId: 'pe-video-test',
+      pageMeta: {
+        title: 'Blog Post with YouTube',
+        slug: 'how-web-vitals-affect-seo',
+        publishedPath: '/blog/how-web-vitals-affect-seo',
+        seo: { description: 'A blog post about web vitals and YouTube.' },
+        sourcePublishedAt: null,
+      },
+      html,
+      baseUrl: 'https://example.com',
+      workspace: { ...baseInput.workspace, id: PE_WS_IDS.video },
+    });
+    const tpl = out.suggestedSchemas[0].template as Record<string, unknown>;
+    const graph = tpl['@graph'] as Array<Record<string, unknown>>;
+    const video = graph.find(n => n['@type'] === 'VideoObject');
+    expect(video).toBeDefined();
+    expect(video!.embedUrl).toBe('https://www.youtube.com/embed/dQw4w9WgXcQ?rel=0');
+  });
+
+  it('emits HowTo in @graph when HTML contains a how-to ordered list', async () => {
+    const html = fixturePageElementsHtml('webflow-blog-howto.html');
+    const out = await generateLeanSchema({
+      ...baseInput,
+      pageId: 'pe-howto-test',
+      pageMeta: {
+        title: 'How to Bake Sourdough',
+        slug: 'how-to-bake-sourdough',
+        publishedPath: '/blog/how-to-bake-sourdough',
+        seo: { description: 'Learn how to bake sourdough in 5 steps.' },
+        sourcePublishedAt: null,
+      },
+      html,
+      baseUrl: 'https://example.com',
+      workspace: { ...baseInput.workspace, id: PE_WS_IDS.howto },
+    });
+    const tpl = out.suggestedSchemas[0].template as Record<string, unknown>;
+    const graph = tpl['@graph'] as Array<Record<string, unknown>>;
+    const howTo = graph.find(n => n['@type'] === 'HowTo');
+    expect(howTo).toBeDefined();
+    expect((howTo!.step as Array<Record<string, unknown>>)).toHaveLength(5);
+  });
+
+  it('emits Article.citation[] when HTML contains outbound external links', async () => {
+    const html = fixturePageElementsHtml('webflow-blog-with-citations.html');
+    const out = await generateLeanSchema({
+      ...baseInput,
+      pageId: 'pe-citation-test',
+      pageMeta: {
+        title: 'The state of Core Web Vitals in 2026',
+        slug: 'core-web-vitals-2026',
+        publishedPath: '/blog/core-web-vitals-2026',
+        seo: { description: 'A survey of CWV metrics in 2026.' },
+        sourcePublishedAt: null,
+      },
+      html,
+      baseUrl: 'https://www.hmpsn.studio',
+      workspace: { ...baseInput.workspace, id: PE_WS_IDS.citation },
+    });
+    const tpl = out.suggestedSchemas[0].template as Record<string, unknown>;
+    const graph = tpl['@graph'] as Array<Record<string, unknown>>;
+    const primary = graph[0];
+    const citations = primary.citation as Array<Record<string, unknown>>;
+    expect(citations).toHaveLength(2);
+    expect(citations[0].url).toBe('https://web.dev/articles/vitals');
+  });
+
+  it('falls back to no-enrichment schema when HTML has no detectable elements', async () => {
+    const html = fixturePageElementsHtml('webflow-no-elements.html');
+    const out = await generateLeanSchema({
+      ...baseInput,
+      pageId: 'pe-none-test',
+      pageMeta: {
+        title: 'Plain Page',
+        slug: 'plain-page',
+        publishedPath: '/blog/plain-page',
+        seo: { description: 'A plain page with no structured elements.' },
+        sourcePublishedAt: null,
+      },
+      html,
+      baseUrl: 'https://example.com',
+      workspace: { ...baseInput.workspace, id: PE_WS_IDS.noElements },
+    });
+    const tpl = out.suggestedSchemas[0].template as Record<string, unknown>;
+    const graph = tpl['@graph'] as Array<Record<string, unknown>>;
+    expect(graph.find(n => n['@type'] === 'VideoObject')).toBeUndefined();
+    expect(graph.find(n => n['@type'] === 'HowTo')).toBeUndefined();
+    expect(graph[0].citation).toBeUndefined();
   });
 });

@@ -16,6 +16,11 @@ import { extractPageData } from './data-sources.js';
 import type { PageMetaInput, WorkspaceSchemaInput } from './data-sources.js';
 import { extractDescription } from './extractors/description.js';
 import { extractFaq } from './extractors/faq.js';
+import { extractPageElements } from './extractors/page-elements.js';
+import { createAiBudget } from './extractors/page-elements/ai-budget.js';
+import type { AiBudget } from './extractors/page-elements/ai-budget.js';
+import { getPageElements, upsertPageElements } from '../page-elements-store.js';
+import type { PageElementCatalog } from '../../shared/types/page-elements.js';
 import { buildArticleSchema } from './templates/article.js';
 import { buildServiceSchema } from './templates/service.js';
 import { buildLocalBusinessSchema } from './templates/local-business.js';
@@ -57,6 +62,8 @@ export interface LeanGeneratorInput {
   workspace: WorkspaceSchemaInput;
   /** Optional override for existing schema detection (saves Cheerio re-parsing in batch). */
   existingSchemas?: string[];
+  /** Per-regenerate AI budget passed by the schema-suggester orchestrator. PR1 always zero. */
+  aiBudget?: AiBudget;
 }
 
 function detectExistingSchemas(html: string): string[] {
@@ -104,6 +111,38 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
     baseUrl,
     workspace: input.workspace,
   });
+
+  // Lazy-refresh element catalog: read from store; if missing or
+  // stale-vs-Webflow-lastPublished, extract from current HTML + persist.
+  // Per audit §2.4 — HTML is already in scope (input.html). Per spec §3.4 —
+  // 100% lazy; no cron, no eager extraction.
+  const workspaceId = input.workspace.id;
+  const pagePath = input.pageMeta.publishedPath;
+  let catalog: PageElementCatalog | undefined;
+  if (workspaceId && pagePath) {
+    const stored = getPageElements(workspaceId, pagePath);
+    const isStale =
+      !stored ||
+      (input.pageMeta.sourcePublishedAt != null
+        && stored.sourcePublishedAt !== null
+        && new Date(input.pageMeta.sourcePublishedAt) > new Date(stored.sourcePublishedAt));
+    if (!stored || isStale) {
+      try {
+        const aiBudget = input.aiBudget ?? createAiBudget(0); // PR1: zero AI calls
+        catalog = await extractPageElements(input.html ?? '', {
+          pageBaseUrl: baseUrl,
+          sourcePublishedAt: input.pageMeta.sourcePublishedAt ?? null,
+          aiBudget,
+        });
+        upsertPageElements(workspaceId, pagePath, catalog);
+      } catch (err) { // catch-ok: extraction failure → schema falls back to current behavior
+        log.warn({ err, workspaceId, pagePath }, 'page-element extraction failed; schema enrichment skipped');
+      }
+    } else {
+      catalog = stored.catalog;
+    }
+  }
+  pageData = { ...pageData, elements: catalog };
 
   // Surgical AI: only if no description was found
   if (!pageData.description) {

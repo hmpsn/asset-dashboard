@@ -25,9 +25,14 @@ export interface PageMetaInput {
    *  via extractPageElements() before the template is built. Empty when
    *  the catalog has not been generated yet. */
   elements?: PageElementCatalog;
+  /** Webflow lastPublished at fetch time. Null for static (sitemap) pages.
+   *  Drives stale-detection in the page-elements lazy refresh. */
+  sourcePublishedAt?: string | null;
 }
 
 export interface WorkspaceSchemaInput {
+  /** Workspace ID — used by the generator to scope page-elements store reads/writes. */
+  id?: string;
   name: string;
   publisherLogoUrl: string | null;
   businessProfile: BusinessProfile | null;
