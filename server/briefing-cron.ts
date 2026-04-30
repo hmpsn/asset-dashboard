@@ -44,7 +44,11 @@ import { WS_EVENTS } from './ws-events.js';
 import { addActivity } from './activity-log.js';
 import { notifyClientBriefingReady } from './email.js';
 import { computeROI } from './roi.js';
-import { buildStoryFromInsight, buildStoryFromContentGap } from './briefing-templates/index.js';
+import {
+  buildStoryFromInsight,
+  buildStoryFromContentGap,
+  SUPPORTED_INSIGHT_TYPES,
+} from './briefing-templates/index.js';
 import { getInsightById } from './analytics-insights-store.js';
 import type { BriefingStory } from '../shared/types/briefing.js';
 import { createLogger } from './logger.js';
@@ -239,7 +243,39 @@ async function runBriefingForWorkspaceInner(
     log.info({ workspaceId, weekOf, manual: !!opts.manual }, 'briefing skipped — no candidates');
     return { status: 'skipped', weekOf, reason: 'no candidates' };
   }
-  const top = topNByMateriality(candidates, 10);
+
+  // Filter to template-dispatchable candidates BEFORE materiality scoring.
+  //
+  // Phase 2.5a deterministic templates only handle two candidate shapes:
+  //   - content_gap (referenceType === 'recommendation' && id.startsWith('gap-'))
+  //   - analytics_insight (referenceType === 'analytics_insight'), gated to
+  //     the InsightTypes registered in `briefing-templates/index.ts`.
+  //
+  // The candidate pool ALSO carries audit_delta (period_change candidates
+  // from `getSchedule().lastScore`) and non-gap recommendations from
+  // `loadRecommendations()`. Neither has a template dispatcher today; the
+  // projection loop returned `null` for them, leaving real story-eligible
+  // candidates crowded out of the top-10. Devin caught this on PR #380.
+  //
+  // Filter THEN score — same materiality math, fewer wasted slots.
+  const dispatchableCandidates = candidates.filter((c) => {
+    if (c.referenceType === 'analytics_insight') {
+      return SUPPORTED_INSIGHT_TYPES.includes(
+        // The candidate doesn't carry the insightType directly; we look up
+        // the underlying insight by id+workspace and check its discriminator
+        // against the dispatcher registry.
+        getInsightById(c.referenceId, workspaceId)?.insightType as never,
+      );
+    }
+    return c.referenceType === 'recommendation' && c.id.startsWith('gap-');
+  });
+
+  if (dispatchableCandidates.length === 0) {
+    log.info({ workspaceId, weekOf, total: candidates.length }, 'briefing skipped — candidates exist but none have a template dispatcher');
+    return { status: 'skipped', weekOf, reason: 'no eligible stories' };
+  }
+
+  const top = topNByMateriality(dispatchableCandidates, 10);
 
   // ── Phase 2.5a: deterministic story templates ───────────────────────
   //

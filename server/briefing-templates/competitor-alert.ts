@@ -45,6 +45,12 @@ export function buildStoryFromInsight(
   }
 
   const competitorDomain = data.competitorDomain.trim();
+  // Truncated form for use in metric `label` (capped at 40 chars by
+  // briefingMetricSchema). Very long domains would silently fail Zod on
+  // round-trip read otherwise. Devin caught this on PR #380.
+  const competitorDomainShort = competitorDomain.length > 28
+    ? competitorDomain.slice(0, 25) + '...'
+    : competitorDomain;
   const keyword = typeof data.keyword === 'string' ? data.keyword.trim() : '';
   const hasKeyword = keyword.length > 0;
   const hasPrev = typeof data.previousPosition === 'number';
@@ -83,7 +89,7 @@ export function buildStoryFromInsight(
           : hasCurr
             ? `#${data.currentPosition}`
             : `#${data.previousPosition}`;
-      metrics.push({ value: positionMetricValue, label: competitorDomain });
+      metrics.push({ value: positionMetricValue, label: competitorDomainShort });
       if (hasVolume) {
         metrics.push({ value: `${fmtNum(data.volume!)}/mo`, label: 'volume' });
       }
@@ -117,7 +123,7 @@ export function buildStoryFromInsight(
           : hasPrev
             ? `#${data.previousPosition}`
             : `#${data.currentPosition}`;
-      metrics.push({ value: positionMetricValue, label: competitorDomain });
+      metrics.push({ value: positionMetricValue, label: competitorDomainShort });
       if (hasVolume) {
         metrics.push({ value: `${fmtNum(data.volume!)}/mo`, label: 'volume' });
       }
@@ -165,7 +171,7 @@ export function buildStoryFromInsight(
         `in this week's snapshot dated ${data.snapshotDate}. ` +
         `The shift affects every keyword we track against ${competitorDomain}.`;
 
-      metrics.push({ value: changeStr, label: `${competitorDomain} authority` });
+      metrics.push({ value: changeStr, label: `${competitorDomainShort} authority` });
       break;
     }
 

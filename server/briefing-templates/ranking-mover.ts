@@ -20,27 +20,11 @@
 import type { AnalyticsInsight, RankingMoverData } from '../../shared/types/analytics.js';
 import type { BriefingStory } from '../../shared/types/briefing.js';
 import type { TemplateContext } from './index.js';
+import { fmtShortDateUTC } from './_helpers.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-const MONTH_ABBREVIATIONS = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-] as const;
-
 /* TemplateContext imported from ./index.js — see Phase 2.5a review */
-
-/**
- * Format a Date as "Mon DD" (e.g. "Apr 14"). Uses UTC components so the
- * output is stable across host timezones — the briefing cron is invoked in
- * server time and we never want a 5pm-PT vs 0am-UTC split rendering a
- * different string for the same `computedAt`.
- */
-function formatShortDate(date: Date): string {
-  const month = MONTH_ABBREVIATIONS[date.getUTCMonth()];
-  const day = date.getUTCDate();
-  return `${month} ${day}`;
-}
 
 /**
  * Round `position` UP to the next multiple of 5 (so #4 -> top 5, #6 -> top
@@ -86,8 +70,10 @@ export function buildStoryFromInsight(
 
   const topBucket = nextTopBucket(data.currentPosition);
 
-  // Headline: 5-12 words. "Your {pageTitle | 'page'} just cracked the top {N}"
-  const headline = `Your ${pageLabel} just cracked the top ${topBucket}`;
+  // Headline: 5-12 words. "Your {pageTitle | 'page'} just cracked the top {N}."
+  // Trailing period for consistency with the other 10 templates (Devin caught
+  // the missing punctuation on PR #380).
+  const headline = `Your ${pageLabel} just cracked the top ${topBucket}.`;
 
   // Narrative: 2-3 sentences, every sentence carries a number, no hedges.
   const narrative =
@@ -103,7 +89,7 @@ export function buildStoryFromInsight(
     : new Date(Date.now() - 14 * DAY_MS);
   const dataReceipt =
     `Source: GSC last-28-day vs prior-28-day window. ` +
-    `Verified across 7 daily samples since ${formatShortDate(anchorDate)}.`;
+    `Verified across 7 daily samples since ${fmtShortDateUTC(anchorDate)}.`;
 
   return {
     id: `story-${insight.id}`,

@@ -15,25 +15,15 @@
 
 import type { AnalyticsInsight, FreshnessAlertData } from '../../shared/types/analytics.js';
 import type { BriefingStory } from '../../shared/types/briefing.js';
+import type { TemplateContext } from './index.js';
+import { fmtLongDateUTC } from './_helpers.js';
 
 const FRESHNESS_WARN_DAYS = 90;
 const FRESHNESS_CRITICAL_DAYS = 180;
 
-/** Format an ISO timestamp as "Mon D, YYYY" in UTC. Returns null if invalid. */
-function formatLastAnalyzedDate(iso: string): string | null {
-  const ts = Date.parse(iso);
-  if (Number.isNaN(ts)) return null;
-  const d = new Date(ts);
-  const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-  ];
-  return `${months[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
-}
-
 export function buildStoryFromInsight(
   insight: AnalyticsInsight,
-  _context: { workspaceId: string; tier: 'free' | 'growth' | 'premium' },
+  _context: TemplateContext,
 ): BriefingStory | null {
   const data = insight.data as FreshnessAlertData;
 
@@ -49,7 +39,7 @@ export function buildStoryFromInsight(
   // Sub-threshold: not stale enough to story.
   if (days < FRESHNESS_WARN_DAYS) return null;
 
-  const lastTouched = formatLastAnalyzedDate(data.lastAnalyzedAt);
+  const lastTouched = fmtLongDateUTC(data.lastAnalyzedAt) || null;
   if (!lastTouched) return null;
 
   const isCritical = days > FRESHNESS_CRITICAL_DAYS;
