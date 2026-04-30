@@ -71,6 +71,10 @@ This trigger model has three advantages:
 
 ## 4. Element types and extraction strategy
 
+### 4.0 Slice rendering contract (pr-check enforced)
+
+Every field on `PageElementCatalog` (and `PageElementSlice`, the slice-level wrapper around it) must be referenced inside a new `formatPageElementsSection(slice: PageElementSlice)` function in `server/workspace-intelligence.ts` (mirrors the existing `formatSeoContextSection`, `formatInsightsSection`, etc.). Fields used only for diagnostics (e.g. `extractedAt`, `diagnostics.aiClassificationCalls`) must be added to `KNOWN_UNRENDERED_FIELDS` in `scripts/pr-check.ts` with a justification comment. Failure to do this trips the existing `Assembled-but-never-rendered slice fields` pr-check rule (`scripts/pr-check.ts:2070-2092`) and blocks the commit.
+
 ### 4.1 PageElementCatalog interface (canonical typed blob)
 
 ```typescript
@@ -144,6 +148,14 @@ export interface ExtractionDiagnostics {
 
 ### 4.2 Extractor module — `server/schema/extractors/page-elements.ts`
 
+**HTML source per page-class:** the extractor is purely a function of HTML — its caller decides where the HTML comes from. In practice:
+
+- **Static pages** discovered via sitemap → HTML fetched on-demand by `fetchPublishedHtml(url)` (the existing helper at `server/helpers.ts:595`); identical to the path PR1's schema generator already uses.
+- **CMS items** (blog posts, case studies) → HTML also fetched via `fetchPublishedHtml(item.url)` against the published URL. Webflow's `fieldData` carries metadata (author, dates) but NOT body HTML; the body lives only in the published page. The existing `discoverCmsItemsBySlug()` at `server/webflow-pages.ts:470` returns `CmsItemFull[]` with `url` (used for fetching) + `fieldData` (metadata only).
+- **No `fieldData`-based extraction.** All catalogs come from published HTML.
+
+
+
 Single entry point. Mirrors `extractors/faq.ts` conventions:
 
 ```typescript
@@ -165,7 +177,7 @@ Extraction order matters for cost: cheap rule-based detection runs first (tables
 - `decorative` → `aria-hidden="true"`, `role="presentation"`, alt empty, very small dimensions
 - `informative` → everything else (the safe default)
 
-**Optional: GPT-4o-mini behind feature flag `pageElementCatalog.aiImageClassification`.** When flag is on, sends `{alt, caption, position, srcUrlBasename}` (text only, no Vision API) to `callAI({ provider: 'openai', model: 'gpt-4o-mini', json: true, ... })` requesting role classification. Vision API is intentionally out of scope (cost ceiling).
+**Optional: GPT-4.1-mini behind feature flag `pageElementCatalog.aiImageClassification`.** When flag is on, sends `{alt, caption, position, srcUrlBasename}` (text only, no Vision API) to `callAI({ provider: 'openai', model: 'gpt-4.1-mini', json: true, ... })` requesting role classification. Vision API is intentionally out of scope (cost ceiling).
 
 **Cost ceiling: 100 AI classifications per regenerate-all run.** Budget tracked across the loop; once exhausted, remaining images fall through to rule-based. Diagnostics field `hitAiBudgetCap: true` exposes when this happened so admins can decide to upgrade.
 
@@ -174,12 +186,12 @@ Extraction order matters for cost: cheap rule-based detection runs first (tables
 | Element type | Default detector | AI fallback |
 |---|---|---|
 | **Tables** | Cheerio `<table>` selector + filter (must have ≥2 rows + located in `<main>`/article scope, not nav/footer) | None |
-| **Lists (HowTo-like)** | Pattern: ordered list + items contain action verbs (regex over the first verb of each item) + nearby heading matches `/how to\|steps?\|guide/i` | When pattern is ambiguous (single signal matches), `callAI` classifies the list with `provider: 'openai', model: 'gpt-4o-mini', json: true` |
+| **Lists (HowTo-like)** | Pattern: ordered list + items contain action verbs (regex over the first verb of each item) + nearby heading matches `/how to\|steps?\|guide/i` | When pattern is ambiguous (single signal matches), `callAI` classifies the list with `provider: 'openai', model: 'gpt-4.1-mini', json: true` |
 | **Videos** | `<iframe src*="youtube"\|"vimeo">`, `<video>`, common embed wrappers (`.video-embed`, `[data-video]`) | None |
 | **Testimonials** | Class heuristics: `.testimonial`, `.review`, `[data-testimonial]`, `<blockquote>` with `<cite>` | Optional AI when class signals absent |
 | **Code blocks** | `<pre><code>` + `<code>` elements with `language-X` class | None |
 | **Citations** | Outbound `<a href>` to absolute URLs (filtered: not own domain, not nav, in body content) | None |
-| **Images (role)** | Rule-based (alt + position + dimensions) | GPT-4o-mini behind feature flag |
+| **Images (role)** | Rule-based (alt + position + dimensions) | GPT-4.1-mini behind feature flag |
 | **Headings/ToC** | `h1-h6` walk; collects text + auto-generates `id` if missing | None |
 
 **Multi-element precedence:** an article with a HowTo-like list AND an embedded video emits BOTH `HowTo` and `VideoObject` schema nodes (Schema.org explicitly allows multiple `@type`s in a `@graph`). Google handles this correctly.
@@ -217,7 +229,7 @@ These three unlock 3 Google rich results: **Video**, **HowTo**, and **E-E-A-T ci
 | PR | Scope | Est | Independent? |
 |---|---|---|---|
 | **PR1** | `PageElementSlice` infrastructure: types in `shared/types/page-elements.ts`, migration 079, `assemblePageElements` dispatch in `workspace-intelligence.ts`, `extractors/page-elements.ts` extractor framework with **3 element types only** (videos, HowTo lists, citations), 3 schema integrations, validator entries for `VideoObject` + `HowTo`, integration tests with real-world HTML fixtures from hmpsn.studio + an open-source content site corpus | ~5 days subagent-driven | Yes — ships standalone |
-| **PR2** | Adds 3 element types (images with role classification, tables, testimonials), 3 schema integrations (`ImageGallery`/role-classified `image`, `Table mainEntity`, `Review`+`AggregateRating`). Validator entries for `Review`, `Table`, `AggregateRating`. Optional GPT-4o-mini AI image classifier behind feature flag with budget tracking. | ~4 days | Depends on PR1 |
+| **PR2** | Adds 3 element types (images with role classification, tables, testimonials), 3 schema integrations (`ImageGallery`/role-classified `image`, `Table mainEntity`, `Review`+`AggregateRating`). Validator entries for `Review`, `Table`, `AggregateRating`. Optional GPT-4.1-mini AI image classifier behind feature flag with budget tracking. | ~4 days | Depends on PR1 |
 | **PR3** | Polish: `codeBlocks[]`, `headings[]` ToC + speakable cssSelector. PR3 is optional — ship if cycles allow; no client deliverables block on it. | ~2 days | Depends on PR1 |
 
 PR1 ships the highest-leverage 3 elements (Video + HowTo + Citation) on the foundation. PR2 ships the visual + commerce piece. Total spec scope: ~11 days. Single-PR delivery would be too risky for code review and Devin throughput — three PRs is the right granularity.
@@ -255,11 +267,13 @@ const REQUIRED_BY_TYPE: Record<string, RequiredFields> = {
 PR2 adds:
 
 ```typescript
-  'Review':           { required: ['author', 'reviewRating'], recommended: ['datePublished'] },
-  'AggregateRating':  { required: ['ratingValue', 'reviewCount'] },
+  'Review':           { required: ['itemReviewed', 'reviewRating', 'author'], recommended: ['datePublished', 'reviewBody'] },
+  'AggregateRating':  { required: ['ratingValue', 'reviewCount'], recommended: ['bestRating', 'worstRating'] },
   'Table':            { required: ['about'] },
   'ImageGallery':     { required: ['name', 'image'] },
 ```
+
+`Review.itemReviewed` is required by Google Search Central and the platform's existing `server/schema/rich-results.ts:31` already enforces it. When emitting `Review[]` from testimonials, the template must populate `itemReviewed: { '@id': '...' }` pointing at the primary node (the `Service` or `LocalBusiness` being reviewed) — otherwise validation fails on every emission.
 
 ### 8.2 Integration tests (real-world HTML corpus)
 
