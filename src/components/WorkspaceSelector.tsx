@@ -13,6 +13,21 @@ export interface Workspace {
   folder: string;
   createdAt: string;
   tier?: 'free' | 'growth' | 'premium';
+  businessProfile?: {
+    phone?: string;
+    email?: string;
+    address?: {
+      street?: string;
+      city?: string;
+      state?: string;
+      zip?: string;
+      country?: string;
+    };
+    socialProfiles?: string[];
+    openingHours?: string;
+    foundedDate?: string;
+    numberOfEmployees?: string;
+  } | null;
 }
 
 interface WebflowSite {

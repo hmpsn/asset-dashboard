@@ -24,6 +24,7 @@ import { PendingApprovals } from './PendingApprovals';
 import { SchemaWorkflowGuide } from './schema/SchemaWorkflowGuide';
 import { SCHEMA_ROLE_INDEX } from '../../shared/types/schema-plan';
 import type { ValidationFinding } from '../../shared/types/schema-validation';
+import { adminPath } from '../routes.js';
 
 type SchemaSubTab = 'generator' | 'guide';
 
@@ -76,9 +77,24 @@ interface Props {
   siteId: string;
   workspaceId?: string;
   fixContext?: FixContext | null;
+  businessProfile?: {
+    phone?: string;
+    email?: string;
+    address?: {
+      street?: string;
+      city?: string;
+      state?: string;
+      zip?: string;
+      country?: string;
+    };
+    socialProfiles?: string[];
+    openingHours?: string;
+    foundedDate?: string;
+    numberOfEmployees?: string;
+  } | null;
 }
 
-export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
+export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfile }: Props) {
   const [schemaSubTab, setSchemaSubTab] = useState<SchemaSubTab>('generator');
   const { forPage: recsForPage, loaded: recsLoaded } = useRecommendations(workspaceId);
   const [data, setData] = useState<SchemaPageSuggestion[] | null>(null);
@@ -125,6 +141,16 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
   }, [fixContext]); // generateSinglePage intentionally excluded — ref guard prevents re-fire
 
   // CMS template schema state
+  const dismissedKey = workspaceId ? `schema-bp-callout-dismissed-${workspaceId}` : null;
+  const [calloutDismissed, setCalloutDismissed] = useState(() =>
+    dismissedKey ? localStorage.getItem(dismissedKey) === '1' : true,
+  );
+  const showBpCallout = !calloutDismissed && !!workspaceId && !businessProfile?.address?.street;
+  function dismissBpCallout() {
+    if (dismissedKey) localStorage.setItem(dismissedKey, '1');
+    setCalloutDismissed(true);
+  }
+
   const [showCmsPanel, setShowCmsPanel] = useState(false);
   const [showTypeGuide, setShowTypeGuide] = useState(false);
   const [cmsTemplatePages, setCmsTemplatePages] = useState<CmsTemplatePage[]>([]);
@@ -822,6 +848,33 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
       )}
       {/* Schema site plan */}
       <SchemaPlanPanel siteId={siteId} />
+
+      {showBpCallout && (
+        <div className="rounded-[var(--radius-lg)] border border-amber-500/30 bg-amber-500/10 p-4 flex items-start gap-3">
+          <span className="t-body text-amber-400 mt-0.5">⚠</span>
+          <div className="flex-1 min-w-0">
+            <p className="t-body text-amber-400 font-medium mb-1">Your business profile is incomplete</p>
+            <p className="t-caption text-[var(--brand-text-muted)]">
+              Add your address to unlock LocalBusiness schema on your homepage, /contact, and /about — the highest-value schema type for local businesses.
+            </p>
+            {workspaceId && (
+              <a
+                href={adminPath(workspaceId, 'workspace-settings') + '?tab=business-profile'}
+                className="t-caption text-teal-400 hover:text-teal-300 mt-2 inline-block"
+              >
+                Complete business profile →
+              </a>
+            )}
+          </div>
+          <button
+            onClick={dismissBpCallout}
+            className="t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] flex-shrink-0"
+            aria-label="Dismiss"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Progress banner while streaming */}
       {loading && data && data.length > 0 && (
