@@ -48,6 +48,12 @@ db.pragma('foreign_keys = ON');
  *     035-schema-validations.sql  → 061-schema-validations.sql
  *     036-llms-txt-cache.sql      → 062-llms-txt-cache.sql
  *     037-llms-txt-freshness.sql  → 063-llms-txt-freshness.sql
+ *   2026-04-30 — 079 collision (PR #385 page-elements + PR #387 briefing-v2 metrics)
+ *     079-workspace-metrics-snapshots.sql → 080-workspace-metrics-snapshots.sql
+ *     (PR #385's 079-page-elements.sql keeps the slot; briefing-v2's later
+ *      migration moves to 080. Both already shipped to staging when the
+ *      collision was found, so the alias bridge below ensures staging
+ *      databases that already executed the old name are not re-run.)
  */
 const MIGRATION_RENAMES: Array<[oldName: string, newName: string]> = [
   ['048-meeting-briefs.sql', '054-meeting-briefs.sql'],
@@ -55,6 +61,7 @@ const MIGRATION_RENAMES: Array<[oldName: string, newName: string]> = [
   ['035-schema-validations.sql', '061-schema-validations.sql'],
   ['036-llms-txt-cache.sql', '062-llms-txt-cache.sql'],
   ['037-llms-txt-freshness.sql', '063-llms-txt-freshness.sql'],
+  ['079-workspace-metrics-snapshots.sql', '080-workspace-metrics-snapshots.sql'],
 ];
 
 /**
