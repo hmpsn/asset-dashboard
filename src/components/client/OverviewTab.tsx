@@ -98,19 +98,24 @@ export function OverviewTab({
     const briefReviews = contentRequests.filter(r => r.status === 'client_review').length;
     const postReviews = contentRequests.filter(r => r.status === 'post_review').length;
     const effectiveTier: Tier = (betaMode ? 'premium' : (ws.tier as Tier)) || 'free';
+    // Wrap in ErrorBoundary to match the rest of OverviewTab's section-level
+    // resilience: a hook failure inside InsightsBriefingPage (GA4/GSC/audit)
+    // shouldn't bring down the whole client portal.
     return (
-      <InsightsBriefingPage
-        workspaceId={workspaceId}
-        effectiveTier={effectiveTier}
-        betaMode={betaMode}
-        actionCounts={{
-          approvals: pendingApprovals,
-          briefs: briefReviews,
-          posts: postReviews,
-          replies: unreadTeamNotes,
-          contentPlan: contentPlanSummary?.reviewCells ?? 0,
-        }}
-      />
+      <ErrorBoundary>
+        <InsightsBriefingPage
+          workspaceId={workspaceId}
+          effectiveTier={effectiveTier}
+          betaMode={betaMode}
+          actionCounts={{
+            approvals: pendingApprovals,
+            briefs: briefReviews,
+            posts: postReviews,
+            replies: unreadTeamNotes,
+            contentPlan: contentPlanSummary?.reviewCells ?? 0,
+          }}
+        />
+      </ErrorBoundary>
     );
   }
   // ─────────────────────────────────────────────────────────────────────────

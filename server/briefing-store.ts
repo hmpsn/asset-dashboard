@@ -102,6 +102,14 @@ const briefingStmts = createStmtCache(() => ({
     WHERE workspace_id = ? AND status = 'published'
     ORDER BY published_at DESC, week_of DESC LIMIT 1
   `),
+  // Phase 2.5b — counts published briefings for a workspace whose
+  // `published_at` is ≤ the given threshold. Drives the "ISSUE N" counter
+  // shown in the dateline. Coalesce nulls because skipped drafts share the
+  // table but never set `published_at`.
+  countPublishedThrough: db.prepare(`
+    SELECT COUNT(*) AS n FROM briefing_drafts
+    WHERE workspace_id = ? AND status = 'published' AND COALESCE(published_at, 0) <= ?
+  `),
   setStories: db.prepare('UPDATE briefing_drafts SET stories = ?, updated_at = ? WHERE id = ? AND workspace_id = ? RETURNING *'),
   setStatus: db.prepare('UPDATE briefing_drafts SET status = ?, updated_at = ?, published_at = ?, auto_published = ?, admin_note = COALESCE(?, admin_note) WHERE id = ? AND workspace_id = ? RETURNING * -- status-ok: guarded by validateTransition() in setStatusScoped()'),
   setNote: db.prepare('UPDATE briefing_drafts SET admin_note = ?, updated_at = ? WHERE id = ? AND workspace_id = ? RETURNING *'),
@@ -189,6 +197,22 @@ export function listBriefingDrafts(workspaceId: string, limit = 12): BriefingDra
 export function getLatestPublishedBriefing(workspaceId: string): BriefingDraft | null {
   const row = briefingStmts().latestPublished.get(workspaceId) as BriefingRow | undefined;
   return row ? rowToDraft(row) : null;
+}
+
+/**
+ * Count of published briefings for a workspace whose `published_at` is ≤
+ * the given threshold. Drives the `ISSUE N` counter rendered in the
+ * client-side dateline (Phase 2.5b). 1-indexed when the latest briefing's
+ * own `publishedAt` is passed as the threshold.
+ */
+export function countPublishedBriefingsThrough(
+  workspaceId: string,
+  publishedAtMs: number,
+): number {
+  const row = briefingStmts().countPublishedThrough.get(workspaceId, publishedAtMs) as
+    | { n: number }
+    | undefined;
+  return row?.n ?? 0;
 }
 
 export function updateBriefingStories(workspaceId: string, id: string, stories: BriefingStory[]): BriefingDraft | null {

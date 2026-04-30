@@ -71,6 +71,21 @@ export function HeroStoryCard({ story, workspaceId, betaMode }: HeroStoryCardPro
             </div>
           )}
 
+          {/*
+            Phase 2.5b — data receipt line. Citation prose populated by 2.5a's
+            deterministic templates (see server/briefing-templates/*). Renders
+            below the metric pills, above the drill-in. Older briefings
+            generated before 2.5a have no receipt and skip this block.
+          */}
+          {story.dataReceipt && (
+            <div className="border-t border-[var(--brand-border)]/30 pt-3">
+              <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">
+                <span aria-hidden="true">─ </span>
+                {story.dataReceipt}
+              </p>
+            </div>
+          )}
+
           {/* Drill-in link */}
           <div className="flex justify-end">
             <button

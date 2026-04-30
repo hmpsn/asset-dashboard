@@ -189,9 +189,18 @@ describe('GET /api/public/briefing/:workspaceId — paid tier, published briefin
     const body = await res.json() as { briefing: Record<string, unknown> | null };
     expect(body.briefing).not.toBeNull();
 
-    // Whitelist: response should ONLY contain weekOf, publishedAt, stories
+    // Whitelist: response should ONLY contain the public-shape fields.
+    // Phase 2.5b added issueSummary, issueNumber, and recommendations
+    // (all derived at serve time from existing data — no admin fields leak).
     const keys = Object.keys(body.briefing!).sort();
-    expect(keys).toEqual(['publishedAt', 'stories', 'weekOf']);
+    expect(keys).toEqual([
+      'issueNumber',
+      'issueSummary',
+      'publishedAt',
+      'recommendations',
+      'stories',
+      'weekOf',
+    ]);
 
     // Explicit blacklist (defense in depth)
     expect(body.briefing).not.toHaveProperty('sourceMetadata');
@@ -239,5 +248,162 @@ describe('GET /api/public/briefing/:workspaceId — trial promotion', () => {
 
     const res = await api(`/api/public/briefing/${trialWsId}`);
     expect(res.status).toBe(402);
+  });
+});
+
+// ── Phase 2.5b — issueSummary, issueNumber, recommendations ───────────────
+//
+// The endpoint computes these three fields at serve time from existing data
+// (no DB schema change). Verifies that:
+//   - issueSummary is a non-empty string composed deterministically from the
+//     story composition (lead + risk count + recommendation count).
+//   - issueNumber is 1-indexed and reflects the count of published briefings
+//     ≤ this one's published_at — so older briefings don't accidentally show
+//     a higher number than newer ones.
+//   - recommendations is an array (possibly empty) of BriefingRecommendation
+//     shape, sorted by opportunityScore desc, capped at 5.
+describe('GET /api/public/briefing/:workspaceId — Phase 2.5b serve-time fields', () => {
+  let summaryWsId = '';
+  const localCleanups: Array<() => void> = [];
+
+  beforeAll(() => {
+    const ws = seedWorkspace({ tier: 'growth', clientPassword: '' });
+    summaryWsId = ws.workspaceId;
+    localCleanups.push(ws.cleanup);
+  });
+
+  afterAll(() => {
+    for (const c of localCleanups) c();
+  });
+
+  it('populates issueSummary as a non-empty string ending in a period', async () => {
+    const draft = upsertBriefingDraft({
+      workspaceId: summaryWsId,
+      weekOf: '2026-04-06',
+      stories: makeStories(3), // 1 headline win + 2 secondary wins
+      sourceMetadata: adminMetadata(),
+    });
+    markPublished(summaryWsId, draft.id, { autoPublished: false });
+
+    const res = await api(`/api/public/briefing/${summaryWsId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      briefing: { issueSummary?: string } | null;
+    };
+    expect(body.briefing).not.toBeNull();
+    expect(typeof body.briefing!.issueSummary).toBe('string');
+    expect(body.briefing!.issueSummary!.length).toBeGreaterThan(0);
+    expect(body.briefing!.issueSummary!.endsWith('.')).toBe(true);
+    // Lead phrase keys off the headline story's category (win).
+    expect(body.briefing!.issueSummary).toContain('A win at the top');
+  });
+
+  it('issueNumber is 1 for the first published briefing in a workspace', async () => {
+    // summaryWsId published one briefing in the previous test → issueNumber=1
+    const res = await api(`/api/public/briefing/${summaryWsId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { briefing: { issueNumber?: number } | null };
+    expect(body.briefing!.issueNumber).toBe(1);
+  });
+
+  it('issueNumber increments for each subsequent published briefing', async () => {
+    // Publish a second briefing (more recent weekOf wins by default)
+    const draft = upsertBriefingDraft({
+      workspaceId: summaryWsId,
+      weekOf: '2026-04-13',
+      stories: makeStories(2),
+      sourceMetadata: adminMetadata(),
+    });
+    markPublished(summaryWsId, draft.id, { autoPublished: false });
+
+    const res = await api(`/api/public/briefing/${summaryWsId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { briefing: { issueNumber?: number; weekOf: string } | null };
+    expect(body.briefing!.weekOf).toBe('2026-04-13');
+    expect(body.briefing!.issueNumber).toBe(2);
+  });
+
+  it('recommendations is an empty array when the workspace has no contentGaps', async () => {
+    const res = await api(`/api/public/briefing/${summaryWsId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      briefing: { recommendations?: unknown[] } | null;
+    };
+    expect(Array.isArray(body.briefing!.recommendations)).toBe(true);
+    expect(body.briefing!.recommendations!.length).toBe(0);
+  });
+
+  it('recommendations is sorted by opportunityScore desc and capped at 5', async () => {
+    // Inject 7 content gaps; 2 should be dropped from the response.
+    updateWorkspace(summaryWsId, {
+      keywordStrategy: {
+        siteKeywords: [],
+        opportunities: [],
+        contentGaps: [
+          { topic: 'Topic A', targetKeyword: 'kw a', intent: 'informational', priority: 'high', rationale: 'r', opportunityScore: 10 },
+          { topic: 'Topic B', targetKeyword: 'kw b', intent: 'informational', priority: 'high', rationale: 'r', opportunityScore: 90 },
+          { topic: 'Topic C', targetKeyword: 'kw c', intent: 'informational', priority: 'high', rationale: 'r', opportunityScore: 50 },
+          { topic: 'Topic D', targetKeyword: 'kw d', intent: 'informational', priority: 'high', rationale: 'r', opportunityScore: 70 },
+          { topic: 'Topic E', targetKeyword: 'kw e', intent: 'informational', priority: 'high', rationale: 'r', opportunityScore: 30 },
+          { topic: 'Topic F', targetKeyword: 'kw f', intent: 'informational', priority: 'high', rationale: 'r', opportunityScore: 80 },
+          { topic: 'Topic G', targetKeyword: 'kw g', intent: 'informational', priority: 'high', rationale: 'r', opportunityScore: 20 },
+        ],
+      },
+    });
+
+    const res = await api(`/api/public/briefing/${summaryWsId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      briefing: { recommendations?: { topic: string; opportunityScore?: number }[] } | null;
+    };
+    const recs = body.briefing!.recommendations!;
+    expect(recs.length).toBe(5);
+    // Verify sort order: B(90), F(80), D(70), C(50), E(30)
+    expect(recs.map((r) => r.topic)).toEqual([
+      'Topic B', 'Topic F', 'Topic D', 'Topic C', 'Topic E',
+    ]);
+  });
+
+  it('issueSummary reflects the FULL recommendation pool, not the post-cap render set', async () => {
+    // Previous test injected 7 gaps. The recommendations array is capped at 5
+    // for rendering, but the summary's "N opportunities" must still reflect
+    // the full pool (otherwise it understates what's available). 7 gaps were
+    // injected in the prior test case.
+    const res = await api(`/api/public/briefing/${summaryWsId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { briefing: { issueSummary?: string } | null };
+    expect(body.briefing!.issueSummary).toContain('7 opportunities to consider');
+  });
+
+  it('computes opportunityScore on-the-fly when the stored value is null', async () => {
+    // Replace gaps with one that has data but no precomputed opportunityScore.
+    updateWorkspace(summaryWsId, {
+      keywordStrategy: {
+        siteKeywords: [],
+        opportunities: [],
+        contentGaps: [
+          {
+            topic: 'Live-scored topic',
+            targetKeyword: 'kw live',
+            intent: 'informational',
+            priority: 'high',
+            rationale: 'r',
+            volume: 5000,
+            difficulty: 30,
+            // opportunityScore intentionally omitted
+          },
+        ],
+      },
+    });
+
+    const res = await api(`/api/public/briefing/${summaryWsId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      briefing: { recommendations?: { opportunityScore?: number }[] } | null;
+    };
+    const score = body.briefing!.recommendations![0]?.opportunityScore;
+    expect(typeof score).toBe('number');
+    expect(score).toBeGreaterThan(0);
+    expect(score).toBeLessThanOrEqual(100);
   });
 });

@@ -2385,7 +2385,10 @@ function formatPageElementsSection(slice: PageElementSlice | undefined): string 
   if (c.headings.length > 0) summary.push(`${c.headings.length} heading${c.headings.length === 1 ? '' : 's'}`);
   if (c.codeBlocks.length > 0) summary.push(`${c.codeBlocks.length} code block${c.codeBlocks.length === 1 ? '' : 's'}`);
   if (summary.length === 0) return '';
-  return `\n## Page elements (${slice.pagePath})\n${summary.join(' · ')}\n`;
+  // No leading/trailing newlines — formatForPrompt joins all sections with
+  // '\n\n', so each formatter must return a string starting at '## …' and
+  // ending without a trailing newline. Matches every other format*Section.
+  return `## Page elements (${slice.pagePath})\n${summary.join(' · ')}`;
 }
 
 function formatPageProfileSection(profile: PageProfileSlice, verbosity: PromptVerbosity): string {
