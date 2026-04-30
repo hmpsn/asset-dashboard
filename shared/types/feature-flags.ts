@@ -63,6 +63,8 @@ export const FEATURE_FLAGS = {
   'client-briefing-v2': false,
   // Deep Diagnostics
   'deep-diagnostics': false,
+  // Page-Element Catalog (schema AI extractors)
+  'schema-ai-element-classifier': false, // PR2: image role classifier + HowTo disambiguation (default OFF)
 } as const;
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;
