@@ -44,6 +44,7 @@ import { WS_EVENTS } from './ws-events.js';
 import { addActivity } from './activity-log.js';
 import { notifyClientBriefingReady } from './email.js';
 import { computeROI } from './roi.js';
+import { recordWeeklyBriefingSnapshot } from './workspace-metrics-snapshots.js';
 import {
   buildStoryFromInsight,
   buildStoryFromContentGap,
@@ -383,6 +384,17 @@ async function runBriefingForWorkspaceInner(
     weekOf,
     action: 'generated',
   });
+
+  // Phase 2.5c — piggyback metric snapshot on the weekly tick. Captures the
+  // metrics that drove this week's pulse data (GSC clicks/impressions/avg-pos,
+  // audit score, ROI traffic value) so future briefings can anchor against
+  // them ("best week since Mar 17"). Failures are logged but don't fail the
+  // cron run — the briefing is already persisted by this point.
+  try {
+    await recordWeeklyBriefingSnapshot(workspaceId, weekOf);
+  } catch (err) {
+    log.warn({ workspaceId, weekOf, err: String(err) }, 'snapshot record failed');
+  }
 
   // Auto-publish branch — only when admin opted in AND afterHours = 0 (immediate)
   // AND the global client-briefing-v2 flag is enabled. The flag gate prevents
