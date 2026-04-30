@@ -14,6 +14,9 @@ import type { PageElementCatalog } from '../../../shared/types/page-elements.js'
 import { extractVideos } from './page-elements/video.js';
 import { extractLists } from './page-elements/howto.js';
 import { extractCitations } from './page-elements/citation.js';
+import { extractImages } from './page-elements/images.js';
+import { extractTables } from './page-elements/tables.js';
+import { extractTestimonials } from './page-elements/testimonials.js';
 import type { AiBudget } from './page-elements/ai-budget.js';
 import { createLogger } from '../../logger.js';
 
@@ -76,11 +79,13 @@ export async function extractPageElements(
     const lists = extractLists($);
     const citations = extractCitations($, opts.pageBaseUrl);
 
-    // PR2/PR3 elements — empty arrays in PR1
+    // PR2 elements — wired in PR2
+    const images = extractImages($);
+    const tables = extractTables($);
+    const testimonials = extractTestimonials($);
+
+    // PR3 elements — empty arrays until PR3
     const headings: PageElementCatalog['headings'] = [];
-    const tables: PageElementCatalog['tables'] = [];
-    const images: PageElementCatalog['images'] = [];
-    const testimonials: PageElementCatalog['testimonials'] = [];
     const codeBlocks: PageElementCatalog['codeBlocks'] = [];
 
     return {

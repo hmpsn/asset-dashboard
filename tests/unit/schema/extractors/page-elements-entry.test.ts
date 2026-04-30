@@ -85,4 +85,59 @@ describe('extractPageElements entry-point', () => {
     });
     expect(catalog.diagnostics.rawCounts.error).toBeFalsy(); // happy path = no error marker
   });
+
+  it('PR2: extracts images, tables, testimonials when present', async () => {
+    const html = `<!DOCTYPE html>
+<html>
+<head><title>PR2 Elements</title></head>
+<body>
+  <article>
+    <header>
+      <img src="/hero.jpg" alt="Hero banner image for our agency services" width="1200" height="600" />
+    </header>
+    <p>We help clients grow their organic traffic.</p>
+    <img src="/team.jpg" alt="Our team of experienced SEO professionals" width="800" height="400" />
+    <table>
+      <caption>Pricing Plans</caption>
+      <thead>
+        <tr><th>Plan</th><th>Price</th><th>Features</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Starter</td><td>$99/mo</td><td>5 pages</td></tr>
+        <tr><td>Growth</td><td>$299/mo</td><td>20 pages</td></tr>
+        <tr><td>Premium</td><td>$599/mo</td><td>Unlimited</td></tr>
+      </tbody>
+    </table>
+    <blockquote data-rating="5">
+      <p>hmpsn.studio transformed our organic traffic within 3 months. Highly recommend their SEO services.</p>
+      <cite>— Jane Smith, CEO at Acme Corp</cite>
+    </blockquote>
+  </article>
+</body>
+</html>`;
+    const catalog = await extractPageElements(html, {
+      pageBaseUrl: 'https://www.hmpsn.studio',
+      sourcePublishedAt: '2026-04-30T00:00:00.000Z',
+      aiBudget: createAiBudget(0),
+    });
+
+    // Images: hero + informative
+    expect(catalog.images.length).toBeGreaterThanOrEqual(1);
+    expect(catalog.images[0].role).toBe('hero');
+    expect(catalog.images[0].src).toBe('/hero.jpg');
+
+    // Tables: one pricing-like table
+    expect(catalog.tables).toHaveLength(1);
+    expect(catalog.tables[0].isPricingLike).toBe(true);
+    expect(catalog.tables[0].caption).toBe('Pricing Plans');
+
+    // Testimonials: one blockquote with rating
+    expect(catalog.testimonials).toHaveLength(1);
+    expect(catalog.testimonials[0].rating).toBe(5);
+
+    // rawCounts reflect actual extracted items
+    expect(catalog.diagnostics.rawCounts.images).toBeGreaterThanOrEqual(1);
+    expect(catalog.diagnostics.rawCounts.tables).toBe(1);
+    expect(catalog.diagnostics.rawCounts.testimonials).toBe(1);
+  });
 });
