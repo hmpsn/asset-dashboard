@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { post } from '../../api/client';
 import { SectionCard, Icon } from '../ui';
+import { useDeepLinkFocus } from '../../hooks/useDeepLinkFocus';
 
 interface WorkspaceData {
   tier?: 'free' | 'growth' | 'premium';
@@ -21,6 +22,7 @@ interface WorkspaceData {
   brandLogoUrl?: string;
   brandAccentColor?: string;
   clientEmail?: string;
+  siteHasSearch?: boolean;
   [key: string]: unknown;
 }
 
@@ -33,6 +35,7 @@ interface FeaturesTabProps {
 
 export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: FeaturesTabProps) {
   const [sendingReport, setSendingReport] = useState(false);
+  useDeepLinkFocus();
 
   return (
     <div className="space-y-8">
@@ -340,6 +343,7 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
             <div className="t-caption-sm font-medium mb-1.5 text-[var(--brand-text-muted)]">Logo URL</div>
             <div className="flex items-center gap-2">
               <input type="url" defaultValue={ws?.brandLogoUrl || ''}
+                data-schema-deeplink="brandLogoUrl"
                 placeholder="https://example.com/logo.svg"
                 onBlur={async (e) => {
                   const val = e.target.value.trim();
@@ -351,6 +355,9 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
                 className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500" />
               {ws?.brandLogoUrl && <img src={ws.brandLogoUrl} alt="" className="h-6 rounded" />}
             </div>
+            <p className="t-caption-sm text-[var(--brand-text-muted)] mt-2">
+              Also used as publisher logo in your schema. Required for Article rich snippets in Google search results.
+            </p>
           </div>
           <div>
             <div className="t-caption-sm font-medium mb-1.5 text-[var(--brand-text-muted)]">Accent Color</div>
@@ -365,6 +372,30 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
               <span className="t-caption-sm text-[var(--brand-text-muted)]">Used in reports and the client portal header</span>
             </div>
           </div>
+        </div>
+      </SectionCard>
+
+      {/* Site Capabilities */}
+      <SectionCard title="Site capabilities">
+        <div className="space-y-3">
+          <p className="t-caption-sm text-[var(--brand-text-muted)]">Tell schema what your live site supports.</p>
+          <label className="flex items-start gap-3 cursor-pointer" data-schema-deeplink="siteHasSearch">
+            <input
+              type="checkbox"
+              defaultChecked={!!ws?.siteHasSearch}
+              onChange={async (e) => {
+                await patchWorkspace({ siteHasSearch: e.currentTarget.checked });
+                toast(e.currentTarget.checked ? 'SearchAction will emit on next regenerate' : 'SearchAction emission disabled');
+              }}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="t-body font-medium text-[var(--brand-text)]">My site has a working search endpoint</span>
+              <span className="block t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
+                When enabled, schema generation emits <code className="t-mono text-[var(--brand-text)]">WebSite.potentialAction</code> (sitelinks SearchAction) so Google can offer in-SERP search. Your site must actually expose <code className="t-mono">https://yoursite.com/?s=&#123;query&#125;</code> or equivalent — verify this works before enabling.
+              </span>
+            </span>
+          </label>
         </div>
       </SectionCard>
 
