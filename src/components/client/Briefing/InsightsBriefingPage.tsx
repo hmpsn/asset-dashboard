@@ -85,7 +85,12 @@ export function InsightsBriefingPage({
   const { data: contentRequests = [] } = useClientContentRequests(workspaceId, !isFree);
 
   const staleTimestamps: number[] = [];
+  // Only items that still need client action contribute to the escalation
+  // pill. ApprovalBatch.status is one of pending|partial|approved|rejected|applied;
+  // the latter three are terminal states that should never raise an "urgent"
+  // signal even if they're old. Mirrors the content-requests filter below.
   for (const a of approvals) {
+    if (a.status !== 'pending' && a.status !== 'partial') continue;
     const ts = parseTs(a.createdAt);
     if (ts !== null) staleTimestamps.push(ts);
   }
