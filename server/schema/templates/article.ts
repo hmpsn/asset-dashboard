@@ -43,6 +43,13 @@ export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Reco
     'articleSection': pageData.articleSection,
     'keywords': pageData.keywords,
     'about': kind === 'Article' ? 'Case study' : undefined,
+    'citation': pageData.elements?.citations && pageData.elements.citations.length > 0
+      ? pageData.elements.citations.map(c => ({
+          '@type': 'WebPage' as const,
+          'url': c.url,
+          'name': c.text || c.url,
+        }))
+      : undefined,
   });
 
   // Build optional HowTo node from pageData.elements.lists (isHowToLike + steps).

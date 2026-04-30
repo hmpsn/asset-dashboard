@@ -490,6 +490,59 @@ describe('Article + BlogPosting — HowTo enrichment (PR1)', () => {
   });
 });
 
+describe('Article + BlogPosting — citation[] enrichment (PR1)', () => {
+  const baseElementCatalogForCitations = {
+    extractedAt: '2026-04-29T00:00:00.000Z',
+    sourcePublishedAt: null,
+    headings: [],
+    tables: [],
+    images: [],
+    videos: [],
+    lists: [],
+    testimonials: [],
+    codeBlocks: [],
+    diagnostics: { aiClassificationCalls: 0, hitAiBudgetCap: false, rawCounts: {} },
+  };
+
+  it('adds citation[] field to primary node when pageData.elements.citations has entries', () => {
+    const input = {
+      ...baseInput,
+      pageData: {
+        ...baseInput.pageData,
+        elements: {
+          ...baseElementCatalogForCitations,
+          citations: [
+            { url: 'https://web.dev/vitals', text: 'Google Web Vitals docs', isExternal: true },
+            { url: 'https://developer.mozilla.org/web/api', text: 'MDN guide', isExternal: true },
+          ],
+        },
+      },
+    };
+    const graph = buildArticleSchema(input as never, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>;
+    const primary = graph[0];
+    const citations = primary.citation as Array<Record<string, unknown>>;
+    expect(citations).toHaveLength(2);
+    expect(citations[0]['@type']).toBe('WebPage');
+    expect(citations[0].url).toBe('https://web.dev/vitals');
+    expect(citations[0].name).toBe('Google Web Vitals docs');
+  });
+
+  it('does NOT add citation[] when no citations present', () => {
+    const input = {
+      ...baseInput,
+      pageData: {
+        ...baseInput.pageData,
+        elements: {
+          ...baseElementCatalogForCitations,
+          citations: [],
+        },
+      },
+    };
+    const graph = buildArticleSchema(input as never, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>;
+    expect(graph[0].citation).toBeUndefined();
+  });
+});
+
 describe('buildHomepageSchema', () => {
   const homepageInput = {
     baseUrl: 'https://example.com',
