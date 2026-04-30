@@ -31,6 +31,7 @@ interface WorkspaceData {
   autoReports?: boolean;
   autoReportFrequency?: 'weekly' | 'monthly';
   brandLogoUrl?: string;
+  siteHasSearch?: boolean;
   brandAccentColor?: string;
   knowledgeBase?: string;
   personas?: { id: string; name: string; description: string; painPoints: string[]; goals: string[]; objections: string[]; preferredContentFormat?: string; buyingStage?: 'awareness' | 'consideration' | 'decision' }[];
@@ -238,6 +239,8 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
           workspaceId={workspaceId}
           businessProfile={ws?.businessProfile}
           businessContext={ws?.keywordStrategy?.businessContext}
+          brandLogoUrl={ws?.brandLogoUrl}
+          siteHasSearch={ws?.siteHasSearch}
           toast={toast}
           onSave={(profile) => setWs(w => w ? { ...w, businessProfile: profile } : w)}
         />
