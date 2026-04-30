@@ -29,7 +29,6 @@ function parseDim(attr: string | undefined): number | undefined {
 }
 
 function classifyRole(
-  $img: ReturnType<cheerio.CheerioAPI>,
   isFirstHero: boolean,
   width: number | undefined,
   height: number | undefined,
@@ -60,7 +59,7 @@ function classifyRole(
  * Returns true when no heading or paragraph element appears before `imgEl`
  * in document order within the given scope selector (e.g. 'article', 'body').
  */
-function isBeforeFirstTextBlock($: cheerio.CheerioAPI, scopeSel: string, imgEl: cheerio.Element): boolean {
+function isBeforeFirstTextBlock($: cheerio.CheerioAPI, scopeSel: string, imgEl: { tagName: string }): boolean {
   const allTextBlocks = $(scopeSel).find('h1,h2,h3,h4,h5,h6,p');
   if (allTextBlocks.length === 0) return true;
   // Walk all nodes inside scope; stop at the first text block or this image.
@@ -69,7 +68,7 @@ function isBeforeFirstTextBlock($: cheerio.CheerioAPI, scopeSel: string, imgEl: 
   $(scopeSel).find('*').each((_, el) => {
     if (hitImage || hitText) return false; // early exit
     if (el === imgEl) { hitImage = true; return false; }
-    const tag = (el as cheerio.Element & { tagName?: string }).tagName?.toLowerCase() ?? '';
+    const tag = el.tagName?.toLowerCase() ?? '';
     if (/^h[1-6]$/.test(tag) || tag === 'p') { hitText = true; return false; }
   });
   return hitImage && !hitText;
@@ -105,7 +104,7 @@ export function extractImages($: cheerio.CheerioAPI): PageImage[] {
     const isHero = isFirstHero && (inHeader || isLeadPosition);
 
     const { role: classifiedRole, roleSource } = classifyRole(
-      $img, isHero, width, height, alt, role,
+      isHero, width, height, alt, role,
     );
 
     if (classifiedRole === 'hero') isFirstHero = false;
