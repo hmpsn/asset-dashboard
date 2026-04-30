@@ -322,4 +322,162 @@ describe('briefing-templates dispatcher', () => {
     };
     expect(dispatchGap(gap, ctx)).not.toBeNull();
   });
+
+  // ── Phase 2.5c additions ──
+
+  it('Phase 2.5c — registers milestone_attribution as a supported InsightType', () => {
+    expect(SUPPORTED_INSIGHT_TYPES).toContain('milestone_attribution');
+  });
+
+  it('Phase 2.5c — dispatches milestone_attribution correctly via index', () => {
+    const insight = baseInsight('milestone_attribution', {
+      severity: 'positive',
+      data: {
+        briefId: 'cr_123',
+        briefTitle: 'Best Fleet Maintenance Practices',
+        pageUrl: '/blog/fleet-maintenance',
+        thresholdCrossed: 'fifty_clicks',
+        currentClicks: 53,
+        daysSinceDelivery: 47,
+        trafficValue: 135,
+      },
+    });
+    const story = dispatch(insight, ctx);
+    expect(story).not.toBeNull();
+    expect(story!.category).toBe('win');
+    expect(story!.leadEligible).toBe(true);
+    expect(story!.headline).toMatch(/50 clicks/);
+    expect(story!.narrative).toMatch(/53/);
+    expect(story!.narrative).toMatch(/\$135/);
+    expect(story!.dataReceipt).toMatch(/threshold/i);
+  });
+});
+
+// ── Phase 2.5c: milestone_attribution template ──
+
+describe('milestone-attribution template', () => {
+  it('rejects when currentClicks <= 0', () => {
+    const insight = baseInsight('milestone_attribution', {
+      severity: 'positive',
+      data: { briefId: 'b', briefTitle: 't', pageUrl: '/p', thresholdCrossed: 'first_clicks', currentClicks: 0, daysSinceDelivery: 10, trafficValue: 0 },
+    });
+    expect(dispatch(insight, ctx)).toBeNull();
+  });
+
+  it('rejects when briefId is empty', () => {
+    const insight = baseInsight('milestone_attribution', {
+      severity: 'positive',
+      data: { briefId: '', briefTitle: 't', pageUrl: '/p', thresholdCrossed: 'first_clicks', currentClicks: 3, daysSinceDelivery: 10, trafficValue: 5 },
+    });
+    expect(dispatch(insight, ctx)).toBeNull();
+  });
+
+  it('frames each threshold with its proper voice', () => {
+    const fst = dispatch(baseInsight('milestone_attribution', {
+      severity: 'positive',
+      data: { briefId: 'b1', briefTitle: 'My Brief', pageUrl: '/p', thresholdCrossed: 'first_clicks', currentClicks: 3, daysSinceDelivery: 30, trafficValue: 8 },
+    }), ctx);
+    const fty = dispatch(baseInsight('milestone_attribution', {
+      severity: 'positive',
+      data: { briefId: 'b2', briefTitle: 'My Brief', pageUrl: '/p', thresholdCrossed: 'fifty_clicks', currentClicks: 53, daysSinceDelivery: 47, trafficValue: 135 },
+    }), ctx);
+    const hndr = dispatch(baseInsight('milestone_attribution', {
+      severity: 'positive',
+      data: { briefId: 'b3', briefTitle: 'My Brief', pageUrl: '/p', thresholdCrossed: 'hundred_clicks', currentClicks: 105, daysSinceDelivery: 60, trafficValue: 280 },
+    }), ctx);
+    expect(fst!.headline).toMatch(/driving clicks/i);
+    expect(fty!.headline).toMatch(/50 clicks/i);
+    expect(hndr!.headline).toMatch(/100 clicks/i);
+  });
+
+  it('milestone narrative + receipt contain no banned hedge words', () => {
+    const story = dispatch(baseInsight('milestone_attribution', {
+      severity: 'positive',
+      data: { briefId: 'b', briefTitle: 'Test', pageUrl: '/p', thresholdCrossed: 'fifty_clicks', currentClicks: 60, daysSinceDelivery: 40, trafficValue: 100 },
+    }), ctx);
+    expect(story!.narrative).not.toMatch(HEDGES);
+    expect(story!.dataReceipt).not.toMatch(HEDGES);
+  });
+});
+
+// ── Phase 2.5c: weCalledIt template ──
+// Note: weCalledIt isn't in INSIGHT_DISPATCHERS (input is TrackedAction +
+// ActionOutcome, not AnalyticsInsight). Imported directly.
+
+import { buildStoryFromWeCalledIt } from '../../server/briefing-templates/we-called-it.js';
+
+describe('we-called-it template', () => {
+  function baseAction(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'act_test',
+      workspaceId: 'ws_test',
+      actionType: 'brief_created',
+      sourceType: 'content_request',
+      sourceId: 'cr_1',
+      pageUrl: '/services/fleet',
+      targetKeyword: 'fleet maintenance austin',
+      baselineSnapshot: { captured_at: '2026-03-14T00:00:00Z' },
+      trailingHistory: { samples: [] },
+      attribution: 'platform_executed',
+      measurementWindow: 60,
+      sourceFlag: null,
+      baselineConfidence: 'high',
+      context: {},
+      createdAt: '2026-03-14T00:00:00Z',
+      updatedAt: '2026-04-22T00:00:00Z',
+      measurementComplete: 0,
+      ...overrides,
+    } as unknown as Parameters<typeof buildStoryFromWeCalledIt>[0]['action'];
+  }
+
+  function baseOutcome(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'out_test',
+      actionId: 'act_test',
+      checkpointDays: 30,
+      metricsSnapshot: { captured_at: '2026-04-22T00:00:00Z', clicks: 142, position: 4 },
+      score: 'strong_win',
+      deltaSummary: {
+        primary_metric: 'clicks',
+        baseline_value: 23,
+        current_value: 142,
+        delta_absolute: 119,
+        delta_percent: 517,
+        secondary_signals: [],
+      },
+      competitorContext: null,
+      measuredAt: '2026-04-22T00:00:00Z',
+      ...overrides,
+    } as unknown as Parameters<typeof buildStoryFromWeCalledIt>[0]['outcome'];
+  }
+
+  it('returns null when outcome.score !== strong_win', () => {
+    const r = buildStoryFromWeCalledIt({
+      action: baseAction(),
+      outcome: baseOutcome({ score: 'win' }),
+    }, ctx);
+    expect(r).toBeNull();
+  });
+
+  it('returns null when action has no pageUrl AND no targetKeyword', () => {
+    const r = buildStoryFromWeCalledIt({
+      action: baseAction({ pageUrl: null, targetKeyword: null }),
+      outcome: baseOutcome(),
+    }, ctx);
+    expect(r).toBeNull();
+  });
+
+  it('builds a win story with predicted/delivery dates and days-to-deliver', () => {
+    const r = buildStoryFromWeCalledIt({ action: baseAction(), outcome: baseOutcome() }, ctx);
+    expect(r).not.toBeNull();
+    expect(r!.category).toBe('win');
+    expect(r!.leadEligible).toBe(true);
+    expect(r!.headline.length).toBeGreaterThan(0);
+    expect(r!.narrative).toMatch(/142/); // current_value
+    expect(r!.metrics.find((m) => m.label === 'predicted')).toBeTruthy();
+    expect(r!.metrics.find((m) => m.label === 'to deliver')).toBeTruthy();
+    expect(r!.dataReceipt).toMatch(/recorded/);
+    expect(r!.narrative).not.toMatch(HEDGES);
+    expect(r!.dataReceipt).not.toMatch(HEDGES);
+  });
 });

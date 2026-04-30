@@ -3,6 +3,8 @@ import { getInsights } from './analytics-insights-store.js';
 import { loadRecommendations } from './recommendations.js';
 import { getSchedule } from './scheduled-audits.js';
 import { getWorkspace } from './workspaces.js';
+import { getActionsByWorkspace, getOutcomesForAction } from './outcome-tracking.js';
+import { computeROI } from './roi.js';
 import { createLogger } from './logger.js';
 import type {
   BriefingCategory,
@@ -271,8 +273,134 @@ function deriveOpportunityScore(gap: ContentGap): number {
   return Math.round(volScore + kdScore + imprScore);
 }
 
+// ── Phase 2.5c: weCalledIt + milestone_attribution candidate collectors ──
+//
+// Both produce Candidate rows with distinct id prefixes (`wci-` / `milestone-`)
+// that the cron's dispatch loop routes through dedicated templates rather
+// than the analytics_insights INSIGHT_DISPATCHERS map. This keeps the
+// candidate shape uniform without forcing both data sources through the
+// `analytics_insights` table — neither is persisted there today.
+
+/** Window for "the win is recent" guard — spec §6 says last 14 days. */
+const WECALLEDIT_RECENT_DAYS = 14;
+
+/** Recency cap for milestone_attribution — only fire on briefs delivered within 90d. */
+const MILESTONE_RECENT_DAYS = 90;
+
 /**
- * Collects candidates from all four sources. Each source is wrapped
+ * Surface tracked_actions whose MOST RECENT outcome is `strong_win` AND
+ * the win was measured within the last 14 days. The cron's dispatch loop
+ * routes these to `buildStoryFromWeCalledIt` via the `wci-` id prefix.
+ *
+ * Sources read: tracked_actions, action_outcomes (via getOutcomesForAction).
+ */
+export function collectWeCalledItCandidates(workspaceId: string): Candidate[] {
+  const actions = getActionsByWorkspace(workspaceId);
+  const out: Candidate[] = [];
+  for (const action of actions) {
+    const outcomes = getOutcomesForAction(action.id);
+    if (outcomes.length === 0) continue;
+    // Pick the latest outcome by measuredAt — the cron emits one story per
+    // action, anchored on the most recent outcome reading.
+    const latest = outcomes.reduce(
+      (acc, o) => (Date.parse(o.measuredAt) > Date.parse(acc.measuredAt) ? o : acc),
+      outcomes[0],
+    );
+    if (latest.score !== 'strong_win') continue;
+    const measuredMs = Date.parse(latest.measuredAt);
+    if (!Number.isFinite(measuredMs)) continue;
+    if (ageDays(measuredMs) > WECALLEDIT_RECENT_DAYS) continue;
+
+    out.push({
+      id: `wci-${action.id}`,
+      category: 'win',
+      // weCalledIt is a TRUST PLAY — high baseline impact. The cron's
+      // hero promotion respects leadEligible (template sets true).
+      impact: 80,
+      referenceId: action.id,
+      // Closest fit in the existing union — there's no `tracked_action` source
+      // type. The cron routes by id-prefix, not by referenceType, so this is
+      // effectively a label rather than a dispatch key.
+      referenceType: 'analytics_insight',
+      occurredAt: measuredMs,
+      title: action.targetKeyword
+        ? `Prediction landed: "${action.targetKeyword}"`
+        : `Prediction landed: ${action.pageUrl ?? action.id}`,
+      description: '',
+      drillIn: { page: 'performance', queryParams: action.pageUrl ? { page: action.pageUrl } : undefined },
+      metrics: [],
+    });
+  }
+  return out;
+}
+
+/**
+ * Surface delivered briefs that just crossed a clicks threshold (first /
+ * fifty / hundred). The cron's dispatch loop routes these via the `milestone-`
+ * id prefix to the milestone_attribution template, constructing a synthetic
+ * AnalyticsInsight<'milestone_attribution'> from the action + ROI data.
+ *
+ * "Just crossed" is approximated by a tight band above the threshold
+ * (current within 1.5× of threshold) so the same milestone doesn't fire
+ * every week the page sits comfortably above the line. Fully accurate
+ * crossing detection requires per-week persisted markers and is deferred.
+ */
+export function collectMilestoneAttributionCandidates(workspaceId: string): Candidate[] {
+  const actions = getActionsByWorkspace(workspaceId).filter((a) => a.actionType === 'brief_created');
+  if (actions.length === 0) return [];
+  const roi = (() => {
+    try { return computeROI(workspaceId); } catch { return null; }
+  })();
+  if (!roi || !Array.isArray(roi.contentItems) || roi.contentItems.length === 0) return [];
+
+  const out: Candidate[] = [];
+  for (const action of actions) {
+    const occurredAt = Date.parse(action.createdAt);
+    if (!Number.isFinite(occurredAt)) continue;
+    const daysSinceDelivery = Math.floor((Date.now() - occurredAt) / 86400_000);
+    if (daysSinceDelivery > MILESTONE_RECENT_DAYS) continue;
+    if (!action.pageUrl) continue;
+
+    // Match the action to its ROI content-item entry by sourceId
+    // (content_request id) when possible, falling back to pageUrl.
+    const item = roi.contentItems.find((ci) => {
+      // contentItems carry a contentRequestId or similar — match best-effort.
+      const ciAny = ci as { contentRequestId?: string; pageUrl?: string };
+      if (action.sourceId && ciAny.contentRequestId === action.sourceId) return true;
+      return ciAny.pageUrl === action.pageUrl;
+    });
+    if (!item) continue;
+    const itemAny = item as { currentClicks?: number; trafficValue?: number; title?: string };
+    const currentClicks = typeof itemAny.currentClicks === 'number' ? itemAny.currentClicks : 0;
+    if (currentClicks < 1) continue;
+
+    // Pick the highest threshold the page has crossed AND is "fresh" (in the
+    // tight band above). Order matters: prefer the largest threshold so we
+    // surface the most impressive milestone first.
+    let threshold: 'hundred_clicks' | 'fifty_clicks' | 'first_clicks' | null = null;
+    if (currentClicks >= 100 && currentClicks < 150) threshold = 'hundred_clicks';
+    else if (currentClicks >= 50 && currentClicks < 75) threshold = 'fifty_clicks';
+    else if (currentClicks >= 1 && currentClicks < 5) threshold = 'first_clicks';
+    if (!threshold) continue;
+
+    out.push({
+      id: `milestone-${action.sourceId ?? action.id}`,
+      category: 'win',
+      impact: threshold === 'hundred_clicks' ? 85 : threshold === 'fifty_clicks' ? 70 : 55,
+      referenceId: action.id,
+      referenceType: 'analytics_insight',
+      occurredAt: Date.now(),
+      title: itemAny.title ? `Brief milestone: "${itemAny.title}"` : `Brief milestone: ${action.pageUrl}`,
+      description: '',
+      drillIn: { page: 'performance', queryParams: { page: action.pageUrl } },
+      metrics: [],
+    });
+  }
+  return out;
+}
+
+/**
+ * Collects candidates from every source. Each source is wrapped
  * independently so a failure in one (e.g. a corrupted analytics_insights row)
  * doesn't drop candidates from the others — the caller gets a true partial
  * result rather than silent total failure.
@@ -284,6 +412,8 @@ export function collectAllCandidates(workspaceId: string): Candidate[] {
     ['recommendations', collectRecommendationCandidates],
     ['audit_delta', collectAuditDeltaCandidates],
     ['content_gaps', collectContentGapCandidates],
+    ['weCalledIt', collectWeCalledItCandidates],
+    ['milestones', collectMilestoneAttributionCandidates],
   ] as const) {
     try {
       out.push(...fn(workspaceId));
