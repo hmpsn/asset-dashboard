@@ -8,6 +8,7 @@
  */
 import type * as cheerio from 'cheerio';
 import type { Citation } from '../../../../shared/types/page-elements.js';
+import { contentScope } from './content-scope.js';
 
 /**
  * URL scheme allowlist — JSON-LD citations are public Schema.org annotations
@@ -31,8 +32,8 @@ export function extractCitations($: cheerio.CheerioAPI, pageBaseUrl: string): Ci
   if (!ownHost) return []; // own URL malformed — skip rather than misclassify
 
   const citations: Citation[] = [];
-  // Restrict to <article> scope — keeps nav/footer/sidebar out
-  $('article a[href]').each((_, el) => {
+  // Restrict to content scope — keeps nav/footer/sidebar out
+  contentScope($).find('a[href]').each((_, el) => {
     const $el = $(el);
     const href = ($el.attr('href') ?? '').trim();
     if (!href) return;
