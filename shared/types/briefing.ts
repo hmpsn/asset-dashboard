@@ -57,6 +57,16 @@ export interface BriefingStory {
   drillIn: BriefingDrillIn;
   /** Traceability — which source records produced this story */
   sourceRefs: BriefingSourceRef[];
+  /**
+   * Optional citation line rendered below metric badges in the
+   * `<HeroStoryCard>`. Plain prose, references data sources +
+   * comparisons (e.g. "Source: GSC last-28-day vs prior-28-day window.
+   * Verified across 7 daily samples since Apr 14"). Added in Phase 2.5a
+   * (deterministic story templates) — older briefings rendered without
+   * this field. When present the hero card renders it; when absent no
+   * receipt line is shown.
+   */
+  dataReceipt?: string;
 }
 
 export interface BriefingDraft {

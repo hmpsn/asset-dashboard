@@ -855,6 +855,27 @@ export const CHECKS: Check[] = [
     severity: 'error',
   },
   {
+    // Phase 2.5a (client-insights-redesign) — banned hedge words in briefing
+    // template files. The whole point of the rebuild is data-rooted prose;
+    // hedges like "potentially / could / may / appears" reproduce the
+    // Phase 2 voice failure where the AI re-narrated typed insight data into
+    // editorial mush. Banning them at write time keeps the contract honest.
+    //
+    // Hatch with `// hedge-ok` inline only when the hedge IS the data
+    // (e.g. quoting a competitor's verbatim claim).
+    name: 'Banned hedge words in briefing templates',
+    pattern: '\\b(potentially|could|may|appears to|suggests|might|seems)\\b',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/briefing-templates/',
+    excludeLines: [
+      '// hedge-ok',
+      '// banned-hedge-ok',
+    ],
+    message: 'Briefing template prose must be definitive — every claim cites a number from typed insight data, no hedge words. See docs/superpowers/specs/2026-04-29-client-insights-redesign-design.md §5 (voice rules). Use `// hedge-ok` inline if the hedge is part of cited source data.',
+    severity: 'error',
+    rationale: 'Phase 2 voice failure was AI hedging on data it had. Templates are deterministic; hedges have no place in them.',
+  },
+  {
     name: 'Hard-coded studio name',
     pattern: 'hmpsn[ .]studio',
     fileGlobs: ['*.ts', '*.tsx'],
