@@ -1,5 +1,13 @@
 // server/briefing-prompt.ts
 //
+// TODO(phase-2.5d): the full-narrative AI path is replaced by deterministic
+// templates in `server/briefing-templates/` as of Phase 2.5a. Only
+// `punchHeroHeadline` and `writeWeeklyOpener` (added in Phase 2.5c) remain
+// in active use. Remove `briefingAIResponseSchema` + `buildBriefingInstructions`
+// + the Zod schema scaffolding in Phase 2.5d cleanup once the deterministic
+// path has soaked. See docs/superpowers/plans/2026-04-29-client-insights-
+// redesign.md Phase 2.5d for the full deletion checklist.
+//
 // Single source of truth for the briefing-specific instructions (Layer 3).
 // Voice DNA + guardrails (Layer 2) are injected upstream by buildSystemPrompt()
 // in server/prompt-assembly.ts — do NOT duplicate that content here.

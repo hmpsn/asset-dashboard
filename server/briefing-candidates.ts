@@ -2,6 +2,7 @@
 import { getInsights } from './analytics-insights-store.js';
 import { loadRecommendations } from './recommendations.js';
 import { getSchedule } from './scheduled-audits.js';
+import { getWorkspace } from './workspaces.js';
 import { createLogger } from './logger.js';
 import type {
   BriefingCategory,
@@ -10,6 +11,7 @@ import type {
   BriefingDrillIn,
   BriefingSourceRef,
 } from '../shared/types/briefing.js';
+import type { ContentGap } from '../shared/types/workspace.js';
 
 const log = createLogger('briefing-candidates');
 
@@ -198,9 +200,81 @@ export function collectAuditDeltaCandidates(workspaceId: string): Candidate[] {
 }
 
 /**
- * Collects candidates from all three sources. Each source is wrapped
+ * Collect content gap candidates from `workspace.keywordStrategy.contentGaps[]`.
+ *
+ * These are keywords with measurable search demand (per SEMrush/DataForSEO) where
+ * the workspace has no existing page targeting the term. They drive the
+ * "Recommended for You" section and one of the highest-margin upsell flows in
+ * the platform (per-brief content generation pricing). Phase 2.5a wires them
+ * into the briefing candidate pool for the first time — they were previously
+ * only surfaced 3+ clicks deep on the Strategy tab.
+ *
+ * Materiality:
+ *   - `impact` is sourced from `gap.opportunityScore` (server-computed at
+ *     strategy generation time; admin's <ContentGaps> sorts by it). When
+ *     `opportunityScore` is absent (older strategies pre-dating the field),
+ *     fall back to a deterministic mix of volume + difficulty so the gap
+ *     still gets a score.
+ *   - `category: 'opportunity'` — gaps are uniformly opportunities (not
+ *     wins or risks). The actionability multiplier handles ranking among
+ *     other opportunities.
+ *
+ * Source ref type is 'recommendation' since gaps are a recommendation-class
+ * signal (not an analytics_insight, not an audit_delta). The id encodes the
+ * target keyword for traceability.
+ */
+export function collectContentGapCandidates(workspaceId: string): Candidate[] {
+  const ws = getWorkspace(workspaceId);
+  const gaps = ws?.keywordStrategy?.contentGaps;
+  if (!gaps || gaps.length === 0) return [];
+
+  const now = Date.now();
+  const out: Candidate[] = [];
+  for (const gap of gaps) {
+    if (!gap.targetKeyword) continue; // skip malformed entries
+    const impact = gap.opportunityScore ?? deriveOpportunityScore(gap);
+    if (impact <= 0) continue;
+    out.push({
+      id: `gap-${gap.targetKeyword}`,
+      category: 'opportunity',
+      impact,
+      referenceId: gap.targetKeyword,
+      referenceType: 'recommendation',
+      occurredAt: now, // gaps don't carry per-row timestamps; treat as fresh
+      title: gap.topic ?? gap.targetKeyword,
+      description: gap.rationale ?? '',
+      drillIn: { page: 'strategy', queryParams: { gap: gap.targetKeyword } },
+      metrics: [],
+    });
+  }
+  return out;
+}
+
+/**
+ * Fallback opportunity-score computation for gaps missing the server-computed
+ * `opportunityScore` field. Mirrors the admin <ContentGaps> sort ordering's
+ * spirit: prefer high-volume, low-difficulty terms; small bonus for non-zero
+ * impressions (proves real demand from the workspace's existing audience).
+ *
+ * Returns 0-100. Templates downstream cite the score as part of their
+ * narrative when it materially drives the headline.
+ */
+function deriveOpportunityScore(gap: ContentGap): number {
+  const vol = gap.volume ?? 0;
+  if (vol <= 0) return 0;
+  // Map volume to 0-60 (log scale: 100 → 20, 1000 → 40, 10k → 60)
+  const volScore = Math.min(60, Math.log10(vol + 1) * 15);
+  // Difficulty penalty: KD 0 → +30, KD 100 → 0
+  const kdScore = gap.difficulty != null ? Math.max(0, 30 - 0.3 * gap.difficulty) : 15;
+  // Impressions bonus: workspace already getting any impressions = +10
+  const imprScore = (gap.impressions ?? 0) > 0 ? 10 : 0;
+  return Math.round(volScore + kdScore + imprScore);
+}
+
+/**
+ * Collects candidates from all four sources. Each source is wrapped
  * independently so a failure in one (e.g. a corrupted analytics_insights row)
- * doesn't drop candidates from the other two — the caller gets a true partial
+ * doesn't drop candidates from the others — the caller gets a true partial
  * result rather than silent total failure.
  */
 export function collectAllCandidates(workspaceId: string): Candidate[] {
@@ -209,6 +283,7 @@ export function collectAllCandidates(workspaceId: string): Candidate[] {
     ['insights', collectInsightCandidates],
     ['recommendations', collectRecommendationCandidates],
     ['audit_delta', collectAuditDeltaCandidates],
+    ['content_gaps', collectContentGapCandidates],
   ] as const) {
     try {
       out.push(...fn(workspaceId));

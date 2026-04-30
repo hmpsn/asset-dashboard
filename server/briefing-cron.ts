@@ -29,12 +29,9 @@ import {
   getClientPortalUrl,
 } from './workspaces.js';
 import { getSchedule } from './scheduled-audits.js';
-import { callAI } from './ai.js';
-import { buildSystemPrompt } from './prompt-assembly.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import {
   collectAllCandidates,
-  formatCandidateBlock,
   topNByMateriality,
 } from './briefing-candidates.js';
 import {
@@ -42,13 +39,14 @@ import {
   getBriefingByWeek,
   markPublished,
 } from './briefing-store.js';
-import { briefingAIResponseSchema, buildBriefingInstructions } from './briefing-prompt.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import { addActivity } from './activity-log.js';
 import { notifyClientBriefingReady } from './email.js';
-import { getWorkspaceLearnings, formatLearningsForPrompt } from './workspace-learnings.js';
-import { stripCodeFences } from './helpers.js';
+import { computeROI } from './roi.js';
+import { buildStoryFromInsight, buildStoryFromContentGap } from './briefing-templates/index.js';
+import { getInsightById } from './analytics-insights-store.js';
+import type { BriefingStory } from '../shared/types/briefing.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('briefing-cron');
@@ -242,70 +240,75 @@ async function runBriefingForWorkspaceInner(
     return { status: 'skipped', weekOf, reason: 'no candidates' };
   }
   const top = topNByMateriality(candidates, 10);
-  const candidateBlock = formatCandidateBlock(top);
 
-  // Optional learnings context (soft-degrade per outcome-ai-injection flag)
-  let learningsContext: string | undefined;
-  if (isFeatureEnabled('outcome-ai-injection')) {
+  // ── Phase 2.5a: deterministic story templates ───────────────────────
+  //
+  // Replaces the prior AI-call-and-parse step. Each candidate is projected
+  // into a BriefingStory by the type-specific template module. Voice rules
+  // are enforced at write-time by the pr-check rule "Banned hedge words in
+  // briefing templates". No AI call, no parse step, no Zod-on-AI failure
+  // mode — the cron's main path is now fully deterministic.
+  //
+  // The original AI path lives on disk in `briefing-prompt.ts` for
+  // Phase 2.5c's optional hero-headline punch + weekly-opener. Phase 2.5d
+  // (cleanup) deletes the multi-story narrative path entirely after the
+  // deterministic templates have soaked.
+  const t0 = Date.now();
+  const tier = (ws.tier as 'free' | 'growth' | 'premium' | undefined) ?? 'free';
+  const roiData = (() => {
+    try { return computeROI(workspaceId); } catch (err) {
+      log.debug({ err, workspaceId }, 'roi unavailable for briefing context; templates degrade $-footnote gracefully');
+      return null;
+    }
+  })();
+  const templateContext = {
+    workspaceId,
+    tier,
+    avgCPC: roiData?.avgCPC,
+  };
+  const stories: BriefingStory[] = [];
+  for (const candidate of top) {
+    let story: BriefingStory | null = null;
     try {
-      const learnings = getWorkspaceLearnings(workspaceId);
-      if (learnings) {
-        const block = formatLearningsForPrompt(learnings, 'all');
-        if (block) learningsContext = block;
+      if (candidate.referenceType === 'recommendation' && candidate.id.startsWith('gap-')) {
+        const gap = ws.keywordStrategy?.contentGaps?.find(
+          (g) => g.targetKeyword === candidate.referenceId,
+        );
+        if (gap) story = buildStoryFromContentGap(gap, templateContext);
+      } else if (candidate.referenceType === 'analytics_insight') {
+        const insight = getInsightById(candidate.referenceId, workspaceId);
+        if (insight) story = buildStoryFromInsight(insight, templateContext);
       }
     } catch (err) {
-      log.debug({ err, workspaceId }, 'learnings injection failed; soft-degrading');
+      log.debug({ err, workspaceId, candidateId: candidate.id }, 'template projection failed; skipping candidate');
     }
+    if (story) stories.push(story);
   }
-
-  // Build prompt
-  const instructions = buildBriefingInstructions({
-    workspaceName: ws.name,
-    weekLabel: `Week of ${weekOf}`,
-    candidateBlock,
-    learningsContext,
-  });
-  const system = buildSystemPrompt(workspaceId, instructions);
-
-  // AI dispatch
-  const t0 = Date.now();
-  const provider = 'anthropic' as const;
-  const model = 'claude-sonnet-4-20250514';
-  const result = await callAI({
-    provider,
-    model,
-    system,
-    messages: [{ role: 'user', content: 'Generate the briefing JSON now.' }],
-    feature: 'client-briefing',
-    workspaceId,
-    maxTokens: 2000,
-    temperature: 0.5,
-  });
   const generationMs = Date.now() - t0;
 
-  // Parse + validate. Sonnet sometimes wraps JSON in ```json fences despite the
-  // prompt instruction not to — stripCodeFences is a no-op when the fence is
-  // absent, so it's safe to apply unconditionally.
-  let parsed;
-  try {
-    parsed = briefingAIResponseSchema.parse(JSON.parse(stripCodeFences(result.text).trim()));
-  } catch (err) {
-    log.error(
-      { err, workspaceId, weekOf, raw: result.text.slice(0, 400) },
-      'briefing AI response invalid',
-    );
-    return { status: 'skipped', weekOf, reason: 'AI response invalid' };
+  if (stories.length === 0) {
+    log.info({ workspaceId, weekOf, candidateCount: top.length }, 'briefing skipped — every candidate rejected by templates');
+    return { status: 'skipped', weekOf, reason: 'no eligible stories' };
   }
+
+  // Promote the highest-impact eligible candidate to hero. Categories that
+  // can lead are listed in the spec — competitor_alert + page_health are
+  // explicitly NEVER lead even when they're highest scoring. We pick the
+  // first lead-eligible story by candidate ranking; templates output
+  // isHeadline=false by default and we flip exactly one to true.
+  const HERO_INELIGIBLE: ReadonlyArray<string> = ['competitive']; // category 'competitive' = competitor_alert
+  const heroIndex = stories.findIndex((s) => !HERO_INELIGIBLE.includes(s.category));
+  if (heroIndex >= 0) stories[heroIndex].isHeadline = true;
 
   // Persist
   const draft = upsertBriefingDraft({
     workspaceId,
     weekOf,
-    stories: parsed.stories,
+    stories,
     sourceMetadata: {
       candidateCount: top.length,
-      model,
-      provider,
+      model: 'deterministic-templates-v1', // sentinel — no AI provider invoked
+      provider: 'anthropic', // unused but Zod-required
       generationMs,
       preflightDeferralCount: deferrals,
     },
@@ -315,7 +318,7 @@ async function runBriefingForWorkspaceInner(
     workspaceId,
     'briefing_generated',
     `Briefing draft generated — ${weekOf}`,
-    `${parsed.stories.length} stories`,
+    `${stories.length} stories`,
     { briefingId: draft.id },
   );
   broadcastToWorkspace(workspaceId, WS_EVENTS.BRIEFING_GENERATED, {

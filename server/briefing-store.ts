@@ -40,6 +40,11 @@ export const briefingStorySchema: z.ZodType<BriefingStory> = z.object({
     type: z.enum(['analytics_insight', 'recommendation', 'audit_delta']),
     id: z.string().min(1),
   })),
+  // Optional citation line below metric pills in <HeroStoryCard>. Added
+  // by Phase 2.5a deterministic templates; older briefings render without
+  // it. .max(800) matches the narrative cap so the receipt + narrative
+  // together stay readable.
+  dataReceipt: z.string().min(1).max(800).optional(),
 });
 
 const sourceMetadataSchema: z.ZodType<BriefingSourceMetadata> = z.object({

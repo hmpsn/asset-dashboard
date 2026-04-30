@@ -1,17 +1,17 @@
 /**
  * Integration tests for briefing-cron.runBriefingForWorkspace().
  *
- * Covers the per-workspace briefing runner contract:
- * - Tier gate (free → skipped)
- * - Duplicate-week guard + manual bypass
- * - AI invalid-JSON / invalid-schema → skipped
- * - Happy path → generated draft persisted
+ * Phase 2.5a: cron now uses deterministic story templates instead of an
+ * AI call. Tests seed real `analytics_insights` rows + a workspace with
+ * keyword strategy and verify the cron projects them into a draft.
  *
- * No HTTP — exercises the runner function directly. broadcast + email are
- * mocked at module level; index.ts is never imported here so we avoid the
- * "broadcast() called before init" startup error.
+ * No HTTP — exercises the runner function directly. broadcast + email
+ * are mocked at module level; index.ts is never imported here so we
+ * avoid the "broadcast() called before init" startup error.
  *
- * Note: callAI() is the unified AI dispatcher (server/ai.ts → returns { text, tokens }).
+ * The legacy AI-error / Zod-failure / fenced-JSON tests have been
+ * removed: those code paths are no longer reachable from the main cron
+ * path. The Phase 2.5d cleanup will delete the underlying scaffolding.
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 
@@ -32,70 +32,59 @@ vi.mock('../../server/email.js', async () => {
   };
 });
 
-vi.mock('../../server/ai.js', async () => {
-  const actual = await vi.importActual<typeof import('../../server/ai.js')>('../../server/ai.js');
-  return {
-    ...actual,
-    callAI: vi.fn(),
-  };
-});
-
 // ── Imports (after mocks) ────────────────────────────────────────────────────
 
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { runBriefingForWorkspace } from '../../server/briefing-cron.js';
 import { getBriefingByWeek } from '../../server/briefing-store.js';
 import { upsertSchedule } from '../../server/scheduled-audits.js';
+import { upsertInsight } from '../../server/analytics-insights-store.js';
 import db from '../../server/db/index.js';
-import { callAI } from '../../server/ai.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function makeAIResponse(stories: Array<Record<string, unknown>>) {
-  return {
-    text: JSON.stringify({ stories }),
-    tokens: { prompt: 10, completion: 20, total: 30 },
-  };
+function seedRankingMover(wsId: string, pageOverride = '/services/fleet') {
+  return upsertInsight({
+    workspaceId: wsId,
+    pageId: pageOverride,
+    insightType: 'ranking_mover',
+    severity: 'positive',
+    data: {
+      query: 'fleet maintenance austin',
+      pageUrl: pageOverride,
+      currentPosition: 4,
+      previousPosition: 11,
+      positionChange: 7, // positive = improved (moved up) per JSDoc
+      currentClicks: 142,
+      previousClicks: 23,
+      impressions: 1840,
+    },
+    pageTitle: 'Fleet Maintenance — Austin',
+    impactScore: 75,
+  });
 }
 
-function validStoryFixture() {
-  return [
-    {
-      id: 's1',
-      category: 'win',
-      isHeadline: true,
-      headline: 'Organic traffic rose 12% this week',
-      narrative: 'Your top landing pages drove a sustained increase in organic visits.',
-      metrics: [],
-      drillIn: { page: 'performance' },
-      sourceRefs: [],
+function seedRankingOpportunity(wsId: string, pageOverride = '/services/hvac') {
+  return upsertInsight({
+    workspaceId: wsId,
+    pageId: pageOverride,
+    insightType: 'ranking_opportunity',
+    severity: 'opportunity',
+    data: {
+      query: 'hvac repair austin',
+      pageUrl: pageOverride,
+      currentPosition: 11,
+      impressions: 2400,
+      estimatedTrafficGain: 250,
     },
-    {
-      id: 's2',
-      category: 'risk',
-      isHeadline: false,
-      headline: 'Two pages slowed below the LCP threshold',
-      narrative: 'Two product pages now load slower than 2.5s; worth a perf audit.',
-      metrics: [],
-      drillIn: { page: 'health' },
-      sourceRefs: [],
-    },
-    {
-      id: 's3',
-      category: 'opportunity',
-      isHeadline: false,
-      headline: 'New ranking opportunity surfaced',
-      narrative: 'A keyword cluster gained 4 positions, sitting just outside the top-3.',
-      metrics: [],
-      drillIn: { page: 'strategy' },
-      sourceRefs: [],
-    },
-  ];
+    pageTitle: 'HVAC Repair — Austin',
+    impactScore: 68,
+  });
 }
 
 // ── Suite ────────────────────────────────────────────────────────────────────
 
-describe('briefing-cron / runBriefingForWorkspace', () => {
+describe('briefing-cron / runBriefingForWorkspace (deterministic templates)', () => {
   let wsCleanup: () => void;
   let wsId: string;
 
@@ -103,8 +92,6 @@ describe('briefing-cron / runBriefingForWorkspace', () => {
     const seeded = seedWorkspace({ tier: 'growth' });
     wsId = seeded.workspaceId;
     wsCleanup = seeded.cleanup;
-    // Seed a fresh audit run so the pre-flight freshness check passes for non-manual tests.
-    // (Without this, the runner defers up to 3 times before generating.)
     upsertSchedule(wsId, {
       enabled: true,
       intervalDays: 7,
@@ -120,17 +107,9 @@ describe('briefing-cron / runBriefingForWorkspace', () => {
 
   beforeEach(() => {
     db.prepare('DELETE FROM briefing_drafts WHERE workspace_id = ?').run(wsId);
+    db.prepare('DELETE FROM analytics_insights WHERE workspace_id = ?').run(wsId);
     db.prepare('UPDATE workspaces SET last_briefing_run_week_of = NULL WHERE id = ?').run(wsId);
-    vi.mocked(callAI).mockReset();
-  });
-
-  it('generates a draft and persists it for an eligible workspace', async () => {
-    vi.mocked(callAI).mockResolvedValue(makeAIResponse(validStoryFixture()));
-    const r = await runBriefingForWorkspace(wsId, { manual: true });
-    expect(r.status).toBe('generated');
-    const draft = getBriefingByWeek(wsId, r.weekOf);
-    expect(draft?.stories).toHaveLength(3);
-    expect(draft?.status).toBe('draft');
+    vi.clearAllMocks();
   });
 
   it('skips workspaces on the free tier', async () => {
@@ -141,8 +120,49 @@ describe('briefing-cron / runBriefingForWorkspace', () => {
     db.prepare("UPDATE workspaces SET tier = 'growth' WHERE id = ?").run(wsId);
   });
 
+  it('skips when no eligible stories can be projected', async () => {
+    // The seeded `upsertSchedule` creates an audit_delta candidate (we need
+    // it to pass the pre-flight freshness check), but no template handles
+    // the period_change category from a raw audit_delta source — so without
+    // any seeded analytics_insights, every candidate is rejected by templates.
+    const r = await runBriefingForWorkspace(wsId, { manual: true });
+    expect(r.status).toBe('skipped');
+    expect(r.reason).toMatch(/no candidates|no eligible stories/);
+  });
+
+  it('generates a draft when seeded insights project into stories', async () => {
+    seedRankingMover(wsId);
+    seedRankingOpportunity(wsId);
+    const r = await runBriefingForWorkspace(wsId, { manual: true });
+    expect(r.status).toBe('generated');
+    const draft = getBriefingByWeek(wsId, r.weekOf);
+    expect(draft).not.toBeNull();
+    expect(draft!.stories.length).toBeGreaterThanOrEqual(1);
+    // Voice contract: every story narrative cites a number AND avoids hedge words
+    const HEDGES = /\b(potentially|could|may|appears to|suggests|might|seems)\b/i;
+    for (const story of draft!.stories) {
+      expect(story.narrative.length).toBeGreaterThan(0);
+      expect(story.narrative).toMatch(/\d/); // contains a digit
+      expect(story.narrative).not.toMatch(HEDGES);
+      expect(story.dataReceipt).toBeTruthy();
+    }
+    // Source metadata records the deterministic-templates sentinel, not an AI model
+    expect(draft!.sourceMetadata?.model).toBe('deterministic-templates-v1');
+  });
+
+  it('promotes one story to hero (isHeadline=true), excluding "competitive"', async () => {
+    seedRankingMover(wsId); // win category
+    seedRankingOpportunity(wsId); // opportunity category
+    const r = await runBriefingForWorkspace(wsId, { manual: true });
+    expect(r.status).toBe('generated');
+    const draft = getBriefingByWeek(wsId, r.weekOf);
+    const heroes = draft!.stories.filter((s) => s.isHeadline);
+    expect(heroes).toHaveLength(1);
+    expect(heroes[0].category).not.toBe('competitive');
+  });
+
   it('refuses to re-run when lastBriefingRunWeekOf matches current week', async () => {
-    vi.mocked(callAI).mockResolvedValue(makeAIResponse(validStoryFixture()));
+    seedRankingMover(wsId);
     const r1 = await runBriefingForWorkspace(wsId, { manual: false });
     expect(r1.status).toBe('generated');
     const r2 = await runBriefingForWorkspace(wsId, { manual: false });
@@ -150,41 +170,10 @@ describe('briefing-cron / runBriefingForWorkspace', () => {
   });
 
   it('manual: true bypasses the duplicate guard', async () => {
-    vi.mocked(callAI).mockResolvedValue(makeAIResponse(validStoryFixture()));
+    seedRankingMover(wsId);
     const r1 = await runBriefingForWorkspace(wsId, { manual: false });
     expect(r1.status).toBe('generated');
     const r2 = await runBriefingForWorkspace(wsId, { manual: true });
     expect(r2.status).toBe('generated');
-  });
-
-  it('returns "skipped" when AI response is invalid JSON', async () => {
-    vi.mocked(callAI).mockResolvedValue({
-      text: 'not valid json',
-      tokens: { prompt: 10, completion: 20, total: 30 },
-    });
-    const r = await runBriefingForWorkspace(wsId, { manual: true });
-    expect(r.status).toBe('skipped');
-    expect(r.reason).toContain('AI response invalid');
-  });
-
-  it('strips Markdown ```json fences from the AI response before parsing', async () => {
-    // Sonnet sometimes wraps JSON in ```json fences despite the prompt
-    // instruction not to — this caught us on staging (PR #370 follow-up).
-    // The runner must defensively strip fences before JSON.parse.
-    const fenced = '```json\n' + JSON.stringify({ stories: validStoryFixture() }) + '\n```';
-    vi.mocked(callAI).mockResolvedValue({
-      text: fenced,
-      tokens: { prompt: 10, completion: 20, total: 30 },
-    });
-    const r = await runBriefingForWorkspace(wsId, { manual: true });
-    expect(r.status).toBe('generated');
-    const draft = getBriefingByWeek(wsId, r.weekOf);
-    expect(draft?.stories).toHaveLength(3);
-  });
-
-  it('returns "skipped" when AI response fails Zod validation (only 2 stories)', async () => {
-    vi.mocked(callAI).mockResolvedValue(makeAIResponse(validStoryFixture().slice(0, 2)));
-    const r = await runBriefingForWorkspace(wsId, { manual: true });
-    expect(r.status).toBe('skipped');
   });
 });
