@@ -258,24 +258,25 @@ export function InsightsBriefingPage({
         tier={effectiveTier}
         onRequestBrief={onRequestBrief}
       />
-      {allStories.length > 0 && (
-        <div className="border-t border-[var(--brand-border)] pt-4">
-          <h3 className="t-label text-[var(--brand-text-muted)] tracking-wider mb-3 flex items-center gap-2">
-            <Icon as={Sparkles} size="sm" className="text-teal-400" />
-            Also this week
-          </h3>
-          <div className="space-y-0">
-            {allStories.map((s) => (
-              <SecondaryStoryRow
-                key={s.id}
-                story={s}
-                workspaceId={workspaceId}
-                betaMode={betaMode}
-              />
-            ))}
-          </div>
+      {/* allStories is briefing.stories — the early-return at the top
+          of the paid-tier block guarantees length ≥ 1 here, so no
+          conditional wrapper is needed. */}
+      <div className="border-t border-[var(--brand-border)] pt-4">
+        <h3 className="t-label text-[var(--brand-text-muted)] tracking-wider mb-3 flex items-center gap-2">
+          <Icon as={Sparkles} size="sm" className="text-teal-400" />
+          Also this week
+        </h3>
+        <div className="space-y-0">
+          {allStories.map((s) => (
+            <SecondaryStoryRow
+              key={s.id}
+              story={s}
+              workspaceId={workspaceId}
+              betaMode={betaMode}
+            />
+          ))}
         </div>
-      )}
+      </div>
     </div>
   );
 }
