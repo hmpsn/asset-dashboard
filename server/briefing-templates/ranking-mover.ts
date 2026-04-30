@@ -20,7 +20,7 @@
 import type { AnalyticsInsight, RankingMoverData } from '../../shared/types/analytics.js';
 import type { BriefingStory } from '../../shared/types/briefing.js';
 import type { TemplateContext } from './index.js';
-import { fmtShortDateUTC } from './_helpers.js';
+import { fmtShortDateUTC, appendAnchor } from './_helpers.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -39,7 +39,7 @@ function nextTopBucket(position: number): number {
 
 export function buildStoryFromInsight(
   insight: AnalyticsInsight<'ranking_mover'>,
-  _context: TemplateContext,
+  context: TemplateContext,
 ): BriefingStory | null {
   const data = insight.data as RankingMoverData;
 
@@ -87,9 +87,14 @@ export function buildStoryFromInsight(
   const anchorDate = Number.isFinite(computedAtMs)
     ? new Date(computedAtMs - 14 * DAY_MS)
     : new Date(Date.now() - 14 * DAY_MS);
-  const dataReceipt =
+  // Phase 2.5c — append a "best week since X" anchor when the current
+  // clicks figure is a new high in the snapshot history. Pure tail-append;
+  // when no anchor is editorially meaningful (insufficient history, current
+  // isn't a new best) the receipt returns unchanged.
+  let dataReceipt =
     `Source: GSC last-28-day vs prior-28-day window. ` +
-    `Verified across 7 daily samples since ${fmtShortDateUTC(anchorDate)}.`;
+    `Verified across 7 daily samples since ${fmtShortDateUTC(anchorDate)}`;
+  dataReceipt = appendAnchor(dataReceipt, context.workspaceId, 'total_clicks', currentClicks);
 
   return {
     id: `story-${insight.id}`,

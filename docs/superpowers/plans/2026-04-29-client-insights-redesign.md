@@ -1,10 +1,12 @@
 # Client Insights Redesign — Master Plan
 **Date:** 2026-04-29
 **Spec:** `docs/superpowers/specs/2026-04-29-client-insights-redesign-design.md` (read first)
-**Phasing:** Four PRs (2.5a / 2.5b / 2.5c / 2.5d). Reuse-first. No new feature flags — `client-briefing-v2` continues to gate the entire feature.
-**Total scope:** ~3,650 LOC additive across 2.5a/b/c, then ~−1,000 LOC in 2.5d cleanup.
+**Phasing:** Five PRs (2.5a / 2.5b / 2.5c / 2.5d / 2.5e). Reuse-first. The optional AI-polish sub-flag `client-briefing-v2-ai-polish` lands in 2.5e (no other new flags); `client-briefing-v2` continues to gate the rest of the feature.
+**Total scope:** ~3,300 LOC additive across 2.5a/b/c, then ~−1,000 LOC in 2.5d cleanup, then ~+400 LOC in 2.5e Premium polish.
 
-This is one master plan covering all four PRs. Each PR section below is independently shippable with its own task graph, file list, and verification gates. **2.5d is housekeeping** — only opens after the redesign has soaked for ≥4 weeks with no rollback or incident.
+This is one master plan covering all five PRs. Each PR section below is independently shippable with its own task graph, file list, and verification gates.
+
+**Phase reorder note (2026-04-29):** the original plan placed the AI hero-punch + weekly-opener inside 2.5c. After the user's call to ship cleanup BEFORE the AI passes, those moved to a new **Phase 2.5e** that runs AFTER **Phase 2.5d**. Cleaner foundation — the AI passes get to live in a `briefing-prompt.ts` that 2.5d emptied of dead full-narrative code, rather than landing alongside it. **2.5d is housekeeping** — only opens after 2.5a/b/c have soaked for ≥4 weeks with no rollback or incident.
 
 ---
 
@@ -788,7 +790,7 @@ Render in `<InsightsBriefingPage>` only when present in the draft response.
    - The system-prompt builder for the multi-story narrative generation
    - The `briefingAIResponseSchema` Zod schema (was for parsing AI's full briefing JSON)
    - The instructions block that asked the AI to pick + write 3-5 stories
-   - **Keep:** `punchHeroHeadline` (T2.5c.10) and `writeWeeklyOpener` (T2.5c.11) — these are the only AI use-cases remaining
+   - **Phase reorder note:** the original plan kept `punchHeroHeadline` + `writeWeeklyOpener` here for 2.5c. After the reorder, those land in **Phase 2.5e** (built fresh on the cleaned-up `briefing-prompt.ts`). Phase 2.5d deletes the file's content wholesale.
 
 2. **`stripCodeFences` call in `briefing-cron.ts`**
    - Was needed because Sonnet wrapped JSON in `\`\`\`json` fences
@@ -829,7 +831,7 @@ Before any deletion, run a grep audit:
 ### T2.5d.1 — Remove AI narrative path (Model: sonnet)
 
 **Files modified:**
-- `server/briefing-prompt.ts` — remove the multi-story narrative generation logic; keep only `punchHeroHeadline` + `writeWeeklyOpener`
+- `server/briefing-prompt.ts` — remove ALL of the multi-story narrative generation logic. Phase 2.5c shipped without `punchHeroHeadline` / `writeWeeklyOpener` (deferred to Phase 2.5e per the plan's reorder), so 2.5d can delete the entire file's invocation path. Re-evaluate at plan-write whether the file should be deleted entirely or left as a stub for 2.5e to extend.
 - `server/briefing-cron.ts` — remove the `stripCodeFences` call + the JSON.parse step + the Zod validation against `briefingAIResponseSchema`
 
 ### T2.5d.2 — Test cleanup (Model: haiku)
@@ -867,6 +869,142 @@ If `client-briefing-v2` is now the default-on flag and we're confident: remove t
 - [ ] Every removed component grepped + verified unreferenced
 - [ ] Decision on `client-briefing-v2` flag retirement documented
 - [ ] BRAND_DESIGN_LANGUAGE.md cleaned of references to retired components
+
+---
+
+# Phase 2.5e · AI polish (Premium-only, fail-soft)
+
+**Validates:** AI hero-headline punch + weekly opener add editorial flair on top of the deterministic templates.
+**LOC budget:** ~400 (≤500 hard cap)
+**Soak after merge:** None — opt-in flag-gated; rollback is the flag flip.
+
+**Phase reorder rationale:** the original plan put these inside 2.5c. We
+moved them to 2.5e (after 2.5d's cleanup pass) so the AI passes land on a
+tidy `briefing-prompt.ts` rather than living next to the dead full-
+narrative path. Cleaner foundation, smaller diff, easier to review.
+
+## Task Dependencies (2.5e)
+
+```
+Sequential:
+  T2.5e.0 Add client-briefing-v2-ai-polish flag (default off)
+  T2.5e.1 server/briefing-prompt.ts: punchHeroHeadline()
+  T2.5e.2 server/briefing-prompt.ts: writeWeeklyOpener()
+  T2.5e.3 Wire both into briefing-cron.ts post-template projection
+  T2.5e.4 Extend PublishedBriefingResponse with weeklyOpener?: string
+  T2.5e.5 <InsightsBriefingPage>: render weeklyOpener above DateLine
+  T2.5e.6 Tests + docs + PR
+```
+
+## Tasks
+
+### T2.5e.0 — Feature flag (Model: haiku)
+
+**Files:** `shared/types/feature-flags.ts`
+
+Add `'client-briefing-v2-ai-polish': false`. Both AI passes gate on this flag AND on `tier === 'premium'`. Either gate failing → fall back to deterministic-only output. Flag-flip is the rollback for both passes.
+
+### T2.5e.1 — punchHeroHeadline (Model: sonnet)
+
+**Files:** `server/briefing-prompt.ts` (new content — Phase 2.5d emptied this file)
+
+```ts
+export async function punchHeroHeadline(
+  deterministicHeadline: string,
+  insight: AnalyticsInsight | { headline: string; data: unknown },
+): Promise<string>
+```
+
+Calls `callAI({ provider: 'anthropic' })` with a tight prompt: "Rewrite this headline to be 5-12 words, more memorable, definite tense, NO hedge words (potentially / could / may / appears / suggests / might / seems). Return only the rewritten headline." Word-count guard at the response (5-12 words inclusive); banned-word regex check; on either failure → return original.
+
+**Fail-soft contract:**
+- Catch every error (timeout, rate-limit, malformed response, hedge-word violation, word-count violation) → return the original deterministic headline
+- Log at `debug` level, never `error` (this is opt-in polish, not a critical path)
+- No retry — one shot, accept-or-fall-back
+
+### T2.5e.2 — writeWeeklyOpener (Model: sonnet)
+
+**Files:** `server/briefing-prompt.ts`
+
+```ts
+export async function writeWeeklyOpener(
+  stories: BriefingStory[],
+  briefingContext: { workspaceName: string; weekOf: string },
+): Promise<string | null>
+```
+
+Returns a one-line "letter from the editor" string. Same fail-soft contract: any error → null (caller skips the section, doesn't crash).
+
+Prompt rules: no hedges; cite a number from at least one story; ≤25 words; period-terminated; no quotation marks.
+
+### T2.5e.3 — Cron wiring (Model: sonnet)
+
+In `briefing-cron.ts`, AFTER `upsertBriefingDraft` and BEFORE the snapshot piggyback:
+
+```ts
+const aiPolishEnabled = isFeatureEnabled('client-briefing-v2-ai-polish');
+const isPremium = ws.tier === 'premium';
+if (aiPolishEnabled && isPremium) {
+  // Hero headline punch
+  const hero = stories.find((s) => s.isHeadline);
+  if (hero) {
+    const punched = await punchHeroHeadline(hero.headline, /* underlying insight */).catch(() => hero.headline);
+    if (punched !== hero.headline) {
+      hero.headline = punched;
+      // Re-persist the updated story array
+      updateBriefingStories(workspaceId, draft.id, stories);
+    }
+  }
+  // Weekly opener
+  const opener = await writeWeeklyOpener(stories, { workspaceName: ws.name, weekOf }).catch(() => null);
+  if (opener) {
+    // Persist via a new column or via source_metadata extension — TBD at plan-write
+  }
+}
+```
+
+Both AI calls are awaited but failure is silent. The cron's outer try/catch around the entire AI block ensures even a thrown error doesn't fail the briefing run.
+
+### T2.5e.4 — Wire opener through PublishedBriefingResponse (Model: haiku)
+
+`shared/types/briefing.ts` — extend `PublishedBriefingResponse`:
+
+```ts
+export interface PublishedBriefingResponse {
+  // … existing fields …
+  /** Premium-only AI-generated one-line "letter from the editor". Optional. */
+  weeklyOpener?: string;
+}
+```
+
+`server/routes/public-portal.ts` — read the persisted opener (column or source_metadata) and include in the response.
+
+### T2.5e.5 — Frontend render (Model: haiku)
+
+`src/components/client/Briefing/InsightsBriefingPage.tsx`:
+- Import a new tiny `<WeeklyOpener>` component (or inline render)
+- Render only when `briefing.weeklyOpener` is present
+- Position: ABOVE `<DateLine>`, italic-styled body text, `t-body italic text-[var(--brand-text-muted)]`
+- No-op when the field is missing (free + growth tiers, or when the AI failed)
+
+### T2.5e.6 — Tests + docs + PR (Model: sonnet)
+
+- Unit tests for `punchHeroHeadline` — mock `callAI` returning hedge-laced response → expect deterministic fallback
+- Unit tests for `writeWeeklyOpener` — mock `callAI` returning empty string → expect null
+- Integration test: feature flag OFF → no AI calls made, no `weeklyOpener` field in response
+- Integration test: feature flag ON + tier=premium → `callAI` called, `weeklyOpener` persisted
+- Component test: `<InsightsBriefingPage>` renders opener when present, omits when absent
+- FEATURE_AUDIT.md update entry (#325 likely)
+- BRAND_DESIGN_LANGUAGE.md addendum for the WeeklyOpener typography
+- PR title: `feat(briefing-v2): Phase 2.5e — Premium AI polish (hero punch + opener)`
+
+## Quality Gates (2.5e)
+
+- [ ] Typecheck + pr-check + vitest pass
+- [ ] AI fail-soft verified by 4+ tests (one per failure mode: hedge-word violation, word-count violation, timeout, rate-limit)
+- [ ] Flag OFF → zero AI calls (verified by mock spy assertion)
+- [ ] No regressions in 2.5a/2.5b/2.5c golden tests
+- [ ] BRAND_DESIGN_LANGUAGE.md updated for WeeklyOpener treatment
 
 ---
 

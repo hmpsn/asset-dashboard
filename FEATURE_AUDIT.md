@@ -4033,3 +4033,45 @@ Current feature count: **310**. Last updated: April 2026.
 **Agency value (when flag flipped):** The reader gets a 5-minute investor-briefing read with a clear stopping rhythm — vital signs in 10s, headline in 30s, "what should I invest in next" upsell in 60s. The "Recommended for You" section surfaces the agency's per-brief monetization in-flow rather than buried 3 clicks deep on the Strategy tab.
 
 **Files added (~1,200 LOC):** `server/briefing-summary.ts`; `src/components/client/Briefing/{PulseStrip,DataSpread,RecommendedForYou,IssueSummaryLine,DateLine}.tsx`; `tests/unit/briefing-summary.test.ts`; `tests/unit/briefing-data-spread.test.tsx`; `tests/unit/briefing-action-staleness.test.tsx`. **Files modified:** `shared/types/briefing.ts` (BriefingRecommendation + PublishedBriefingResponse extension); `server/briefing-store.ts` (count helper); `server/routes/public-portal.ts` (endpoint computes serve-time fields); `src/components/client/Briefing/InsightsBriefingPage.tsx` (composer mounts new sections + computes pulseData/staleness); `src/components/client/Briefing/HeroStoryCard.tsx` (dataReceipt rendering); `src/components/client/Briefing/ActionQueueStrip.tsx` (stale escalation + computeStaleness export); `src/index.css` (.t-caption typography update); `tests/integration/briefing-public.test.ts` (extended).
+
+---
+
+### 324. Client Insights Briefing v2 — Phase 2.5c (Anchors + Outcome Stories)
+**What it does:** Adds historical anchors ("best week since Mar 17") to existing 2.5a template `dataReceipt` lines and introduces two new story types: `weCalledIt` (the prediction-landed trust play) and `milestone_attribution` (a delivered brief crossed a clicks threshold). All gated by the existing `client-briefing-v2` flag — no new flags. The optional AI passes (hero-headline punch + weekly opener) are deferred to a separate small PR per the spec's "Premium polish" framing.
+
+**Server side:**
+- `server/db/migrations/079-workspace-metrics-snapshots.sql` (NEW): one row per `(workspace_id, snapshot_date)` UNIQUE, nullable metric columns (`total_clicks`, `total_impressions`, `avg_position`, `audit_score`, `organic_traffic_value`).
+- `server/workspace-metrics-snapshots.ts` (NEW): read/write helpers + cron orchestrator.
+  - `recordSnapshot` (idempotent INSERT … ON CONFLICT DO UPDATE)
+  - `getSnapshots(workspaceId, days = 90)`
+  - `getBestValueSinceDate(workspaceId, metricName, current, windowDays)` — metric-aware comparator (lower-is-better for `avg_position`, higher-is-better for the rest)
+  - `pruneOld(workspaceId, retentionDays = 90)`
+  - `recordWeeklyBriefingSnapshot(workspaceId, weekOf)` — async, pulls GSC overview + audit score + ROI value, each in independent try/catch
+- `server/briefing-cron.ts`: piggyback `recordWeeklyBriefingSnapshot` after `upsertBriefingDraft`. Plus a NEW dispatch path: candidates with `wci-` and `milestone-` id prefixes route through dedicated templates, with a synthetic `AnalyticsInsight<'milestone_attribution'>` constructed in-memory from the action + ROI content-item.
+- `server/briefing-anchors.ts` (NEW): `findBestWeekSince(workspaceId, metricName, current, windowDays?)` — phrase formatter. Returns `{ sinceDate, phrase }`. Phrases pre-vetted for the pr-check banned-hedge-words rule.
+- `server/briefing-templates/_helpers.ts`: NEW `appendAnchor(receipt, workspaceId, metricName, current)` helper. Templates call this when they have a snapshot-worthy metric on hand.
+- `server/briefing-templates/we-called-it.ts` (NEW): projects a `TrackedAction + ActionOutcome (strong_win)` into a hero-eligible win story. Action-type-aware verb labels (10 ActionType variants). Three narrative shapes (page+keyword / page-only / keyword-only).
+- `server/briefing-templates/milestone-attribution.ts` (NEW): projects a `MilestoneAttributionData` insight into a hero-eligible win story. Threshold-aware framing per `first_clicks | fifty_clicks | hundred_clicks`.
+- `server/briefing-templates/index.ts`: registers `milestone_attribution` in `INSIGHT_DISPATCHERS`. Re-exports `buildStoryFromWeCalledIt`. Extends `TemplateContext` with optional `pulseMetrics` (forward-looking — anchor wiring uses the helper today, the context field lets templates query their own metric without a workspace fetch in future).
+- `server/briefing-candidates.ts`: NEW `collectWeCalledItCandidates` (reads tracked_actions + recent strong_win outcomes, 14-day recency cap) and `collectMilestoneAttributionCandidates` (reads ROI contentItems + tracked_actions baselines, 90-day delivery cap, "tight band above threshold" detection to avoid weekly re-firing).
+- `server/briefing-templates/{ranking-mover,audit-finding}.ts`: anchors wired — `total_clicks` for `ranking_mover`, `audit_score` for `audit_finding`. The pattern is `let receipt = '...'; receipt = appendAnchor(receipt, ctx.workspaceId, 'metric_name', currentValue)`. Other templates can opt in incrementally — `appendAnchor` is fail-soft (no anchor → receipt unchanged).
+
+**Type registration (4-place lockstep per CLAUDE.md):**
+1. `shared/types/analytics.ts` — `'milestone_attribution'` added to `InsightType` union; `MilestoneAttributionData extends InsightDataBase` interface; `InsightDataMap` entry.
+2. `server/schemas/insight-schemas.ts` — `milestoneAttributionDataSchema` Zod schema with `thresholdCrossed` enum + map entry.
+3. `server/analytics-insights-store.ts` — `getInsight` made GENERIC on `InsightType` so callers reading by specific type get the narrowed `AnalyticsInsight<T>` shape (drops the need for `as` casts at consumer sites). Was needed because the leaner `MilestoneAttributionData` would have broken the existing audit-finding consumers' field-access pattern.
+4. `src/components/client/InsightsDigest.tsx` — `INSIGHT_TYPE_ICONS` entry → `Trophy`.
+
+**Tests:**
+- `tests/unit/briefing-anchors.test.ts` (NEW, 8 cases) — phrase shapes per metric, lower-vs-higher-is-better mapping, no banned hedge words.
+- `tests/unit/workspace-metrics-snapshots.test.ts` (NEW, 14 cases) — record/upsert/getSnapshots/getBestValueSinceDate (newest-first, lower-is-better, null-skip), pruneOld retention.
+- `tests/unit/briefing-templates.test.ts` (extended, +8 cases) — milestone_attribution dispatch + threshold framing + voice contract; weCalledIt eligibility guards + win story shape + voice contract.
+
+**Constraint compliance:**
+- ✅ Migration number 079 verified next available
+- ✅ No new feature flag (per plan T2.5c.3 clarification)
+- ✅ AI passes (T2.5c.10/.11) deferred to a separate PR per spec
+- ✅ 4-place lockstep for new InsightType
+- ✅ typecheck + 1,978 tests pass
+
+**Files added:** `server/db/migrations/079-workspace-metrics-snapshots.sql`; `server/workspace-metrics-snapshots.ts`; `server/briefing-anchors.ts`; `server/briefing-templates/{we-called-it,milestone-attribution}.ts`; `tests/unit/{briefing-anchors,workspace-metrics-snapshots}.test.ts`. **Files modified:** `shared/types/analytics.ts`; `server/schemas/insight-schemas.ts`; `server/analytics-insights-store.ts`; `server/briefing-cron.ts`; `server/briefing-candidates.ts`; `server/briefing-templates/{index,_helpers,ranking-mover,audit-finding}.ts`; `src/components/client/InsightsDigest.tsx`; `tests/unit/briefing-templates.test.ts`.

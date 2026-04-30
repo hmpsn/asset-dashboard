@@ -27,6 +27,7 @@
 import type { AnalyticsInsight, AuditFindingData } from '../../shared/types/analytics.js';
 import type { BriefingStory } from '../../shared/types/briefing.js';
 import type { TemplateContext } from './index.js';
+import { appendAnchor } from './_helpers.js';
 
 /* TemplateContext imported from ./index.js — see Phase 2.5a review */
 
@@ -49,7 +50,7 @@ function parseIssueCategories(issueMessages: string): string[] {
 
 export function buildStoryFromInsight(
   insight: AnalyticsInsight<'audit_finding'>,
-  _context: TemplateContext,
+  context: TemplateContext,
 ): BriefingStory | null {
   const data = insight.data as AuditFindingData;
 
@@ -93,9 +94,13 @@ export function buildStoryFromInsight(
   // Data receipt: anchor in the scheduled audit run + bridge source +
   // explicit note that issue categories were parsed from a delimited string
   // (so a downstream reader knows the parsing fidelity is best-effort).
-  const dataReceipt =
+  // Phase 2.5c: append "highest site health since X" anchor when the
+  // current siteScore beats the workspace's recent history. Pure tail
+  // append — degrades silently when no anchor is editorially meaningful.
+  let dataReceipt =
     `Source: scheduled audit run. Bridge: ${data.source}. ` +
-    `Issue messages: parsed from delimited string.`;
+    `Issue messages: parsed from delimited string`;
+  dataReceipt = appendAnchor(dataReceipt, context.workspaceId, 'audit_score', siteScore);
 
   return {
     id: `story-${insight.id}`,
