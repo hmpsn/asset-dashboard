@@ -152,12 +152,12 @@ export function buildStoryFromWeCalledIt(
   // "ahead of schedule" is a factual claim — only assert it when daysToDeliver
   // actually beats the measurement window. Devin caught us claiming "75 days,
   // ahead of schedule" against a 60-day window in the original 2.5c diff —
-  // factually wrong client-facing copy in a trust-play story. Now: under-
-  // window → "ahead of schedule"; equal/over-window → just the day count.
+  // factually wrong client-facing copy in a trust-play story. Now: strictly
+  // under window → "ahead of schedule"; equal/over → just the day count.
   let scheduleLabel: string;
   if (daysToDeliver !== null) {
     const window = action.measurementWindow;
-    if (typeof window === 'number' && Number.isFinite(window) && daysToDeliver <= window) {
+    if (typeof window === 'number' && Number.isFinite(window) && daysToDeliver < window) {
       scheduleLabel = `${daysToDeliver} days, ahead of schedule`;
     } else {
       scheduleLabel = `${daysToDeliver} days`;
