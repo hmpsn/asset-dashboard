@@ -133,8 +133,8 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
   const [calloutDismissed, setCalloutDismissed] = useState(() =>
     dismissedKey ? localStorage.getItem(dismissedKey) === '1' : true,
   );
-  // Gate matches the template gate (businessProfile?.address object presence) — not street-specific
-  const showBpCallout = !calloutDismissed && !!workspaceId && !businessProfile?.address;
+  // Gate matches the template gate — LocalBusiness refs require street or city
+  const showBpCallout = !calloutDismissed && !!workspaceId && !(businessProfile?.address?.street || businessProfile?.address?.city);
   const dismissBpCallout = () => {
     if (dismissedKey) localStorage.setItem(dismissedKey, '1');
     setCalloutDismissed(true);
