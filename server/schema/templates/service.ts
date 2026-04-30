@@ -51,7 +51,7 @@ export function buildServiceSchema(input: ServiceInput): Record<string, unknown>
     'description': pageData.description,
     'image': pageData.image,
     'url': pageData.canonicalUrl,
-    'provider': input.businessProfile?.address
+    'provider': (input.businessProfile?.address?.street || input.businessProfile?.address?.city)
       ? localBusinessRef(baseUrl)
       : dropUndefined({
           '@type': 'Organization',

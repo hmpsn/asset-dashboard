@@ -19,7 +19,7 @@ export function buildAboutPageSchema(input: StaticInput): Record<string, unknown
     'name': pageData.cleanTitle,
     'description': pageData.description,
     'url': pageData.canonicalUrl,
-    'mainEntity': input.businessProfile?.address
+    'mainEntity': (input.businessProfile?.address?.street || input.businessProfile?.address?.city)
       ? localBusinessRef(baseUrl)
       : orgRef(baseUrl),
     'isPartOf': webSiteRef(baseUrl),
@@ -37,7 +37,9 @@ export function buildContactPageSchema(input: StaticInput): Record<string, unkno
     'name': pageData.cleanTitle,
     'description': pageData.description,
     'url': pageData.canonicalUrl,
-    'mainEntity': input.businessProfile?.address
+    // ContactPage: only link to LocalBusiness when address has at least one locating field.
+    // Falls back to undefined (not orgRef) — a ContactPage without a LocalBusiness has no meaningful mainEntity.
+    'mainEntity': (input.businessProfile?.address?.street || input.businessProfile?.address?.city)
       ? localBusinessRef(baseUrl)
       : undefined,
     'isPartOf': webSiteRef(baseUrl),

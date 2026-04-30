@@ -6,6 +6,7 @@
 import * as cheerio from 'cheerio';
 import { scrubBrandSuffix } from './templates/helpers.js';
 import type { PageElementCatalog } from '../../shared/types/page-elements.js';
+import type { BusinessProfileContact } from '../../shared/types/workspace.js';
 
 export interface PageMetaInput {
   title: string;
@@ -35,7 +36,7 @@ export interface WorkspaceSchemaInput {
   id?: string;
   name: string;
   publisherLogoUrl: string | null;
-  businessProfile: BusinessProfile | null;
+  businessProfile: BusinessProfileContact | null;
   /** Default site-wide locale from Webflow site.locales[0] or "en" if absent. */
   defaultLocale: string;
   /** Top-N siteKeywords (deduped, lowercased, declined-filter applied) for Organization.knowsAbout emission. */
@@ -45,14 +46,8 @@ export interface WorkspaceSchemaInput {
   siteHasSearch?: boolean;
 }
 
-export interface BusinessProfile {
-  phone?: string;
-  email?: string;
-  address?: { street?: string; city?: string; state?: string; zip?: string; country?: string };
-  socialProfiles?: string[];
-  openingHours?: string;
-  foundedDate?: string;
-}
+/** Re-export so schema templates can import from a single data-sources module. */
+export type { BusinessProfileContact as BusinessProfile } from '../../shared/types/workspace.js';
 
 export interface BreadcrumbItem {
   name: string;

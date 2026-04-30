@@ -7,8 +7,9 @@ import { useSchemaSnapshot, useWebflowPages } from '../hooks/admin';
 import {
   Loader2, CheckCircle,
   Info, Sparkles, RefreshCw, Plus, Database, HelpCircle,
-  Clock, BarChart3, BookOpen,
+  Clock, BarChart3, BookOpen, AlertTriangle, X,
 } from 'lucide-react';
+import type { BusinessProfileContact } from '../../shared/types/workspace.js';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { usePageEditStates } from '../hooks/usePageEditStates';
@@ -78,21 +79,7 @@ interface Props {
   siteId: string;
   workspaceId?: string;
   fixContext?: FixContext | null;
-  businessProfile?: {
-    phone?: string;
-    email?: string;
-    address?: {
-      street?: string;
-      city?: string;
-      state?: string;
-      zip?: string;
-      country?: string;
-    };
-    socialProfiles?: string[];
-    openingHours?: string;
-    foundedDate?: string;
-    numberOfEmployees?: string;
-  } | null;
+  businessProfile?: BusinessProfileContact | null;
 }
 
 export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfile }: Props) {
@@ -146,11 +133,12 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
   const [calloutDismissed, setCalloutDismissed] = useState(() =>
     dismissedKey ? localStorage.getItem(dismissedKey) === '1' : true,
   );
-  const showBpCallout = !calloutDismissed && !!workspaceId && !businessProfile?.address?.street;
-  function dismissBpCallout() {
+  // Gate matches the template gate (businessProfile?.address object presence) — not street-specific
+  const showBpCallout = !calloutDismissed && !!workspaceId && !businessProfile?.address;
+  const dismissBpCallout = () => {
     if (dismissedKey) localStorage.setItem(dismissedKey, '1');
     setCalloutDismissed(true);
-  }
+  };
 
   const [showCmsPanel, setShowCmsPanel] = useState(false);
   const [showTypeGuide, setShowTypeGuide] = useState(false);
@@ -851,8 +839,8 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
       <SchemaPlanPanel siteId={siteId} />
 
       {showBpCallout && (
-        <div className="rounded-[var(--radius-lg)] border border-amber-500/30 bg-amber-500/10 p-4 flex items-start gap-3">
-          <span className="t-body text-amber-400 mt-0.5">⚠</span>
+        <div role="alert" className="rounded-[var(--radius-lg)] border border-amber-500/30 bg-amber-500/10 p-4 flex items-start gap-3">
+          <AlertTriangle size={16} className="text-amber-400 flex-shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
             <p className="t-body text-amber-400 font-medium mb-1">Your business profile is incomplete</p>
             <p className="t-caption text-[var(--brand-text-muted)]">
@@ -869,10 +857,10 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
           </div>
           <button
             onClick={dismissBpCallout}
-            className="t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] flex-shrink-0"
+            className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] flex-shrink-0"
             aria-label="Dismiss"
           >
-            ✕
+            <X size={14} />
           </button>
         </div>
       )}

@@ -204,6 +204,24 @@ export interface AudiencePersona {
   buyingStage?: 'awareness' | 'consideration' | 'decision';
 }
 
+/** Verified business contact info stored in the workspace.businessProfile DB column.
+ *  Distinct from intelligence.ts:BusinessProfile (AI calibration context with industry/goals). */
+export interface BusinessProfileContact {
+  phone?: string;
+  email?: string;
+  address?: {
+    street?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    country?: string;
+  };
+  socialProfiles?: string[];    // LinkedIn, Facebook, Google Business, etc.
+  openingHours?: string;        // Plain text or structured e.g. "Mon-Fri 9am-5pm"
+  foundedDate?: string;         // ISO date or year
+  numberOfEmployees?: string;   // e.g. "10-50"
+}
+
 export interface Workspace {
   id: string;
   name: string;
@@ -286,22 +304,8 @@ export interface Workspace {
   };
   // SEO data provider preference
   seoDataProvider?: 'semrush' | 'dataforseo';
-  // Verified business profile for schema generation (bypasses page-content verification)
-  businessProfile?: {
-    phone?: string;
-    email?: string;
-    address?: {
-      street?: string;
-      city?: string;
-      state?: string;
-      zip?: string;
-      country?: string;
-    };
-    socialProfiles?: string[];    // LinkedIn, Facebook, Google Business, etc.
-    openingHours?: string;        // Plain text or structured e.g. "Mon-Fri 9am-5pm"
-    foundedDate?: string;         // ISO date or year
-    numberOfEmployees?: string;   // e.g. "10-50"
-  };
+  // Verified business contact info for schema generation (bypasses page-content verification)
+  businessProfile?: BusinessProfileContact | null;
   /**
    * Admin-set strategic goals for AI context, e.g. ['Grow patient appointments by 25% in Q3'].
    * Distinct from the `client_business_priorities` DB table (public-portal.ts), which stores

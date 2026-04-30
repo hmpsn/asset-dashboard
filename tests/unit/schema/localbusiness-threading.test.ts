@@ -31,6 +31,12 @@ const withoutAddress = {
   // address intentionally absent
 };
 
+// Empty address object — must NOT trigger LocalBusiness (no locating fields)
+const withEmptyAddress = {
+  phone: '512-555-0100',
+  address: {},
+};
+
 describe('buildAboutPageSchema — businessProfile threading', () => {
   it('mainEntity points to /#localbusiness when businessProfile.address is set', () => {
     const schema = buildAboutPageSchema({ baseUrl, pageData, businessProfile: withAddress });
@@ -63,6 +69,14 @@ describe('buildAboutPageSchema — businessProfile threading', () => {
     const mainEntity = aboutNode['mainEntity'] as Record<string, unknown>;
     expect(mainEntity['@id']).toBe('https://example.com/#organization');
   });
+
+  it('mainEntity falls back to Organization @id when address object is empty (no locating fields)', () => {
+    const schema = buildAboutPageSchema({ baseUrl, pageData, businessProfile: withEmptyAddress });
+    const graph = schema['@graph'] as Array<Record<string, unknown>>;
+    const aboutNode = graph.find((n) => n['@type'] === 'AboutPage') as Record<string, unknown>;
+    const mainEntity = aboutNode['mainEntity'] as Record<string, unknown>;
+    expect(mainEntity['@id']).toBe('https://example.com/#organization');
+  });
 });
 
 describe('buildContactPageSchema — businessProfile threading', () => {
@@ -86,6 +100,14 @@ describe('buildContactPageSchema — businessProfile threading', () => {
   it('mainEntity is absent when businessProfile is undefined (no breaking change)', () => {
     const contactPageData = { ...pageData, canonicalUrl: 'https://example.com/contact' };
     const schema = buildContactPageSchema({ baseUrl, pageData: contactPageData });
+    const graph = schema['@graph'] as Array<Record<string, unknown>>;
+    const contactNode = graph.find((n) => n['@type'] === 'ContactPage') as Record<string, unknown>;
+    expect(contactNode['mainEntity']).toBeUndefined();
+  });
+
+  it('mainEntity is absent when address object is empty (no locating fields)', () => {
+    const contactPageData = { ...pageData, canonicalUrl: 'https://example.com/contact' };
+    const schema = buildContactPageSchema({ baseUrl, pageData: contactPageData, businessProfile: withEmptyAddress });
     const graph = schema['@graph'] as Array<Record<string, unknown>>;
     const contactNode = graph.find((n) => n['@type'] === 'ContactPage') as Record<string, unknown>;
     expect(contactNode['mainEntity']).toBeUndefined();
@@ -122,5 +144,14 @@ describe('buildServiceSchema — businessProfile threading', () => {
     const serviceNode = graph.find((n) => n['@type'] === 'Service') as Record<string, unknown>;
     const provider = serviceNode['provider'] as Record<string, unknown>;
     expect(provider['@type']).toBe('Organization');
+  });
+
+  it('provider is inline Organization when address object is empty (no locating fields)', () => {
+    const schema = buildServiceSchema({ baseUrl, pageData: servicePageData, businessProfile: withEmptyAddress });
+    const graph = schema['@graph'] as Array<Record<string, unknown>>;
+    const serviceNode = graph.find((n) => n['@type'] === 'Service') as Record<string, unknown>;
+    const provider = serviceNode['provider'] as Record<string, unknown>;
+    expect(provider['@type']).toBe('Organization');
+    expect(provider['@id']).toBe('https://example.com/#organization');
   });
 });
