@@ -25,9 +25,10 @@ function renderWithRouter(pages: unknown[], workspaceId = 'ws_test') {
             </>
           }
         />
-        {/* Global-tab route — settings is a GLOBAL_TAB so adminPath returns /settings */}
+        {/* Workspace-scoped settings route — adminPath(workspaceId, 'workspace-settings')
+            returns /ws/:workspaceId/workspace-settings (NOT in GLOBAL_TABS) */}
         <Route
-          path="/settings"
+          path="/ws/:workspaceId/workspace-settings"
           element={
             <LocationCapture onLocation={loc => { capturedLocation = loc; }} />
           }
@@ -79,13 +80,17 @@ describe('SchemaCompletenessWidget', () => {
     expect(screen.getByText('1 page')).toBeInTheDocument();
   });
 
-  it('navigates to settings?tab=features&focus=brandLogoUrl on Publisher logo click', () => {
-    // adminPath(workspaceId, 'settings') returns '/settings' because 'settings' is a GLOBAL_TAB
+  it('navigates to /ws/:workspaceId/workspace-settings?tab=features&focus=brandLogoUrl on Publisher logo click', () => {
+    // adminPath(workspaceId, 'workspace-settings') returns /ws/:workspaceId/workspace-settings
+    // because 'workspace-settings' is NOT in GLOBAL_TABS — this is the per-workspace
+    // Settings page where FeaturesTab + BusinessProfileTab live.
     const { getLocation } = renderWithRouter([
       { pageId: 'p1', validationFindings: [finding('error', 'publisher.logo')] },
     ]);
     fireEvent.click(screen.getByText('Publisher logo'));
-    expect(getLocation()).toContain('?tab=features&focus=brandLogoUrl');
+    const loc = getLocation();
+    expect(loc).toContain('/ws/ws_test/workspace-settings');
+    expect(loc).toContain('?tab=features&focus=brandLogoUrl');
   });
 
   it('errors sort above warnings', () => {

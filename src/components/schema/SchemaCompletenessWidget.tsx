@@ -106,7 +106,7 @@ export function SchemaCompletenessWidget({ pages, workspaceId }: SchemaCompleten
             type="button"
             onClick={() => {
               if (!workspaceId) return;
-              navigate(`${adminPath(workspaceId, 'settings')}?tab=${g.target.tab}&focus=${g.target.focus}`);
+              navigate(`${adminPath(workspaceId, 'workspace-settings')}?tab=${g.target.tab}&focus=${g.target.focus}`);
             }}
             className="flex items-center justify-between gap-3 w-full px-3 py-2 rounded text-left hover:bg-[var(--surface-3)] transition-colors group"
           >

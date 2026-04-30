@@ -36,12 +36,17 @@ export function useDeepLinkFocus(): void {
         el.focus({ preventScroll: true });
       }
 
-      // Clear the param so re-renders don't re-trigger
-      const next = new URLSearchParams(searchParams);
-      next.delete('focus');
-      setSearchParams(next, { replace: true });
+      // Clear the `focus` param so re-renders don't re-trigger. Using the
+      // functional setter form reads CURRENT params from React Router (not the
+      // effect-time closure), so any params added by other code during the 50ms
+      // debounce window are preserved. (Devin Review INFO-0001 on PR #379.)
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev);
+        next.delete('focus');
+        return next;
+      }, { replace: true });
     }, 50);
 
     return () => clearTimeout(timer);
-  }, [focus, searchParams, setSearchParams]);
+  }, [focus, setSearchParams]);
 }

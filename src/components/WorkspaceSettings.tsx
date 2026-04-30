@@ -1,4 +1,5 @@
 import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Download, Pencil, Check, X } from 'lucide-react';
 import { useToast } from './Toast';
 import { ConnectionsTab } from './settings/ConnectionsTab';
@@ -69,10 +70,17 @@ interface Props {
 }
 
 type SectionTab = 'connections' | 'features' | 'dashboard' | 'publishing' | 'business-profile' | 'intelligence-profile' | 'export' | 'llms-txt';
+const VALID_SECTION_TABS: readonly SectionTab[] = ['connections', 'features', 'dashboard', 'publishing', 'business-profile', 'intelligence-profile', 'export', 'llms-txt'];
 
 export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, webflowSiteName, onUpdate }: Props) {
   const { toast } = useToast();
-  const [tab, setTab] = useState<SectionTab>('connections');
+  const [searchParams] = useSearchParams();
+  // Tab deep-link two-halves contract: senders append ?tab=X; receiver reads it here.
+  // See CLAUDE.md "?tab= deep-link two-halves contract" + useDeepLinkFocus hook.
+  const [tab, setTab] = useState<SectionTab>(() => {
+    const param = searchParams.get('tab');
+    return (VALID_SECTION_TABS as readonly string[]).includes(param ?? '') ? (param as SectionTab) : 'connections';
+  });
   const [ws, setWs] = useState<WorkspaceData | null>(null);
   const [googleStatus, setGoogleStatus] = useState<{ connected: boolean; configured: boolean } | null>(null);
   const [gscSites, setGscSites] = useState<GscSite[]>([]);

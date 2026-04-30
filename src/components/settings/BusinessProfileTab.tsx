@@ -47,7 +47,7 @@ function SchemaImpactRow({
   scrollTo?: string;
   workspaceId: string;
 }) {
-  const linkTarget = target ? `${adminPath(workspaceId, 'settings')}?tab=${target.tab}&focus=${target.focus}` : null;
+  const linkTarget = target ? `${adminPath(workspaceId, 'workspace-settings')}?tab=${target.tab}&focus=${target.focus}` : null;
   const handleScroll = scrollTo
     ? () => {
         const el = document.querySelector<HTMLElement>(`[data-schema-deeplink="${scrollTo}"]`);

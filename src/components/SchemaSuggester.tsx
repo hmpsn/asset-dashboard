@@ -545,6 +545,20 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
     return () => { cancelled = true; };
   }, [workspaceId]);
 
+  // Hooks must be called before ANY conditional early returns (Rules of Hooks).
+  // `data` may be null while loading; guard inside the memo. (Devin Review BUG-0001 on PR #379.)
+  const fixesAvailable = useMemo(() => {
+    if (!data) return 0;
+    const fields = new Set<string>();
+    for (const p of data) {
+      for (const f of p.validationFindings ?? []) {
+        if (!f.field) continue;
+        if (KNOWN_TARGET_FIELDS.has(f.field)) fields.add(f.field);
+      }
+    }
+    return fields.size;
+  }, [data]);
+
   const PAGE_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
     { value: 'auto', label: 'Auto-detect' },
     { value: 'homepage', label: 'Homepage' },
@@ -784,16 +798,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
   const pagesWithWarnings = data.filter(p =>
     (p.validationFindings?.some(f => f.severity === 'warning') ?? false),
   ).length;
-  const fixesAvailable = useMemo(() => {
-    const fields = new Set<string>();
-    for (const p of data) {
-      for (const f of p.validationFindings ?? []) {
-        if (!f.field) continue;
-        if (KNOWN_TARGET_FIELDS.has(f.field)) fields.add(f.field);
-      }
-    }
-    return fields.size;
-  }, [data]);
+  // fixesAvailable is hoisted above the early returns (Rules of Hooks); reuse here.
   const totalTypes = data.reduce((s, p) => {
     const schema = p.suggestedSchemas[0]?.template;
     const graph = schema?.['@graph'] as Record<string, unknown>[] | undefined;

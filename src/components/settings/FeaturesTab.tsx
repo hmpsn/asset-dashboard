@@ -385,13 +385,17 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
               data-schema-deeplink="siteHasSearch"
               defaultChecked={!!ws?.siteHasSearch}
               onChange={async (e) => {
+                // Capture sync values before await — currentTarget access after await
+                // is implementation-defined in React's synthetic event lifecycle.
+                const target = e.currentTarget;
+                const nextChecked = target.checked;
                 try {
-                  await patchWorkspace({ siteHasSearch: e.currentTarget.checked });
-                  toast(e.currentTarget.checked ? 'SearchAction will emit on next regenerate' : 'SearchAction emission disabled');
+                  await patchWorkspace({ siteHasSearch: nextChecked });
+                  toast(nextChecked ? 'SearchAction will emit on next regenerate' : 'SearchAction emission disabled');
                 } catch (err) {
                   toast('Failed to update — please try again');
                   // Revert visual state on failure
-                  e.currentTarget.checked = !e.currentTarget.checked;
+                  target.checked = !nextChecked;
                   throw err;
                 }
               }}
