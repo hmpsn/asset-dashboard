@@ -1,6 +1,7 @@
 /**
  * Article and BlogPosting templates.
- * Emits ONE primary node + optional BreadcrumbList. No multi-type @graph.
+ * Emits up to 4 nodes: primary (Article/BlogPosting) + optional HowTo +
+ * optional VideoObject + BreadcrumbList.
  */
 import type { PageData } from '../data-sources.js';
 import { dropUndefined, withBreadcrumb, webSiteRef, breadcrumbRef } from './helpers.js';
