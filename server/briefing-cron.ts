@@ -291,14 +291,35 @@ async function runBriefingForWorkspaceInner(
     return { status: 'skipped', weekOf, reason: 'no eligible stories' };
   }
 
-  // Promote the highest-impact eligible candidate to hero. Categories that
-  // can lead are listed in the spec — competitor_alert + page_health are
-  // explicitly NEVER lead even when they're highest scoring. We pick the
-  // first lead-eligible story by candidate ranking; templates output
-  // isHeadline=false by default and we flip exactly one to true.
-  const HERO_INELIGIBLE: ReadonlyArray<string> = ['competitive']; // category 'competitive' = competitor_alert
-  const heroIndex = stories.findIndex((s) => !HERO_INELIGIBLE.includes(s.category));
-  if (heroIndex >= 0) stories[heroIndex].isHeadline = true;
+  // Promote the highest-impact lead-eligible story to hero.
+  //
+  // Templates set `leadEligible: false` for story types the spec marks as
+  // Watch List only (`competitor_alert`, `page_health`, `ctr_opportunity`,
+  // `freshness_alert`, `cannibalization`). Lead-eligible templates leave the
+  // field undefined (treated as eligible). Category alone is insufficient —
+  // multiple Watch-List-only types share `risk` / `opportunity` categories
+  // with lead-eligible types, so we filter on the per-story flag instead.
+  //
+  // Stories arrive in candidate-rank order (highest materiality first), so
+  // `findIndex` picks the first lead-eligible. Fallback: if NO story is
+  // lead-eligible (every candidate was Watch-List-only — unusual but
+  // possible), force-promote stories[0] so the briefing always carries
+  // exactly one hero. The Zod schema doesn't enforce ≥1 hero, but the
+  // `<HeroStoryCard>` UI assumes one — defensive promotion preserves the
+  // contract.
+  const heroIndex = stories.findIndex((s) => s.leadEligible !== false);
+  if (heroIndex >= 0) {
+    stories[heroIndex].isHeadline = true;
+  } else {
+    // No lead-eligible story — promote the first story regardless. This
+    // preserves the "exactly one hero" invariant. Logged so we can detect
+    // workspaces stuck in Watch-List-only territory.
+    log.info(
+      { workspaceId, weekOf, categories: stories.map((s) => s.category) },
+      'briefing: no lead-eligible story; promoting first by materiality',
+    );
+    stories[0].isHeadline = true;
+  }
 
   // Persist
   const draft = upsertBriefingDraft({

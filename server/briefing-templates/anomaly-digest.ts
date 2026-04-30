@@ -15,11 +15,9 @@ import type {
   AnomalyDigestData,
 } from '../../shared/types/analytics.js';
 import type { BriefingStory } from '../../shared/types/briefing.js';
+import type { TemplateContext } from './index.js';
 
-interface TemplateContext {
-  workspaceId: string;
-  tier: 'free' | 'growth' | 'premium';
-}
+/* TemplateContext imported from ./index.js — see Phase 2.5a review */
 
 /**
  * Metrics where "positive direction" means the current value rose above the

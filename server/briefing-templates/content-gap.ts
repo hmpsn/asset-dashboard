@@ -20,6 +20,7 @@
 
 import type { ContentGap } from '../../shared/types/workspace.js';
 import type { BriefingStory } from '../../shared/types/briefing.js';
+import { fmtNum } from './_helpers.js';
 
 export interface GapTemplateContext {
   workspaceId: string;
@@ -30,16 +31,6 @@ export interface GapTemplateContext {
    * undefined, the receipt omits the dollar figure.
    */
   avgCPC?: number;
-}
-
-/**
- * Compact number formatter — local copy to avoid pulling in client-only
- * utilities from `src/utils/`. Matches the form prescribed by the task spec
- * (lowercase `k` suffix, locale-aware fallback below 1000).
- */
-function fmtNum(n: number): string {
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
-  return n.toLocaleString();
 }
 
 /**
@@ -120,7 +111,7 @@ export function buildStoryFromContentGap(
     `Source: SEMrush volume ${volumeLabel}/mo${hasDifficulty ? ` · KD ${gap.difficulty} (${framing})` : ''}.`,
   );
   if (hasCompetitorProof) {
-    // `competitorProof` may or may not end in punctuation; normalize with a period.
+    // `competitorProof` is sometimes terminated, sometimes not — normalize with a period.
     const proof = (gap.competitorProof as string).replace(/\.$/, '');
     receiptParts.push(`${proof}.`);
   }

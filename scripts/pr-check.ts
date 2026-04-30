@@ -870,6 +870,22 @@ export const CHECKS: Check[] = [
     excludeLines: [
       '// hedge-ok',
       '// banned-hedge-ok',
+      // Doc-comment phrasings that ENUMERATE banned hedges as anti-examples
+      // (every template's voice-contract block lists them). Without these
+      // excludes the rule self-fails on its own templates' contract docs.
+      // Match-by-substring keeps the exclude list minimal regardless of
+      // comment formatting (single-line, JSDoc continuation, etc.).
+      'Banned hedges:',
+      'No hedge words',
+      'banned hedge word',
+      'banned hedges',
+      'Banned hedge words',
+      // Anti-example continuations from voice-contract doc blocks:
+      'might / seems',           // continuation of `Banned hedges: potentially / could / may / appears to / suggests / might / seems`
+      'Definite tone',            // anti-example block ("Definite tone — 'a refresh', NOT 'may benefit'")
+      'Definite tense',           // anti-example block ("Definite tense, never future-tense speculation")
+      'future-tense speculation', // anti-example
+      'may indicate',             // anti-example phrase quoted in doc
     ],
     message: 'Briefing template prose must be definitive — every claim cites a number from typed insight data, no hedge words. See docs/superpowers/specs/2026-04-29-client-insights-redesign-design.md §5 (voice rules). Use `// hedge-ok` inline if the hedge is part of cited source data.',
     severity: 'error',

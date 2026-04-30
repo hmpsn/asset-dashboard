@@ -26,22 +26,10 @@
 
 import type { AnalyticsInsight, CompetitorAlertData } from '../../shared/types/analytics.js';
 import type { BriefingStory } from '../../shared/types/briefing.js';
+import { fmtNum } from './_helpers.js';
+import type { TemplateContext } from './index.js';
 
-export interface TemplateContext {
-  workspaceId: string;
-  tier: 'free' | 'growth' | 'premium';
-}
-
-/**
- * Compact number formatter — local copy to avoid pulling in client-only
- * utilities from `src/utils/`. Matches the behavior of `fmtNum` in
- * `src/utils/formatNumbers.ts`.
- */
-function fmtNum(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString();
-}
+/* TemplateContext imported from ./index.js — see Phase 2.5a review */
 
 export function buildStoryFromInsight(
   insight: AnalyticsInsight<'competitor_alert'>,
@@ -198,6 +186,7 @@ export function buildStoryFromInsight(
     // The dispatcher relies on this flag to keep competitor alerts in the
     // Watch List section.
     isHeadline: false,
+    leadEligible: false,
     headline,
     narrative,
     metrics,

@@ -19,6 +19,7 @@
 
 import type { AnalyticsInsight, RankingMoverData } from '../../shared/types/analytics.js';
 import type { BriefingStory } from '../../shared/types/briefing.js';
+import type { TemplateContext } from './index.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -27,10 +28,7 @@ const MONTH_ABBREVIATIONS = [
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ] as const;
 
-export interface TemplateContext {
-  workspaceId: string;
-  tier: 'free' | 'growth' | 'premium';
-}
+/* TemplateContext imported from ./index.js — see Phase 2.5a review */
 
 /**
  * Format a Date as "Mon DD" (e.g. "Apr 14"). Uses UTC components so the

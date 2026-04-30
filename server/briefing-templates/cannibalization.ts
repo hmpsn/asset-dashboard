@@ -21,11 +21,9 @@ import type {
   CannibalizationData,
 } from '../../shared/types/analytics.js';
 import type { BriefingStory } from '../../shared/types/briefing.js';
+import type { TemplateContext } from './index.js';
 
-interface BuildStoryContext {
-  workspaceId: string;
-  tier: 'free' | 'growth' | 'premium';
-}
+/* TemplateContext renamed/imported as TemplateContext from ./index.js */
 
 type Severity = 'high' | 'medium' | 'low';
 
@@ -46,7 +44,7 @@ function computeSeverity(pageCount: number, positions: number[]): Severity {
 
 export function buildStoryFromInsight(
   insight: AnalyticsInsight,
-  _context: BuildStoryContext,
+  _context: TemplateContext,
 ): BriefingStory | null {
   const data = insight.data as CannibalizationData;
 
@@ -110,6 +108,7 @@ export function buildStoryFromInsight(
     id: `story-${insight.id}`,
     category: 'risk',
     isHeadline: false, // Watch List entry — never the hero
+    leadEligible: false,
     headline,
     narrative,
     metrics: [

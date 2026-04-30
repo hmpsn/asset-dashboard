@@ -10,8 +10,7 @@
 // - No hedge words: potentially / could / may / appears to / suggests /
 //   might / seems.
 // - Every sentence in the narrative cites a number from the typed payload.
-// - Definite tense ("earns 6.3% CTR"), never future-tense speculation
-//   ("could capture more clicks").
+// - Definite tense ("earns 6.3% CTR"), never future-tense speculation.
 //
 // Eligibility for an OPPORTUNITY (Watch List) story:
 //   - actualCtr < expectedCtr  (page underperforms its SERP-position benchmark)
@@ -27,13 +26,11 @@
 
 import type { AnalyticsInsight, CtrOpportunityData } from '../../shared/types/analytics.js';
 import type { BriefingStory } from '../../shared/types/briefing.js';
+import type { TemplateContext } from './index.js';
 
 const MIN_IMPRESSIONS = 100;
 
-export interface TemplateContext {
-  workspaceId: string;
-  tier: 'free' | 'growth' | 'premium';
-}
+/* TemplateContext imported from ./index.js — see Phase 2.5a review */
 
 /**
  * Format a CTR percentage for display. The stored value is already a
@@ -85,8 +82,7 @@ export function buildStoryFromInsight(
 
   // Narrative: 3 sentences, every sentence carries a number, no hedges.
   // Sentence 1: page + query + rank + impressions + actual vs expected CTR.
-  // Sentence 2: click upside ("clicks left on the table" is allowed; the
-  //             banned phrasing is "could capture more clicks").
+  // Sentence 2: click upside framed as "clicks left on the table" (definite).
   // Sentence 3: title-tag / meta-description optimization tied to the gap.
   const narrative =
     `${data.pageUrl} ranks #${data.position} for "${data.query}" with ` +
@@ -106,6 +102,7 @@ export function buildStoryFromInsight(
     id: `story-${insight.id}`,
     category: 'opportunity',
     isHeadline: false,
+    leadEligible: false,
     headline,
     narrative,
     metrics: [

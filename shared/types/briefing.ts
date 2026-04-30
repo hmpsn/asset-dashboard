@@ -67,6 +67,17 @@ export interface BriefingStory {
    * receipt line is shown.
    */
   dataReceipt?: string;
+  /**
+   * Whether this story is eligible to be promoted to hero
+   * (`isHeadline: true`). Default behavior: undefined === eligible.
+   * Templates set this to `false` for story types that the spec marks
+   * as Watch List only (`competitor_alert`, `page_health`,
+   * `ctr_opportunity`, `freshness_alert`, `cannibalization`). The cron's
+   * hero-promotion logic respects this field — a story with
+   * `leadEligible: false` is NEVER flipped to `isHeadline: true`,
+   * regardless of category or materiality rank. Phase 2.5a addition.
+   */
+  leadEligible?: boolean;
 }
 
 export interface BriefingDraft {

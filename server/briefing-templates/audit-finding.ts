@@ -26,11 +26,9 @@
 
 import type { AnalyticsInsight, AuditFindingData } from '../../shared/types/analytics.js';
 import type { BriefingStory } from '../../shared/types/briefing.js';
+import type { TemplateContext } from './index.js';
 
-export interface TemplateContext {
-  workspaceId: string;
-  tier: 'free' | 'growth' | 'premium';
-}
+/* TemplateContext imported from ./index.js — see Phase 2.5a review */
 
 const RISK_ISSUE_THRESHOLD = 5;
 const MAX_ISSUE_CATEGORIES = 3;

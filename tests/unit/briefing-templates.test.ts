@@ -48,17 +48,38 @@ function baseInsight<T extends string>(type: T, overrides: Record<string, unknow
   } as unknown as AnalyticsInsight;
 }
 
-function expectStoryShape(story: { headline: string; narrative: string; dataReceipt?: string; metrics: unknown[] } | null) {
+const VALID_CATEGORIES: ReadonlyArray<string> = ['win', 'risk', 'opportunity', 'competitive', 'period_change'];
+const VALID_DRILL_PAGES: ReadonlyArray<string> = ['performance', 'health', 'strategy', 'content-plan', 'schema-review', 'roi', 'brand'];
+
+function expectStoryShape(story: ReturnType<typeof rankingMover> | null) {
   expect(story).not.toBeNull();
   if (!story) return;
+  // Required scalar fields
+  expect(story.id.length).toBeGreaterThan(0);
   expect(story.headline.length).toBeGreaterThan(0);
   expect(story.narrative.length).toBeGreaterThan(0);
+  // Voice contract
   expect(story.narrative).toMatch(/\d/);
   expect(story.narrative).not.toMatch(HEDGES);
   expect(story.headline).not.toMatch(HEDGES);
   expect(story.dataReceipt).toBeTruthy();
-  expect(story.metrics.length).toBeGreaterThanOrEqual(0);
+  expect(story.dataReceipt!).not.toMatch(HEDGES);
+  // Enum / discriminated fields
+  expect(VALID_CATEGORIES).toContain(story.category);
+  expect(VALID_DRILL_PAGES).toContain(story.drillIn.page);
+  // Metric badges — 0 to 2, each with non-empty value + label strings
   expect(story.metrics.length).toBeLessThanOrEqual(2);
+  for (const m of story.metrics) {
+    expect(m.value.length).toBeGreaterThan(0);
+    expect(m.label.length).toBeGreaterThan(0);
+  }
+  // sourceRefs — exactly one ref pointing back to the underlying record
+  expect(story.sourceRefs.length).toBeGreaterThanOrEqual(1);
+  for (const ref of story.sourceRefs) {
+    expect(ref.id.length).toBeGreaterThan(0);
+  }
+  // isHeadline always false from templates (cron promotes downstream)
+  expect(story.isHeadline).toBe(false);
 }
 
 describe('briefing template: ranking_mover', () => {

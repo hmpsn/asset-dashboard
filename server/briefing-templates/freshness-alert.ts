@@ -111,6 +111,7 @@ export function buildStoryFromInsight(
     id: `story-${insight.id}`,
     category,
     isHeadline: false, // Watch List candidate — never lead the briefing.
+    leadEligible: false,
     headline,
     narrative,
     metrics,

@@ -12,17 +12,8 @@
 
 import type { AnalyticsInsight } from '../../shared/types/analytics.js';
 import type { BriefingStory } from '../../shared/types/briefing.js';
+import { fmtNum } from './_helpers.js';
 
-/**
- * Compact number formatter — local copy to avoid pulling in client-only
- * utilities from `src/utils/`. Matches the behavior of `fmtNum` in
- * `src/utils/formatNumbers.ts`.
- */
-function fmtNum(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString();
-}
 
 export function buildStoryFromInsight(
   insight: AnalyticsInsight<'ranking_opportunity'>,

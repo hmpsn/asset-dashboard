@@ -25,11 +25,9 @@
 
 import type { AnalyticsInsight, PageHealthData } from '../../shared/types/analytics.js';
 import type { BriefingStory } from '../../shared/types/briefing.js';
+import type { TemplateContext } from './index.js';
 
-export interface TemplateContext {
-  workspaceId: string;
-  tier: 'free' | 'growth' | 'premium';
-}
+/* TemplateContext imported from ./index.js — see Phase 2.5a review */
 
 export function buildStoryFromInsight(
   insight: AnalyticsInsight<'page_health'>,
@@ -111,6 +109,7 @@ export function buildStoryFromInsight(
     id: `story-${insight.id}`,
     category,
     isHeadline: false, // page_health is Watch List only — never leads.
+    leadEligible: false,
     headline,
     narrative,
     metrics: [
