@@ -12,6 +12,7 @@
  */
 import type * as cheerio from 'cheerio';
 import type { Table } from '../../../../shared/types/page-elements.js';
+import { contentScope } from './content-scope.js';
 
 const CURRENCY_RE = /(?:\$|€|£|¥|₹)\s?\d/;
 const MIN_PRICING_HITS = 2;
@@ -20,7 +21,7 @@ const MIN_COMPARISON_DATA_ROWS = 2;
 
 export function extractTables($: cheerio.CheerioAPI): Table[] {
   // Scope: <article> first; fall back to whole document.
-  const $scope = $('article').length > 0 ? $('article table') : $('table');
+  const $scope = contentScope($).find('table');
   const tables: Table[] = [];
 
   $scope.each((_, el) => {

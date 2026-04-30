@@ -13,6 +13,7 @@
  */
 import type * as cheerio from 'cheerio';
 import type { Testimonial } from '../../../../shared/types/page-elements.js';
+import { contentScope } from './content-scope.js';
 
 const MIN_QUOTE_LENGTH = 10;
 const ARIA_RATING_RE = /(\d+(?:\.\d+)?)\s*(?:out of|\/)\s*\d+\s*stars?/i;
@@ -35,7 +36,7 @@ function cleanAuthor(raw: string | undefined): string | undefined {
 }
 
 export function extractTestimonials($: cheerio.CheerioAPI): Testimonial[] {
-  const $scope = $('article').length > 0 ? $('article blockquote') : $('blockquote');
+  const $scope = contentScope($).find('blockquote');
   const testimonials: Testimonial[] = [];
 
   $scope.each((_, el) => {

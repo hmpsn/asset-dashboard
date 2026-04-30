@@ -70,7 +70,8 @@ function buildRouteMap(): Map<string, string> {
   }
 
   // Step 2: page slug → component name
-  const routeRe = /if\s*\(\s*tab\s*===\s*'([^']+)'\s*\)\s*return\s*<(\w+)/g;
+  // [^)]* allows optional guards like `&& selected` after the tab comparison
+  const routeRe = /if\s*\(\s*tab\s*===\s*'([^']+)'[^)]*\)\s*return\s*<(\w+)/g;
   const routeMap = new Map<string, string>();
 
   while ((m = routeRe.exec(appTsx)) !== null) {

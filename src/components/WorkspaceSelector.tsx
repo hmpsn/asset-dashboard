@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Plus, ChevronDown, Link, Link2Off, Trash2, Globe, Eye, EyeOff, ExternalLink, MoreHorizontal } from 'lucide-react';
 import { cn, Icon, ConfirmDialog } from './ui';
 import { webflow } from '../api';
+import type { BusinessProfileContact } from '../../shared/types/workspace.js';
 
 export interface Workspace {
   id: string;
@@ -13,6 +14,7 @@ export interface Workspace {
   folder: string;
   createdAt: string;
   tier?: 'free' | 'growth' | 'premium';
+  businessProfile?: BusinessProfileContact | null;
 }
 
 interface WebflowSite {

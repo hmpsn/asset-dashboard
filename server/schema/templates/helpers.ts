@@ -69,6 +69,14 @@ export function orgRef(baseUrl: string): { '@id': string } {
 }
 
 /**
+ * Returns an @id reference to the homepage LocalBusiness node.
+ * Used by About, Contact, and Service pages when businessProfile.address is set.
+ */
+export function localBusinessRef(baseUrl: string): { '@id': string } {
+  return { '@id': `${baseUrl}/#localbusiness` };
+}
+
+/**
  * Wraps a single image URL in the schema.org ImageObject shape.
  * Returns undefined if no URL provided so dropUndefined will strip the field.
  */

@@ -3,12 +3,13 @@
  * Service uses provider @id reference (no duplicated Organization).
  * Product never emits zero-price offers.
  */
-import type { PageData } from '../data-sources.js';
-import { dropUndefined, orgRef, withBreadcrumb, webSiteRef, breadcrumbRef, filterHttpUrls } from './helpers.js';
+import type { PageData, BusinessProfile } from '../data-sources.js';
+import { dropUndefined, orgRef, localBusinessRef, withBreadcrumb, webSiteRef, breadcrumbRef, filterHttpUrls } from './helpers.js';
 
 export interface ServiceInput {
   baseUrl: string;
   pageData: PageData;
+  businessProfile?: BusinessProfile | null;
 }
 
 export function buildServiceSchema(input: ServiceInput): Record<string, unknown> {
@@ -50,11 +51,13 @@ export function buildServiceSchema(input: ServiceInput): Record<string, unknown>
     'description': pageData.description,
     'image': pageData.image,
     'url': pageData.canonicalUrl,
-    'provider': dropUndefined({
-      '@type': 'Organization',
-      ...orgRef(baseUrl),
-      'name': pageData.publisher.name,
-    }),
+    'provider': (input.businessProfile?.address?.street || input.businessProfile?.address?.city)
+      ? localBusinessRef(baseUrl)
+      : dropUndefined({
+          '@type': 'Organization',
+          ...orgRef(baseUrl),
+          'name': pageData.publisher.name,
+        }),
     'isPartOf': webSiteRef(baseUrl),
     'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
     'inLanguage': pageData.inLanguage,
