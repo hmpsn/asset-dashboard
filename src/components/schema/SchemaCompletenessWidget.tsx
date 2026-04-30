@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { ValidationFinding } from '../../../shared/types/schema-validation';
 import { SectionCard } from '../ui/SectionCard';
 import { adminPath } from '../../routes';
+import { fieldToTarget } from './fieldTargets';
 
 interface PageWithFindings {
   pageId?: string;
@@ -13,26 +14,6 @@ interface PageWithFindings {
 interface SchemaCompletenessWidgetProps {
   pages: PageWithFindings[];
   workspaceId?: string;
-}
-
-/**
- * Maps a ValidationFinding's `field` to the canonical write location.
- * Returns null for fields without a known canonical write location (e.g.,
- * per-page CMS fields the admin doesn't control from settings).
- *
- * Task 5 will extract this table to a shared module (`fieldTargets.ts`)
- * so the widget + SchemaSuggester summary stat read from the same source.
- */
-function fieldToTarget(field: string): { tab: string; focus: string; label: string } | null {
-  const map: Record<string, { tab: string; focus: string; label: string }> = {
-    'publisher.logo': { tab: 'features', focus: 'brandLogoUrl', label: 'Publisher logo' },
-    'publisher.logo.url': { tab: 'features', focus: 'brandLogoUrl', label: 'Publisher logo URL' },
-    'address': { tab: 'business-profile', focus: 'address', label: 'Business address' },
-    'telephone': { tab: 'business-profile', focus: 'phone', label: 'Phone number' },
-    'sameAs': { tab: 'business-profile', focus: 'socialProfiles', label: 'Social profiles' },
-    'foundedDate': { tab: 'business-profile', focus: 'foundedDate', label: 'Founded date' },
-  };
-  return map[field] ?? null;
 }
 
 interface FieldGroup {

@@ -2,7 +2,7 @@
  * SchemaPageCard — Per-page card rendering for schema suggestions.
  * Extracted from SchemaSuggester.tsx per-page rendering logic.
  */
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ChevronDown, ChevronRight, Copy, CheckCircle,
   AlertCircle, Sparkles, RefreshCw, Upload, Send,
@@ -109,7 +109,24 @@ export function SchemaPageCard({
   getEffectiveSchema, siteId, onRestore, validationStatus,
 }: SchemaPageCardProps) {
   const [showHistory, setShowHistory] = useState(false);
+  const [expandedField, setExpandedField] = useState<string | null>(null);
   const hasErrors = (page.validationErrors?.length || 0) > 0;
+
+  const findingsByField = useMemo(() => {
+    const map = new Map<string, ValidationFinding[]>();
+    for (const f of page.validationFindings ?? []) {
+      const key = f.field ?? '__noField';
+      const arr = map.get(key) ?? [];
+      arr.push(f);
+      map.set(key, arr);
+    }
+    return Array.from(map.entries()).sort(([, a], [, b]) => {
+      const aHasError = a.some(f => f.severity === 'error');
+      const bHasError = b.some(f => f.severity === 'error');
+      if (aHasError !== bHasError) return aHasError ? -1 : 1;
+      return 0;
+    });
+  }, [page.validationFindings]);
   const schema = page.suggestedSchemas[0];
   const graphTypes = schema ? ((schema.template?.['@graph'] as Record<string, unknown>[]) || []).map(n => n['@type'] as string).filter(Boolean) : [];
   const eligibleCount = page.richResultsEligibility?.filter(r => r.eligible).length || 0;
@@ -228,27 +245,50 @@ export function SchemaPageCard({
             </div>
           )}
 
-          {/* Validation findings — grouped by severity (with fallback for old-format validationErrors) */}
-          {(page.validationFindings && page.validationFindings.length > 0) ? (
+          {/* Validation findings — grouped by field, click-to-expand when 2+ findings on one field */}
+          {findingsByField.length > 0 ? (
             <div className="px-4 py-2 bg-amber-500/5 border-b border-amber-500/20">
               <div className="t-caption font-medium text-amber-400/80 mb-1">Validation findings</div>
-              <div className="space-y-1">
-                {page.validationFindings
-                  .filter(f => f.severity === 'error')
-                  .map((f, i) => (
-                    <div key={`err-${i}`} className="t-caption-sm flex items-start gap-2">
-                      <span className="font-semibold uppercase tracking-wide text-red-400" style={{ fontSize: '10px' }}>Error</span>
-                      <span className="text-red-400/80">{f.message}</span>
+              <div className="mt-2 space-y-1">
+                {findingsByField.map(([field, findings]) => {
+                  const severity = findings.some(f => f.severity === 'error') ? 'error' : 'warning';
+                  const expanded = expandedField === field;
+                  const colorClass = severity === 'error' ? 'text-red-400' : 'text-amber-400';
+                  const badge = severity === 'error' ? 'Error' : 'Recommended';
+
+                  // Single-finding rows or un-grouped (__noField) — render flat
+                  if (field === '__noField' || findings.length === 1) {
+                    return (
+                      <div key={field} className={`${colorClass} text-xs flex items-start gap-2`}>
+                        <span className="font-semibold uppercase tracking-wide shrink-0" style={{ fontSize: '10px' }}>{badge}</span>
+                        <span>{findings[0].message}</span>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={field}>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedField(expanded ? null : field)}
+                        className={`flex items-center gap-2 w-full text-left ${colorClass} text-xs hover:opacity-80`}
+                      >
+                        <span className="font-semibold uppercase tracking-wide shrink-0" style={{ fontSize: '10px' }}>{badge}</span>
+                        <span className="truncate">{field} ({findings.length})</span>
+                        <span className="text-[var(--brand-text-muted)] shrink-0">{expanded ? '▾' : '▸'}</span>
+                      </button>
+                      {expanded && (
+                        <div className="ml-4 mt-1 space-y-0.5">
+                          {findings.map((f, i) => (
+                            <div key={i} className={`${colorClass} text-xs`}>
+                              {f.message}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  ))}
-                {page.validationFindings
-                  .filter(f => f.severity === 'warning')
-                  .map((f, i) => (
-                    <div key={`warn-${i}`} className="t-caption-sm flex items-start gap-2">
-                      <span className="font-semibold uppercase tracking-wide text-amber-400" style={{ fontSize: '10px' }}>Recommended</span>
-                      <span className="text-amber-300/80">{f.message}</span>
-                    </div>
-                  ))}
+                  );
+                })}
               </div>
             </div>
           ) : hasErrors && (

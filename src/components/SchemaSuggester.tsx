@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { post, put, getSafe } from '../api/client';
 import { schema as schemaApi, schemaImpact as schemaImpactApi, type SchemaImpactData, type SchemaDeploymentImpact } from '../api/seo';
 import type { FixContext } from '../App';
@@ -19,6 +19,7 @@ import { BulkPublishPanel } from './schema/BulkPublishPanel';
 import { PagePicker } from './schema/PagePicker';
 import { SchemaPlanPanel } from './schema/SchemaPlanPanel';
 import { SchemaCompletenessWidget } from './schema/SchemaCompletenessWidget';
+import { KNOWN_TARGET_FIELDS } from './schema/fieldTargets';
 import { PendingApprovals } from './PendingApprovals';
 import { SchemaWorkflowGuide } from './schema/SchemaWorkflowGuide';
 import { SCHEMA_ROLE_INDEX } from '../../shared/types/schema-plan';
@@ -783,6 +784,16 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
   const pagesWithWarnings = data.filter(p =>
     (p.validationFindings?.some(f => f.severity === 'warning') ?? false),
   ).length;
+  const fixesAvailable = useMemo(() => {
+    const fields = new Set<string>();
+    for (const p of data) {
+      for (const f of p.validationFindings ?? []) {
+        if (!f.field) continue;
+        if (KNOWN_TARGET_FIELDS.has(f.field)) fields.add(f.field);
+      }
+    }
+    return fields.size;
+  }, [data]);
   const totalTypes = data.reduce((s, p) => {
     const schema = p.suggestedSchemas[0]?.template;
     const graph = schema?.['@graph'] as Record<string, unknown>[] | undefined;
@@ -914,6 +925,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
           <div className={cn('text-2xl font-bold', pagesWithErrors > 0 ? 'text-amber-400/80' : 'text-emerald-400/80')}>{data.length - pagesWithErrors}/{data.length}</div>
           <div className="t-caption text-[var(--brand-text-muted)]">
             {pagesWithErrors > 0 ? `${pagesWithErrors} with errors` : pagesWithWarnings > 0 ? `${pagesWithWarnings} with warnings` : 'all passing'}
+            {fixesAvailable > 0 && ` · ${fixesAvailable} fix${fixesAvailable === 1 ? '' : 'es'} available`}
           </div>
         </div>
         <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature)' }}>
