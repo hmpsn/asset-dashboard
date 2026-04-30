@@ -1,17 +1,25 @@
 /**
  * List + HowTo detection. Pattern-first (no AI in PR1):
  *   - Ordered list (<ol>)
- *   - At least 2 items
- *   - Either: page <h1> contains "how to" / "guide" / "steps"
- *     OR a previous-sibling heading (h2-h4) contains the same
+ *   - At least 3 items (Google's HowTo guidelines effectively require ≥3 steps;
+ *     a 2-item ordered list is too thin to be a procedural guide)
+ *   - Scoped to <article> — nav/footer/sidebar lists are excluded to keep
+ *     diagnostic counts honest and avoid false positives on landing pages
+ *   - Either: page <h1> matches HOWTO_RE
+ *     OR a previous-sibling/section heading matches
  *
- * AI-fallback for ambiguous cases is deferred to PR2 (callAI for
- * disambiguation per audit §2.3 conventions).
+ * The regex deliberately excludes the standalone word "guide" — too many
+ * landing-page sections ("Pricing guide", "Buyer's guide") would trigger
+ * HowTo emission and risk Google manual actions for invalid schema.
+ *
+ * AI-fallback for ambiguous cases (action-verb check on item content,
+ * pricing-table disambiguation) is deferred to PR2.
  */
 import type * as cheerio from 'cheerio';
 import type { PageList, HowToStep } from '../../../../shared/types/page-elements.js';
 
-const HOWTO_RE = /\b(how\s+to|steps?|guide|tutorial|walkthrough)\b/i;
+const HOWTO_RE = /\b(how\s+to|step-by-step|tutorial|walkthrough)\b/i;
+const MIN_HOWTO_STEPS = 3;
 
 function findNearbyHowToHeading($: cheerio.CheerioAPI, $list: ReturnType<cheerio.CheerioAPI>): boolean {
   // 1) Page <h1>
@@ -32,7 +40,12 @@ function findNearbyHowToHeading($: cheerio.CheerioAPI, $list: ReturnType<cheerio
 export function extractLists($: cheerio.CheerioAPI): PageList[] {
   const lists: PageList[] = [];
 
-  $('ol, ul').each((_, el) => {
+  // Scope to <article> for consistency with citation extractor — keeps
+  // navigational/footer lists out of diagnostics and HowTo candidates.
+  // Falls back to whole document if no <article> is present (so we still
+  // capture lists on landing pages that don't use the <article> tag).
+  const $scope = $('article').length > 0 ? $('article ol, article ul') : $('ol, ul');
+  $scope.each((_, el) => {
     const $list = $(el);
     const kind = el.tagName === 'ol' ? 'ordered' : 'unordered';
     const items = $list.children('li').toArray();
@@ -41,8 +54,8 @@ export function extractLists($: cheerio.CheerioAPI): PageList[] {
     let isHowToLike = false;
     let steps: HowToStep[] | undefined;
 
-    // HowTo only applies to ordered lists with 2+ items
-    if (kind === 'ordered' && itemCount >= 2) {
+    // HowTo only applies to ordered lists with MIN_HOWTO_STEPS+ items
+    if (kind === 'ordered' && itemCount >= MIN_HOWTO_STEPS) {
       if (findNearbyHowToHeading($, $list)) {
         isHowToLike = true;
         steps = items.map((li, i) => {

@@ -77,13 +77,80 @@ describe('extractLists (HowTo detection)', () => {
     expect(lists[0].itemCount).toBe(3);
   });
 
-  it('requires at least 2 items to flag as HowTo (single-item ol is not a how-to)', () => {
+  it('requires at least 3 items to flag as HowTo (2-item ol is too thin per Google guidelines)', () => {
     const $ = cheerio.load(`
       <article>
         <h1>How to fix it</h1>
-        <ol><li>Restart.</li></ol>
+        <ol><li>Restart.</li><li>Done.</li></ol>
       </article>
     `);
     expect(extractLists($)[0].isHowToLike).toBe(false);
+  });
+
+  it('does NOT flag a list under "Pricing guide" — \\bguide\\b removed from heuristic to prevent landing-page false positives', () => {
+    const $ = cheerio.load(`
+      <article>
+        <h2>Pricing guide</h2>
+        <ol>
+          <li>Free tier — $0/mo</li>
+          <li>Growth tier — $49/mo</li>
+          <li>Premium tier — $149/mo</li>
+        </ol>
+      </article>
+    `);
+    const lists = extractLists($);
+    expect(lists[0].isHowToLike).toBe(false);
+  });
+
+  it('does NOT flag lists in <nav> or <footer> when an <article> is present (scope guard)', () => {
+    const $ = cheerio.load(`
+      <body>
+        <nav>
+          <ol>
+            <li>Home</li>
+            <li>About</li>
+            <li>Contact</li>
+          </ol>
+        </nav>
+        <article>
+          <h1>How to deploy</h1>
+          <ol>
+            <li>Step 1: Connect domain.</li>
+            <li>Step 2: Configure DNS.</li>
+            <li>Step 3: Publish.</li>
+          </ol>
+        </article>
+        <footer>
+          <ol>
+            <li>Privacy</li>
+            <li>Terms</li>
+            <li>Contact</li>
+          </ol>
+        </footer>
+      </body>
+    `);
+    const lists = extractLists($);
+    // Only the article-scoped <ol> should be returned (nav + footer excluded).
+    expect(lists).toHaveLength(1);
+    expect(lists[0].itemCount).toBe(3);
+    expect(lists[0].isHowToLike).toBe(true);
+  });
+
+  it('falls back to whole-document scope when no <article> tag is present', () => {
+    const $ = cheerio.load(`
+      <body>
+        <main>
+          <h1>How to migrate</h1>
+          <ol>
+            <li>Backup existing data.</li>
+            <li>Import to new system.</li>
+            <li>Verify integrity.</li>
+          </ol>
+        </main>
+      </body>
+    `);
+    const lists = extractLists($);
+    expect(lists).toHaveLength(1);
+    expect(lists[0].isHowToLike).toBe(true);
   });
 });

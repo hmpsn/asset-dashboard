@@ -54,10 +54,13 @@ export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Reco
 
   // Build optional HowTo node from pageData.elements.lists (isHowToLike + steps).
   const howToList = pageData.elements?.lists?.find(l => l.isHowToLike && l.steps && l.steps.length > 0);
+  // `||` (not `??`) on title/description fallthroughs: validators check
+  // `=== undefined || === null`, so an empty string would slip past required-field
+  // checks and produce a HowTo/VideoObject with a blank `name`/`description`.
   const howTo = howToList ? dropUndefined({
     '@type': 'HowTo' as const,
     '@id': `${pageData.canonicalUrl}#howto`,
-    'name': pageData.cleanTitle ?? pageData.title,
+    'name': pageData.cleanTitle || pageData.title,
     'step': howToList.steps!.map((s) => ({
       '@type': 'HowToStep' as const,
       'position': s.position,
@@ -68,12 +71,13 @@ export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Reco
 
   // Build optional VideoObject node from pageData.elements.videos[0].
   // Multi-node @graph append per audit §2.6 (withBreadcrumb accepts arrays).
+  // Multi-video iteration is deferred to PR2 (single video object today).
   const video = pageData.elements?.videos?.[0];
   const videoObject = video ? dropUndefined({
     '@type': 'VideoObject' as const,
     '@id': `${pageData.canonicalUrl}#video-0`,
-    'name': video.title ?? pageData.cleanTitle ?? pageData.title,
-    'description': pageData.description ?? `Video embedded in ${pageData.title}.`,
+    'name': video.title || pageData.cleanTitle || pageData.title,
+    'description': pageData.description || `Video embedded in ${pageData.title}.`,
     'thumbnailUrl': video.thumbnailUrl,
     'uploadDate': pageData.datePublished,
     'embedUrl': video.embedUrl,

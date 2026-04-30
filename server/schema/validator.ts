@@ -67,8 +67,8 @@ const REQUIRED_BY_TYPE: Record<string, RequiredFields> = {
     required: ['name', 'url', 'description', 'isPartOf', 'breadcrumb', 'inLanguage'],
   },
   VideoObject: {
-    required: ['name', 'description', 'thumbnailUrl', 'uploadDate'],
-    recommended: ['duration', 'embedUrl', 'contentUrl'],
+    required: ['name', 'description', 'uploadDate'],
+    recommended: ['thumbnailUrl', 'duration', 'embedUrl', 'contentUrl'],
   },
   HowTo: {
     required: ['name', 'step'],

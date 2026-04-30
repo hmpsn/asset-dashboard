@@ -9,16 +9,25 @@
 import type * as cheerio from 'cheerio';
 import type { Citation } from '../../../../shared/types/page-elements.js';
 
-function urlHostnameOrNull(url: string): string | null {
+/**
+ * URL scheme allowlist — JSON-LD citations are public Schema.org annotations
+ * consumed by search engines. Only http(s) outbound links qualify; data:,
+ * file:, blob:, javascript:, vbscript:, mailto:, tel:, and anchor-only hrefs
+ * are excluded.
+ */
+const ALLOWED_SCHEMES = new Set(['http:', 'https:']);
+
+function parseUrlOrNull(url: string): URL | null {
   try {
-    return new URL(url).hostname.toLowerCase();
+    return new URL(url);
   } catch { // catch-ok: malformed URL or relative path — treat as internal/skipped
     return null;
   }
 }
 
 export function extractCitations($: cheerio.CheerioAPI, pageBaseUrl: string): Citation[] {
-  const ownHost = urlHostnameOrNull(pageBaseUrl);
+  const ownUrl = parseUrlOrNull(pageBaseUrl);
+  const ownHost = ownUrl?.hostname.toLowerCase() ?? null;
   if (!ownHost) return []; // own URL malformed — skip rather than misclassify
 
   const citations: Citation[] = [];
@@ -27,13 +36,11 @@ export function extractCitations($: cheerio.CheerioAPI, pageBaseUrl: string): Ci
     const $el = $(el);
     const href = ($el.attr('href') ?? '').trim();
     if (!href) return;
-    if (href.startsWith('javascript:')) return;
-    if (href.startsWith('mailto:')) return;
-    if (href.startsWith('tel:')) return;
 
-    const linkHost = urlHostnameOrNull(href);
-    if (!linkHost) return; // relative path or malformed — skip
-    if (linkHost === ownHost) return; // internal — skip
+    const linkUrl = parseUrlOrNull(href);
+    if (!linkUrl) return; // relative path or malformed — skip
+    if (!ALLOWED_SCHEMES.has(linkUrl.protocol)) return; // non-http(s) — skip
+    if (linkUrl.hostname.toLowerCase() === ownHost) return; // internal — skip
 
     citations.push({
       url: href,

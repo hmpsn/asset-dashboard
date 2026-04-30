@@ -520,7 +520,9 @@ const KNOWN_UNRENDERED_FIELDS = new Set([
   // ClientSignalsSlice — these are rendered but may not appear by field name
   // OperationalSlice
   // none
-  // PageElementSlice diagnostic fields — not in formatPageElementsSection by design.
+  // PageElementCatalog diagnostic fields surfaced via PageElementSlice.catalog —
+  // not rendered by formatPageElementsSection by design (operational metadata,
+  // not consumer-facing context).
   'extractedAt',
   'sourcePublishedAt',
   'diagnostics',

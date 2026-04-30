@@ -92,6 +92,30 @@ function plainText(html: string): string {
   return $('body').text().replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * Lazy-refresh staleness check for the page-element catalog.
+ *
+ * Refresh policy (preserves work, never freezes the cache):
+ *   1. If both timestamps present and parseable → refresh iff input > stored.
+ *   2. If presence differs (one null, one set) → refresh (CMS↔static migration
+ *      or first-time republish acquisition).
+ *   3. If either timestamp is unparseable (NaN) → refresh (corrupted row should
+ *      not freeze the catalog forever).
+ *   4. If both null → no refresh signal; rely on caller to invalidate
+ *      (typical for static pages with no published-at metadata).
+ */
+export function isCatalogStale(
+  storedSourcePublishedAt: string | null,
+  inputSourcePublishedAt: string | null,
+): boolean {
+  if (storedSourcePublishedAt === null && inputSourcePublishedAt === null) return false;
+  if (storedSourcePublishedAt === null || inputSourcePublishedAt === null) return true;
+  const storedMs = new Date(storedSourcePublishedAt).getTime();
+  const inputMs = new Date(inputSourcePublishedAt).getTime();
+  if (!Number.isFinite(storedMs) || !Number.isFinite(inputMs)) return true;
+  return inputMs > storedMs;
+}
+
 export async function generateLeanSchema(input: LeanGeneratorInput): Promise<LeanGeneratorOutput> {
   // Fix 1: strip trailing slashes from baseUrl to prevent //path canonical URLs
   const baseUrl = input.baseUrl.replace(/\/+$/, '');
@@ -121,12 +145,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
   let catalog: PageElementCatalog | undefined;
   if (workspaceId && pagePath) {
     const stored = getPageElements(workspaceId, pagePath);
-    const isStale =
-      !stored ||
-      (input.pageMeta.sourcePublishedAt != null
-        && stored.sourcePublishedAt !== null
-        && new Date(input.pageMeta.sourcePublishedAt) > new Date(stored.sourcePublishedAt));
-    if (!stored || isStale) {
+    if (!stored || isCatalogStale(stored.sourcePublishedAt, input.pageMeta.sourcePublishedAt ?? null)) {
       try {
         const aiBudget = input.aiBudget ?? createAiBudget(0); // PR1: zero AI calls
         catalog = await extractPageElements(input.html ?? '', {

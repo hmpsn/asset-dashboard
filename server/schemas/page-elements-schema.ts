@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { PageElementCatalog } from '../../shared/types/page-elements.js';
 
+
 /**
  * Zod schema mirroring PageElementCatalog. Used by parseJsonSafe to
  * validate `catalog_json` blobs read from the page_elements table.
@@ -78,19 +79,33 @@ const diagnosticsSchema = z.object({
   rawCounts: z.record(z.number()),
 });
 
-export const pageElementCatalogSchema: z.ZodType<PageElementCatalog> = z.object({
+/**
+ * Array fields use `.default([])` so a partial blob (e.g. PR2 writing only
+ * the fields it touches) does not destroy ALL data via parseJsonSafe →
+ * fallback. The `diagnostics` field is also defaulted for the same reason.
+ *
+ * Schema-vs-stored-shape discipline (CLAUDE.md "Code Conventions"): every
+ * field a PR1 writer omits MUST have a default here, otherwise
+ * parseJsonSafe silently returns EMPTY_CATALOG and erases real data.
+ *
+ * The output type matches PageElementCatalog after defaults are applied;
+ * the input accepts a partial blob. We use `as unknown as` to bridge the
+ * Zod inferred type to the shared interface — the runtime parse guarantees
+ * field-shape conformance.
+ */
+export const pageElementCatalogSchema = z.object({
   extractedAt: z.string(),
   sourcePublishedAt: z.string().nullable(),
-  headings: z.array(headingSchema),
-  tables: z.array(tableSchema),
-  images: z.array(pageImageSchema),
-  videos: z.array(videoSchema),
-  lists: z.array(pageListSchema),
-  testimonials: z.array(testimonialSchema),
-  codeBlocks: z.array(codeBlockSchema),
-  citations: z.array(citationSchema),
-  diagnostics: diagnosticsSchema,
-}).passthrough();
+  headings: z.array(headingSchema).default([]),
+  tables: z.array(tableSchema).default([]),
+  images: z.array(pageImageSchema).default([]),
+  videos: z.array(videoSchema).default([]),
+  lists: z.array(pageListSchema).default([]),
+  testimonials: z.array(testimonialSchema).default([]),
+  codeBlocks: z.array(codeBlockSchema).default([]),
+  citations: z.array(citationSchema).default([]),
+  diagnostics: diagnosticsSchema.default({ aiClassificationCalls: 0, hitAiBudgetCap: false, rawCounts: {} }),
+}).passthrough() as unknown as z.ZodType<PageElementCatalog>;
 
 /**
  * Sentinel empty catalog used as parseJsonSafe fallback when stored
