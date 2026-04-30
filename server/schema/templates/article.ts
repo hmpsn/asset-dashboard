@@ -45,6 +45,20 @@ export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Reco
     'about': kind === 'Article' ? 'Case study' : undefined,
   });
 
+  // Build optional HowTo node from pageData.elements.lists (isHowToLike + steps).
+  const howToList = pageData.elements?.lists?.find(l => l.isHowToLike && l.steps && l.steps.length > 0);
+  const howTo = howToList ? dropUndefined({
+    '@type': 'HowTo' as const,
+    '@id': `${pageData.canonicalUrl}#howto`,
+    'name': pageData.cleanTitle ?? pageData.title,
+    'step': howToList.steps!.map((s) => ({
+      '@type': 'HowToStep' as const,
+      'position': s.position,
+      'name': s.name,
+      'text': s.text,
+    })),
+  }) : undefined;
+
   // Build optional VideoObject node from pageData.elements.videos[0].
   // Multi-node @graph append per audit §2.6 (withBreadcrumb accepts arrays).
   const video = pageData.elements?.videos?.[0];
@@ -60,6 +74,7 @@ export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Reco
   }) : undefined;
 
   const nodes: Array<Record<string, unknown>> = [primary];
+  if (howTo) nodes.push(howTo);
   if (videoObject) nodes.push(videoObject);
 
   return withBreadcrumb(nodes, pageData);

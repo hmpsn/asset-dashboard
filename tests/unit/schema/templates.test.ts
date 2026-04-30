@@ -414,6 +414,82 @@ describe('Article + BlogPosting — VideoObject enrichment (PR1)', () => {
   });
 });
 
+describe('Article + BlogPosting — HowTo enrichment (PR1)', () => {
+  const baseElementCatalog = {
+    extractedAt: '2026-04-29T00:00:00.000Z',
+    sourcePublishedAt: null,
+    headings: [],
+    tables: [],
+    images: [],
+    videos: [],
+    testimonials: [],
+    codeBlocks: [],
+    citations: [],
+    diagnostics: { aiClassificationCalls: 0, hitAiBudgetCap: false, rawCounts: {} },
+  };
+
+  it('emits HowTo graph node when pageData.elements.lists has an isHowToLike entry', () => {
+    const input = {
+      ...baseInput,
+      pageData: {
+        ...baseInput.pageData,
+        elements: {
+          ...baseElementCatalog,
+          lists: [{
+            kind: 'ordered' as const,
+            itemCount: 3,
+            isHowToLike: true,
+            steps: [
+              { name: 'Mix flour, water, salt.', text: 'Mix flour, water, salt.', position: 1 },
+              { name: 'Knead for 10 minutes.', text: 'Knead for 10 minutes.', position: 2 },
+              { name: 'Bake at 450°F.', text: 'Bake at 450°F.', position: 3 },
+            ],
+          }],
+        },
+      },
+    };
+    const graph = buildArticleSchema(input as never, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>;
+    const howTo = graph.find(n => n['@type'] === 'HowTo');
+    expect(howTo).toBeDefined();
+    expect(howTo!.name).toBeDefined();
+    expect(Array.isArray(howTo!.step)).toBe(true);
+    expect((howTo!.step as Array<Record<string, unknown>>)).toHaveLength(3);
+    expect((howTo!.step as Array<Record<string, unknown>>)[0]['@type']).toBe('HowToStep');
+    expect((howTo!.step as Array<Record<string, unknown>>)[0].position).toBe(1);
+    expect((howTo!.step as Array<Record<string, unknown>>)[0].text).toBe('Mix flour, water, salt.');
+  });
+
+  it('does NOT emit HowTo when no list has isHowToLike: true', () => {
+    const input = {
+      ...baseInput,
+      pageData: {
+        ...baseInput.pageData,
+        elements: {
+          ...baseElementCatalog,
+          lists: [{ kind: 'ordered' as const, itemCount: 3, isHowToLike: false }],
+        },
+      },
+    };
+    const graph = buildArticleSchema(input as never, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>;
+    expect(graph.find(n => n['@type'] === 'HowTo')).toBeUndefined();
+  });
+
+  it('does NOT emit HowTo when isHowToLike list has no steps', () => {
+    const input = {
+      ...baseInput,
+      pageData: {
+        ...baseInput.pageData,
+        elements: {
+          ...baseElementCatalog,
+          lists: [{ kind: 'ordered' as const, itemCount: 3, isHowToLike: true }],
+        },
+      },
+    };
+    const graph = buildArticleSchema(input as never, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>;
+    expect(graph.find(n => n['@type'] === 'HowTo')).toBeUndefined();
+  });
+});
+
 describe('buildHomepageSchema', () => {
   const homepageInput = {
     baseUrl: 'https://example.com',

@@ -70,6 +70,10 @@ const REQUIRED_BY_TYPE: Record<string, RequiredFields> = {
     required: ['name', 'description', 'thumbnailUrl', 'uploadDate'],
     recommended: ['duration', 'embedUrl', 'contentUrl'],
   },
+  HowTo: {
+    required: ['name', 'step'],
+    recommended: ['totalTime', 'estimatedCost'],
+  },
 };
 
 function validateBreadcrumb(node: Record<string, unknown>): ValidationFinding[] {
