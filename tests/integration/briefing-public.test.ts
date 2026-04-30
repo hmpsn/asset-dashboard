@@ -189,9 +189,18 @@ describe('GET /api/public/briefing/:workspaceId — paid tier, published briefin
     const body = await res.json() as { briefing: Record<string, unknown> | null };
     expect(body.briefing).not.toBeNull();
 
-    // Whitelist: response should ONLY contain weekOf, publishedAt, stories
+    // Whitelist: response should ONLY contain the public-shape fields.
+    // Phase 2.5b added issueSummary, issueNumber, and recommendations
+    // (all derived at serve time from existing data — no admin fields leak).
     const keys = Object.keys(body.briefing!).sort();
-    expect(keys).toEqual(['publishedAt', 'stories', 'weekOf']);
+    expect(keys).toEqual([
+      'issueNumber',
+      'issueSummary',
+      'publishedAt',
+      'recommendations',
+      'stories',
+      'weekOf',
+    ]);
 
     // Explicit blacklist (defense in depth)
     expect(body.briefing).not.toHaveProperty('sourceMetadata');

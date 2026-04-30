@@ -111,9 +111,56 @@ export interface BriefingSummary {
   hasHero: boolean;
 }
 
+/**
+ * A subset of `ContentGap` (from `shared/types/workspace.ts`) — the fields
+ * surfaced in the briefing's "Recommended for You" section. Computed at
+ * serve-time from the workspace's current `keywordStrategy.contentGaps[]`,
+ * NOT persisted on the briefing draft. Top N (sorted by `opportunityScore`)
+ * are returned. The full ContentGap type is imported by name to avoid a
+ * cross-module import cycle on the briefing endpoint hot path.
+ *
+ * Phase 2.5b addition.
+ */
+export interface BriefingRecommendation {
+  topic: string;
+  targetKeyword: string;
+  intent: 'informational' | 'commercial' | 'transactional' | 'navigational';
+  priority: 'high' | 'medium' | 'low';
+  rationale: string;
+  suggestedPageType?: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource';
+  volume?: number;
+  difficulty?: number;
+  trendDirection?: 'rising' | 'declining' | 'stable';
+  serpFeatures?: string[];
+  impressions?: number;
+  competitorProof?: string;
+  questionKeywords?: string[];
+  serpTargeting?: string[];
+  opportunityScore?: number;
+}
+
 /** Wire shape returned from /api/public/briefing/:wsId */
 export interface PublishedBriefingResponse {
   weekOf: string;
   publishedAt: number;
   stories: BriefingStory[];
+  /**
+   * Phase 2.5b — deterministic one-line summary computed at serve time from
+   * the story composition + recommendation count. See server/briefing-summary.ts.
+   * Optional so older clients/responses without it still parse cleanly.
+   */
+  issueSummary?: string;
+  /**
+   * Phase 2.5b — sequential issue counter. The Nth published briefing for the
+   * workspace (1-indexed). Computed at serve time as `count(published)` ≤ this
+   * one's `published_at`. Stable for a given briefing once published.
+   */
+  issueNumber?: number;
+  /**
+   * Phase 2.5b — top content-gap opportunities for "Recommended for You".
+   * Pulled live from `keywordStrategy.contentGaps[]` (sorted by
+   * `opportunityScore` desc, max 5). Live data — reflects current strategy
+   * state, not a snapshot at briefing-publish time.
+   */
+  recommendations?: BriefingRecommendation[];
 }

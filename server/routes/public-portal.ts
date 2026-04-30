@@ -16,7 +16,10 @@ import { listSnapshots, getLatestSnapshot, getLatestSnapshotBefore } from '../re
 import { getAllGscPages } from '../search-console.js';
 import { isStripeConfigured, listProducts } from '../stripe.js';
 import { updateWorkspace, getWorkspace, computeEffectiveTier } from '../workspaces.js';
-import { getLatestPublishedBriefing } from '../briefing-store.js';
+import { getLatestPublishedBriefing, countPublishedBriefingsThrough } from '../briefing-store.js';
+import { generateIssueSummary } from '../briefing-summary.js';
+import { computeOpportunityScore } from './keyword-strategy.js';
+import type { BriefingRecommendation } from '../../shared/types/briefing.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
 import { parseJsonFallback } from '../db/json-validation.js';
@@ -801,11 +804,36 @@ router.get('/api/public/briefing/:workspaceId', (req, res) => {
   const latest = getLatestPublishedBriefing(ws.id);
   if (!latest) return res.json({ briefing: null });
 
+  // Phase 2.5b — issueNumber is the count of published briefings ≤ this one's
+  // publishedAt. Always ≥1 once published; falls back to 1 defensively when
+  // publishedAt is unexpectedly null (shouldn't happen for status='published').
+  const issueNumber = latest.publishedAt
+    ? countPublishedBriefingsThrough(ws.id, latest.publishedAt)
+    : 1;
+
+  // Phase 2.5b — recommendations sourced live from current contentGaps.
+  // Score-fallback: when a gap is missing `opportunityScore` we compute it
+  // here using the same formula as keyword-strategy.ts so ranking is stable
+  // across stored vs newly-collected gaps. Top 5 by score are returned.
+  const gaps = ws.keywordStrategy?.contentGaps ?? [];
+  const recommendations: BriefingRecommendation[] = gaps
+    .map((gap) => ({
+      ...gap,
+      opportunityScore: gap.opportunityScore ?? computeOpportunityScore(gap),
+    }))
+    .sort((a, b) => (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0))
+    .slice(0, 5);
+
+  const issueSummary = generateIssueSummary(latest.stories, recommendations.length);
+
   res.json({
     briefing: {
       weekOf: latest.weekOf,
       publishedAt: latest.publishedAt,
       stories: latest.stories,
+      issueSummary,
+      issueNumber,
+      recommendations,
     },
   });
 });
