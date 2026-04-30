@@ -520,12 +520,11 @@ const KNOWN_UNRENDERED_FIELDS = new Set([
   // ClientSignalsSlice — these are rendered but may not appear by field name
   // OperationalSlice
   // none
-  // PageElementCatalog diagnostic fields surfaced via PageElementSlice.catalog —
-  // not rendered by formatPageElementsSection by design (operational metadata,
-  // not consumer-facing context).
-  'extractedAt',
-  'sourcePublishedAt',
-  'diagnostics',
+  // PageElementSlice top-level fields (`pagePath`, `catalog`) are both
+  // referenced in formatPageElementsSection. The `catalog`'s own nested
+  // diagnostic fields (extractedAt, sourcePublishedAt, diagnostics) are
+  // PageElementCatalog members, not slice fields, so the rule's interface-
+  // level field extractor never flags them — no allowlist entry needed.
 ]);
 
 function extractInterfaceFields(typeFileContent: string, interfaceName: string): string[] {

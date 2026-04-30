@@ -154,8 +154,19 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
           aiBudget,
         });
         upsertPageElements(workspaceId, pagePath, catalog);
-      } catch (err) { // catch-ok: extraction failure → schema falls back to current behavior
-        log.warn({ err, workspaceId, pagePath }, 'page-element extraction failed; schema enrichment skipped');
+      } catch (err) { // catch-ok: extraction or persistence failure — schema generation continues
+        // The catch covers two distinct failure modes:
+        //   1. extractPageElements throws → catalog is undefined; schema falls
+        //      back to non-enriched behavior (this is the "skipped" path).
+        //   2. extractPageElements succeeds but upsertPageElements throws (FK
+        //      violation, disk error, etc.) → catalog IS populated and the
+        //      enrichment proceeds in-memory; only persistence is skipped.
+        // The log distinguishes the two so operators can tell which path fired.
+        if (catalog) {
+          log.warn({ err, workspaceId, pagePath }, 'page-element persistence failed; schema enrichment proceeds with in-memory catalog');
+        } else {
+          log.warn({ err, workspaceId, pagePath }, 'page-element extraction failed; schema enrichment skipped');
+        }
       }
     } else {
       catalog = stored.catalog;

@@ -412,6 +412,19 @@ describe('Article + BlogPosting — VideoObject enrichment (PR1)', () => {
     const graphMissing = buildArticleSchema(inputMissing, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>;
     expect(graphMissing.find(n => n['@type'] === 'VideoObject')).toBeUndefined();
   });
+
+  it('does NOT emit VideoObject when pageData.datePublished is undefined (pre-emission gate prevents invalid uploadDate)', () => {
+    // VideoObject.uploadDate is required by Google. If pageData.datePublished
+    // is undefined (static page without date metadata), emitting the node
+    // would produce invalid schema. The template pre-emission gate skips it
+    // entirely instead of emitting a node missing a required field.
+    const noDateInput = {
+      ...baseInput,
+      pageData: { ...baseInput.pageData, datePublished: undefined, elements: videoElementCatalog },
+    };
+    const graph = buildArticleSchema(noDateInput, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>;
+    expect(graph.find(n => n['@type'] === 'VideoObject')).toBeUndefined();
+  });
 });
 
 describe('Article + BlogPosting — HowTo enrichment (PR1)', () => {

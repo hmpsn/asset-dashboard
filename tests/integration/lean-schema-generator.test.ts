@@ -302,6 +302,10 @@ const PE_WS_IDS = {
   howto: 'ws_test_pe_howto',
   citation: 'ws_test_pe_citation',
   noElements: 'ws_test_pe_none',
+  mixed: 'ws_test_pe_mixed',
+  cacheHit: 'ws_test_pe_cache_hit',
+  refresh: 'ws_test_pe_refresh',
+  nullToSet: 'ws_test_pe_null_to_set',
 };
 
 describe('lean schema generator — page-element enrichment (PR1)', () => {
@@ -311,8 +315,16 @@ describe('lean schema generator — page-element enrichment (PR1)', () => {
       text: 'A clean description.',
       tokens: { prompt: 100, completion: 20, total: 120 },
     });
-    // Clean up page_elements rows written by these tests so each run starts fresh.
+    // Seed workspace rows so the FK on page_elements.workspace_id holds. Without
+    // this, upsertPageElements throws SQLITE_CONSTRAINT_FOREIGNKEY and the
+    // generator's catch silently falls back to in-memory enrichment — the tests
+    // would still pass for emission shape but would not exercise the persistence
+    // path. Seeding lets cache-hit / staleness tests verify real DB behavior.
     for (const wsId of Object.values(PE_WS_IDS)) {
+      db.prepare(`
+        INSERT OR IGNORE INTO workspaces (id, name, folder, created_at)
+        VALUES (?, ?, ?, ?)
+      `).run(wsId, `Test PE WS ${wsId}`, wsId, new Date().toISOString());
       db.prepare('DELETE FROM page_elements WHERE workspace_id = ?').run(wsId);
     }
   });
@@ -328,6 +340,8 @@ describe('lean schema generator — page-element enrichment (PR1)', () => {
         publishedPath: '/blog/how-web-vitals-affect-seo',
         seo: { description: 'A blog post about web vitals and YouTube.' },
         sourcePublishedAt: null,
+        // VideoObject pre-emission gate requires datePublished — supplied via lastPublished fallback in extractPageData.
+        lastPublished: '2026-04-15T00:00:00Z',
       },
       html,
       baseUrl: 'https://example.com',
@@ -412,8 +426,7 @@ describe('lean schema generator — page-element enrichment (PR1)', () => {
 
   it('emits Article + BreadcrumbList + VideoObject + HowTo + citations all in the same @graph with unique @ids', async () => {
     const html = fixturePageElementsHtml('webflow-mixed-elements.html');
-    const wsId = 'ws_test_pe_mixed';
-    db.prepare('DELETE FROM page_elements WHERE workspace_id = ?').run(wsId);
+    const wsId = PE_WS_IDS.mixed;
     const out = await generateLeanSchema({
       ...baseInput,
       pageId: 'pe-mixed-test',
@@ -423,6 +436,8 @@ describe('lean schema generator — page-element enrichment (PR1)', () => {
         publishedPath: '/blog/webflow-gsc-setup',
         seo: { description: 'Combined video + how-to + citation example.' },
         sourcePublishedAt: null,
+        // datePublished required for VideoObject pre-emission gate.
+        lastPublished: '2026-04-15T00:00:00Z',
       },
       html,
       baseUrl: 'https://www.example.com',
@@ -441,8 +456,7 @@ describe('lean schema generator — page-element enrichment (PR1)', () => {
   it('cache hit: second call with same sourcePublishedAt re-uses stored catalog (no re-extraction)', async () => {
     // Use a fixture that produces a deterministic, non-empty catalog.
     const html = fixturePageElementsHtml('webflow-blog-with-youtube.html');
-    const wsId = 'ws_test_pe_cache_hit';
-    db.prepare('DELETE FROM page_elements WHERE workspace_id = ?').run(wsId);
+    const wsId = PE_WS_IDS.cacheHit;
     const baseMeta = {
       title: 'Cache hit test',
       slug: 'cache-hit',
@@ -480,8 +494,7 @@ describe('lean schema generator — page-element enrichment (PR1)', () => {
 
   it('staleness: third call with NEWER sourcePublishedAt triggers re-extraction', async () => {
     const html = fixturePageElementsHtml('webflow-blog-with-youtube.html');
-    const wsId = 'ws_test_pe_refresh';
-    db.prepare('DELETE FROM page_elements WHERE workspace_id = ?').run(wsId);
+    const wsId = PE_WS_IDS.refresh;
     const baseMeta = {
       title: 'Refresh test',
       slug: 'refresh',
@@ -520,8 +533,7 @@ describe('lean schema generator — page-element enrichment (PR1)', () => {
 
   it('staleness: stored.sourcePublishedAt=null + input.sourcePublishedAt=set triggers re-extraction (CMS migration scenario)', async () => {
     const html = fixturePageElementsHtml('webflow-blog-with-youtube.html');
-    const wsId = 'ws_test_pe_null_to_set';
-    db.prepare('DELETE FROM page_elements WHERE workspace_id = ?').run(wsId);
+    const wsId = PE_WS_IDS.nullToSet;
     const baseMeta = {
       title: 'Null→set test',
       slug: 'null-to-set',

@@ -72,16 +72,27 @@ export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Reco
   // Build optional VideoObject node from pageData.elements.videos[0].
   // Multi-node @graph append per audit §2.6 (withBreadcrumb accepts arrays).
   // Multi-video iteration is deferred to PR2 (single video object today).
+  //
+  // Pre-emission gating: only emit when ALL Google-required fields will be
+  // populated (`name`, `description`, `uploadDate`). The validator's
+  // `thumbnailUrl` requirement was moved to `recommended` because Vimeo
+  // and native videos cannot supply a thumbnail without an API call, but
+  // `uploadDate` (= pageData.datePublished) remains required and may be
+  // undefined for static pages without date metadata. Skipping the node
+  // entirely is preferable to emitting invalid schema (spec §2: "never
+  // produces invalid output"); FAQ uses post-validation rollback for the
+  // async case, but VideoObject can decide synchronously here.
   const video = pageData.elements?.videos?.[0];
-  const videoObject = video ? dropUndefined({
+  const canEmitVideo = !!(video && pageData.datePublished);
+  const videoObject = canEmitVideo ? dropUndefined({
     '@type': 'VideoObject' as const,
     '@id': `${pageData.canonicalUrl}#video-0`,
-    'name': video.title || pageData.cleanTitle || pageData.title,
+    'name': video!.title || pageData.cleanTitle || pageData.title,
     'description': pageData.description || `Video embedded in ${pageData.title}.`,
-    'thumbnailUrl': video.thumbnailUrl,
+    'thumbnailUrl': video!.thumbnailUrl,
     'uploadDate': pageData.datePublished,
-    'embedUrl': video.embedUrl,
-    'duration': video.durationSec ? `PT${video.durationSec}S` : undefined,
+    'embedUrl': video!.embedUrl,
+    'duration': video!.durationSec ? `PT${video!.durationSec}S` : undefined,
   }) : undefined;
 
   const nodes: Array<Record<string, unknown>> = [primary];
