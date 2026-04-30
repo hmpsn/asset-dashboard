@@ -857,6 +857,7 @@ export const CHECKS: Check[] = [
       'server/schema/generator.ts', // HTML JSON-LD script tag parsing (existing page schemas from HTML), not DB columns
       'server/briefing-cron.ts', // AI response text parser (Anthropic Sonnet briefing JSON), validated by briefingAIResponseSchema, not DB columns
       'server/schema/extractors/page-elements/image-ai-classifier.ts', // AI response text parser (vision API role JSON), not DB columns
+      'server/schema/extractors/page-elements/howto-ai-fallback.ts', // AI response text parser (HowTo disambiguation JSON), not DB columns
     ],
     message: 'Use parseJsonSafe() or parseJsonFallback() from server/db/json-validation.ts.',
     severity: 'error',
