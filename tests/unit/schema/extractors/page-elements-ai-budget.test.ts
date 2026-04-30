@@ -64,3 +64,20 @@ describe('AI budget', () => {
     });
   });
 });
+
+describe('Shared budget across multiple consumers (PR2 plumbing)', () => {
+  it('a single budget enforces the cap across N consumers', () => {
+    const shared = createAiBudget(3);
+    // Simulate 3 pages each trying to consume 2 calls.
+    const consumed: boolean[] = [];
+    for (let page = 0; page < 3; page++) {
+      for (let call = 0; call < 2; call++) {
+        consumed.push(tryConsumeAiBudget(shared));
+      }
+    }
+    // Total attempts: 6. Cap: 3. So exactly 3 true, then 3 false.
+    expect(consumed.filter(Boolean).length).toBe(3);
+    expect(consumed.filter(c => !c).length).toBe(3);
+    expect(shared.exhausted).toBe(true);
+  });
+});
