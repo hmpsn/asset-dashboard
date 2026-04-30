@@ -215,16 +215,16 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       reason = 'Case study — Article (not Service) with about="Case study".';
       break;
     case 'Service':
-      schema = buildServiceSchema({ baseUrl, pageData });
+      schema = buildServiceSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile });
       reason = 'Service detail page — Service with provider reference.';
       break;
     case 'AboutPage':
-      schema = buildAboutPageSchema({ baseUrl, pageData });
-      reason = 'About page — AboutPage referencing Organization.';
+      schema = buildAboutPageSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile });
+      reason = 'About page — AboutPage with LocalBusiness mainEntity when address is set.';
       break;
     case 'ContactPage':
-      schema = buildContactPageSchema({ baseUrl, pageData });
-      reason = 'Contact page — ContactPage.';
+      schema = buildContactPageSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile });
+      reason = 'Contact page — ContactPage with LocalBusiness mainEntity when address is set.';
       break;
     case 'BlogIndex':
     case 'CaseStudyIndex':
