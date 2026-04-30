@@ -103,11 +103,60 @@ export type BriefingAIResponse = z.infer<typeof briefingAIResponseSchema>;
 
 /**
  * Banned hedge-word regex — mirrors the pr-check rule scoped to
- * `server/briefing-templates/`. We enforce it on AI-generated output
- * here as a runtime guard so the deterministic-fallback path catches
- * any hedge that slips through despite the prompt instructions.
+ * `server/briefing-templates/`, with one extension: we ALSO reject the
+ * standalone "appears" (without "to") because the prompt instruction
+ * lists "appears" as banned and the AI shouldn't be able to slip
+ * `Traffic appears strong this week` past validation when the prompt
+ * explicitly forbade it.
+ *
+ * KEEP IN SYNC with `BANNED_WORDS_TEXT` below — both must list the same
+ * forbidden tokens or the prompt instruction and the runtime guard
+ * will diverge (model expects to obey one set, validator enforces another).
  */
-const HEDGE_WORDS_RE = /\b(potentially|could|may|appears to|suggests|might|seems)\b/i;
+const HEDGE_WORDS_RE = /\b(potentially|could|may|appears(?:\s+to)?|suggests|might|seems)\b/i;
+
+/** Display string for the "BANNED words:" line in AI prompts. KEEP IN SYNC with HEDGE_WORDS_RE. */
+const BANNED_WORDS_TEXT = 'potentially, could, may, appears, suggests, might, seems';
+
+/**
+ * Detect paired quotation marks in `s`. Returns true when the string
+ * contains a `"` (always rejected — clashes with magazine chrome that
+ * already wraps query strings) OR a `'` used as a quotation mark
+ * (opening at word-boundary start OR closing at word-boundary end —
+ * NOT mid-word, where it's a contraction like "it's" / "this week's").
+ *
+ * Devin caught the previous strict `includes("'")` check rejecting valid
+ * editorial prose with contractions. We narrow to the paired-quote
+ * shape so contractions pass through.
+ */
+function hasPairedQuotes(s: string): boolean {
+  if (s.includes('"')) return true;
+  // Single-quote at the start of a word OR end of a word marks a
+  // quotation-mark usage. `\B` prevents matching mid-word apostrophes.
+  // Examples that match (rejected):
+  //   "'opener text'"  →  '<word> at word start
+  //   "she said 'yes'" →  'yes' both bounded
+  // Examples that DON'T match (accepted):
+  //   "it's a great week"   → 'mid-word
+  //   "this week's results" → 'mid-word
+  return /(^|\s)'\w|\w'(\s|$)/.test(s);
+}
+
+/**
+ * Sanitize a value for safe interpolation into a prompt. Strips control
+ * characters (newlines, tabs, etc.) to harden against soft prompt
+ * injection where a workspace name or story headline contains
+ * "...end. Ignore prior instructions." Anthropic system instructions
+ * already provide the primary defense; this is defense-in-depth.
+ *
+ * Truncates to 200 chars to bound prompt size — workspace names and
+ * headlines are normally well under that.
+ */
+function sanitizeForPrompt(s: string): string {
+  if (typeof s !== 'string') return '';
+  // eslint-disable-next-line no-control-regex
+  return s.replace(/[\x00-\x1f\x7f]+/g, ' ').trim().slice(0, 200);
+}
 
 /** Word count helper for the headline punch validator. */
 function countWords(s: string): number {
@@ -152,17 +201,22 @@ export async function punchHeroHeadline(
     return deterministicHeadline;
   }
   try {
-    const userMsg = [
-      `Original headline: ${deterministicHeadline}`,
-      insightHint ? `Underlying data: ${insightHint}` : '',
-      ``,
-      `Rewrite this headline to be 5-12 words, more memorable, definite tense.`,
-      `BANNED words: potentially, could, may, appears, suggests, might, seems.`,
+    // System prompt carries the rules — codebase idiom (see
+    // server/copy-generation.ts, server/content-posts-ai.ts). The user
+    // message carries only the data the model needs to act on.
+    const systemMsg = [
+      `You rewrite SEO briefing headlines to be 5-12 words, more memorable, definite tense.`,
+      `BANNED words: ${BANNED_WORDS_TEXT}.`,
       `Return ONLY the rewritten headline as a single line. No quotes, no preamble.`,
+    ].join(' ');
+    const userMsg = [
+      `Original headline: ${sanitizeForPrompt(deterministicHeadline)}`,
+      insightHint ? `Underlying data: ${sanitizeForPrompt(insightHint)}` : '',
     ].filter(Boolean).join('\n');
 
     const result = await callAI({
       provider: 'anthropic',
+      system: systemMsg,
       messages: [{ role: 'user', content: userMsg }],
       maxTokens: 60,
       temperature: 0.7,
@@ -223,29 +277,33 @@ export async function writeWeeklyOpener(
   if (!Array.isArray(stories) || stories.length === 0) return null;
   try {
     const headlines = stories.slice(0, 5).map((s, i) => {
-      const metric = s.metrics?.[0]?.value ? ` [${s.metrics[0].value}]` : '';
-      return `${i + 1}. ${s.headline}${metric}`;
+      const metric = s.metrics?.[0]?.value ? ` [${sanitizeForPrompt(s.metrics[0].value)}]` : '';
+      return `${i + 1}. ${sanitizeForPrompt(s.headline)}${metric}`;
     }).join('\n');
 
-    const userMsg = [
-      `Workspace: ${ctx.workspaceName}`,
-      `Week of: ${ctx.weekOf}`,
-      ``,
-      `Stories in this briefing:`,
-      headlines,
-      ``,
-      `Write a single-line "letter from the editor" intro that frames this week's briefing.`,
+    // System prompt carries rules; user prompt carries data. Codebase
+    // idiom — Anthropic models obey system instructions more reliably.
+    const systemMsg = [
+      `You write a single-line "letter from the editor" intro that frames a weekly SEO briefing.`,
       `Rules:`,
       `- 25 words MAX. Period-terminated.`,
-      `- Cite a specific number or page from one of the stories above.`,
-      `- BANNED words: potentially, could, may, appears, suggests, might, seems.`,
+      `- Cite a specific number or page from one of the stories provided.`,
+      `- BANNED words: ${BANNED_WORDS_TEXT}.`,
       `- No quotation marks. No bold/italics. Plain prose.`,
       `- Definite tense. Confident editorial voice.`,
       `Return ONLY the line.`,
     ].join('\n');
+    const userMsg = [
+      `Workspace: ${sanitizeForPrompt(ctx.workspaceName)}`,
+      `Week of: ${ctx.weekOf}`,
+      ``,
+      `Stories in this briefing:`,
+      headlines,
+    ].join('\n');
 
     const result = await callAI({
       provider: 'anthropic',
+      system: systemMsg,
       messages: [{ role: 'user', content: userMsg }],
       maxTokens: 80,
       temperature: 0.7,
@@ -253,10 +311,18 @@ export async function writeWeeklyOpener(
       workspaceId: ctx.workspaceId,
     });
 
+    // Note: `unquote()` strips OUTER wrapping quotes; `.split('\n')[0]`
+    // takes the first line (lenient multi-line — see asymmetry note vs
+    // punchHeroHeadline). Trailing quote characters from a leaked
+    // multi-line response (e.g. `"line 1"\n"line 2"` → `line 1"`) are
+    // caught by the paired-quote check below.
     const candidate = unquote(result.text).split('\n')[0]?.trim() ?? '';
     if (!candidate) return null;
-    if (candidate.includes('"') || candidate.includes("'")) {
-      log.debug({ workspaceId: ctx.workspaceId, candidate }, 'weekly-opener: contains quotes, falling back');
+    if (hasPairedQuotes(candidate)) {
+      // Rejects `"..."` always; rejects `'...'` only when used as paired
+      // quote marks (start-of-word or end-of-word). Mid-word apostrophes
+      // (`it's`, `this week's`) are accepted as natural editorial prose.
+      log.debug({ workspaceId: ctx.workspaceId, candidate }, 'weekly-opener: contains paired quotes, falling back');
       return null;
     }
     if (HEDGE_WORDS_RE.test(candidate)) {
