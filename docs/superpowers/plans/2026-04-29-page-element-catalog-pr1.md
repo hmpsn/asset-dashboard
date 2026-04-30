@@ -600,7 +600,7 @@ Create `server/page-elements-store.ts`:
  * - workspace_id always in WHERE clause
  * - ISO 8601 timestamps as TEXT
  */
-import { db } from './db/index.js';
+import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonSafe } from './db/json-validation.js';
 import { pageElementCatalogSchema, EMPTY_CATALOG } from './schemas/page-elements-schema.js';
@@ -651,11 +651,15 @@ function rowToRecord(row: PageElementsRow): PageElementsRecord {
   return {
     workspaceId: row.workspace_id,
     pagePath: row.page_path,
+    // parseJsonSafe signature: (raw, schema, fallback, context?) — returns T | F.
+    // EMPTY_CATALOG is the fallback so the function never returns null;
+    // no `?? EMPTY_CATALOG` needed at the call site.
     catalog: parseJsonSafe(
       row.catalog_json,
       pageElementCatalogSchema,
+      EMPTY_CATALOG,
       { workspaceId: row.workspace_id, field: 'catalog_json', table: 'page_elements' },
-    ) ?? EMPTY_CATALOG,
+    ),
     sourcePublishedAt: row.source_published_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -861,13 +865,13 @@ Find `KNOWN_UNRENDERED_FIELDS` (lines 505-522 per audit). Add the diagnostic-onl
 const KNOWN_UNRENDERED_FIELDS = new Set([
   // ...existing entries...
   // PageElementSlice diagnostic fields — not in formatPageElementsSection by design.
-  'PageElementCatalog.extractedAt',
-  'PageElementCatalog.sourcePublishedAt',
-  'PageElementCatalog.diagnostics',
+  'extractedAt',
+  'sourcePublishedAt',
+  'diagnostics',
 ]);
 ```
 
-The exact key shape depends on how the rule walks slice fields. Read the rule's `customCheck` (lines 2078-2091) to confirm the key format, then match it.
+The Set uses bare field names (verified: existing entries are `'forPage'`, `'bySeverity'`, `'searchIntent'` — not qualified by slice name). The rule's `customCheck` walks each slice's typed fields and checks each leaf name against this Set, so a single field-name entry covers all slices that have a field by that name. Note: existing `'forPage'` already covers PageElementCatalog if we ever add a forPage field (we don't in PR1).
 
 - [ ] **Step 6: Wire `formatPageElementsSection` into the section assembler**
 
