@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { post, put, getSafe } from '../api/client';
 import { schema as schemaApi, schemaImpact as schemaImpactApi, type SchemaImpactData, type SchemaDeploymentImpact } from '../api/seo';
 import type { FixContext } from '../App';
@@ -18,6 +18,8 @@ import { SchemaPageCard } from './schema/SchemaPageCard';
 import { BulkPublishPanel } from './schema/BulkPublishPanel';
 import { PagePicker } from './schema/PagePicker';
 import { SchemaPlanPanel } from './schema/SchemaPlanPanel';
+import { SchemaCompletenessWidget } from './schema/SchemaCompletenessWidget';
+import { KNOWN_TARGET_FIELDS } from './schema/fieldTargets';
 import { PendingApprovals } from './PendingApprovals';
 import { SchemaWorkflowGuide } from './schema/SchemaWorkflowGuide';
 import { SCHEMA_ROLE_INDEX } from '../../shared/types/schema-plan';
@@ -543,6 +545,20 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
     return () => { cancelled = true; };
   }, [workspaceId]);
 
+  // Hooks must be called before ANY conditional early returns (Rules of Hooks).
+  // `data` may be null while loading; guard inside the memo. (Devin Review BUG-0001 on PR #379.)
+  const fixesAvailable = useMemo(() => {
+    if (!data) return 0;
+    const fields = new Set<string>();
+    for (const p of data) {
+      for (const f of p.validationFindings ?? []) {
+        if (!f.field) continue;
+        if (KNOWN_TARGET_FIELDS.has(f.field)) fields.add(f.field);
+      }
+    }
+    return fields.size;
+  }, [data]);
+
   const PAGE_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
     { value: 'auto', label: 'Auto-detect' },
     { value: 'homepage', label: 'Homepage' },
@@ -782,6 +798,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
   const pagesWithWarnings = data.filter(p =>
     (p.validationFindings?.some(f => f.severity === 'warning') ?? false),
   ).length;
+  // fixesAvailable is hoisted above the early returns (Rules of Hooks); reuse here.
   const totalTypes = data.reduce((s, p) => {
     const schema = p.suggestedSchemas[0]?.template;
     const graph = schema?.['@graph'] as Record<string, unknown>[] | undefined;
@@ -897,6 +914,9 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
         />
       )}
 
+      {/* Schema completeness widget — aggregates validationFindings and deep-links to fix locations */}
+      <SchemaCompletenessWidget pages={data} workspaceId={workspaceId} />
+
       {/* Summary cards */}
       <div id="schema-suggestions-list" />
       <div className="grid grid-cols-3 gap-3">
@@ -910,6 +930,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
           <div className={cn('text-2xl font-bold', pagesWithErrors > 0 ? 'text-amber-400/80' : 'text-emerald-400/80')}>{data.length - pagesWithErrors}/{data.length}</div>
           <div className="t-caption text-[var(--brand-text-muted)]">
             {pagesWithErrors > 0 ? `${pagesWithErrors} with errors` : pagesWithWarnings > 0 ? `${pagesWithWarnings} with warnings` : 'all passing'}
+            {fixesAvailable > 0 && ` · ${fixesAvailable} fix${fixesAvailable === 1 ? '' : 'es'} available`}
           </div>
         </div>
         <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature)' }}>

@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   BarChart3, Mail, Image as ImageIcon, Sparkles,
   Users, Shield, SlidersHorizontal, Brain, CreditCard,
 } from 'lucide-react';
 import { post } from '../../api/client';
 import { SectionCard, Icon } from '../ui';
+import { useDeepLinkFocus } from '../../hooks/useDeepLinkFocus';
 
 interface WorkspaceData {
   tier?: 'free' | 'growth' | 'premium';
@@ -21,6 +22,7 @@ interface WorkspaceData {
   brandLogoUrl?: string;
   brandAccentColor?: string;
   clientEmail?: string;
+  siteHasSearch?: boolean;
   [key: string]: unknown;
 }
 
@@ -33,6 +35,31 @@ interface FeaturesTabProps {
 
 export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: FeaturesTabProps) {
   const [sendingReport, setSendingReport] = useState(false);
+  // Controlled mirrors of branding inputs — sync from ws so deep-links that
+  // render this tab before ws loads still show the persisted values once they
+  // arrive. (Devin Review ANALYSIS-0005 round 3 on PR #379.)
+  const [logoUrlDraft, setLogoUrlDraft] = useState<string>(ws?.brandLogoUrl ?? '');
+  const [accentColorDraft, setAccentColorDraft] = useState<string>(ws?.brandAccentColor ?? '#2dd4bf');
+  // Track values WE've submitted so the resync effect doesn't overwrite the
+  // user's draft with a stale server response from an in-flight patch.
+  // (Devin Review BUG-0001 round 5 on PR #379 — color picker drag flicker.)
+  const lastSubmittedLogoRef = useRef<string | null>(null);
+  const lastSubmittedColorRef = useRef<string | null>(null);
+  // Debounce timer for accent color — color pickers fire onChange continuously
+  // during drag; debouncing collapses N patches into 1 final patch when the
+  // user stops dragging.
+  const accentColorPatchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    const wsLogo = ws?.brandLogoUrl ?? '';
+    if (wsLogo !== lastSubmittedLogoRef.current) setLogoUrlDraft(wsLogo);
+    const wsColor = ws?.brandAccentColor ?? '#2dd4bf';
+    if (wsColor !== lastSubmittedColorRef.current) setAccentColorDraft(wsColor);
+  }, [ws?.brandLogoUrl, ws?.brandAccentColor]);
+  // Cleanup pending debounce on unmount.
+  useEffect(() => () => {
+    if (accentColorPatchTimerRef.current) clearTimeout(accentColorPatchTimerRef.current);
+  }, []);
+  useDeepLinkFocus();
 
   return (
     <div className="space-y-8">
@@ -339,11 +366,14 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
           <div>
             <div className="t-caption-sm font-medium mb-1.5 text-[var(--brand-text-muted)]">Logo URL</div>
             <div className="flex items-center gap-2">
-              <input type="url" defaultValue={ws?.brandLogoUrl || ''}
+              <input type="url" value={logoUrlDraft}
+                data-schema-deeplink="brandLogoUrl"
                 placeholder="https://example.com/logo.svg"
+                onChange={e => setLogoUrlDraft(e.target.value)}
                 onBlur={async (e) => {
                   const val = e.target.value.trim();
                   if (val !== (ws?.brandLogoUrl || '')) {
+                    lastSubmittedLogoRef.current = val;
                     await patchWorkspace({ brandLogoUrl: val });
                     toast('Logo URL saved');
                   }
@@ -351,20 +381,69 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
                 className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500" />
               {ws?.brandLogoUrl && <img src={ws.brandLogoUrl} alt="" className="h-6 rounded" />}
             </div>
+            <p className="t-caption-sm text-[var(--brand-text-muted)] mt-2">
+              Also used as publisher logo in your schema. Required for Article rich snippets in Google search results.
+            </p>
           </div>
           <div>
             <div className="t-caption-sm font-medium mb-1.5 text-[var(--brand-text-muted)]">Accent Color</div>
             <div className="flex items-center gap-2">
-              <input type="color" defaultValue={ws?.brandAccentColor || '#2dd4bf'}
-                onChange={async (e) => {
+              <input type="color" value={accentColorDraft}
+                onChange={(e) => {
                   const val = e.target.value;
-                  await patchWorkspace({ brandAccentColor: val });
+                  setAccentColorDraft(val);
+                  // Debounce the patch — color pickers fire onChange continuously
+                  // during drag. We collapse N patches into 1 fired 250ms after
+                  // the user stops dragging. Combined with lastSubmittedColorRef
+                  // this also prevents the stale-response → draft-overwrite flicker.
+                  if (accentColorPatchTimerRef.current) clearTimeout(accentColorPatchTimerRef.current);
+                  accentColorPatchTimerRef.current = setTimeout(() => {
+                    lastSubmittedColorRef.current = val;
+                    void patchWorkspace({ brandAccentColor: val });
+                  }, 250);
                 }}
                 className="w-8 h-8 rounded-[var(--radius-lg)] border border-[var(--brand-border)] cursor-pointer bg-transparent" />
-              <code className="t-caption text-[var(--brand-text)]">{ws?.brandAccentColor || '#2dd4bf'}</code>
+              <code className="t-caption text-[var(--brand-text)]">{accentColorDraft}</code>
               <span className="t-caption-sm text-[var(--brand-text-muted)]">Used in reports and the client portal header</span>
             </div>
           </div>
+        </div>
+      </SectionCard>
+
+      {/* Site Capabilities */}
+      <SectionCard title="Site capabilities">
+        <div className="space-y-3">
+          <p className="t-caption-sm text-[var(--brand-text-muted)]">Tell schema what your live site supports.</p>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              data-schema-deeplink="siteHasSearch"
+              // Controlled — reads current ws state on every render so the box
+              // reflects the loaded value even if FeaturesTab mounts before ws
+              // resolves (e.g. via deep-link). (Devin Review BUG-0002 round 3.)
+              checked={!!ws?.siteHasSearch}
+              onChange={async (e) => {
+                // Capture sync value before await — currentTarget access after
+                // await is implementation-defined in React's synthetic event lifecycle.
+                const nextChecked = e.currentTarget.checked;
+                try {
+                  await patchWorkspace({ siteHasSearch: nextChecked });
+                  toast(nextChecked ? 'SearchAction will emit on next regenerate' : 'SearchAction emission disabled');
+                } catch (err) {
+                  toast('Failed to update — please try again');
+                  // No manual revert needed — controlled component re-reads ws on next render.
+                  throw err;
+                }
+              }}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="t-body font-medium text-[var(--brand-text)]">My site has a working search endpoint</span>
+              <span className="block t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
+                When enabled, schema generation emits <code className="t-mono text-[var(--brand-text)]">WebSite.potentialAction</code> (sitelinks SearchAction) so Google can offer in-SERP search. Your site must actually expose <code className="t-mono">https://yoursite.com/?s=&#123;query&#125;</code> or equivalent — verify this works before enabling.
+              </span>
+            </span>
+          </label>
         </div>
       </SectionCard>
 
