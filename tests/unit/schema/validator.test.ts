@@ -955,4 +955,59 @@ describe('validateLeanSchema — LocalBusiness value-shape (Pillar 1)', () => {
       );
     });
   });
+
+  describe('Review[] graph emission — multiple Review nodes are valid', () => {
+    // Regression guard: PR2 templates emit one Review per rated testimonial.
+    // The duplicate-type validator MUST exempt 'Review' or every multi-testimonial
+    // Service/LocalBusiness page produces a spurious 'duplicate-type' error.
+    const multiReviewGraph = {
+      '@context': 'https://schema.org',
+      '@graph': [
+        {
+          '@type': 'Service',
+          '@id': 'https://x/y#service',
+          'name': 'Web Design',
+          'description': 'Premium Webflow.',
+          'provider': { '@type': 'Organization', 'name': 'Acme' },
+          'isPartOf': { '@id': 'https://x/#website' },
+          'breadcrumb': { '@id': 'https://x/y#breadcrumb' },
+          'inLanguage': 'en',
+        },
+        {
+          '@type': 'Review',
+          '@id': 'https://x/y#review-0',
+          'itemReviewed': { '@id': 'https://x/y#service' },
+          'reviewRating': { '@type': 'Rating', 'ratingValue': 5, 'bestRating': 5 },
+          'author': { '@type': 'Person', 'name': 'Jane' },
+        },
+        {
+          '@type': 'Review',
+          '@id': 'https://x/y#review-1',
+          'itemReviewed': { '@id': 'https://x/y#service' },
+          'reviewRating': { '@type': 'Rating', 'ratingValue': 4, 'bestRating': 5 },
+          'author': { '@type': 'Person', 'name': 'Bob' },
+        },
+      ],
+    };
+
+    it('does NOT flag duplicate-type for 2+ Review nodes (allowlist exemption)', () => {
+      const findings = validateLeanSchema(multiReviewGraph, 'Service');
+      const dupErrors = findings.filter(f => f.ruleId === 'duplicate-type');
+      expect(dupErrors).toEqual([]);
+    });
+
+    it('still flags duplicate-type for unrelated repeat (e.g. two Service nodes)', () => {
+      const broken = JSON.parse(JSON.stringify(multiReviewGraph));
+      // Add a second Service to confirm the allowlist is type-specific
+      broken['@graph'].push({
+        '@type': 'Service',
+        '@id': 'https://x/y#service-2',
+        'name': 'Another Service',
+      });
+      const findings = validateLeanSchema(broken, 'Service');
+      expect(findings).toContainEqual(
+        expect.objectContaining({ ruleId: 'duplicate-type', type: 'Service' }),
+      );
+    });
+  });
 });

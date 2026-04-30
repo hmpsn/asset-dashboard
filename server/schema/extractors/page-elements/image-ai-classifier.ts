@@ -124,7 +124,14 @@ export async function aiClassifyImages(
         });
       }
 
-      const text = response.choices?.[0]?.message?.content ?? '';
+      const text = (response.choices?.[0]?.message?.content ?? '').trim();
+      if (!text) {
+        // Empty content (rare gpt-4.1-mini failure mode: refusal, content filter).
+        // Avoid JSON.parse(''), which throws unnecessarily — budget already
+        // consumed; stay rule-classified.
+        result.push(image);
+        continue;
+      }
       const parsed: AiResponse = JSON.parse(text);
       if (parsed.role && VALID_ROLES.has(parsed.role as PageImage['role'])) {
         result.push({

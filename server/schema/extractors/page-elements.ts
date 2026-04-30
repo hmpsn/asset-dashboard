@@ -81,14 +81,19 @@ export async function extractPageElements(
     // PR1 elements
     const videos = extractVideos($);
     let lists = extractLists($);
-    // Capture parallel raw item text for AI disambiguation (PR2). Same scope rules as extractLists.
-    const $listScope = $('article').length > 0 ? $('article ol') : $('ol');
-    const orderedItemsRaw: string[] = [];
-    $listScope.each((_, ol) => {
-      const items = $(ol).children('li').toArray().map(li => $(li).text().trim());
-      orderedItemsRaw.push(...items);
+    // Capture parallel raw item text for AI disambiguation (PR2).
+    // Scope must match extractLists EXACTLY (article ol+ul, with whole-document
+    // fallback) so the resulting itemsByList[i] is aligned with lists[i] by
+    // DOM order. The disambiguator slices itemsByList[i] per list — a flat
+    // concat would silently send list-0's items as the prompt for every
+    // subsequent list (review-caught data corruption bug).
+    const $listScope = $('article').length > 0 ? $('article ol, article ul') : $('ol, ul');
+    const itemsByList: string[][] = [];
+    $listScope.each((_, el) => {
+      const items = $(el).children('li').toArray().map(li => $(li).text().trim());
+      itemsByList.push(items);
     });
-    lists = await aiDisambiguateHowTo(lists, orderedItemsRaw, {
+    lists = await aiDisambiguateHowTo(lists, itemsByList, {
       budget: opts.aiBudget,
       workspaceId: opts.workspaceId,
     });

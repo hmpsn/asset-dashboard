@@ -6,10 +6,17 @@
  * Shares the same AiBudget as image classifier; consumes 1 slot per
  * disambiguation. Behind schema-ai-element-classifier feature flag.
  *
- * The caller passes `orderedItemsRaw` (parallel array — one entry per
- * list, containing the list's li.text() values) so the AI sees actual
- * step content. Empty array means caller didn't extract item text and
- * the disambiguator falls through to no-op.
+ * `itemsByList` is a parallel array aligned to `lists` by index — each
+ * inner array contains the corresponding list's `<li>` text values. The
+ * caller (page-elements.ts entry-point) builds this via the same scope
+ * query as `extractLists`, so `lists[i]` and `itemsByList[i]` describe
+ * the same DOM element. A previous flat-array shape (`string[]`) was
+ * found by review to silently send list-0's items as the prompt for
+ * every subsequent list — fixed in PR2 round-2.
+ *
+ * Empty `itemsByList` (or an empty inner array for a given index) means
+ * the caller couldn't extract item text for that list — the disambiguator
+ * falls through to no-op for that index.
  */
 import type { PageList, HowToStep } from '../../../../shared/types/page-elements.js';
 import { isFeatureEnabled } from '../../../feature-flags.js';
@@ -40,20 +47,22 @@ interface AiResponse {
 
 export async function aiDisambiguateHowTo(
   lists: PageList[],
-  orderedItemsRaw: string[],
+  itemsByList: string[][],
   opts: AiDisambiguateHowToOpts,
 ): Promise<PageList[]> {
   if (!isFeatureEnabled('schema-ai-element-classifier')) return lists;
   if (lists.length === 0) return lists;
   // Caller didn't pass parallel item text — can't disambiguate
-  if (orderedItemsRaw.length === 0) return lists;
+  if (itemsByList.length === 0) return lists;
 
   const result: PageList[] = [];
   for (let i = 0; i < lists.length; i++) {
     const list = lists[i];
+    const items = itemsByList[i] ?? [];
     if (list.kind !== 'ordered'
       || list.isHowToLike
       || list.itemCount < MIN_AI_DISAMBIG_ITEMS
+      || items.length === 0
       || opts.budget.exhausted) {
       result.push(list);
       continue;
@@ -74,12 +83,19 @@ export async function aiDisambiguateHowTo(
         temperature: 0,
         messages: [{
           role: 'user',
-          content: DISAMBIG_PROMPT + orderedItemsRaw.slice(0, list.itemCount).map((t, idx) => `${idx + 1}. ${t}`).join('\n'),
+          content: DISAMBIG_PROMPT + items.map((t, idx) => `${idx + 1}. ${t}`).join('\n'),
         }],
       });
-      const parsed: AiResponse = JSON.parse(response.text);
+      // Empty AI content (rare gpt-4.1-mini failure mode: refusal, content filter)
+      // would crash JSON.parse('') — guard so the budget slot doesn't double-cost via stack unwind.
+      const text = (response.text ?? '').trim();
+      if (!text) {
+        result.push(list);
+        continue;
+      }
+      const parsed: AiResponse = JSON.parse(text);
       if (parsed.howTo === true) {
-        const steps: HowToStep[] = orderedItemsRaw.slice(0, list.itemCount).map((text, idx) => ({
+        const steps: HowToStep[] = items.map((text, idx) => ({
           name: text,
           text,
           position: idx + 1,

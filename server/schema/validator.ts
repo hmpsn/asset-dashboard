@@ -484,16 +484,20 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
     return findings;
   }
 
-  // Duplicate @type detection — the lean rule: at most one node per @type, except
-  // ListItem (legitimate breadcrumb children). Homepage may have BOTH Organization +
-  // WebSite (different @types), so the rule is per-type, not "exactly one primary".
+  // Duplicate @type detection — the lean rule: at most one node per @type, except:
+  //  - ListItem (legitimate breadcrumb children)
+  //  - Review (PR2: a Service or LocalBusiness with N rated testimonials emits N
+  //    Review nodes — each pointing at the parent via itemReviewed.@id)
+  // Homepage may have BOTH Organization + WebSite (different @types), so the
+  // rule is per-type, not "exactly one primary".
+  const ALLOW_MULTIPLE = new Set(['ListItem', 'Review']);
   const typeCounts = new Map<string, number>();
   for (const node of graph) {
     const t = node['@type'] as string;
     typeCounts.set(t, (typeCounts.get(t) || 0) + 1);
   }
   for (const [t, count] of typeCounts) {
-    if (count > 1 && t !== 'ListItem') {
+    if (count > 1 && !ALLOW_MULTIPLE.has(t)) {
       findings.push({
         severity: 'error',
         type: t,

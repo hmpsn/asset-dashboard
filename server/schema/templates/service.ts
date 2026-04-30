@@ -4,7 +4,7 @@
  * Product never emits zero-price offers.
  */
 import type { PageData } from '../data-sources.js';
-import { dropUndefined, orgRef, withBreadcrumb, webSiteRef, breadcrumbRef } from './helpers.js';
+import { dropUndefined, orgRef, withBreadcrumb, webSiteRef, breadcrumbRef, filterHttpUrls } from './helpers.js';
 
 export interface ServiceInput {
   baseUrl: string;
@@ -81,15 +81,19 @@ export function buildServiceSchema(input: ServiceInput): Record<string, unknown>
     } as Record<string, unknown>));
   });
 
-  // PR2: ImageGallery from informative images (≥2 required, non-empty name required)
+  // PR2: ImageGallery from informative images (≥2 required, non-empty name required).
+  // filterHttpUrls drops javascript:/data:/relative — extracted img.src is
+  // attacker-influenced; emitting non-http(s) into JSON-LD would fail validation
+  // and is a defense-in-depth measure (mirrors PR1 citation extractor).
   const informativeImages = (pageData.elements?.images ?? []).filter(i => i.role === 'informative');
   const galleryName = pageData.cleanTitle || pageData.title;
-  const canEmitGallery = informativeImages.length >= 2 && !!galleryName;
+  const galleryImageUrls = filterHttpUrls(informativeImages.map(i => i.src));
+  const canEmitGallery = galleryImageUrls.length >= 2 && !!galleryName;
   const imageGallery = canEmitGallery ? dropUndefined({
     '@type': 'ImageGallery' as const,
     '@id': `${pageData.canonicalUrl}#gallery`,
     'name': galleryName,
-    'image': informativeImages.map(i => i.src),
+    'image': galleryImageUrls,
   }) : undefined;
 
   const nodes: Array<Record<string, unknown>> = [primary, ...reviews];
