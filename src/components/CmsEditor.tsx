@@ -328,7 +328,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
           const descF = extra.find(f => f.slug.includes('description') || f.slug.includes('desc'));
 
           if (targetField === 'all' && titleF && descF) {
-            if (targetField === 'all') await aiRewrite(coll.collectionId, itemId, 'name');
+            await aiRewrite(coll.collectionId, itemId, 'name');
             await aiRewriteBoth(coll.collectionId, itemId, titleF.slug, descF.slug);
           } else {
             const slugs: string[] = [];
