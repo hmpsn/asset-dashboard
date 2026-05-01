@@ -615,8 +615,6 @@ RULES:
 - Introduction: return HTML paragraphs only (no heading)
 - Conclusion: return full HTML including its <h2> heading
 - KEYWORD COVERAGE CHECK: The following keywords from the brief MUST each appear at least once in the final article. If any are missing, weave them into the most relevant section naturally (do not force or stuff): ${[brief.targetKeyword, ...brief.secondaryKeywords].map(k => `"${k}"`).join(', ')}
-- KEYWORD DENSITY CAP: No keyword phrase should appear more than 4 times in the full article. Count occurrences of each keyword from the brief. Where any exceeds 4, replace the excess with a synonym or rephrase to refer to the concept implicitly — do not simply delete the passage.
-- STRUCTURAL VARIETY: Review how each section is shaped (opening sentence type, prose vs. bullet list, example-first vs. definition-first, etc.). If more than 2 consecutive sections follow the same pattern, rewrite the middle one using a different approach — straight prose, an example-first opening, a comparison, or a short Q&A exchange. Variety should feel natural, not forced.
 
 Return valid JSON with this exact structure (${post.sections.length} items in the sections array):
 {
@@ -633,18 +631,20 @@ Return ONLY valid JSON, no markdown fences, no comments.`;
 
   log.info(`Unification pass: ${currentWords} words → target ${targetTotal}, overBudget=${overBudget}, maxTokens=${maxTokens}`);
 
-  const rawResult = await callCreativeAI({
-    systemPrompt: 'You are a senior editor performing a cohesion and word-count review.',
-    userPrompt: prompt,
+  const result = await callOpenAI({
+    model: CONTENT_MODEL,
+    messages: [
+      { role: 'system', content: 'You are a senior editor performing a cohesion and word-count review. Return valid JSON only.' },
+      { role: 'user', content: prompt },
+    ],
     maxTokens,
     temperature: 0.4,
     feature: 'content-post-unify',
     workspaceId,
-    json: true,
   });
 
   try {
-    const jsonMatch = rawResult.match(/\{[\s\S]*\}/);
+    const jsonMatch = result.text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       log.warn('Unification: no JSON object found in response');
       return null;
