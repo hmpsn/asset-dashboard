@@ -4,44 +4,31 @@
  * optional VideoObject + BreadcrumbList.
  */
 import type { PageData } from '../data-sources.js';
-import type { SemanticPageData } from '../../../shared/types/page-elements.js';
 import { dropUndefined, withBreadcrumb, webSiteRef, breadcrumbRef, filterHttpUrls } from './helpers.js';
 
 export interface ArticleInput {
   baseUrl: string;
   pageData: PageData;
-  semantics?: SemanticPageData;
 }
 
 export type ArticleKind = 'BlogPosting' | 'Article';
 
 export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Record<string, unknown> {
   const { pageData } = input;
-  const { semantics } = input;
 
   const author = pageData.author
     ? { '@type': 'Person', 'name': pageData.author }
-    : semantics?.staff?.[0]
-    ? {
-        '@type': 'Person',
-        'name': semantics.staff[0].name,
-        'jobTitle': semantics.staff[0].jobTitle,
-        'hasCredential': semantics.staff[0].credentials,
-      }
     : { '@type': 'Organization', 'name': pageData.publisher.name };
-
-  const articleImages = filterHttpUrls([semantics?.primaryImage ?? '', pageData.image ?? '']);
 
   const primary = dropUndefined({
     '@type': kind,
     '@id': `${pageData.canonicalUrl}#article`,
     'headline': pageData.cleanTitle,
     'description': pageData.description,
-    'image': articleImages.length > 0 ? articleImages : undefined,
+    'image': pageData.image ? [pageData.image] : undefined,
     'url': pageData.canonicalUrl,
     'datePublished': pageData.datePublished,
     'dateModified': pageData.dateModified || pageData.datePublished,
-    'mainEntityOfPage': { '@type': 'WebPage', '@id': pageData.canonicalUrl },
     'author': author,
     'publisher': dropUndefined({
       '@type': 'Organization',
@@ -124,7 +111,19 @@ export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Reco
     'image': galleryImageUrls,
   }) : undefined;
 
-  const nodes: Array<Record<string, unknown>> = [primary];
+  const webPageNode = dropUndefined({
+    '@type': 'WebPage' as const,
+    '@id': `${pageData.canonicalUrl}#webpage`,
+    'url': pageData.canonicalUrl,
+    'name': pageData.cleanTitle,
+    'description': pageData.description,
+    'isPartOf': webSiteRef(input.baseUrl),
+    'about': { '@id': `${pageData.canonicalUrl}#article` },
+    'inLanguage': pageData.inLanguage,
+    'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
+  });
+
+  const nodes: Array<Record<string, unknown>> = [primary, webPageNode];
   if (howTo) nodes.push(howTo);
   if (videoObject) nodes.push(videoObject);
   if (imageGallery) nodes.push(imageGallery);

@@ -3,27 +3,19 @@
  * that all other pages reference via @id, never duplicating.
  */
 import type { PageData, BusinessProfile } from '../data-sources.js';
-import type { SemanticPageData } from '../../../shared/types/page-elements.js';
-import { dropUndefined, filterHttpUrls } from './helpers.js';
+import { breadcrumbRef, dropUndefined } from './helpers.js';
 
 export interface HomepageInput {
   baseUrl: string;
   pageData: PageData;
-  /** Optional — when present, sameAs and foundedDate are emitted on the Organization node. */
+  /** Optional — when present, sameAs and foundingDate are emitted on the Organization node. */
   businessProfile?: BusinessProfile | null;
   /** When true, WebSite.potentialAction (sitelinks SearchAction) is emitted. Mirrors Workspace.siteHasSearch. */
   siteHasSearch?: boolean;
-  semantics?: SemanticPageData;
 }
 
 export function buildHomepageSchema(input: HomepageInput): Record<string, unknown> {
   const { baseUrl, pageData, businessProfile, siteHasSearch } = input;
-  const { semantics } = input;
-
-  const sameAsUrls = [
-    ...(semantics?.sameAs ?? []),
-    ...(businessProfile?.socialProfiles ?? []),
-  ].filter(Boolean);
 
   const organization = dropUndefined({
     '@type': 'Organization',
@@ -31,15 +23,12 @@ export function buildHomepageSchema(input: HomepageInput): Record<string, unknow
     'name': pageData.publisher.name,
     'url': baseUrl,
     'description': pageData.description,
-    'image': filterHttpUrls([semantics?.primaryImage ?? '', pageData.image ?? ''])[0],
+    'image': pageData.image,
     'logo': pageData.publisher.logoUrl
       ? { '@type': 'ImageObject', 'url': pageData.publisher.logoUrl }
       : undefined,
-    'sameAs': sameAsUrls.length > 0 ? [...new Set(sameAsUrls)] : undefined,
-    'foundingDate': semantics?.foundingDate || businessProfile?.foundedDate,
-    'numberOfLocations': semantics?.numberOfLocations,
-    'award': semantics?.awards?.length ? semantics.awards : undefined,
-    'slogan': semantics?.highlights?.[0],
+    'sameAs': businessProfile?.socialProfiles?.length ? businessProfile.socialProfiles : undefined,
+    'foundingDate': businessProfile?.foundedDate,
     'knowsAbout': pageData.knowsAbout?.length ? pageData.knowsAbout : undefined,
   });
 
@@ -63,5 +52,17 @@ export function buildHomepageSchema(input: HomepageInput): Record<string, unknow
     } : {}),
   };
 
-  return { '@context': 'https://schema.org', '@graph': [organization, website] };
+  const webPage = dropUndefined({
+    '@type': 'WebPage' as const,
+    '@id': `${baseUrl}/#webpage`,
+    'url': baseUrl,
+    'name': pageData.cleanTitle,
+    'description': pageData.description,
+    'isPartOf': { '@id': `${baseUrl}/#website` },
+    'about': { '@id': `${baseUrl}/#organization` },
+    'inLanguage': pageData.inLanguage,
+    'breadcrumb': breadcrumbRef(baseUrl, pageData.breadcrumbs),
+  });
+
+  return { '@context': 'https://schema.org', '@graph': [organization, website, webPage] };
 }

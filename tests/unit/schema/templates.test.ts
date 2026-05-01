@@ -28,12 +28,13 @@ const baseInput = {
 };
 
 describe('buildArticleSchema (BlogPosting)', () => {
-  it('emits exactly two nodes: BlogPosting + BreadcrumbList', () => {
+  it('emits BlogPosting + WebPage + BreadcrumbList', () => {
     const schema = buildArticleSchema(baseInput, 'BlogPosting');
     const graph = schema['@graph'] as Array<Record<string, unknown>>;
-    expect(graph).toHaveLength(2);
+    expect(graph).toHaveLength(3);
     expect(graph[0]['@type']).toBe('BlogPosting');
-    expect(graph[1]['@type']).toBe('BreadcrumbList');
+    expect(graph[1]['@type']).toBe('WebPage');
+    expect(graph[2]['@type']).toBe('BreadcrumbList');
   });
 
   it('passes the validator', () => {
@@ -73,7 +74,9 @@ describe('buildArticleSchema (BlogPosting)', () => {
       pageData: { ...baseInput.pageData, breadcrumbs: [{ name: 'Home', url: 'https://example.com' }] },
     };
     const schema = buildArticleSchema(input, 'BlogPosting');
-    expect((schema['@graph'] as unknown[]).length).toBe(1);
+    const graph = schema['@graph'] as Array<Record<string, unknown>>;
+    expect(graph).toHaveLength(2);
+    expect(graph.map(n => n['@type'])).toEqual(['BlogPosting', 'WebPage']);
   });
 
   it('uses cleanTitle for headline, not raw title', () => {
@@ -88,6 +91,15 @@ describe('buildArticleSchema (BlogPosting)', () => {
     expect(node.breadcrumb).toEqual({ '@id': 'https://example.com/blog/my-post#breadcrumb' });
     expect(node.inLanguage).toBe('en');
     expect(node.articleSection).toBe('Blog');
+  });
+  it('links the sibling WebPage back to the article node', () => {
+    const graph = buildArticleSchema(baseInput, 'BlogPosting')['@graph'] as Array<Record<string, unknown>>;
+    const webPage = graph.find(n => n['@type'] === 'WebPage');
+    expect(webPage).toMatchObject({
+      '@id': 'https://example.com/blog/my-post#webpage',
+      about: { '@id': 'https://example.com/blog/my-post#article' },
+      isPartOf: { '@id': 'https://example.com/#website' },
+    });
   });
   it('uses CMS-derived author when pageData.author is set', () => {
     const withAuthor = { ...baseInput, pageData: { ...baseInput.pageData, author: 'Jane Doe' } };
@@ -137,12 +149,13 @@ const serviceInput = {
 };
 
 describe('buildServiceSchema', () => {
-  it('emits Service + BreadcrumbList', () => {
+  it('emits Service + WebPage + BreadcrumbList', () => {
     const schema = buildServiceSchema(serviceInput);
     const graph = schema['@graph'] as Array<Record<string, unknown>>;
-    expect(graph).toHaveLength(2);
+    expect(graph).toHaveLength(3);
     expect(graph[0]['@type']).toBe('Service');
-    expect(graph[1]['@type']).toBe('BreadcrumbList');
+    expect(graph[1]['@type']).toBe('WebPage');
+    expect(graph[2]['@type']).toBe('BreadcrumbList');
   });
 
   it('passes validator', () => {
@@ -160,11 +173,17 @@ describe('buildServiceSchema', () => {
     expect(node.image).toBeUndefined();
   });
 
-  it('Service primary node has isPartOf, breadcrumb, inLanguage', () => {
-    const node = (buildServiceSchema(serviceInput)['@graph'] as Array<Record<string, unknown>>)[0];
-    expect(node.isPartOf).toEqual({ '@id': 'https://example.com/#website' });
+  it('Service primary node has breadcrumb and inLanguage, while WebPage owns isPartOf', () => {
+    const graph = buildServiceSchema(serviceInput)['@graph'] as Array<Record<string, unknown>>;
+    const node = graph[0];
+    const webPage = graph.find(n => n['@type'] === 'WebPage');
+    expect(node.isPartOf).toBeUndefined();
     expect(node.breadcrumb).toEqual({ '@id': 'https://example.com/services/web-design#breadcrumb' });
     expect(node.inLanguage).toBe('en');
+    expect(webPage).toMatchObject({
+      isPartOf: { '@id': 'https://example.com/#website' },
+      about: { '@id': 'https://example.com/services/web-design#service' },
+    });
   });
 
   it('Service emits areaServed as Place when populated', () => {
@@ -302,7 +321,70 @@ describe('buildLocalBusinessSchema', () => {
       pageData: { ...localInput.pageData, areaServed: 'Austin, TX' },
     };
     const lb = (buildLocalBusinessSchema(withArea)['@graph'] as Array<Record<string, unknown>>).find(n => n['@type'] === 'LocalBusiness');
-    expect(lb?.areaServed).toEqual([{ '@type': 'Place', name: 'Austin, TX' }]);
+    expect(lb?.areaServed).toEqual({ '@type': 'Place', name: 'Austin, TX' });
+  });
+
+  it('uses page-specific LocalBusiness ids and WebPage nodes for location pages', () => {
+    const locationInput = {
+      ...localInput,
+      pageData: {
+        ...localInput.pageData,
+        title: 'Austin Location',
+        cleanTitle: 'Austin Location',
+        canonicalUrl: 'https://acme.dental/locations/austin',
+        breadcrumbs: [
+          { name: 'Home', url: 'https://acme.dental' },
+          { name: 'Austin Location', url: 'https://acme.dental/locations/austin' },
+        ],
+      },
+    };
+    const graph = buildLocalBusinessSchema(locationInput)['@graph'] as Array<Record<string, unknown>>;
+    const lb = graph.find(n => n['@type'] === 'LocalBusiness');
+    const webPage = graph.find(n => n['@type'] === 'WebPage');
+    expect(lb).toMatchObject({
+      '@id': 'https://acme.dental/locations/austin#localbusiness',
+      url: 'https://acme.dental/locations/austin',
+    });
+    expect(webPage).toMatchObject({
+      '@id': 'https://acme.dental/locations/austin#webpage',
+      about: { '@id': 'https://acme.dental/locations/austin#localbusiness' },
+      isPartOf: { '@id': 'https://acme.dental/#website' },
+    });
+  });
+
+  it('uses page-specific Review ids for location pages', () => {
+    const locationInput = {
+      ...localInput,
+      pageData: {
+        ...localInput.pageData,
+        title: 'Austin Location',
+        cleanTitle: 'Austin Location',
+        canonicalUrl: 'https://acme.dental/locations/austin',
+        breadcrumbs: [
+          { name: 'Home', url: 'https://acme.dental' },
+          { name: 'Austin Location', url: 'https://acme.dental/locations/austin' },
+        ],
+        elements: {
+          extractedAt: '2026-05-01T00:00:00.000Z',
+          sourcePublishedAt: null,
+          headings: [],
+          tables: [],
+          images: [],
+          videos: [],
+          lists: [],
+          testimonials: [{ author: 'Jane Patient', rating: 5, quote: 'Great visit.' }],
+          codeBlocks: [],
+          citations: [],
+          diagnostics: { aiClassificationCalls: 0, hitAiBudgetCap: false, rawCounts: {} },
+        },
+      },
+    };
+    const graph = buildLocalBusinessSchema(locationInput)['@graph'] as Array<Record<string, unknown>>;
+    const review = graph.find(n => n['@type'] === 'Review');
+    expect(review).toMatchObject({
+      '@id': 'https://acme.dental/locations/austin#review-0',
+      itemReviewed: { '@id': 'https://acme.dental/locations/austin#localbusiness' },
+    });
   });
 });
 
@@ -571,12 +653,25 @@ describe('buildHomepageSchema', () => {
     },
   };
 
-  it('emits Organization + WebSite', () => {
+  it('emits Organization + WebSite + WebPage', () => {
     const schema = buildHomepageSchema(homepageInput);
     const graph = schema['@graph'] as Array<Record<string, unknown>>;
-    expect(graph).toHaveLength(2);
+    expect(graph).toHaveLength(3);
     expect(graph[0]['@type']).toBe('Organization');
     expect(graph[1]['@type']).toBe('WebSite');
+    expect(graph[2]['@type']).toBe('WebPage');
+  });
+
+  it('homepage WebPage references the sitewide entities without fabricating contact URLs', () => {
+    const graph = buildHomepageSchema(homepageInput)['@graph'] as Array<Record<string, unknown>>;
+    const org = graph.find(n => n['@type'] === 'Organization');
+    const webPage = graph.find(n => n['@type'] === 'WebPage');
+    expect(org?.contactPoint).toBeUndefined();
+    expect(webPage).toMatchObject({
+      '@id': 'https://example.com/#webpage',
+      isPartOf: { '@id': 'https://example.com/#website' },
+      about: { '@id': 'https://example.com/#organization' },
+    });
   });
 
   it('WebSite publisher references Organization @id', () => {

@@ -7,6 +7,7 @@ import * as cheerio from 'cheerio';
 import { scrubBrandSuffix } from './templates/helpers.js';
 import type { PageElementCatalog } from '../../shared/types/page-elements.js';
 import type { BusinessProfileContact } from '../../shared/types/workspace.js';
+import type { SchemaIndustrySubtype } from '../../shared/types/schema-plan.js';
 
 export interface PageMetaInput {
   title: string;
@@ -44,6 +45,8 @@ export interface WorkspaceSchemaInput {
   /** When true, schema generator emits WebSite.potentialAction (sitelinks SearchAction).
    *  Mirrors Workspace.siteHasSearch DB column. PR2 ships the admin toggle UI. */
   siteHasSearch?: boolean;
+  /** Active schema-plan local business specialization. */
+  industrySubtype?: SchemaIndustrySubtype;
 }
 
 /** Re-export so schema templates can import from a single data-sources module. */

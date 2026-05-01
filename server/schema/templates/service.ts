@@ -4,50 +4,18 @@
  * Product never emits zero-price offers.
  */
 import type { PageData, BusinessProfile } from '../data-sources.js';
-import type { SemanticPageData } from '../../../shared/types/page-elements.js';
 import { dropUndefined, orgRef, localBusinessRef, withBreadcrumb, webSiteRef, breadcrumbRef, filterHttpUrls } from './helpers.js';
 
 export interface ServiceInput {
   baseUrl: string;
   pageData: PageData;
   businessProfile?: BusinessProfile | null;
-  semantics?: SemanticPageData;
+  offers?: Array<{ name?: string; price: string; priceCurrency: string; description?: string }>;
 }
 
 export function buildServiceSchema(input: ServiceInput): Record<string, unknown> {
   const { pageData, baseUrl } = input;
-  const { semantics } = input;
   const serviceId = `${pageData.canonicalUrl}#service`;
-
-  const semanticsRating = semantics?.aggregateRating
-    ? dropUndefined({
-        '@type': 'AggregateRating' as const,
-        'ratingValue': semantics.aggregateRating.ratingValue,
-        'reviewCount': semantics.aggregateRating.reviewCount,
-        'bestRating': 5,
-        'worstRating': 1,
-      })
-    : undefined;
-
-  const semanticsOffers = semantics?.offers?.length
-    ? semantics.offers.map((o, i) => dropUndefined({
-        '@type': 'Offer' as const,
-        '@id': `${pageData.canonicalUrl}#offer-${i}`,
-        'name': o.name,
-        'price': o.price,
-        'priceCurrency': o.priceCurrency || undefined,
-        'description': o.description,
-      }))
-    : undefined;
-
-  const staffNodes: Array<Record<string, unknown>> = (semantics?.staff ?? []).map((s, i) => dropUndefined({
-    '@type': 'Person' as const,
-    '@id': `${pageData.canonicalUrl}#person-${i}`,
-    'name': s.name,
-    'jobTitle': s.jobTitle,
-    'hasCredential': s.credentials,
-    'image': filterHttpUrls([s.image ?? ''])[0],
-  }));
 
   // PR2: AggregateRating from testimonials WITH ratings
   // Filter must match the Review[] emission gate below — both require author + rating.
@@ -82,7 +50,7 @@ export function buildServiceSchema(input: ServiceInput): Record<string, unknown>
     '@id': serviceId,
     'name': pageData.cleanTitle,
     'description': pageData.description,
-    'image': filterHttpUrls([semantics?.primaryImage ?? '', pageData.image ?? ''])[0],
+    'image': pageData.image,
     'url': pageData.canonicalUrl,
     'provider': (input.businessProfile?.address?.street || input.businessProfile?.address?.city)
       ? localBusinessRef(baseUrl)
@@ -91,21 +59,11 @@ export function buildServiceSchema(input: ServiceInput): Record<string, unknown>
           ...orgRef(baseUrl),
           'name': pageData.publisher.name,
         }),
-    'isPartOf': webSiteRef(baseUrl),
     'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
     'inLanguage': pageData.inLanguage,
-    'areaServed': semantics?.areaServed?.length
-      ? semantics.areaServed.map(a => ({ '@type': 'Place' as const, 'name': a }))
-      : (pageData.areaServed ? { '@type': 'Place' as const, name: pageData.areaServed } : undefined),
+    'areaServed': pageData.areaServed ? { '@type': 'Place' as const, name: pageData.areaServed } : undefined,
     'serviceType': pageData.serviceType,
-    'aggregateRating': semanticsRating || aggregateRating,
-    'hasOfferCatalog': semanticsOffers ? {
-      '@type': 'OfferCatalog' as const,
-      'name': pageData.cleanTitle,
-      'itemListElement': semanticsOffers,
-    } : undefined,
-    'award': semantics?.certifications?.length ? semantics.certifications : undefined,
-    'priceRange': semantics?.priceRange,
+    'aggregateRating': aggregateRating,
     'mainEntity': tableMainEntity,
   });
 
@@ -144,7 +102,19 @@ export function buildServiceSchema(input: ServiceInput): Record<string, unknown>
     'image': galleryImageUrls,
   }) : undefined;
 
-  const nodes: Array<Record<string, unknown>> = [primary, ...reviews, ...staffNodes];
+  const webPageNode = dropUndefined({
+    '@type': 'WebPage' as const,
+    '@id': `${pageData.canonicalUrl}#webpage`,
+    'url': pageData.canonicalUrl,
+    'name': pageData.cleanTitle,
+    'description': pageData.description,
+    'isPartOf': webSiteRef(baseUrl),
+    'about': { '@id': serviceId },
+    'inLanguage': pageData.inLanguage,
+    'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
+  });
+
+  const nodes: Array<Record<string, unknown>> = [primary, webPageNode, ...reviews];
   if (imageGallery) nodes.push(imageGallery);
 
   return withBreadcrumb(nodes, pageData);
@@ -161,11 +131,21 @@ export function buildProductSchema(input: ServiceInput): Record<string, unknown>
     'image': pageData.image ? [pageData.image] : undefined,
     'url': pageData.canonicalUrl,
     'brand': { '@type': 'Brand', 'name': pageData.publisher.name },
+    'offers': input.offers && input.offers.length > 0
+      ? input.offers.map((offer, idx) => dropUndefined({
+          '@type': 'Offer' as const,
+          '@id': `${pageData.canonicalUrl}#offer-${idx}`,
+          'name': offer.name,
+          'price': offer.price,
+          'priceCurrency': offer.priceCurrency,
+          'description': offer.description,
+          'url': pageData.canonicalUrl,
+          'availability': 'https://schema.org/InStock',
+        }))
+      : undefined,
     'isPartOf': webSiteRef(baseUrl),
     'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
     'inLanguage': pageData.inLanguage,
-    // Intentionally NO offers — emitting offers without a verified price is spammy
-    // and Google penalises it. Add via intelligence layer when business profile has price.
   });
 
   return withBreadcrumb(primary, pageData);

@@ -51,7 +51,6 @@ export const WS_EVENTS = {
 
   // Schema
   SCHEMA_PLAN_SENT: 'schema:plan_sent',
-  SCHEMA_GOOGLE_VALIDATION: 'schema:google_validation',
 
   // Outcome tracking
   OUTCOME_ACTION_RECORDED: 'outcome:action_recorded',

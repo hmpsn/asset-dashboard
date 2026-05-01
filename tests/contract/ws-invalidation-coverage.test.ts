@@ -56,10 +56,6 @@ const LOCAL_ONLY_EVENTS = new Set<string>([
   // event locally to show a success toast. Task 1 investigation confirmed no
   // client-visible React Query query is gated on this event.
   'SCHEMA_PLAN_SENT',
-  // SCHEMA_GOOGLE_VALIDATION — background GSC validation result after schema publish.
-  // No React Query cache exists for Google validation status yet; UI badges are a
-  // follow-on task. Added to KNOWN_UNHANDLED_BROADCASTS in broadcast-handler-pairs test.
-  'SCHEMA_GOOGLE_VALIDATION',
 ]);
 
 // ---------------------------------------------------------------------------

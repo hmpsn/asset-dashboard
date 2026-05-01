@@ -10,6 +10,7 @@ import db from './db/index.js';
 import { randomUUID } from 'crypto';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import { GOOGLE_RICH_RESULT_RULES, GOOGLE_RICH_RESULT_TYPES } from './schema/google-rich-result-rules.js';
 
 // ── Types ──
 
@@ -136,108 +137,8 @@ export function deleteValidation(workspaceId: string, pageId: string): boolean {
 // ── Google Rich Results Validator ──
 
 // Per-type required and recommended fields, based on Google's structured data documentation.
-const RICH_RESULT_RULES: Record<string, {
-  required: string[];
-  recommended: string[];
-}> = {
-  Article: {
-    required: ['headline', 'datePublished', 'author', 'image'],
-    recommended: ['dateModified', 'publisher', 'description'],
-  },
-  FAQPage: {
-    required: ['mainEntity'],
-    recommended: [],
-  },
-  LocalBusiness: {
-    required: ['name', 'address'],
-    recommended: ['telephone', 'openingHours', 'geo', 'url', 'image'],
-  },
-  Product: {
-    required: ['name', 'offers'],
-    recommended: ['image', 'description', 'brand', 'review', 'aggregateRating'],
-  },
-  JobPosting: {
-    required: ['title', 'datePosted', 'description', 'hiringOrganization'],
-    recommended: ['validThrough', 'employmentType', 'jobLocation', 'baseSalary'],
-  },
-  Event: {
-    required: ['name', 'startDate', 'location'],
-    recommended: ['endDate', 'description', 'image', 'offers', 'organizer'],
-  },
-  Recipe: {
-    required: ['name', 'image', 'recipeIngredient', 'recipeInstructions'],
-    recommended: ['cookTime', 'prepTime', 'totalTime', 'nutrition', 'author'],
-  },
-  Course: {
-    required: ['name', 'description', 'provider'],
-    recommended: ['hasCourseInstance', 'offers'],
-  },
-  Review: {
-    required: ['itemReviewed', 'reviewRating', 'author'],
-    recommended: ['datePublished', 'reviewBody'],
-  },
-  HowTo: {
-    required: ['name', 'step'],
-    recommended: ['image', 'description', 'totalTime', 'estimatedCost', 'supply', 'tool'],
-  },
-  VideoObject: {
-    required: ['name', 'description', 'thumbnailUrl', 'uploadDate'],
-    recommended: ['contentUrl', 'embedUrl', 'duration', 'author', 'publisher'],
-  },
-  BlogPosting: {
-    required: ['headline', 'datePublished', 'author', 'image'],
-    recommended: ['dateModified', 'publisher', 'description', 'keywords'],
-  },
-  NewsArticle: {
-    required: ['headline', 'datePublished', 'author', 'image'],
-    recommended: ['dateModified', 'publisher', 'description', 'articleSection'],
-  },
-  BreadcrumbList: {
-    required: ['itemListElement'],
-    recommended: [],
-  },
-  WebPage: {
-    required: [],
-    recommended: ['name', 'description', 'dateModified'],
-  },
-  Organization: {
-    required: ['name'],
-    recommended: ['url', 'logo', 'sameAs', 'address', 'telephone'],
-  },
-  WebSite: {
-    required: ['name', 'url'],
-    // potentialAction (sitelinks SearchAction) used to be recommended here, but
-    // Pillar 2.1 dropped the unconditional template emission because most workspaces
-    // have no working search endpoint at the urlTemplate. Re-add to `recommended`
-    // (or surface a different conditional warning) once schema-yoast-parity-fields
-    // adds a workspace flag (Workspace.siteHasSearch) to gate emission.
-    recommended: [],
-  },
-  Service: {
-    required: ['name'],
-    recommended: ['description', 'provider', 'areaServed', 'serviceType'],
-  },
-  ProfilePage: {
-    required: ['mainEntity'],
-    recommended: ['name', 'description'],
-  },
-  MedicalOrganization: {
-    required: ['name', 'address'],
-    recommended: ['telephone', 'medicalSpecialty', 'availableService', 'openingHours', 'image'],
-  },
-  FinancialService: {
-    required: ['name', 'address'],
-    recommended: ['telephone', 'areaServed', 'serviceType', 'openingHours', 'image'],
-  },
-};
-
-// Types that qualify for Google Rich Results
-const RICH_RESULT_TYPES = new Set([
-  'Article', 'FAQPage', 'LocalBusiness', 'Product', 'JobPosting',
-  'Event', 'Recipe', 'Course', 'Review', 'BreadcrumbList', 'Service',
-  'ProfilePage', 'MedicalOrganization', 'FinancialService',
-  'HowTo', 'VideoObject', 'BlogPosting', 'NewsArticle',
-]);
+const RICH_RESULT_RULES = GOOGLE_RICH_RESULT_RULES;
+const RICH_RESULT_TYPES = GOOGLE_RICH_RESULT_TYPES;
 
 function extractGraphNodes(schema: Record<string, unknown>): Array<Record<string, unknown>> {
   const graph = schema['@graph'];

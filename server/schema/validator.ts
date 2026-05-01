@@ -13,24 +13,29 @@ interface RequiredFields {
 
 const REQUIRED_BY_TYPE: Record<string, RequiredFields> = {
   BlogPosting: {
+    // breadcrumb is validated conditionally in validateCrossRefs (required only when a BreadcrumbList is in the graph).
     required: [
       'headline', 'description', 'image', 'datePublished', 'dateModified',
-      'author', 'publisher', 'mainEntityOfPage',
-      'isPartOf', 'breadcrumb', 'inLanguage', 'articleSection',
+      'author', 'publisher',
+      'isPartOf', 'inLanguage', 'articleSection',
     ],
   },
   Article: {
+    // breadcrumb is validated conditionally in validateCrossRefs (required only when a BreadcrumbList is in the graph).
     required: [
       'headline', 'description', 'image', 'datePublished', 'dateModified',
-      'author', 'publisher', 'mainEntityOfPage',
-      'isPartOf', 'breadcrumb', 'inLanguage',
+      'author', 'publisher',
+      'isPartOf', 'inLanguage',
     ],
   },
   Service: {
-    required: ['name', 'description', 'provider', 'isPartOf', 'breadcrumb', 'inLanguage'],
+    // Service is not a WebPage subtype; isPartOf lives on the sibling WebPage node.
+    // breadcrumb is validated conditionally in validateCrossRefs.
+    required: ['name', 'description', 'provider', 'inLanguage'],
   },
   Product: {
-    required: ['name', 'description', 'isPartOf', 'breadcrumb', 'inLanguage'],
+    // breadcrumb is validated conditionally in validateCrossRefs.
+    required: ['name', 'description', 'isPartOf', 'inLanguage'],
   },
   LocalBusiness: {
     // address + telephone are GOOGLE-RECOMMENDED but workspace-data-dependent. A workspace
@@ -39,6 +44,14 @@ const REQUIRED_BY_TYPE: Record<string, RequiredFields> = {
     // required list until we add a "recommended" tier with admin-facing prompts to fix
     // workspace settings. Tracked: schema-yoast-parity-fields will introduce that tier.
     required: ['name', 'url', 'inLanguage'],
+  },
+  MedicalOrganization: {
+    required: ['name', 'url', 'inLanguage'],
+    recommended: ['address', 'telephone', 'openingHours', 'image'],
+  },
+  FinancialService: {
+    required: ['name', 'url', 'inLanguage'],
+    recommended: ['address', 'telephone', 'openingHours', 'image'],
   },
   Organization: {
     // logo is GOOGLE-RECOMMENDED but tied to workspace.brandLogoUrl. Same rationale as
@@ -69,11 +82,17 @@ const REQUIRED_BY_TYPE: Record<string, RequiredFields> = {
   OfferCatalog: {
     required: ['name'],
   },
+  Offer: {
+    required: ['price', 'priceCurrency'],
+    recommended: ['name', 'url', 'availability'],
+  },
   ItemList: {
     required: ['itemListElement'],
   },
   WebPage: {
-    required: ['name', 'url', 'description', 'isPartOf', 'breadcrumb', 'inLanguage'],
+    // breadcrumb is omitted from required because homepage WebPage nodes have no
+    // BreadcrumbList to reference (single-item breadcrumb -> no BreadcrumbList emitted).
+    required: ['name', 'url', 'description', 'isPartOf', 'inLanguage'],
   },
   VideoObject: {
     required: ['name', 'description', 'uploadDate'],
@@ -96,30 +115,6 @@ const REQUIRED_BY_TYPE: Record<string, RequiredFields> = {
   },
   ImageGallery: {
     required: ['name', 'image'],
-  },
-  Dentist: {
-    required: ['name', 'url', 'inLanguage'],
-    recommended: ['telephone', 'address', 'openingHours', 'aggregateRating'],
-  },
-  MedicalBusiness: {
-    required: ['name', 'url', 'inLanguage'],
-    recommended: ['telephone', 'address'],
-  },
-  LegalService: {
-    required: ['name', 'url', 'inLanguage'],
-    recommended: ['telephone', 'areaServed'],
-  },
-  ProfessionalService: {
-    required: ['name', 'url', 'inLanguage'],
-    recommended: ['telephone', 'areaServed'],
-  },
-  Event: {
-    required: ['name', 'startDate', 'location'],
-    recommended: ['endDate', 'description', 'offers', 'organizer'],
-  },
-  Course: {
-    required: ['name', 'description', 'provider'],
-    recommended: ['hasCourseInstance', 'courseCode'],
   },
 };
 
@@ -211,6 +206,17 @@ function validateCrossRefs(node: Record<string, unknown>, allNodes: Record<strin
           message: `${t}.breadcrumb references @id "${target}" but no BreadcrumbList with that @id is in the @graph`,
         });
       }
+    }
+  } else {
+    const hasBreadcrumbList = allNodes.some(n => n['@type'] === 'BreadcrumbList');
+    if (hasBreadcrumbList && (t === 'BlogPosting' || t === 'Article' || t === 'Service' || t === 'Product' || t === 'WebPage')) {
+      findings.push({
+        severity: 'error',
+        type: t,
+        field: 'breadcrumb',
+        ruleId: 'required-field-missing',
+        message: `${t} missing required field: breadcrumb`,
+      });
     }
   }
 
@@ -415,27 +421,29 @@ function validateArticleShape(node: Record<string, unknown>): ValidationFinding[
  * three locator fields — Google rejects bare-string addresses.
  */
 function validateLocalBusinessShape(node: Record<string, unknown>): ValidationFinding[] {
-  if (node['@type'] !== 'LocalBusiness') return [];
+  const localTypes = new Set(['LocalBusiness', 'MedicalOrganization', 'FinancialService']);
+  const nodeType = typeof node['@type'] === 'string' ? node['@type'] : 'LocalBusiness';
+  if (!localTypes.has(nodeType)) return [];
   const findings: ValidationFinding[] = [];
   const address = node.address;
   if (address !== undefined) {
     if (typeof address !== 'object' || address === null) {
       findings.push({
         severity: 'error',
-        type: 'LocalBusiness',
+        type: nodeType,
         field: 'address',
         ruleId: 'localbusiness-address-not-object',
-        message: `LocalBusiness.address must be a PostalAddress object (got ${typeof address})`,
+        message: `${nodeType}.address must be a PostalAddress object (got ${typeof address})`,
       });
     } else {
       const a = address as Record<string, unknown>;
       if (a['@type'] !== 'PostalAddress') {
         findings.push({
           severity: 'error',
-          type: 'LocalBusiness',
+          type: nodeType,
           field: 'address.@type',
           ruleId: 'localbusiness-address-type-invalid',
-          message: `LocalBusiness.address.@type must be "PostalAddress"`,
+          message: `${nodeType}.address.@type must be "PostalAddress"`,
         });
       }
       const hasLocator = typeof a.streetAddress === 'string' && (a.streetAddress as string).trim()
@@ -444,10 +452,10 @@ function validateLocalBusinessShape(node: Record<string, unknown>): ValidationFi
       if (!hasLocator) {
         findings.push({
           severity: 'error',
-          type: 'LocalBusiness',
+          type: nodeType,
           field: 'address',
           ruleId: 'localbusiness-address-no-locator',
-          message: `LocalBusiness.address must have at least one of streetAddress, addressLocality, postalCode`,
+          message: `${nodeType}.address must have at least one of streetAddress, addressLocality, postalCode`,
         });
       }
     }
@@ -523,10 +531,7 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
   //    Review nodes — each pointing at the parent via itemReviewed.@id)
   // Homepage may have BOTH Organization + WebSite (different @types), so the
   // rule is per-type, not "exactly one primary".
-  // Person is emitted as multiple top-level nodes when semantics.staff has 2+ entries.
-  // VideoObject is emitted once per video (catalog.videos or semantics.videos).
-  // HowToStep is emitted once per step in HowTo nodes.
-  const ALLOW_MULTIPLE = new Set(['ListItem', 'Review', 'Person', 'VideoObject', 'HowToStep']);
+  const ALLOW_MULTIPLE = new Set(['ListItem', 'Review', 'Offer']);
   const typeCounts = new Map<string, number>();
   for (const node of graph) {
     const t = node['@type'] as string;
@@ -550,22 +555,6 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
     PRIMARY_TYPES.add(node['@type'] as string);
   }
   const NESTED_TYPES = new Set(['Table', 'ImageGallery', 'AggregateRating', 'OfferCatalog', 'ItemList']);
-  // Types handled by dedicated validators (not in REQUIRED_BY_TYPE but still "known").
-  // These are excluded from the unverified-type warning path.
-  // FAQPage/Question/Answer are validated structurally at extraction time (extractFaq guarantees
-  // ≥2 pairs with non-empty question+answer), so no redundant re-check here.
-  // Types handled by dedicated validators or known structural types — excluded from unverified-type warning.
-  const DEDICATED_VALIDATOR_TYPES = new Set([
-    'BreadcrumbList', 'ListItem', 'FAQPage', 'Question', 'Answer',
-    // Person nodes from semantics.staff are structurally validated upstream (name is required).
-    // VideoObject nodes are validated by REQUIRED_BY_TYPE (name/description/uploadDate).
-    // Suppress unverified-type warnings for these well-known types that templates legitimately emit.
-    'Person', 'PostalAddress', 'OpeningHoursSpecification', 'GeoCoordinates',
-    'AggregateRating', 'Rating', 'Offer', 'OfferCatalog',
-    'HowTo', 'HowToStep', 'ImageGallery', 'ImageObject',
-    'SearchAction', 'EntryPoint', 'LocationFeatureSpecification',
-    'Organization', 'WebPage', 'AboutPage', 'ContactPage',
-  ]);
 
   function validateNodeRecursive(node: Record<string, unknown>) {
     const t = node['@type'] as string;
@@ -593,29 +582,6 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
           });
         }
       }
-    } else if (!DEDICATED_VALIDATOR_TYPES.has(t)) {
-      // Unknown type: structural validation only — always emit warning to surface uncertainty.
-      // @context is NOT checked here: in @graph output, @context lives on the wrapper object,
-      // not on individual nodes, so node['@context'] is always undefined for valid schemas.
-      const hasType = typeof node['@type'] === 'string' && node['@type'].length > 0;
-      let hasId = false;
-      try {
-        if (typeof node['@id'] === 'string' && node['@id'].length > 0) {
-          new URL(node['@id']);
-          hasId = true;
-        }
-      } catch { /* invalid URL */ }
-      const hasEmptyValues = Object.values(node).some(v => v === '' || (Array.isArray(v) && v.length === 0));
-      findings.push({
-        severity: 'warning',
-        type: t,
-        ruleId: 'unverified-type',
-        message: `${t}: unverified schema.org type — structural check only. Issues: ${[
-          !hasType && 'missing @type',
-          !hasId && '@id not a valid URL',
-          hasEmptyValues && 'empty string or array values',
-        ].filter(Boolean).join(', ') || 'none'}`,
-      });
     }
 
     // Walk nested objects with @type, but only validate those marked as NESTED_TYPES
