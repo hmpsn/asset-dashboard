@@ -92,7 +92,7 @@ export function classifyPage(url: string, baseUrl: string, opts: ClassifyOpts = 
   }
 
   // Location detail pages (dental/medical/retail chains with per-location pages)
-  if (/^\/(locations?|branches?|offices?|clinics?|studios?|stores?)\/.+/.test(path)) {
+  if (/^\/(locations?|branch(?:es)?|offices?|clinics?|studios?|stores?)\/.+/.test(path)) {
     return { kind: 'Location', primaryType: 'LocalBusiness', pagePath: path };
   }
 
