@@ -415,6 +415,8 @@ export function savePageTypes(siteId: string, updates: Record<string, string>): 
 
 // ── Schema Publish History (version tracking) ──
 
+export type GoogleValidationStatus = 'published' | 'google_validated' | 'google_failed' | 'no_gsc' | 'locally_validated';
+
 export interface SchemaPublishEntry {
   id: string;
   siteId: string;
@@ -422,6 +424,8 @@ export interface SchemaPublishEntry {
   workspaceId: string;
   schemaJson: Record<string, unknown>;
   publishedAt: string;
+  googleValidationStatus?: GoogleValidationStatus;
+  googleValidationDetails?: Array<{ type: string; message: string }>;
 }
 
 interface PublishHistoryRow {
@@ -431,6 +435,8 @@ interface PublishHistoryRow {
   workspace_id: string;
   schema_json: string;
   published_at: string;
+  google_validation_status: string | null;
+  google_validation_details: string | null;
 }
 
 const historyStmts = createStmtCache(() => ({
@@ -453,6 +459,17 @@ const historyStmts = createStmtCache(() => ({
     WHERE site_id = ?
     GROUP BY page_id
   `),
+  updateStatus: db.prepare(`
+    UPDATE schema_publish_history
+    SET google_validation_status = @status, google_validation_details = @details
+    WHERE id = @id AND workspace_id = @workspace_id
+  `),
+  latestByPage: db.prepare<[pageId: string]>(`
+    SELECT * FROM schema_publish_history
+    WHERE page_id = ?
+    ORDER BY published_at DESC
+    LIMIT 1
+  `),
 }));
 
 function rowToPublishEntry(row: PublishHistoryRow): SchemaPublishEntry {
@@ -463,6 +480,10 @@ function rowToPublishEntry(row: PublishHistoryRow): SchemaPublishEntry {
     workspaceId: row.workspace_id,
     schemaJson: parseJsonFallback(row.schema_json, {}),
     publishedAt: row.published_at,
+    googleValidationStatus: (row.google_validation_status as GoogleValidationStatus) ?? undefined,
+    googleValidationDetails: row.google_validation_details
+      ? parseJsonFallback(row.google_validation_details, undefined)
+      : undefined,
   };
 }
 
@@ -507,6 +528,25 @@ export function getSchemaPublishEntry(id: string): SchemaPublishEntry | null {
 export function getPublishDatesForSite(siteId: string): Record<string, string> {
   const rows = historyStmts().latestPublishDates.all(siteId) as Array<{ page_id: string; published_at: string }>;
   return Object.fromEntries(rows.map(r => [r.page_id, r.published_at]));
+}
+
+export function updateSchemaGoogleStatus(
+  entryId: string,
+  workspaceId: string,
+  status: GoogleValidationStatus,
+  details?: Array<{ type: string; message: string }>,
+): void {
+  historyStmts().updateStatus.run({
+    id: entryId,
+    workspace_id: workspaceId,
+    status,
+    details: details && details.length > 0 ? JSON.stringify(details) : null,
+  });
+}
+
+export function getLatestPublishEntryByPageId(pageId: string): SchemaPublishEntry | null {
+  const row = historyStmts().latestByPage.get(pageId) as PublishHistoryRow | undefined;
+  return row ? rowToPublishEntry(row) : null;
 }
 
 export function patchSiteTemplate(
