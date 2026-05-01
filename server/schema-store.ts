@@ -442,7 +442,7 @@ export function savePageTypes(siteId: string, updates: Record<string, string>): 
 
 // ── Schema Publish History (version tracking) ──
 
-export type GoogleValidationStatus = 'published' | 'google_validated' | 'google_failed' | 'no_gsc';
+export type GoogleValidationStatus = 'google_validated' | 'google_failed' | 'no_gsc';
 
 export interface SchemaPublishEntry {
   id: string;

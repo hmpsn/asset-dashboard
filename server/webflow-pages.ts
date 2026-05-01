@@ -220,11 +220,12 @@ export async function publishSchemaToPage(
   schemaJson: Record<string, unknown>,
   tokenOverride?: string,
 ): Promise<{ success: boolean; error?: string }> {
-  // Escape </script> and <!-- so LLM-sourced string values cannot break out of the
-  // JSON-LD <script> block on the live page (stored-XSS defence-in-depth).
+  // Escape </script so LLM-sourced string values cannot break out of the JSON-LD
+  // <script> block on the live page (stored-XSS defence-in-depth).
+  // <!-- has no special meaning inside <script type="application/ld+json"> in HTML5
+  // and <\!-- is not a valid JSON escape, so we don't touch HTML comments.
   const safeJson = JSON.stringify(schemaJson, null, 2)
-    .replace(/<\/script/gi, '<\\/script')
-    .replace(/<!--/g, '<\\!--');
+    .replace(/<\/script/gi, '<\\/script');
   const sourceCode = `<script type="application/ld+json">\n${safeJson}\n</script>`;
   const version = `1.0.${Date.now()}`;
   const displayName = `${SCHEMA_SCRIPT_PREFIX} (${pageId.slice(0, 8)})`;
@@ -264,8 +265,7 @@ export async function publishRawSchemaToPage(
   tokenOverride?: string,
 ): Promise<{ success: boolean; error?: string }> {
   const safeRaw = rawJsonLd
-    .replace(/<\/script/gi, '<\\/script')
-    .replace(/<!--/g, '<\\!--');
+    .replace(/<\/script/gi, '<\\/script');
   const sourceCode = `<script type="application/ld+json">\n${safeRaw}\n</script>`;
   const version = `1.0.${Date.now()}`;
   const displayName = `${SCHEMA_SCRIPT_PREFIX} (${pageId.slice(0, 8)})`;
