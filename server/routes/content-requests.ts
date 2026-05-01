@@ -155,6 +155,10 @@ router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('w
   if (status === 'post_review') {
     addActivity(req.params.workspaceId, 'post_sent_for_review', `Post sent to client for review: "${updated.topic}"`, '', { requestId: updated.id });
   }
+  // Activity log entry for serviceType upgrade (matches public endpoint behavior)
+  if (serviceType === 'full_post') {
+    addActivity(req.params.workspaceId, 'content_upgraded', `Admin upgraded "${updated.topic}" to full blog post`, '', { requestId: updated.id });
+  }
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
   res.json(updated);
 });
