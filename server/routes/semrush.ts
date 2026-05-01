@@ -13,6 +13,7 @@ import { listWorkspaces, getWorkspace, updateWorkspace } from '../workspaces.js'
 import { createLogger } from '../logger.js';
 import { getUploadRoot } from '../data-dir.js';
 import { MAX_COMPETITORS } from '../constants.js';
+import { cleanCompetitorDomains, filterDiscoveredCompetitors } from '../competitor-domain-filter.js';
 import fs from 'fs';
 import path from 'path';
 import { isProgrammingError } from '../errors.js';
@@ -81,10 +82,7 @@ router.get('/api/semrush/discover-competitors/:workspaceId', async (req, res) =>
 
   try {
     const competitors = await provider.getCompetitors(myDomain, ws.id, 10);
-    // Filter out the site's own domain and subdomains
-    const filtered = competitors.filter(c =>
-      !c.domain.includes(myDomain) && !myDomain.includes(c.domain)
-    );
+    const filtered = filterDiscoveredCompetitors(competitors, myDomain);
     res.json({ competitors: filtered, domain: myDomain });
   } catch (err) {
     log.error({ err }, 'Competitor discovery failed');
@@ -101,12 +99,8 @@ router.post('/api/semrush/competitors/:workspaceId', (req, res) => {
   const domainList = domains || competitors;
   if (!Array.isArray(domainList)) return res.status(400).json({ error: 'domains must be an array of domain strings' });
 
-  // Clean and deduplicate
-  const cleaned = [...new Set(
-    domainList
-      .map(d => d.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim().toLowerCase())
-      .filter(Boolean)
-  )];
+  const myDomain = (ws.liveDomain || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '');
+  const cleaned = cleanCompetitorDomains(domainList, myDomain).slice(0, MAX_COMPETITORS);
 
   updateWorkspace(ws.id, { competitorDomains: cleaned });
   res.json({ competitors: cleaned });
