@@ -63,6 +63,15 @@ const REQUIRED_BY_TYPE: Record<string, RequiredFields> = {
   CollectionPage: {
     required: ['name', 'url', 'description', 'isPartOf', 'breadcrumb', 'inLanguage'],
   },
+  Blog: {
+    required: ['name', 'url', 'publisher'],
+  },
+  OfferCatalog: {
+    required: ['name'],
+  },
+  ItemList: {
+    required: ['itemListElement'],
+  },
   WebPage: {
     required: ['name', 'url', 'description', 'isPartOf', 'breadcrumb', 'inLanguage'],
   },
@@ -513,7 +522,7 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
   for (const node of graph) {
     PRIMARY_TYPES.add(node['@type'] as string);
   }
-  const NESTED_TYPES = new Set(['Table', 'ImageGallery', 'AggregateRating']);
+  const NESTED_TYPES = new Set(['Table', 'ImageGallery', 'AggregateRating', 'OfferCatalog', 'ItemList']);
 
   function validateNodeRecursive(node: Record<string, unknown>) {
     const t = node['@type'] as string;
