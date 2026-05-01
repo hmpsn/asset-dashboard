@@ -291,10 +291,12 @@ export function RequestList({
                   onGeneratePost={async (briefId) => {
                     if (!onGeneratePost) return;
                     if ((req.serviceType || 'brief_only') === 'brief_only') {
-                      onUpdateRequestStatus(req.id, req.status, { serviceType: 'full_post' });
+                      await onUpdateRequestStatus(req.id, req.status, { serviceType: 'full_post' });
                     }
                     const ok = await onGeneratePost(briefId);
-                    if (ok) onUpdateRequestStatus(req.id, 'in_progress');
+                    // Only advance to in_progress for statuses that allow this transition
+                    const canAdvance = ['requested', 'brief_generated', 'client_review', 'changes_requested', 'approved'].includes(req.status);
+                    if (ok && canAdvance) onUpdateRequestStatus(req.id, 'in_progress');
                   }}
                   onRegenerate={(briefId, feedback) => onRegenerateBrief(briefId, feedback, req.id)}
                   onRegenerateOutline={onRegenerateOutline}
