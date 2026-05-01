@@ -302,7 +302,7 @@ describe('buildLocalBusinessSchema', () => {
       pageData: { ...localInput.pageData, areaServed: 'Austin, TX' },
     };
     const lb = (buildLocalBusinessSchema(withArea)['@graph'] as Array<Record<string, unknown>>).find(n => n['@type'] === 'LocalBusiness');
-    expect(lb?.areaServed).toEqual({ '@type': 'Place', name: 'Austin, TX' });
+    expect(lb?.areaServed).toEqual([{ '@type': 'Place', name: 'Austin, TX' }]);
   });
 });
 
