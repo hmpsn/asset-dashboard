@@ -24,13 +24,13 @@ import type { PageElementCatalog } from '../../shared/types/page-elements.js';
 import { buildArticleSchema } from './templates/article.js';
 import { buildServiceSchema } from './templates/service.js';
 import { buildLocalBusinessSchema } from './templates/local-business.js';
-import { buildAboutPageSchema, buildContactPageSchema, buildCollectionPageSchema, buildWebPageSchema } from './templates/static.js';
+import { buildAboutPageSchema, buildContactPageSchema, buildCollectionPageSchema, buildWebPageSchema, buildBlogIndexSchema, buildServiceHubSchema } from './templates/static.js';
 import { buildHomepageSchema } from './templates/homepage.js';
 import { validateLeanSchema } from './validator.js';
 import { checkRichResultsEligibility } from './rich-results.js';
 import type { RichResultEligibility } from './rich-results.js';
 import type { ValidationFinding } from '../../shared/types/schema-validation.js';
-import type { SiteContext } from './site-context.js';
+import type { SiteContext, SiteContextPage } from './site-context.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('schema/generator');
@@ -233,12 +233,57 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       schema = buildContactPageSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile });
       reason = 'Contact page — ContactPage with LocalBusiness mainEntity when address is set.';
       break;
-    case 'BlogIndex':
-    case 'CaseStudyIndex':
-    case 'ServiceIndex':
-      schema = buildCollectionPageSchema({ baseUrl, pageData });
-      reason = `${classified.kind.replace('Index', '')} index — CollectionPage.`;
+    case 'BlogIndex': {
+      const hubCtx = input.siteContext?.pages.find(
+        p => p.path === input.pageMeta.publishedPath,
+      );
+      if (hubCtx && hubCtx.childPaths.length > 0) {
+        const children = hubCtx.childPaths
+          .map(cp => input.siteContext!.pages.find(p => p.path === cp))
+          .filter((p): p is SiteContextPage => p !== undefined)
+          .map(p => ({ id: p.id }));
+        schema = buildBlogIndexSchema({ baseUrl, pageData, children });
+        reason = 'Blog index — Blog with cross-page child @id references.';
+      } else {
+        schema = buildCollectionPageSchema({ baseUrl, pageData });
+        reason = 'Blog index — CollectionPage (no child context available).';
+      }
       break;
+    }
+    case 'ServiceIndex': {
+      const hubCtx = input.siteContext?.pages.find(
+        p => p.path === input.pageMeta.publishedPath,
+      );
+      if (hubCtx && hubCtx.childPaths.length > 0) {
+        const children = hubCtx.childPaths
+          .map(cp => input.siteContext!.pages.find(p => p.path === cp))
+          .filter((p): p is SiteContextPage => p !== undefined)
+          .map(p => ({ id: p.id }));
+        schema = buildServiceHubSchema({ baseUrl, pageData, children });
+        reason = 'Service index — Service + OfferCatalog with child @id references.';
+      } else {
+        schema = buildCollectionPageSchema({ baseUrl, pageData });
+        reason = 'Service index — CollectionPage (no child context available).';
+      }
+      break;
+    }
+    case 'CaseStudyIndex': {
+      const hubCtx = input.siteContext?.pages.find(
+        p => p.path === input.pageMeta.publishedPath,
+      );
+      if (hubCtx && hubCtx.childPaths.length > 0) {
+        const children = hubCtx.childPaths
+          .map(cp => input.siteContext!.pages.find(p => p.path === cp))
+          .filter((p): p is SiteContextPage => p !== undefined)
+          .map(p => ({ id: p.id }));
+        schema = buildCollectionPageSchema({ baseUrl, pageData, children });
+        reason = 'Case study index — CollectionPage + ItemList with child @id references.';
+      } else {
+        schema = buildCollectionPageSchema({ baseUrl, pageData });
+        reason = 'Case study index — CollectionPage (no child context available).';
+      }
+      break;
+    }
     case 'Legal':
     case 'WebPage':
       schema = buildWebPageSchema({ baseUrl, pageData });
