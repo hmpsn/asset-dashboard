@@ -129,3 +129,113 @@ export async function callAnthropic(opts: AnthropicChatOptions): Promise<Anthrop
 export function isAnthropicConfigured(): boolean {
   return !!process.env.ANTHROPIC_API_KEY;
 }
+
+export interface AnthropicToolDefinition {
+  name: string;
+  description: string;
+  input_schema: {
+    type: 'object';
+    properties: Record<string, unknown>;
+    required?: string[];
+  };
+}
+
+export interface AnthropicToolUseResult {
+  toolInput: Record<string, unknown>;
+  promptTokens: number;
+  completionTokens: number;
+}
+
+/**
+ * Call Anthropic Messages API with tool_use (structured output).
+ * Forces the model to respond with the named tool's input_schema shape.
+ * Returns the tool_use input block — guaranteed structured JSON.
+ */
+export async function callAnthropicWithTools(opts: {
+  model?: string;
+  system?: string;
+  userMessage: string;
+  tools: AnthropicToolDefinition[];
+  /** Force a specific tool (tool_choice: { type: 'tool', name }). Defaults to auto. */
+  forceTool?: string;
+  maxTokens?: number;
+  feature: string;
+  workspaceId?: string;
+  maxRetries?: number;
+  timeoutMs?: number;
+}): Promise<AnthropicToolUseResult> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
+
+  const {
+    model = 'claude-haiku-4-5-20251001',
+    system,
+    userMessage,
+    tools,
+    forceTool,
+    maxTokens = 4096,
+    feature,
+    workspaceId,
+    maxRetries = 3,
+    timeoutMs = 60_000,
+  } = opts;
+
+  const bodyObj: Record<string, unknown> = {
+    model,
+    messages: [{ role: 'user', content: userMessage }],
+    tools,
+    max_tokens: maxTokens,
+  };
+  if (system) bodyObj.system = system;
+  if (forceTool) bodyObj.tool_choice = { type: 'tool', name: forceTool };
+
+  const body = JSON.stringify(bodyObj);
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'Content-Type': 'application/json',
+        },
+        body,
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        const isRetryable = res.status === 429 || res.status >= 500;
+        if (isRetryable && attempt < maxRetries) {
+          const waitMs = Math.min(2000 * Math.pow(2, attempt), 30_000);
+          await new Promise(r => setTimeout(r, waitMs));
+          continue;
+        }
+        throw new Error(`Anthropic tool_use ${res.status}: ${errText.slice(0, 300)}`);
+      }
+
+      const data = await res.json() as {
+        content?: Array<{ type: string; input?: Record<string, unknown> }>;
+        usage?: { input_tokens?: number; output_tokens?: number };
+      };
+
+      const toolUseBlock = data.content?.find(c => c.type === 'tool_use');
+      if (!toolUseBlock?.input) throw new Error(`Anthropic tool_use: no tool_use block in response`);
+
+      const promptTokens = data.usage?.input_tokens ?? 0;
+      const completionTokens = data.usage?.output_tokens ?? 0;
+      logTokenUsage({ promptTokens, completionTokens, totalTokens: promptTokens + completionTokens, model, feature, workspaceId });
+
+      return { toolInput: toolUseBlock.input, promptTokens, completionTokens };
+    } catch (err) {
+      if (err instanceof Error && err.name === 'TimeoutError' && attempt < maxRetries) {
+        await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+        continue;
+      }
+      if (attempt === maxRetries) throw err;
+      await new Promise(r => setTimeout(r, 2000 * Math.pow(2, attempt)));
+    }
+  }
+  throw new Error(`[${feature}] callAnthropicWithTools failed after ${maxRetries} retries`);
+}

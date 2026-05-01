@@ -105,6 +105,7 @@ export const pageElementCatalogSchema = z.object({
   codeBlocks: z.array(codeBlockSchema).default([]),
   citations: z.array(citationSchema).default([]),
   diagnostics: diagnosticsSchema.default({ aiClassificationCalls: 0, hitAiBudgetCap: false, rawCounts: {} }),
+  semantics: z.record(z.unknown()).optional(),
 }).passthrough() as unknown as z.ZodType<PageElementCatalog>;
 
 /**
