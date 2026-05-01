@@ -4,8 +4,8 @@
  * (Dentist, Physician, etc.) is deferred to the intelligence-layer follow-up.
  */
 import type { PageData, BusinessProfile } from '../data-sources.js';
-import type { SemanticPageData } from '../../../shared/types/page-elements.js';
-import { dropUndefined, withBreadcrumb, filterHttpUrls } from './helpers.js';
+import type { SchemaIndustrySubtype } from '../../../shared/types/schema-plan.js';
+import { breadcrumbRef, dropUndefined, withBreadcrumb } from './helpers.js';
 
 export interface LocalBusinessInput {
   baseUrl: string;
@@ -13,79 +13,21 @@ export interface LocalBusinessInput {
   businessProfile: BusinessProfile | null;
   /** When true, WebSite.potentialAction (sitelinks SearchAction) is emitted. Mirrors Workspace.siteHasSearch. */
   siteHasSearch?: boolean;
-  /** Semantic data extracted from page content. Enriches NAP, hours, staff, services, rating. */
-  semantics?: SemanticPageData;
+  industrySubtype?: SchemaIndustrySubtype;
 }
 
 export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<string, unknown> {
   const { pageData, businessProfile, baseUrl, siteHasSearch } = input;
-
-  const { semantics } = input;
-
-  // Prefer semantics (page-level) over businessProfile (workspace-level) for location-specific data
-  const phone = semantics?.phone || businessProfile?.phone;
-  const email = semantics?.email || businessProfile?.email;
-
-  const semanticsAddress = semantics?.address ? dropUndefined({
-    '@type': 'PostalAddress' as const,
-    'streetAddress': semantics.address.street,
-    'addressLocality': semantics.address.city,
-    'addressRegion': semantics.address.state,
-    'postalCode': semantics.address.postalCode,
-    'addressCountry': semantics.address.country,
-  }) : undefined;
-
-  const openingHoursSpec = semantics?.hours?.length
-    ? semantics.hours.map(h => dropUndefined({
-        '@type': 'OpeningHoursSpecification' as const,
-        'dayOfWeek': h.dayOfWeek,
-        'opens': h.opens,
-        'closes': h.closes,
-      }))
-    : undefined;
-
-  // semantics.aggregateRating (page-extracted) overrides testimonial-derived rating
-  const semanticsRating = semantics?.aggregateRating
-    ? dropUndefined({
-        '@type': 'AggregateRating' as const,
-        'ratingValue': semantics.aggregateRating.ratingValue,
-        'reviewCount': semantics.aggregateRating.reviewCount,
-        'bestRating': 5,
-        'worstRating': 1,
-      })
-    : undefined;
-
-  const staffNodes: Array<Record<string, unknown>> = (semantics?.staff ?? []).map((s, i) => dropUndefined({
-    '@type': 'Person' as const,
-    '@id': `${baseUrl}/#person-${i}`,
-    'name': s.name,
-    'jobTitle': s.jobTitle,
-    'hasCredential': s.credentials,
-    'image': filterHttpUrls([s.image ?? ''])[0],
-    'worksFor': { '@id': `${baseUrl}/#localbusiness` },
-  }));
-
-  const hasOfferCatalog = semantics?.services?.length
-    ? {
-        '@type': 'OfferCatalog' as const,
-        'name': `${pageData.publisher.name} Services`,
-        'itemListElement': semantics.services.map((svc, i) => ({
-          '@type': 'ListItem' as const,
-          'position': i + 1,
-          'item': { '@type': 'Service' as const, 'name': svc },
-        })),
-      }
-    : undefined;
-
-  const sameAsUrls = [
-    ...(semantics?.sameAs ?? []),
-    ...(businessProfile?.socialProfiles ?? []),
-  ].filter(Boolean);
-  const sameAs = sameAsUrls.length > 0 ? [...new Set(sameAsUrls)] : undefined;
-
-  const areaServedList = semantics?.areaServed?.length
-    ? semantics.areaServed.map(a => ({ '@type': 'Place' as const, 'name': a }))
-    : (pageData.areaServed ? [{ '@type': 'Place' as const, 'name': pageData.areaServed }] : undefined);
+  const isHomepageUsage = pageData.canonicalUrl === baseUrl || pageData.canonicalUrl === `${baseUrl}/`;
+  const lbId = isHomepageUsage
+    ? `${baseUrl}/#localbusiness`
+    : `${pageData.canonicalUrl}#localbusiness`;
+  const lbUrl = isHomepageUsage ? baseUrl : pageData.canonicalUrl;
+  const localBusinessType = input.industrySubtype === 'medical'
+    ? 'MedicalOrganization'
+    : input.industrySubtype === 'financial'
+      ? 'FinancialService'
+      : 'LocalBusiness';
 
   const address = businessProfile?.address
     ? dropUndefined({
@@ -127,29 +69,22 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
   });
 
   const localBusiness = dropUndefined({
-    '@type': 'LocalBusiness',
-    '@id': `${baseUrl}/#localbusiness`,
+    '@type': localBusinessType,
+    '@id': lbId,
     'name': pageData.publisher.name,
     'description': pageData.description,
-    'url': baseUrl,
-    'image': filterHttpUrls([semantics?.primaryImage ?? '', pageData.image ?? ''])[0],
+    'url': lbUrl,
+    'image': pageData.image,
     'inLanguage': pageData.inLanguage,
-    'telephone': phone,
-    'email': email,
-    'openingHoursSpecification': openingHoursSpec,
-    'openingHours': !openingHoursSpec ? businessProfile?.openingHours : undefined,
-    'address': semanticsAddress || address,
-    'sameAs': sameAs,
-    'foundingDate': semantics?.foundingDate || businessProfile?.foundedDate,
-    'hasOfferCatalog': hasOfferCatalog,
+    'telephone': businessProfile?.phone,
+    'email': businessProfile?.email,
+    'openingHours': businessProfile?.openingHours,
+    'address': address,
+    'sameAs': businessProfile?.socialProfiles?.length ? businessProfile.socialProfiles : undefined,
+    'foundingDate': businessProfile?.foundedDate,
     'parentOrganization': { '@id': `${baseUrl}/#organization` },
-    'areaServed': areaServedList,
-    'aggregateRating': semanticsRating || aggregateRating,
-    'amenityFeature': semantics?.accessibility?.length
-      ? semantics.accessibility.map(a => ({ '@type': 'LocationFeatureSpecification' as const, 'name': a, 'value': true }))
-      : undefined,
-    'knowsLanguage': semantics?.languagesSpoken,
-    'paymentAccepted': semantics?.paymentOptions?.join(', '),
+    'areaServed': pageData.areaServed ? { '@type': 'Place' as const, name: pageData.areaServed } : undefined,
+    'aggregateRating': aggregateRating,
   });
 
   // Emit the same WebSite sitewide entity that buildHomepageSchema does — Google
@@ -173,13 +108,12 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
   };
 
   // PR2: Review[] graph nodes
-  const lbId = `${baseUrl}/#localbusiness`;
   const reviews: Array<Record<string, unknown>> = (pageData.elements?.testimonials ?? [])
     .reduce<Array<Record<string, unknown>>>((acc, t, idx) => {
       if (!t.author || t.rating == null) return acc;
       acc.push(dropUndefined({
         '@type': 'Review' as const,
-        '@id': `${baseUrl}/#review-${idx}`,
+        '@id': `${lbUrl}#review-${idx}`,
         'itemReviewed': { '@id': lbId },
         'reviewRating': dropUndefined({
           '@type': 'Rating' as const,
@@ -193,5 +127,20 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
       return acc;
     }, []);
 
-  return withBreadcrumb([organization, localBusiness, website, ...reviews, ...staffNodes], pageData);
+  const webPageNode = !isHomepageUsage ? dropUndefined({
+    '@type': 'WebPage' as const,
+    '@id': `${pageData.canonicalUrl}#webpage`,
+    'url': pageData.canonicalUrl,
+    'name': pageData.cleanTitle,
+    'description': pageData.description,
+    'isPartOf': { '@id': `${baseUrl}/#website` },
+    'about': { '@id': lbId },
+    'inLanguage': pageData.inLanguage,
+    'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
+  }) : undefined;
+
+  const nodes: Array<Record<string, unknown>> = [organization, localBusiness, website, ...reviews];
+  if (webPageNode) nodes.push(webPageNode);
+
+  return withBreadcrumb(nodes, pageData);
 }

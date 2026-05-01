@@ -7,33 +7,14 @@
  * fields per @type), so it has no dependency on the lean generator pipeline.
  */
 
+import { GOOGLE_RICH_RESULT_RULES, GOOGLE_RICH_RESULT_TYPES } from './google-rich-result-rules.js';
+
 export interface RichResultEligibility {
   type: string;
   eligible: boolean;
   feature: string;
   missingFields?: string[];
 }
-
-const RICH_RESULTS_ELIGIBLE: Record<string, { feature: string; required: string[] }> = {
-  FAQPage:       { feature: 'FAQ accordion in search',        required: ['mainEntity'] },
-  HowTo:         { feature: 'How-to steps in search',         required: ['name', 'step'] },
-  VideoObject:   { feature: 'Video carousel',                 required: ['name', 'uploadDate', 'thumbnailUrl'] },
-  Article:       { feature: 'Article rich result',            required: ['headline', 'datePublished', 'author', 'image'] },
-  NewsArticle:   { feature: 'Article rich result',            required: ['headline', 'datePublished', 'author', 'image'] },
-  BlogPosting:   { feature: 'Article rich result',            required: ['headline', 'datePublished', 'author', 'image'] },
-  Product:       { feature: 'Product rich result',            required: ['name', 'offers'] },
-  LocalBusiness: { feature: 'Local business panel',           required: ['name', 'address'] },
-  Event:         { feature: 'Event listing',                  required: ['name', 'startDate', 'location'] },
-  Recipe:        { feature: 'Recipe rich result',             required: ['name', 'image', 'recipeIngredient', 'recipeInstructions'] },
-  JobPosting:    { feature: 'Job listing in search',          required: ['title', 'hiringOrganization', 'jobLocation', 'datePosted', 'description'] },
-  BreadcrumbList: { feature: 'Breadcrumb trail in search',    required: ['itemListElement'] },
-  Course:        { feature: 'Course info in search',          required: ['name', 'description', 'provider'] },
-  Review:        { feature: 'Review rich result',             required: ['itemReviewed', 'reviewRating', 'author'] },
-  ProfilePage:   { feature: 'Profile page in search',         required: ['mainEntity'] },
-  MedicalOrganization: { feature: 'Medical business panel',   required: ['name', 'address'] },
-  FinancialService:    { feature: 'Financial service panel',  required: ['name', 'address'] },
-  Speakable:     { feature: 'Speakable for voice assistants', required: ['cssSelector'] },
-};
 
 /**
  * Check which schema types in a @graph qualify for Google Rich Results,
@@ -49,9 +30,9 @@ export function checkRichResultsEligibility(schema: Record<string, unknown>): Ri
     const rawType = node['@type'];
     const types = Array.isArray(rawType) ? rawType as string[] : (rawType ? [rawType as string] : []);
     for (const type of types) {
-      if (!type || !RICH_RESULTS_ELIGIBLE[type]) continue;
+      if (!type || !GOOGLE_RICH_RESULT_TYPES.has(type) || !GOOGLE_RICH_RESULT_RULES[type]) continue;
 
-      const { feature, required } = RICH_RESULTS_ELIGIBLE[type];
+      const { feature, required } = GOOGLE_RICH_RESULT_RULES[type];
       const missingFields = required.filter(field => {
         const val = node[field];
         if (val === undefined || val === null) return true;

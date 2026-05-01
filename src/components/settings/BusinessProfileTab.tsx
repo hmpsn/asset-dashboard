@@ -230,7 +230,7 @@ export function BusinessProfileTab({ workspaceId, businessProfile, businessConte
             field="Founded date"
             filled={!!businessProfile?.foundedDate}
             scrollTo="foundedDate"
-            hint={businessProfile?.foundedDate ? null : 'Populates Organization.foundedDate'}
+            hint={businessProfile?.foundedDate ? null : 'Populates Organization.foundingDate'}
             workspaceId={workspaceId}
           />
           <SchemaImpactRow

@@ -16,6 +16,9 @@ import { isFeatureEnabled } from './feature-flags.js';
 import { assembleSiteContext } from './schema/site-context.js';
 import type { SiteContext } from './schema/site-context.js';
 import { getSchemaPlan } from './schema-store.js';
+import type { PageKind } from './schema/classifier.js';
+import type { SchemaPageRole } from '../shared/types/schema-plan.js';
+import type { SchemaGenerationDiagnostics } from '../shared/types/schema-generation.js';
 
 const log = createLogger('schema');
 
@@ -49,6 +52,7 @@ export interface SchemaPageSuggestion {
   validationErrors?: string[];
   validationFindings?: ValidationFinding[];
   richResultsEligibility?: RichResultEligibility[];
+  generationDiagnostics?: SchemaGenerationDiagnostics;
   savedPageType?: string;  // Persisted page type from DB
 }
 
@@ -118,6 +122,69 @@ export const PAGE_TYPE_SCHEMA_MAP: Record<SchemaPageType, { primary: string[]; s
   recipe: { primary: ['Recipe'], secondary: ['HowToStep', 'NutritionInformation', 'BreadcrumbList'] },
   generic: { primary: ['WebPage'], secondary: ['BreadcrumbList'] },
 };
+
+export const SCHEMA_ROLE_TO_PAGE_KIND: Partial<Record<SchemaPageRole, PageKind>> = {
+  homepage:     'Homepage',
+  pillar:       'WebPage',
+  audience:     'WebPage',
+  'lead-gen':   'WebPage',
+  blog:         'BlogPosting',
+  service:      'Service',
+  about:        'AboutPage',
+  contact:      'ContactPage',
+  location:     'Location',
+  partnership:  'WebPage',
+  'case-study': 'CaseStudy',
+  comparison:   'WebPage',
+  generic:      'WebPage',
+};
+
+function pathMatchesRolePath(rolePath: string, pagePath: string): boolean {
+  const normalizedPage = pagePath === '/' ? '/' : pagePath.replace(/\/$/, '');
+  const normalizedRole = rolePath === '/' ? '/' : rolePath.replace(/\/$/, '');
+  return normalizedRole === normalizedPage;
+}
+
+function findPlanRole(plan: ReturnType<typeof getSchemaPlan>, pagePath: string) {
+  return plan?.pageRoles.find(pr => pathMatchesRolePath(pr.pagePath, pagePath));
+}
+
+function resolveRoleOverride(opts: {
+  siteId: string;
+  pagePath: string;
+  ctxPageType?: SchemaPageType;
+}) {
+  const latestPlan = getSchemaPlan(opts.siteId);
+  const activePlan = latestPlan?.status === 'active' ? latestPlan : null;
+  const planRole = findPlanRole(activePlan, opts.pagePath);
+  if (opts.ctxPageType && opts.ctxPageType !== 'auto') {
+    const role = opts.ctxPageType as SchemaPageRole;
+    return {
+      pageKindOverride: SCHEMA_ROLE_TO_PAGE_KIND[role],
+      schemaRoleOverride: { role, source: 'ui' as const, industrySubtype: planRole?.industrySubtype },
+      inactivePlanStatus: activePlan ? undefined : latestPlan?.status,
+      activePlan,
+    };
+  }
+  if (planRole) {
+    return {
+      pageKindOverride: SCHEMA_ROLE_TO_PAGE_KIND[planRole.role],
+      schemaRoleOverride: {
+        role: planRole.role,
+        source: 'site-plan' as const,
+        industrySubtype: planRole.industrySubtype,
+      },
+      inactivePlanStatus: undefined,
+      activePlan,
+    };
+  }
+  return {
+    pageKindOverride: undefined,
+    schemaRoleOverride: undefined,
+    inactivePlanStatus: latestPlan && latestPlan.status !== 'active' ? latestPlan.status : undefined,
+    activePlan,
+  };
+}
 
 // (RICH_RESULTS_ELIGIBLE + checkRichResultsEligibility moved to ./schema/rich-results.ts
 //  to break circular import. Re-exports near the top of this file preserve the public API.)
@@ -301,6 +368,7 @@ function leanToSuggestion(lean: import('./schema/index.js').LeanGeneratorOutput)
     validationErrors: lean.validationErrors,
     validationFindings: lean.validationFindings,
     richResultsEligibility: lean.richResultsEligibility,
+    generationDiagnostics: lean.generationDiagnostics,
   };
 }
 
@@ -337,16 +405,22 @@ export async function generateSchemaForPage(
       if (matched?.publishedPath) {
         publishedPath = matched.publishedPath;
       }
+      const activePlan = getSchemaPlan(siteId);
       siteContextForPage = assembleSiteContext(
         allPages,
         baseUrl,
-        getSchemaPlan(siteId)?.canonicalEntities ?? [],
+        activePlan?.status === 'active' ? activePlan.canonicalEntities : [],
       );
     }
   } catch { /* page list failure — fall back to derived path */ } // catch-ok
 
   const url = isHomepage ? baseUrl : `${baseUrl}${publishedPath}`;
   const html = await fetchPublishedHtml(url);
+  const roleOverride = resolveRoleOverride({
+    siteId,
+    pagePath: publishedPath,
+    ctxPageType: ctx.pageType,
+  });
 
   // Per-page slice fetch for pageKeywords (Audit Correction 4: pageKeywords is a PageKeywordMap
   // populated only when buildWorkspaceIntelligence is called with opts.pagePath).
@@ -392,9 +466,13 @@ export async function generateSchemaForPage(
       defaultLocale: ctx._defaultLocale ?? 'en',
       siteKeywordsForKnowsAbout: ctx.siteKeywords, // NEW
       siteHasSearch: ctx._siteHasSearch ?? false, // NEW
+      industrySubtype: roleOverride.schemaRoleOverride?.industrySubtype,
     },
     aiBudget, // PR2: thread per-call budget so AI extractors can run within cap
     siteContext: siteContextForPage, // cross-page hub enrichment
+    pageKindOverride: roleOverride.pageKindOverride,
+    schemaRoleOverride: roleOverride.schemaRoleOverride,
+    inactivePlanStatus: roleOverride.inactivePlanStatus,
   });
 
   // Surface unused parameters to satisfy TS noUnusedParameters via void casts.
@@ -424,9 +502,11 @@ export async function generateSchemaSuggestions(
 
   const wsId = ctx.workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
   const pages = wsId ? await getWorkspacePages(wsId, siteId) : [];
+  const latestPlan = getSchemaPlan(siteId);
+  const activePlan = latestPlan?.status === 'active' ? latestPlan : null;
 
   let siteContext: SiteContext | undefined = pages.length > 0
-    ? assembleSiteContext(pages, baseUrl, getSchemaPlan(siteId)?.canonicalEntities ?? [])
+    ? assembleSiteContext(pages, baseUrl, activePlan?.canonicalEntities ?? [])
     : undefined;
 
   // PR2: ONE shared budget for the entire regenerate-all run (static + CMS loops).
@@ -443,6 +523,11 @@ export async function generateSchemaSuggestions(
     const publishedPath = page.publishedPath || (slug ? `/${slug}` : '/');
     const url = (!slug || slug === 'index') ? baseUrl : `${baseUrl}${publishedPath}`;
     const html = await fetchPublishedHtml(url);
+    const roleOverride = resolveRoleOverride({
+      siteId,
+      pagePath: publishedPath,
+      ctxPageType: undefined,
+    });
 
     // Per-page slice fetch for pageKeywords (5-min LRU + single-flight dedup — cheap).
     let pageKeywords: { primary: string; secondary: string[] } | undefined;
@@ -487,9 +572,13 @@ export async function generateSchemaSuggestions(
         defaultLocale: ctx._defaultLocale ?? 'en',
         siteKeywordsForKnowsAbout: ctx.siteKeywords, // NEW
         siteHasSearch: ctx._siteHasSearch ?? false, // NEW
+        industrySubtype: roleOverride.schemaRoleOverride?.industrySubtype,
       },
       aiBudget, // PR2: shared budget — drains across all static pages in this run
       siteContext, // cross-page hub enrichment
+      pageKindOverride: roleOverride.pageKindOverride,
+      schemaRoleOverride: roleOverride.schemaRoleOverride,
+      inactivePlanStatus: roleOverride.inactivePlanStatus,
     });
     results.push(leanToSuggestion(lean));
     onProgress?.(results, false, `Processed ${results.length} of ${pages.length} static pages...`);
@@ -502,6 +591,11 @@ export async function generateSchemaSuggestions(
     for (const item of cmsItems) {
       if (isCancelled?.()) break;
       const itemHtml = await fetchPublishedHtml(item.url);
+      const roleOverride = resolveRoleOverride({
+        siteId,
+        pagePath: item.path,
+        ctxPageType: undefined,
+      });
       // Per-page slice fetch for CMS item pageKeywords.
       let cmsPageKeywords: { primary: string; secondary: string[] } | undefined;
       if (wsId) {
@@ -539,8 +633,12 @@ export async function generateSchemaSuggestions(
           defaultLocale: ctx._defaultLocale ?? 'en',
           siteKeywordsForKnowsAbout: ctx.siteKeywords, // NEW
           siteHasSearch: ctx._siteHasSearch ?? false, // NEW
+          industrySubtype: roleOverride.schemaRoleOverride?.industrySubtype,
         },
         aiBudget, // PR2: same shared budget — drains across CMS pages in same run
+        pageKindOverride: roleOverride.pageKindOverride,
+        schemaRoleOverride: roleOverride.schemaRoleOverride,
+        inactivePlanStatus: roleOverride.inactivePlanStatus,
       });
       results.push(leanToSuggestion(itemLean));
     }

@@ -12,6 +12,7 @@
 
 import * as cheerio from 'cheerio';
 import { classifyPage } from './classifier.js';
+import type { BusinessKind, ClassifiedPage, PageKind } from './classifier.js';
 import { extractPageData } from './data-sources.js';
 import type { PageMetaInput, WorkspaceSchemaInput } from './data-sources.js';
 import { extractDescription } from './extractors/description.js';
@@ -22,7 +23,9 @@ import type { AiBudget } from './extractors/page-elements/ai-budget.js';
 import { getPageElements, upsertPageElements } from '../page-elements-store.js';
 import type { PageElementCatalog } from '../../shared/types/page-elements.js';
 import { buildArticleSchema } from './templates/article.js';
-import { buildServiceSchema } from './templates/service.js';
+import { buildServiceSchema, buildProductSchema } from './templates/service.js';
+import { buildPricingPageSchema, buildProfilePageSchema } from './templates/rich-roles.js';
+import type { OfferData } from './templates/rich-roles.js';
 import { buildLocalBusinessSchema } from './templates/local-business.js';
 import { buildAboutPageSchema, buildContactPageSchema, buildCollectionPageSchema, buildWebPageSchema, buildBlogIndexSchema, buildServiceHubSchema } from './templates/static.js';
 import { buildHomepageSchema } from './templates/homepage.js';
@@ -30,14 +33,31 @@ import { validateLeanSchema } from './validator.js';
 import { checkRichResultsEligibility } from './rich-results.js';
 import type { RichResultEligibility } from './rich-results.js';
 import type { ValidationFinding } from '../../shared/types/schema-validation.js';
+import type { SchemaGenerationDiagnostics, SchemaRoleSource, SkippedSchemaType } from '../../shared/types/schema-generation.js';
+import type { SchemaIndustrySubtype, SchemaPageRole } from '../../shared/types/schema-plan.js';
 import type { SiteContext, SiteContextPage } from './site-context.js';
-import { extractSemanticData } from './extractors/semantic.js';
-import { generateSchemaForUnknownType } from './extractors/schema-generation.js';
-import type { SemanticPageData } from '../../shared/types/page-elements.js';
+import { validateForGoogleRichResults } from '../schema-validator.js';
 import { createLogger } from '../logger.js';
-import { filterHttpUrls } from './templates/helpers.js';
 
 const log = createLogger('schema/generator');
+
+function pageKindToPrimaryType(kind: PageKind, businessKind: BusinessKind = 'unknown'): string {
+  const map: Record<PageKind, string> = {
+    Homepage:       businessKind === 'local' ? 'LocalBusiness' : 'Organization',
+    BlogPosting:    'BlogPosting',
+    BlogIndex:      'CollectionPage',
+    Service:        'Service',
+    ServiceIndex:   'CollectionPage',
+    CaseStudy:      'Article',
+    CaseStudyIndex: 'CollectionPage',
+    AboutPage:      'AboutPage',
+    ContactPage:    'ContactPage',
+    Location:       'LocalBusiness',
+    Legal:          'WebPage',
+    WebPage:        'WebPage',
+  };
+  return map[kind] ?? 'WebPage';
+}
 
 /** Subset of SchemaPageSuggestion that the generator returns. */
 export interface LeanGeneratorOutput {
@@ -57,6 +77,7 @@ export interface LeanGeneratorOutput {
   /** Backwards-compat: severity=error findings flattened to messages. Snapshot storage + legacy frontend consume this. */
   validationErrors?: string[];
   richResultsEligibility?: RichResultEligibility[];
+  generationDiagnostics?: SchemaGenerationDiagnostics;
 }
 
 export interface LeanGeneratorInput {
@@ -75,6 +96,13 @@ export interface LeanGeneratorInput {
    * Workstream D will extend SiteContext with role/exclusion fields.
    */
   siteContext?: SiteContext;
+  pageKindOverride?: PageKind;
+  schemaRoleOverride?: {
+    role: SchemaPageRole;
+    source: Exclude<SchemaRoleSource, 'auto-detect'>;
+    industrySubtype?: SchemaIndustrySubtype;
+  };
+  inactivePlanStatus?: string;
 }
 
 function detectExistingSchemas(html: string): string[] {
@@ -141,162 +169,99 @@ function resolveHubChildren(input: LeanGeneratorInput): Array<{ id: string }> | 
   return resolved.length > 0 ? resolved : null;
 }
 
-/**
- * Post-enrichment pass: appends FAQPage (from semantics.faq), VideoObject nodes
- * (from catalog.videos, with semantics fallback), sameAs, and AggregateRating to
- * the primary org/localbusiness node. Each append uses the existing rollback pattern:
- * append → validate → if new errors introduced → pop.
- */
-function applyPostEnrichment(
-  schema: Record<string, unknown>,
-  semantics: SemanticPageData | undefined,
-  catalog: PageElementCatalog | undefined,
-  canonicalUrl: string,
-  primaryType: string,
-  baseValidationFindings: ValidationFinding[],
-  uploadDate: string | undefined,
-): Record<string, unknown> {
-  const graph = schema['@graph'] as Array<Record<string, unknown>>;
-  if (!Array.isArray(graph)) return schema;
-
-  const findingKey = (f: { ruleId: string; type: string; field?: string }) =>
-    `${f.ruleId}::${f.type}::${f.field ?? ''}`;
-  const baseFindingKeySet = new Set(baseValidationFindings.map(findingKey));
-
-  function tryAppend(node: Record<string, unknown>): void {
-    graph.push(node);
-    const postFindings = validateLeanSchema(schema, primaryType);
-    const newErrors = postFindings.filter(
-      f => f.severity === 'error' && !baseFindingKeySet.has(findingKey(f)),
-    );
-    if (newErrors.length > 0) {
-      graph.pop();
-      log.debug({ type: node['@type'], errors: newErrors }, 'post-enrichment: rolled back append due to new errors');
-    }
+function extractVisibleOffers(html: string, fallbackName: string): OfferData[] {
+  const $ = cheerio.load(html || '');
+  $('script, style, noscript').remove();
+  const text = $('body').text().replace(/\s+/g, ' ').trim();
+  const matches = text.matchAll(/(?:US\$|\$)\s?(\d{1,5}(?:,\d{3})?(?:\.\d{2})?)/g);
+  const offers: OfferData[] = [];
+  for (const match of matches) {
+    const rawPrice = match[1]?.replace(/,/g, '');
+    if (!rawPrice) continue;
+    const before = text.slice(Math.max(0, match.index - 80), match.index).trim();
+    const name = before.match(/([A-Z][A-Za-z0-9 +&/-]{2,40})$/)?.[1]?.trim();
+    offers.push({
+      name: name || fallbackName,
+      price: rawPrice,
+      priceCurrency: 'USD',
+    });
+    if (offers.length >= 6) break;
   }
+  return offers;
+}
 
-  // 1. FAQPage from semantics.faq (only if not already present from extractFaq)
-  const hasFaqPage = graph.some(n => n['@type'] === 'FAQPage');
-  if (!hasFaqPage && (semantics?.faq?.length ?? 0) >= 2) {
-    tryAppend({
-      '@type': 'FAQPage',
-      '@id': `${canonicalUrl}#faq`,
-      'mainEntity': semantics!.faq!.map(pair => ({
-        '@type': 'Question',
-        'name': pair.question,
-        'acceptedAnswer': { '@type': 'Answer', 'text': pair.answer },
-      })),
+function hasGraphType(schema: Record<string, unknown>, type: string): boolean {
+  const graph = schema['@graph'] as Array<Record<string, unknown>> | undefined;
+  return Array.isArray(graph) && graph.some(node => node['@type'] === type);
+}
+
+function validationStatus(findings: ValidationFinding[]): 'valid' | 'warnings' | 'errors' {
+  if (findings.some(f => f.severity === 'error')) return 'errors';
+  if (findings.some(f => f.severity === 'warning')) return 'warnings';
+  return 'valid';
+}
+
+function roleToDiagnosticsType(role: SchemaPageRole): string | null {
+  const map: Partial<Record<SchemaPageRole, string>> = {
+    product: 'Product',
+    faq: 'FAQPage',
+    howto: 'HowTo',
+    video: 'VideoObject',
+    pricing: 'Offer',
+    author: 'ProfilePage',
+    'job-posting': 'JobPosting',
+    course: 'Course',
+    event: 'Event',
+    review: 'Review',
+    recipe: 'Recipe',
+  };
+  return map[role] ?? null;
+}
+
+function buildGenerationDiagnostics(input: {
+  role?: SchemaPageRole;
+  roleSource: SchemaRoleSource;
+  emittedTypes: string[];
+  skippedSchemaTypes: SkippedSchemaType[];
+  richResultsEligibility: RichResultEligibility[];
+  validationFindings: ValidationFinding[];
+  validationStatus?: 'valid' | 'warnings' | 'errors';
+  inactivePlanStatus?: string;
+}): SchemaGenerationDiagnostics {
+  const skippedSchemaTypes = [...input.skippedSchemaTypes];
+  if (input.inactivePlanStatus && input.roleSource === 'auto-detect') {
+    skippedSchemaTypes.unshift({
+      type: 'SchemaSitePlan',
+      reason: `Plan role ignored: schema site plan is ${input.inactivePlanStatus}, not active.`,
     });
   }
-
-  // 2. VideoObject nodes — catalog.videos is authoritative; semantics.videos supplements only if catalog empty
-  const videoSources = catalog?.videos?.length ? catalog.videos : [];
-  const semanticsVideos = (!videoSources.length && semantics?.videos?.length) ? semantics.videos : [];
-  const existingVideoIds = new Set(graph.filter(n => n['@type'] === 'VideoObject').map(n => n['@id']));
-
-  // VideoObject requires uploadDate — skip entirely when unavailable to avoid
-  // immediate rollback (tryAppend validates and pops on new errors).
-  if (uploadDate) {
-    for (const [idx, v] of videoSources.entries()) {
-      const videoId = `${canonicalUrl}#video-${idx}`;
-      if (!existingVideoIds.has(videoId)) {
-        tryAppend({
-          '@type': 'VideoObject',
-          '@id': videoId,
-          'name': v.title || 'Video',
-          'description': `Video on ${canonicalUrl}`,
-          'uploadDate': uploadDate,
-          'thumbnailUrl': v.thumbnailUrl,
-          'embedUrl': v.embedUrl,
-        });
-      }
-    }
-    for (const [idx, v] of semanticsVideos.entries()) {
-      const videoId = `${canonicalUrl}#semvideo-${idx}`;
-      if (!existingVideoIds.has(videoId)) {
-        const safeThumb = filterHttpUrls([v.thumbnailUrl ?? ''])[0];
-        const safeContent = filterHttpUrls([v.contentUrl ?? ''])[0];
-        tryAppend({
-          '@type': 'VideoObject',
-          '@id': videoId,
-          'name': v.name || 'Video',
-          'description': v.description || `Video on ${canonicalUrl}`,
-          'uploadDate': uploadDate,
-          ...(safeThumb ? { 'thumbnailUrl': safeThumb } : {}),
-          ...(safeContent ? { 'contentUrl': safeContent } : {}),
-        });
-      }
-    }
-  }
-
-  // 3. sameAs on primary org/localbusiness node
-  if (semantics?.sameAs?.length) {
-    const primaryNode = graph.find(n => {
-      const t = n['@type'];
-      return typeof t === 'string' && (
-        t === 'Organization' || t === 'LocalBusiness' ||
-        ['Dentist', 'Physician', 'LegalService', 'ProfessionalService', 'MedicalBusiness',
-         'HealthAndBeautyBusiness', 'FoodEstablishment', 'Hotel'].includes(t)
-      );
-    });
-    if (primaryNode && !primaryNode.sameAs) {
-      primaryNode.sameAs = semantics.sameAs;
-      const postFindings = validateLeanSchema(schema, primaryType);
-      const newErrors = postFindings.filter(
-        f => f.severity === 'error' && !baseFindingKeySet.has(findingKey(f)),
-      );
-      if (newErrors.length > 0) {
-        delete primaryNode.sameAs;
-      }
-    }
-  }
-
-  // 4. AggregateRating on primary node (if not already set).
-  // Inclusion list mirrors types Google allows AggregateRating on — avoids attaching to
-  // structural nodes (BreadcrumbList, WebSite) or secondary content nodes (FAQPage, VideoObject).
-  if (semantics?.aggregateRating) {
-    const AGGREGATE_RATING_TYPES = new Set([
-      'LocalBusiness', 'Organization', 'Service', 'Product', 'Course', 'Event', 'Recipe',
-      'Movie', 'Book', 'SoftwareApplication', 'Offer',
-      // LocalBusiness subtypes
-      'Dentist', 'Physician', 'Attorney', 'LegalService', 'FinancialService',
-      'ProfessionalService', 'HomeAndConstructionBusiness', 'InsuranceAgency', 'RealEstateAgent',
-      'HealthAndBeautyBusiness', 'MedicalBusiness', 'MedicalClinic',
-      'FoodEstablishment', 'Restaurant', 'Hotel', 'Store', 'AutoDealer',
-    ]);
-    const primaryNode = graph.find(n => {
-      const t = n['@type'];
-      return typeof t === 'string' && AGGREGATE_RATING_TYPES.has(t);
-    });
-    if (primaryNode && !primaryNode.aggregateRating) {
-      primaryNode.aggregateRating = {
-        '@type': 'AggregateRating',
-        'ratingValue': semantics.aggregateRating.ratingValue,
-        ...(semantics.aggregateRating.reviewCount !== undefined && {
-          'reviewCount': semantics.aggregateRating.reviewCount,
-        }),
-        'bestRating': 5,
-        'worstRating': 1,
-      };
-      const postFindings = validateLeanSchema(schema, primaryType);
-      const newErrors = postFindings.filter(
-        f => f.severity === 'error' && !baseFindingKeySet.has(findingKey(f)),
-      );
-      if (newErrors.length > 0) {
-        delete primaryNode.aggregateRating;
-      }
-    }
-  }
-
-  return schema;
+  return {
+    plannedRole: input.role,
+    effectiveRole: input.role,
+    roleSource: input.roleSource,
+    emittedTypes: input.emittedTypes,
+    skippedSchemaTypes,
+    richResultsEligibility: input.richResultsEligibility,
+    validationStatus: input.validationStatus ?? validationStatus(input.validationFindings),
+  };
 }
 
 export async function generateLeanSchema(input: LeanGeneratorInput): Promise<LeanGeneratorOutput> {
   // Fix 1: strip trailing slashes from baseUrl to prevent //path canonical URLs
   const baseUrl = input.baseUrl.replace(/\/+$/, '');
 
-  const businessKind = input.workspace.businessProfile?.address ? 'local' : 'unknown';
-  const classified = classifyPage(`${baseUrl}${input.pageMeta.publishedPath}`, baseUrl, { businessKind });
+  const businessKind: BusinessKind = input.workspace.businessProfile?.address ? 'local' : 'unknown';
+  const classified: ClassifiedPage = input.pageKindOverride
+    ? {
+        kind: input.pageKindOverride,
+        primaryType: pageKindToPrimaryType(input.pageKindOverride, businessKind),
+        pagePath: input.pageMeta.publishedPath,
+      }
+    : classifyPage(`${baseUrl}${input.pageMeta.publishedPath}`, baseUrl, { businessKind });
+  const role = input.schemaRoleOverride?.role;
+  const roleSource: SchemaRoleSource = input.schemaRoleOverride?.source ?? 'auto-detect';
+  const industrySubtype = input.schemaRoleOverride?.industrySubtype ?? input.workspace.industrySubtype;
+  const skippedSchemaTypes: SkippedSchemaType[] = [];
 
   // Fix 2: warn when HTML is empty — existing-schema detection returns [] silently
   if (!input.html || input.html.trim().length === 0) {
@@ -329,29 +294,17 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
           aiBudget,
           workspaceId,
         });
-        // Sequential after extractPageElements to avoid write-race on the same catalog row.
-        // extractSemanticData is NOT gated by AiBudget — it always runs when catalog is stale.
-        const semanticsExtracted = await extractSemanticData(input.html ?? '', {
-          pageBaseUrl: baseUrl,
-          workspaceBusinessProfile: input.workspace.businessProfile,
-          workspaceId,
-        });
-        catalog = { ...catalog, semantics: semanticsExtracted };
         upsertPageElements(workspaceId, pagePath, catalog);
       } catch (err) { // catch-ok: extraction or persistence failure — schema generation continues
-        // The catch covers three distinct failure modes:
+        // The catch covers two distinct failure modes:
         //   1. extractPageElements throws → catalog is undefined; schema falls
         //      back to non-enriched behavior (this is the "skipped" path).
-        //   2. extractSemanticData throws (normally it catches internally and
-        //      returns {} — but defensively handled here) → catalog IS populated
-        //      and enrichment proceeds without semantics; only semantics is skipped.
-        //   3. extractPageElements and extractSemanticData succeed but
-        //      upsertPageElements throws (FK violation, disk error, etc.) →
-        //      catalog IS populated and enrichment proceeds in-memory; only
-        //      persistence is skipped.
+        //   2. extractPageElements succeeds but upsertPageElements throws (FK
+        //      violation, disk error, etc.) → catalog IS populated and the
+        //      enrichment proceeds in-memory; only persistence is skipped.
         // The log distinguishes the two so operators can tell which path fired.
         if (catalog) {
-          log.warn({ err, workspaceId, pagePath }, 'page-element extraction or persistence failed; schema enrichment proceeds with in-memory catalog');
+          log.warn({ err, workspaceId, pagePath }, 'page-element persistence failed; schema enrichment proceeds with in-memory catalog');
         } else {
           log.warn({ err, workspaceId, pagePath }, 'page-element extraction failed; schema enrichment skipped');
         }
@@ -360,8 +313,19 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       catalog = stored.catalog;
     }
   }
+  if (!catalog && (role === 'howto' || role === 'video')) {
+    try {
+      catalog = await extractPageElements(input.html ?? '', {
+        pageBaseUrl: baseUrl,
+        sourcePublishedAt: input.pageMeta.sourcePublishedAt ?? null,
+        aiBudget: input.aiBudget ?? createAiBudget(0),
+        workspaceId: workspaceId ?? 'schema-preview',
+      });
+    } catch (err) { // catch-ok: in-memory enrichment is optional
+      log.warn({ err, pageId: input.pageId }, 'page-element extraction failed; planned rich role will fall back conservatively');
+    }
+  }
   pageData = { ...pageData, elements: catalog };
-  const semantics = catalog?.semantics;
 
   // Surgical AI: only if no description was found
   if (!pageData.description) {
@@ -376,10 +340,65 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
     }
   }
 
-  // Build template by kind
+  // Build template by explicit role first, then deterministic PageKind.
   let schema: Record<string, unknown>;
   let reason: string;
-  switch (classified.kind) {
+  const offers = extractVisibleOffers(input.html, pageData.cleanTitle || pageData.title);
+
+  if (role === 'product') {
+    schema = buildProductSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile, offers });
+    reason = offers.length > 0
+      ? 'Product page — Product with visible price-backed Offer data.'
+      : 'Product page — Product without Offer because no visible price/currency was verified.';
+    if (offers.length === 0) {
+      skippedSchemaTypes.push({
+        type: 'Offer',
+        reason: 'Product emitted without Offer: price/currency not verified.',
+        missingFields: ['price', 'priceCurrency'],
+      });
+    }
+  } else if (role === 'pricing') {
+    schema = buildPricingPageSchema({ baseUrl, pageData, offers });
+    reason = offers.length > 0
+      ? 'Pricing page — WebPage with visible price-backed Offer nodes.'
+      : 'Pricing page — WebPage only because no visible price/currency was verified.';
+    if (offers.length === 0) {
+      skippedSchemaTypes.push({
+        type: 'Offer',
+        reason: 'Offer skipped: price/currency not verified.',
+        missingFields: ['price', 'priceCurrency'],
+      });
+    }
+  } else if (role === 'author') {
+    schema = buildProfilePageSchema({ baseUrl, pageData });
+    reason = 'Author/profile page — ProfilePage with Person mainEntity from visible page data.';
+  } else if (role === 'faq') {
+    schema = buildWebPageSchema({ baseUrl, pageData });
+    reason = 'FAQ role — WebPage base; FAQPage is emitted only when valid Q&A pairs are visible.';
+  } else if (role === 'howto') {
+    schema = buildArticleSchema({ baseUrl, pageData }, 'Article');
+    reason = 'How-to role — Article base; HowTo is emitted only when visible step lists are extracted.';
+  } else if (role === 'video') {
+    schema = buildArticleSchema({ baseUrl, pageData }, 'Article');
+    reason = 'Video role — Article base; VideoObject is emitted only when required video fields are verified.';
+  } else if (role === 'job-posting' || role === 'course' || role === 'event') {
+    schema = buildWebPageSchema({ baseUrl, pageData });
+    const type = roleToDiagnosticsType(role)!;
+    reason = `${type} role — WebPage fallback because required rich-result fields were not fully verified.`;
+    skippedSchemaTypes.push({
+      type,
+      reason: `${type} skipped: required fields were not fully verified from visible or workspace data.`,
+    });
+  } else if (role === 'review' || role === 'recipe') {
+    schema = buildWebPageSchema({ baseUrl, pageData });
+    const type = roleToDiagnosticsType(role)!;
+    reason = `${type} role — WebPage fallback because required rich-result fields were not fully verified.`;
+    skippedSchemaTypes.push({
+      type,
+      reason: `${type} skipped: required fields were not fully verified from visible page data.`,
+    });
+  } else {
+    switch (classified.kind) {
     case 'Homepage':
       if (classified.primaryType === 'LocalBusiness') {
         schema = buildLocalBusinessSchema({
@@ -387,33 +406,25 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
           pageData,
           businessProfile: input.workspace.businessProfile,
           siteHasSearch: input.workspace.siteHasSearch,
-          semantics,
+          industrySubtype,
         });
         reason = 'Local business homepage — LocalBusiness with verified contact info.';
       } else {
-        schema = buildHomepageSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile, siteHasSearch: input.workspace.siteHasSearch, semantics });
+        schema = buildHomepageSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile, siteHasSearch: input.workspace.siteHasSearch });
         reason = 'Homepage — Organization + WebSite (sitewide entities).';
       }
       break;
     case 'BlogPosting':
-      schema = buildArticleSchema({ baseUrl, pageData, semantics }, 'BlogPosting');
+      schema = buildArticleSchema({ baseUrl, pageData }, 'BlogPosting');
       reason = 'Blog post — BlogPosting with author/publisher/dates.';
       break;
     case 'CaseStudy':
-      schema = buildArticleSchema({ baseUrl, pageData, semantics }, 'Article');
+      schema = buildArticleSchema({ baseUrl, pageData }, 'Article');
       reason = 'Case study — Article (not Service) with about="Case study".';
       break;
     case 'Service':
-      schema = buildServiceSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile, semantics });
+      schema = buildServiceSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile });
       reason = 'Service detail page — Service with provider reference.';
-      break;
-    case 'AboutPage':
-      schema = buildAboutPageSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile, semantics });
-      reason = 'About page — AboutPage with LocalBusiness mainEntity when address is set.';
-      break;
-    case 'ContactPage':
-      schema = buildContactPageSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile, semantics });
-      reason = 'Contact page — ContactPage with LocalBusiness mainEntity when address is set.';
       break;
     case 'Location':
       schema = buildLocalBusinessSchema({
@@ -421,9 +432,17 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
         pageData,
         businessProfile: input.workspace.businessProfile,
         siteHasSearch: input.workspace.siteHasSearch,
-        semantics,
+        industrySubtype,
       });
-      reason = 'Location page — LocalBusiness with NAP/hours from semantic extraction when available.';
+      reason = 'Location page — LocalBusiness with verified business profile details when available.';
+      break;
+    case 'AboutPage':
+      schema = buildAboutPageSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile });
+      reason = 'About page — AboutPage with LocalBusiness mainEntity when address is set.';
+      break;
+    case 'ContactPage':
+      schema = buildContactPageSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile });
+      reason = 'Contact page — ContactPage with LocalBusiness mainEntity when address is set.';
       break;
     case 'BlogIndex': {
       const children = resolveHubChildren(input);
@@ -459,23 +478,9 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       break;
     }
     case 'Legal':
-      schema = buildWebPageSchema({ baseUrl, pageData });
-      reason = 'Legal page — WebPage with breadcrumb.';
-      break;
     case 'WebPage':
-      if (semantics && Object.keys(semantics).length > 0) {
-        try {
-          schema = await generateSchemaForUnknownType({ semantics, pageData, workspace: { ...input.workspace, id: input.workspace.id ?? '' }, baseUrl });
-          reason = `Unknown page type — Haiku-generated schema based on extracted page content (category: ${semantics.pageCategory ?? 'unclassified'}).`;
-        } catch (err) {
-          log.warn({ err, pageId: input.pageId }, 'generateSchemaForUnknownType failed; falling back to WebPage');
-          schema = buildWebPageSchema({ baseUrl, pageData });
-          reason = 'Generic page — WebPage (AI generation failed).';
-        }
-      } else {
-        schema = buildWebPageSchema({ baseUrl, pageData });
-        reason = 'Generic page — WebPage with breadcrumb.';
-      }
+      schema = buildWebPageSchema({ baseUrl, pageData });
+      reason = 'Generic page — WebPage with breadcrumb.';
       break;
     default: {
       // Exhaustiveness check — TS will error here if a new PageKind value is added
@@ -485,6 +490,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       schema = buildWebPageSchema({ baseUrl, pageData });
       reason = 'Generic page — WebPage (unreachable fallback).';
       break;
+    }
     }
   }
 
@@ -523,19 +529,48 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       (schema['@graph'] as Array<Record<string, unknown>>).pop();
     }
   }
-
-  // Post-enrichment pass: FAQPage (from semantics), VideoObject, sameAs, AggregateRating
-  schema = applyPostEnrichment(schema, semantics, catalog, pageData.canonicalUrl, classified.primaryType, baseValidationFindings, pageData.datePublished);
+  if (role === 'faq' && !hasGraphType(schema, 'FAQPage')) {
+    skippedSchemaTypes.push({
+      type: 'FAQPage',
+      reason: 'FAQPage skipped: no valid Q&A pairs found.',
+      missingFields: ['mainEntity'],
+    });
+  }
+  if (role === 'howto' && !hasGraphType(schema, 'HowTo')) {
+    skippedSchemaTypes.push({
+      type: 'HowTo',
+      reason: 'HowTo skipped: no visible step list was extracted.',
+      missingFields: ['step'],
+    });
+  }
+  if (role === 'video' && !hasGraphType(schema, 'VideoObject')) {
+    skippedSchemaTypes.push({
+      type: 'VideoObject',
+      reason: 'VideoObject skipped: required video fields were not verified.',
+      missingFields: ['uploadDate', 'thumbnailUrl'],
+    });
+  }
 
   // Surface validation findings of the FINAL schema (after FAQ resolution) to caller
   const validationFindings = validateLeanSchema(schema, classified.primaryType);
 
   // Fix 3: compute rich results eligibility and pass through to caller
   const richResultsEligibility = checkRichResultsEligibility(schema);
+  const publishValidation = validateForGoogleRichResults(schema);
 
   // Determine declared types for the suggestion `type` field
   const graph = (schema['@graph'] as Array<Record<string, unknown>>) ?? [];
   const declaredTypes = graph.map(n => n['@type']).filter((t): t is string => typeof t === 'string');
+  const generationDiagnostics = buildGenerationDiagnostics({
+    role,
+    roleSource,
+    emittedTypes: declaredTypes,
+    skippedSchemaTypes,
+    richResultsEligibility,
+    validationFindings,
+    validationStatus: publishValidation.status,
+    inactivePlanStatus: input.inactivePlanStatus,
+  });
 
   return {
     pageId: input.pageId,
@@ -560,5 +595,6 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       return errors.length > 0 ? errors : undefined;
     })(),
     richResultsEligibility: richResultsEligibility.length > 0 ? richResultsEligibility : undefined,
+    generationDiagnostics,
   };
 }

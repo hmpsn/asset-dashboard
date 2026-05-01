@@ -293,9 +293,9 @@ ROLES (choose exactly one per page):
 - recipe: Recipe pages with ingredients/instructions — Recipe schema eligible for Recipe rich results
 - generic: Anything that doesn't fit above — WebPage + BreadcrumbList only
 
-INDUSTRY SUBTYPES: If the site is in healthcare or financial services, note this in the "notes" field:
-- Medical sites: Use "MedicalOrganization" or "Physician" instead of "LocalBusiness" for the main entity
-- Financial sites: Use "FinancialService" instead of "LocalBusiness" for the main entity
+INDUSTRY SUBTYPES: If the site is in healthcare or financial services, set "industrySubtype":
+- Medical sites: "medical" so the generator can use MedicalOrganization/healthcare-specific LocalBusiness output
+- Financial sites: "financial" so the generator can use FinancialService output
 
 CANONICAL ENTITIES: Identify the DISTINCT products/services this site offers. Most SaaS sites have ONE product.
 - Each entity needs: type (SoftwareApplication or Service), name, canonicalUrl (the pillar page), id (@id format)
@@ -330,7 +330,7 @@ Return JSON with this exact structure:
     { "type": "SoftwareApplication", "name": "Product Name", "canonicalUrl": "${siteUrl}/platform", "id": "${siteUrl}/platform/#software", "description": "One-sentence description" }
   ],
   "pageRoles": [
-    { "pagePath": "/", "pageTitle": "Homepage", "role": "homepage", "primaryType": "Organization", "entityRefs": ["${siteUrl}/platform/#software"], "notes": "Full Org + WebSite + product entity" },
+    { "pagePath": "/", "pageTitle": "Homepage", "role": "homepage", "primaryType": "Organization", "entityRefs": ["${siteUrl}/platform/#software"], "notes": "Full Org + WebSite + product entity", "industrySubtype": null },
     { "pagePath": "/platform", "pageTitle": "Platform", "role": "pillar", "primaryType": "SoftwareApplication", "entityRefs": [], "notes": "Canonical product page" },
     { "pagePath": "/ai-leaders", "pageTitle": "For AI Leaders", "role": "audience", "primaryType": "WebPage", "entityRefs": ["${siteUrl}/platform/#software"], "notes": "References product, no own Service node" }
   ]
@@ -341,6 +341,7 @@ IMPORTANT:
 - The pillar page that OWNS an entity should have an empty entityRefs for that entity (it creates it)
 - The homepage should reference all canonical entities
 - primaryType is the main schema @type for the page's content (not Organization/WebSite — those are handled separately)
+- industrySubtype must be "medical", "financial", or null
 - For CMS collections with many pages, you may use a WILDCARD entry like { "pagePath": "/blog/*", ... } to assign the same role to all pages in that collection. The system will expand it to individual pages.
 - Return ONLY valid JSON, no markdown`;
 
@@ -372,14 +373,31 @@ IMPORTANT:
       'job-posting', 'course', 'event', 'author', 'review', 'pricing', 'recipe', 'generic',
     ]);
 
-    const rawRoles: PageRoleAssignment[] = parsed.pageRoles.map((pr: Record<string, unknown>) => ({
-      pagePath: String(pr.pagePath || ''),
-      pageTitle: String(pr.pageTitle || ''),
-      role: validRoles.has(String(pr.role)) ? String(pr.role) as SchemaPageRole : 'generic',
-      primaryType: String(pr.primaryType || 'WebPage'),
-      entityRefs: Array.isArray(pr.entityRefs) ? pr.entityRefs.map(String) : [],
-      notes: pr.notes ? String(pr.notes) : undefined,
-    }));
+    const rawRoles: PageRoleAssignment[] = parsed.pageRoles.map((pr: Record<string, unknown>) => {
+      const rawSubtype = typeof pr.industrySubtype === 'string'
+        ? pr.industrySubtype.toLowerCase()
+        : '';
+      const notes = pr.notes ? String(pr.notes) : undefined;
+      const noteSubtype = notes && /\bmedical(organization| clinic| practice)?\b/i.test(notes)
+        ? 'medical'
+        : notes && /\bfinancial(service| services| advisor| planning)?\b/i.test(notes)
+          ? 'financial'
+          : '';
+      const industrySubtype = rawSubtype === 'medical' || rawSubtype === 'financial'
+        ? rawSubtype
+        : noteSubtype === 'medical' || noteSubtype === 'financial'
+          ? noteSubtype
+          : null;
+      return {
+        pagePath: String(pr.pagePath || ''),
+        pageTitle: String(pr.pageTitle || ''),
+        role: validRoles.has(String(pr.role)) ? String(pr.role) as SchemaPageRole : 'generic',
+        primaryType: String(pr.primaryType || 'WebPage'),
+        entityRefs: Array.isArray(pr.entityRefs) ? pr.entityRefs.map(String) : [],
+        notes,
+        industrySubtype,
+      };
+    });
 
     // Expand wildcard entries (e.g. "/blog/*") to individual page entries
     const pageRoles: PageRoleAssignment[] = [];

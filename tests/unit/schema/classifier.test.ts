@@ -68,6 +68,8 @@ describe('classifyPage', () => {
     expect(classifyPage(`${BASE}/clinic/north`, BASE).kind).toBe('Location');
     expect(classifyPage(`${BASE}/branch/west`, BASE).kind).toBe('Location');
     expect(classifyPage(`${BASE}/branches/south`, BASE).kind).toBe('Location');
+    expect(classifyPage(`${BASE}/store/downtown`, BASE).kind).toBe('Location');
+    expect(classifyPage(`${BASE}/stores/main-street`, BASE).kind).toBe('Location');
   });
 
   it('Location pages have LocalBusiness primaryType', () => {

@@ -31,8 +31,7 @@ import { callOpenAI } from '../openai-helpers.js';
 import { generateRecommendations, loadRecommendations } from '../recommendations.js';
 import { saveSnapshot, getLatestSnapshotBefore } from '../reports.js';
 import { runSalesAudit } from '../sales-audit.js';
-import { saveSchemaSnapshot, updateSnapshotSchemaOrgStatus } from '../schema-store.js';
-import { validateWithSchemaOrg } from '../schema/schema-org-validator.js';
+import { saveSchemaSnapshot } from '../schema-store.js';
 import { generateSchemaSuggestions } from '../schema-suggester.js';
 import { getValidations } from '../schema-validator.js';
 import { runSeoAudit } from '../seo-audit.js';
@@ -659,17 +658,7 @@ router.post('/api/jobs', async (req, res) => {
             }, () => isJobCancelled(job.id), gscMap, ga4Map, queryPageData, insightsMap, validationsByPageId);
             // Final save — always write the complete result
             if (result.length > 0) {
-              const snapshot = saveSchemaSnapshot(schemaSiteId, schemaWsId, result);
-              // Validate the first page schema against schema.org API and persist the result.
-              // Fire-and-forget: uses the first page as a representative sample for the snapshot.
-              const firstTemplate = result[0]?.suggestedSchemas?.[0]?.template;
-              if (firstTemplate) {
-                validateWithSchemaOrg(firstTemplate).then(({ status, issues }) => {
-                  updateSnapshotSchemaOrgStatus(snapshot.id, status, issues);
-                }).catch(() => {
-                  // validateWithSchemaOrg logs internally on failure — nothing more to do
-                });
-              }
+              saveSchemaSnapshot(schemaSiteId, schemaWsId, result);
             }
             if (isJobCancelled(job.id)) {
               updateJob(job.id, { status: 'cancelled', result, message: `Cancelled — ${result.length} pages completed before stop` });

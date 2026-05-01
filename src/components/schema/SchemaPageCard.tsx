@@ -14,6 +14,7 @@ import { statusBorderClass, type PageEditStatus } from '../ui/statusConfig';
 import { SchemaEditor } from './SchemaEditor';
 import { SchemaVersionHistory } from './SchemaVersionHistory';
 import type { ValidationFinding } from '../../../shared/types/schema-validation';
+import type { SchemaGenerationDiagnostics } from '../../../shared/types/schema-generation';
 
 interface SchemaSuggestion {
   type: string;
@@ -40,6 +41,7 @@ interface SchemaPageSuggestion {
   validationErrors?: string[];
   validationFindings?: ValidationFinding[];
   richResultsEligibility?: RichResultEligibility[];
+  generationDiagnostics?: SchemaGenerationDiagnostics;
   lastPublishedAt?: string | null;
 }
 
@@ -130,6 +132,7 @@ export function SchemaPageCard({
   const schema = page.suggestedSchemas[0];
   const graphTypes = schema ? ((schema.template?.['@graph'] as Record<string, unknown>[]) || []).map(n => n['@type'] as string).filter(Boolean) : [];
   const eligibleCount = page.richResultsEligibility?.filter(r => r.eligible).length || 0;
+  const diagnostics = page.generationDiagnostics;
 
   // Stale schema detection: published > 90 days ago
   const staleDays = page.lastPublishedAt
@@ -356,6 +359,40 @@ export function SchemaPageCard({
             </div>
             <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1.5">{schema.reason}</p>
           </div>
+
+          {diagnostics && (
+            <div className="px-4 py-2 border-b border-[var(--brand-border)]/50">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Icon as={ShieldCheck} size="sm" className="text-teal-400/80" />
+                <div className="t-caption font-medium text-[var(--brand-text-muted)]">Generation diagnostics</div>
+              </div>
+              <div className="flex flex-wrap gap-1.5 mb-1.5">
+                <span className="px-2 py-1 rounded-[var(--radius-md)] t-caption-sm bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)]">
+                  {diagnostics.roleSource === 'auto-detect' ? 'Auto-detected' : diagnostics.roleSource === 'site-plan' ? 'Site plan' : 'UI override'}
+                  {diagnostics.effectiveRole ? `: ${diagnostics.effectiveRole}` : ''}
+                </span>
+                <span className={cn(
+                  'px-2 py-1 rounded-[var(--radius-md)] t-caption-sm border',
+                  diagnostics.validationStatus === 'errors'
+                    ? 'bg-red-500/8 text-red-400/80 border-red-500/20'
+                    : diagnostics.validationStatus === 'warnings'
+                      ? 'bg-amber-500/8 text-amber-400/80 border-amber-500/20'
+                      : 'bg-emerald-500/8 text-emerald-400/80 border-emerald-500/20',
+                )}>
+                  {diagnostics.validationStatus}
+                </span>
+              </div>
+              {diagnostics.skippedSchemaTypes.length > 0 && (
+                <div className="space-y-1">
+                  {diagnostics.skippedSchemaTypes.map((skip, i) => (
+                    <div key={`${skip.type}-${i}`} className="t-caption-sm text-[var(--brand-text-muted)]">
+                      <span className="text-amber-400/80">{skip.type}</span>: {skip.reason}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Rich Results Eligibility */}
           {page.richResultsEligibility && page.richResultsEligibility.length > 0 && (

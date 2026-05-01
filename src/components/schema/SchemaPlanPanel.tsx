@@ -19,7 +19,8 @@ interface Props {
 const ROLE_OPTIONS: SchemaPageRole[] = [
   'homepage', 'pillar', 'service', 'audience', 'lead-gen', 'blog', 'about',
   'contact', 'location', 'product', 'partnership', 'faq', 'case-study',
-  'comparison', 'generic',
+  'comparison', 'author', 'howto', 'video', 'job-posting', 'course', 'event',
+  'review', 'pricing', 'recipe', 'generic',
 ];
 
 const ROLE_COLORS: Partial<Record<SchemaPageRole, string>> = {
@@ -37,6 +38,15 @@ const ROLE_COLORS: Partial<Record<SchemaPageRole, string>> = {
   faq: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
   'case-study': 'bg-blue-500/15 text-blue-300 border-blue-500/30',
   comparison: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+  author: 'bg-purple-500/15 text-purple-300 border-purple-500/30',
+  howto: 'bg-lime-500/15 text-lime-300 border-lime-500/30',
+  video: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
+  'job-posting': 'bg-blue-500/15 text-blue-300 border-blue-500/30',
+  course: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
+  event: 'bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/30',
+  review: 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30',
+  pricing: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+  recipe: 'bg-red-500/15 text-red-300 border-red-500/30',
   generic: 'bg-[var(--brand-text-muted)]/10 text-[var(--brand-text)] border-[var(--brand-text-dim)]/30',
 };
 const DEFAULT_ROLE_COLOR = 'bg-[var(--brand-text-muted)]/10 text-[var(--brand-text)] border-[var(--brand-text-dim)]/30';

@@ -26,6 +26,7 @@ import { PendingApprovals } from './PendingApprovals';
 import { SchemaWorkflowGuide } from './schema/SchemaWorkflowGuide';
 import { SCHEMA_ROLE_INDEX } from '../../shared/types/schema-plan';
 import type { ValidationFinding } from '../../shared/types/schema-validation';
+import type { SchemaGenerationDiagnostics } from '../../shared/types/schema-generation';
 import { adminPath } from '../routes.js';
 
 type SchemaSubTab = 'generator' | 'guide';
@@ -55,6 +56,7 @@ interface SchemaPageSuggestion {
   validationErrors?: string[];
   validationFindings?: ValidationFinding[];
   richResultsEligibility?: RichResultEligibility[];
+  generationDiagnostics?: SchemaGenerationDiagnostics;
   lastPublishedAt?: string | null;
 }
 
