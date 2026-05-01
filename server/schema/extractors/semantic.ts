@@ -15,6 +15,7 @@ const log = createLogger('schema/extractors/semantic');
 const SOCIAL_DOMAINS = [
   'linkedin.com', 'facebook.com', 'instagram.com', 'twitter.com', 'x.com',
   'yelp.com', 'tiktok.com', 'youtube.com',
+  'google.com', 'bbb.org',
 ];
 
 const MAX_TEXT_CHARS = 24_000;
@@ -67,7 +68,7 @@ const EXTRACT_TOOL: AnthropicToolDefinition = {
           postalCode: { type: 'string' },
           country: { type: 'string' },
         },
-        required: ['street', 'city', 'state', 'postalCode'],
+        required: ['street', 'city', 'state'],
       },
       geo: {
         type: 'object',
@@ -79,7 +80,7 @@ const EXTRACT_TOOL: AnthropicToolDefinition = {
         items: {
           type: 'object',
           properties: {
-            dayOfWeek: {},
+            dayOfWeek: { oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }] },
             opens: { type: 'string', description: 'HH:MM format' },
             closes: { type: 'string', description: 'HH:MM format' },
           },
