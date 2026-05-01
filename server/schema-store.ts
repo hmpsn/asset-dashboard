@@ -482,7 +482,7 @@ function rowToPublishEntry(row: PublishHistoryRow): SchemaPublishEntry {
     publishedAt: row.published_at,
     googleValidationStatus: (row.google_validation_status as GoogleValidationStatus) ?? undefined,
     googleValidationDetails: row.google_validation_details
-      ? parseJsonFallback(row.google_validation_details, undefined)
+      ? parseJsonFallback<Array<{ type: string; message: string }>>(row.google_validation_details, [])
       : undefined,
   };
 }

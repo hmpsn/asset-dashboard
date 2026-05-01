@@ -547,6 +547,9 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
     PRIMARY_TYPES.add(node['@type'] as string);
   }
   const NESTED_TYPES = new Set(['Table', 'ImageGallery', 'AggregateRating', 'OfferCatalog', 'ItemList']);
+  // Types handled by dedicated validators (not in REQUIRED_BY_TYPE but still "known").
+  // These are excluded from the unverified-type warning path.
+  const DEDICATED_VALIDATOR_TYPES = new Set(['BreadcrumbList', 'ListItem']);
 
   function validateNodeRecursive(node: Record<string, unknown>) {
     const t = node['@type'] as string;
@@ -574,8 +577,9 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
           });
         }
       }
-    } else {
-      // Unknown type: structural validation only
+    } else if (!DEDICATED_VALIDATOR_TYPES.has(t)) {
+      // Unknown type: structural validation only — always emit warning to surface uncertainty
+      const hasContext = node['@context'] === 'https://schema.org';
       const hasType = typeof node['@type'] === 'string' && node['@type'].length > 0;
       let hasId = false;
       try {
@@ -585,18 +589,17 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
         }
       } catch { /* invalid URL */ }
       const hasEmptyValues = Object.values(node).some(v => v === '' || (Array.isArray(v) && v.length === 0));
-      if (!hasType || !hasId || hasEmptyValues) {
-        findings.push({
-          severity: 'warning',
-          type: t,
-          ruleId: 'unverified-type',
-          message: `${t}: unverified schema.org type — structural check only. Issues: ${[
-            !hasType && 'missing @type',
-            !hasId && '@id not a valid URL',
-            hasEmptyValues && 'empty string or array values',
-          ].filter(Boolean).join(', ') || 'none'}`,
-        });
-      }
+      findings.push({
+        severity: 'warning',
+        type: t,
+        ruleId: 'unverified-type',
+        message: `${t}: unverified schema.org type — structural check only. Issues: ${[
+          !hasContext && '@context not "https://schema.org"',
+          !hasType && 'missing @type',
+          !hasId && '@id not a valid URL',
+          hasEmptyValues && 'empty string or array values',
+        ].filter(Boolean).join(', ') || 'none'}`,
+      });
     }
 
     // Walk nested objects with @type, but only validate those marked as NESTED_TYPES

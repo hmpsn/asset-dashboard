@@ -55,6 +55,7 @@ export function buildContactPageSchema(input: StaticInput): Record<string, unkno
     'addressLocality': semantics.address.city,
     'addressRegion': semantics.address.state,
     'postalCode': semantics.address.postalCode,
+    'addressCountry': semantics.address.country,
   } : undefined;
   const openingHoursSpec = semantics?.hours?.length
     ? semantics.hours.map(h => dropUndefined({

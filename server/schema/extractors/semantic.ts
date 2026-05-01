@@ -14,11 +14,11 @@ const log = createLogger('schema/extractors/semantic');
 
 const SOCIAL_DOMAINS = [
   'linkedin.com', 'facebook.com', 'instagram.com', 'twitter.com', 'x.com',
-  'yelp.com', 'google.com/maps', 'tiktok.com', 'youtube.com', 'bbb.org',
+  'yelp.com', 'tiktok.com', 'youtube.com',
 ];
 
 const MAX_TEXT_CHARS = 24_000;
-const ALLOWED_SAME_AS_DOMAINS = new Set(SOCIAL_DOMAINS.map(d => d.split('/')[0]));
+const ALLOWED_SAME_AS_DOMAINS = new Set(SOCIAL_DOMAINS);
 
 function stripToMainContent(html: string): string {
   const $ = cheerio.load(html);
@@ -185,7 +185,7 @@ function validateExtracted(raw: Record<string, unknown>, strippedText: string): 
     const rc = result.aggregateRating.reviewCount;
     if (typeof rv !== 'number' || rv < 0 || rv > 5) {
       delete result.aggregateRating;
-    } else if (rc !== undefined && (typeof rc !== 'number' || rc < 0 || !Number.isInteger(rc))) {
+    } else if (rc !== undefined && (typeof rc !== 'number' || rc <= 0 || !Number.isInteger(rc))) {
       delete result.aggregateRating.reviewCount;
     }
   }
@@ -197,12 +197,17 @@ function validateExtracted(raw: Record<string, unknown>, strippedText: string): 
     if (result.hours.length === 0) delete result.hours;
   }
 
-  // sameAs: only allowed social domains
+  // sameAs: only allowed social domains, plus google.com/maps path specifically
   if (result.sameAs) {
     result.sameAs = result.sameAs.filter(url => {
       try {
-        const hostname = new URL(url).hostname.replace(/^www\./, '');
-        return ALLOWED_SAME_AS_DOMAINS.has(hostname) || ALLOWED_SAME_AS_DOMAINS.has(hostname.split('.').slice(-2).join('.'));
+        const parsed = new URL(url);
+        const hostname = parsed.hostname.replace(/^www\./, '');
+        const registrable = hostname.split('.').slice(-2).join('.');
+        if (ALLOWED_SAME_AS_DOMAINS.has(hostname) || ALLOWED_SAME_AS_DOMAINS.has(registrable)) return true;
+        // google.com/maps — only accept URLs whose path starts with /maps
+        if ((hostname === 'google.com' || hostname.endsWith('.google.com')) && parsed.pathname.startsWith('/maps')) return true;
+        return false;
       } catch { return false; }
     });
     if (result.sameAs.length === 0) delete result.sameAs;
