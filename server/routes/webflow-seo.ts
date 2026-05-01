@@ -34,7 +34,7 @@ import { getInsights } from '../analytics-insights-store.js';
 import type * as AnalyticsInsightsStore from '../analytics-insights-store.js';
 import { buildKeywordMapContext } from '../seo-context.js';
 import { isProgrammingError } from '../errors.js';
-import { applySuppressionsToAudit, stripHtmlToText, stripCodeFences, tryResolvePagePath, matchGscUrlToPath, applyBulkKeywordGuards, findPageMapEntryForPage, toAuditFindingPageId } from '../helpers.js';
+import { applySuppressionsToAudit, stripHtmlToText, stripCodeFences, tryResolvePagePath, matchGscUrlToPath, applyBulkKeywordGuards, findPageMapEntryForPage, toAuditFindingPageId, normalizePath } from '../helpers.js';
 import { resolveBaseUrl } from '../url-helpers.js';
 import { createJob, updateJob, isJobCancelled, hasActiveJob, registerAbort } from '../jobs.js';
 import { broadcastToWorkspace } from '../broadcast.js';
@@ -249,10 +249,9 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
       const ws = getWorkspace(workspaceId);
       if (ws?.gscPropertyUrl && ws?.webflowSiteId) {
         const queryPageData = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 28);
-        // Match queries to this page by slug
-        const slug = pagePath.replace(/^\//, '');
+        const normalizedPagePath = normalizePath(pagePath);
         const pageQueries = queryPageData
-          .filter(r => r.page.includes(slug) || (slug === '' && r.page.endsWith('/')))
+          .filter(r => matchGscUrlToPath(r.page, normalizedPagePath))
           .sort((a, b) => b.impressions - a.impressions)
           .slice(0, 15);
         if (pageQueries.length > 0) {
@@ -285,9 +284,14 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
         const snapshot = getLatestSnapshot(ws.webflowSiteId);
         if (snapshot) {
           const pageSlug = pagePath ? pagePath.replace(/^\//, '') : '';
-          const pageAudit = snapshot.audit.pages.find(p =>
-            p.slug === pageSlug || p.url?.includes(pageSlug) || (pagePath && p.page === pagePath)
-          );
+          const matchesAuditPage = (p: { slug?: string; url?: string; page?: string }) => {
+            if (p.slug === pageSlug) return true;
+            if (p.url && pagePath) {
+              try { return normalizePath(new URL(p.url).pathname) === normalizePath(pagePath); } catch { /* malformed URL — expected */ } // catch-ok
+            }
+            return pagePath ? p.page === pagePath : false;
+          };
+          const pageAudit = snapshot.audit.pages.find(matchesAuditPage);
           if (pageAudit && pageAudit.issues.length > 0) {
             const relevant = pageAudit.issues
               .filter(i => ['title', 'meta-description', 'content-length', 'h1', 'duplicate-title', 'duplicate-description'].includes(i.check))

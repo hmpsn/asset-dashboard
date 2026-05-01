@@ -9,6 +9,7 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { getValidToken } from './google-auth.js';
 import { createLogger } from './logger.js';
+import { normalizePath } from './helpers.js';
 
 const log = createLogger('seo-change-tracker');
 
@@ -197,11 +198,14 @@ function fmt(d: Date): string {
 }
 
 function matchPage(gscUrl: string, slug: string): boolean {
-  const normalizedSlug = slug.startsWith('/') ? slug : `/${slug}`;
-  const gscLower = gscUrl.toLowerCase();
-  // Match by slug in the URL path
-  return gscLower.endsWith(normalizedSlug.toLowerCase()) ||
-    gscLower.endsWith(`${normalizedSlug.toLowerCase()}/`);
+  const normalizedSlug = normalizePath(slug).toLowerCase();
+  try {
+    const pathname = normalizePath(new URL(gscUrl).pathname).toLowerCase();
+    return pathname === normalizedSlug;
+  } catch { // catch-ok — malformed URL fallback
+    const gscLower = gscUrl.toLowerCase();
+    return gscLower.endsWith(normalizedSlug) || gscLower.endsWith(`${normalizedSlug}/`);
+  }
 }
 
 export async function getSeoChangeImpact(
