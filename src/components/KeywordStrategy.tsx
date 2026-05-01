@@ -70,6 +70,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const [maxPages, setMaxPages] = useState<number>(500);
   const [competitors, setCompetitors] = useState('');
   const [discoveringCompetitors, setDiscoveringCompetitors] = useState(false);
+  const [discoverError, setDiscoverError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(true);
   const [progressStep, setProgressStep] = useState('');
   const [progressDetail, setProgressDetail] = useState('');
@@ -111,12 +112,14 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   };
 
 
-  // Initialize SEMRush availability from React Query hook
+  // Initialize SEO provider availability from React Query hook
   useEffect(() => {
+    setSemrushAvailable(semrushAvailableFromHook);
     if (semrushAvailableFromHook) {
-      setSemrushAvailable(true);
-      // Default to quick mode when SEMRush is available
+      // Default to quick mode when an SEO data provider is available
       setSemrushMode(prev => prev === 'none' ? 'quick' : prev);
+    } else {
+      setSemrushMode('none');
     }
   }, [semrushAvailableFromHook]);
 
@@ -334,7 +337,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             <span className="t-caption font-semibold text-[var(--brand-text-bright)]">Strategy Settings</span>
             {!settingsOpen && (
               <span className="t-caption-sm text-[var(--brand-text-muted)]">
-                {semrushMode !== 'none' ? `SEMRush: ${semrushMode}` : ''}
+                {semrushMode !== 'none' ? `SEO data: ${semrushMode}` : ''}
                 {maxPages > 0 ? `${semrushMode !== 'none' ? ' · ' : ''}${maxPages} pages max` : `${semrushMode !== 'none' ? ' · ' : ''}All pages`}
                 {businessContext ? ` · Context set` : ''}
                 {competitors.trim() ? ` · ${competitors.split(/[,\n]+/).filter(Boolean).length} competitors` : ''}
@@ -376,17 +379,17 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                 <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1.5">
                   {(activeProvider || 'semrush') === 'dataforseo'
                     ? 'DataForSEO: pay-per-call pricing (~$0.01-0.08/call). Uses same cache layer.'
-                    : 'SEMRush: subscription-based. Traditional keyword intelligence provider.'}
+                    : 'SEMRush: subscription-based traditional keyword intelligence provider.'}
                 </p>
               </div>
             )}
 
-            {/* SEMRush Mode */}
+            {/* SEO Data Mode */}
             {semrushAvailable && (
               <div>
                 <div className="flex items-center gap-1.5 mb-2">
                   <Icon as={BarChart3} size="md" className="text-orange-400" />
-                  <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">SEMRush Data Mode</span>
+                  <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">SEO Data Mode</span>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   {(['none', 'quick', 'full'] as const).map(mode => (
@@ -409,9 +412,9 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                   ))}
                 </div>
                 <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1.5">
-                  {semrushMode === 'quick' && 'Enriches keywords with real search volume + difficulty scores from SEMRush.'}
+                  {semrushMode === 'quick' && 'Enriches keywords with real search volume + difficulty scores from your configured SEO provider.'}
                   {semrushMode === 'full' && 'Full competitive analysis: domain keywords, competitor gaps, related keywords, volume + difficulty.'}
-                  {semrushMode === 'none' && 'Uses AI + Google Search Console data only. No SEMRush API credits used.'}
+                  {semrushMode === 'none' && 'Uses AI + Google Search Console data only. No SEO provider credits used.'}
                 </p>
               </div>
             )}
@@ -427,15 +430,21 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                   <button
                     onClick={async () => {
                       setDiscoveringCompetitors(true);
+                      setDiscoverError(null);
                       try {
                         const result = await keywords.discoverCompetitors(workspaceId);
                         if (result?.competitors?.length) {
                           const domains = result.competitors.slice(0, 5).map(c => c.domain);
                           setCompetitors(domains.join(', '));
                           await keywords.saveCompetitors(workspaceId, domains);
+                        } else {
+                          setDiscoverError('No organic competitors were found for this domain.');
                         }
-                      } catch { /* ignore */ }
-                      setDiscoveringCompetitors(false);
+                      } catch (err: any) {
+                        setDiscoverError(err?.message || 'Failed to discover competitors. Check that your domain is set and an SEO provider is configured.');
+                      } finally {
+                        setDiscoveringCompetitors(false);
+                      }
                     }}
                     disabled={discoveringCompetitors}
                     className="flex items-center gap-1 px-2 py-0.5 rounded bg-orange-500/10 border border-orange-500/20 t-micro text-orange-400 font-medium hover:bg-orange-500/20 transition-all disabled:opacity-50"
@@ -451,7 +460,8 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                   placeholder="e.g. competitor1.com, competitor2.com"
                   className="w-full px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-bright)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-orange-500"
                 />
-                <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">Comma-separated (max 5). Auto-discover uses SEMRush to find your organic competitors. These persist between strategy runs.</p>
+                <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">Comma-separated (max 5). Auto-discover uses your configured SEO data provider to find organic competitors. These persist between strategy runs.</p>
+                {discoverError && <p className="t-caption-sm text-red-400 mt-1">{discoverError}</p>}
               </div>
             )}
 
@@ -572,7 +582,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
               <Icon as={AlertTriangle} size="md" className="text-amber-400 flex-shrink-0 mt-0.5" />
               <div className="t-caption text-amber-300/90 leading-relaxed">
                 <strong className="text-amber-300">This strategy was generated without keyword volume validation.</strong>{' '}
-                Keywords, volume, and difficulty data may not reflect real search demand. Enable SEMRush integration for validated keyword recommendations.
+                Keywords, volume, and difficulty data may not reflect real search demand. Enable an SEO data provider for validated keyword recommendations.
               </div>
             </div>
           )}
@@ -725,7 +735,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                 Use <strong className="text-teal-400">Page Intelligence</strong> to analyze individual pages, edit keywords, and generate SEO copy.
                 {strategy.semrushMode && strategy.semrushMode !== 'none' && (
                   <span className="block mt-1 text-orange-400/80">
-                    SEMRush data: Keywords enriched with real search volume and difficulty. Cached for 7 days.
+                    SEO provider data: Keywords enriched with real search volume and difficulty. Cached for 7 days.
                   </span>
                 )}
                 {!(strategy.pageMap ?? []).some((p: PageKeywordMap) => p.currentPosition) && (

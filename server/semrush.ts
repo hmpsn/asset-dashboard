@@ -6,6 +6,7 @@ import { getCachedMetricsBatch, cacheMetrics } from './keyword-metrics-cache.js'
 import { createLogger } from './logger.js';
 import { isProgrammingError } from './errors.js';
 import { normalizeProviderDate } from './seo-data-provider.js';
+import { KEYWORD_GAP_COMPETITOR_KEYWORD_LIMIT, MAX_COMPETITORS } from './constants.js';
 
 const log = createLogger('semrush');
 
@@ -400,12 +401,21 @@ export async function getKeywordGap(
   if (!apiKey) throw new Error('SEMRUSH_API_KEY not configured');
 
   const allGaps: KeywordGap[] = [];
+  let clientKwSet: Set<string> | null = null;
+
+  async function getClientKeywordSet(): Promise<Set<string>> {
+    if (!clientKwSet) {
+      const clientKeywords = await getDomainOrganicKeywords(clientDomain, workspaceId, 200, database);
+      clientKwSet = new Set(clientKeywords.map(k => k.keyword.toLowerCase()));
+    }
+    return clientKwSet;
+  }
 
   // For each competitor, get their organic keywords and find ones client doesn't rank for
   // We use domain_organic for each competitor and cross-reference
-  for (const comp of competitorDomains.slice(0, 3)) {
+  for (const comp of competitorDomains.slice(0, MAX_COMPETITORS)) {
     const cleanComp = cleanDomainForSemrush(comp);
-    const cacheKey = `gap_${database}_${clientDomain.replace(/\./g, '_')}_vs_${cleanComp.replace(/\./g, '_')}_${limit}`;
+    const cacheKey = `gap_${database}_${clientDomain.replace(/\./g, '_')}_vs_${cleanComp.replace(/\./g, '_')}_${limit}_comp${KEYWORD_GAP_COMPETITOR_KEYWORD_LIMIT}`;
     const cached = readCache<KeywordGap[]>(workspaceId, cacheKey);
 
     if (cached) {
@@ -415,15 +425,14 @@ export async function getKeywordGap(
 
     try {
       // Get competitor's top keywords
-      const compKeywords = await getDomainOrganicKeywords(cleanComp, workspaceId, limit, database);
+      const compKeywords = await getDomainOrganicKeywords(cleanComp, workspaceId, KEYWORD_GAP_COMPETITOR_KEYWORD_LIMIT, database);
 
       // Get client's keywords to find gaps
-      const clientKeywords = await getDomainOrganicKeywords(clientDomain, workspaceId, 200, database);
-      const clientKwSet = new Set(clientKeywords.map(k => k.keyword.toLowerCase()));
+      const clientKeywords = await getClientKeywordSet();
 
       // Keywords competitor ranks for but client doesn't
       const gaps: KeywordGap[] = compKeywords
-        .filter(ck => !clientKwSet.has(ck.keyword.toLowerCase()))
+        .filter(ck => !clientKeywords.has(ck.keyword.toLowerCase()))
         .filter(ck => ck.volume > 0)
         .sort((a, b) => b.volume - a.volume)
         .slice(0, limit)
