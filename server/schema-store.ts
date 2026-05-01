@@ -491,12 +491,6 @@ const historyStmts = createStmtCache(() => ({
     SET google_validation_status = @status, google_validation_details = @details
     WHERE id = @id AND workspace_id = @workspace_id
   `),
-  latestByPage: db.prepare<[pageId: string]>(`
-    SELECT * FROM schema_publish_history
-    WHERE page_id = ?
-    ORDER BY published_at DESC
-    LIMIT 1
-  `),
 }));
 
 function rowToPublishEntry(row: PublishHistoryRow): SchemaPublishEntry {
@@ -569,11 +563,6 @@ export function updateSchemaGoogleStatus(
     status,
     details: details && details.length > 0 ? JSON.stringify(details) : null,
   });
-}
-
-export function getLatestPublishEntryByPageId(pageId: string): SchemaPublishEntry | null {
-  const row = historyStmts().latestByPage.get(pageId) as PublishHistoryRow | undefined;
-  return row ? rowToPublishEntry(row) : null;
 }
 
 export function patchSiteTemplate(

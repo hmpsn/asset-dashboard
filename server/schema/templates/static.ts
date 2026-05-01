@@ -65,26 +65,46 @@ export function buildContactPageSchema(input: StaticInput): Record<string, unkno
         'closes': h.closes,
       }))
     : undefined;
+  const hasAddress = !!(input.businessProfile?.address?.street || input.businessProfile?.address?.city);
   const primary = dropUndefined({
     '@type': 'ContactPage',
     '@id': `${pageData.canonicalUrl}#contactpage`,
     'name': pageData.cleanTitle,
     'description': pageData.description,
     'url': pageData.canonicalUrl,
-    // ContactPage: only link to LocalBusiness when address has at least one locating field.
-    // Falls back to undefined (not orgRef) — a ContactPage without a LocalBusiness has no meaningful mainEntity.
-    'mainEntity': (input.businessProfile?.address?.street || input.businessProfile?.address?.city)
-      ? localBusinessRef(baseUrl)
-      : undefined,
+    // Only link to LocalBusiness when address has at least one locating field.
+    'mainEntity': hasAddress ? localBusinessRef(baseUrl) : undefined,
     'isPartOf': webSiteRef(baseUrl),
     'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
     'inLanguage': pageData.inLanguage,
-    'telephone': phone,
-    'email': email,
-    'address': semanticsAddress,
-    'openingHoursSpecification': openingHoursSpec,
   });
-  return withBreadcrumb(primary, pageData);
+  // Emit contact properties on a LocalBusiness/Organization sibling node —
+  // telephone/email/address/openingHoursSpecification are not valid on ContactPage (a WebPage subtype).
+  const hasContactData = !!(phone || email || semanticsAddress || openingHoursSpec);
+  const nodes: Array<Record<string, unknown>> = [primary];
+  if (hasContactData) {
+    const contactEntity = hasAddress
+      ? dropUndefined({
+          '@type': 'LocalBusiness' as const,
+          '@id': `${baseUrl}/#localbusiness`,
+          'name': pageData.publisher.name,
+          'url': baseUrl,
+          'telephone': phone,
+          'email': email,
+          'address': semanticsAddress,
+          'openingHoursSpecification': openingHoursSpec,
+        })
+      : dropUndefined({
+          '@type': 'Organization' as const,
+          '@id': `${baseUrl}/#organization`,
+          'name': pageData.publisher.name,
+          'url': baseUrl,
+          'telephone': phone,
+          'email': email,
+        });
+    nodes.push(contactEntity);
+  }
+  return withBreadcrumb(nodes, pageData);
 }
 
 export function buildCollectionPageSchema(input: StaticInput & {
