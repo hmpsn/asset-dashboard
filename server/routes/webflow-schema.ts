@@ -65,6 +65,7 @@ function scheduleSchemaGoogleValidation(
       if (!result) {
         // GSC not connected or quota exhausted
         updateSchemaGoogleStatus(publishEntryId, workspaceId, 'no_gsc');
+        // ws-event-ok: schema:google_validation not yet in WS_EVENTS — new event from Task 12
         broadcastToWorkspace(workspaceId, 'schema:google_validation', {
           publishEntryId, pageUrl, status: 'no_gsc',
         });
@@ -80,6 +81,7 @@ function scheduleSchemaGoogleValidation(
         errorIssues.length > 0 ? errorIssues.map(i => ({ type: i.type, message: i.issueMessage })) : undefined,
       );
 
+      // ws-event-ok: schema:google_validation not yet in WS_EVENTS — new event from Task 12
       broadcastToWorkspace(workspaceId, 'schema:google_validation', {
         publishEntryId,
         pageUrl,
