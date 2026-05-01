@@ -267,7 +267,7 @@ router.post('/api/content-briefs/:workspaceId/:briefId/send-to-client', requireW
     source: 'strategy',
     serviceType: 'brief_only',
     pageType: (brief.pageType as 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource') || 'blog',
-    initialStatus: 'requested',
+    initialStatus: 'brief_generated',
   });
 
   // Link the brief and set to client_review

@@ -3,40 +3,7 @@ import {
 } from 'lucide-react';
 import { BriefDetail } from './BriefDetail';
 import { EmptyState, Icon } from '../ui';
-
-interface ContentBrief {
-  id: string;
-  workspaceId: string;
-  targetKeyword: string;
-  secondaryKeywords: string[];
-  suggestedTitle: string;
-  suggestedMetaDesc: string;
-  outline: { heading: string; notes: string; wordCount?: number; keywords?: string[] }[];
-  wordCountTarget: number;
-  intent: string;
-  audience: string;
-  competitorInsights: string;
-  internalLinkSuggestions: string[];
-  createdAt: string;
-  executiveSummary?: string;
-  contentFormat?: string;
-  toneAndStyle?: string;
-  peopleAlsoAsk?: string[];
-  topicalEntities?: string[];
-  serpAnalysis?: { contentType: string; avgWordCount: number; commonElements: string[]; gaps: string[] };
-  difficultyScore?: number;
-  trafficPotential?: string;
-  ctaRecommendations?: string[];
-  eeatGuidance?: { experience: string; expertise: string; authority: string; trust: string };
-  contentChecklist?: string[];
-  schemaRecommendations?: { type: string; notes: string }[];
-  pageType?: string;
-  referenceUrls?: string[];
-  realPeopleAlsoAsk?: string[];
-  realTopResults?: { position: number; title: string; url: string }[];
-  titleVariants?: string[];
-  metaDescVariants?: string[];
-}
+import type { ContentBrief } from '../../../shared/types/content';
 
 interface ContentTopicRequest {
   id: string;

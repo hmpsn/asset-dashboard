@@ -156,6 +156,20 @@ export function notifyTeamContentRequest(opts: {
   }));
 }
 
+export function notifyTeamChangesRequested(opts: {
+  workspaceName: string;
+  workspaceId?: string;
+  topic: string;
+  targetKeyword: string;
+  feedback: string;
+}): void {
+  const to = getNotificationEmail();
+  if (!to || !isEmailConfigured()) return;
+  queueEmail(makeEvent('content_changes_requested', to, opts.workspaceId || '', opts.workspaceName, undefined, {
+    topic: opts.topic, targetKeyword: opts.targetKeyword, feedback: opts.feedback,
+  }));
+}
+
 export function notifyClientBriefReady(opts: {
   clientEmail: string;
   workspaceName: string;
