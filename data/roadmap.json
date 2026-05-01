@@ -291,7 +291,8 @@
           "est": "3-4h",
           "priority": "P1",
           "status": "done",
-          "notes": "Replaced ~240 lines of inline brief JSX in RequestList.tsx with a single <BriefDetail> component call via new hideActions/defaultFeedback/autoShowRegenerate props. Consolidated ContentBrief and ContentTopicRequest types from 4 component files into shared/types/content.ts canonical source. Added SERP data rendering (realPeopleAlsoAsk, realTopResults) in BriefDetail."
+          "notes": "Replaced ~240 lines of inline brief JSX in RequestList.tsx with a single <BriefDetail> component call via new hideActions/defaultFeedback/autoShowRegenerate props. Consolidated ContentBrief and ContentTopicRequest types from 4 component files into shared/types/content.ts canonical source. Added SERP data rendering (realPeopleAlsoAsk, realTopResults) in BriefDetail.",
+          "shippedAt": "2026-05-01"
         },
         {
           "id": "pr398-bug-fixes",
@@ -300,7 +301,8 @@
           "est": "2-3h",
           "priority": "P1",
           "status": "done",
-          "notes": "Bug 2: Clear clientFeedback on resubmit. Bug 3: Upgrade endpoint try/catch for InvalidTransitionError. Bug 4: send-to-client initialStatus changed to brief_generated. Bug 5: Client can view post in changes_requested status. Bug 6: postId only exposed when serviceType=full_post. Bug 7: Double skeleton save prevention. Bug 8: State machine \u2014 removed post_review from changes_requested transitions, Re-queue for Revision button."
+          "notes": "Bug 2: Clear clientFeedback on resubmit. Bug 3: Upgrade endpoint try/catch for InvalidTransitionError. Bug 4: send-to-client initialStatus changed to brief_generated. Bug 5: Client can view post in changes_requested status. Bug 6: postId only exposed when serviceType=full_post. Bug 7: Double skeleton save prevention. Bug 8: State machine \u2014 removed post_review from changes_requested transitions, Re-queue for Revision button.",
+          "shippedAt": "2026-05-01"
         },
         {
           "id": "pr398-email-notifications",
@@ -309,7 +311,8 @@
           "est": "1h",
           "priority": "P2",
           "status": "done",
-          "notes": "Added content_changes_requested event type to email system. notifyTeamChangesRequested called from both brief and post change-request endpoints in public-content.ts. Throttle category mapped to 'internal'."
+          "notes": "Added content_changes_requested event type to email system. notifyTeamChangesRequested called from both brief and post change-request endpoints in public-content.ts. Throttle category mapped to 'internal'.",
+          "shippedAt": "2026-05-01"
         }
       ]
     },
