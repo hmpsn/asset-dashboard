@@ -30,6 +30,8 @@ export interface PageElementCatalog {
   citations: Citation[];
   /** Diagnostic counters — extractor confidence, AI calls used, fallbacks hit. */
   diagnostics: ExtractionDiagnostics;
+  /** Semantic business data extracted by Haiku — populated by extractSemanticData(). */
+  semantics?: SemanticPageData;
 }
 
 export interface Heading {
@@ -116,4 +118,99 @@ export interface ExtractionDiagnostics {
   hitAiBudgetCap: boolean;
   /** Per-element-type detection counts before filtering. Keys: 'tables' | 'images' | 'videos' | 'lists' | 'testimonials' | 'codeBlocks' | 'citations' | 'headings'. */
   rawCounts: Record<string, number>;
+}
+
+// ── Semantic extraction ────────────────────────────────────────────────────
+
+export interface SemanticPageData {
+  // Contact / NAP
+  phone?: string;
+  email?: string;
+  address?: {
+    street: string;
+    city: string;
+    state: string;
+    postalCode: string;
+    country?: string;
+  };
+  geo?: { latitude: number; longitude: number };
+  hours?: Array<{
+    dayOfWeek: string | string[];
+    opens: string;   // "09:00"
+    closes: string;  // "18:00"
+  }>;
+  parking?: string;
+
+  // Reputation
+  aggregateRating?: {
+    ratingValue: number;
+    reviewCount?: number;
+    platform?: string;
+  };
+  reviews?: Array<{
+    author: string;
+    reviewBody: string;
+    ratingValue?: number;
+  }>;
+
+  // Business identity
+  foundingDate?: string;
+  numberOfLocations?: number;
+  sameAs?: string[];
+  certifications?: string[];
+  mediaMentions?: string[];
+  awards?: string[];
+  highlights?: string[];
+  insurance?: string[];
+  paymentOptions?: string[];
+  areaServed?: string[];
+  languagesSpoken?: string[];
+  accessibility?: string[];
+
+  // Content entities
+  services?: string[];
+  staff?: Array<{
+    name: string;
+    credentials?: string;
+    jobTitle?: string;
+    image?: string;
+  }>;
+  offers?: Array<{
+    name: string;
+    price?: string;
+    priceCurrency?: string;
+    description?: string;
+  }>;
+  priceRange?: string;
+  events?: Array<{
+    name: string;
+    startDate?: string;
+    endDate?: string;
+    description?: string;
+    price?: string;
+    location?: string;
+  }>;
+  courses?: Array<{
+    name: string;
+    description?: string;
+    duration?: string;
+  }>;
+
+  // Rich content
+  faq?: Array<{ question: string; answer: string }>;
+  howToSteps?: Array<{ name: string; text: string }>;
+
+  // Media
+  primaryImage?: string;
+  images?: Array<{ url: string; caption?: string }>;
+  videos?: Array<{
+    contentUrl: string;
+    name?: string;
+    description?: string;
+    thumbnailUrl?: string;
+  }>;
+
+  // Page intent
+  primaryAction?: 'book' | 'contact' | 'buy' | 'learn' | 'apply' | 'quote';
+  pageCategory?: string;
 }
