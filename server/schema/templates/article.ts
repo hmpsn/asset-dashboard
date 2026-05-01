@@ -4,20 +4,30 @@
  * optional VideoObject + BreadcrumbList.
  */
 import type { PageData } from '../data-sources.js';
+import type { SemanticPageData } from '../../../shared/types/page-elements.js';
 import { dropUndefined, withBreadcrumb, webSiteRef, breadcrumbRef, filterHttpUrls } from './helpers.js';
 
 export interface ArticleInput {
   baseUrl: string;
   pageData: PageData;
+  semantics?: SemanticPageData;
 }
 
 export type ArticleKind = 'BlogPosting' | 'Article';
 
 export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Record<string, unknown> {
   const { pageData } = input;
+  const { semantics } = input;
 
   const author = pageData.author
     ? { '@type': 'Person', 'name': pageData.author }
+    : semantics?.staff?.[0]
+    ? {
+        '@type': 'Person',
+        'name': semantics.staff[0].name,
+        'jobTitle': semantics.staff[0].jobTitle,
+        'hasCredential': semantics.staff[0].credentials,
+      }
     : { '@type': 'Organization', 'name': pageData.publisher.name };
 
   const primary = dropUndefined({
@@ -25,7 +35,9 @@ export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Reco
     '@id': `${pageData.canonicalUrl}#article`,
     'headline': pageData.cleanTitle,
     'description': pageData.description,
-    'image': pageData.image ? [pageData.image] : undefined,
+    'image': (semantics?.primaryImage || pageData.image)
+      ? [(semantics?.primaryImage || pageData.image)!]
+      : undefined,
     'url': pageData.canonicalUrl,
     'datePublished': pageData.datePublished,
     'dateModified': pageData.dateModified || pageData.datePublished,

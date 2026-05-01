@@ -4,17 +4,50 @@
  * Product never emits zero-price offers.
  */
 import type { PageData, BusinessProfile } from '../data-sources.js';
+import type { SemanticPageData } from '../../../shared/types/page-elements.js';
 import { dropUndefined, orgRef, localBusinessRef, withBreadcrumb, webSiteRef, breadcrumbRef, filterHttpUrls } from './helpers.js';
 
 export interface ServiceInput {
   baseUrl: string;
   pageData: PageData;
   businessProfile?: BusinessProfile | null;
+  semantics?: SemanticPageData;
 }
 
 export function buildServiceSchema(input: ServiceInput): Record<string, unknown> {
   const { pageData, baseUrl } = input;
+  const { semantics } = input;
   const serviceId = `${pageData.canonicalUrl}#service`;
+
+  const semanticsRating = semantics?.aggregateRating
+    ? dropUndefined({
+        '@type': 'AggregateRating' as const,
+        'ratingValue': semantics.aggregateRating.ratingValue,
+        'reviewCount': semantics.aggregateRating.reviewCount,
+        'bestRating': 5,
+        'worstRating': 1,
+      })
+    : undefined;
+
+  const semanticsOffers = semantics?.offers?.length
+    ? semantics.offers.map((o, i) => dropUndefined({
+        '@type': 'Offer' as const,
+        '@id': `${pageData.canonicalUrl}#offer-${i}`,
+        'name': o.name,
+        'price': o.price,
+        'priceCurrency': o.priceCurrency || 'USD',
+        'description': o.description,
+      }))
+    : undefined;
+
+  const staffNodes: Array<Record<string, unknown>> = (semantics?.staff ?? []).map((s, i) => dropUndefined({
+    '@type': 'Person' as const,
+    '@id': `${pageData.canonicalUrl}#person-${i}`,
+    'name': s.name,
+    'jobTitle': s.jobTitle,
+    'hasCredential': s.credentials,
+    'image': s.image,
+  }));
 
   // PR2: AggregateRating from testimonials WITH ratings
   // Filter must match the Review[] emission gate below — both require author + rating.
@@ -61,9 +94,18 @@ export function buildServiceSchema(input: ServiceInput): Record<string, unknown>
     'isPartOf': webSiteRef(baseUrl),
     'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
     'inLanguage': pageData.inLanguage,
-    'areaServed': pageData.areaServed ? { '@type': 'Place' as const, name: pageData.areaServed } : undefined,
+    'areaServed': semantics?.areaServed?.length
+      ? semantics.areaServed.map(a => ({ '@type': 'Place' as const, 'name': a }))
+      : (pageData.areaServed ? { '@type': 'Place' as const, name: pageData.areaServed } : undefined),
     'serviceType': pageData.serviceType,
-    'aggregateRating': aggregateRating,
+    'aggregateRating': semanticsRating || aggregateRating,
+    'hasOfferCatalog': semanticsOffers ? {
+      '@type': 'OfferCatalog' as const,
+      'name': pageData.cleanTitle,
+      'itemListElement': semanticsOffers,
+    } : undefined,
+    'award': semantics?.certifications?.length ? semantics.certifications : undefined,
+    'priceRange': semantics?.priceRange,
     'mainEntity': tableMainEntity,
   });
 
@@ -102,7 +144,7 @@ export function buildServiceSchema(input: ServiceInput): Record<string, unknown>
     'image': galleryImageUrls,
   }) : undefined;
 
-  const nodes: Array<Record<string, unknown>> = [primary, ...reviews];
+  const nodes: Array<Record<string, unknown>> = [primary, ...reviews, ...staffNodes];
   if (imageGallery) nodes.push(imageGallery);
 
   return withBreadcrumb(nodes, pageData);
