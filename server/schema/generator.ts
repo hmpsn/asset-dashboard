@@ -415,6 +415,16 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       schema = buildContactPageSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile, semantics });
       reason = 'Contact page — ContactPage with LocalBusiness mainEntity when address is set.';
       break;
+    case 'Location':
+      schema = buildLocalBusinessSchema({
+        baseUrl,
+        pageData,
+        businessProfile: input.workspace.businessProfile,
+        siteHasSearch: input.workspace.siteHasSearch,
+        semantics,
+      });
+      reason = 'Location page — LocalBusiness with NAP/hours from semantic extraction when available.';
+      break;
     case 'BlogIndex': {
       const children = resolveHubChildren(input);
       if (children) {
