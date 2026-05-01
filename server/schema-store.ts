@@ -216,7 +216,10 @@ export function getOrSeedSiteTemplate(siteId: string, workspaceId?: string): Sch
     const graph = schemaObj?.['@graph'] as Record<string, unknown>[] | undefined;
     if (!Array.isArray(graph)) return null;
 
-    const orgNode = graph.find(n => n['@type'] === 'Organization');
+    // Match by @id so healthcare-upgraded types (Dentist, Physician, etc.) are found too
+    const orgNode = graph.find(n =>
+      n['@type'] === 'Organization' || String(n['@id'] || '').endsWith('/#organization')
+    );
     const wsNode = graph.find(n => n['@type'] === 'WebSite');
     if (!orgNode) return null;
 

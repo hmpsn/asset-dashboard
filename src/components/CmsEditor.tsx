@@ -85,7 +85,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
   const [sendingApproval, setSendingApproval] = useState(false);
   const [approvalSent, setApprovalSent] = useState(false);
   const [approvalRefreshKey, setApprovalRefreshKey] = useState(0);
-  const [variations, setVariations] = useState<Record<string, { fieldSlug: string; options: string[] }>>(() => {
+  const [variations, setVariations] = useState<Record<string, { fieldSlug: string; options: string[]; descOptions?: string[] }>>(() => {
     try { const raw = sessionStorage.getItem(`cms-editor-vars-${siteId}`); if (raw) return JSON.parse(raw); } catch { /* ignore */ }
     return {};
   });
@@ -223,8 +223,8 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
 
       const data = await post<{ text?: string; variations?: string[] }>('/api/webflow/seo-rewrite', {
         pageTitle: itemName,
-        currentSeoTitle: isTitle ? currentValue : undefined,
-        currentDescription: !isTitle ? currentValue : undefined,
+        currentSeoTitle: isTitle ? currentValue : (() => { const tf = collection?.seoFields?.find(f => f.slug.includes('title') && f.slug !== 'name' && f.slug !== 'slug'); return tf ? (edits[itemId]?.[tf.slug] || '') : undefined; })(),
+        currentDescription: !isTitle ? currentValue : (() => { const df = collection?.seoFields?.find(f => f.slug.includes('description') || f.slug.includes('desc')); return df ? (edits[itemId]?.[df.slug] || '') : undefined; })(),
         pageContent: fieldContext || undefined,
         siteContext: collection ? `CMS collection: ${collection.collectionName}` : undefined,
         pagePath,
@@ -237,6 +237,52 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
       } else if (data.text) {
         // Single result (no picker) — apply directly
         updateField(itemId, fieldSlug, data.text);
+      }
+    } catch (err) { console.error('CmsEditor operation failed:', err); } finally {
+      setAiLoading(prev => { const n = { ...prev }; delete n[key]; return n; });
+    }
+  };
+
+  const aiRewriteBoth = async (collectionId: string, itemId: string, titleSlug: string, descSlug: string) => {
+    const key = `${itemId}-both`;
+    setAiLoading(prev => ({ ...prev, [key]: true }));
+    try {
+      const itemName = edits[itemId]?.['name'] || '';
+      const currentTitle = edits[itemId]?.[titleSlug] || '';
+      const currentDesc = edits[itemId]?.[descSlug] || '';
+
+      const collection = collections.find(c => c.collectionId === collectionId);
+      const itemFields = edits[itemId] || {};
+      const fieldContext = Object.entries(itemFields)
+        .filter(([slug, val]) => val && slug !== titleSlug && slug !== descSlug && slug !== 'name')
+        .map(([slug, val]) => `${slug}: ${String(val).slice(0, 300)}`)
+        .join('\n');
+      const itemSlug = collection?.items.find(i => i.id === itemId)?.fieldData?.slug;
+      const pagePath = itemSlug ? `/${collection?.collectionSlug}/${itemSlug}` : undefined;
+
+      const data = await post<{ text?: string; variations?: string[]; pairs?: Array<{ title: string; description: string }> }>('/api/webflow/seo-rewrite', {
+        pageTitle: itemName,
+        currentSeoTitle: currentTitle,
+        currentDescription: currentDesc,
+        pageContent: fieldContext || undefined,
+        siteContext: collection ? `CMS collection: ${collection.collectionName}` : undefined,
+        pagePath,
+        field: 'both',
+        workspaceId,
+      });
+      if (data.pairs && data.pairs.length > 0) {
+        setVariations(prev => ({
+          ...prev,
+          [itemId]: {
+            fieldSlug: 'both',
+            options: data.pairs!.map(p => p.title),
+            descOptions: data.pairs!.map(p => p.description),
+          },
+        }));
+      } else if (data.variations && data.variations.length > 1) {
+        setVariations(prev => ({ ...prev, [itemId]: { fieldSlug: titleSlug, options: data.variations! } }));
+      } else if (data.text) {
+        updateField(itemId, titleSlug, data.text);
       }
     } catch (err) { console.error('CmsEditor operation failed:', err); } finally {
       setAiLoading(prev => { const n = { ...prev }; delete n[key]; return n; });
@@ -281,13 +327,18 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
           const titleF = extra.find(f => f.slug.includes('title'));
           const descF = extra.find(f => f.slug.includes('description') || f.slug.includes('desc'));
 
-          const slugs: string[] = [];
-          if (targetField === 'name' || targetField === 'all') slugs.push('name');
-          if ((targetField === 'title' || targetField === 'all') && titleF) slugs.push(titleF.slug);
-          if ((targetField === 'description' || targetField === 'all') && descF) slugs.push(descF.slug);
+          if (targetField === 'all' && titleF && descF) {
+            await aiRewrite(coll.collectionId, itemId, 'name');
+            await aiRewriteBoth(coll.collectionId, itemId, titleF.slug, descF.slug);
+          } else {
+            const slugs: string[] = [];
+            if (targetField === 'name' || targetField === 'all') slugs.push('name');
+            if ((targetField === 'title' || targetField === 'all') && titleF) slugs.push(titleF.slug);
+            if ((targetField === 'description' || targetField === 'all') && descF) slugs.push(descF.slug);
 
-          for (const slug of slugs) {
-            await aiRewrite(coll.collectionId, itemId, slug);
+            for (const slug of slugs) {
+              await aiRewrite(coll.collectionId, itemId, slug);
+            }
           }
         })
       );
@@ -713,7 +764,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                             />
                                 <button
                                   onClick={() => aiRewrite(coll.collectionId, item.id, 'name')}
-                                  disabled={!!aiLoading[`${item.id}-name`]}
+                                  disabled={!!aiLoading[`${item.id}-name`] || !!aiLoading[`${item.id}-both`]}
                                   className="p-0.5 text-teal-400 hover:text-teal-300 disabled:opacity-50"
                                   title="AI rewrite"
                                 >
@@ -776,7 +827,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                                   />
                                     <button
                                       onClick={() => aiRewrite(coll.collectionId, item.id, field.slug)}
-                                      disabled={!!aiLoading[`${item.id}-${field.slug}`]}
+                                      disabled={!!aiLoading[`${item.id}-${field.slug}`] || !!aiLoading[`${item.id}-both`]}
                                       className="p-0.5 text-teal-400 hover:text-teal-300 disabled:opacity-50"
                                       title="AI rewrite"
                                     >
@@ -824,6 +875,57 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                               </div>
                             );
                           })}
+
+                          {/* AI Generate Both + paired variation picker */}
+                          {titleField && descField && (
+                            <div className="space-y-2">
+                              <button
+                                onClick={() => aiRewriteBoth(coll.collectionId, item.id, titleField.slug, descField.slug)}
+                                disabled={!!aiLoading[`${item.id}-both`]}
+                                className="flex items-center gap-1 t-caption-sm bg-teal-600 hover:bg-teal-500 text-white font-medium px-2 py-1 rounded transition-colors disabled:opacity-50"
+                                title="Generate paired title + description"
+                              >
+                                <Icon as={aiLoading[`${item.id}-both`] ? Loader2 : Sparkles} size="sm" className={aiLoading[`${item.id}-both`] ? 'animate-spin' : ''} />
+                                AI Generate Both
+                              </button>
+                              {variations[item.id]?.fieldSlug === 'both' && variations[item.id].options.length > 0 && variations[item.id].descOptions && (
+                                <div className="space-y-1.5 border border-teal-500/20 bg-teal-500/5 rounded-[var(--radius-lg)] p-3">
+                                  <div className="t-caption-sm text-teal-400 font-medium">Pick a paired title + description:</div>
+                                  {variations[item.id].options.map((titleV, i) => {
+                                    const descV = variations[item.id].descOptions![i] || '';
+                                    const isSelected = (edits[item.id]?.[titleField.slug] || '') === titleV && (edits[item.id]?.[descField.slug] || '') === descV;
+                                    return (
+                                      <button
+                                        key={i}
+                                        onClick={() => {
+                                          updateField(item.id, titleField.slug, titleV);
+                                          updateField(item.id, descField.slug, descV);
+                                          setVariations(prev => { const n = { ...prev }; delete n[item.id]; return n; });
+                                        }}
+                                        className={`w-full text-left px-3 py-2 rounded-[var(--radius-lg)] text-xs border transition-colors ${
+                                          isSelected
+                                            ? 'bg-teal-600/20 border-teal-500/40 text-teal-300'
+                                            : 'bg-[var(--surface-3)]/60 border-[var(--brand-border)]/50 text-[var(--brand-text-bright)] hover:border-teal-500/30 hover:bg-teal-600/10'
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-2 mb-1">
+                                          <span className="text-[var(--brand-text-muted)] font-bold">{i + 1}.</span>
+                                          <span className="t-caption-sm px-1 py-0.5 rounded bg-blue-500/10 text-blue-400">Title</span>
+                                          <span className="flex-1">{titleV}</span>
+                                          <CharacterCounter current={titleV.length} max={60} size="sm" />
+                                        </div>
+                                        <div className="flex items-center gap-2 ml-4">
+                                          <span className="t-caption-sm px-1 py-0.5 rounded bg-purple-500/10 text-purple-400">Desc</span>
+                                          <span className="flex-1 text-[var(--brand-text)]">{descV}</span>
+                                          <CharacterCounter current={descV.length} max={160} size="sm" />
+                                        </div>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
 
                           {/* Save button + error */}
                           <div className="flex items-center justify-between pt-1">

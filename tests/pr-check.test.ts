@@ -4428,6 +4428,10 @@ describe('Meta: customCheck rule name registry', () => {
     // must use <Button variant="primary">. Locked in after migrating the two
     // TemplateEditor sites that were the last hand-rolled gradient CTAs.
     'Hand-rolled gradient CTA button',
+    // Schema Yoast parity PR1 (2026-04-29) — Trajectory 3 → 1 migration guard.
+    // Fires on any new direct ws.* read in buildSchemaContext outside the 6
+    // identity-field allow-list. Grandfathered legacy reads carry inline hatches.
+    'schema-context-direct-read-not-on-allowlist',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -5836,6 +5840,86 @@ describe('Rule: Raw rounded-* literal (use --radius-* token)', () => {
   });
 });
 
+describe('Rule: HTML-naive word count on rich-text post field', () => {
+  function makeRule(): Check {
+    const rule = CHECKS.find((c) => c.name === 'HTML-naive word count on rich-text post field');
+    if (!rule) throw new Error('rule not found in CHECKS');
+    return rule;
+  }
+
+  it('flags countWords(post.introduction)', () => {
+    const probe = write(
+      uniqPath('html-wc-intro', 'probe.ts'),
+      'const n = countWords(post.introduction);\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('flags countWords(post.conclusion)', () => {
+    const probe = write(
+      uniqPath('html-wc-conc', 'probe.ts'),
+      'const n = countWords(post.conclusion);\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('flags post.introduction.split(/\\s+/)', () => {
+    const probe = write(
+      uniqPath('html-wc-split-intro', 'probe.tsx'),
+      'const w = post.introduction.split(/\\s+/).filter(x => x).length;\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('flags introduction.split(/\\s+/) on a local variable named introduction', () => {
+    const probe = write(
+      uniqPath('html-wc-split-local', 'probe.ts'),
+      'const introduction = "<p>x</p>"; const n = introduction.split(/\\s+/).length;\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('does NOT flag countHtmlWords(post.introduction)', () => {
+    const probe = write(
+      uniqPath('html-wc-helper', 'probe.ts'),
+      'const n = countHtmlWords(post.introduction);\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBe(0);
+  });
+
+  it('does NOT flag countWords(stripHtml(post.introduction)) (already strips HTML)', () => {
+    const probe = write(
+      uniqPath('html-wc-stripped', 'probe.ts'),
+      'const n = countWords(stripHtml(post.introduction));\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBe(0);
+  });
+
+  it('does NOT flag countWords on plain-text fields like title', () => {
+    const probe = write(
+      uniqPath('html-wc-plain', 'probe.ts'),
+      'const n = countWords(post.title);\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBe(0);
+  });
+
+  it('respects // html-word-count-ok hatch', () => {
+    const probe = write(
+      uniqPath('html-wc-hatched', 'probe.ts'),
+      'const n = countWords(post.introduction); // html-word-count-ok\n'
+    );
+    const hits = checkFile(probe, makeRule());
+    expect(hits.length).toBe(0);
+  });
+});
+
 describe('Rule: No purple/violet in client domain', () => {
   function makeRule(): Check {
     const rule = CHECKS.find((c) => c.name === 'No purple/violet in client domain');
@@ -6052,6 +6136,102 @@ describe('Rule: styleguide-typography-parity', () => {
     const hits = runRule(RULE, [
       write(uniqPath('typo-parity', 'src/components/Foo.tsx'), 'export const Foo = () => null;'),
     ]);
+    expect(hits).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: schema-context-direct-read-not-on-allowlist
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Brace-walks buildSchemaContext in server/helpers.ts, skipping identity
+// fields (ws.name, ws.id, ws.liveDomain, ws.brandLogoUrl, ws.siteHasSearch,
+// siteId) and lines with `// schema-context-direct-read-ok` hatches (inline
+// or on the line immediately above).
+//
+// The fixture files are placed at a path ending in `server/helpers.ts` so
+// the rule's `file.endsWith('server/helpers.ts')` guard accepts them.
+//
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: schema-context-direct-read-not-on-allowlist', () => {
+  const RULE = 'schema-context-direct-read-not-on-allowlist';
+
+  // Write a minimal helpers.ts fixture at a path ending in server/helpers.ts.
+  // The function signature spans 3 lines (matching the real file's multi-line
+  // return type) so the paren+angle body-opener logic is exercised.
+  function writeHelpers(subdir: string, bodyLines: string): string {
+    return write(
+      `${subdir}/server/helpers.ts`,
+      lines(
+        'export async function buildSchemaContext(',
+        '  siteId: string,',
+        '): Promise<{ ctx: Record<string, unknown> }> {',
+        '  const ws = { name: "x", id: "y", liveDomain: "z", brandLogoUrl: "", siteHasSearch: false };',
+        '  const ctx: Record<string, unknown> = {};',
+        bodyLines,
+        '}',
+      ),
+    );
+  }
+
+  it('flags a non-allowlist ws.* read with no hatch', () => {
+    const file = writeHelpers(
+      uniqPath('rule-schema-ctx', 'trigger'),
+      '  ctx.foo = ws.gscPropertyUrl;',
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0].text).toContain('ws.gscPropertyUrl');
+  });
+
+  it('does NOT flag allowlisted identity reads (ws.name, ws.id, ws.liveDomain, ws.brandLogoUrl, ws.siteHasSearch, siteId)', () => {
+    const file = writeHelpers(
+      uniqPath('rule-schema-ctx', 'allowlist-neg'),
+      lines(
+        '  ctx.companyName = ws.name;',
+        '  ctx.liveDomain = ws.liveDomain;',
+        '  ctx.logoUrl = ws.brandLogoUrl;',
+        '  ctx.workspaceId = ws.id;',
+        '  ctx._siteHasSearch = ws.siteHasSearch === true;',
+        '  ctx._siteId = siteId;',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(0);
+  });
+
+  it('respects inline // schema-context-direct-read-ok hatch on the same line', () => {
+    const file = writeHelpers(
+      uniqPath('rule-schema-ctx', 'hatch-inline'),
+      '  ctx.foo = ws.gscPropertyUrl; // schema-context-direct-read-ok: legacy',
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(0);
+  });
+
+  it('respects // schema-context-direct-read-ok hatch on the line immediately above', () => {
+    const file = writeHelpers(
+      uniqPath('rule-schema-ctx', 'hatch-above'),
+      lines(
+        '  // schema-context-direct-read-ok: legacy; tracked in roadmap',
+        '  ctx.foo = ws.gscPropertyUrl;',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(0);
+  });
+
+  it('does NOT scan files that do not end in server/helpers.ts', () => {
+    const file = write(
+      uniqPath('rule-schema-ctx', 'wrong-file.ts'),
+      lines(
+        'export async function buildSchemaContext(siteId: string): Promise<{}> {',
+        '  ctx.foo = ws.gscPropertyUrl;',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
     expect(hits).toHaveLength(0);
   });
 });

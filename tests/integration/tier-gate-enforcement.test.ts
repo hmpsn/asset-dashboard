@@ -47,11 +47,19 @@ beforeAll(async () => {
   db.prepare('UPDATE workspaces SET trial_ends_at = ? WHERE id = ?').run(futureDate, trialWs.workspaceId);
 }, 25_000);
 
+// Null-guard each cleanup so a beforeAll failure (e.g., EADDRINUSE on the
+// test server port) doesn't throw out of afterAll before `ctx.stopServer()`
+// runs — that's how the orphaned-server-holds-port feedback loop got created
+// in the first place. Always reach stopServer even on the sad path. The
+// variables are typed as non-undefined so .cleanup() compiles in the test
+// body (which only runs if beforeAll succeeded), but at runtime they may be
+// unset; the helper restores the runtime safety the type system lost.
 afterAll(() => {
-  freeWs.cleanup();
-  growthWs.cleanup();
-  premiumWs.cleanup();
-  trialWs.cleanup();
+  const tryCleanup = (w: SeededFullWorkspace | undefined) => w?.cleanup();
+  tryCleanup(freeWs);
+  tryCleanup(growthWs);
+  tryCleanup(premiumWs);
+  tryCleanup(trialWs);
   ctx.stopServer();
 });
 

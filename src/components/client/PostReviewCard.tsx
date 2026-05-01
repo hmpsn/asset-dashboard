@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Check, X, ChevronDown, ChevronUp, Edit3 } from 'lucide-react';
+import { Check, X, ChevronDown, ChevronUp, Edit3, Loader2 } from 'lucide-react';
 import { Icon, Button } from '../ui';
 import type { ClientContentRequest } from './types';
 import type { GeneratedPost, ContentTopicRequest } from '../../../shared/types/content';
 import { publicPostReview } from '../../api/content';
 import { queryKeys } from '../../lib/queryKeys';
+import { countWordsFromHtml } from '../../lib/utils';
 import { useClientPostPreview } from '../../hooks/client/useClientPostPreview';
+import { RichTextEditor } from '../post-editor/RichTextEditor';
+import { useAutoSave } from '../../hooks/useAutoSave';
 
 // Adapter: server returns the full ContentTopicRequest; the client portal
 // only consumes the ClientContentRequest projection. We merge the few changed
@@ -35,15 +38,51 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
   const [post, setPost] = useState<GeneratedPost | undefined>(undefined);
   // Editor state — unconditional, even though they're only used when post is loaded
   const [editingSection, setEditingSection] = useState<number | null>(null);
-  const [sectionDraft, setSectionDraft] = useState('');
   const [editingIntro, setEditingIntro] = useState(false);
-  const [introDraft, setIntroDraft] = useState('');
   const [editingConclusion, setEditingConclusion] = useState(false);
-  const [conclusionDraft, setConclusionDraft] = useState('');
   const [feedback, setFeedback] = useState('');
   const [showFeedback, setShowFeedback] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [approving, setApproving] = useState(false);
+
+  const { scheduleAutoSave: scheduleIntroSave, flush: flushIntro, saveStatus: introSaveStatus } = useAutoSave(
+    async (html: string) => {
+      const updated = await publicPostReview.clientEdit(workspaceId, post!.id, { introduction: html });
+      setPost(updated);
+      queryClient.invalidateQueries({ queryKey: queryKeys.client.postPreview(workspaceId, request.postId) });
+    },
+    2000,
+    () => { setToast({ message: 'Failed to save introduction', type: 'error' }); },
+  );
+
+  const autoSaveSectionContent = async (html: string) => {
+    if (editingSection === null) return;
+    const existing = post!.sections.find(s => s.index === editingSection);
+    const sections = [{
+      index: editingSection,
+      heading: existing?.heading ?? '',
+      content: html,
+      wordCount: countWordsFromHtml(html),
+    }];
+    const updated = await publicPostReview.clientEdit(workspaceId, post!.id, { sections });
+    setPost(updated);
+    queryClient.invalidateQueries({ queryKey: queryKeys.client.postPreview(workspaceId, request.postId) });
+  };
+  const { scheduleAutoSave: scheduleSectionSave, flush: flushSection, saveStatus: sectionSaveStatus } = useAutoSave(
+    autoSaveSectionContent,
+    2000,
+    () => { setToast({ message: 'Failed to save section', type: 'error' }); },
+  );
+
+  const { scheduleAutoSave: scheduleConclusionSave, flush: flushConclusion, saveStatus: conclusionSaveStatus } = useAutoSave(
+    async (html: string) => {
+      const updated = await publicPostReview.clientEdit(workspaceId, post!.id, { conclusion: html });
+      setPost(updated);
+      queryClient.invalidateQueries({ queryKey: queryKeys.client.postPreview(workspaceId, request.postId) });
+    },
+    2000,
+    () => { setToast({ message: 'Failed to save conclusion', type: 'error' }); },
+  );
 
   // Sync fetched post into local state once (so edits can update it without refetching).
   // This runs on every render but is guarded by `!post` so it only fires on the first
@@ -53,56 +92,6 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
   // Early returns AFTER all hooks — this is the correct order per Rules of Hooks
   if (postLoading) return <p className="t-caption text-[var(--brand-text-muted)] mt-3 animate-pulse">Loading post…</p>;
   if (!post) return <p className="t-caption text-[var(--brand-text-muted)] mt-3">Post not available.</p>;
-
-  async function saveSection(index: number, content: string) {
-    try {
-      // Send only the single changed section — NOT post.sections.map() over the full array.
-      // The server-side merge (Step 4.5) iterates the DB sections and replaces only the
-      // matching index, leaving all others untouched. Rebuilding and sending the full array
-      // from the stale `post` closure would corrupt concurrent saves: save B would overwrite
-      // save A's changes because it captured the pre-A `post.sections` snapshot.
-      const existing = post!.sections.find(s => s.index === index);
-      const sections = [{
-        index,
-        heading: existing?.heading ?? '',
-        content,
-        wordCount: content.split(/\s+/).filter(Boolean).length,
-      }];
-      const updated = await publicPostReview.clientEdit(workspaceId, post!.id, { sections });
-      setPost(updated);
-      // Invalidate React Query cache so remounts within staleTime don't serve pre-edit data.
-      // Without this, the `if (fetchedPost && !post)` sync guard would restore stale content.
-      queryClient.invalidateQueries({ queryKey: queryKeys.client.postPreview(workspaceId, request.postId) });
-      setEditingSection(null);
-      setToast({ message: 'Section saved', type: 'success' });
-    } catch {
-      setToast({ message: 'Failed to save section', type: 'error' });
-    }
-  }
-
-  async function saveIntro(content: string) {
-    try {
-      const updated = await publicPostReview.clientEdit(workspaceId, post!.id, { introduction: content });
-      setPost(updated);
-      queryClient.invalidateQueries({ queryKey: queryKeys.client.postPreview(workspaceId, request.postId) });
-      setEditingIntro(false);
-      setToast({ message: 'Introduction saved', type: 'success' });
-    } catch {
-      setToast({ message: 'Failed to save introduction', type: 'error' });
-    }
-  }
-
-  async function saveConclusion(content: string) {
-    try {
-      const updated = await publicPostReview.clientEdit(workspaceId, post!.id, { conclusion: content });
-      setPost(updated);
-      queryClient.invalidateQueries({ queryKey: queryKeys.client.postPreview(workspaceId, request.postId) });
-      setEditingConclusion(false);
-      setToast({ message: 'Conclusion saved', type: 'success' });
-    } catch {
-      setToast({ message: 'Failed to save conclusion', type: 'error' });
-    }
-  }
 
   async function handleApprove() {
     setApproving(true);
@@ -150,11 +139,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
           <span className="t-label text-[var(--brand-text-muted)]">Introduction</span>
           {!editingIntro && (
             <button
-              // v1 simplification: HTML tags are stripped for the textarea draft. Saving plain
-              // text back to an HTML field loses formatting (paragraphs, bold, links). A
-              // Markdown or WYSIWYG editor would be needed to preserve formatting in a future
-              // iteration. The strip is intentional — it avoids exposing raw HTML to clients.
-              onClick={() => { setIntroDraft(post.introduction.replace(/<[^>]+>/g, '')); setEditingIntro(true); }}
+              onClick={() => setEditingIntro(true)}
               className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-400 transition-colors"
             >
               <Icon as={Edit3} size="sm" /> Edit
@@ -163,16 +148,25 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
         </div>
         {editingIntro ? (
           <div className="space-y-2">
-            <textarea
-              value={introDraft}
-              onChange={e => setIntroDraft(e.target.value)}
-              className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:border-teal-500/50 focus:outline-none resize-y"
-              rows={4}
-              autoFocus
+            <RichTextEditor
+              initialValue={post.introduction}
+              onChange={scheduleIntroSave}
             />
-            <div className="flex gap-2">
-              <button onClick={() => saveIntro(introDraft)} className="px-2.5 py-1 rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors">Save</button>
-              <button onClick={() => setEditingIntro(false)} className="px-2.5 py-1 rounded t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">Cancel</button>
+            <div className="flex gap-2 items-center">
+              <button
+                onClick={async () => { await flushIntro(); setEditingIntro(false); }}
+                className="px-2.5 py-1 rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors"
+              >
+                Done
+              </button>
+              {introSaveStatus === 'saving' && (
+                <span className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Saving…
+                </span>
+              )}
+              {introSaveStatus === 'saved' && (
+                <span className="t-caption-sm text-emerald-400/70">Saved</span>
+              )}
             </div>
           </div>
         ) : (
@@ -190,7 +184,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
             <span className="t-caption font-semibold text-[var(--brand-text-bright)]">{section.heading}</span>
             {editingSection !== section.index && (
               <button
-                onClick={() => { setSectionDraft(section.content.replace(/<[^>]+>/g, '')); setEditingSection(section.index); }}
+                onClick={async () => { await flushSection(); setEditingSection(section.index); }}
                 className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-400 transition-colors"
               >
                 <Icon as={Edit3} size="sm" /> Edit
@@ -199,16 +193,25 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
           </div>
           {editingSection === section.index ? (
             <div className="space-y-2">
-              <textarea
-                value={sectionDraft}
-                onChange={e => setSectionDraft(e.target.value)}
-                className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:border-teal-500/50 focus:outline-none resize-y"
-                rows={6}
-                autoFocus
+              <RichTextEditor
+                initialValue={section.content}
+                onChange={scheduleSectionSave}
               />
-              <div className="flex gap-2">
-                <button onClick={() => saveSection(section.index, sectionDraft)} className="px-2.5 py-1 rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors">Save</button>
-                <button onClick={() => setEditingSection(null)} className="px-2.5 py-1 rounded t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">Cancel</button>
+              <div className="flex gap-2 items-center">
+                <button
+                  onClick={async () => { await flushSection(); setEditingSection(null); }}
+                  className="px-2.5 py-1 rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors"
+                >
+                  Done
+                </button>
+                {sectionSaveStatus === 'saving' && (
+                  <span className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
+                    <Loader2 className="w-3 h-3 animate-spin" /> Saving…
+                  </span>
+                )}
+                {sectionSaveStatus === 'saved' && (
+                  <span className="t-caption-sm text-emerald-400/70">Saved</span>
+                )}
               </div>
             </div>
           ) : (
@@ -226,7 +229,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
           <span className="t-label text-[var(--brand-text-muted)]">Conclusion</span>
           {!editingConclusion && (
             <button
-              onClick={() => { setConclusionDraft(post.conclusion.replace(/<[^>]+>/g, '')); setEditingConclusion(true); }}
+              onClick={() => setEditingConclusion(true)}
               className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-400 transition-colors"
             >
               <Icon as={Edit3} size="sm" /> Edit
@@ -235,16 +238,25 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
         </div>
         {editingConclusion ? (
           <div className="space-y-2">
-            <textarea
-              value={conclusionDraft}
-              onChange={e => setConclusionDraft(e.target.value)}
-              className="w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:border-teal-500/50 focus:outline-none resize-y"
-              rows={4}
-              autoFocus
+            <RichTextEditor
+              initialValue={post.conclusion}
+              onChange={scheduleConclusionSave}
             />
-            <div className="flex gap-2">
-              <button onClick={() => saveConclusion(conclusionDraft)} className="px-2.5 py-1 rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors">Save</button>
-              <button onClick={() => setEditingConclusion(false)} className="px-2.5 py-1 rounded t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">Cancel</button>
+            <div className="flex gap-2 items-center">
+              <button
+                onClick={async () => { await flushConclusion(); setEditingConclusion(false); }}
+                className="px-2.5 py-1 rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors"
+              >
+                Done
+              </button>
+              {conclusionSaveStatus === 'saving' && (
+                <span className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Saving…
+                </span>
+              )}
+              {conclusionSaveStatus === 'saved' && (
+                <span className="t-caption-sm text-emerald-400/70">Saved</span>
+              )}
             </div>
           </div>
         ) : (

@@ -234,9 +234,29 @@ export function useWsInvalidation(workspaceId: string | undefined) {
     // SCHEMA_PLAN_SENT is intentionally NOT registered here — SchemaPlanPanel
     // fetches the plan directly (no React Query cache). Exemption is tracked
     // in tests/contract/ws-invalidation-coverage.test.ts LOCAL_ONLY_EVENTS.
-    [WS_EVENTS.POST_UPDATED]: () => {
+    [WS_EVENTS.POST_UPDATED]: (data: unknown) => {
       if (!workspaceId) return;
+      const payload = data as { postId?: string };
       qc.invalidateQueries({ queryKey: queryKeys.admin.posts(workspaceId) });
+      if (payload?.postId) {
+        qc.invalidateQueries({ queryKey: queryKeys.admin.post(workspaceId, payload.postId) });
+      }
+    },
+    // ── Client Briefing v2 ──────────────────────────────────────────────
+    // Both events refresh the admin review queue. The cron generates +
+    // broadcasts BRIEFING_GENERATED on every successful run; routes/briefing.ts
+    // emits BRIEFING_PUBLISHED on publish (manual or auto) and reuses
+    // BRIEFING_GENERATED for approve/edit/skip with an action discriminator.
+    [WS_EVENTS.BRIEFING_GENERATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.briefingDrafts(workspaceId) });
+    },
+    [WS_EVENTS.BRIEFING_PUBLISHED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.briefingDrafts(workspaceId) });
+      // TODO(phase-2): also invalidate queryKeys.client.briefing(workspaceId)
+      // when the client-facing briefing component lands. For now, paid-tier
+      // workspaces hit /api/public/briefing/:wsId on demand without caching.
     },
   });
 }

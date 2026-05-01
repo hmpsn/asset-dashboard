@@ -58,10 +58,9 @@ setupAnthropicMocks();
 
 async function startTestServer(): Promise<{ server: http.Server; baseUrl: string; stop: () => void }> {
   // Import createApp lazily so mocks are established first
+  delete process.env.APP_PASSWORD; // bypass auth gate in-process
   const { createApp } = await import('../../server/app.js');
   const app = createApp();
-
-  // Disable auth gate for test environment — APP_PASSWORD is not set in test env
   const server = http.createServer(app);
 
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));

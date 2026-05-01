@@ -236,7 +236,10 @@ describe('PATCH /api/public/content-posts/:wsId/:postId/client-edit', () => {
     const toReview = await patchJson(`/api/content-requests/${testWsId}/${req.id}`, { status: 'post_review' });
     expect(toReview.status).toBe(200);
 
-    // Client edits via public route (server strips HTML tags per Fix 5b)
+    // Client edits via public route — content is rich text now (TipTap output);
+    // server sanitizes via sanitizeRichText() instead of stripping. Headings are
+    // plain text (sanitizePlainText), so heading HTML is dropped but section
+    // content keeps the allowlisted tags (<p>, <strong>, <a>, etc.).
     const editRes = await api(`/api/public/content-posts/${testWsId}/${post.id}/client-edit`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -248,12 +251,11 @@ describe('PATCH /api/public/content-posts/:wsId/:postId/client-edit', () => {
     });
     expect(editRes.status).toBe(200);
     const updated = await editRes.json() as { sections: { content: string }[] };
-    // Server strips HTML tags — content is stored as plain text
-    expect(updated.sections[0].content).toBe('Updated section content by client.');
+    expect(updated.sections[0].content).toBe('<p>Updated section content by client.</p>');
 
     // Verify post is actually persisted (in-process check)
     const persisted = getPost(testWsId, post.id);
-    expect(persisted?.sections[0].content).toBe('Updated section content by client.');
+    expect(persisted?.sections[0].content).toBe('<p>Updated section content by client.</p>');
 
     // Verify totalWordCount was recomputed (Fix 1):
     // intro: "Test introduction" = 2 words

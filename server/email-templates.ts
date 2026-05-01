@@ -179,7 +179,9 @@ export type EmailEventType =
   | 'content_published'
   | 'feedback_new'
   | 'audit_complete'
-  | 'client_signal';
+  | 'client_signal'
+  | 'client_briefing_ready'
+  | 'content_changes_requested';
 
 // ── Template renderers ──
 
@@ -255,6 +257,10 @@ export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subj
       result = renderAuditComplete(events[0], logoUrl); break;
     case 'client_signal':
       result = renderClientSignal(events, count, ws, dashUrl, logoUrl); break;
+    case 'client_briefing_ready':
+      result = renderClientBriefingReady(events, count, ws, dashUrl, logoUrl); break;
+    case 'content_changes_requested':
+      result = renderContentChangesRequested(events, count, ws, dashUrl, logoUrl); break;
     default:
       result = { subject: 'Notification', html: '' };
   }
@@ -412,6 +418,32 @@ function renderContentRequest(events: EmailEvent[], count: number, ws: string, d
   };
 }
 
+function renderContentChangesRequested(events: EmailEvent[], count: number, ws: string, dashUrl?: string, logoUrl?: string) {
+  const items = events.map((e, i) => {
+    const feedback = (e.data.feedback as string) || '';
+    return itemRow({
+      title: (e.data.topic as string) || 'Content Topic',
+      detail: feedback ? `Feedback: "${feedback.slice(0, 200)}${feedback.length > 200 ? '…' : ''}"` : `Keyword: "${(e.data.targetKeyword as string) || '—'}"`,
+      badge: { label: 'Changes Requested', color: '#ea580c', bg: '#fff7ed' },
+      isLast: i === events.length - 1,
+    });
+  }).join('');
+
+  return {
+    subject: count === 1
+      ? `Changes requested: "${(events[0].data.topic as string) || 'Topic'}" — ${ws}`
+      : `${count} change requests on content — ${ws}`,
+    html: layout({
+      preheader: `Client requested changes on ${count} content item${count !== 1 ? 's' : ''}`,
+      headline: count === 1 ? 'Changes Requested' : `${count} Change Requests`,
+      subtitle: ws,
+      body: (count > 1 ? countPill(count, 'change request') : '') + items,
+      cta: dashUrl ? { label: 'View in Dashboard', url: dashUrl } : undefined,
+      logoUrl,
+    }),
+  };
+}
+
 function renderContentBriefReady(events: EmailEvent[], count: number, ws: string, dashUrl?: string, logoUrl?: string) {
   const items = events.map((e, i) => itemRow({
     title: (e.data.topic as string) || 'Content Brief',
@@ -451,6 +483,30 @@ function renderContentPostReady(events: EmailEvent[], count: number, ws: string,
       subtitle: ws,
       body: (count > 1 ? countPill(count, 'post ready') : '') + items,
       cta: dashUrl ? { label: 'Review Post', url: dashUrl } : undefined,
+      logoUrl,
+    }),
+  };
+}
+
+function renderClientBriefingReady(events: EmailEvent[], count: number, ws: string, dashUrl?: string, logoUrl?: string) {
+  const items = events.map((e, i) => itemRow({
+    title: (e.data.heroHeadline as string) || `Briefing — ${(e.data.weekOf as string) || 'this week'}`,
+    detail: typeof e.data.storyCount === 'number'
+      ? `${e.data.storyCount} ${e.data.storyCount === 1 ? 'story' : 'stories'}`
+      : undefined,
+    isLast: i === events.length - 1,
+  })).join('');
+
+  return {
+    subject: count === 1
+      ? `Your ${ws} briefing is ready — ${(events[0].data.weekOf as string) || 'this week'}`
+      : `${count} new briefings ready — ${ws}`,
+    html: layout({
+      preheader: `Weekly briefing${count !== 1 ? 's' : ''} for ${ws}`,
+      headline: count === 1 ? "This Week's Briefing" : `${count} Weekly Briefings`,
+      subtitle: ws,
+      body: (count > 1 ? countPill(count, 'briefing ready') : '') + items,
+      cta: dashUrl ? { label: 'Read the Briefing', url: dashUrl } : undefined,
       logoUrl,
     }),
   };

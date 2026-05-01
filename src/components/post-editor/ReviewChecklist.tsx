@@ -18,7 +18,7 @@ interface ReviewChecklistState {
   word_count_target: boolean;
 }
 
-const CHECKLIST_ITEMS: { key: keyof ReviewChecklistState; label: string }[] = [
+export const CHECKLIST_ITEMS: { key: keyof ReviewChecklistState; label: string }[] = [
   { key: 'factual_accuracy', label: 'Factual accuracy verified' },
   { key: 'brand_voice', label: 'Brand voice match confirmed' },
   { key: 'internal_links', label: 'Internal links verified and working' },
@@ -49,17 +49,29 @@ export interface ReviewChecklistProps {
   onToggleItem: (key: keyof ReviewChecklistState) => void;
   onChangeStatus: (status: string) => void;
   onRunAIReview?: () => Promise<Record<string, AIReviewResult> | null>;
+  onRequestFix?: (issueKey: string, reason: string) => Promise<void>;
 }
 
 export function ReviewChecklist({
   postStatus, reviewChecklist, showChecklist,
-  onToggleShowChecklist, onToggleItem, onChangeStatus, onRunAIReview,
+  onToggleShowChecklist, onToggleItem, onChangeStatus, onRunAIReview, onRequestFix,
 }: ReviewChecklistProps) {
   const checklist = reviewChecklist ?? EMPTY_CHECKLIST;
   const checkedCount = CHECKLIST_ITEMS.filter(item => checklist[item.key]).length;
   const allChecked = checkedCount === CHECKLIST_ITEMS.length;
   const [aiRunning, setAiRunning] = useState(false);
   const [aiResults, setAiResults] = useState<Record<string, AIReviewResult> | null>(null);
+  const [fixingKey, setFixingKey] = useState<string | null>(null);
+
+  const handleFixThis = async (issueKey: string, reason: string) => {
+    if (!onRequestFix || fixingKey) return;
+    setFixingKey(issueKey);
+    try {
+      await onRequestFix(issueKey, reason);
+    } finally {
+      setFixingKey(null);
+    }
+  };
 
   const handleAIReview = async () => {
     if (!onRunAIReview || aiRunning) return;
@@ -130,6 +142,19 @@ export function ReviewChecklist({
                   {aiResults?.[item.key] && (
                     <div className={`ml-8 mr-2 mb-1 px-2 py-1.5 rounded text-[10px] leading-relaxed ${aiResults[item.key].pass ? 'text-[var(--brand-text-muted)]' : 'text-amber-400/80 bg-amber-500/5 border border-amber-500/10'}`}>
                       {aiResults[item.key].reason}
+                    </div>
+                  )}
+                  {aiResults?.[item.key] && !aiResults[item.key].pass && onRequestFix && (
+                    <div className="ml-8 mr-2 mb-1">
+                      <button
+                        onClick={() => handleFixThis(item.key, aiResults![item.key].reason)}
+                        disabled={fixingKey !== null}
+                        className="flex items-center gap-1 px-2 py-1 rounded t-caption-sm bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50"
+                      >
+                        {fixingKey === item.key
+                          ? <><Icon as={Loader2} size="sm" className="animate-spin" /> Fixing…</>
+                          : 'Fix this'}
+                      </button>
                     </div>
                   )}
                 </div>

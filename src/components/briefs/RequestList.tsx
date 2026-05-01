@@ -1,69 +1,11 @@
 import {
   Loader2, Trash2, Sparkles, FileText,
   Inbox, CheckCircle2, XCircle, Clock, Zap,
-  Copy, Download, Search, Target, MessageSquare, BarChart3,
-  BookOpen, Users, TrendingUp, Check, ExternalLink, Link2, PenLine, Eye, Send,
+  Check, ExternalLink, Link2, PenLine, Eye, Send, MessageSquare,
 } from 'lucide-react';
+import { BriefDetail } from './BriefDetail';
 import { SectionCard, Icon } from '../ui';
-import type { PostSummary } from '../../../shared/types/content';
-
-interface ContentBrief {
-  id: string;
-  workspaceId: string;
-  targetKeyword: string;
-  secondaryKeywords: string[];
-  suggestedTitle: string;
-  suggestedMetaDesc: string;
-  outline: { heading: string; notes: string; wordCount?: number; keywords?: string[] }[];
-  wordCountTarget: number;
-  intent: string;
-  audience: string;
-  competitorInsights: string;
-  internalLinkSuggestions: string[];
-  createdAt: string;
-  executiveSummary?: string;
-  contentFormat?: string;
-  toneAndStyle?: string;
-  peopleAlsoAsk?: string[];
-  topicalEntities?: string[];
-  serpAnalysis?: { contentType: string; avgWordCount: number; commonElements: string[]; gaps: string[] };
-  difficultyScore?: number;
-  trafficPotential?: string;
-  ctaRecommendations?: string[];
-  eeatGuidance?: { experience: string; expertise: string; authority: string; trust: string };
-  contentChecklist?: string[];
-  schemaRecommendations?: { type: string; notes: string }[];
-  pageType?: string;
-  referenceUrls?: string[];
-  realPeopleAlsoAsk?: string[];
-  realTopResults?: { position: number; title: string; url: string }[];
-}
-
-interface ContentTopicRequest {
-  id: string;
-  workspaceId: string;
-  topic: string;
-  targetKeyword: string;
-  intent: string;
-  priority: string;
-  rationale: string;
-  status: 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'post_review' | 'delivered' | 'published' | 'declined';
-  briefId?: string;
-  clientNote?: string;
-  internalNote?: string;
-  declineReason?: string;
-  clientFeedback?: string;
-  source?: 'strategy' | 'client';
-  serviceType?: 'brief_only' | 'full_post';
-  upgradedAt?: string;
-  deliveryUrl?: string;
-  deliveryNotes?: string;
-  targetPageId?: string;
-  targetPageSlug?: string;
-  comments?: { id: string; author: 'client' | 'team'; content: string; createdAt: string }[];
-  requestedAt: string;
-  updatedAt: string;
-}
+import type { ContentBrief, ContentTopicRequest, PostSummary } from '../../../shared/types/content';
 
 // Subset of PostSummary that RequestList needs. Pick keeps it in lock-step with the
 // canonical type — if PostSummary changes, TypeScript catches mismatches here.
@@ -82,7 +24,7 @@ export interface RequestListProps {
   getBriefById: (briefId: string) => ContentBrief | undefined;
   onToggleRequestBrief: (reqId: string, briefId: string) => void;
   onGenerateBriefForRequest: (req: ContentTopicRequest) => void;
-  onUpdateRequestStatus: (reqId: string, status: ContentTopicRequest['status'], extra?: { deliveryUrl?: string; deliveryNotes?: string }) => void;
+  onUpdateRequestStatus: (reqId: string, status: ContentTopicRequest['status'] | undefined, extra?: { deliveryUrl?: string; deliveryNotes?: string; briefId?: string; clientFeedback?: string; serviceType?: 'brief_only' | 'full_post'; upgradedAt?: string }) => void;
   onConfirmDeleteRequest: (req: ContentTopicRequest) => void;
   onSetDeliveringReqId: (reqId: string | null) => void;
   onSetDeliveryUrl: (value: string) => void;
@@ -91,6 +33,15 @@ export interface RequestListProps {
   onSetExpandedRequest: (value: string | null) => void;
   onCopyAsMarkdown: (brief: ContentBrief) => void;
   onExportClientHTML: (brief: ContentBrief) => void;
+  // Brief editing/regeneration (threaded from ContentBriefs)
+  editingBrief: string | null;
+  onSetEditingBrief: (id: string | null) => void;
+  onSaveBriefField: (briefId: string, updates: Partial<ContentBrief>) => void;
+  regeneratingBrief: string | null;
+  onRegenerateBrief: (briefId: string, feedback: string, requestId?: string) => void;
+  regeneratingOutline?: string | null;
+  onRegenerateOutline?: (briefId: string, feedback?: string) => void;
+  sendingToClient?: string | null;
   // Post production (full_post requests after brief approval)
   posts?: RequestPostSummary[];
   generatingPostFor?: string | null;
@@ -121,6 +72,14 @@ export function RequestList({
   onSetExpandedRequest,
   onCopyAsMarkdown,
   onExportClientHTML,
+  editingBrief,
+  onSetEditingBrief,
+  onSaveBriefField,
+  regeneratingBrief,
+  onRegenerateBrief,
+  regeneratingOutline,
+  onRegenerateOutline,
+  sendingToClient = null,
   posts = [],
   generatingPostFor = null,
   onGeneratePost,
@@ -203,35 +162,16 @@ export function RequestList({
                       {req.status === 'post_review' && (
                         <span className="t-caption-sm text-cyan-400/60 italic">Post sent — awaiting client approval</span>
                       )}
-                      {req.status === 'approved' && (req.serviceType || 'brief_only') === 'full_post' && req.briefId && (() => {
+                      {req.briefId && (() => {
                         const existingPost = posts.find(p => p.briefId === req.briefId);
-                        if (existingPost) {
-                          return (
-                            <button
-                              onClick={() => onOpenPost?.(existingPost.id)}
-                              className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors"
-                              title="Open post in editor"
-                            >
-                              <Icon as={PenLine} size="sm" /> Open Post
-                            </button>
-                          );
-                        }
-                        const isGeneratingPost = generatingPostFor === req.briefId;
+                        if (!existingPost) return null;
                         return (
                           <button
-                            onClick={async () => {
-                              if (!req.briefId || !onGeneratePost) return;
-                              // Only advance status to in_progress if generation actually succeeded.
-                              // Otherwise a transient failure would leave the request stuck:
-                              // approved → in_progress with no post and no UI to recover.
-                              const ok = await onGeneratePost(req.briefId);
-                              if (ok) onUpdateRequestStatus(req.id, 'in_progress');
-                            }}
-                            disabled={isGeneratingPost || !onGeneratePost}
-                            className="flex items-center gap-1 px-2 py-1 rounded bg-gradient-to-r from-teal-600/30 to-emerald-600/30 border border-teal-500/40 t-caption-sm text-teal-200 font-medium hover:from-teal-600/50 hover:to-emerald-600/50 transition-all disabled:opacity-50"
+                            onClick={() => onOpenPost?.(existingPost.id)}
+                            className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors"
+                            title="Open post in editor"
                           >
-                            <Icon as={isGeneratingPost ? Loader2 : PenLine} size="sm" className={isGeneratingPost ? 'animate-spin' : ''} />
-                            {isGeneratingPost ? 'Generating…' : 'Generate Post'}
+                            <Icon as={PenLine} size="sm" /> Open Post
                           </button>
                         );
                       })()}
@@ -246,17 +186,17 @@ export function RequestList({
                         if (isPostFlow) {
                           return (
                             <button
-                              onClick={() => onUpdateRequestStatus(req.id, 'post_review')}
-                              className="flex items-center gap-1 px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 t-caption-sm text-cyan-300 hover:bg-cyan-600/30 transition-colors"
-                              title="Send the revised post back to client for review"
+                              onClick={() => onUpdateRequestStatus(req.id, 'in_progress')}
+                              className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors"
+                              title="Re-queue for revision before resending to client"
                             >
-                              <Icon as={Send} size="sm" /> Resend Post to Client
+                              <Icon as={Zap} size="sm" /> Re-queue for Revision
                             </button>
                           );
                         }
                         return (
                           <button
-                            onClick={() => onUpdateRequestStatus(req.id, 'client_review')}
+                            onClick={() => onUpdateRequestStatus(req.id, 'client_review', { clientFeedback: '' })}
                             className="flex items-center gap-1 px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 t-caption-sm text-cyan-300 hover:bg-cyan-600/30 transition-colors"
                             title="Send the revised brief back to client for review"
                           >
@@ -268,25 +208,15 @@ export function RequestList({
                         const existingPost = posts.find(p => p.briefId === req.briefId);
                         if (!existingPost) return null;
                         const canSendToClient = existingPost.status === 'review' || existingPost.status === 'approved';
+                        if (!canSendToClient) return null;
                         return (
-                          <>
-                            <button
-                              onClick={() => onOpenPost?.(existingPost.id)}
-                              className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors"
-                              title="Open post in editor"
-                            >
-                              <Icon as={PenLine} size="sm" /> Open Post
-                            </button>
-                            {canSendToClient && (
-                              <button
-                                onClick={() => onUpdateRequestStatus(req.id, 'post_review')}
-                                className="flex items-center gap-1 px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 t-caption-sm text-cyan-300 hover:bg-cyan-600/30 transition-colors"
-                                title="Send post to client for review and approval"
-                              >
-                                <Icon as={Send} size="sm" /> Send Post to Client
-                              </button>
-                            )}
-                          </>
+                          <button
+                            onClick={() => onUpdateRequestStatus(req.id, 'post_review')}
+                            className="flex items-center gap-1 px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 t-caption-sm text-cyan-300 hover:bg-cyan-600/30 transition-colors"
+                            title="Send post to client for review and approval"
+                          >
+                            <Icon as={Send} size="sm" /> Send Post to Client
+                          </button>
                         );
                       })()}
                       {req.status === 'in_progress' && deliveringReqId !== req.id && (
@@ -350,248 +280,36 @@ export function RequestList({
               )}
               {/* Full inline brief detail */}
               {inlineBrief && (
-                <div className="border-t border-[var(--brand-border)] px-4 pb-4 space-y-4">
-                  {/* Export buttons */}
-                  <div className="pt-3 flex items-center gap-2">
-                    <button onClick={() => onCopyAsMarkdown(inlineBrief)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
-                      <Icon as={Copy} size="sm" /> Copy for AI Tool
-                    </button>
-                    <button onClick={() => onExportClientHTML(inlineBrief)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
-                      <Icon as={Download} size="sm" /> Export PDF
-                    </button>
-                    <button onClick={() => { navigator.clipboard.writeText(JSON.stringify(inlineBrief, null, 2)); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
-                      <Icon as={Copy} size="sm" /> Copy JSON
-                    </button>
-                  </div>
-
-                  {/* Executive Summary */}
-                  {inlineBrief.executiveSummary && (
-                    <div className="bg-teal-500/5 border border-teal-500/20 rounded-[var(--radius-lg)] px-4 py-3">
-                      <div className="flex items-center gap-1.5 mb-1.5"><Icon as={BookOpen} size="md" className="text-teal-400" /><span className="t-caption-sm uppercase tracking-wider text-teal-400 font-medium">Executive Summary</span></div>
-                      <div className="text-xs text-[var(--brand-text-bright)] leading-relaxed">{inlineBrief.executiveSummary}</div>
-                    </div>
-                  )}
-
-                  {/* Title & Meta */}
-                  <div className="space-y-2">
-                    <div>
-                      <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1">Suggested Title</div>
-                      <div className="text-xs text-teal-400 bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">{inlineBrief.suggestedTitle}</div>
-                    </div>
-                    <div>
-                      <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1">Meta Description</div>
-                      <div className="text-xs text-[var(--brand-text-bright)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">{inlineBrief.suggestedMetaDesc}</div>
-                    </div>
-                  </div>
-
-                  {/* Key Metrics Row */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">
-                      <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-0.5">Word Count</div>
-                      <div className="text-sm font-bold text-blue-400">{inlineBrief.wordCountTarget?.toLocaleString()}</div>
-                    </div>
-                    <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">
-                      <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-0.5">Intent</div>
-                      <div className="text-xs text-[var(--brand-text-bright)] capitalize font-medium">{inlineBrief.intent}</div>
-                    </div>
-                    {inlineBrief.contentFormat && (
-                      <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">
-                        <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-0.5">Format</div>
-                        <div className="text-xs text-amber-400 capitalize font-medium">{inlineBrief.contentFormat}</div>
-                      </div>
-                    )}
-                    {inlineBrief.difficultyScore != null && (
-                      <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">
-                        <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-0.5">Difficulty</div>
-                        <div className={`text-sm font-bold ${inlineBrief.difficultyScore <= 30 ? 'text-emerald-400' : inlineBrief.difficultyScore <= 60 ? 'text-amber-400' : 'text-red-400'}`}>{inlineBrief.difficultyScore}/100</div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Traffic Potential */}
-                  {inlineBrief.trafficPotential && (
-                    <div className="flex items-start gap-2 bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">
-                      <Icon as={TrendingUp} size="md" className="text-emerald-400 mt-0.5 flex-shrink-0" />
-                      <div><div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-0.5">Traffic Potential</div><div className="text-xs text-[var(--brand-text-bright)]">{inlineBrief.trafficPotential}</div></div>
-                    </div>
-                  )}
-
-                  {/* Audience & Tone */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-1"><Icon as={Users} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Audience</span></div>
-                      <div className="text-xs text-[var(--brand-text)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">{inlineBrief.audience}</div>
-                    </div>
-                    {inlineBrief.toneAndStyle && (
-                      <div>
-                        <div className="flex items-center gap-1.5 mb-1"><Icon as={MessageSquare} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Tone & Style</span></div>
-                        <div className="text-xs text-[var(--brand-text)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">{inlineBrief.toneAndStyle}</div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Secondary Keywords */}
-                  {inlineBrief.secondaryKeywords?.length > 0 && (
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-1.5"><Icon as={Search} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Secondary Keywords</span></div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {inlineBrief.secondaryKeywords.map((kw, i) => (
-                          <span key={i} className="t-caption-sm px-2 py-0.5 rounded-full bg-[var(--surface-3)] text-[var(--brand-text)]">{kw}</span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Topical Entities */}
-                  {inlineBrief.topicalEntities && inlineBrief.topicalEntities.length > 0 && (
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-1.5"><Icon as={Target} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Topical Entities to Cover</span></div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {inlineBrief.topicalEntities.map((entity, i) => (
-                          <span key={i} className="t-caption-sm px-2 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-300">{entity}</span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* People Also Ask */}
-                  {inlineBrief.peopleAlsoAsk && inlineBrief.peopleAlsoAsk.length > 0 && (
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-1.5"><Icon as={MessageSquare} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Questions to Answer</span></div>
-                      <div className="space-y-1">
-                        {inlineBrief.peopleAlsoAsk.map((q, i) => (
-                          <div key={i} className="flex items-start gap-2 text-xs text-[var(--brand-text-bright)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">
-                            <span className="text-amber-400 flex-shrink-0 font-medium">Q{i + 1}.</span> {q}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* SERP Analysis */}
-                  {inlineBrief.serpAnalysis && (
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-1.5"><Icon as={BarChart3} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">SERP Analysis</span></div>
-                      <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-3 border border-[var(--brand-border)] space-y-2">
-                        <div className="grid grid-cols-2 gap-3">
-                          <div><span className="t-caption-sm text-[var(--brand-text-muted)]">Content Type:</span><span className="text-xs text-[var(--brand-text-bright)] ml-1">{inlineBrief.serpAnalysis.contentType}</span></div>
-                          <div><span className="t-caption-sm text-[var(--brand-text-muted)]">Avg Word Count:</span><span className="text-xs text-[var(--brand-text-bright)] ml-1">{inlineBrief.serpAnalysis.avgWordCount.toLocaleString()}</span></div>
-                        </div>
-                        {inlineBrief.serpAnalysis.commonElements.length > 0 && (
-                          <div><span className="t-caption-sm text-[var(--brand-text-muted)] block mb-1">Common Elements:</span><div className="flex flex-wrap gap-1">{inlineBrief.serpAnalysis.commonElements.map((el, i) => <span key={i} className="t-caption-sm px-2 py-0.5 rounded bg-[var(--surface-3)] text-[var(--brand-text)]">{el}</span>)}</div></div>
-                        )}
-                        {inlineBrief.serpAnalysis.gaps.length > 0 && (
-                          <div><span className="t-caption-sm text-emerald-400/80 block mb-1">Opportunities (gaps in existing content):</span><div className="space-y-1">{inlineBrief.serpAnalysis.gaps.map((g, i) => <div key={i} className="t-caption-sm text-emerald-300/80 flex items-start gap-1.5"><span className="text-emerald-400 mt-0.5">→</span>{g}</div>)}</div></div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Content Outline */}
-                  {inlineBrief.outline?.length > 0 && (
-                    <div>
-                      <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-2">Content Outline</div>
-                      <div className="space-y-2">
-                        {inlineBrief.outline.map((section, i) => (
-                          <div key={i} className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2.5 border border-[var(--brand-border)]">
-                            <div className="flex items-center justify-between">
-                              <div className="text-xs font-medium text-[var(--brand-text-bright)]">H2: {section.heading}</div>
-                              {section.wordCount && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{section.wordCount} words</span>}
-                            </div>
-                            <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1 leading-relaxed">{section.notes}</div>
-                            {section.keywords && section.keywords.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mt-1.5">{section.keywords.map((kw, j) => <span key={j} className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400/80">{kw}</span>)}</div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* CTA Recommendations */}
-                  {inlineBrief.ctaRecommendations && inlineBrief.ctaRecommendations.length > 0 && (
-                    <div>
-                      <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1.5">CTA Recommendations</div>
-                      <div className="space-y-1">{inlineBrief.ctaRecommendations.map((cta, i) => (
-                        <div key={i} className="text-xs text-[var(--brand-text-bright)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)] flex items-start gap-2">
-                          <span className={`t-caption-sm px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${i === 0 ? 'bg-teal-500/20 text-teal-400' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)]'}`}>{i === 0 ? 'Primary' : 'Secondary'}</span>{cta}
-                        </div>
-                      ))}</div>
-                    </div>
-                  )}
-
-                  {/* Competitor Insights */}
-                  {inlineBrief.competitorInsights && (
-                    <div>
-                      <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1">Competitor Insights</div>
-                      <div className="text-xs text-[var(--brand-text)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)] leading-relaxed">{inlineBrief.competitorInsights}</div>
-                    </div>
-                  )}
-
-                  {/* Internal Links */}
-                  {inlineBrief.internalLinkSuggestions?.length > 0 && (
-                    <div>
-                      <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1">Internal Link Suggestions</div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {inlineBrief.internalLinkSuggestions.map((link, i) => (
-                          <span key={i} className="t-caption-sm px-2 py-0.5 rounded bg-[var(--surface-3)] text-blue-400">/{link}</span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* E-E-A-T Guidance */}
-                  {inlineBrief.eeatGuidance && (
-                    <div>
-                      <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-2">E-E-A-T Signals</div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {[
-                          { label: 'Experience', value: inlineBrief.eeatGuidance.experience, color: 'text-blue-400' },
-                          { label: 'Expertise', value: inlineBrief.eeatGuidance.expertise, color: 'text-teal-400' },
-                          { label: 'Authority', value: inlineBrief.eeatGuidance.authority, color: 'text-teal-400' },
-                          { label: 'Trust', value: inlineBrief.eeatGuidance.trust, color: 'text-amber-400' },
-                        ].filter(e => e.value).map((e, i) => (
-                          <div key={i} className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2.5 border border-[var(--brand-border)]">
-                            <div className={`t-caption-sm uppercase tracking-wider ${e.color} font-medium mb-1`}>{e.label}</div>
-                            <div className="t-caption-sm text-[var(--brand-text)] leading-relaxed">{e.value}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Content Checklist */}
-                  {inlineBrief.contentChecklist && inlineBrief.contentChecklist.length > 0 && (
-                    <div>
-                      <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-2">Content Checklist</div>
-                      <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] border border-[var(--brand-border)] divide-y divide-[var(--brand-border)]/50">
-                        {inlineBrief.contentChecklist.map((item, i) => (
-                          <div key={i} className="flex items-start gap-2.5 px-4 py-2.5">
-                            <div className="w-4 h-4 mt-0.5 rounded border border-[var(--brand-border)] flex-shrink-0" />
-                            <span className="t-caption-sm text-[var(--brand-text)] leading-relaxed">{item}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Schema Recommendations */}
-                  {inlineBrief.schemaRecommendations && inlineBrief.schemaRecommendations.length > 0 && (
-                    <div>
-                      <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-2">Schema Markup</div>
-                      <div className="space-y-2">
-                        {inlineBrief.schemaRecommendations.map((schema, i) => (
-                          <div key={i} className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-4 py-3 border border-[var(--brand-border)]">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="t-caption-sm px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-medium">{schema.type}</span>
-                            </div>
-                            <div className="t-caption-sm text-[var(--brand-text)] leading-relaxed">{schema.notes}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <BriefDetail
+                  brief={inlineBrief}
+                  editingBrief={editingBrief}
+                  generatingPostFor={generatingPostFor}
+                  regeneratingBrief={regeneratingBrief}
+                  sendingToClient={sendingToClient ?? null}
+                  onSaveBriefField={onSaveBriefField}
+                  onSetEditingBrief={onSetEditingBrief}
+                  onGeneratePost={async (briefId) => {
+                    if (!onGeneratePost) return;
+                    const ok = await onGeneratePost(briefId);
+                    if (!ok) return;
+                    if ((req.serviceType || 'brief_only') === 'brief_only') {
+                      await onUpdateRequestStatus(req.id, undefined, { serviceType: 'full_post', upgradedAt: new Date().toISOString() });
+                    }
+                    // Only advance to in_progress for statuses that allow this transition
+                    const canAdvance = ['requested', 'brief_generated', 'client_review', 'changes_requested', 'approved'].includes(req.status);
+                    if (canAdvance) onUpdateRequestStatus(req.id, 'in_progress');
+                  }}
+                  onRegenerate={(briefId, feedback) => onRegenerateBrief(briefId, feedback, req.id)}
+                  onRegenerateOutline={onRegenerateOutline}
+                  regeneratingOutline={regeneratingOutline}
+                  onCopyAsMarkdown={onCopyAsMarkdown}
+                  onExportClientHTML={onExportClientHTML}
+                  onSendToClient={() => {}}
+                  onConfirmDelete={() => {}}
+                  hideActions={['sendToClient', 'delete']}
+                  defaultFeedback={req.status === 'changes_requested' ? req.clientFeedback : undefined}
+                  autoShowRegenerate={req.status === 'changes_requested' && !!req.clientFeedback}
+                />
               )}
             </div>
           );

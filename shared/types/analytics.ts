@@ -203,7 +203,8 @@ export type InsightType =
   | 'site_health'            // new: site-level audit health (Bridge #15)
   | 'emerging_keyword'       // Tier 2: SEMRush trend-rising keyword opportunity
   | 'competitor_alert'       // Tier 2: weekly competitor position change
-  | 'freshness_alert';       // Tier 2: stale content detected via page_keywords age
+  | 'freshness_alert'        // Tier 2: stale content detected via page_keywords age
+  | 'milestone_attribution'; // Phase 2.5c: delivered brief crossed a traffic threshold
 
 export type InsightDomain = 'search' | 'traffic' | 'cross';
 
@@ -435,6 +436,33 @@ export interface FreshnessAlertData extends InsightDataBase {
   clicks?: number;               // 28d GSC clicks
 }
 
+/**
+ * Phase 2.5c — surfaced when a delivered content brief's tracked traffic
+ * value crosses a threshold ("first clicks" / "fifty clicks" / "hundred
+ * clicks"). Pairs the brief metadata with the post-delivery measurement
+ * window so the briefing template can frame the win as attributable.
+ *
+ * Source: tracked_actions + content_requests + roi.contentItems[]. Baseline
+ * captured at brief delivery (existing flow); milestone is detected by
+ * comparing current metric to thresholdCrossed bucket.
+ */
+export interface MilestoneAttributionData extends InsightDataBase {
+  /** content_request id of the delivered brief */
+  briefId: string;
+  /** Title at delivery — surfaced verbatim in the briefing narrative */
+  briefTitle: string;
+  /** The page URL the brief targeted */
+  pageUrl: string;
+  /** Threshold this insight fired for */
+  thresholdCrossed: 'first_clicks' | 'fifty_clicks' | 'hundred_clicks';
+  /** GSC clicks observed for the page in the latest measurement window */
+  currentClicks: number;
+  /** Days between brief delivery and the threshold-crossing observation */
+  daysSinceDelivery: number;
+  /** Dollar-equivalent organic value the brief is currently driving */
+  trafficValue: number;
+}
+
 // ── Insight Data Map (discriminated union) ────────────────────────
 // Use this to get type-safe access to insight data by type.
 
@@ -456,6 +484,7 @@ export interface InsightDataMap {
   emerging_keyword: EmergingKeywordData;
   competitor_alert: CompetitorAlertData;
   freshness_alert: FreshnessAlertData;
+  milestone_attribution: MilestoneAttributionData;
 }
 
 // ── Insight Feed Filter Keys ──────────────────────────────────────

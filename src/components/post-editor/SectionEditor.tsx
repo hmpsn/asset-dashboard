@@ -6,6 +6,7 @@ import {
   Loader2, RefreshCw, Check, ChevronDown, ChevronUp, Pencil, Clock, AlertTriangle,
 } from 'lucide-react';
 import { SectionCard, Icon } from '../ui';
+import { RichTextEditor } from './RichTextEditor';
 
 interface PostSection {
   index: number;
@@ -30,20 +31,19 @@ export interface SectionEditorProps {
   section: PostSection;
   expanded: boolean;
   editing: boolean;
-  editBuffer: string;
   regenerating: boolean;
   isGenerating: boolean;
+  saveStatus: 'idle' | 'saving' | 'saved';
   onToggleExpand: (index: number) => void;
-  onStartEdit: (index: number, content: string) => void;
-  onSaveEdit: () => void;
-  onCancelEdit: () => void;
+  onStartEdit: (index: number) => void;
+  onChange: (html: string) => void;
+  onDone: () => Promise<void>;
   onRegenerate: (index: number) => void;
-  onChangeBuffer: (value: string) => void;
 }
 
 export function SectionEditor({
-  section, expanded, editing, editBuffer, regenerating, isGenerating,
-  onToggleExpand, onStartEdit, onSaveEdit, onCancelEdit, onRegenerate, onChangeBuffer,
+  section, expanded, editing, regenerating, isGenerating, saveStatus,
+  onToggleExpand, onStartEdit, onChange, onDone, onRegenerate,
 }: SectionEditorProps) {
   return (
     <SectionCard noPadding className={`overflow-hidden ${section.status === 'error' ? '!border-red-500/30' : section.status === 'generating' ? '!border-amber-500/20' : ''}`}>
@@ -82,18 +82,32 @@ export function SectionEditor({
             </div>
           ) : editing ? (
             <div className="space-y-2">
-              <textarea value={editBuffer} onChange={e => onChangeBuffer(e.target.value)} className="w-full bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 text-xs text-[var(--brand-text)] font-mono focus:border-teal-500/50 focus:outline-none resize-y min-h-[150px]" rows={12} />
+              <RichTextEditor
+                initialValue={section.content}
+                onChange={onChange}
+              />
               <div className="flex items-center gap-2">
-                <button onClick={onSaveEdit} className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors flex items-center gap-1"><Check className="w-3 h-3" /> Save</button>
-                <button onClick={onCancelEdit} className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">Cancel</button>
-                <span className="t-caption-sm text-[var(--brand-text-muted)] ml-auto">{editBuffer.split(/\s+/).filter(w => w).length} words</span>
+                <button
+                  onClick={onDone}
+                  className="px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors flex items-center gap-1"
+                >
+                  <Check className="w-3 h-3" /> Done
+                </button>
+                {saveStatus === 'saving' && (
+                  <span className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
+                    <Loader2 className="w-3 h-3 animate-spin" /> Saving…
+                  </span>
+                )}
+                {saveStatus === 'saved' && (
+                  <span className="t-caption-sm text-emerald-400/70">Saved</span>
+                )}
               </div>
             </div>
           ) : (
             <div>
               <div className="text-xs text-[var(--brand-text)] leading-relaxed [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:text-[var(--brand-text-bright)] [&_h2]:mb-2 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:text-[var(--brand-text-bright)] [&_h3]:mt-3 [&_h3]:mb-1 [&_p]:mb-2 [&_ul]:pl-4 [&_ul]:mb-2 [&_ol]:pl-4 [&_ol]:mb-2 [&_li]:mb-1 [&_strong]:text-[var(--brand-text-bright)] [&_a]:text-teal-400" dangerouslySetInnerHTML={{ __html: section.content }} />
               <div className="flex items-center gap-2 mt-3 pt-2 border-t border-[var(--brand-border)]/50">
-                <button onClick={() => onStartEdit(section.index, section.content)} className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"><Icon as={Pencil} size="sm" /> Edit</button>
+                <button onClick={() => onStartEdit(section.index)} className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"><Icon as={Pencil} size="sm" /> Edit</button>
                 <button onClick={() => onRegenerate(section.index)} disabled={regenerating} className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-300 transition-colors disabled:opacity-50">
                   <Icon as={regenerating ? Loader2 : RefreshCw} size="sm" className={regenerating ? 'animate-spin' : ''} /> Regenerate
                 </button>

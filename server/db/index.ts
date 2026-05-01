@@ -22,8 +22,11 @@ const db = new Database(dbPath);
 
 // Enable WAL mode for better concurrent read performance
 db.pragma('journal_mode = WAL');
-// Wait up to 5 seconds when the database is locked (avoids SQLITE_BUSY in parallel test workers)
-db.pragma('busy_timeout = 5000');
+// Wait up to 30 seconds when the database is locked. macOS APFS fsync() can
+// occasionally stall for 5-15 s under background I/O (Time Machine, Spotlight),
+// which was causing SQLITE_BUSY failures when parallel integration test servers
+// all shared the same database file.
+db.pragma('busy_timeout = 30000');
 // Enable foreign key enforcement
 db.pragma('foreign_keys = ON');
 
@@ -45,6 +48,12 @@ db.pragma('foreign_keys = ON');
  *     035-schema-validations.sql  → 061-schema-validations.sql
  *     036-llms-txt-cache.sql      → 062-llms-txt-cache.sql
  *     037-llms-txt-freshness.sql  → 063-llms-txt-freshness.sql
+ *   2026-04-30 — 079 collision (PR #385 page-elements + PR #387 briefing-v2 metrics)
+ *     079-workspace-metrics-snapshots.sql → 080-workspace-metrics-snapshots.sql
+ *     (PR #385's 079-page-elements.sql keeps the slot; briefing-v2's later
+ *      migration moves to 080. Both already shipped to staging when the
+ *      collision was found, so the alias bridge below ensures staging
+ *      databases that already executed the old name are not re-run.)
  */
 const MIGRATION_RENAMES: Array<[oldName: string, newName: string]> = [
   ['048-meeting-briefs.sql', '054-meeting-briefs.sql'],
@@ -52,6 +61,7 @@ const MIGRATION_RENAMES: Array<[oldName: string, newName: string]> = [
   ['035-schema-validations.sql', '061-schema-validations.sql'],
   ['036-llms-txt-cache.sql', '062-llms-txt-cache.sql'],
   ['037-llms-txt-freshness.sql', '063-llms-txt-freshness.sql'],
+  ['079-workspace-metrics-snapshots.sql', '080-workspace-metrics-snapshots.sql'],
 ];
 
 /**
@@ -62,7 +72,7 @@ const MIGRATION_RENAMES: Array<[oldName: string, newName: string]> = [
  * IMMEDIATE transaction, serialising concurrent server starts against the same
  * database file (common in the test suite where multiple servers share
  * ~/.asset-dashboard/dashboard.db). Only one process holds the write lock at a
- * time; others block (up to busy_timeout = 5 s), then see all migrations
+ * time; others block (up to busy_timeout = 30 s), then see all migrations
  * already applied and exit immediately. This prevents the TOCTOU window where
  * two processes both read the applied set, both see the same migration as
  * pending, and race to apply it.

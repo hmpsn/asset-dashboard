@@ -17,7 +17,7 @@ import {
   formatKnowledgeBaseForPrompt,
 } from './workspace-intelligence.js';
 import { getActivePatterns } from './copy-intelligence.js';
-import { WRITING_QUALITY_RULES } from './content-posts-ai.js';
+import { WRITING_QUALITY_RULES } from './writing-quality.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import db from './db/index.js';
 import {
@@ -100,7 +100,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown fences, no prose before or after.
 Context:
 ${context}`;
 
-  const systemPrompt = buildSystemPrompt(wsId, baseInstructions);
+  const systemPrompt = buildSystemPrompt(wsId, baseInstructions, undefined, { skipProseRules: true });
 
   const response = await callAnthropic({
     model: 'claude-sonnet-4-20250514',
@@ -200,7 +200,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown fences, no prose before or after.
 Context:
 ${context}`;
 
-  const systemPrompt = buildSystemPrompt(wsId, baseInstructions);
+  const systemPrompt = buildSystemPrompt(wsId, baseInstructions, undefined, { skipProseRules: true });
 
   const response = await callAnthropic({
     model: 'claude-sonnet-4-20250514',

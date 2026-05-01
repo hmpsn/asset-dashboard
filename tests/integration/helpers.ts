@@ -89,8 +89,12 @@ export function createTestContext(port: number): TestContext {
       proc!.stdout?.on('data', (data: Buffer) => {
         const text = data.toString();
         if (text.includes('running on')) {
-          clearTimeout(timeout);
-          resolve();
+          // Stage 2: confirm routes are serving before resolving.
+          // Keep the timeout active across both stages so a health-check hang
+          // still triggers the 20-second deadline.
+          waitForServer(BASE)
+            .then(() => { clearTimeout(timeout); resolve(); })
+            .catch(err => { clearTimeout(timeout); reject(err); });
         }
       });
 
@@ -211,6 +215,37 @@ export function createTestContext(port: number): TestContext {
     authPatchJson,
     authDel,
   };
+}
+
+// ─── Server readiness helper ──────────────────────────────────────────────────
+
+/**
+ * Poll GET {base}/api/health until it returns 200.
+ *
+ * Called by startServer() after the "running on" stdout signal so tests never
+ * fire before routes are actively serving. Also exported for test files that
+ * need custom retry parameters.
+ */
+export async function waitForServer(
+  base: string,
+  options?: { maxRetries?: number; intervalMs?: number },
+): Promise<void> {
+  const { maxRetries = 15, intervalMs = 200 } = options ?? {};
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const res = await fetch(`${base}/api/health`);
+      if (res.status === 200) return;
+    } catch {
+      // ECONNREFUSED or other transient error — retry
+    }
+    if (attempt < maxRetries - 1) {
+      await new Promise<void>(resolve => setTimeout(resolve, intervalMs));
+    }
+  }
+  throw new Error(
+    `Server on ${base} did not become healthy after ${maxRetries} retries`,
+  );
 }
 
 // ─── Test assertion factories ─────────────────────────────────────────────────

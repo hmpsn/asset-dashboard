@@ -16,9 +16,11 @@ import {
   updateContentRequest,
   addComment,
 } from '../content-requests.js';
-import { notifyTeamContentRequest } from '../email.js';
+import { notifyTeamContentRequest, notifyTeamChangesRequested } from '../email.js';
 import { getPost, updatePostField, snapshotPostVersion, getMostRecentPostVersion } from '../content-posts.js';
 import { sanitizeString, validateEnum } from '../helpers.js';
+import { sanitizeRichText, sanitizePlainText } from '../html-sanitize.js';
+import { countHtmlWords } from '../content-posts-ai.js';
 import { getPageKeyword, listPageKeywords } from '../page-keywords.js';
 import { getClientActor } from '../middleware.js';
 import { getPageTrend, getQueryPageData } from '../search-console.js';
@@ -156,7 +158,7 @@ router.get('/api/public/content-requests/:workspaceId', (req, res) => {
     // Include briefId only when in client_review or later
     briefId: ['client_review', 'approved', 'changes_requested', 'in_progress', 'delivered', 'published'].includes(r.status) ? r.briefId : undefined,
     // Include postId only when post is ready for client review or beyond
-    postId: ['post_review', 'changes_requested', 'delivered', 'published'].includes(r.status) ? r.postId : undefined,
+    postId: ['post_review', 'delivered', 'published'].includes(r.status) || (r.status === 'changes_requested' && r.serviceType === 'full_post') ? r.postId : undefined,
     clientFeedback: r.clientFeedback,
   })));
 });
@@ -244,15 +246,31 @@ router.post('/api/public/content-request/:workspaceId/:id/request-changes', vali
   const actor = getClientActor(req, req.params.workspaceId);
   addActivity(req.params.workspaceId, 'changes_requested', `${actor?.name || 'Client'} requested changes on "${updated.topic}"`, feedback || '', { requestId: updated.id }, actor);
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
+  const wsInfo = getWorkspace(req.params.workspaceId);
+  notifyTeamChangesRequested({
+    workspaceName: wsInfo?.name || req.params.workspaceId,
+    workspaceId: req.params.workspaceId,
+    topic: updated.topic,
+    targetKeyword: updated.targetKeyword,
+    feedback: feedback || '',
+  });
   res.json(updated);
 });
 
 // Client upgrades from brief_only to full_post
-router.post('/api/public/content-request/:workspaceId/:id/upgrade', validate(upgradeContentRequestSchema), (req, res) => {
-  const updated = updateContentRequest(req.params.workspaceId, req.params.id, {
-    serviceType: 'full_post',
-    upgradedAt: new Date().toISOString(),
-  });
+router.post('/api/public/content-request/:workspaceId/:id/upgrade', validate(upgradeContentRequestSchema), (req, res, next) => {
+  let updated;
+  try {
+    updated = updateContentRequest(req.params.workspaceId, req.params.id, {
+      serviceType: 'full_post',
+      upgradedAt: new Date().toISOString(),
+    });
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'InvalidTransitionError') {
+      return res.status(400).json({ error: err.message });
+    }
+    return next(err);
+  }
   if (!updated) return res.status(404).json({ error: 'Request not found' });
   const actor = getClientActor(req, req.params.workspaceId);
   addActivity(req.params.workspaceId, 'content_upgraded', `${actor?.name || 'Client'} upgraded "${updated.topic}" to full blog post`, '', { requestId: updated.id }, actor);
@@ -431,7 +449,7 @@ router.get('/api/public/content-posts/:workspaceId/:postId', (req, res) => {
   // Verify the associated request is in post_review (or delivered for read-only view)
   const requests = listContentRequests(req.params.workspaceId);
   const req_ = requests.find(r => r.briefId === post.briefId);
-  if (!req_ || !['post_review', 'delivered', 'published'].includes(req_.status)) {
+  if (!req_ || !['post_review', 'changes_requested', 'delivered', 'published'].includes(req_.status)) {
     return res.status(403).json({ error: 'Post is not available for client review' });
   }
 
@@ -489,16 +507,21 @@ router.post('/api/public/content-request/:workspaceId/:id/request-post-changes',
   const actor = getClientActor(req, req.params.workspaceId);
   addActivity(req.params.workspaceId, 'post_changes_requested', `${actor?.name || 'Client'} requested changes on post for "${updated.topic}"`, feedback || '', { requestId: updated.id }, actor);
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
+  const wsInfo = getWorkspace(req.params.workspaceId);
+  notifyTeamChangesRequested({
+    workspaceName: wsInfo?.name || req.params.workspaceId,
+    workspaceId: req.params.workspaceId,
+    topic: updated.topic,
+    targetKeyword: updated.targetKeyword,
+    feedback: feedback || '',
+  });
   res.json(updated);
 });
 
-// Strip HTML tags. The client-edit UI uses plain-text textareas (it strips tags
-// on edit-entry), so valid public callers send plain text. Server-side strip
-// prevents malicious callers from injecting HTML that would later render via
-// dangerouslySetInnerHTML in admin/client post views.
-const stripHtmlTags = (s: string) => s.replace(/<[^>]+>/g, '');
-
 // Client edits post content (sections, title, meta — NOT status or admin fields)
+// title/metaDescription are plain text; introduction/conclusion/section.content are
+// rich text (TipTap HTML) — both paths are sanitized via the shared allowlist
+// rather than stripped, so client formatting (bold, italic, headings, links) survives.
 router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', validate(clientPostEditSchema), (req, res, next) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -530,10 +553,10 @@ router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', valid
 
   const { title, metaDescription, introduction, sections, conclusion } = req.body;
   const updates: Record<string, unknown> = {};
-  if (title !== undefined) updates.title = stripHtmlTags(title);
-  if (metaDescription !== undefined) updates.metaDescription = stripHtmlTags(metaDescription);
-  if (introduction !== undefined) updates.introduction = stripHtmlTags(introduction);
-  if (conclusion !== undefined) updates.conclusion = stripHtmlTags(conclusion);
+  if (title !== undefined) updates.title = sanitizePlainText(title);
+  if (metaDescription !== undefined) updates.metaDescription = sanitizePlainText(metaDescription);
+  if (introduction !== undefined) updates.introduction = sanitizeRichText(introduction);
+  if (conclusion !== undefined) updates.conclusion = sanitizeRichText(conclusion);
   if (sections !== undefined) {
     // CRITICAL: merge client edits with existing section data by index.
     // The client only sends { index, heading, content, wordCount } — the editable fields.
@@ -544,11 +567,12 @@ router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', valid
     updates.sections = post.sections.map(existing => {
       const edit = clientSections.find(s => s.index === existing.index);
       if (!edit) return existing; // unedited section — keep as-is
+      const sanitizedContent = sanitizeRichText(edit.content);
       return {
         ...existing,                           // preserves: targetWordCount, keywords, status, error
-        heading: stripHtmlTags(edit.heading),
-        content: stripHtmlTags(edit.content),
-        wordCount: edit.wordCount,
+        heading: sanitizePlainText(edit.heading),
+        content: sanitizedContent,
+        wordCount: countHtmlWords(sanitizedContent),
       };
     });
   }
@@ -559,8 +583,8 @@ router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', valid
     const finalIntro = updates.introduction !== undefined ? (updates.introduction as string) : post.introduction;
     const finalConclusion = updates.conclusion !== undefined ? (updates.conclusion as string) : post.conclusion;
     const finalSections = (updates.sections as { wordCount: number }[] | undefined) ?? post.sections;
-    const introWords = (finalIntro || '').split(/\s+/).filter(Boolean).length;
-    const conclusionWords = (finalConclusion || '').split(/\s+/).filter(Boolean).length;
+    const introWords = countHtmlWords(finalIntro || '');
+    const conclusionWords = countHtmlWords(finalConclusion || '');
     const sectionWords = finalSections.reduce((sum, s) => sum + (s.wordCount || 0), 0);
     updates.totalWordCount = introWords + conclusionWords + sectionWords;
   }
@@ -574,8 +598,10 @@ router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', valid
   if (!updated) return res.status(404).json({ error: 'Post not found' });
 
   const actor = getClientActor(req, req.params.workspaceId);
-  addActivity(req.params.workspaceId, 'post_client_edit', `${actor?.name || 'Client'} edited post content for "${post.targetKeyword}"`, '', { postId: post.id }, actor);
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { id: updated.id, status: updated.status });
+  if (shouldSnapshot) {
+    addActivity(req.params.workspaceId, 'post_client_edit', `${actor?.name || 'Client'} edited post content for "${post.targetKeyword}"`, '', { postId: post.id }, actor);
+  }
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: updated.id, status: updated.status });
   res.json(updated);
 });
 

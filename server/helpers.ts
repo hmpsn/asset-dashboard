@@ -12,10 +12,13 @@ import { getAllGscPages, getQueryPageData } from './search-console.js';
 import { getGA4TopPages } from './google-analytics.js';
 import { getRawKnowledge, buildPersonasContext } from './seo-context.js';
 import { getInsights } from './analytics-insights-store.js';
+import { getDeclinedKeywords } from './keyword-feedback.js';
+import { listSites } from './webflow-pages.js';
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
 import { CRITICAL_CHECKS, MODERATE_CHECKS, computePageScore } from '../shared/scoring.js';
+import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
 
 
 const log = createLogger('helpers');
@@ -304,17 +307,39 @@ export type SchemaAnalyticsMaps = {
   insightsMap?: Map<string, { healthScore?: number; healthTrend?: string; isQuickWin?: boolean }>;
 };
 
-// 5-minute TTL cache for analytics maps — prevents repeated API calls on
+// 5-minute TTL cache for analytics maps + intelligence signals — prevents repeated API calls on
 // the interactive single-page generation endpoint.
-const analyticsCache: Record<string, { maps: SchemaAnalyticsMaps; ts: number }> = {};
+const analyticsCache: Record<string, {
+  maps: SchemaAnalyticsMaps;
+  serpFeatures?: { featuredSnippets: number; peopleAlsoAsk: number; localPack: boolean; videoCarousel: number };
+  backlinkReferringDomains?: number;
+  ts: number;
+}> = {};
 const ANALYTICS_CACHE_TTL_MS = 5 * 60 * 1000;
+
+// 5-minute TTL cache for listSites() — prevents an extra Webflow API round-trip on every
+// single-page schema generation request. Keyed by workspace token (or '' for global).
+const sitesCache: Record<string, {
+  sites: Array<{ id: string; displayName: string; shortName: string; defaultLocale: string }>;
+  ts: number;
+}> = {};
+
+async function listSitesCached(
+  tokenOverride?: string,
+): Promise<Array<{ id: string; displayName: string; shortName: string; defaultLocale: string }>> {
+  const key = tokenOverride ?? '';
+  const cached = sitesCache[key];
+  if (cached && Date.now() - cached.ts < ANALYTICS_CACHE_TTL_MS) return cached.sites;
+  const sites = await listSites(tokenOverride);
+  sitesCache[key] = { sites, ts: Date.now() };
+  return sites;
+}
 
 export async function buildSchemaContext(
   siteId: string,
   options?: { includeAnalytics?: boolean },
 ): Promise<{
   ctx: SchemaContext;
-  pageKeywordMap?: { pagePath: string; primaryKeyword: string; secondaryKeywords: string[]; searchIntent?: string; topicCluster?: string; contentGaps?: string[]; optimizationScore?: number }[];
 } & SchemaAnalyticsMaps> {
   const allWs = listWorkspaces();
   const ws = allWs.find(w => w.webflowSiteId === siteId);
@@ -322,34 +347,65 @@ export async function buildSchemaContext(
   if (ws) {
     ctx.companyName = ws.name;
     ctx.liveDomain = ws.liveDomain;
+    // schema-context-direct-read-ok: legacy; tracked in roadmap schema-context-builder-pattern-b-migration
     ctx.brandVoice = ws.brandVoice;
+    // schema-context-direct-read-ok: legacy; tracked in roadmap schema-context-builder-pattern-b-migration
     ctx.businessContext = ws.keywordStrategy?.businessContext;
-    ctx.siteKeywords = ws.keywordStrategy?.siteKeywords;
+
+    // Slice-migration starter (Trajectory 3 → 1; tracked in
+    // data/roadmap.json:schema-context-builder-pattern-b-migration).
+    // PR1 migrates `siteKeywords` and per-page `pageKeywords` to slice consumption.
+    // Other direct reads (brandVoice, businessContext, knowledgeBase, _businessProfile,
+    // _personasBlock) tracked for opportunistic migration; pr-check rule
+    // schema-context-direct-read-not-on-allowlist (Task 13) fires on any new
+    // non-identity direct read.
+    let schemaIntel: Awaited<ReturnType<typeof buildWorkspaceIntelligence>> | null = null;
+    try {
+      schemaIntel = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext'] });
+    } catch { /* intelligence layer not ready — siteKeywords falls back to undefined */ } // catch-ok
+
+    // Audit Correction 2: SeoContextSlice field is strategy.siteKeywords (not keywordStrategy.siteKeywords).
+    const rawSiteKeywords = schemaIntel?.seoContext?.strategy?.siteKeywords;
+    if (rawSiteKeywords?.length) {
+      // Audit Correction 3: slice does NOT apply the declined filter — schema layer must.
+      const declined = getDeclinedKeywords(ws.id);
+      if (declined.length > 0) {
+        const declinedSet = new Set(declined.map(k => k.toLowerCase()));
+        ctx.siteKeywords = rawSiteKeywords.filter(k => !declinedSet.has(k.toLowerCase()));
+      } else {
+        ctx.siteKeywords = rawSiteKeywords;
+      }
+    }
     ctx.logoUrl = ws.brandLogoUrl;
     ctx.workspaceId = ws.id;
     ctx._siteId = siteId;
 
+    // Resolve site-wide default locale from Webflow (paid-grade `inLanguage`).
+    // Pass the workspace's per-site token so this works for workspaces that don't
+    // rely on the global WEBFLOW_API_TOKEN env var.
+    try {
+      const sites = await listSitesCached(ws.webflowToken || undefined);
+      const matched = sites.find(s => s.id === siteId);
+      if (matched?.defaultLocale) ctx._defaultLocale = matched.defaultLocale;
+    } catch { /* listSites failure: leave _defaultLocale undefined; downstream falls back to 'en' */ } // catch-ok
+
     // Knowledge base from unified seo-context builder (inline + knowledge-docs/ files)
+    // schema-context-direct-read-ok: legacy; tracked in roadmap schema-context-builder-pattern-b-migration
     const rawKB = getRawKnowledge(ws.id);
     if (rawKB) ctx.knowledgeBase = rawKB.slice(0, 4000);
 
     // Audience personas for richer schema targeting
+    // schema-context-direct-read-ok: legacy; tracked in roadmap schema-context-builder-pattern-b-migration
     const personasBlock = buildPersonasContext(ws.id);
     if (personasBlock) ctx._personasBlock = personasBlock;
 
     // Verified business profile for schema grounding (bypasses page content verification)
+    // schema-context-direct-read-ok: legacy; tracked in roadmap schema-context-builder-pattern-b-migration
     if (ws.businessProfile) ctx._businessProfile = ws.businessProfile;
-  }
-  const pageKeywordMap = ws?.keywordStrategy?.pageMap?.map(p => ({
-    pagePath: p.pagePath,
-    primaryKeyword: p.primaryKeyword,
-    secondaryKeywords: p.secondaryKeywords || [],
-    searchIntent: p.searchIntent,
-    topicCluster: p.topicCluster,
-    contentGaps: p.contentGaps,
-    optimizationScore: p.optimizationScore,
-  }));
 
+    ctx._siteHasSearch = ws.siteHasSearch === true; // schema-context-direct-read-ok: Workspace identity field (DB-stored boolean flag, not on a slice).
+
+  }
   // Fetch analytics maps when requested (for schema generation routes)
   let gscMap: SchemaAnalyticsMaps['gscMap'];
   let ga4Map: SchemaAnalyticsMaps['ga4Map'];
@@ -364,6 +420,8 @@ export async function buildSchemaContext(
       ga4Map = cached.maps.ga4Map;
       queryPageData = cached.maps.queryPageData;
       insightsMap = cached.maps.insightsMap;
+      if (cached.serpFeatures) ctx._serpFeatures = cached.serpFeatures;
+      if (cached.backlinkReferringDomains != null) ctx._backlinkReferringDomains = cached.backlinkReferringDomains;
     } else {
       const [gscResults, ga4Results, qpResults] = await Promise.allSettled([
         ws.gscPropertyUrl ? getAllGscPages(ws.id, ws.gscPropertyUrl, 90) : Promise.resolve([]),
@@ -406,10 +464,13 @@ export async function buildSchemaContext(
 
       // Build insights map from intelligence layer (SQLite — synchronous)
       try {
+        // schema-context-direct-read-ok: legacy analytics read; tracked in roadmap schema-context-builder-pattern-b-migration
         const allInsights = getInsights(ws.id);
         insightsMap = new Map();
-        // Quick win pageIds are composite keys like "https://example.com/blog::seo tips"
-        // Extract the page URL prefix (before "::") for matching against page_health pageIds
+        // ranking_opportunity pageIds are stored as relative paths after the
+        // page-identity normalisation; legacy composite-key form ("path::query")
+        // may still exist in not-yet-migrated rows. split('::')[0] is a no-op
+        // for the new format and a safe extraction for the legacy form.
         const quickWinPageUrls = new Set(
           allInsights
             .filter(i => i.insightType === 'ranking_opportunity' && i.pageId)
@@ -433,12 +494,38 @@ export async function buildSchemaContext(
         }
       }
 
+      // Wire in SEO intelligence signals — cached alongside analytics to avoid per-request latency
+      let cachedSerpFeatures: typeof ctx._serpFeatures | undefined;
+      let cachedBacklinkDomains: number | undefined;
+      try {
+        const intel = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext'] });
+        if (intel.seoContext?.serpFeatures) {
+          cachedSerpFeatures = intel.seoContext.serpFeatures;
+          ctx._serpFeatures = cachedSerpFeatures;
+        }
+        if (intel.seoContext?.backlinkProfile?.referringDomains != null) {
+          cachedBacklinkDomains = intel.seoContext.backlinkProfile.referringDomains;
+          ctx._backlinkReferringDomains = cachedBacklinkDomains;
+        }
+      } catch (err) {
+        if (isProgrammingError(err)) {
+          log.warn({ err }, 'helpers/buildSchemaContext: intelligence layer error');
+        } else {
+          log.debug({ err }, 'helpers/buildSchemaContext: intelligence layer not ready — skipping SEO signals');
+        }
+      }
+
       // Store in cache (even if empty — avoids hammering APIs on sites with no connections)
-      analyticsCache[cacheKey] = { maps: { gscMap, ga4Map, queryPageData, insightsMap }, ts: Date.now() };
+      analyticsCache[cacheKey] = {
+        maps: { gscMap, ga4Map, queryPageData, insightsMap },
+        serpFeatures: cachedSerpFeatures,
+        backlinkReferringDomains: cachedBacklinkDomains,
+        ts: Date.now(),
+      };
     }
   }
 
-  return { ctx, pageKeywordMap, gscMap, ga4Map, queryPageData, insightsMap };
+  return { ctx, gscMap, ga4Map, queryPageData, insightsMap };
 }
 
 // ── Audit Traffic Cache ──
@@ -546,10 +633,37 @@ export function stripHtmlToText(
  * Strip Markdown code fences from AI responses.
  * Handles leading ```json, ```html, ```xml, or plain ``` fences.
  * Only strips the trailing fence when a leading fence was present.
+ *
+ * Trims leading/trailing whitespace from the input first — without this, an
+ * AI response like `"\n```json\n{...}\n```"` would skip the fence-strip path
+ * because the `^` anchor in the regex doesn't match the backtick. (Devin
+ * follow-up to PR #371.)
  */
 export function stripCodeFences(text: string): string {
-  if (!/^```(?:json|html|xml)?\s*/i.test(text)) return text;
-  return text
+  const trimmed = text.trim();
+  if (!/^```(?:json|html|xml)?\s*/i.test(trimmed)) return trimmed;
+  return trimmed
     .replace(/^```(?:json|html|xml)?\s*/i, '')
     .replace(/\s*```\s*$/i, '');
+}
+
+/**
+ * Normalise a URL to a relative path for `analytics_insights.page_id` storage.
+ * GSC/GA4 producers emit full URLs; insight `page_id` is stored as the URL pathname
+ * so consumers can compare against site-relative paths. Already-relative inputs
+ * (or non-URL strings) pass through unchanged.
+ */
+export function toInsightPageId(url: string): string {
+  try { return new URL(url).pathname; } catch { return url; }
+}
+
+/**
+ * Convert a Webflow audit page object to the canonical relative path used for
+ * `analytics_insights.page_id`. Prefers slug (→ /slug), falls back to URL pathname,
+ * and finally falls back to the raw pageId (Webflow UUID) as a last resort.
+ * Defensively strips leading slashes from slug to avoid `//foo` from a leading-slash slug.
+ */
+export function toAuditFindingPageId(page: { slug: string; url: string; pageId: string }): string {
+  if (page.slug) return `/${page.slug.replace(/^\/+/, '')}`;
+  try { return new URL(page.url).pathname; } catch { return page.pageId; }
 }

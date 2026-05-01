@@ -26,8 +26,7 @@ import {
   generateIntroduction,
   generateSection,
   generateConclusion,
-  countWords,
-  stripHtml,
+  countHtmlWords,
   generateSeoMeta,
   unifyPost,
 } from './content-posts-ai.js';
@@ -77,8 +76,11 @@ export async function generatePost(
     updatedAt: new Date().toISOString(),
   };
 
-  // Save initial skeleton
-  savePost(workspaceId, post);
+  // Only save initial skeleton if not already saved by the caller
+  const existingPost = getPost(workspaceId, postId);
+  if (!existingPost) {
+    savePost(workspaceId, post);
+  }
 
   // 1. Generate introduction
   try {
@@ -103,7 +105,7 @@ export async function generatePost(
         brief, brief.outline[i], i, completedSections, voiceCtx, workspaceId, siteDomain,
       );
       post.sections[i].content = content;
-      post.sections[i].wordCount = countWords(content);
+      post.sections[i].wordCount = countHtmlWords(content);
       post.sections[i].status = 'done';
       completedSections.push(content);
     } catch (err) {
@@ -132,18 +134,18 @@ export async function generatePost(
   savePost(workspaceId, post);
 
   try {
-    const preUnifyWords = countWords(post.introduction) + post.sections.reduce((s, sec) => s + sec.wordCount, 0) + countWords(post.conclusion);
+    const preUnifyWords = countHtmlWords(post.introduction) + post.sections.reduce((s, sec) => s + sec.wordCount, 0) + countHtmlWords(post.conclusion);
     const unified = await unifyPost(post, brief, voiceCtx, workspaceId);
     if (unified) {
       if (unified.introduction) post.introduction = unified.introduction;
       for (let i = 0; i < post.sections.length; i++) {
         if (unified.sections?.[i]) {
           post.sections[i].content = unified.sections[i];
-          post.sections[i].wordCount = countWords(unified.sections[i]);
+          post.sections[i].wordCount = countHtmlWords(unified.sections[i]);
         }
       }
       if (unified.conclusion) post.conclusion = unified.conclusion;
-      const postUnifyWords = countWords(post.introduction) + post.sections.reduce((s, sec) => s + sec.wordCount, 0) + countWords(post.conclusion);
+      const postUnifyWords = countHtmlWords(post.introduction) + post.sections.reduce((s, sec) => s + sec.wordCount, 0) + countHtmlWords(post.conclusion);
       post.unificationStatus = 'success';
       post.unificationNote = `Unified: ${preUnifyWords} → ${postUnifyWords} words (target: ${post.targetWordCount})`;
       log.info(`${post.unificationNote}`);
@@ -174,12 +176,12 @@ export async function generatePost(
   }
 
   // Finalize
-  post.totalWordCount = countWords(stripHtml(post.introduction))
-    + post.sections.reduce((s, sec) => s + countWords(stripHtml(sec.content)), 0)
-    + countWords(stripHtml(post.conclusion));
-  // Update per-section word counts to use stripped HTML
+  post.totalWordCount = countHtmlWords(post.introduction)
+    + post.sections.reduce((s, sec) => s + countHtmlWords(sec.content), 0)
+    + countHtmlWords(post.conclusion);
+  // Update per-section word counts (HTML-aware)
   for (const sec of post.sections) {
-    sec.wordCount = countWords(stripHtml(sec.content));
+    sec.wordCount = countHtmlWords(sec.content);
   }
   post.status = 'draft';
   post.updatedAt = new Date().toISOString();
@@ -216,7 +218,7 @@ export async function regenerateSection(
       brief, brief.outline[sectionIndex], sectionIndex, previousSections, voiceCtx, workspaceId,
     );
     post.sections[sectionIndex].content = content;
-    post.sections[sectionIndex].wordCount = countWords(content);
+    post.sections[sectionIndex].wordCount = countHtmlWords(content);
     post.sections[sectionIndex].status = 'done';
     post.sections[sectionIndex].error = undefined;
   } catch (err) {
@@ -224,9 +226,9 @@ export async function regenerateSection(
     post.sections[sectionIndex].error = err instanceof Error ? err.message : 'Regeneration failed';
   }
 
-  post.totalWordCount = countWords(post.introduction)
+  post.totalWordCount = countHtmlWords(post.introduction)
     + post.sections.reduce((s, sec) => s + sec.wordCount, 0)
-    + countWords(post.conclusion);
+    + countHtmlWords(post.conclusion);
   post.updatedAt = new Date().toISOString();
   savePost(workspaceId, post);
 

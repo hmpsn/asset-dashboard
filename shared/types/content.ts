@@ -369,3 +369,14 @@ export interface PageTypeBriefConfig {
   /** Full page-type instruction block injected verbatim into the generateBrief() prompt. */
   prompt: string;
 }
+
+export interface AiFixResult {
+  field: 'introduction' | 'section' | 'conclusion' | 'meta';
+  sectionIndex?: number;
+  originalText: string;
+  suggestedText: string;
+  explanation: string;
+}
+
+export const ISSUE_KEYS = ['factual_accuracy', 'brand_voice', 'internal_links', 'no_hallucinations', 'meta_optimized', 'word_count_target'] as const;
+export type IssueKey = typeof ISSUE_KEYS[number];

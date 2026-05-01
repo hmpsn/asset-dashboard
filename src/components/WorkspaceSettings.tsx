@@ -1,4 +1,5 @@
 import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Download, Pencil, Check, X } from 'lucide-react';
 import { useToast } from './Toast';
 import { ConnectionsTab } from './settings/ConnectionsTab';
@@ -31,6 +32,7 @@ interface WorkspaceData {
   autoReports?: boolean;
   autoReportFrequency?: 'weekly' | 'monthly';
   brandLogoUrl?: string;
+  siteHasSearch?: boolean;
   brandAccentColor?: string;
   knowledgeBase?: string;
   personas?: { id: string; name: string; description: string; painPoints: string[]; goals: string[]; objections: string[]; preferredContentFormat?: string; buyingStage?: 'awareness' | 'consideration' | 'decision' }[];
@@ -54,6 +56,9 @@ interface WorkspaceData {
     goals?: string[];
     targetAudience?: string;
   } | null;
+  keywordStrategy?: {
+    businessContext?: string;
+  } | null;
 }
 
 interface Props {
@@ -65,10 +70,31 @@ interface Props {
 }
 
 type SectionTab = 'connections' | 'features' | 'dashboard' | 'publishing' | 'business-profile' | 'intelligence-profile' | 'export' | 'llms-txt';
+const VALID_SECTION_TABS: readonly SectionTab[] = ['connections', 'features', 'dashboard', 'publishing', 'business-profile', 'intelligence-profile', 'export', 'llms-txt'];
 
 export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, webflowSiteName, onUpdate }: Props) {
   const { toast } = useToast();
-  const [tab, setTab] = useState<SectionTab>('connections');
+  const [searchParams] = useSearchParams();
+  // Tab deep-link two-halves contract: senders append ?tab=X; receiver reads it here.
+  // See CLAUDE.md "?tab= deep-link two-halves contract" + useDeepLinkFocus hook.
+  const [tab, setTab] = useState<SectionTab>(() => {
+    const param = searchParams.get('tab');
+    return (VALID_SECTION_TABS as readonly string[]).includes(param ?? '') ? (param as SectionTab) : 'connections';
+  });
+  // Sync tab state with subsequent ?tab= URL changes (e.g., when SchemaImpactRow's
+  // Edit→ link navigates to ?tab=features while already on this page).
+  // CRITICAL: do NOT include `tab` in deps. Manual tab clicks (the nav buttons at
+  // line ~207 call setTab without updating the URL) would otherwise trigger this
+  // effect to revert the tab back to the stale URL value, trapping the user.
+  // setTab(sameValue) is a React no-op so re-firing on every searchParams change
+  // is safe. (Devin Review BUG-0001 round 4 on PR #379.)
+  useEffect(() => {
+    const param = searchParams.get('tab');
+    if (param && (VALID_SECTION_TABS as readonly string[]).includes(param)) {
+      setTab(param as SectionTab);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
   const [ws, setWs] = useState<WorkspaceData | null>(null);
   const [googleStatus, setGoogleStatus] = useState<{ connected: boolean; configured: boolean } | null>(null);
   const [gscSites, setGscSites] = useState<GscSite[]>([]);
@@ -234,6 +260,9 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
         <BusinessProfileTab
           workspaceId={workspaceId}
           businessProfile={ws?.businessProfile}
+          businessContext={ws?.keywordStrategy?.businessContext}
+          brandLogoUrl={ws?.brandLogoUrl}
+          siteHasSearch={ws?.siteHasSearch}
           toast={toast}
           onSave={(profile) => setWs(w => w ? { ...w, businessProfile: profile } : w)}
         />

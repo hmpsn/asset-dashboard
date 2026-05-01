@@ -29,6 +29,10 @@ export type ActivityType =
   | 'brief_generated'
   | 'brief_approved'
   | 'changes_requested'
+  | 'briefing_generated'      // admin: cron wrote a new draft (admin review queue)
+  | 'briefing_published'      // CLIENT-VISIBLE: admin manually published a briefing
+  | 'briefing_skipped'        // admin: a draft was skipped with note
+  | 'briefing_auto_published' // CLIENT-VISIBLE: cron auto-published a briefing (no admin review). Clients see this OR briefing_published per event — never both.
   | 'content_upgraded'
   | 'schema_generated'
   | 'schema_published'
@@ -155,7 +159,7 @@ function rowToEntry(row: ActivityRow): ActivityEntry {
 const CLIENT_VISIBLE_TYPES: Set<ActivityType> = new Set([
   'audit_completed', 'request_resolved', 'approval_applied', 'seo_updated',
   'images_optimized', 'links_fixed', 'content_updated', 'content_requested',
-  'brief_generated', 'brief_approved', 'content_upgraded', 'fix_completed',
+  'brief_generated', 'brief_approved', 'briefing_published', 'briefing_auto_published', 'content_upgraded', 'fix_completed',
   'content_published', 'copy_sent_to_client', 'post_approved', 'post_changes_requested',
   'post_client_edit', 'post_sent_for_review',
 ]);

@@ -25,3 +25,4 @@ export type * from './features.ts';
 export type * from './narrative.ts';
 export type * from './cms-images.ts';
 export type * from './page-join.ts';
+export type * from './briefing.ts';

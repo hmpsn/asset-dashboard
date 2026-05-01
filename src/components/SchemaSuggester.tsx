@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { post, put, getSafe } from '../api/client';
 import { schema as schemaApi, schemaImpact as schemaImpactApi, type SchemaImpactData, type SchemaDeploymentImpact } from '../api/seo';
 import type { FixContext } from '../App';
@@ -6,8 +7,9 @@ import { useSchemaSnapshot, useWebflowPages } from '../hooks/admin';
 import {
   Loader2, CheckCircle,
   Info, Sparkles, RefreshCw, Plus, Database, HelpCircle,
-  Clock, BarChart3, BookOpen,
+  Clock, BarChart3, BookOpen, AlertTriangle, X,
 } from 'lucide-react';
+import type { BusinessProfileContact } from '../../shared/types/workspace.js';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { usePageEditStates } from '../hooks/usePageEditStates';
@@ -18,9 +20,13 @@ import { SchemaPageCard } from './schema/SchemaPageCard';
 import { BulkPublishPanel } from './schema/BulkPublishPanel';
 import { PagePicker } from './schema/PagePicker';
 import { SchemaPlanPanel } from './schema/SchemaPlanPanel';
+import { SchemaCompletenessWidget } from './schema/SchemaCompletenessWidget';
+import { KNOWN_TARGET_FIELDS } from './schema/fieldTargets';
 import { PendingApprovals } from './PendingApprovals';
 import { SchemaWorkflowGuide } from './schema/SchemaWorkflowGuide';
 import { SCHEMA_ROLE_INDEX } from '../../shared/types/schema-plan';
+import type { ValidationFinding } from '../../shared/types/schema-validation';
+import { adminPath } from '../routes.js';
 
 type SchemaSubTab = 'generator' | 'guide';
 
@@ -47,6 +53,7 @@ interface SchemaPageSuggestion {
   existingSchemaJson?: Record<string, unknown>[];
   suggestedSchemas: SchemaSuggestion[];
   validationErrors?: string[];
+  validationFindings?: ValidationFinding[];
   richResultsEligibility?: RichResultEligibility[];
   lastPublishedAt?: string | null;
 }
@@ -72,9 +79,10 @@ interface Props {
   siteId: string;
   workspaceId?: string;
   fixContext?: FixContext | null;
+  businessProfile?: BusinessProfileContact | null;
 }
 
-export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
+export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfile }: Props) {
   const [schemaSubTab, setSchemaSubTab] = useState<SchemaSubTab>('generator');
   const { forPage: recsForPage, loaded: recsLoaded } = useRecommendations(workspaceId);
   const [data, setData] = useState<SchemaPageSuggestion[] | null>(null);
@@ -121,6 +129,17 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
   }, [fixContext]); // generateSinglePage intentionally excluded — ref guard prevents re-fire
 
   // CMS template schema state
+  const dismissedKey = workspaceId ? `schema-bp-callout-dismissed-${workspaceId}` : null;
+  const [calloutDismissed, setCalloutDismissed] = useState(() =>
+    dismissedKey ? localStorage.getItem(dismissedKey) === '1' : true,
+  );
+  // Gate matches the template gate — LocalBusiness refs require street or city
+  const showBpCallout = !calloutDismissed && !!workspaceId && !(businessProfile?.address?.street || businessProfile?.address?.city);
+  const dismissBpCallout = () => {
+    if (dismissedKey) localStorage.setItem(dismissedKey, '1');
+    setCalloutDismissed(true);
+  };
+
   const [showCmsPanel, setShowCmsPanel] = useState(false);
   const [showTypeGuide, setShowTypeGuide] = useState(false);
   const [cmsTemplatePages, setCmsTemplatePages] = useState<CmsTemplatePage[]>([]);
@@ -541,6 +560,20 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
     return () => { cancelled = true; };
   }, [workspaceId]);
 
+  // Hooks must be called before ANY conditional early returns (Rules of Hooks).
+  // `data` may be null while loading; guard inside the memo. (Devin Review BUG-0001 on PR #379.)
+  const fixesAvailable = useMemo(() => {
+    if (!data) return 0;
+    const fields = new Set<string>();
+    for (const p of data) {
+      for (const f of p.validationFindings ?? []) {
+        if (!f.field) continue;
+        if (KNOWN_TARGET_FIELDS.has(f.field)) fields.add(f.field);
+      }
+    }
+    return fields.size;
+  }, [data]);
+
   const PAGE_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
     { value: 'auto', label: 'Auto-detect' },
     { value: 'homepage', label: 'Homepage' },
@@ -632,6 +665,32 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
           </div>
         </div>
         <SchemaPlanPanel siteId={siteId} />
+        {showBpCallout && (
+          <div role="alert" className="rounded-[var(--radius-lg)] border border-amber-500/30 bg-amber-500/10 p-4 flex items-start gap-3">
+            <AlertTriangle size={16} className="text-amber-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="t-body text-amber-400 font-medium mb-1">Your business profile is incomplete</p>
+              <p className="t-caption text-[var(--brand-text-muted)]">
+                Add your address to unlock LocalBusiness schema on your homepage, /contact, and /about — the highest-value schema type for local businesses.
+              </p>
+              {workspaceId && (
+                <Link
+                  to={adminPath(workspaceId, 'workspace-settings') + '?tab=business-profile'}
+                  className="t-caption text-teal-400 hover:text-teal-300 mt-2 inline-block"
+                >
+                  Complete business profile →
+                </Link>
+              )}
+            </div>
+            <button
+              onClick={dismissBpCallout}
+              className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] flex-shrink-0"
+              aria-label="Dismiss"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
         <CmsTemplatePanel
           showCmsPanel={showCmsPanel}
           cmsTemplatePages={cmsTemplatePages}
@@ -774,6 +833,13 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
 
   const pagesWithExisting = data.filter(p => p.existingSchemas.length > 0).length;
   const pagesWithErrors = data.filter(p => (p.validationErrors?.length || 0) > 0).length;
+  // Page count, not finding count — units must match `pagesWithErrors` since the display reads
+  // "${N} with warnings" sister to "${N} with errors". A page with 3 warning findings counts once.
+  // (Devin Review BUG-0001 on PR #376.)
+  const pagesWithWarnings = data.filter(p =>
+    (p.validationFindings?.some(f => f.severity === 'warning') ?? false),
+  ).length;
+  // fixesAvailable is hoisted above the early returns (Rules of Hooks); reuse here.
   const totalTypes = data.reduce((s, p) => {
     const schema = p.suggestedSchemas[0]?.template;
     const graph = schema?.['@graph'] as Record<string, unknown>[] | undefined;
@@ -797,6 +863,33 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
       )}
       {/* Schema site plan */}
       <SchemaPlanPanel siteId={siteId} />
+
+      {showBpCallout && (
+        <div role="alert" className="rounded-[var(--radius-lg)] border border-amber-500/30 bg-amber-500/10 p-4 flex items-start gap-3">
+          <AlertTriangle size={16} className="text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="t-body text-amber-400 font-medium mb-1">Your business profile is incomplete</p>
+            <p className="t-caption text-[var(--brand-text-muted)]">
+              Add your address to unlock LocalBusiness schema on your homepage, /contact, and /about — the highest-value schema type for local businesses.
+            </p>
+            {workspaceId && (
+              <Link
+                to={adminPath(workspaceId, 'workspace-settings') + '?tab=business-profile'}
+                className="t-caption text-teal-400 hover:text-teal-300 mt-2 inline-block"
+              >
+                Complete business profile →
+              </Link>
+            )}
+          </div>
+          <button
+            onClick={dismissBpCallout}
+            className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] flex-shrink-0"
+            aria-label="Dismiss"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {/* Progress banner while streaming */}
       {loading && data && data.length > 0 && (
@@ -889,6 +982,9 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
         />
       )}
 
+      {/* Schema completeness widget — aggregates validationFindings and deep-links to fix locations */}
+      <SchemaCompletenessWidget pages={data} workspaceId={workspaceId} />
+
       {/* Summary cards */}
       <div id="schema-suggestions-list" />
       <div className="grid grid-cols-3 gap-3">
@@ -900,7 +996,10 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
         <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature)' }}>
           <div className="t-caption text-[var(--brand-text-muted)] mb-1">Validated</div>
           <div className={cn('text-2xl font-bold', pagesWithErrors > 0 ? 'text-amber-400/80' : 'text-emerald-400/80')}>{data.length - pagesWithErrors}/{data.length}</div>
-          <div className="t-caption text-[var(--brand-text-muted)]">{pagesWithErrors > 0 ? `${pagesWithErrors} with warnings` : 'all passing'}</div>
+          <div className="t-caption text-[var(--brand-text-muted)]">
+            {pagesWithErrors > 0 ? `${pagesWithErrors} with errors` : pagesWithWarnings > 0 ? `${pagesWithWarnings} with warnings` : 'all passing'}
+            {fixesAvailable > 0 && ` · ${fixesAvailable} fix${fixesAvailable === 1 ? '' : 'es'} available`}
+          </div>
         </div>
         <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature)' }}>
           <div className="t-caption text-[var(--brand-text-muted)] mb-1">Existing Schemas</div>

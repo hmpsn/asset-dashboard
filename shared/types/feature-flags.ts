@@ -53,13 +53,23 @@ export const FEATURE_FLAGS = {
   'bridge-annotation-to-insight': false,    // #14: annotation created → insight correlation (Phase 3)
   'bridge-audit-site-health': false,        // #15: audit → site_health insights
   'bridge-audit-auto-resolve': false,       // IG-4: auto-resolve audit_finding insights on clean audit
+  'bridge-briefing-candidate-refresh': false, // CB-1: audit complete → briefing candidate-pool freshness marker (T1.15)
   'bridge-client-signal': false,            // #16: client feedback → signal insights (Phase 3)
   // Platform Intelligence Enhancements
   'smart-placeholders': false,       // System-wide smart placeholder hook (admin chips + prefill, client ghost text)
   'client-brand-section': false,     // Brand tab in client portal (business profile + brand positioning)
   'seo-editor-unified': false,       // Merged static+CMS SEO editor with collection filtering
+  // Client Insights Briefing (5-phase feature)
+  'client-briefing-v2': false,
+  // Phase 2.5e — Premium-only AI polish (hero-headline punch + weekly opener).
+  // Sub-flag: gates BOTH AI passes ON TOP OF the workspace's tier (must be
+  // 'premium' for either to run). Default off; flag-flip is the rollback.
+  'client-briefing-v2-ai-polish': false,
   // Deep Diagnostics
   'deep-diagnostics': false,
+
+  // Page-Element Catalog (schema AI extractors)
+  'schema-ai-element-classifier': false, // PR2: image role classifier + HowTo disambiguation (default OFF)
 } as const;
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;

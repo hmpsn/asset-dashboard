@@ -21,6 +21,7 @@ import type {
   InsightsSlice,
   LearningsSlice,
   PageProfileSlice,
+  PageElementSlice,
   ContentPipelineSlice,
   SiteHealthSlice,
   RedirectDetail,
@@ -41,7 +42,9 @@ import type {
   CopyPipelineSummary,
   SerpFeatures,
 } from '../shared/types/intelligence.js';
+import { getPageElements } from './page-elements-store.js';
 import type { AnalyticsInsight, InsightType, InsightSeverity } from '../shared/types/analytics.js';
+import type { BriefingSummary } from '../shared/types/briefing.js';
 import type { TrackedAction } from '../shared/types/outcome-tracking.js';
 import type { Workspace, AudiencePersona } from '../shared/types/workspace.js';
 import type { PageKeywordMap } from '../shared/types/workspace.js';
@@ -127,7 +130,7 @@ const INTELLIGENCE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 // ── Assembly ────────────────────────────────────────────────────────────
 
 const ALL_SLICES: IntelligenceSlice[] = [
-  'seoContext', 'insights', 'learnings', 'pageProfile',
+  'seoContext', 'insights', 'learnings', 'pageProfile', 'pageElements',
   'contentPipeline', 'siteHealth', 'clientSignals', 'operational',
 ];
 
@@ -226,6 +229,10 @@ async function assembleSlice(
       if (opts?.pagePath) {
         result.pageProfile = await assemblePageProfile(workspaceId, opts.pagePath, opts);
       }
+      break;
+    case 'pageElements':
+      if (!opts?.pagePath) break; // pageElements is per-page; no-op without pagePath
+      result.pageElements = await assemblePageElements(workspaceId, opts.pagePath);
       break;
   }
 }
@@ -1369,6 +1376,25 @@ async function assembleClientSignals(
     }
   }
 
+  // Latest published briefing summary — null if none published, undefined-tolerant
+  // for the chat AI context. Reads from the briefing-store; degrades gracefully
+  // if the table is unavailable (e.g., migration not applied).
+  let latestBriefing: BriefingSummary | null = null;
+  try {
+    const { getLatestPublishedBriefing } = await import('./briefing-store.js');
+    const draft = getLatestPublishedBriefing(workspaceId);
+    if (draft) {
+      latestBriefing = {
+        weekOf: draft.weekOf,
+        publishedAt: draft.publishedAt,
+        storyCount: draft.stories.length,
+        hasHero: draft.stories.some((s) => s.isHeadline),
+      };
+    }
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleClientSignals: latest briefing optional, degrading gracefully');
+  }
+
   return {
     keywordFeedback,
     contentGapVotes,
@@ -1383,6 +1409,7 @@ async function assembleClientSignals(
     feedbackItems,
     serviceRequests,
     intentSignals,
+    latestBriefing,
   };
 }
 
@@ -1615,7 +1642,11 @@ export function formatForPrompt(
       (include.has('clientSignals') && intelligence.clientSignals != null) ||
       (include.has('operational') && intelligence.operational != null) ||
       (include.has('contentPipeline') && intelligence.contentPipeline != null) ||
-      (include.has('siteHealth') && intelligence.siteHealth != null)
+      (include.has('siteHealth') && intelligence.siteHealth != null) ||
+      // pageElements is page-scoped and only assembled when pagePath is supplied;
+      // a section-filtered request for it implies the caller already knows the
+      // slice should exist, so a populated slice should bypass cold-start.
+      (include.has('pageElements') && intelligence.pageElements != null)
     ));
   if (!hasData) {
     // Cold-start messaging is a workspace-level signal, not a page/section signal.
@@ -1654,6 +1685,11 @@ export function formatForPrompt(
   // Page Profile
   if (intelligence.pageProfile && (!include || include.has('pageProfile'))) {
     sections.push(formatPageProfileSection(intelligence.pageProfile, verbosity));
+  }
+
+  // Page Elements
+  if (intelligence.pageElements && (!include || include.has('pageElements'))) {
+    sections.push(formatPageElementsSection(intelligence.pageElements));
   }
 
   // Content Pipeline
@@ -2228,6 +2264,12 @@ function formatClientSignalsSection(signals: ClientSignalsSlice, verbosity: Prom
   if (signals.compositeHealthScore != null) {
     lines.push(`Health score: ${signals.compositeHealthScore}/100`);
   }
+  if (signals.latestBriefing) {
+    const b = signals.latestBriefing;
+    lines.push(
+      `Latest briefing: ${b.storyCount} stor${b.storyCount === 1 ? 'y' : 'ies'} (week of ${b.weekOf})${b.hasHero ? ' with hero' : ''}`,
+    );
+  }
 
   if (verbosity !== 'compact') {
     if (signals.engagement) {
@@ -2333,6 +2375,26 @@ function formatOperationalSection(ops: OperationalSlice, verbosity: PromptVerbos
   return lines.join('\n');
 }
 
+function formatPageElementsSection(slice: PageElementSlice | undefined): string {
+  if (!slice) return '';
+  const c = slice.catalog;
+  const summary: string[] = [];
+  if (c.videos.length > 0) summary.push(`${c.videos.length} video${c.videos.length === 1 ? '' : 's'}`);
+  const howToCount = c.lists.filter(l => l.isHowToLike).length;
+  if (howToCount > 0) summary.push(`${howToCount} HowTo list${howToCount === 1 ? '' : 's'}`);
+  if (c.citations.length > 0) summary.push(`${c.citations.length} citation${c.citations.length === 1 ? '' : 's'}`);
+  if (c.tables.length > 0) summary.push(`${c.tables.length} table${c.tables.length === 1 ? '' : 's'}`);
+  if (c.images.length > 0) summary.push(`${c.images.length} image${c.images.length === 1 ? '' : 's'}`);
+  if (c.testimonials.length > 0) summary.push(`${c.testimonials.length} testimonial${c.testimonials.length === 1 ? '' : 's'}`);
+  if (c.headings.length > 0) summary.push(`${c.headings.length} heading${c.headings.length === 1 ? '' : 's'}`);
+  if (c.codeBlocks.length > 0) summary.push(`${c.codeBlocks.length} code block${c.codeBlocks.length === 1 ? '' : 's'}`);
+  if (summary.length === 0) return '';
+  // No leading/trailing newlines — formatForPrompt joins all sections with
+  // '\n\n', so each formatter must return a string starting at '## …' and
+  // ending without a trailing newline. Matches every other format*Section.
+  return `## Page elements (${slice.pagePath})\n${summary.join(' · ')}`;
+}
+
 function formatPageProfileSection(profile: PageProfileSlice, verbosity: PromptVerbosity): string {
   const lines: string[] = [`## Page Profile: ${profile.pagePath}`];
 
@@ -2396,6 +2458,29 @@ function formatPageProfileSection(profile: PageProfileSlice, verbosity: PromptVe
 }
 
 // ── Page Profile assembler ──────────────────────────────────────────────
+
+async function assemblePageElements(
+  workspaceId: string,
+  pagePath: string,
+): Promise<PageElementSlice | undefined> {
+  try {
+    const record = getPageElements(workspaceId, pagePath);
+    if (!record) {
+      // No persisted catalog — extraction will happen during the next
+      // generator pass (Task 13 wires lazy refresh inside generator.ts).
+      // Returning undefined here is correct; consumers gracefully
+      // degrade (no schema enrichment until catalog exists).
+      return undefined;
+    }
+    return {
+      pagePath: record.pagePath,
+      catalog: record.catalog,
+    };
+  } catch (err) { // catch-ok: graceful degrade — slice stays undefined
+    log.warn({ err, workspaceId, pagePath }, 'assemblePageElements: store read failed, slice unavailable');
+    return undefined;
+  }
+}
 
 async function assemblePageProfile(
   workspaceId: string,
@@ -2475,11 +2560,18 @@ async function assemblePageProfile(
     log.debug({ err, workspaceId }, 'assemblePageProfile: page actions optional, degrading gracefully');
   }
 
+  // Hoist workspace lookup so both auditIssues and schemaStatus blocks can reuse it.
+  let ws: Workspace | null = null;
+  try {
+    const { getWorkspace } = await import('./workspaces.js');
+    ws = getWorkspace(workspaceId) ?? null;
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assemblePageProfile: workspace lookup optional, degrading gracefully');
+  }
+
   // Audit issues for this page
   let auditIssues: string[] = [];
   try {
-    const { getWorkspace } = await import('./workspaces.js');
-    const ws = getWorkspace(workspaceId);
     if (ws?.webflowSiteId) {
       const { getLatestSnapshot } = await import('./reports.js');
       const snap = getLatestSnapshot(ws.webflowSiteId);
@@ -2494,12 +2586,21 @@ async function assemblePageProfile(
     log.debug({ err, workspaceId }, 'assemblePageProfile: audit data optional, degrading gracefully');
   }
 
-  // Schema status
+  // Schema status — schema_validations.pageId is the Webflow UUID (static pages)
+  // or cms-{path} synthetic ID (CMS pages), never pagePath. Resolve pagePath →
+  // pageId via the schema snapshot (slug→pageId map for static pages), and fall
+  // back to toCmsPageId(pagePath) for CMS pages — works immediately post-migration.
   let schemaStatus: PageProfileSlice['schemaStatus'] = 'none';
   try {
     const { getValidations } = await import('./schema-validator.js');
+    const { getSchemaSnapshot } = await import('./schema-store.js');
+    const { toCmsPageId } = await import('./webflow-pages.js');
     const validations: SchemaValidation[] = getValidations(workspaceId);
-    const pageValidation = validations.find(v => v.pageId === pagePath);
+    const snapshot = ws?.webflowSiteId ? getSchemaSnapshot(ws.webflowSiteId) : null;
+    const pagePathTrimmed = pagePath.replace(/^\//, '');
+    const resolvedPageId = snapshot?.results.find(r => r.slug === pagePathTrimmed)?.pageId
+      ?? toCmsPageId(pagePath);
+    const pageValidation = validations.find(v => v.pageId === resolvedPageId);
     if (pageValidation) {
       const status = pageValidation.status;
       schemaStatus = status === 'valid' ? 'valid' : status === 'warnings' ? 'warnings' : status === 'errors' ? 'errors' : 'none';

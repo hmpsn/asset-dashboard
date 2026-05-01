@@ -23,6 +23,7 @@ import { getPresence } from './websocket.js';
 import { setupSentryErrorHandler } from './sentry.js';
 import { requestLogger } from './middleware/request-logger.js';
 import { createLogger } from './logger.js';
+import { sanitizeErrorMessage } from './helpers.js';
 
 const log = createLogger('app');
 
@@ -80,6 +81,7 @@ import brandIdentityRoutes from './routes/brand-identity.js';
 import pageStrategyRoutes from './routes/page-strategy.js';
 import copyPipelineRoutes from './routes/copy-pipeline.js';
 import diagnosticsRoutes from './routes/diagnostics.js';
+import briefingRoutes from './routes/briefing.js';
 import { registerProvider } from './seo-data-provider.js';
 import { SemrushProvider } from './providers/semrush-provider.js';
 import { DataForSeoProvider } from './providers/dataforseo-provider.js';
@@ -325,9 +327,20 @@ export function createApp(): express.Express {
   app.use(pageStrategyRoutes);
   app.use(copyPipelineRoutes);
   app.use(diagnosticsRoutes);
+  app.use(briefingRoutes);
 
   // --- Sentry error handler (must be after all route mounts, before frontend catch-all) ---
   setupSentryErrorHandler(app);
+
+  // --- Global JSON error handler ---
+  // Express finalhandler returns HTML for unhandled errors, which breaks API clients
+  // that expect JSON. This catches synchronous throws from route handlers that escape
+  // to Express's error pipeline and returns a consistent { error: string } shape.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  app.use((err: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (res.headersSent) return next(err);
+    res.status(500).json({ error: sanitizeErrorMessage(err, 'Internal server error') });
+  });
 
   // --- Serve frontend in production (MUST be after all API routes) ---
   if (IS_PROD) {

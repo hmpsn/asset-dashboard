@@ -33,6 +33,7 @@ import { saveSnapshot, getLatestSnapshotBefore } from '../reports.js';
 import { runSalesAudit } from '../sales-audit.js';
 import { saveSchemaSnapshot } from '../schema-store.js';
 import { generateSchemaSuggestions } from '../schema-suggester.js';
+import { getValidations } from '../schema-validator.js';
 import { runSeoAudit } from '../seo-audit.js';
 import { clearSeoContextCache } from '../seo-context.js';
 import {
@@ -43,6 +44,7 @@ import {
   getSiteSubdomain,
   discoverCmsUrls,
   buildStaticPathSet,
+  toCmsPageId,
 } from '../webflow.js';
 import { getWorkspacePages } from '../workspace-data.js';
 import {
@@ -631,8 +633,11 @@ router.post('/api/jobs', async (req, res) => {
         (async () => {
           try {
             updateJob(job.id, { status: 'running', message: 'Scanning pages and generating unified schemas...' });
-            const { ctx, pageKeywordMap, gscMap, ga4Map, queryPageData, insightsMap } = await buildSchemaContext(schemaSiteId, { includeAnalytics: true });
+            const { ctx, gscMap, ga4Map, queryPageData, insightsMap } = await buildSchemaContext(schemaSiteId, { includeAnalytics: true });
             const schemaWsId = (params.workspaceId as string) || '';
+            // Build per-page validation map so the AI can avoid repeating known mistakes
+            const allValidations = ctx.workspaceId ? getValidations(ctx.workspaceId) : [];
+            const validationsByPageId = new Map(allValidations.map(v => [v.pageId, v]));
             // Enrich with architecture tree for deterministic breadcrumbs
             if (ctx.workspaceId) {
               try {
@@ -643,14 +648,14 @@ router.post('/api/jobs', async (req, res) => {
             // Debounced incremental save — persist partial results every 10s
             let lastSaveTime = 0;
             const SAVE_INTERVAL = 10_000;
-            const result = await generateSchemaSuggestions(schemaSiteId, schemaToken, ctx, pageKeywordMap, (partial, _done, message) => {
+            const result = await generateSchemaSuggestions(schemaSiteId, schemaToken, ctx, (partial, _done, message) => {
               updateJob(job.id, { status: 'running', result: partial, message, progress: partial.length });
               const now = Date.now();
               if (partial.length > 0 && now - lastSaveTime >= SAVE_INTERVAL) {
                 lastSaveTime = now;
                 saveSchemaSnapshot(schemaSiteId, schemaWsId, partial);
               }
-            }, () => isJobCancelled(job.id), gscMap, ga4Map, queryPageData, insightsMap);
+            }, () => isJobCancelled(job.id), gscMap, ga4Map, queryPageData, insightsMap, validationsByPageId);
             // Final save — always write the complete result
             if (result.length > 0) {
               saveSchemaSnapshot(schemaSiteId, schemaWsId, result);
@@ -718,7 +723,7 @@ router.post('/api/jobs', async (req, res) => {
                 const { cmsUrls } = await discoverCmsUrls(baseUrl, staticPaths, 200);
                 for (const cms of cmsUrls) {
                   pages.push({
-                    id: `cms-${cms.path.replace(/\//g, '-')}`,
+                    id: toCmsPageId(cms.path),
                     title: cms.pageName,
                     slug: cms.path.replace(/^\//, ''),
                     path: cms.path,

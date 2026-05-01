@@ -206,7 +206,12 @@ const RICH_RESULT_RULES: Record<string, {
   },
   WebSite: {
     required: ['name', 'url'],
-    recommended: ['potentialAction'],
+    // potentialAction (sitelinks SearchAction) used to be recommended here, but
+    // Pillar 2.1 dropped the unconditional template emission because most workspaces
+    // have no working search endpoint at the urlTemplate. Re-add to `recommended`
+    // (or surface a different conditional warning) once schema-yoast-parity-fields
+    // adds a workspace flag (Workspace.siteHasSearch) to gate emission.
+    recommended: [],
   },
   Service: {
     required: ['name'],

@@ -27,12 +27,9 @@ describe('case-insensitive page path matching in admin-chat-context and helpers'
       expect(adminChatSrc).toMatch(/pSlug\.toLowerCase\(\)\s*===\s*targetSlug\.toLowerCase\(\)/);
     });
 
-    it('uses .toLowerCase() in the fallback template string comparison', () => {
-      expect(adminChatSrc).toMatch(/pSlug\.toLowerCase\(\)\s*===\s*`\$\{targetSlug\}\/`\.toLowerCase\(\)/);
-    });
-
-    it('uses .toLowerCase() in the endsWith() check', () => {
-      expect(adminChatSrc).toMatch(/targetSlug\.toLowerCase\(\)\.endsWith\(pSlug\.toLowerCase\(\)\)/);
+    it('uses normalizePath for exact matching (no endsWith fallback)', () => {
+      expect(adminChatSrc).toMatch(/normalizePath\(resolvePagePath\(p\)\)/);
+      expect(adminChatSrc).toMatch(/normalizePath\(pageContext\.url/);
     });
   });
 

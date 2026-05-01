@@ -217,6 +217,80 @@ For inline styles and Recharts props that can't be overridden by CSS class rules
 | Welcome modal | `from-teal-500 to-emerald-500` icon/glow | Brand accent |
 | Payment modal | All teal (header, price, topic, CTA) | Unified teal |
 
+#### Client Insights — Magazine Briefing Layout (`Briefing/`, behind `client-briefing-v2`)
+
+When the `client-briefing-v2` feature flag is on, the client Insights tab swaps to a magazine-rhythm editorial briefing. Layout convention:
+
+| Element | Color | Rationale |
+|---------|-------|-----------|
+| **Action queue strip** (top) | `bg-amber-500/15 border-amber-500/30 text-amber-300` | Amber = "needs attention" — same hue as the existing inbox banner. Renders null when all 5 counts are zero. |
+| Action chip hover | `hover:text-amber-200` | Subtle one-step lift (avoids invisible-hover trap from CLAUDE.md memory) |
+| **Hero card** wrapper | `border-l-2 border-teal-400 pl-3` around `<SectionCard>` | Teal-accent left stripe (SectionCard has no built-in accent prop, so use a wrapper div) |
+| Hero category label | `t-label text-teal-400 font-semibold tracking-wider` | Teal = brand action / editorial accent |
+| Hero headline | `t-h2 font-bold text-[var(--brand-text-bright)]` | Largest type on the page |
+| Hero metric pills | `bg-teal-500/10 text-teal-400 rounded-full t-caption inline-flex` | 0–2 per story, max — supporting numbers, not data dump |
+| Hero "See the data →" | `t-caption text-teal-400 hover:text-teal-300` | Drill-in link, teal action |
+| **Secondary divider rows** | `border-b border-[var(--brand-border)] last:border-b-0 hover:bg-[var(--surface-3)]/50` | No card chrome — plain rows, hover state for affordance |
+| Secondary category icon | category-mapped: `win=star/emerald-400`, `risk=alert-triangle/amber-400`, `opportunity=lightbulb/blue-400`, `competitive=search/teal-400`, `period_change=trending-up/blue-400` | Color-codes the category at a glance |
+| **Free-tier upgrade CTA** | Same teal-accent wrapper as Hero, solid `bg-teal-500 hover:bg-teal-400` button | NEVER hand-rolled gradient (pr-check enforces) |
+
+**Magazine layout principles** (mirrors the spec's three rules):
+
+1. **No top-of-page health score, no stat row, no banner CTAs** when the flag is on. Numbers appear ONLY as inline metric badges inside the hero card.
+2. **Exactly one hero card** per briefing. The Phase 1 Zod schema enforces `isHeadline: true` on exactly one story.
+3. **Secondary stories are divider rows, not cards.** No card chrome. Whole row is a `<button>` so it's keyboard-accessible end-to-end.
+
+**Two-halves contract:** The action chips deep-link via `?tab=<InboxFilter>` to `<InboxTab>` — the Inbox MUST read `useSearchParams().get('tab')` and validate against the `InboxFilter` union for the deep-link to work. Same contract applies to hero/secondary `drillIn.tab` (currently optional / unused by receivers in Phase 2; Phase 4 will wire receivers as the briefing AI starts populating it).
+
+##### Phase 2.5b — investor-briefing reading rhythm
+
+Phase 2.5b extends the magazine layout with five new sections in the 8-stop reading rhythm: Dateline → Issue Summary → Action Strip → **Pulse** → Lead → **Data Spread** → **Recommended for You** → Watch List. New layout conventions:
+
+| Element | Color | Rationale |
+|---------|-------|-----------|
+| **DateLine** ("WEEK OF MMM DD · ISSUE N") | `t-label tracking-wider text-[var(--brand-text-muted)]` + hairline divider below | Anchors the reader; "ISSUE N" parallels print briefings. Issue badge omitted when null. |
+| **IssueSummaryLine** | `t-body text-[var(--brand-text-muted)] leading-relaxed` | One-line investor-briefing prose; deterministic from story composition. |
+| **ActionQueueStrip stale pill** (Phase 2.5b extension) | `bg-amber-500/30 border-amber-400/50 text-amber-200` + Clock icon | Brighter amber than the regular chips — escalation step for items >7d old. Renders only when `staleCount > 0`. |
+| **PulseStrip** wrapper | `<SectionCard variant="subtle">` titled "THE PULSE", `titleExtra` "vs prev 28d" | Subtle chrome — Pulse is a snapshot, not the story |
+| Pulse cell — Site Health | `<MetricRing size={56}>` (built-in score color: emerald ≥80 / amber ≥60 / red <60) + label/delta to the right | Ring is the canonical health visualisation |
+| Pulse cell — Visitors / Clicks / Avg Position | `<StatCard size="hero" valueColor="text-blue-400">` (data hue) | Blue = data; default delta colors handle direction |
+| Pulse cell — Avg Position | StatCard with `invertDelta` | Lower position number = better; invert flips the sign for color rendering |
+| **DataSpread** wrapper | Two `<SectionCard variant="subtle" noPadding>` columns in a `grid grid-cols-1 md:grid-cols-2 gap-6` | `noPadding` prevents the SectionCard inner wrapper from doubling internal padding |
+| Data Spread "WINS" icon | `text-emerald-400` (TrendingUp) | Emerald — success / positive change |
+| Data Spread "RISKS" icon | `text-amber-400` (TrendingDown) | Amber — needs attention |
+| Data Spread row hover (clickable) | `hover:bg-[var(--surface-3)]/60 transition-colors` | One-step surface lift; cursor pointer when `drillInUrl` present |
+| **RecommendedForYou** wrapper | `<SectionCard variant="default">` titled "RECOMMENDED FOR YOU" | Default chrome — primary upsell moment |
+| RecommendedForYou row | `bg-[var(--surface-3)]/40 border-[var(--brand-border)] rounded-[var(--radius-lg)]` | Surface-3 inside surface-2 (SectionCard) — visible separation |
+| Opportunity score badge | `bg-blue-500/10 text-blue-400 rounded-full` | Blue — read-only data metric (0/100 score) |
+| Generate Brief CTA (Growth/Premium) | `bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/40` + Sparkles icon (Growth) / Check icon (Premium) | Teal — primary action; Premium variant signals "included" |
+| Free-tier upgrade block (replaces row list) | Locked icon + "{N} opportunities locked" + Upgrade button | Free tier never sees individual rows — single CTA simplifies the choice |
+| **HeroStoryCard dataReceipt line** (Phase 2.5b extension) | `border-t border-[var(--brand-border)]/30 pt-3` + `t-caption-sm text-[var(--brand-text-muted)] leading-relaxed` | Citation prose ("─ Source: GSC last-28-day vs prior-28-day window…"); rendered only when `story.dataReceipt` is populated by Phase 2.5a templates |
+
+**Phase 2.5b principles:**
+
+1. **Compose, don't duplicate.** PulseStrip uses existing `<StatCard size="hero">` + `<MetricRing>` primitives, not new variants. RecommendedForYou ports the admin `<ContentGaps>` row layout verbatim, swapping only the CTAs.
+2. **Reuse existing data sources.** `pulseData` is computed client-side from `useClientAuditSummary` / `useClientGA4` / `useClientSearch` (the same hooks the Performance/Health tabs use). `recommendations` are sourced live from `keywordStrategy.contentGaps[]` at endpoint serve-time. No new tables, no migrations in 2.5b.
+3. **Stale-item escalation is opt-in.** The ActionQueueStrip's escalation pill renders only when the composer passes `staleCount > 0`. Callers without staleness data (free tier, older code paths) see no escalation — back-compat preserved.
+4. **Free tier is unchanged.** Phase 2.5b explicitly does NOT extend the free-tier branch; it stays at `<ActionQueueStrip>` + `<FreeTierUpgradeCTA>` + un-gated `<MonthlyDigestContent>` per the Phase 2 contract.
+
+**Typography update (Phase 2.5b):** `.t-caption` switched from `'Inter' 400` to `'DIN Pro' 600` — global typography refresh aligning caption text with the rest of the DIN Pro hierarchy.
+
+##### Phase 2.5e — Premium AI polish (`<WeeklyOpener>`)
+
+Premium-only one-line "letter from the editor" rendered ABOVE the dateline when the `client-briefing-v2-ai-polish` flag is on. Free/Growth tiers and any fail-soft path → component is omitted entirely; the dateline remains the first element.
+
+| Element | Treatment | Rationale |
+|---|---|---|
+| `<WeeklyOpener>` text | `t-body italic text-[var(--brand-text-muted)] leading-relaxed mb-2` | Italic body — visually distinct from the deterministic IssueSummaryLine that follows the dateline. Muted color signals "editorial overlay, not the lede." |
+| Position | Above DateLine | Sets the tone before the reader anchors on the date. Mirrors a magazine's pull-quote intro. |
+| Render guard | `briefing.weeklyOpener && <WeeklyOpener>` | Component itself returns null on empty input (defensive); composer skips the render when the wire field is absent (the common case). |
+
+**2.5e principles:**
+
+1. **Fail-soft is the default.** Both AI passes (`punchHeroHeadline`, `writeWeeklyOpener`) catch every error and return the deterministic original / null. The cron's surrounding try/catch is a backup, not the primary safety net. A flag-flip is the only rollback needed — no schema migration, no frontend conditional.
+2. **Premium-only by tier check.** The flag gates the AI call; the workspace's `tier === 'premium'` is a second gate. Both must clear. A workspace flipping to Growth mid-week would cleanly stop receiving polish on the next cron tick.
+3. **No quotes inside the opener.** The model is instructed to omit quote characters and the helper rejects responses that contain them. Quote characters clash with magazine chrome (story headlines already use `"`-wrapped queries).
+
 ### Admin Components
 
 | Component | Element | Color | Rationale |
@@ -248,6 +322,16 @@ For inline styles and Recharts props that can't be overridden by CSS class rules
 | **AssetAudit.tsx** | Action buttons (Crawl, Export) | `bg-blue-700 hover:bg-blue-600` | Admin data-action context (acceptable) |
 | **SeoEditor.tsx** | "Unsaved" badge | `blue-500/10 text-blue-400` | State indicator |
 | **RequestManager.tsx** | "New" status | `blue-500/10 text-blue-400` | Info state |
+| **RichTextEditor.tsx** (BubbleMenu) | Active format button (B/I/H2/H3/Link) | `bg-teal-500/20 text-teal-300` | Teal = active interactive state (Law 1) |
+| **RichTextEditor.tsx** (BubbleMenu) | Inactive format button | `text-[var(--brand-text)] hover:bg-[var(--surface-3)]` | Standard hover pattern |
+| **RichTextEditor.tsx** (BubbleMenu) | Inline link input | `border-b border-teal-500/50` | Teal underline = actionable input |
+| **RichTextEditor.tsx** (ProseMirror) | Links in content | `text-teal-400 underline` | Teal = interactive/actionable |
+| **PostEditor.tsx** / **PostReviewCard.tsx** | Auto-save status "Saving…" | `t-caption-sm text-[var(--brand-text-muted)]` | Muted = passive state indicator |
+| **PostEditor.tsx** / **PostReviewCard.tsx** | Auto-save status "Saved" | `t-caption-sm text-emerald-400` | Emerald = success (Law 3) |
+| **FixDiffModal.tsx** | Backdrop | `bg-[var(--brand-overlay)] z-[var(--z-modal-backdrop)]` | Token-only — no raw `bg-black/X` |
+| **FixDiffModal.tsx** | "Before" column header | `text-[var(--brand-text-muted)]` | Muted = old/passive content |
+| **FixDiffModal.tsx** | "After" column header | `text-teal-300` | Teal = new/actionable suggestion |
+| **FixDiffModal.tsx** | "Apply Fix" CTA | `bg-teal-600 hover:bg-teal-500` | Teal = action (Law 1) |
 
 ### Outcome Tracking
 
@@ -523,6 +607,8 @@ When shipping UI changes that affect color or design patterns:
 | 2026-04-27 | **Design System Phase C — New pr-check rules** (PR #337): 5 new rules (`Raw rounded-* literal` warn, `No purple/violet in client domain` error, `Trend icon import outside TrendBadge` warn, `Hand-rolled fixed inset-0 outside overlay` warn, `score-color-law-parity` error) + promoted `styleguide-token-parity` warn→error. Rule count: 91→96 (52 error, 44 warn). |
 | 2026-04-27 | **Design System Phase D — Doc drift fixes**: Renamed "Three Laws" → "Four Laws" across all docs and pr-check rule messages. Added emerald Law 3 (success). Updated `DESIGN_SYSTEM.md` typography scale to match `.t-*` class definitions. Synced `automated-rules.md`. |
 | 2026-04-28 | **Design System Phase 6D — Blue-on-Button Law 02 Audit**: Audited blue usage on interactive elements per Law 02 ("Blue is read-only, never actionable"). Changed 4 actionable buttons from blue to teal: RequestList "View Brief" toggle, BriefDetail "Generate Full Post", SettingsPanel + ConnectionsTab "Connect Google". SettingsPanel Trash2 prune icon changed blue→red (destructive action). SeoAudit Info StatCard blue retained as severity-category color (consistent with Errors=red, Warnings=amber). |
+| 2026-04-28 | **Blog Editor — TipTap BubbleMenu + FixDiffModal patterns**: `RichTextEditor.tsx` BubbleMenu uses `bg-teal-500/20 text-teal-300` for active format buttons (Law 1), `hover:bg-[var(--surface-3)]` for inactive. Link text in ProseMirror content uses `text-teal-400 underline`. Auto-save status: "Saving…" = `text-[var(--brand-text-muted)]`, "Saved" = `text-emerald-400` (Law 3 success). `FixDiffModal` backdrop uses `bg-[var(--brand-overlay)]` (no raw `bg-black/X`), "After" suggestion header `text-teal-300`, "Apply Fix" CTA `bg-teal-600 hover:bg-teal-500`. Per-component entries added to color map table above. |
+| 2026-04-29 | **`.t-body` → DIN Pro 500** (PR #379): Body text utility class promoted from `Inter / 400` to `'DIN Pro', 'Inter' / 500` in both `src/index.css` + `public/styleguide.css` (lockstep per styleguide-typography-parity rule). Affects every consumer of `.t-body` platform-wide — page cards, form descriptions, schema widgets, BodyText primitive, etc. Inter remains the fallback so glyphs missing from DIN Pro degrade gracefully. Other `.t-*` classes unchanged. |
 
 ---
 

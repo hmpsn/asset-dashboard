@@ -156,6 +156,20 @@ export function notifyTeamContentRequest(opts: {
   }));
 }
 
+export function notifyTeamChangesRequested(opts: {
+  workspaceName: string;
+  workspaceId?: string;
+  topic: string;
+  targetKeyword: string;
+  feedback: string;
+}): void {
+  const to = getNotificationEmail();
+  if (!to || !isEmailConfigured()) return;
+  queueEmail(makeEvent('content_changes_requested', to, opts.workspaceId || '', opts.workspaceName, undefined, {
+    topic: opts.topic, targetKeyword: opts.targetKeyword, feedback: opts.feedback,
+  }));
+}
+
 export function notifyClientBriefReady(opts: {
   clientEmail: string;
   workspaceName: string;
@@ -181,6 +195,28 @@ export function notifyClientPostReady(opts: {
   if (!isEmailConfigured()) return;
   queueEmail(makeEvent('content_post_ready', opts.clientEmail, opts.workspaceId || '', opts.workspaceName, opts.dashboardUrl, {
     topic: opts.topic, targetKeyword: opts.targetKeyword,
+  }));
+}
+
+/**
+ * Phase 1b helper — invoked by briefing-cron.ts (T1.14) when a weekly briefing
+ * publishes (manual or auto). No-op until SMTP is configured. Phase 4 connects
+ * this helper to the autoReportFrequency='weekly' path in monthly-report.ts.
+ */
+export function notifyClientBriefingReady(opts: {
+  clientEmail: string;
+  workspaceName: string;
+  workspaceId: string;
+  weekOf: string;
+  storyCount: number;
+  heroHeadline: string;
+  dashboardUrl?: string;
+}): void {
+  if (!isEmailConfigured()) return;
+  queueEmail(makeEvent('client_briefing_ready', opts.clientEmail, opts.workspaceId, opts.workspaceName, opts.dashboardUrl, {
+    weekOf: opts.weekOf,
+    storyCount: opts.storyCount,
+    heroHeadline: opts.heroHeadline,
   }));
 }
 

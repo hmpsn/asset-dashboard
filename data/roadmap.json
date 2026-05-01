@@ -48,8 +48,8 @@
           "source": "CI flakiness — recurring on staging push runs",
           "est": "1-2h",
           "priority": "P1",
-          "notes": "Two recurring failure modes in parallel-run integration tests, same root cause (test server not ready when first request fires, or server crash mid-suite under parallel load):\n\n1. tests/integration/brand-engine-routes.test.ts (port 13317) — DELETE voice samples test fails with `SyntaxError: Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON`. The Express server's startServer() promise resolves but the route registry isn't ready, so the POST /api/voice/.../samples returns Vite's SPA fallback HTML. Hit on 2026-04-27 staging push (PR #322 merge).\n\n2. tests/integration/brand-identity-hardening.test.ts (port unknown) — 4 tests fail with `TypeError: fetch failed / SocketError: other side closed`. Server connection drops mid-test. Hit on 2026-04-27 PR #319 round-3 commit CI run.\n\nBoth have unique ports (no collision per pr-check rule). Both pass on rerun, blocking confirmation that they aren't real bugs. Fixes to investigate:\n- Add explicit await for server.listen() callback before resolving startServer()\n- Add retry-on-HTML-response in postJson/del helpers (quick guard)\n- Consider --threads=1 for integration tests in CI (slower but eliminates parallelism)\n- Add a health-check ping in beforeAll() to wait for server readiness\n\nGoal: zero false-failure CI runs from these test files over 2 weeks of normal merge cadence. Stretch: extract a shared `waitForServer(port)` helper to tests/integration/helpers.ts so all integration suites benefit.",
-          "status": "pending"
+          "status": "done",
+          "notes": "Fixed with a four-layer defense: (1) waitForServer health-check polling added to startServer() in tests/integration/helpers.ts so tests never fire before routes are serving; (2) SQLite busy_timeout increased from 5s to 30s to handle macOS APFS fsync stalls under parallel load; (3) incrementIfAllowed moved inside try/catch in all async AI handlers (brand-identity.ts, voice-calibration.ts) to prevent SQLITE_BUSY from escaping as an unhandled promise rejection that crashes the server; (4) global JSON error handler added to app.ts so synchronous throws return JSON 500 instead of HTML. All write transactions in voice-calibration.ts changed to .immediate() to prevent SQLITE_BUSY_SNAPSHOT in WAL mode. Pre-commit hook scoped to unit tests only to avoid parallel SQLite contention during local commits."
         },
         {
           "id": 306,
@@ -77,6 +77,15 @@
           "priority": "P2",
           "notes": "Standardize loading patterns: route-level (keep ChunkFallback), data fetching (skeleton screens), actions (button loading + optimistic UI), background jobs (progress panel).\n[Audit 2026-04-22 partial] Skeleton primitive widely adopted (169 usages across 34 files including Roadmap, ClientDashboard, AdminInbox, brand/*, client/*); no formal standardization rule, lint, or codified loading-pattern doc.",
           "status": "pending"
+        },
+        {
+          "id": 627,
+          "title": "Blog/content editor improvements — TipTap rich text, auto-save, reading time, AI Fix This flow",
+          "source": "docs/superpowers/plans/2026-04-28-blog-editor-improvements.md",
+          "est": "8-10h",
+          "priority": "P1",
+          "status": "done",
+          "notes": "Shipped — Phase 1: replaced all PostEditor/SectionEditor/PostReviewCard textareas with TipTap v3 rich text editor (bold/italic/H2/H3/links via BubbleMenu). New useAutoSave hook (debounced 2s, stale-closure-safe). Reading time added to PostPreview. Phase 2: AI 'Fix This' button on failed ReviewChecklist items. POST /api/content-posts/:wsId/:postId/ai-fix with 6 issue-key strategies (factual_accuracy, brand_voice, internal_links, no_hallucinations, meta_optimized, word_count_target). FixDiffModal shows two-column before/after diff. AiFixResult + IssueKey shared types. POST_UPDATED broadcast added to PATCH handler. 6 unit tests (useAutoSave) + 6 integration tests (ai-fix endpoint)."
         }
       ]
     },
@@ -274,6 +283,36 @@
           "priority": "P3",
           "notes": "Track pages published per month as a trend. Leading indicator for ranking momentum.",
           "status": "pending"
+        },
+        {
+          "id": "pr398-dedup-types",
+          "title": "BriefDetail dedup + type consolidation (Unit A + B)",
+          "source": "PR #398 — content brief pipeline refactor",
+          "est": "3-4h",
+          "priority": "P1",
+          "status": "done",
+          "notes": "Replaced ~240 lines of inline brief JSX in RequestList.tsx with a single <BriefDetail> component call via new hideActions/defaultFeedback/autoShowRegenerate props. Consolidated ContentBrief and ContentTopicRequest types from 4 component files into shared/types/content.ts canonical source. Added SERP data rendering (realPeopleAlsoAsk, realTopResults) in BriefDetail.",
+          "shippedAt": "2026-05-01"
+        },
+        {
+          "id": "pr398-bug-fixes",
+          "title": "Content pipeline bug fixes — 7 server-side fixes (Unit C)",
+          "source": "PR #398 — content brief pipeline refactor",
+          "est": "2-3h",
+          "priority": "P1",
+          "status": "done",
+          "notes": "Bug 2: Clear clientFeedback on resubmit. Bug 3: Upgrade endpoint try/catch for InvalidTransitionError. Bug 4: send-to-client initialStatus changed to brief_generated. Bug 5: Client can view post in changes_requested status. Bug 6: postId only exposed when serviceType=full_post. Bug 7: Double skeleton save prevention. Bug 8: State machine — removed post_review from changes_requested transitions, Re-queue for Revision button.",
+          "shippedAt": "2026-05-01"
+        },
+        {
+          "id": "pr398-email-notifications",
+          "title": "Email notification for changes_requested (Unit D)",
+          "source": "PR #398 — content brief pipeline refactor",
+          "est": "1h",
+          "priority": "P2",
+          "status": "done",
+          "notes": "Added content_changes_requested event type to email system. notifyTeamChangesRequested called from both brief and post change-request endpoints in public-content.ts. Throttle category mapped to 'internal'.",
+          "shippedAt": "2026-05-01"
         }
       ]
     },
@@ -469,6 +508,201 @@
       "name": "Future",
       "rationale": "Aspirational features and team-scale work deferred until the current sprint queue clears.",
       "items": [
+        {
+          "id": "schema-page-element-catalog-pr1",
+          "title": "Schema Page-Element Catalog PR1 — slice + 3 element types + 3 schema integrations",
+          "source": "docs/superpowers/plans/2026-04-29-page-element-catalog-pr1.md",
+          "est": "5d",
+          "priority": "P1",
+          "sprint": "J",
+          "status": "done",
+          "shippedAt": "2026-04-29",
+          "notes": "PageElementSlice + page_elements table + extractors for videos/HowTo/citations + VideoObject/HowTo/Article.citation[] schema integrations on Article + BlogPosting. No AI in PR1. Spec: docs/superpowers/specs/2026-04-29-page-element-catalog-design.md. Audit: docs/superpowers/audits/2026-04-29-page-element-catalog-audit.md."
+        },
+        {
+          "id": "schema-page-element-catalog-pr2",
+          "title": "Schema Page-Element Catalog PR2 — images + tables + testimonials",
+          "source": "docs/superpowers/specs/2026-04-29-page-element-catalog-design.md §5.2 + §6",
+          "est": "4d",
+          "priority": "P1",
+          "sprint": "J",
+          "status": "done",
+          "notes": "Shipped 3 pattern extractors (images w/ rule-based hero/informative/decorative + AI vision classifier; tables w/ pricing+comparison heuristics; testimonials w/ author+rating) + 2 AI extractors (vision image-role classifier via openai SDK direct, HowTo disambiguation via callAI) behind schema-ai-element-classifier flag (default off, 120-call shared per-run AiBudget). Threaded one AiBudget per regenerate-all through generateSchemaSuggestions's 3 generateLeanSchema sites (Devin r5 follow-up). Added 4 validator REQUIRED_BY_TYPE entries (Review/AggregateRating/Table/ImageGallery) + 3 schema integrations: ImageGallery (Article+Service), Review[]+AggregateRating (Service+LocalBusiness), Table mainEntity (Service). Pre-emission gates on every new node type (synchronous, per PR1 Devin r2 lesson). 4 new HTML fixtures + 6 new test files + extended integration tests."
+        },
+        {
+          "id": "schema-entity-graph-workstream-c",
+          "title": "Schema Workstream C \u2014 Entity Graph Hub Dispatch",
+          "source": "claude/schema-v2-brainstorm branch",
+          "est": "1d",
+          "priority": "P0",
+          "sprint": "J",
+          "status": "done",
+          "shippedAt": "2026-04-30",
+          "notes": "Workstream C shipped: hub pages now emit semantically correct schema types with cross-page @id references via assembleSiteContext + SiteContext plumbing into generateLeanSchema. BlogIndex \u2192 Blog with blogPost[] (@id refs, sorted newest-first, capped at 10, numberOfItems = true count). ServiceIndex \u2192 Service + hasOfferCatalog: { @type: OfferCatalog, hasPart[] }. CaseStudyIndex \u2192 CollectionPage + mainEntity: { @type: ItemList, itemListElement[] (positional ListItems) }. All three fall back to CollectionPage when siteContext is absent. Non-hub pages (BlogPosting, Service, AboutPage, etc.) unchanged. 18 integration tests in tests/integration/schema-entity-graph.test.ts."
+        },
+        {
+          "id": "schema-page-element-catalog-pr3",
+          "title": "Schema Page-Element Catalog PR3 — polish (codeBlocks, headings/ToC, speakable)",
+          "source": "docs/superpowers/specs/2026-04-29-page-element-catalog-design.md §5.3",
+          "est": "2d",
+          "priority": "P2",
+          "sprint": "future",
+          "status": "pending",
+          "notes": "Optional polish: codeBlocks → CodeRepository/SoftwareSourceCode (low ROI for agency sites); headings → WebPage.speakable cssSelector (overlaps with schema-engagement-signals; whichever ships first wins). May be skipped if cycles are short."
+        },
+        {
+          "id": "schema-context-builder-pattern-b-migration",
+          "title": "Migrate buildSchemaContext direct reads to intelligence slices",
+          "source": "docs/superpowers/specs/2026-04-29-schema-yoast-parity-fields-design.md §6",
+          "est": "2-3h cumulative across opportunistic PRs",
+          "priority": "P1",
+          "sprint": "I",
+          "status": "in-progress",
+          "notes": "Trajectory 3 → 1 migration. Direct reads in server/helpers.ts:buildSchemaContext → corresponding seoContext slice fields. Each migration is opportunistic — done when adjacent code is touched for other reasons. Completion gates Pillar 3 reactivation.\n\nRemaining queue (5 fields):\n  1. brandVoice            → seoContext.brandVoice\n  2. businessContext       → seoContext.strategy.businessContext  (NB: NOT keywordStrategy)\n  3. knowledgeBase         → seoContext.knowledgeBase\n  4. _businessProfile      → seoContext.businessProfile\n  5. _personasBlock        → seoContext.personas (AudiencePersona[]; formatting moves to schema layer)\n\nPR1 (schema-yoast-parity-fields) ports siteKeywords as the pattern anchor (committed outside this queue since it shipped with the PR). Identity fields (ws.name, ws.id, ws.liveDomain, ws.brandLogoUrl, ws.siteHasSearch, siteId) intentionally stay as direct reads — they're per-entity DB fields, not on a slice.\n\nMigration completion criterion: zero non-allowlisted direct reads in buildSchemaContext (verified by pr-check rule schema-context-direct-read-not-on-allowlist). At that point, Pillar 3 (compile-time + CI gates) reactivates."
+        },
+        {
+          "id": "schema-cleanup-dead-pageKeywordMap",
+          "title": "Remove dead pageKeywordMap from buildSchemaContext + generateSchemaSuggestions signature",
+          "source": "PR #376 Devin Review INFO-0001",
+          "est": "30m",
+          "priority": "P2",
+          "sprint": "future",
+          "status": "pending",
+          "notes": "After schema-yoast-parity-fields PR1, buildSchemaContext still computes pageKeywordMap from ws?.keywordStrategy?.pageMap and returns it (server/helpers.ts:343, :410-418, :539). Both callers (server/routes/webflow-schema.ts:51, server/routes/jobs.ts:636) destructure it and pass to generateSchemaSuggestions, which immediately voids it (server/schema-suggester.ts:391). Per-page keywords are now fetched via buildWorkspaceIntelligence inside the page loop. Cleanup: drop the pageKeywordMap return field, the parameter, and the void discard. While in there, audit the other 5 voided params on generateSchemaSuggestions (gscMap, ga4Map, queryPageData, insightsMap, validationsByPageId) — likely also dead. Devin Review explicitly recommended deferring to a follow-up PR; doesn't affect correctness."
+        },
+        {
+          "id": "schema-engagement-signals",
+          "title": "Schema engagement signals — wordCount, timeRequired, speakable, educationalLevel",
+          "source": "Strategic landscape brainstorm 2026-04-29 (post-PR1 merge)",
+          "est": "2d",
+          "priority": "P1",
+          "sprint": "future",
+          "status": "pending",
+          "notes": "Quick-win Tier-4 fields with data the platform already has. Article.wordCount (already computed in TipTap on every save). Article.timeRequired = wordCount/250wpm rounded. WebPage.speakable with cssSelector pointing to .lead/.intro/first-paragraph — voice-assistant rich result; almost nobody implements correctly. Article.educationalLevel via AI classification (Beginner/Intermediate/Advanced). All wire through existing PageData typed boundary. No new admin UI required for the basics; speakable cssSelector is a per-template constant. Independent rich-result eligibility unlock for Google Article + voice-search amplification."
+        },
+        {
+          "id": "schema-eeat-amplifiers",
+          "title": "Schema E-E-A-T amplifiers — publishingPrinciples, reviewedBy, copyrightHolder, isAccessibleForFree, Person.jobTitle",
+          "source": "Strategic landscape brainstorm 2026-04-29 (post-PR1 merge)",
+          "est": "1w",
+          "priority": "P1",
+          "sprint": "future",
+          "status": "pending",
+          "notes": "Tier-3 trust signals Google increasingly weighs. Add 4 new optional Workspace fields: publishingPrinciplesUrl, actionableFeedbackPolicyUrl (both → Organization.publishingPrinciples + actionableFeedbackPolicy on every page's @graph). Article.copyrightHolder ref to Organization, copyrightYear from datePublished. Article.reviewedBy as Person from new CMS field 'fact_checker' (optional). Article.isAccessibleForFree from per-tier content gating. Person.jobTitle + worksFor on author when CMS author records have those fields (currently they're just string names). Mostly admin Settings UI work + template emission. Each field is an additive E-E-A-T signal — non-breaking, immediate ranking benefit on YMYL content."
+        },
+        {
+          "id": "schema-entity-grounding-wikidata",
+          "title": "Schema entity grounding — typed Thing/Place entities + Wikidata sameAs disambiguation",
+          "source": "Strategic landscape brainstorm 2026-04-29 (post-PR1 merge)",
+          "est": "2-3w",
+          "priority": "P1",
+          "sprint": "future",
+          "status": "pending",
+          "notes": "Tier-2 / biggest competitive moat. Replace string knowsAbout (currently ['brand strategy','webflow']) with typed Thing entities linked to Wikidata Q-numbers via sameAs. Same upgrade for Article.about (typed Thing — what is this article about?), Article.mentions[] (entities referenced in body), Place entities for areaServed (Austin, TX → Wikidata Q16559), Organization.sameAs extended with Wikidata identifier. Architecture: new EntityResolutionSlice on buildWorkspaceIntelligence, populated by a Cheerio-based extractor that runs entity recognition (likely via OpenAI structured-output prompt against curated entity types) + Wikidata SPARQL lookup for top candidates, cached per-entity. Most agencies don't do this; Google's knowledge graph rewards disambiguation heavily. Architectural prerequisite met by parity-fields PR1 Pattern B starter. Can ship after schema-page-element-catalog-v1 (the catalog feeds Article.mentions extraction)."
+        },
+        {
+          "id": "schema-commerce-types",
+          "title": "Schema commerce types — Service.offers (PriceSpecification), Product, Course, Event",
+          "source": "Strategic landscape brainstorm 2026-04-29 (post-PR1 merge)",
+          "est": "1-2w per type, parallelizable",
+          "priority": "P2",
+          "sprint": "future",
+          "status": "pending",
+          "notes": "Tier-5 monetization opportunity for agencies with productized services / paid content. Service.offers with Offer { price, priceCurrency, availability } — Google's 'service prices' SERP feature. Product schema for templates/digital products. Course for educational content/training. Event for webinars/launches with eventStatus + eventAttendanceMode (Online/Offline/Mixed). Each is independent rich-result eligibility unlock. Workspace.contentPricing already exists (used for content-purchase tiers); Service.offers can reuse the pricing infra. Per-type effort similar to parity-fields PR1's per-template additions; parallelizable across template files. Default-off; admin opts in per-workspace. Most useful for agencies with packaged services (web-design + brand audit + content retainer); skip for service-only sites without published prices."
+        },
+        {
+          "id": "schema-trust-authority-graph",
+          "title": "Schema trust/authority — Organization.award, member, hasCredential, numberOfEmployees",
+          "source": "Strategic landscape brainstorm 2026-04-29 (post-PR1 merge)",
+          "est": "2-3d",
+          "priority": "P2",
+          "sprint": "future",
+          "status": "pending",
+          "notes": "Tier-6 reputation graph fields. New Workspace.organizationAwards (string[] of Award names → Award entity[]), Workspace.organizationMemberships (industry orgs → ProgramMembership/Organization references), Workspace.organizationCredentials (certifications → EducationalOccupationalCredential), Workspace.numberOfEmployees (QuantitativeValue { minValue, maxValue, unitText: 'employee' }). Each emitted on Organization sibling node in homepage + local-business templates. Pure admin Settings UI + template extension; no AI/intelligence dependencies. Agency credibility in SERP, especially for B2B competitive queries."
+        },
+        {
+          "id": "test-flake-aiLimiter-state-pollution",
+          "title": "Reset aiLimiter in beforeEach for brandscript-hardening I14 burst-cap",
+          "source": "docs/superpowers/audits/2026-04-29-pre-existing-test-failures-audit.md",
+          "est": "30m",
+          "priority": "P2",
+          "sprint": "future",
+          "status": "pending",
+          "notes": "Module-scoped aiLimiter is shared across parallel test files. brandscript-hardening I14 (4-request burst cap) intermittently sees the 4th request return ≠429 because other test files consumed the limiter's quota. Fix: expose __resetForTest() and call in beforeEach. Audit triggered during schema-yoast-parity-fields PR1 full-suite run (commit 67d68bef)."
+        },
+        {
+          "id": "test-flake-outcome-tracking-mock-drift",
+          "title": "Add missing exports to outcome-tracking.js mock factory",
+          "source": "docs/superpowers/audits/2026-04-29-pre-existing-test-failures-audit.md",
+          "est": "15m",
+          "priority": "P2",
+          "sprint": "future",
+          "status": "pending",
+          "notes": "deep-diagnostic-jobs.test.ts surfaces 'No \"getActionsByWorkspace\"/\"getPendingActions\"/\"getTopWinsFromActions\" export is defined on outcome-tracking.js mock' in full-suite mode. SUT was extended with new exports after the mock factory was last updated. Mechanical fix: add vi.fn() stubs for each missing export. Audit triggered during schema-yoast-parity-fields PR1 full-suite run."
+        },
+        {
+          "id": "test-flake-content-decay-ai-mock-timeout",
+          "title": "Investigate content-decay-routes graceful-degradation timeout in full-suite mode",
+          "source": "docs/superpowers/audits/2026-04-29-pre-existing-test-failures-audit.md",
+          "est": "30-60m",
+          "priority": "P2",
+          "sprint": "future",
+          "status": "pending",
+          "notes": "'returns 200 with fallback recommendations when AI call fails' times out at 60s in full-suite mode but passes in isolation. Likely AI mock state collision causing the rejection to hang instead of failing fast. Fix options: (a) reduce timeout if intent is fast-rejection; (b) hoist vi.mock with explicit mockImplementation in beforeEach. Audit triggered during schema-yoast-parity-fields PR1 full-suite run."
+        },
+        {
+          "id": "schema-pillar-2-1-searchaction-correctness",
+          "title": "Schema Pillar 2.1 — Stop emitting SearchAction on sites without search",
+          "source": "docs/superpowers/plans/2026-04-29-schema-pillar-2-data-wiring.md (post-merge correction)",
+          "est": "1h",
+          "priority": "P0",
+          "sprint": "H",
+          "status": "done",
+          "shippedAt": "2026-04-29",
+          "notes": "Pillar 2's homepage + LocalBusiness templates emitted `potentialAction: SearchAction` unconditionally. Google's docs require the site actually expose a working search endpoint at the urlTemplate; emitting it on a site without search misrepresents capability. Fix: dropped SearchAction emission until a workspace-level signal indicates site search is available. Re-add as opt-in via Workspace.siteHasSearch (or auto-detect from homepage HTML <form action=/search>) is queued under schema-yoast-parity-fields."
+        },
+        {
+          "id": "schema-pillar-1-validator-bar",
+          "title": "Schema Pillar 1 — Raise the Validator Bar",
+          "source": "docs/superpowers/plans/2026-04-29-schema-pillar-1-validator-bar.md",
+          "est": "1d",
+          "priority": "P0",
+          "sprint": "H",
+          "status": "done",
+          "shippedAt": "2026-04-29",
+          "notes": "REQUIRED_BY_TYPE in validator.ts now enforces Yoast/Google-baseline completeness. Article/BlogPosting require image+dateModified+articleSection+isPartOf+breadcrumb+inLanguage. WebPage variants require description+isPartOf+breadcrumb+inLanguage. LocalBusiness requires address+telephone+inLanguage. WebSite requires inLanguage (potentialAction is conditional, deferred to schema-yoast-parity-fields where it gates on Workspace.siteHasSearch). Organization requires logo. Cross-ref validators reject malformed isPartOf/breadcrumb shapes and dangling BreadcrumbList @id pointers. NEW value-shape validators reject malformed Article author/publisher/image, non-ISO 8601 dates, non-contiguous breadcrumb positions, and non-absolute URLs on primary nodes. Locks the bar Pillars 2 + 2.1 raised. 24 new test assertions across required-fields, cross-ref shape, and value-shape describe blocks."
+        },
+        {
+          "id": "schema-yoast-parity-fields-pr1",
+          "title": "Schema Yoast-Parity Fields PR1 — validator API + 6 fields + slice-migration starter",
+          "source": "docs/superpowers/plans/2026-04-29-schema-yoast-parity-fields-pr1.md",
+          "est": "2d",
+          "priority": "P0",
+          "sprint": "I",
+          "status": "done",
+          "shippedAt": "2026-04-29",
+          "notes": "ValidationFinding API (typed { severity, type, field?, ruleId, message }) + 6 new template fields (Service.areaServed, Service.serviceType, LocalBusiness.areaServed, Organization.knowsAbout, Article.keywords, gated WebSite.potentialAction) + Workspace.siteHasSearch field plumbing (default false) + slice-migration starter (siteKeywords + per-page pageKeywords moved to seoContext slice consumption) + new pr-check rule schema-context-direct-read-not-on-allowlist + CLAUDE.md convention paragraph + roadmap migration tracker entry (schema-context-builder-pattern-b-migration). 5 dead SchemaContext._* fields deleted (3 preserved per audit). Frontend renders findings grouped by severity (errors red, warnings amber 'Recommended'). PR2 ships admin discoverability surfaces. Spec: docs/superpowers/specs/2026-04-29-schema-yoast-parity-fields-design.md. Audit: docs/superpowers/audits/2026-04-29-schema-yoast-parity-fields-audit.md."
+        },
+        {
+          "id": "schema-yoast-parity-fields-pr2",
+          "title": "Schema Yoast-Parity Fields PR2 — admin discoverability surfaces",
+          "source": "docs/superpowers/plans/2026-04-29-schema-yoast-parity-fields-pr2.md",
+          "est": "1.5d",
+          "priority": "P0",
+          "sprint": "I",
+          "status": "done",
+          "shippedAt": "2026-04-29",
+          "notes": "Admin discoverability layer atop PR1's typed validationFindings. SchemaCompletenessWidget on the Schema page aggregates findings across all pages with progress bar + missing-field deep-link buttons. BusinessProfileTab gains a 'Schema impact' read-only mirror SectionCard listing 5 schema-impacting fields with ✓/✗ status + deep-links (cross-tab via Link with ?tab=...&focus=..., in-tab via scroll-to-element). FeaturesTab gains Logo URL microcopy + new 'Site capabilities' SectionCard with the siteHasSearch checkbox (toggling on activates PR1's gated WebSite.potentialAction emission). SchemaPageCard now groups findings by field with click-to-expand collapsible rows when a single field has 2+ findings on a page. SchemaSuggester header gains 'X fixes available' annotation. New shared useDeepLinkFocus hook + data-schema-deeplink attribute convention establishes the field-level deep-link two-halves contract. New fieldTargets.ts module is the single source of truth mapping ValidationFinding.field → Settings deep-link. Frontend-only; no backend changes. 8 new component tests (3 hook + 5 widget). Plan: docs/superpowers/plans/2026-04-29-schema-yoast-parity-fields-pr2.md."
+        },
+        {
+          "id": "schema-pillar-3-gates",
+          "title": "Schema Pillar 3 — Compile-time + CI Gates",
+          "source": "docs/superpowers/plans/2026-04-29-schema-pillar-3-gates.md",
+          "est": "1d",
+          "priority": "P2",
+          "status": "deferred",
+          "notes": "DEFERRED. Pillar 3 is regression-prevention hardening (schema-dts compile-time types + schemarama CI corpus + pr-check rule for cross-ref helper imports). It does not change schema output — it locks the bar Pillars 1 + 2 set. Decision (2026-04-29): defer until after schema-yoast-parity-fields ships, because the field expansion will reshape templates and Pillar 3's typed signatures would have to be rewritten. Reactivate after intelligence layer settles. Plan file remains committed for reference."
+        },
         {
           "id": 16,
           "title": "Internal team management",
@@ -765,6 +999,16 @@
           "priority": "P3",
           "notes": "Each new workspace requires: connect Webflow, connect GSC, connect GA4, run keyword analysis, run site audit, set up brand voice, configure competitors, set content pricing, enable client portal. Most steps are identical across workspaces. Add: workspace templates (clone config from existing workspace), batch analysis trigger (run audit + keyword analysis + decay analysis in one click), onboarding checklist with progress tracking, default competitor auto-discovery. Separate initiative from intelligence engine — scoped as its own spec.",
           "status": "pending"
+        },
+        {
+          "id": "schema-intelligence-layer-v2",
+          "title": "Schema Intelligence Layer (FAQ-from-GSC, E-E-A-T, healthcare subtypes)",
+          "source": "docs/superpowers/plans/2026-04-29-lean-schema-rewrite.md (deferred scope)",
+          "est": "2-3w",
+          "priority": "P1",
+          "sprint": "I",
+          "status": "pending",
+          "notes": "Follow-up to lean-schema-rewrite. Re-injects the platform's intelligence layer surgically into schema generation: (1) Healthcare type escalation — workspace businessContext → Dentist/Physician/Optician/Chiropractor/MedicalClinic/etc. when address+phone+hours are present, falls back to LocalBusiness otherwise. (2) FAQ enrichment from GSC question queries — extractFaqOpportunities (already exists in analytics-intelligence.ts) feeds FAQPage when ≥3 question queries match a page. (3) E-E-A-T author injection from content brief — extractEeatFromBrief (already exists) populates Article.author with Person.knowsAbout, sameAs from the brief's expert profile. (4) Service serviceType from voice profile + business profile. Reuses existing intelligence wiring; the lean rewrite kept the data flow intact, this task adds surgical injection points to the templates."
         }
       ]
     },
@@ -4310,7 +4554,7 @@
           "source": "USER REQUEST",
           "est": "1.5h",
           "priority": "P0",
-          "notes": "Shipped — field='both' mode for single + bulk SEO rewrite. AI generates 3 paired title/description sets per page. Frontend: 'AI Generate Both' button, paired variation picker, bulk 'AI Rewrite Both'. Feature #164.",
+          "notes": "Shipped — field='both' mode for single + bulk SEO rewrite. AI generates 3 paired title/description sets per page. Frontend: 'AI Generate Both' button, paired variation picker, bulk 'AI Rewrite Both'. Feature #164.\n[2026-05-01 PR #400] Bug fix: aiRewrite never sent field=\"both\" — added aiRewriteBoth() with paired variation picker UI. Also fixed: always send both title+description context to AI (bug 3).",
           "status": "done"
         },
         {
@@ -4409,7 +4653,7 @@
           "source": "BUG FIX",
           "est": "1h",
           "priority": "P0",
-          "notes": "Shipped — includes()-based path matching caused every page to match '/' (homepage) since all paths contain '/'. Broke page analysis persistence (only 7/256 pages saved) AND all AI features received homepage keywords instead of page-specific ones. Fixed 5 instances in 4 server files + frontend path display for nested pages. Feature #174.",
+          "notes": "Shipped — includes()-based path matching caused every page to match '/' (homepage) since all paths contain '/'. Broke page analysis persistence (only 7/256 pages saved) AND all AI features received homepage keywords instead of page-specific ones. Fixed 5 instances in 4 server files + frontend path display for nested pages. Feature #174.\n[2026-05-01 PR #400] Bug fix: 4 remaining fuzzy-match instances across webflow-seo.ts (GSC + audit matching), seo-change-tracker.ts (matchPage), admin-chat-context.ts (page audit lookup). All now use normalizePath() + exact comparison.",
           "status": "done"
         },
         {
@@ -4703,6 +4947,39 @@
           "status": "done",
           "shippedAt": "2026-04-22",
           "notes": "Six discrete backend enrichments across SEO pipelines: (Item 12) GSC queries as keyword candidates in keyword-recommendations.ts; (Item 13) GSC query breakdown in content-decay refresh AI prompt; (Item 13b) Decay query context injected when brief matches decaying page; (Item 13c) DecayContext.topQueries from GSC in copy-refresh AI prompt; (Item 14) SEMRush metrics pre-fetch for top-N pages in jobs.ts bulk analyze; (Item 15) Issue-type-specific recovery rates replacing flat 12% in recommendations.ts. All six independent, no API/UI changes, no new DB columns or shared types."
+        },
+        {
+          "id": "schema-generator-quality-hardening",
+          "title": "Schema Generator One-Shot Quality Hardening",
+          "source": "docs/superpowers/plans/2026-04-28-schema-generator-quality.md",
+          "est": "6-8h",
+          "priority": "P1",
+          "sprint": "H",
+          "status": "done",
+          "shippedAt": "2026-04-28",
+          "notes": "7 targeted fixes to schema output quality and intelligence wiring. (1) UTILITY_SLUGS constant — single regex applied at hasPart/relatedLink injections and generation queue pre-filter. (2) SiteNavigationElement block deleted from postProcessSchema; removed from PAGE_TYPE_SCHEMA_MAP homepage secondary array. (3) CollectionPage injection guarded with pagePath !== '/'. (4) upgradeHealthcareType() deterministic fallback: businessContext → Dentist/Physician/Optician/Chiropractor/MedicalClinic/Hospital/MedicalBusiness. (5) autoFixSchema: knowsAbout trimmed ≤5, Product zero-price offers stripped, SiteNavigationElement nodes stripped. (6) INVALID_PROPERTIES expanded with Product: ['pricing', 'features', 'cost']. (7) Prompt: healthcare rule promoted to 3b with expanded trigger keywords; Product zero-price guard added as 9b; SiteNavigationElement removed from homepage instructions. (8) Intelligence context: _serpFeatures + _backlinkReferringDomains from workspace intelligence layer (non-blocking); _existingErrors from schema_validations at all 3 call sites. (9) Declined keywords filtered before context assembly. (10) BusinessProfileTab amber warning for empty profile on local-business workspace. Audit: docs/superpowers/audits/2026-04-28-schema-generator-audit.md."
+        },
+        {
+          "id": "lean-schema-rewrite",
+          "title": "Lean Schema Generation Rewrite",
+          "source": "docs/superpowers/plans/2026-04-29-lean-schema-rewrite.md",
+          "est": "5-7d",
+          "priority": "P0",
+          "sprint": "H",
+          "status": "done",
+          "shippedAt": "2026-04-29",
+          "notes": "Replaces 2,558-line schema-suggester.ts pipeline with deterministic 6-module package at server/schema/. URL classifier + per-type templates + canonical data sources + 2 surgical AI extractors (description, FAQ) + per-type validator + thin orchestrator. Output ~72% smaller, validates first time, eliminates duplicate WebPage bug and wrong-type bug for case studies/privacy/index pages. Common types only (BlogPosting, Article, Service, Product, LocalBusiness, AboutPage, ContactPage, CollectionPage, WebPage, Organization, WebSite). Healthcare uses LocalBusiness fallback; subtype escalation deferred to schema-intelligence-layer-v2."
+        },
+        {
+          "id": "schema-pillar-2-data-wiring",
+          "title": "Schema Pillar 2 — Data Wiring & Cross-References",
+          "source": "docs/superpowers/plans/2026-04-29-schema-pillar-2-data-wiring.md",
+          "est": "1d",
+          "priority": "P0",
+          "sprint": "H",
+          "status": "done",
+          "shippedAt": "2026-04-29",
+          "notes": "Brand-suffix scrubber strips ' | Brand'/' - Brand'/' — Brand'/' · Brand' from name fields and breadcrumb leaves. Every non-homepage primary node emits isPartOf (→#website), breadcrumb (→#breadcrumb), inLanguage (Yoast-baseline @graph topology). Article emits articleSection (URL-derived) and Person author when CMS fieldData exposes one. New discoverCmsItemsBySlug joins sitemap URLs against /collections/:id/items so CMS pages get real datePublished + author from fieldData. Homepage Organization gains sameAs+foundedDate from BusinessProfile; WebSite gains potentialAction (sitelinks SearchAction). Default locale extracted from Webflow site.locales.primary.tag via extended listSites and SchemaContext._defaultLocale. Locks via 4 integration assertions. Closes wiring gaps from 2026-04-29 audits. Pillar 1 (validator bar) and Pillar 3 (compile + CI gates) ship next."
         }
       ]
     }

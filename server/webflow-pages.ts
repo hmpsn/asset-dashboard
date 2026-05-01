@@ -326,17 +326,27 @@ export async function retractSchemaFromPage(
   return { success: true, removed: removedCount };
 }
 
-export async function listSites(tokenOverride?: string): Promise<Array<{ id: string; displayName: string; shortName: string }>> {
+export async function listSites(
+  tokenOverride?: string,
+): Promise<Array<{ id: string; displayName: string; shortName: string; defaultLocale: string }>> {
   const token = tokenOverride || getToken();
   if (!token) return [];
 
   const res = await webflowFetch('/sites', {}, token);
   if (!res.ok) return [];
-  const data = await res.json() as { sites?: Array<{ id: string; displayName?: string; shortName: string }> };
+  const data = await res.json() as {
+    sites?: Array<{
+      id: string;
+      displayName?: string;
+      shortName: string;
+      locales?: { primary?: { tag?: string } };
+    }>;
+  };
   return (data.sites || []).map((s) => ({
     id: s.id,
     displayName: s.displayName || s.shortName,
     shortName: s.shortName,
+    defaultLocale: s.locales?.primary?.tag || 'en',
   }));
 }
 
@@ -429,4 +439,104 @@ export function buildStaticPathSet(pages: WebflowPage[]): Set<string> {
     paths.add(path);
   }
   return paths;
+}
+
+/**
+ * Canonical formula for synthetic CMS page IDs.
+ * All code that creates or looks up a CMS page ID must use this function.
+ * Format: cms-{path-with-slashes-replaced-by-dashes}
+ * Example: /blog/my-post → cms-blog-my-post
+ */
+export function toCmsPageId(path: string): string {
+  return `cms-${path.replace(/^\//, '').replace(/\//g, '-')}`;
+}
+
+export interface CmsItemFull extends CmsPageUrl {
+  collectionId: string;
+  itemId: string;
+  /** Webflow CMS publishing timestamp (ISO 8601). */
+  lastPublished: string | null;
+  /** Webflow CMS creation timestamp (ISO 8601). */
+  createdOn: string | null;
+  /** Raw fieldData blob from /collections/:id/items/:itemId — passed to extractPageData via pageMeta.cmsFieldData. */
+  fieldData: Record<string, unknown> | null;
+}
+
+/**
+ * Like discoverCmsUrls but joins the sitemap-discovered URLs against Webflow's
+ * collection items API to populate collectionId, itemId, timestamps, and fieldData.
+ * Cost: 1 listCollections + 1 listCollectionItems per collection — cached per call.
+ */
+export async function discoverCmsItemsBySlug(
+  siteId: string,
+  sitemapBaseUrl: string,
+  staticPaths: Set<string>,
+  limit: number,
+  tokenOverride?: string,
+): Promise<{ items: CmsItemFull[]; totalFound: number }> {
+  const { cmsUrls, totalFound } = await discoverCmsUrls(sitemapBaseUrl, staticPaths, limit);
+  if (cmsUrls.length === 0) return { items: [], totalFound };
+
+  // Lazy-import to avoid a circular module load at startup.
+  const { listCollections, listCollectionItems } = await import('./webflow-cms.js'); // dynamic-import-ok
+  const collections = await listCollections(siteId, tokenOverride);
+
+  // Key by `${collectionSlug}/${itemSlug}` to disambiguate items that share an item-slug
+  // across collections (e.g. /blog/expero AND /our-work/expero — same item-slug, different
+  // collection). A flat slug map would silently last-writer-wins. We also keep a fallback
+  // index by item-slug alone so URLs whose collection-prefix doesn't match the collection's
+  // listed slug (Webflow allows custom URL paths per collection) still resolve when the
+  // item-slug is globally unique — but never when ambiguous.
+  type CmsItemMeta = Omit<CmsItemFull, 'url' | 'path' | 'pageName'>;
+  const compoundMap = new Map<string, CmsItemMeta>();
+  const itemSlugIndex = new Map<string, CmsItemMeta[]>();
+  for (const coll of collections) {
+    const collSlug = (coll.slug || '').toLowerCase();
+    let offset = 0;
+    const pageSize = 100;
+    while (offset < limit) {
+      const { items: batch, total } = await listCollectionItems(coll.id, pageSize, offset, tokenOverride);
+      if (batch.length === 0) break;
+      for (const it of batch) {
+        const fieldData = (it.fieldData as Record<string, unknown> | undefined) ?? null;
+        const slug = (fieldData?.slug as string | undefined) ?? undefined;
+        if (!slug) continue;
+        const itemSlug = slug.toLowerCase();
+        const meta: CmsItemMeta = {
+          collectionId: coll.id,
+          itemId: (it.id as string) ?? '',
+          lastPublished: (it.lastPublished as string | null | undefined) ?? null,
+          createdOn: (it.createdOn as string | null | undefined) ?? null,
+          fieldData,
+        };
+        if (collSlug) compoundMap.set(`${collSlug}/${itemSlug}`, meta);
+        const bucket = itemSlugIndex.get(itemSlug) ?? [];
+        bucket.push(meta);
+        itemSlugIndex.set(itemSlug, bucket);
+      }
+      offset += batch.length;
+      if (offset >= total) break;
+    }
+  }
+
+  const items: CmsItemFull[] = [];
+  for (const u of cmsUrls) {
+    const segs = u.path.replace(/^\/|\/$/g, '').toLowerCase().split('/').filter(Boolean);
+    const itemSlug = segs[segs.length - 1] ?? '';
+    const collSeg = segs.length >= 2 ? segs[segs.length - 2] : '';
+    let meta: CmsItemMeta | undefined;
+    if (collSeg && compoundMap.has(`${collSeg}/${itemSlug}`)) {
+      meta = compoundMap.get(`${collSeg}/${itemSlug}`);
+    } else {
+      const candidates = itemSlugIndex.get(itemSlug) ?? [];
+      // Fallback only when the item-slug is globally unique — never when ambiguous.
+      if (candidates.length === 1) meta = candidates[0];
+    }
+    if (!meta) {
+      items.push({ ...u, collectionId: '', itemId: '', lastPublished: null, createdOn: null, fieldData: null });
+    } else {
+      items.push({ ...u, ...meta });
+    }
+  }
+  return { items, totalFound };
 }

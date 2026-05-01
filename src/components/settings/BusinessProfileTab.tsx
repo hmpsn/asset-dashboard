@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Building2, Phone, Mail, MapPin, Link2, Clock, Save } from 'lucide-react';
 import { put } from '../../api/client';
 import { SectionCard, Icon, Button } from '../ui';
+import { useDeepLinkFocus } from '../../hooks/useDeepLinkFocus';
+import { adminPath } from '../../routes';
 
 interface BusinessProfile {
   phone?: string;
@@ -22,11 +25,74 @@ interface BusinessProfile {
 interface BusinessProfileTabProps {
   workspaceId: string;
   businessProfile?: BusinessProfile | null;
+  businessContext?: string;
+  brandLogoUrl?: string;
+  siteHasSearch?: boolean;
   toast: (msg: string, type?: 'success' | 'error' | 'info') => void;
   onSave: (profile: BusinessProfile) => void;
 }
 
-export function BusinessProfileTab({ workspaceId, businessProfile, toast, onSave }: BusinessProfileTabProps) {
+function SchemaImpactRow({
+  field,
+  filled,
+  hint,
+  target,
+  scrollTo,
+  workspaceId,
+}: {
+  field: string;
+  filled: boolean;
+  hint: string | null;
+  target?: { tab: string; focus: string };
+  scrollTo?: string;
+  workspaceId: string;
+}) {
+  const linkTarget = target ? `${adminPath(workspaceId, 'workspace-settings')}?tab=${target.tab}&focus=${target.focus}` : null;
+  const handleScroll = scrollTo
+    ? () => {
+        const el = document.querySelector<HTMLElement>(`[data-schema-deeplink="${scrollTo}"]`);
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const focusable = el?.querySelector<HTMLInputElement>('input, textarea, select') ?? (el instanceof HTMLInputElement ? el : null);
+        focusable?.focus({ preventScroll: true });
+      }
+    : null;
+
+  return (
+    <div className="flex items-center justify-between gap-3 py-1.5">
+      <div className="flex items-center gap-2 min-w-0 flex-1">
+        {filled ? (
+          <span aria-hidden="true" className="text-emerald-400 text-sm shrink-0">✓</span>
+        ) : (
+          <span aria-hidden="true" className="text-amber-400 text-sm shrink-0">✗</span>
+        )}
+        <span className="t-body text-[var(--brand-text)] truncate">
+          <span className="sr-only">{filled ? 'Filled: ' : 'Missing: '}</span>{field}
+        </span>
+        {hint && <span className="t-caption-sm text-[var(--brand-text-muted)] truncate">{hint}</span>}
+      </div>
+      {linkTarget && (
+        <Link
+          to={linkTarget}
+          className="t-caption text-[var(--brand-text-bright)] hover:underline shrink-0"
+        >
+          Edit →
+        </Link>
+      )}
+      {handleScroll && (
+        <button
+          type="button"
+          onClick={handleScroll}
+          className="t-caption text-[var(--brand-text-bright)] hover:underline shrink-0"
+        >
+          Jump to →
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function BusinessProfileTab({ workspaceId, businessProfile, businessContext, brandLogoUrl, siteHasSearch, toast, onSave }: BusinessProfileTabProps) {
+  useDeepLinkFocus();
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<BusinessProfile>({
     phone: businessProfile?.phone || '',
@@ -44,6 +110,13 @@ export function BusinessProfileTab({ workspaceId, businessProfile, toast, onSave
     numberOfEmployees: businessProfile?.numberOfEmployees || '',
   });
   const [socialInput, setSocialInput] = useState('');
+
+  const isMissingCriticalFields = !businessProfile?.phone &&
+    !businessProfile?.address?.street &&
+    !businessProfile?.email;
+
+  const isLocalBusinessContext = /\b(dental|dentist|clinic|medical|attorney|accountant|restaurant|retail|salon|spa|plumber|electrician|contractor)\b/i
+    .test(businessContext || '');
 
   // Re-initialize form if businessProfile prop arrives after mount (ws loads async)
   useEffect(() => {
@@ -120,6 +193,67 @@ export function BusinessProfileTab({ workspaceId, businessProfile, toast, onSave
 
   return (
     <div className="space-y-8">
+      <SectionCard title="Schema impact" className="mb-6">
+        <p className="t-caption-sm text-[var(--brand-text-muted)] mb-3">
+          These fields shape how Google understands your business in search.
+        </p>
+        <div className="space-y-2">
+          <SchemaImpactRow
+            field="Brand logo"
+            filled={!!brandLogoUrl}
+            target={{ tab: 'features', focus: 'brandLogoUrl' }}
+            hint={brandLogoUrl ? null : 'Upload in Settings · Features'}
+            workspaceId={workspaceId}
+          />
+          <SchemaImpactRow
+            field="Address"
+            filled={!!(businessProfile?.address?.city || businessProfile?.address?.state)}
+            scrollTo="address"
+            hint={businessProfile?.address?.city ? null : 'Enables Service.areaServed for local SEO'}
+            workspaceId={workspaceId}
+          />
+          <SchemaImpactRow
+            field="Phone"
+            filled={!!businessProfile?.phone}
+            scrollTo="phone"
+            hint={businessProfile?.phone ? null : 'Required for LocalBusiness rich snippet'}
+            workspaceId={workspaceId}
+          />
+          <SchemaImpactRow
+            field="Social profiles"
+            filled={!!(businessProfile?.socialProfiles?.length)}
+            scrollTo="socialProfiles"
+            hint={businessProfile?.socialProfiles?.length ? null : 'Populates Organization.sameAs'}
+            workspaceId={workspaceId}
+          />
+          <SchemaImpactRow
+            field="Founded date"
+            filled={!!businessProfile?.foundedDate}
+            scrollTo="foundedDate"
+            hint={businessProfile?.foundedDate ? null : 'Populates Organization.foundedDate'}
+            workspaceId={workspaceId}
+          />
+          <SchemaImpactRow
+            field="Site search endpoint"
+            filled={!!siteHasSearch}
+            target={{ tab: 'features', focus: 'siteHasSearch' }}
+            hint={siteHasSearch ? null : 'Toggle on in Settings · Features when search is wired'}
+            workspaceId={workspaceId}
+          />
+        </div>
+      </SectionCard>
+
+      {isMissingCriticalFields && isLocalBusinessContext && (
+        <div className="rounded-[var(--radius-lg)] border border-amber-500/30 bg-amber-500/10 p-4 mb-6">
+          <p className="t-body text-amber-400 font-medium mb-1">Business profile incomplete</p>
+          <p className="t-caption text-[var(--brand-text-muted)]">
+            Schema generation for local businesses uses your verified business profile to populate
+            phone, address, and hours — bypassing the need for this data to appear on each page.
+            Add at least one contact field to improve schema accuracy.
+          </p>
+        </div>
+      )}
+
       {/* Header */}
       <SectionCard noPadding>
         <div className="px-5 py-4 flex items-center gap-3 border-b border-[var(--brand-border)]">
@@ -149,6 +283,7 @@ export function BusinessProfileTab({ workspaceId, businessProfile, toast, onSave
                   placeholder="+1-555-123-4567"
                   value={form.phone || ''}
                   onChange={e => update('phone', e.target.value)}
+                  data-schema-deeplink="phone"
                 />
               </div>
               <div>
@@ -167,7 +302,7 @@ export function BusinessProfileTab({ workspaceId, businessProfile, toast, onSave
           </div>
 
           {/* Address */}
-          <div>
+          <div data-schema-deeplink="address">
             <h4 className="t-caption-sm font-semibold text-[var(--brand-text)] uppercase tracking-wider mb-3">
               <span className="inline-flex items-center gap-1"><Icon as={MapPin} size="sm" /> Address</span>
             </h4>
@@ -223,7 +358,7 @@ export function BusinessProfileTab({ workspaceId, businessProfile, toast, onSave
           </div>
 
           {/* Social Profiles */}
-          <div>
+          <div data-schema-deeplink="socialProfiles">
             <h4 className="t-caption-sm font-semibold text-[var(--brand-text)] uppercase tracking-wider mb-3">
               <span className="inline-flex items-center gap-1"><Icon as={Link2} size="sm" /> Social / External Profiles</span>
             </h4>
@@ -280,6 +415,7 @@ export function BusinessProfileTab({ workspaceId, businessProfile, toast, onSave
                 <div>
                   <label className={labelClass}>Founded</label>
                   <input
+                    data-schema-deeplink="foundedDate"
                     className={fieldClass}
                     placeholder="2015"
                     value={form.foundedDate || ''}

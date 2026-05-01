@@ -16,6 +16,8 @@ import { InsightsDigest } from './InsightsDigest';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { QUICK_QUESTIONS, LEARN_SEO_QUESTIONS } from './types';
 import { clientPath } from '../../routes';
+import { useFeatureFlag } from '../../hooks/useFeatureFlag';
+import { InsightsBriefingPage } from './Briefing/InsightsBriefingPage';
 import { themeColor } from '../ui/constants';
 import type {
   SearchOverview, PerformanceTrend, WorkspaceInfo, AuditSummary, AuditDetail,
@@ -85,6 +87,39 @@ export function OverviewTab({
   const navigate = useNavigate();
   const betaMode = useBetaMode();
   const { data: clientIntel } = useClientIntelligence(workspaceId);
+
+  // ── client-briefing-v2 magazine layout (Phase 2) ─────────────────────────
+  // When the flag is on, replace the entire overview body with the
+  // <InsightsBriefingPage> composer. Routes / props remain identical so the
+  // flag can be flipped per-workspace without touching anything below this
+  // block. When OFF (default), the original overview body renders unchanged.
+  const briefingV2Enabled = useFeatureFlag('client-briefing-v2');
+  if (briefingV2Enabled) {
+    const briefReviews = contentRequests.filter(r => r.status === 'client_review').length;
+    const postReviews = contentRequests.filter(r => r.status === 'post_review').length;
+    const effectiveTier: Tier = (betaMode ? 'premium' : (ws.tier as Tier)) || 'free';
+    // Wrap in ErrorBoundary to match the rest of OverviewTab's section-level
+    // resilience: a hook failure inside InsightsBriefingPage (GA4/GSC/audit)
+    // shouldn't bring down the whole client portal.
+    return (
+      <ErrorBoundary>
+        <InsightsBriefingPage
+          workspaceId={workspaceId}
+          effectiveTier={effectiveTier}
+          betaMode={betaMode}
+          actionCounts={{
+            approvals: pendingApprovals,
+            briefs: briefReviews,
+            posts: postReviews,
+            replies: unreadTeamNotes,
+            contentPlan: contentPlanSummary?.reviewCells ?? 0,
+          }}
+        />
+      </ErrorBoundary>
+    );
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   // Derive a dynamic subtitle from the most significant data signal
   const dynamicSubtitle = (() => {
     if (ga4Comparison) {

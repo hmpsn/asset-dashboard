@@ -5,7 +5,7 @@ import { runSeoAudit } from './seo-audit.js';
 import { saveSnapshot, getLatestSnapshotBefore } from './reports.js';
 import { addActivity } from './activity-log.js';
 import { notifyAuditAlert, notifyClientAuditComplete } from './email.js';
-import { applySuppressionsToAudit } from './helpers.js';
+import { applySuppressionsToAudit, toAuditFindingPageId } from './helpers.js';
 import { createLogger } from './logger.js';
 import { fireBridge } from './bridge-infrastructure.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
@@ -155,7 +155,7 @@ async function runScheduledAudit(schedule: AuditSchedule) {
       const pagesWithIssues = new Set<string>();
       for (const page of effectiveAudit.pages) {
         if (page.issues?.some(i => i.severity === 'error' || i.severity === 'warning')) {
-          pagesWithIssues.add(page.pageId);
+          pagesWithIssues.add(toAuditFindingPageId(page));
         }
       }
 
@@ -201,7 +201,7 @@ async function runScheduledAudit(schedule: AuditSchedule) {
         // and applies stored deltas on top. Mirror: Bridge #15. If the delta math changes,
         // replicate in both bridges. upsertInsight replaces `data` on conflict, so we
         // must read-before-write to avoid clobbering cross-bridge adjustments.
-        const existing = getInsight(ws.id, page.pageId, 'audit_finding');
+        const existing = getInsight(ws.id, toAuditFindingPageId(page), 'audit_finding');
         const prevAdj = existing?.data._scoreAdjustments as Record<string, number> | undefined;
         const totalDelta = prevAdj
           ? Object.values(prevAdj).reduce((s, d) => s + (Number.isFinite(d) ? d : 0), 0)
@@ -218,7 +218,7 @@ async function runScheduledAudit(schedule: AuditSchedule) {
         upsertInsight({
           workspaceId: ws.id,
           insightType: 'audit_finding',
-          pageId: page.pageId,
+          pageId: toAuditFindingPageId(page),
           pageTitle: page.page,
           severity: pageIssues.some(i => i.severity === 'error') ? 'critical' : 'warning',
           data,
@@ -268,6 +268,15 @@ async function runScheduledAudit(schedule: AuditSchedule) {
         });
         return { modified: 1 };
       }
+      return { modified: 0 };
+    });
+
+    // Bridge #16 — briefing-candidate-refresh (T1.15 of Client Insights Briefing v2).
+    // No-op marker: the briefing cron's pre-flight reads `getSchedule().lastRunAt` directly,
+    // so a successful audit completion automatically counts as fresh on the next briefing run.
+    // This bridge fires for symmetry with the other audit bridges and gives us a hook for
+    // future event-driven candidate-pool invalidation (e.g., warm a cache, kick a stream).
+    fireBridge('bridge-briefing-candidate-refresh', ws.id, async () => {
       return { modified: 0 };
     });
 
