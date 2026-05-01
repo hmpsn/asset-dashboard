@@ -13,6 +13,9 @@ import { resolveBaseUrl } from './url-helpers.js';
 import { createAiBudget } from './schema/extractors/page-elements/ai-budget.js';
 import type { AiBudget } from './schema/extractors/page-elements/ai-budget.js';
 import { isFeatureEnabled } from './feature-flags.js';
+import { assembleSiteContext } from './schema/site-context.js';
+import type { SiteContext } from './schema/site-context.js';
+import { getSchemaPlan } from './schema-store.js';
 
 const log = createLogger('schema');
 
@@ -325,6 +328,7 @@ export async function generateSchemaForPage(
   // published at /services/web-design would produce /web-design from slug alone).
   // Fall back to derived path if page list fails or page is not found.
   let publishedPath = isHomepage ? '/' : `/${slug}`;
+  let siteContextForPage: SiteContext | undefined;
   try {
     const wsId = ctx.workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
     if (wsId) {
@@ -333,6 +337,11 @@ export async function generateSchemaForPage(
       if (matched?.publishedPath) {
         publishedPath = matched.publishedPath;
       }
+      siteContextForPage = assembleSiteContext(
+        allPages,
+        baseUrl,
+        getSchemaPlan(siteId)?.canonicalEntities ?? [],
+      );
     }
   } catch { /* page list failure — fall back to derived path */ } // catch-ok
 
@@ -385,6 +394,7 @@ export async function generateSchemaForPage(
       siteHasSearch: ctx._siteHasSearch ?? false, // NEW
     },
     aiBudget, // PR2: thread per-call budget so AI extractors can run within cap
+    siteContext: siteContextForPage, // cross-page hub enrichment
   });
 
   // Surface unused parameters to satisfy TS noUnusedParameters via void casts.
@@ -414,6 +424,10 @@ export async function generateSchemaSuggestions(
 
   const wsId = ctx.workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
   const pages = wsId ? await getWorkspacePages(wsId, siteId) : [];
+
+  const siteContext: SiteContext | undefined = pages.length > 0
+    ? assembleSiteContext(pages, baseUrl, getSchemaPlan(siteId)?.canonicalEntities ?? [])
+    : undefined;
 
   // PR2: ONE shared budget for the entire regenerate-all run (static + CMS loops).
   // Allocates 120 slots when schema-ai-element-classifier is enabled; 0 when off.
@@ -475,6 +489,7 @@ export async function generateSchemaSuggestions(
         siteHasSearch: ctx._siteHasSearch ?? false, // NEW
       },
       aiBudget, // PR2: shared budget — drains across all static pages in this run
+      siteContext, // cross-page hub enrichment
     });
     results.push(leanToSuggestion(lean));
     onProgress?.(results, false, `Processed ${results.length} of ${pages.length} static pages...`);
