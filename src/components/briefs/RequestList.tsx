@@ -24,7 +24,7 @@ export interface RequestListProps {
   getBriefById: (briefId: string) => ContentBrief | undefined;
   onToggleRequestBrief: (reqId: string, briefId: string) => void;
   onGenerateBriefForRequest: (req: ContentTopicRequest) => void;
-  onUpdateRequestStatus: (reqId: string, status: ContentTopicRequest['status'] | undefined, extra?: { deliveryUrl?: string; deliveryNotes?: string; briefId?: string; clientFeedback?: string; serviceType?: 'brief_only' | 'full_post' }) => void;
+  onUpdateRequestStatus: (reqId: string, status: ContentTopicRequest['status'] | undefined, extra?: { deliveryUrl?: string; deliveryNotes?: string; briefId?: string; clientFeedback?: string; serviceType?: 'brief_only' | 'full_post'; upgradedAt?: string }) => void;
   onConfirmDeleteRequest: (req: ContentTopicRequest) => void;
   onSetDeliveringReqId: (reqId: string | null) => void;
   onSetDeliveryUrl: (value: string) => void;
@@ -293,7 +293,7 @@ export function RequestList({
                     const ok = await onGeneratePost(briefId);
                     if (!ok) return;
                     if ((req.serviceType || 'brief_only') === 'brief_only') {
-                      await onUpdateRequestStatus(req.id, undefined, { serviceType: 'full_post' });
+                      await onUpdateRequestStatus(req.id, undefined, { serviceType: 'full_post', upgradedAt: new Date().toISOString() });
                     }
                     // Only advance to in_progress for statuses that allow this transition
                     const canAdvance = ['requested', 'brief_generated', 'client_review', 'changes_requested', 'approved'].includes(req.status);

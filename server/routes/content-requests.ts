@@ -46,6 +46,7 @@ const updateContentRequestSchema = z.object({
   deliveryNotes: z.string().max(5000).optional(),
   briefId: z.string().optional(),
   serviceType: z.enum(['brief_only', 'full_post']).optional(),
+  upgradedAt: z.string().datetime().optional(),
   clientFeedback: z.string().max(2000).optional().or(z.literal('')),
 });
 
@@ -71,7 +72,7 @@ router.get('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('wor
 });
 
 router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('workspaceId'), validate(updateContentRequestSchema), (req, res, next) => {
-  const { status, internalNote, deliveryUrl, deliveryNotes, briefId, serviceType, clientFeedback } = req.body;
+  const { status, internalNote, deliveryUrl, deliveryNotes, briefId, serviceType, upgradedAt, clientFeedback } = req.body;
   // Auto-populate postId when sending to post_review.
   // The state machine has already validated the transition by this point.
   let postIdToSet: string | undefined;
@@ -90,7 +91,7 @@ router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('w
   let updated;
   try {
     updated = updateContentRequest(req.params.workspaceId, req.params.id, {
-      status, internalNote, deliveryUrl, deliveryNotes, briefId, serviceType, clientFeedback,
+      status, internalNote, deliveryUrl, deliveryNotes, briefId, serviceType, upgradedAt, clientFeedback,
       ...(postIdToSet ? { postId: postIdToSet } : {}),
     });
   } catch (err: unknown) {

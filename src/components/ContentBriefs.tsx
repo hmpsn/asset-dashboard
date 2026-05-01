@@ -271,7 +271,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
     }
   };
 
-  const handleUpdateRequestStatus = async (reqId: string, status: ContentTopicRequest['status'] | undefined, extra?: { deliveryUrl?: string; deliveryNotes?: string; briefId?: string; clientFeedback?: string; serviceType?: 'brief_only' | 'full_post' }) => {
+  const handleUpdateRequestStatus = async (reqId: string, status: ContentTopicRequest['status'] | undefined, extra?: { deliveryUrl?: string; deliveryNotes?: string; briefId?: string; clientFeedback?: string; serviceType?: 'brief_only' | 'full_post'; upgradedAt?: string }) => {
     try {
       const body: Record<string, unknown> = { ...extra };
       if (status !== undefined) body.status = status;
