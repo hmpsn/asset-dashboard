@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **102** — 81 error, 21 warn.
+Total rules: **104** — 83 error, 21 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -97,6 +97,8 @@ advisory but tracked.
 | 79 | Raw z-index class (use z-[var(--z-*)] tokens) | error | pattern | `src/` | `z-index-ok` | Ensures z-index values come from the centralized token scale in tokens.css, preventing stacking-context collisions. |
 | 80 | schema-context-direct-read-not-on-allowlist | error | custom | `server/helpers.ts` | — | Schema generation reads from workspace+intelligence data. Trajectory 3 → 1 migration (data/roadmap.json:schema-context-builder-pattern-b-migration) ports legacy direct reads to slice consumption. New direct reads bypass that migration; flag them at PR time. |
 | 81 | HTML-naive word count on rich-text post field | error | pattern | `*.ts, *.tsx` | `html-word-count-ok` | Counting words on rich-text HTML treats `<p>` and `</p>` as words. The dedicated HTML-aware helpers strip tags first. Same root cause as the section.wordCount drift Devin flagged in PR #356. |
+| 82 | schema.org property key foundedDate (should be foundingDate) | error | pattern | `server/schema/templates/` | `schema-property-name-ok` | foundedDate is not a schema.org property. foundingDate is. Caught in PR #406 review where the pre-existing wrong key prevented the newly-extracted semantics.foundingDate from reaching Google. |
+| 83 | Unfiltered staff image URL in schema template (use filterHttpUrls) | error | pattern | `server/schema/templates/` | `staff-image-filter-ok` | s.image is AI-extracted from attacker-controllable page HTML. filterHttpUrls blocks non-http(s) scheme URLs from reaching JSON-LD published to live Webflow pages. Caught in PR #406 review where static.ts missed the fix applied to local-business.ts and service.ts. |
 
 ---
 
