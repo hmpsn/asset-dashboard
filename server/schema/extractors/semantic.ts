@@ -19,7 +19,7 @@ const SOCIAL_DOMAINS = [
 ];
 
 const MAX_TEXT_CHARS = 24_000;
-const ALLOWED_SAME_AS_DOMAINS = new Set(SOCIAL_DOMAINS);
+const ALLOWED_SAME_AS_DOMAINS = new Set(SOCIAL_DOMAINS.filter(d => d !== 'google.com'));
 
 function stripToMainContent(html: string): string {
   const $ = cheerio.load(html);

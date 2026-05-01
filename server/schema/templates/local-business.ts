@@ -149,7 +149,7 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
       ? semantics.accessibility.map(a => ({ '@type': 'LocationFeatureSpecification' as const, 'name': a, 'value': true }))
       : undefined,
     'knowsLanguage': semantics?.languagesSpoken,
-    'currenciesAccepted': semantics?.paymentOptions?.join(', '),
+    'paymentAccepted': semantics?.paymentOptions?.join(', '),
   });
 
   // Emit the same WebSite sitewide entity that buildHomepageSchema does — Google
