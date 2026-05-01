@@ -45,6 +45,8 @@ const updateContentRequestSchema = z.object({
   deliveryUrl: z.string().url().optional().or(z.literal('')),
   deliveryNotes: z.string().max(5000).optional(),
   briefId: z.string().optional(),
+  serviceType: z.enum(['brief_only', 'full_post']).optional(),
+  upgradedAt: z.string().datetime().optional(),
   clientFeedback: z.string().max(2000).optional().or(z.literal('')),
 });
 
@@ -70,7 +72,7 @@ router.get('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('wor
 });
 
 router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('workspaceId'), validate(updateContentRequestSchema), (req, res, next) => {
-  const { status, internalNote, deliveryUrl, deliveryNotes, briefId, clientFeedback } = req.body;
+  const { status, internalNote, deliveryUrl, deliveryNotes, briefId, serviceType, upgradedAt, clientFeedback } = req.body;
   // Auto-populate postId when sending to post_review.
   // The state machine has already validated the transition by this point.
   let postIdToSet: string | undefined;
@@ -89,7 +91,7 @@ router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('w
   let updated;
   try {
     updated = updateContentRequest(req.params.workspaceId, req.params.id, {
-      status, internalNote, deliveryUrl, deliveryNotes, briefId, clientFeedback,
+      status, internalNote, deliveryUrl, deliveryNotes, briefId, serviceType, upgradedAt, clientFeedback,
       ...(postIdToSet ? { postId: postIdToSet } : {}),
     });
   } catch (err: unknown) {
@@ -152,6 +154,10 @@ router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('w
   // Activity log entry for post_review transition
   if (status === 'post_review') {
     addActivity(req.params.workspaceId, 'post_sent_for_review', `Post sent to client for review: "${updated.topic}"`, '', { requestId: updated.id });
+  }
+  // Activity log entry for serviceType upgrade (matches public endpoint behavior)
+  if (serviceType === 'full_post') {
+    addActivity(req.params.workspaceId, 'content_upgraded', `Admin upgraded "${updated.topic}" to full blog post`, '', { requestId: updated.id });
   }
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
   res.json(updated);

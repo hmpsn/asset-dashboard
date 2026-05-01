@@ -24,7 +24,7 @@ export interface RequestListProps {
   getBriefById: (briefId: string) => ContentBrief | undefined;
   onToggleRequestBrief: (reqId: string, briefId: string) => void;
   onGenerateBriefForRequest: (req: ContentTopicRequest) => void;
-  onUpdateRequestStatus: (reqId: string, status: ContentTopicRequest['status'] | undefined, extra?: { deliveryUrl?: string; deliveryNotes?: string; briefId?: string; clientFeedback?: string }) => void;
+  onUpdateRequestStatus: (reqId: string, status: ContentTopicRequest['status'] | undefined, extra?: { deliveryUrl?: string; deliveryNotes?: string; briefId?: string; clientFeedback?: string; serviceType?: 'brief_only' | 'full_post'; upgradedAt?: string }) => void;
   onConfirmDeleteRequest: (req: ContentTopicRequest) => void;
   onSetDeliveringReqId: (reqId: string | null) => void;
   onSetDeliveryUrl: (value: string) => void;
@@ -41,6 +41,7 @@ export interface RequestListProps {
   onRegenerateBrief: (briefId: string, feedback: string, requestId?: string) => void;
   regeneratingOutline?: string | null;
   onRegenerateOutline?: (briefId: string, feedback?: string) => void;
+  sendingToClient?: string | null;
   // Post production (full_post requests after brief approval)
   posts?: RequestPostSummary[];
   generatingPostFor?: string | null;
@@ -78,6 +79,7 @@ export function RequestList({
   onRegenerateBrief,
   regeneratingOutline,
   onRegenerateOutline,
+  sendingToClient = null,
   posts = [],
   generatingPostFor = null,
   onGeneratePost,
@@ -160,35 +162,16 @@ export function RequestList({
                       {req.status === 'post_review' && (
                         <span className="t-caption-sm text-cyan-400/60 italic">Post sent — awaiting client approval</span>
                       )}
-                      {req.status === 'approved' && (req.serviceType || 'brief_only') === 'full_post' && req.briefId && (() => {
+                      {req.briefId && (() => {
                         const existingPost = posts.find(p => p.briefId === req.briefId);
-                        if (existingPost) {
-                          return (
-                            <button
-                              onClick={() => onOpenPost?.(existingPost.id)}
-                              className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors"
-                              title="Open post in editor"
-                            >
-                              <Icon as={PenLine} size="sm" /> Open Post
-                            </button>
-                          );
-                        }
-                        const isGeneratingPost = generatingPostFor === req.briefId;
+                        if (!existingPost) return null;
                         return (
                           <button
-                            onClick={async () => {
-                              if (!req.briefId || !onGeneratePost) return;
-                              // Only advance status to in_progress if generation actually succeeded.
-                              // Otherwise a transient failure would leave the request stuck:
-                              // approved → in_progress with no post and no UI to recover.
-                              const ok = await onGeneratePost(req.briefId);
-                              if (ok) onUpdateRequestStatus(req.id, 'in_progress');
-                            }}
-                            disabled={isGeneratingPost || !onGeneratePost}
-                            className="flex items-center gap-1 px-2 py-1 rounded bg-gradient-to-r from-teal-600/30 to-emerald-600/30 border border-teal-500/40 t-caption-sm text-teal-200 font-medium hover:from-teal-600/50 hover:to-emerald-600/50 transition-all disabled:opacity-50"
+                            onClick={() => onOpenPost?.(existingPost.id)}
+                            className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors"
+                            title="Open post in editor"
                           >
-                            <Icon as={isGeneratingPost ? Loader2 : PenLine} size="sm" className={isGeneratingPost ? 'animate-spin' : ''} />
-                            {isGeneratingPost ? 'Generating…' : 'Generate Post'}
+                            <Icon as={PenLine} size="sm" /> Open Post
                           </button>
                         );
                       })()}
@@ -225,25 +208,15 @@ export function RequestList({
                         const existingPost = posts.find(p => p.briefId === req.briefId);
                         if (!existingPost) return null;
                         const canSendToClient = existingPost.status === 'review' || existingPost.status === 'approved';
+                        if (!canSendToClient) return null;
                         return (
-                          <>
-                            <button
-                              onClick={() => onOpenPost?.(existingPost.id)}
-                              className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors"
-                              title="Open post in editor"
-                            >
-                              <Icon as={PenLine} size="sm" /> Open Post
-                            </button>
-                            {canSendToClient && (
-                              <button
-                                onClick={() => onUpdateRequestStatus(req.id, 'post_review')}
-                                className="flex items-center gap-1 px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 t-caption-sm text-cyan-300 hover:bg-cyan-600/30 transition-colors"
-                                title="Send post to client for review and approval"
-                              >
-                                <Icon as={Send} size="sm" /> Send Post to Client
-                              </button>
-                            )}
-                          </>
+                          <button
+                            onClick={() => onUpdateRequestStatus(req.id, 'post_review')}
+                            className="flex items-center gap-1 px-2 py-1 rounded bg-cyan-600/20 border border-cyan-500/30 t-caption-sm text-cyan-300 hover:bg-cyan-600/30 transition-colors"
+                            title="Send post to client for review and approval"
+                          >
+                            <Icon as={Send} size="sm" /> Send Post to Client
+                          </button>
                         );
                       })()}
                       {req.status === 'in_progress' && deliveringReqId !== req.id && (
@@ -312,10 +285,20 @@ export function RequestList({
                   editingBrief={editingBrief}
                   generatingPostFor={generatingPostFor}
                   regeneratingBrief={regeneratingBrief}
-                  sendingToClient={null}
+                  sendingToClient={sendingToClient ?? null}
                   onSaveBriefField={onSaveBriefField}
                   onSetEditingBrief={onSetEditingBrief}
-                  onGeneratePost={onGeneratePost!}
+                  onGeneratePost={async (briefId) => {
+                    if (!onGeneratePost) return;
+                    const ok = await onGeneratePost(briefId);
+                    if (!ok) return;
+                    if ((req.serviceType || 'brief_only') === 'brief_only') {
+                      await onUpdateRequestStatus(req.id, undefined, { serviceType: 'full_post', upgradedAt: new Date().toISOString() });
+                    }
+                    // Only advance to in_progress for statuses that allow this transition
+                    const canAdvance = ['requested', 'brief_generated', 'client_review', 'changes_requested', 'approved'].includes(req.status);
+                    if (canAdvance) onUpdateRequestStatus(req.id, 'in_progress');
+                  }}
                   onRegenerate={(briefId, feedback) => onRegenerateBrief(briefId, feedback, req.id)}
                   onRegenerateOutline={onRegenerateOutline}
                   regeneratingOutline={regeneratingOutline}
@@ -323,7 +306,7 @@ export function RequestList({
                   onExportClientHTML={onExportClientHTML}
                   onSendToClient={() => {}}
                   onConfirmDelete={() => {}}
-                  hideActions={['sendToClient', 'generatePost', 'delete']}
+                  hideActions={['sendToClient', 'delete']}
                   defaultFeedback={req.status === 'changes_requested' ? req.clientFeedback : undefined}
                   autoShowRegenerate={req.status === 'changes_requested' && !!req.clientFeedback}
                 />

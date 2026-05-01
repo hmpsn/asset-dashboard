@@ -125,6 +125,7 @@ A comprehensive value assessment of every feature in the platform — **310 feat
 - **send-to-client initialStatus (Bug 4)**: Changed from `requested` to `brief_generated` when creating request via send-to-client flow.
 - **Client post view (Bug 5)**: Client can now view post when request is in `changes_requested` status.
 - **postId leak prevention (Bug 6)**: `postId` only exposed to client for brief-only `changes_requested` requests when `serviceType === 'full_post'`.
+- **Generate Post discoverability fix**: "Generate Full Post" button now visible inside the expanded `BriefDetail` for any request status (not just `approved + full_post`). Clicking it auto-upgrades `brief_only` → `full_post` serviceType, generates the post, and advances status to `in_progress`. "Open Post" button moved outside status gates so admins can always access an existing post. Server PATCH endpoint extended to accept `serviceType`. When `changes_requested`, the regen panel auto-opens with client feedback pre-filled.
 - **Double skeleton save (Bug 7)**: `generatePost` checks for existing post before saving initial skeleton.
 - **State machine fix (Bug 8)**: Removed `post_review` from `changes_requested` allowed transitions. "Re-queue for Revision" button transitions to `in_progress` instead.
 - **Email notifications (Bug 9)**: New `content_changes_requested` event type with `notifyTeamChangesRequested` function called from both brief and post change-request endpoints.
