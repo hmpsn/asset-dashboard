@@ -3,16 +3,30 @@
  * Each emits the typed primary node + BreadcrumbList only.
  */
 import type { PageData, BusinessProfile } from '../data-sources.js';
+import type { SemanticPageData } from '../../../shared/types/page-elements.js';
 import { dropUndefined, orgRef, localBusinessRef, withBreadcrumb, webSiteRef, breadcrumbRef } from './helpers.js';
 
 export interface StaticInput {
   baseUrl: string;
   pageData: PageData;
   businessProfile?: BusinessProfile | null;
+  semantics?: SemanticPageData;
 }
 
 export function buildAboutPageSchema(input: StaticInput): Record<string, unknown> {
   const { pageData, baseUrl } = input;
+  const { semantics } = input;
+  const staffNodes: Array<Record<string, unknown>> = (semantics?.staff ?? []).map((s, i) => dropUndefined({
+    '@type': 'Person' as const,
+    '@id': `${pageData.canonicalUrl}#person-${i}`,
+    'name': s.name,
+    'jobTitle': s.jobTitle,
+    'hasCredential': s.credentials,
+    'image': s.image,
+    'worksFor': (input.businessProfile?.address?.street || input.businessProfile?.address?.city)
+      ? localBusinessRef(baseUrl)
+      : orgRef(baseUrl),
+  }));
   const primary = dropUndefined({
     '@type': 'AboutPage',
     '@id': `${pageData.canonicalUrl}#aboutpage`,
@@ -26,11 +40,30 @@ export function buildAboutPageSchema(input: StaticInput): Record<string, unknown
     'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
     'inLanguage': pageData.inLanguage,
   });
-  return withBreadcrumb(primary, pageData);
+  const nodes: Array<Record<string, unknown>> = [primary, ...staffNodes];
+  return withBreadcrumb(nodes, pageData);
 }
 
 export function buildContactPageSchema(input: StaticInput): Record<string, unknown> {
   const { pageData, baseUrl } = input;
+  const { semantics } = input;
+  const phone = semantics?.phone || input.businessProfile?.phone;
+  const email = semantics?.email || input.businessProfile?.email;
+  const semanticsAddress = semantics?.address ? {
+    '@type': 'PostalAddress' as const,
+    'streetAddress': semantics.address.street,
+    'addressLocality': semantics.address.city,
+    'addressRegion': semantics.address.state,
+    'postalCode': semantics.address.postalCode,
+  } : undefined;
+  const openingHoursSpec = semantics?.hours?.length
+    ? semantics.hours.map(h => dropUndefined({
+        '@type': 'OpeningHoursSpecification' as const,
+        'dayOfWeek': h.dayOfWeek,
+        'opens': h.opens,
+        'closes': h.closes,
+      }))
+    : undefined;
   const primary = dropUndefined({
     '@type': 'ContactPage',
     '@id': `${pageData.canonicalUrl}#contactpage`,
@@ -45,6 +78,10 @@ export function buildContactPageSchema(input: StaticInput): Record<string, unkno
     'isPartOf': webSiteRef(baseUrl),
     'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
     'inLanguage': pageData.inLanguage,
+    'telephone': phone,
+    'email': email,
+    'address': semanticsAddress,
+    'openingHoursSpecification': openingHoursSpec,
   });
   return withBreadcrumb(primary, pageData);
 }
