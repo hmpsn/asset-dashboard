@@ -59,6 +59,7 @@ import { WS_EVENTS } from '../ws-events.js';
 import { requireWorkspaceAccess } from '../auth.js';
 import { filterDeclinedFromPool, matchesQuestionKeyword } from '../strategy-filters.js';
 import { MAX_COMPETITORS } from '../constants.js';
+import { filterDiscoveredCompetitors } from '../competitor-domain-filter.js';
 
 const log = createLogger('keyword-strategy');
 
@@ -787,8 +788,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
           try {
             sendProgress('semrush', 'Auto-discovering organic competitors...', 0.57);
             const discovered = await provider.getCompetitors(siteDomain, ws.id, 5);
-            const autoCompetitors = discovered
-              .filter(c => !c.domain.includes(siteDomain) && !siteDomain.includes(c.domain))
+            const autoCompetitors = filterDiscoveredCompetitors(discovered, siteDomain)
               .slice(0, MAX_COMPETITORS)
               .map(c => c.domain);
             if (autoCompetitors.length > 0) {
