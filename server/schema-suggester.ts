@@ -425,7 +425,7 @@ export async function generateSchemaSuggestions(
   const wsId = ctx.workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
   const pages = wsId ? await getWorkspacePages(wsId, siteId) : [];
 
-  const siteContext: SiteContext | undefined = pages.length > 0
+  let siteContext: SiteContext | undefined = pages.length > 0
     ? assembleSiteContext(pages, baseUrl, getSchemaPlan(siteId)?.canonicalEntities ?? [])
     : undefined;
 
