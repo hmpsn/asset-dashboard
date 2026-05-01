@@ -261,14 +261,11 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         if (draftData) {
           const draft = JSON.parse(draftData);
           // Only use draft if it's newer than the current Webflow data
-          const draftDate = new Date(draft.savedAt);
-          const lastModified = new Date(); // We don't have page last modified, so use draft if it exists
-          if (draftDate <= lastModified) {
-            // Sanitize: JSON.parse can return null for fields that were stored as null
-            seoTitle = draft.seoTitle ?? seoTitle;
-            seoDescription = draft.seoDescription ?? seoDescription;
-            dirty = true; // Mark as dirty since it differs from Webflow
-          }
+          // Apply persisted draft (we don't have page lastModified from Webflow yet)
+          // Sanitize: JSON.parse can return null for fields that were stored as null
+          seoTitle = draft.seoTitle ?? seoTitle;
+          seoDescription = draft.seoDescription ?? seoDescription;
+          dirty = true;
         }
       } catch (err) {
         console.warn('Failed to load draft for page', p.id, err);
