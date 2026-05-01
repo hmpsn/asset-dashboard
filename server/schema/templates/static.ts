@@ -49,14 +49,14 @@ export function buildContactPageSchema(input: StaticInput): Record<string, unkno
   const { semantics } = input;
   const phone = semantics?.phone || input.businessProfile?.phone;
   const email = semantics?.email || input.businessProfile?.email;
-  const semanticsAddress = semantics?.address ? {
+  const semanticsAddress = semantics?.address ? dropUndefined({
     '@type': 'PostalAddress' as const,
     'streetAddress': semantics.address.street,
     'addressLocality': semantics.address.city,
     'addressRegion': semantics.address.state,
     'postalCode': semantics.address.postalCode,
     'addressCountry': semantics.address.country,
-  } : undefined;
+  }) : undefined;
   const openingHoursSpec = semantics?.hours?.length
     ? semantics.hours.map(h => dropUndefined({
         '@type': 'OpeningHoursSpecification' as const,

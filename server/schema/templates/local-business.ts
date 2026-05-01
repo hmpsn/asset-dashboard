@@ -26,14 +26,14 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
   const phone = semantics?.phone || businessProfile?.phone;
   const email = semantics?.email || businessProfile?.email;
 
-  const semanticsAddress = semantics?.address ? {
+  const semanticsAddress = semantics?.address ? dropUndefined({
     '@type': 'PostalAddress' as const,
     'streetAddress': semantics.address.street,
     'addressLocality': semantics.address.city,
     'addressRegion': semantics.address.state,
     'postalCode': semantics.address.postalCode,
     'addressCountry': semantics.address.country,
-  } : undefined;
+  }) : undefined;
 
   const openingHoursSpec = semantics?.hours?.length
     ? semantics.hours.map(h => dropUndefined({
