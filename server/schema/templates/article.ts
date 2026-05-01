@@ -30,14 +30,14 @@ export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Reco
       }
     : { '@type': 'Organization', 'name': pageData.publisher.name };
 
+  const articleImages = filterHttpUrls([semantics?.primaryImage ?? '', pageData.image ?? '']);
+
   const primary = dropUndefined({
     '@type': kind,
     '@id': `${pageData.canonicalUrl}#article`,
     'headline': pageData.cleanTitle,
     'description': pageData.description,
-    'image': filterHttpUrls([semantics?.primaryImage ?? '', pageData.image ?? '']).length > 0
-      ? filterHttpUrls([semantics?.primaryImage ?? '', pageData.image ?? ''])
-      : undefined,
+    'image': articleImages.length > 0 ? articleImages : undefined,
     'url': pageData.canonicalUrl,
     'datePublished': pageData.datePublished,
     'dateModified': pageData.dateModified || pageData.datePublished,

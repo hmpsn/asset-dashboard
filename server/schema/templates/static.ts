@@ -4,7 +4,7 @@
  */
 import type { PageData, BusinessProfile } from '../data-sources.js';
 import type { SemanticPageData } from '../../../shared/types/page-elements.js';
-import { dropUndefined, orgRef, localBusinessRef, withBreadcrumb, webSiteRef, breadcrumbRef } from './helpers.js';
+import { dropUndefined, orgRef, localBusinessRef, withBreadcrumb, webSiteRef, breadcrumbRef, filterHttpUrls } from './helpers.js';
 
 export interface StaticInput {
   baseUrl: string;
@@ -22,7 +22,7 @@ export function buildAboutPageSchema(input: StaticInput): Record<string, unknown
     'name': s.name,
     'jobTitle': s.jobTitle,
     'hasCredential': s.credentials,
-    'image': s.image,
+    'image': filterHttpUrls([s.image ?? ''])[0],
     'worksFor': (input.businessProfile?.address?.street || input.businessProfile?.address?.city)
       ? localBusinessRef(baseUrl)
       : orgRef(baseUrl),

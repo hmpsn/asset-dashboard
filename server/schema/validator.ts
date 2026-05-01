@@ -594,8 +594,9 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
         }
       }
     } else if (!DEDICATED_VALIDATOR_TYPES.has(t)) {
-      // Unknown type: structural validation only — always emit warning to surface uncertainty
-      const hasContext = node['@context'] === 'https://schema.org';
+      // Unknown type: structural validation only — always emit warning to surface uncertainty.
+      // @context is NOT checked here: in @graph output, @context lives on the wrapper object,
+      // not on individual nodes, so node['@context'] is always undefined for valid schemas.
       const hasType = typeof node['@type'] === 'string' && node['@type'].length > 0;
       let hasId = false;
       try {
@@ -610,7 +611,6 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
         type: t,
         ruleId: 'unverified-type',
         message: `${t}: unverified schema.org type — structural check only. Issues: ${[
-          !hasContext && '@context not "https://schema.org"',
           !hasType && 'missing @type',
           !hasId && '@id not a valid URL',
           hasEmptyValues && 'empty string or array values',
