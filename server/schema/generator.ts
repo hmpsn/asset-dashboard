@@ -30,6 +30,7 @@ import { validateLeanSchema } from './validator.js';
 import { checkRichResultsEligibility } from './rich-results.js';
 import type { RichResultEligibility } from './rich-results.js';
 import type { ValidationFinding } from '../../shared/types/schema-validation.js';
+import type { SiteContext } from './site-context.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('schema/generator');
@@ -64,6 +65,12 @@ export interface LeanGeneratorInput {
   existingSchemas?: string[];
   /** Per-regenerate AI budget passed by the schema-suggester orchestrator. PR1 always zero. */
   aiBudget?: AiBudget;
+  /**
+   * Optional cross-page context assembled once per regenerate-all run.
+   * When absent, generator behaves exactly as before (no hub enrichment).
+   * Workstream D will extend SiteContext with role/exclusion fields.
+   */
+  siteContext?: SiteContext;
 }
 
 function detectExistingSchemas(html: string): string[] {
