@@ -15,7 +15,7 @@ interface BriefDetailProps {
   sendingToClient: string | null;
   onSaveBriefField: (briefId: string, updates: Partial<ContentBrief>) => void;
   onSetEditingBrief: (id: string | null) => void;
-  onGeneratePost: (briefId: string) => void;
+  onGeneratePost: (briefId: string) => void | Promise<void>;
   onRegenerate: (briefId: string, feedback: string) => void;
   onRegenerateOutline?: (briefId: string, feedback?: string) => void;
   regeneratingOutline?: string | null;
