@@ -4141,3 +4141,29 @@ Current feature count: **310**. Last updated: April 2026.
 - ✅ typecheck + 109 briefing tests pass
 
 **Files added:** `src/components/client/Briefing/WeeklyOpener.tsx`; `tests/unit/briefing-prompt-ai-polish.test.ts`. **Files modified:** `shared/types/feature-flags.ts`; `shared/types/briefing.ts`; `server/briefing-store.ts`; `server/briefing-prompt.ts`; `server/briefing-cron.ts`; `server/routes/public-portal.ts`; `src/components/client/Briefing/InsightsBriefingPage.tsx`.
+
+
+### 327. SEO Editor Bug Sweep — Generate Both, Fuzzy Path Matching, Dead Code (PR #400)
+**What it does:** Fixes 10 bugs across the SEO Editor workflow in two categories: (A) CMS Editor "Generate Both" feature + related UI bugs, and (B) platform-wide fuzzy string matching where `.includes()` / `.endsWith()` was used for path/URL comparison instead of exact matching via `normalizePath()`.
+
+**Category A — CMS Editor (3 bugs):**
+- **Bug 1 (Generate Both):** Added `aiRewriteBoth()` function that sends `field: 'both'` to `/api/webflow/seo-rewrite` and receives paired title+description variations. Extended `variations` state type with `descOptions?: string[]`. Updated `bulkAiRewrite('all')` to call `aiRewriteBoth` when both title and description fields exist. Added paired variation picker UI — selectable cards with blue "Title" (`bg-blue-500/10 text-blue-400`) and purple "Desc" (`bg-purple-500/10 text-purple-400`) labels with `<CharacterCounter>` per field. Individual AI buttons disabled during "both" generation.
+- **Bug 3 (AI context):** `aiRewrite` now always sends both `currentSeoTitle` and `currentDescription` to the server regardless of which field triggered the rewrite, so the AI has full context.
+- **Bug 10 (Draft loading):** Removed dead `draftDate <= lastModified` condition in `SeoEditor.tsx` — `lastModified` was always `new Date()`, making the condition always true. Draft now applies unconditionally.
+
+**Category B — Fuzzy Path Matching (4 bugs):**
+All replaced `.includes()` / `.endsWith()` with `normalizePath()` + exact comparison, using `new URL().pathname` for GSC full URLs.
+- **Bug 4:** Single-page GSC query matching in `webflow-seo.ts` — uses `matchGscUrlToPath()`.
+- **Bug 6:** Audit page matching in `webflow-seo.ts` — extracted `matchesAuditPage()` helper with `normalizePath(new URL(p.url).pathname)`.
+- **Bug 8:** `matchPage()` in `seo-change-tracker.ts` — parses GSC URL pathname for exact comparison, falls back to `endsWith` only for malformed URLs.
+- **Bug 9:** Admin chat page audit lookup in `admin-chat-context.ts` — `normalizePath(resolvePagePath(p))` with case-insensitive exact match.
+
+**Bugs 2, 5, 7 were already fixed on staging** — verified by code inspection.
+
+**Agency value:** Accurate per-page GSC data, audit findings, and AI context. No more false matches where short slugs like `/seo` matched every URL containing that substring.
+
+**Client value:** N/A — admin-only fixes. Indirectly improves AI suggestion quality.
+
+**Mutual:** Eliminates a class of data-integrity bugs that caused incorrect keyword/traffic attribution across all SEO tools.
+
+**Files modified:** `src/components/CmsEditor.tsx` (bugs 1, 3); `src/components/SeoEditor.tsx` (bug 10); `server/routes/webflow-seo.ts` (bugs 4, 6); `server/seo-change-tracker.ts` (bug 8); `server/admin-chat-context.ts` (bug 9); `tests/admin-chat-path-matching.test.ts` (updated assertions).

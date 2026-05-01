@@ -260,7 +260,6 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         const draftData = localStorage.getItem(draftKey);
         if (draftData) {
           const draft = JSON.parse(draftData);
-          // Only use draft if it's newer than the current Webflow data
           // Apply persisted draft (we don't have page lastModified from Webflow yet)
           // Sanitize: JSON.parse can return null for fields that were stored as null
           seoTitle = draft.seoTitle ?? seoTitle;
