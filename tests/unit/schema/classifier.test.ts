@@ -59,6 +59,19 @@ describe('classifyPage', () => {
     expect(classifyPage(`${BASE}/blog/post/`, BASE).kind).toBe('BlogPosting');
   });
 
+  it('classifies /location/* paths as Location', () => {
+    expect(classifyPage(`${BASE}/location/downtown`, BASE).kind).toBe('Location');
+    expect(classifyPage(`${BASE}/location/cedar-park`, BASE).kind).toBe('Location');
+    expect(classifyPage(`${BASE}/locations/main-street`, BASE).kind).toBe('Location');
+    expect(classifyPage(`${BASE}/office/suite-100`, BASE).kind).toBe('Location');
+    expect(classifyPage(`${BASE}/studio/east-austin`, BASE).kind).toBe('Location');
+    expect(classifyPage(`${BASE}/clinic/north`, BASE).kind).toBe('Location');
+  });
+
+  it('Location pages have LocalBusiness primaryType', () => {
+    expect(classifyPage(`${BASE}/location/downtown`, BASE).primaryType).toBe('LocalBusiness');
+  });
+
   it('falls back to WebPage for unknown patterns', () => {
     expect(classifyPage(`${BASE}/random/deep/path`, BASE).kind).toBe('WebPage');
   });

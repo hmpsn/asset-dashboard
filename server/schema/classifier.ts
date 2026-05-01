@@ -16,6 +16,7 @@ export type PageKind =
   | 'CaseStudyIndex'
   | 'AboutPage'
   | 'ContactPage'
+  | 'Location'
   | 'Legal'
   | 'WebPage';
 
@@ -88,6 +89,11 @@ export function classifyPage(url: string, baseUrl: string, opts: ClassifyOpts = 
   }
   if (/^\/(our-work|case-stud(y|ies)|portfolio|projects?|work)$/.test(path)) {
     return { kind: 'CaseStudyIndex', primaryType: 'CollectionPage', pagePath: path };
+  }
+
+  // Location detail pages (dental/medical/retail chains with per-location pages)
+  if (/^\/(locations?|branches?|offices?|clinics?|studios?|stores?)\/.+/.test(path)) {
+    return { kind: 'Location', primaryType: 'LocalBusiness', pagePath: path };
   }
 
   return { kind: 'WebPage', primaryType: 'WebPage', pagePath: path };
