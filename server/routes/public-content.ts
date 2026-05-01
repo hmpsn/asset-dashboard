@@ -16,7 +16,7 @@ import {
   updateContentRequest,
   addComment,
 } from '../content-requests.js';
-import { notifyTeamContentRequest } from '../email.js';
+import { notifyTeamContentRequest, notifyTeamChangesRequested } from '../email.js';
 import { getPost, updatePostField, snapshotPostVersion, getMostRecentPostVersion } from '../content-posts.js';
 import { sanitizeString, validateEnum } from '../helpers.js';
 import { sanitizeRichText, sanitizePlainText } from '../html-sanitize.js';
@@ -158,7 +158,7 @@ router.get('/api/public/content-requests/:workspaceId', (req, res) => {
     // Include briefId only when in client_review or later
     briefId: ['client_review', 'approved', 'changes_requested', 'in_progress', 'delivered', 'published'].includes(r.status) ? r.briefId : undefined,
     // Include postId only when post is ready for client review or beyond
-    postId: ['post_review', 'changes_requested', 'delivered', 'published'].includes(r.status) ? r.postId : undefined,
+    postId: ['post_review', 'delivered', 'published'].includes(r.status) || (r.status === 'changes_requested' && r.serviceType === 'full_post') ? r.postId : undefined,
     clientFeedback: r.clientFeedback,
   })));
 });
@@ -246,15 +246,31 @@ router.post('/api/public/content-request/:workspaceId/:id/request-changes', vali
   const actor = getClientActor(req, req.params.workspaceId);
   addActivity(req.params.workspaceId, 'changes_requested', `${actor?.name || 'Client'} requested changes on "${updated.topic}"`, feedback || '', { requestId: updated.id }, actor);
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
+  const wsInfo = getWorkspace(req.params.workspaceId);
+  notifyTeamChangesRequested({
+    workspaceName: wsInfo?.name || req.params.workspaceId,
+    workspaceId: req.params.workspaceId,
+    topic: updated.topic,
+    targetKeyword: updated.targetKeyword,
+    feedback: feedback || '',
+  });
   res.json(updated);
 });
 
 // Client upgrades from brief_only to full_post
-router.post('/api/public/content-request/:workspaceId/:id/upgrade', validate(upgradeContentRequestSchema), (req, res) => {
-  const updated = updateContentRequest(req.params.workspaceId, req.params.id, {
-    serviceType: 'full_post',
-    upgradedAt: new Date().toISOString(),
-  });
+router.post('/api/public/content-request/:workspaceId/:id/upgrade', validate(upgradeContentRequestSchema), (req, res, next) => {
+  let updated;
+  try {
+    updated = updateContentRequest(req.params.workspaceId, req.params.id, {
+      serviceType: 'full_post',
+      upgradedAt: new Date().toISOString(),
+    });
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'InvalidTransitionError') {
+      return res.status(400).json({ error: err.message });
+    }
+    return next(err);
+  }
   if (!updated) return res.status(404).json({ error: 'Request not found' });
   const actor = getClientActor(req, req.params.workspaceId);
   addActivity(req.params.workspaceId, 'content_upgraded', `${actor?.name || 'Client'} upgraded "${updated.topic}" to full blog post`, '', { requestId: updated.id }, actor);
@@ -433,7 +449,7 @@ router.get('/api/public/content-posts/:workspaceId/:postId', (req, res) => {
   // Verify the associated request is in post_review (or delivered for read-only view)
   const requests = listContentRequests(req.params.workspaceId);
   const req_ = requests.find(r => r.briefId === post.briefId);
-  if (!req_ || !['post_review', 'delivered', 'published'].includes(req_.status)) {
+  if (!req_ || !['post_review', 'changes_requested', 'delivered', 'published'].includes(req_.status)) {
     return res.status(403).json({ error: 'Post is not available for client review' });
   }
 
@@ -491,6 +507,14 @@ router.post('/api/public/content-request/:workspaceId/:id/request-post-changes',
   const actor = getClientActor(req, req.params.workspaceId);
   addActivity(req.params.workspaceId, 'post_changes_requested', `${actor?.name || 'Client'} requested changes on post for "${updated.topic}"`, feedback || '', { requestId: updated.id }, actor);
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
+  const wsInfo = getWorkspace(req.params.workspaceId);
+  notifyTeamChangesRequested({
+    workspaceName: wsInfo?.name || req.params.workspaceId,
+    workspaceId: req.params.workspaceId,
+    topic: updated.topic,
+    targetKeyword: updated.targetKeyword,
+    feedback: feedback || '',
+  });
   res.json(updated);
 });
 

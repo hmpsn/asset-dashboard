@@ -5,40 +5,7 @@ import {
   Pencil, Check, PenLine, RefreshCw, Send,
 } from 'lucide-react';
 import { Icon } from '../ui';
-
-interface ContentBrief {
-  id: string;
-  workspaceId: string;
-  targetKeyword: string;
-  secondaryKeywords: string[];
-  suggestedTitle: string;
-  suggestedMetaDesc: string;
-  outline: { heading: string; notes: string; wordCount?: number; keywords?: string[] }[];
-  wordCountTarget: number;
-  intent: string;
-  audience: string;
-  competitorInsights: string;
-  internalLinkSuggestions: string[];
-  createdAt: string;
-  executiveSummary?: string;
-  contentFormat?: string;
-  toneAndStyle?: string;
-  peopleAlsoAsk?: string[];
-  topicalEntities?: string[];
-  serpAnalysis?: { contentType: string; avgWordCount: number; commonElements: string[]; gaps: string[] };
-  difficultyScore?: number;
-  trafficPotential?: string;
-  ctaRecommendations?: string[];
-  eeatGuidance?: { experience: string; expertise: string; authority: string; trust: string };
-  contentChecklist?: string[];
-  schemaRecommendations?: { type: string; notes: string }[];
-  pageType?: string;
-  referenceUrls?: string[];
-  realPeopleAlsoAsk?: string[];
-  realTopResults?: { position: number; title: string; url: string }[];
-  titleVariants?: string[];
-  metaDescVariants?: string[];
-}
+import type { ContentBrief } from '../../../shared/types/content';
 
 interface BriefDetailProps {
   brief: ContentBrief;
@@ -56,6 +23,9 @@ interface BriefDetailProps {
   onExportClientHTML: (brief: ContentBrief) => void;
   onSendToClient: (brief: ContentBrief) => void;
   onConfirmDelete: (brief: ContentBrief) => void;
+  hideActions?: ('sendToClient' | 'generatePost' | 'delete')[];
+  defaultFeedback?: string;
+  autoShowRegenerate?: boolean;
 }
 
 export function BriefDetail({
@@ -63,9 +33,10 @@ export function BriefDetail({
   onSaveBriefField, onSetEditingBrief, onGeneratePost, onRegenerate,
   onRegenerateOutline, regeneratingOutline,
   onCopyAsMarkdown, onExportClientHTML, onSendToClient, onConfirmDelete,
+  hideActions, defaultFeedback, autoShowRegenerate,
 }: BriefDetailProps) {
-  const [showRegenerate, setShowRegenerate] = useState(false);
-  const [regenFeedback, setRegenFeedback] = useState('');
+  const [showRegenerate, setShowRegenerate] = useState(autoShowRegenerate ?? false);
+  const [regenFeedback, setRegenFeedback] = useState(defaultFeedback ?? '');
   const [showOutlineRegen, setShowOutlineRegen] = useState(false);
   const [outlineRegenFeedback, setOutlineRegenFeedback] = useState('');
 
@@ -73,10 +44,12 @@ export function BriefDetail({
     <div className="px-4 pb-4 space-y-4 border-t border-[var(--brand-border)]">
       {/* Action buttons */}
       <div className="pt-3 flex items-center gap-2 flex-wrap">
+        {!hideActions?.includes('generatePost') && (
         <button onClick={() => onGeneratePost(brief.id)} disabled={generatingPostFor === brief.id} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50">
           <Icon as={generatingPostFor === brief.id ? Loader2 : PenLine} size="sm" className={generatingPostFor === brief.id ? 'animate-spin' : ''} />
           {generatingPostFor === brief.id ? 'Starting...' : 'Generate Full Post'}
         </button>
+        )}
         <button onClick={() => onSetEditingBrief(editingBrief === brief.id ? null : brief.id)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors ${editingBrief === brief.id ? 'bg-amber-600/20 border border-amber-500/30 text-amber-300 hover:bg-amber-600/30' : 'bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] border border-[var(--brand-border)]'}`}>
           {editingBrief === brief.id ? <><Icon as={Check} size="sm" /> Done Editing</> : <><Icon as={Pencil} size="sm" /> Edit Brief</>}
         </button>
@@ -86,10 +59,12 @@ export function BriefDetail({
         <button onClick={() => onExportClientHTML(brief)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
           <Icon as={Download} size="sm" /> Export PDF
         </button>
+        {!hideActions?.includes('sendToClient') && (
         <button onClick={() => onSendToClient(brief)} disabled={sendingToClient === brief.id} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-cyan-600/20 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-600/30 transition-colors disabled:opacity-50">
           <Icon as={sendingToClient === brief.id ? Loader2 : Send} size="sm" className={sendingToClient === brief.id ? 'animate-spin' : ''} />
           {sendingToClient === brief.id ? 'Sending...' : 'Send to Client'}
         </button>
+        )}
         <button onClick={() => { navigator.clipboard.writeText(JSON.stringify(brief, null, 2)); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
           <Icon as={Copy} size="sm" /> Copy JSON
         </button>
@@ -299,6 +274,37 @@ export function BriefDetail({
         </div>
       )}
 
+      {/* Real People Also Ask (from SERP data) */}
+      {brief.realPeopleAlsoAsk && brief.realPeopleAlsoAsk.length > 0 && (
+        <div>
+          <div className="flex items-center gap-1.5 mb-1.5"><Icon as={MessageSquare} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Real People Also Ask (SERP)</span></div>
+          <div className="space-y-1">
+            {brief.realPeopleAlsoAsk.map((q, i) => (
+              <div key={i} className="flex items-start gap-2 text-xs text-[var(--brand-text-bright)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">
+                <span className="text-cyan-400 flex-shrink-0 font-medium">Q{i + 1}.</span> {q}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Real Top Results (from SERP data) */}
+      {brief.realTopResults && brief.realTopResults.length > 0 && (
+        <div>
+          <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1.5">Top SERP Results</div>
+          <div className="space-y-1.5">
+            {brief.realTopResults.map((result, i) => (
+              <div key={i} className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">
+                <div className="flex items-center gap-2">
+                  <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">#{result.position}</span>
+                  <a href={result.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:text-blue-300 truncate">{result.title}</a>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* SERP Analysis */}
       {brief.serpAnalysis && (
         <div>
@@ -482,6 +488,7 @@ export function BriefDetail({
       )}
 
       {/* Delete */}
+      {!hideActions?.includes('delete') && (
       <div className="pt-3 border-t border-[var(--brand-border)] flex items-center justify-between">
         <button
           onClick={() => onConfirmDelete(brief)}
@@ -491,6 +498,7 @@ export function BriefDetail({
         </button>
         <span className="t-caption-sm text-[var(--brand-text-muted)]/50">Created {new Date(brief.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
       </div>
+      )}
     </div>
   );
 }

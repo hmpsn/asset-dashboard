@@ -76,8 +76,11 @@ export async function generatePost(
     updatedAt: new Date().toISOString(),
   };
 
-  // Save initial skeleton
-  savePost(workspaceId, post);
+  // Only save initial skeleton if not already saved by the caller
+  const existingPost = getPost(workspaceId, postId);
+  if (!existingPost) {
+    savePost(workspaceId, post);
+  }
 
   // 1. Generate introduction
   try {

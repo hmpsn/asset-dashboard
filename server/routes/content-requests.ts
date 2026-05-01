@@ -44,6 +44,8 @@ const updateContentRequestSchema = z.object({
   internalNote: z.string().max(5000).optional(),
   deliveryUrl: z.string().url().optional().or(z.literal('')),
   deliveryNotes: z.string().max(5000).optional(),
+  briefId: z.string().optional(),
+  clientFeedback: z.string().max(2000).optional().or(z.literal('')),
 });
 
 // --- Helper: Derive journey stage from intent ---
@@ -68,7 +70,7 @@ router.get('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('wor
 });
 
 router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('workspaceId'), validate(updateContentRequestSchema), (req, res, next) => {
-  const { status, internalNote, deliveryUrl, deliveryNotes } = req.body;
+  const { status, internalNote, deliveryUrl, deliveryNotes, briefId, clientFeedback } = req.body;
   // Auto-populate postId when sending to post_review.
   // The state machine has already validated the transition by this point.
   let postIdToSet: string | undefined;
@@ -87,7 +89,7 @@ router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('w
   let updated;
   try {
     updated = updateContentRequest(req.params.workspaceId, req.params.id, {
-      status, internalNote, deliveryUrl, deliveryNotes,
+      status, internalNote, deliveryUrl, deliveryNotes, briefId, clientFeedback,
       ...(postIdToSet ? { postId: postIdToSet } : {}),
     });
   } catch (err: unknown) {

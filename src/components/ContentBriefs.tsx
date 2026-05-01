@@ -6,73 +6,13 @@ import {
 } from 'lucide-react';
 import { Icon, cn } from './ui';
 import type { FixContext } from '../App';
-import type { PostSummary } from '../../shared/types/content';
+import type { ContentBrief, ContentTopicRequest, PostSummary } from '../../shared/types/content';
 import { PostEditor } from './PostEditor';
 import { BriefGenerator } from './briefs/BriefGenerator';
 import { RequestList } from './briefs/RequestList';
 import { BriefList } from './briefs/BriefList';
 import { useAdminBriefsList, useAdminRequestsList, useAdminPostsList } from '../hooks/admin';
 import { queryKeys } from '../lib/queryKeys';
-
-interface ContentBrief {
-  id: string;
-  workspaceId: string;
-  targetKeyword: string;
-  secondaryKeywords: string[];
-  suggestedTitle: string;
-  suggestedMetaDesc: string;
-  outline: { heading: string; notes: string; wordCount?: number; keywords?: string[] }[];
-  wordCountTarget: number;
-  intent: string;
-  audience: string;
-  competitorInsights: string;
-  internalLinkSuggestions: string[];
-  createdAt: string;
-  executiveSummary?: string;
-  contentFormat?: string;
-  toneAndStyle?: string;
-  peopleAlsoAsk?: string[];
-  topicalEntities?: string[];
-  serpAnalysis?: { contentType: string; avgWordCount: number; commonElements: string[]; gaps: string[] };
-  difficultyScore?: number;
-  trafficPotential?: string;
-  ctaRecommendations?: string[];
-  eeatGuidance?: { experience: string; expertise: string; authority: string; trust: string };
-  contentChecklist?: string[];
-  schemaRecommendations?: { type: string; notes: string }[];
-  pageType?: string;
-  referenceUrls?: string[];
-  realPeopleAlsoAsk?: string[];
-  realTopResults?: { position: number; title: string; url: string }[];
-  titleVariants?: string[];
-  metaDescVariants?: string[];
-}
-
-interface ContentTopicRequest {
-  id: string;
-  workspaceId: string;
-  topic: string;
-  targetKeyword: string;
-  intent: string;
-  priority: string;
-  rationale: string;
-  status: 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'post_review' | 'delivered' | 'published' | 'declined';
-  briefId?: string;
-  clientNote?: string;
-  internalNote?: string;
-  declineReason?: string;
-  clientFeedback?: string;
-  source?: 'strategy' | 'client';
-  serviceType?: 'brief_only' | 'full_post';
-  upgradedAt?: string;
-  deliveryUrl?: string;
-  deliveryNotes?: string;
-  targetPageId?: string;
-  targetPageSlug?: string;
-  comments?: { id: string; author: 'client' | 'team'; content: string; createdAt: string }[];
-  requestedAt: string;
-  updatedAt: string;
-}
 
 /** targetRoute values that ContentBriefs recognises as legitimate brief-generation navigations.
  *  Any fixContext without one of these routes is treated as stale (e.g. from seo-editor). */
@@ -176,12 +116,15 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
     setRegeneratingOutline(null);
   };
 
-  const handleRegenerateBrief = async (briefId: string, feedback: string) => {
+  const handleRegenerateBrief = async (briefId: string, feedback: string, requestId?: string) => {
     setRegeneratingBrief(briefId);
     try {
       const newBrief = await post<ContentBrief>(`/api/content-briefs/${workspaceId}/${briefId}/regenerate`, { feedback });
       queryClient.setQueryData<ContentBrief[]>(queryKeys.admin.briefs(workspaceId), old => [newBrief, ...(old ?? [])]);
       setExpanded(newBrief.id);
+      if (requestId) {
+        await handleUpdateRequestStatus(requestId, undefined, { briefId: newBrief.id });
+      }
     } catch (err) { console.error('ContentBriefs operation failed:', err); }
     setRegeneratingBrief(null);
   };
@@ -328,9 +271,11 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
     }
   };
 
-  const handleUpdateRequestStatus = async (reqId: string, status: ContentTopicRequest['status'], extra?: { deliveryUrl?: string; deliveryNotes?: string }) => {
+  const handleUpdateRequestStatus = async (reqId: string, status: ContentTopicRequest['status'] | undefined, extra?: { deliveryUrl?: string; deliveryNotes?: string; briefId?: string; clientFeedback?: string }) => {
     try {
-      const updated = await patch<ContentTopicRequest>(`/api/content-requests/${workspaceId}/${reqId}`, { status, ...extra });
+      const body: Record<string, unknown> = { ...extra };
+      if (status !== undefined) body.status = status;
+      const updated = await patch<ContentTopicRequest>(`/api/content-requests/${workspaceId}/${reqId}`, body);
       queryClient.setQueryData<ContentTopicRequest[]>(queryKeys.admin.requests(workspaceId), old => (old ?? []).map(r => r.id === reqId ? updated : r));
     } catch (err) { console.error('ContentBriefs operation failed:', err); }
   };
@@ -507,6 +452,13 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
         onSetExpandedRequest={setExpandedRequest}
         onCopyAsMarkdown={copyAsMarkdown}
         onExportClientHTML={exportClientHTML}
+        editingBrief={editingBrief}
+        onSetEditingBrief={setEditingBrief}
+        onSaveBriefField={saveBriefField}
+        regeneratingBrief={regeneratingBrief}
+        onRegenerateBrief={handleRegenerateBrief}
+        regeneratingOutline={regeneratingOutline}
+        onRegenerateOutline={handleRegenerateOutline}
         posts={posts}
         generatingPostFor={generatingPostFor}
         onGeneratePost={handleGeneratePost}
