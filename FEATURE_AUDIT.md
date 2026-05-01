@@ -116,6 +116,19 @@ A comprehensive value assessment of every feature in the platform — **310 feat
 
 **Mutual:** Streamlines the entire content production pipeline from strategy → brief → review → approval → production. Pricing transparency builds trust. Editable briefs mean faster iteration; real data means better strategic decisions. The multi-source enrichment pipeline means every brief is informed by competitive intelligence, audience understanding, and actual search landscape data. Brief-level quality rules (case study anonymity, FAQ formatting, industry diversity, section count, buzzword bans) propagate cleaner instructions to downstream post generation.
 
+**PR #398 updates (2026-05-01):**
+- **BriefDetail dedup**: Replaced ~240 lines of inline brief JSX in `RequestList.tsx` with a single `<BriefDetail>` component call. New `hideActions`, `defaultFeedback`, and `autoShowRegenerate` props control behavior when embedded inside request cards. Standalone BriefList→BriefDetail flow unaffected (no regression).
+- **Type consolidation**: Moved `ContentBrief` and `ContentTopicRequest` interfaces from 4 component files to single canonical source in `shared/types/content.ts`. Eliminated all local duplicates.
+- **SERP data rendering**: `realPeopleAlsoAsk` and `realTopResults` fields (populated by brief generation pipeline) now render in BriefDetail — previously stored but never displayed.
+- **Client feedback clearing (Bug 2)**: "Resubmit to Client" button clears `clientFeedback` to empty string when transitioning `changes_requested → client_review`.
+- **Upgrade error handling (Bug 3)**: Upgrade endpoint wrapped in try/catch for `InvalidTransitionError`.
+- **send-to-client initialStatus (Bug 4)**: Changed from `requested` to `brief_generated` when creating request via send-to-client flow.
+- **Client post view (Bug 5)**: Client can now view post when request is in `changes_requested` status.
+- **postId leak prevention (Bug 6)**: `postId` only exposed to client for brief-only `changes_requested` requests when `serviceType === 'full_post'`.
+- **Double skeleton save (Bug 7)**: `generatePost` checks for existing post before saving initial skeleton.
+- **State machine fix (Bug 8)**: Removed `post_review` from `changes_requested` allowed transitions. "Re-queue for Revision" button transitions to `in_progress` instead.
+- **Email notifications (Bug 9)**: New `content_changes_requested` event type with `notifyTeamChangesRequested` function called from both brief and post change-request endpoints.
+
 ---
 
 ### 8.5. SEO Tier 3 Data Source Enrichment
