@@ -9,7 +9,9 @@ import { addActivity } from '../activity-log.js';
 import { validate, z } from '../middleware/validate.js';
 import { buildSchemaContext } from '../helpers.js';
 import { getCachedArchitecture } from '../site-architecture.js';
-import { getSchemaSnapshot, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot, getSchemaPlan, updateSchemaPlanStatus, updateSchemaPlanRoles, deleteSchemaPlan, deleteSchemaSnapshot, removePageFromSnapshot, getPageTypes, savePageType, recordSchemaPublish, getSchemaPublishHistory, getSchemaPublishEntry, getPublishDatesForSite } from '../schema-store.js';
+import { getSchemaSnapshot, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot, getSchemaPlan, updateSchemaPlanStatus, updateSchemaPlanRoles, deleteSchemaPlan, deleteSchemaSnapshot, removePageFromSnapshot, getPageTypes, savePageType, recordSchemaPublish, getSchemaPublishHistory, getSchemaPublishEntry, getPublishDatesForSite, updateSchemaGoogleStatus } from '../schema-store.js';
+import type { GoogleValidationStatus } from '../schema-store.js';
+import { inspectUrlForRichResults } from '../search-console.js';
 import { generateSchemaSuggestions, generateSchemaForPage, generateCmsTemplateSchema } from '../schema-suggester.js';
 import { generateSchemaPlan } from '../schema-plan.js';
 import { deleteBatch } from '../approvals.js';
@@ -44,6 +46,54 @@ import { isProgrammingError } from '../errors.js';
 
 const router = Router();
 const log = createLogger('webflow-schema');
+
+/**
+ * Queues a 3-minute delayed GSC URL Inspection check after schema publish.
+ * Fires-and-forgets — never throws to the caller.
+ */
+function scheduleSchemaGoogleValidation(
+  publishEntryId: string,
+  pageUrl: string,
+  siteId: string,
+  workspaceId: string,
+  liveDomain: string,
+): void {
+  // 3-minute CDN propagation delay
+  setTimeout(async () => {
+    try {
+      const result = await inspectUrlForRichResults(siteId, pageUrl, `https://${liveDomain}`);
+      if (!result) {
+        // GSC not connected or quota exhausted
+        updateSchemaGoogleStatus(publishEntryId, workspaceId, 'no_gsc');
+        broadcastToWorkspace(workspaceId, 'schema:google_validation', {
+          publishEntryId, pageUrl, status: 'no_gsc',
+        });
+        return;
+      }
+
+      const status: GoogleValidationStatus = result.hasErrors ? 'google_failed' : 'google_validated';
+      const errorIssues = result.issues.filter(i => i.severity === 'ERROR');
+      updateSchemaGoogleStatus(
+        publishEntryId,
+        workspaceId,
+        status,
+        errorIssues.length > 0 ? errorIssues.map(i => ({ type: i.type, message: i.issueMessage })) : undefined,
+      );
+
+      broadcastToWorkspace(workspaceId, 'schema:google_validation', {
+        publishEntryId,
+        pageUrl,
+        status,
+        issues: errorIssues,
+        richResultsDetected: result.richResultsDetected,
+      });
+
+      log.info({ publishEntryId, pageUrl, status, issueCount: errorIssues.length }, 'schema google validation complete');
+    } catch (err) {
+      log.warn({ err, publishEntryId, pageUrl }, 'scheduleSchemaGoogleValidation failed');
+    }
+  }, 3 * 60 * 1000);
+}
 
 router.get('/api/webflow/schema-suggestions/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   try {
@@ -179,7 +229,19 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceAccessFromQue
 
     // Record version history for rollback support
     const pubWsForHistory = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
-    recordSchemaPublish(req.params.siteId, pageId, pubWsForHistory?.id || '', schema);
+    const publishEntry = recordSchemaPublish(req.params.siteId, pageId, pubWsForHistory?.id || '', schema);
+
+    // Background GSC validation — 3-minute delay for CDN propagation
+    const pubPageUrl = req.body.pageUrl as string | undefined;
+    if (pubWsForHistory && pubPageUrl && pubWsForHistory.liveDomain) {
+      scheduleSchemaGoogleValidation(
+        publishEntry.id,
+        pubPageUrl,
+        req.params.siteId,
+        pubWsForHistory.id,
+        pubWsForHistory.liveDomain,
+      );
+    }
 
     // Auto-save site template if this is a homepage publish
     const isHomepage = req.body.isHomepage || false;

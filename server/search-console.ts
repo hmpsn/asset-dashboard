@@ -462,6 +462,90 @@ export async function paginateGscQuery<T>(
   return results.slice(0, maxRows);
 }
 
+export interface RichResultsIssue {
+  severity: 'ERROR' | 'SUGGESTION' | 'WARNING';
+  issueMessage: string;
+  type: string;
+}
+
+export interface UrlInspectionResult {
+  hasErrors: boolean;
+  issues: RichResultsIssue[];
+  richResultsDetected: string[];
+}
+
+/**
+ * Call GSC URL Inspection API to check rich results status.
+ * Uses the existing getValidToken OAuth pattern.
+ * Returns null when GSC is not connected or quota is exhausted.
+ */
+export async function inspectUrlForRichResults(
+  siteId: string,
+  pageUrl: string,
+  siteUrl: string,
+): Promise<UrlInspectionResult | null> {
+  const token = await getValidToken(siteId);
+  if (!token) return null;
+
+  const res = await fetch(
+    'https://searchconsole.googleapis.com/v1/urlInspection/index:inspect',
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ inspectionUrl: pageUrl, siteUrl }),
+    },
+  );
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    if (res.status === 429) {
+      log.warn({ siteId }, 'GSC URL Inspection API quota exhausted');
+      return null;
+    }
+    throw new Error(`GSC URL Inspection error (${res.status}): ${errText.slice(0, 200)}`);
+  }
+
+  const data = await res.json() as {
+    inspectionResult?: {
+      richResultsResult?: {
+        detectedItems?: Array<{
+          richResultType?: string;
+          items?: Array<{
+            issues?: Array<{
+              severity?: string;
+              issueMessage?: string;
+              type?: string;
+            }>;
+          }>;
+        }>;
+      };
+    };
+  };
+
+  const detectedItems = data.inspectionResult?.richResultsResult?.detectedItems ?? [];
+  const issues: RichResultsIssue[] = [];
+  const richResultsDetected: string[] = [];
+
+  for (const item of detectedItems) {
+    if (item.richResultType) richResultsDetected.push(item.richResultType);
+    for (const i of (item.items ?? [])) {
+      for (const issue of (i.issues ?? [])) {
+        issues.push({
+          severity: (issue.severity as RichResultsIssue['severity']) || 'SUGGESTION',
+          issueMessage: issue.issueMessage || '',
+          type: issue.type || '',
+        });
+      }
+    }
+  }
+
+  return {
+    hasErrors: issues.some(i => i.severity === 'ERROR'),
+    issues,
+    richResultsDetected,
+  };
+}
+
 /** Shared date range helper (GSC has ~3 day data delay) */
 function gscDateRange(days: number, dateRange?: CustomDateRange) {
   if (dateRange) return { startDate: dateRange.startDate, endDate: dateRange.endDate };
