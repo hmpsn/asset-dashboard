@@ -36,6 +36,14 @@ describe('buildStrategyIntelligenceBlock', () => {
       conversionRate: number;
       sessions: number;
     }>;
+    contentDecay?: Array<{
+      pageId: string;
+      clicksDelta: number;
+      deltaPercent: number;
+    }>;
+    cannibalization?: Array<any>;
+    ctrOpportunities?: Array<any>;
+    rankingOpportunities?: Array<any>;
   }) => string;
 
   beforeAll(async () => {
@@ -101,6 +109,70 @@ describe('buildStrategyIntelligenceBlock', () => {
     expect(result).toContain('25 conversions');
   });
 
+  it('includes content decay signals', () => {
+    const result = buildStrategyIntelligenceBlock({
+      contentDecay: [
+        { pageId: '/old-guide', clicksDelta: -120, deltaPercent: -42 },
+      ],
+    });
+    expect(result).toContain('CONTENT DECAY');
+    expect(result).toContain('/old-guide');
+    expect(result).toContain('-120 clicks');
+  });
+
+  it('includes cannibalization warnings', () => {
+    const result = buildStrategyIntelligenceBlock({
+      cannibalization: [
+        {
+          pageId: '/service-a',
+          data: { query: 'local seo service', pages: ['/service-a', '/service-b'], totalImpressions: 1200 },
+        },
+      ],
+    });
+    expect(result).toContain('CANNIBALIZATION WARNINGS');
+    expect(result).toContain('local seo service');
+    expect(result).toContain('/service-a vs /service-b');
+  });
+
+  it('includes CTR opportunities', () => {
+    const result = buildStrategyIntelligenceBlock({
+      ctrOpportunities: [
+        {
+          pageId: '/service',
+          data: {
+            query: 'seo agency',
+            pageUrl: 'https://example.com/service',
+            actualCtr: 1.2,
+            expectedCtr: 5.8,
+            estimatedClickGap: 48,
+          },
+        },
+      ],
+    });
+    expect(result).toContain('CTR OPPORTUNITIES');
+    expect(result).toContain('seo agency');
+    expect(result).toContain('48 click gap');
+  });
+
+  it('includes ranking opportunities', () => {
+    const result = buildStrategyIntelligenceBlock({
+      rankingOpportunities: [
+        {
+          pageId: '/pricing',
+          data: {
+            query: 'seo pricing',
+            pageUrl: 'https://example.com/pricing',
+            currentPosition: 8.4,
+            estimatedTrafficGain: 75,
+          },
+        },
+      ],
+    });
+    expect(result).toContain('RANKING OPPORTUNITIES');
+    expect(result).toContain('seo pricing');
+    expect(result).toContain('position 8');
+  });
+
   it('combines all intelligence sections', () => {
     const result = buildStrategyIntelligenceBlock({
       keywordClusters: [
@@ -115,12 +187,19 @@ describe('buildStrategyIntelligenceBlock', () => {
       conversionPages: [
         { pageUrl: 'https://example.com/services', conversions: 10, conversionRate: 5.0, sessions: 200 },
       ],
+      ctrOpportunities: [
+        {
+          pageId: '/service',
+          data: { query: 'seo agency', pageUrl: 'https://example.com/service', actualCtr: 1, expectedCtr: 4, estimatedClickGap: 30 },
+        },
+      ],
     });
     expect(result).toContain('ANALYTICS INTELLIGENCE');
     expect(result).toContain('KEYWORD CLUSTERS');
     expect(result).toContain('COMPETITOR GAPS');
     expect(result).toContain('PERFORMANCE CHANGES');
     expect(result).toContain('CONVERSION DATA');
+    expect(result).toContain('CTR OPPORTUNITIES');
   });
 
   it('caps keyword clusters at 10', () => {

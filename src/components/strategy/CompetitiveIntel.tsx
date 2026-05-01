@@ -113,8 +113,8 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
         <div className="flex items-center gap-3 py-6 justify-center">
           <Icon as={Target} size="lg" className="text-[var(--brand-text-muted)]" />
           <div>
-            <p className="t-ui text-[var(--brand-text)]">Competitive Intelligence requires SEMRush</p>
-            <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">Configure your SEMRush API key in Settings to unlock this feature.</p>
+            <p className="t-ui text-[var(--brand-text)]">Competitive Intelligence requires an SEO data provider</p>
+            <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">Configure SEMRush or DataForSEO in Settings to unlock this feature.</p>
           </div>
         </div>
       </SectionCard>
@@ -300,7 +300,7 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
           </p>
         )}
         <p className="t-caption-sm text-[var(--brand-text-dim)] text-right ml-auto">
-          Data via SEMRush · {usingFallbackGaps
+          Data via SEO provider · {usingFallbackGaps
             ? 'Keyword gaps from last strategy run'
             : data?.fetchedAt ? `Cached 48h · ${new Date(data.fetchedAt).toLocaleString()}` : ''}
         </p>

@@ -34,7 +34,7 @@ import {
 } from '../webflow.js';
 import { getWorkspacePages } from '../workspace-data.js';
 import { clearSeoContextCache } from '../seo-context.js';
-import { buildWorkspaceIntelligence, invalidateIntelligenceCache, formatPersonasForPrompt, formatKnowledgeBaseForPrompt } from '../workspace-intelligence.js';
+import { buildWorkspaceIntelligence, invalidateIntelligenceCache, formatPersonasForPrompt, formatKnowledgeBaseForPrompt, formatForPrompt } from '../workspace-intelligence.js';
 import { debouncedStrategyInvalidate, debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { updateWorkspace, getWorkspace, getTokenForSite } from '../workspaces.js';
 import { upsertAndCleanPageKeywords, upsertPageKeywordsBatch, listPageKeywords } from '../page-keywords.js';
@@ -49,8 +49,6 @@ import { METRICS_SOURCE } from '../../shared/types/keywords.js';
 import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
 import { buildStrategySignals } from '../insight-feedback.js';
 import { recordAction, getActionBySource } from '../outcome-tracking.js';
-import { getWorkspaceLearnings, formatLearningsForPrompt } from '../workspace-learnings.js';
-import { isFeatureEnabled } from '../feature-flags.js';
 import { filterBrandedKeywords, filterBrandedContentGaps, extractBrandTokens } from '../competitor-brand-filter.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';
 import { isProgrammingError } from '../errors.js';
@@ -60,6 +58,7 @@ import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { requireWorkspaceAccess } from '../auth.js';
 import { filterDeclinedFromPool, matchesQuestionKeyword } from '../strategy-filters.js';
+import { MAX_COMPETITORS } from '../constants.js';
 
 const log = createLogger('keyword-strategy');
 
@@ -197,6 +196,9 @@ interface StrategyIntelligenceInput {
     clicksDelta: number;
     deltaPercent: number;
   }>;
+  cannibalization?: Array<AnalyticsInsight<'cannibalization'>>;
+  ctrOpportunities?: Array<AnalyticsInsight<'ctr_opportunity'>>;
+  rankingOpportunities?: Array<AnalyticsInsight<'ranking_opportunity'>>;
 }
 
 interface StrategyPageMapEntry {
@@ -310,6 +312,31 @@ export function buildStrategyIntelligenceBlock(opts: StrategyIntelligenceInput):
       return `  ${d.pageId}: ${d.clicksDelta > 0 ? '+' : ''}${d.clicksDelta} clicks${pctStr}`;
     });
     sections.push(`CONTENT DECAY (pages losing organic clicks — consider refreshing content or updating keyword targeting):\n${lines.join('\n')}`);
+  }
+
+  // Cannibalization warnings
+  if (opts.cannibalization && opts.cannibalization.length > 0) {
+    const lines = opts.cannibalization.slice(0, 8).map(i => {
+      const pages = i.data.pages.length > 0 ? i.data.pages.join(' vs ') : (i.pageId ?? 'unknown pages');
+      return `  "${i.data.query}" → ${pages} (${i.data.totalImpressions} imp)`;
+    });
+    sections.push(`CANNIBALIZATION WARNINGS (multiple pages competing for the same query — avoid creating new overlapping content):\n${lines.join('\n')}`);
+  }
+
+  // CTR opportunities
+  if (opts.ctrOpportunities && opts.ctrOpportunities.length > 0) {
+    const lines = opts.ctrOpportunities.slice(0, 8).map(i => {
+      return `  "${i.data.query}" → ${i.data.pageUrl}: CTR ${i.data.actualCtr}% vs expected ${i.data.expectedCtr}% (${Math.round(i.data.estimatedClickGap)} click gap)`;
+    });
+    sections.push(`CTR OPPORTUNITIES (below-expected click-through rate — quick wins via title/meta optimization):\n${lines.join('\n')}`);
+  }
+
+  // Ranking opportunities
+  if (opts.rankingOpportunities && opts.rankingOpportunities.length > 0) {
+    const lines = opts.rankingOpportunities.slice(0, 8).map(i => {
+      return `  "${i.data.query}" → ${i.data.pageUrl}: position ${Math.round(i.data.currentPosition)}, estimated gain ${Math.round(i.data.estimatedTrafficGain)} clicks`;
+    });
+    sections.push(`RANKING OPPORTUNITIES (positions 4-20 — small improvements could reach page 1):\n${lines.join('\n')}`);
   }
 
   // Conversion data
@@ -695,8 +722,8 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
       }
     }
 
-    // 5. SEMRush data gathering (based on mode)
-    // The keyword pool paradigm: SEMRush provides the keyword universe, AI assigns them to pages
+    // 5. SEO provider data gathering (based on mode)
+    // The keyword pool paradigm: provider data supplies the keyword universe, AI assigns terms to pages
     let semrushContext = '';
     let semrushDomainData: DomainKeyword[] = [];
     let keywordGaps: KeywordGapEntry[] = [];
@@ -746,7 +773,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
           log.info(`Got ${semrushDomainData.length} domain keywords`);
 
           if (semrushDomainData.length > 0) {
-            semrushContext += `\n\nSEMRush Domain Organic Keywords (real search volume + difficulty data):\n`;
+            semrushContext += `\n\nSEO PROVIDER DOMAIN ORGANIC KEYWORDS (real search volume + difficulty data):\n`;
             semrushContext += semrushDomainData.slice(0, 100).map(k =>
               `- "${k.keyword}" → ${k.url} (pos: #${k.position}, vol: ${k.volume}/mo, KD: ${k.difficulty}%, CPC: $${k.cpc}, traffic: ${k.traffic})`
             ).join('\n');
@@ -762,7 +789,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
             const discovered = await provider.getCompetitors(siteDomain, ws.id, 5);
             const autoCompetitors = discovered
               .filter(c => !c.domain.includes(siteDomain) && !siteDomain.includes(c.domain))
-              .slice(0, 3)
+              .slice(0, MAX_COMPETITORS)
               .map(c => c.domain);
             if (autoCompetitors.length > 0) {
               competitorDomains.push(...autoCompetitors);
@@ -791,8 +818,9 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
             const fetchMultiplier = provider.name === 'semrush' ? 2 : 1;
             const fetchLimit = compLimit * fetchMultiplier;
 
-            sendProgress('semrush', `Fetching competitor keywords (${competitorDomains.length} competitors)...`, 0.58);
-            for (const comp of competitorDomains.slice(0, 3)) {
+            const cappedCompetitorDomains = competitorDomains.slice(0, MAX_COMPETITORS);
+            sendProgress('semrush', `Fetching competitor keywords (${cappedCompetitorDomains.length} competitors)...`, 0.58);
+            for (const comp of cappedCompetitorDomains) {
               const cleanComp = comp.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
               try {
                 // cache-miss-ok: fetchLimit intentionally differs from compLimit for SEMRush overfetch.
@@ -875,7 +903,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
             }
             if (relatedKws.length > 0) {
               const unique = relatedKws.filter((k, i, arr) => arr.findIndex(x => x.keyword === k.keyword) === i);
-              semrushContext += `\n\nSEMRush Related Keywords (expansion ideas with real volume):\n`;
+              semrushContext += `\n\nSEO PROVIDER RELATED KEYWORDS (expansion ideas with real volume):\n`;
               semrushContext += unique.slice(0, 30).map(k =>
                 `- "${k.keyword}" (vol: ${k.volume}/mo, KD: ${k.difficulty}%)`
               ).join('\n');
@@ -913,7 +941,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
 
     // 6. BATCHED AI STRATEGY — parallel page analysis + master synthesis
     //    Step 1: Split pages into batches, analyze each batch in parallel (per-page keyword mapping)
-    //    Step 2: Master synthesis call merges all mappings + GSC + SEMRush into final strategy
+    //    Step 2: Master synthesis call merges all mappings + GSC + provider data into final strategy
 
     // Helper: call OpenAI for strategy using shared utility
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -952,7 +980,9 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
     if (businessContext) {
       businessSection = `\nBUSINESS CONTEXT: ${businessContext}\n`;
     }
-    const strategyIntel = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext'] });
+    const strategyIntel = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext', 'insights', 'learnings', 'clientSignals', 'contentPipeline'],
+      learningsDomain: 'strategy',
+    });
     const strategySeo = strategyIntel.seoContext;
     const kbBlock = formatKnowledgeBaseForPrompt(strategySeo?.knowledgeBase);
     const persBlock = formatPersonasForPrompt(strategySeo?.personas ?? []);
@@ -963,34 +993,55 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
       businessSection += persBlock + '\n';
     }
 
-    // Inject client-declined keywords so AI avoids them
-    const declinedKeywords = getDeclinedKeywords(ws.id);
+    const clientSignals = strategyIntel.clientSignals;
+
+    // Inject client-declined keywords so AI avoids them. Use the intelligence slice
+    // plus the direct helper as a fallback/compat guard.
+    const declinedKeywords = [...new Set([
+      ...(clientSignals?.keywordFeedback.rejected ?? []),
+      ...getDeclinedKeywords(ws.id),
+    ])];
     if (declinedKeywords.length > 0) {
       businessSection += `\nDECLINED KEYWORDS (the client has explicitly rejected these — do NOT suggest them or close variants as primaryKeyword, secondaryKeywords, or content gap targets):\n${declinedKeywords.map(k => `- "${k}"`).join('\n')}\n`;
+      const rejectionReasons = clientSignals?.keywordFeedback.patterns.topRejectionReasons ?? [];
+      if (rejectionReasons.length > 0) {
+        businessSection += `Top rejection reasons: ${rejectionReasons.join(', ')} — avoid keywords matching these patterns.\n`;
+      }
       log.info(`Injecting ${declinedKeywords.length} declined keywords into AI prompt`);
     }
 
-    // Inject client-requested keywords so AI prioritizes them
+    // Inject client-requested keywords so AI prioritizes them. These are not the
+    // same as clientSignals.keywordFeedback.approved; requested is its own status.
     const requestedKeywords = getRequestedKeywords(ws.id);
     if (requestedKeywords.length > 0) {
       businessSection += `\nCLIENT-REQUESTED KEYWORDS (the client has submitted these keyword ideas — give them HIGH PRIORITY in page assignments and content gap suggestions. If no existing page covers a requested keyword, it MUST appear as a content gap):\n${requestedKeywords.map(k => `- "${k}"`).join('\n')}\n`;
       log.info(`Injecting ${requestedKeywords.length} client-requested keywords into AI prompt`);
     }
 
-    // Adaptive pipeline: inject workspace learnings for difficulty range guidance
-    if (isFeatureEnabled('outcome-ai-injection')) {
-      try {
-        const learnings = getWorkspaceLearnings(ws.id);
-        if (learnings) {
-          const block = formatLearningsForPrompt(learnings, 'strategy');
-          if (block) {
-            businessSection += `\n\n${block}\n`;
-            log.info({ workspaceId: ws.id }, 'Injected workspace learnings into strategy prompt');
-          }
-        }
-      } catch (err) {
-        log.warn({ err }, 'Failed to inject workspace learnings into strategy prompt');
-      }
+    const approvedKeywords = clientSignals?.keywordFeedback.approved ?? [];
+    if (approvedKeywords.length > 0) {
+      businessSection += `\nAPPROVED KEYWORDS (client has positively reviewed these — treat as safe strategic direction):\n${approvedKeywords.map(k => `- "${k}"`).join('\n')}\n`;
+    }
+    if (clientSignals?.contentGapVotes?.length) {
+      businessSection += `\nCLIENT-PRIORITIZED TOPICS (upvoted by client — give high priority):\n${clientSignals.contentGapVotes.map(v => `- "${v.topic}" (${v.votes} votes)`).join('\n')}\n`;
+    }
+    if (clientSignals?.businessPriorities?.length) {
+      businessSection += `\nBUSINESS PRIORITIES: ${clientSignals.businessPriorities.join('; ')}\n`;
+    }
+    const coverageGaps = strategyIntel.contentPipeline?.coverageGaps ?? [];
+    if (coverageGaps.length > 0) {
+      businessSection += `\nSTRATEGY COVERAGE GAPS (strategy keywords without content briefs — prioritize in contentGaps):\n${coverageGaps.map(k => `- "${k}"`).join('\n')}\n`;
+    }
+
+    const learningsBlock = formatForPrompt(strategyIntel, {
+      sections: ['learnings'],
+      learningsDomain: 'strategy',
+      verbosity: 'standard',
+      tokenBudget: 1500,
+    });
+    if (learningsBlock) {
+      businessSection += `\n\n${learningsBlock}\n`;
+      log.info({ workspaceId: ws.id }, 'Injected workspace learnings into strategy prompt');
     }
 
     let strategy: StrategyOutput = {};
@@ -1053,7 +1104,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
       } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* skip */ }
     }
 
-    // Build SEMRush keyword reference for batch prompts — give the AI real search terms to pick from
+    // Build provider keyword reference for batch prompts — give the AI real search terms to pick from
     let semrushBatchRef = '';
     const semrushByPath = new Map<string, typeof semrushDomainData>();
     // Populate keyword pool from ALL available data sources
@@ -1146,11 +1197,11 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
           const topGsc = pageGsc.sort((a, b) => b.impressions - a.impressions).slice(0, 5);
           entry += `\n  GSC: ${topGsc.map(g => `"${g.query}" pos:${g.position.toFixed(1)} clicks:${g.clicks} imp:${g.impressions}`).join(', ')}`;
         }
-        // Add per-page SEMRush keywords so the AI sees what this page actually ranks for
+        // Add per-page provider keywords so the AI sees what this page actually ranks for
         const pageSem = semrushByPath.get(p.path);
         if (pageSem && pageSem.length > 0) {
           const topSem = pageSem.sort((a, b) => b.volume - a.volume).slice(0, 3);
-          entry += `\n  SEMRush: ${topSem.map(s => `"${s.keyword}" vol:${s.volume} KD:${s.difficulty}% pos:#${s.position}`).join(', ')}`;
+          entry += `\n  SEO provider keywords: ${topSem.map(s => `"${s.keyword}" vol:${s.volume} KD:${s.difficulty}% pos:#${s.position}`).join(', ')}`;
         }
         return entry;
       }).join('\n');
@@ -1175,7 +1226,7 @@ Return a JSON array with one entry per page:
 Rules:
 ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL above. These are real, verified search terms with actual search volume. Do NOT invent keywords.
 - If a page has GSC data, the highest-impression GSC query IS your primaryKeyword (it's already in the pool).
-- If a page has SEMRush data, prefer those keywords (they're proven ranking terms).
+- If a page has SEO provider data, prefer those keywords (they're proven ranking terms).
 - If multiple pages could target the same keyword, assign it to the MOST relevant page. Other pages can share keywords — that's better than inventing fake ones.
 - ONLY if absolutely NO keyword in the pool is even remotely relevant to the page topic, you may suggest a SHORT generic industry term (2-4 words). Mark these with "(invented)" suffix so we can identify them.` : `- primaryKeyword must be a real search term people actually use on Google. Short, generic industry terms (2-4 words).
 - If GSC data is available, PREFER the highest-impression GSC query.`}
@@ -1492,7 +1543,7 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
     // Fetch analytics intelligence from computed insights layer
     let intelligenceBlock = '';
     try {
-      const insights = getInsights(ws.id);
+      const insights = strategyIntel.insights?.all ?? [];
       if (insights.length > 0) {
         const keywordClusters = insights
           .filter((i): i is AnalyticsInsight<'keyword_cluster'> => i.insightType === 'keyword_cluster')
@@ -1513,12 +1564,36 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
             clicksDelta: i.data.currentClicks - i.data.baselineClicks,
             deltaPercent: i.data.deltaPercent,
           }));
+        const rankingMovers = insights
+          .filter((i): i is AnalyticsInsight<'ranking_mover'> => i.insightType === 'ranking_mover')
+          .map(i => ({
+            query: i.data.query,
+            // StrategyIntelligenceInput treats positive as a drop for legacy display.
+            // RankingMoverData treats positive as improvement, so invert here.
+            positionDelta: -i.data.positionChange,
+            clicksDelta: i.data.currentClicks - i.data.previousClicks,
+            currentPosition: i.data.currentPosition,
+          }))
+          .sort((a, b) => Math.abs(b.positionDelta) - Math.abs(a.positionDelta));
+        const cannibalization = insights
+          .filter((i): i is AnalyticsInsight<'cannibalization'> => i.insightType === 'cannibalization')
+          .sort((a, b) => (b.impactScore ?? 0) - (a.impactScore ?? 0));
+        const ctrOpportunities = insights
+          .filter((i): i is AnalyticsInsight<'ctr_opportunity'> => i.insightType === 'ctr_opportunity')
+          .sort((a, b) => b.data.estimatedClickGap - a.data.estimatedClickGap);
+        const rankingOpportunities = insights
+          .filter((i): i is AnalyticsInsight<'ranking_opportunity'> => i.insightType === 'ranking_opportunity')
+          .sort((a, b) => b.data.estimatedTrafficGain - a.data.estimatedTrafficGain);
 
         intelligenceBlock = buildStrategyIntelligenceBlock({
           keywordClusters: keywordClusters.length > 0 ? keywordClusters : undefined,
           competitorGaps: competitorGaps.length > 0 ? competitorGaps : undefined,
           conversionPages: conversionPages.length > 0 ? conversionPages : undefined,
+          performanceDeltas: rankingMovers.length > 0 ? rankingMovers : undefined,
           contentDecay: contentDecaySignals.length > 0 ? contentDecaySignals : undefined,
+          cannibalization: cannibalization.length > 0 ? cannibalization : undefined,
+          ctrOpportunities: ctrOpportunities.length > 0 ? ctrOpportunities : undefined,
+          rankingOpportunities: rankingOpportunities.length > 0 ? rankingOpportunities : undefined,
         });
 
         // Append feedback-loop signals to give the AI real performance context
@@ -1566,7 +1641,7 @@ Return JSON with this EXACT structure (do NOT include a pageMap — it's already
 
 Rules:
 - siteKeywords: 8-15 broad themes covering the full site
-- contentGaps: 6-10 NEW pages/posts to create that DO NOT overlap with existing pages listed above. CRITICAL: Every targetKeyword MUST come from the SEMRush/GSC data above when available — do NOT invent keywords. ${hasSemrush ? 'PRIORITIZE keywords from COMPETITOR KEYWORD GAPS — these are keywords competitors rank for that this site doesn\'t. For each gap backed by competitor data, include competitorProof citing which competitor ranks and at what position. At least 50% of content gaps should come from competitor gap data.' : ''}${clientKeywordsAdded > 0 ? ` CLIENT-REQUESTED KEYWORDS get HIGH PRIORITY: if any client-requested keyword from the pool has no existing page covering it, it MUST appear as a content gap. The client specifically wants to rank for these terms.` : ''} Before suggesting a content gap, verify no current page already targets that keyword or covers that topic. If an existing page is thin or weak on a topic, suggest it as a quickWin improvement instead of creating a competing new page. Vary intent (informational, commercial, transactional). Mix high and medium priority
+- contentGaps: 6-10 NEW pages/posts to create that DO NOT overlap with existing pages listed above. CRITICAL: Every targetKeyword MUST come from SEO provider/GSC data above when available — do NOT invent keywords. ${hasSemrush ? 'PRIORITIZE keywords from COMPETITOR KEYWORD GAPS — these are keywords competitors rank for that this site doesn\'t. For each gap backed by competitor data, include competitorProof citing which competitor ranks and at what position. At least 50% of content gaps should come from competitor gap data.' : ''}${clientKeywordsAdded > 0 ? ` CLIENT-REQUESTED KEYWORDS get HIGH PRIORITY: if any client-requested keyword from the pool has no existing page covering it, it MUST appear as a content gap. The client specifically wants to rank for these terms.` : ''} Before suggesting a content gap, verify no current page already targets that keyword or covers that topic. If an existing page is thin or weak on a topic, suggest it as a quickWin improvement instead of creating a competing new page. Vary intent (informational, commercial, transactional). Mix high and medium priority
 - suggestedPageType: Choose the best page type for each content gap. Use "blog" for informational articles, "landing" for conversion pages, "service" for service descriptions, "location" for local SEO, "product" for product pages, "pillar" for topic hubs, "resource" for guides/downloads.
 - quickWins: 3-5 existing pages where small changes boost rankings. Use GSC data if available (high impressions + poor position = opportunity).
 - If DEVICE BREAKDOWN shows mobile ranking gaps, include a mobile-optimization quick win.
@@ -1577,7 +1652,7 @@ Rules:
 - If TOP CONVERTING PAGES data is available, mention specific conversion events in quickWin rationales (e.g., "this page drives 15 form_submissions — fixing its meta description could increase CTR").
 - If SEO AUDIT data shows high-traffic pages with errors, include them as quickWins with specific fix actions.
 - If COUNTRY data shows a dominant market, consider location-specific content gaps.
-${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.' : ''}
+${hasSemrush ? '- Use SEO provider data to inform priorities. KD < 40% = quick wins.' : ''}
 ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a competitor's brand name. Competitor domains are used to identify topic areas and intent gaps — NOT to recommend branded searches that funnel users to a competitor. Specifically, do NOT include keywords containing any of these brand tokens: ${[...new Set(competitorDomains.flatMap(d => extractBrandTokens(d)))].join(', ')}. If a keyword gap came from competitor data but contains a competitor brand name, skip it and find the next best non-branded gap.` : '- NEVER suggest branded competitor keywords — keywords containing a competitor\'s company or product name. Use competitor data to find topic areas, not to recommend searches that drive users to a competitor.'}
 - Return ONLY valid JSON, no markdown`;
 
@@ -1708,7 +1783,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
       }
     }
 
-    // Enrich pageMap with SEMRush volume/difficulty data
+    // Enrich pageMap with SEO provider volume/difficulty data
     if (semrushDomainData.length > 0) {
       // Build lookup: keyword → metrics
       const kwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k])); // map-dup-ok
@@ -1730,7 +1805,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
           if (serp.video) features.push('video');
           if (serp.localPack) features.push('local_pack');
           // Always write serpFeatures for exact matches (even empty) so COALESCE overwrites
-          // stale features if SEMRush data changed. Pages with no exact match are left
+          // stale features if provider data changed. Pages with no exact match are left
           // undefined → null → COALESCE keeps previous value (correct for unmatched pages).
           pm.serpFeatures = features;
         } else {
@@ -1760,7 +1835,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
       }
     }
 
-    // If we still have keywords without volume data and SEMRush is available, bulk-fetch them
+    // If we still have keywords without volume data and a provider is available, bulk-fetch them
     // Only look up keywords NOT already in the pool (those are "invented" by the AI)
     // Cap at 30 to avoid burning credits on keywords that will mostly return NOTHING FOUND
     if (provider && semrushMode !== 'none') {
@@ -1795,7 +1870,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
       }
     }
 
-    // Enrich contentGaps with SEMRush volume/difficulty + GSC impressions
+    // Enrich contentGaps with SEO provider volume/difficulty + GSC impressions
     if (strategy.contentGaps && strategy.contentGaps.length > 0) {
       // Enrich content gaps with volume/KD from the keyword pool first (has data from
       // competitor gaps, competitor keywords, GSC, related keywords), then domain organic
