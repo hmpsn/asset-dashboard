@@ -157,14 +157,15 @@ describe('ServiceIndex hub dispatch', () => {
     expect(service['@type']).toBe('Service');
   });
 
-  it('emits hasOfferCatalog with hasPart refs for all children', async () => {
+  it('emits hasOfferCatalog with itemListElement refs for all children', async () => {
     const out = await generate('/services', ctx);
     const service = (out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>)[0];
     const catalog = service['hasOfferCatalog'] as Record<string, unknown>;
     expect(catalog['@type']).toBe('OfferCatalog');
-    const hasPart = catalog['hasPart'] as Array<{ '@id': string }>;
-    expect(hasPart).toHaveLength(3);
-    const ids = hasPart.map(p => p['@id']);
+    const items = catalog['itemListElement'] as Array<Record<string, unknown>>;
+    expect(items).toHaveLength(3);
+    expect(items[0]).toMatchObject({ '@type': 'ListItem', 'position': 1 });
+    const ids = items.map(p => (p['item'] as { '@id': string })['@id']);
     expect(ids).toContain(`${BASE}/services/design#service`);
     expect(ids).toContain(`${BASE}/services/development#service`);
     expect(ids).toContain(`${BASE}/services/strategy#service`);

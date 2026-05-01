@@ -1067,14 +1067,14 @@ describe('buildServiceHubSchema', () => {
     expect(service['@id']).toBe('https://example.com/services#service');
   });
 
-  it('emits hasOfferCatalog with hasPart @id refs', () => {
+  it('emits hasOfferCatalog with itemListElement refs', () => {
     const schema = buildServiceHubSchema({ ...serviceHubInput, children: serviceChildren });
     const service = (schema['@graph'] as Array<Record<string, unknown>>)[0];
     const catalog = service['hasOfferCatalog'] as Record<string, unknown>;
     expect(catalog['@type']).toBe('OfferCatalog');
-    expect(catalog['hasPart']).toEqual([
-      { '@id': 'https://example.com/services/design#service' },
-      { '@id': 'https://example.com/services/dev#service' },
+    expect(catalog['itemListElement']).toEqual([
+      { '@type': 'ListItem', 'position': 1, 'item': { '@id': 'https://example.com/services/design#service' } },
+      { '@type': 'ListItem', 'position': 2, 'item': { '@id': 'https://example.com/services/dev#service' } },
     ]);
   });
 

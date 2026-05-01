@@ -99,7 +99,8 @@ export function assembleSiteContext(
     for (const candidate of sitePages) {
       if (candidate.path === page.path) continue;
       if (
-        page.path.startsWith(candidate.path === '/' ? '/' : candidate.path + '/') &&
+        candidate.path !== '/' &&
+        page.path.startsWith(candidate.path + '/') &&
         candidate.path.length > longestAncestorPath.length
       ) {
         longestAncestorPath = candidate.path;

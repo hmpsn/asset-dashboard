@@ -147,7 +147,11 @@ export function buildServiceHubSchema(input: {
       ? {
           '@type': 'OfferCatalog',
           'name': pageData.cleanTitle || 'Services',
-          'hasPart': input.children.map(c => ({ '@id': c.id })),
+          'itemListElement': input.children.map((c, i) => ({
+              '@type': 'ListItem',
+              'position': i + 1,
+              'item': { '@id': c.id },
+            })),
         }
       : undefined,
     'isPartOf': webSiteRef(baseUrl),
