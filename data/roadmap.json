@@ -500,6 +500,17 @@
           "notes": "Shipped 3 pattern extractors (images w/ rule-based hero/informative/decorative + AI vision classifier; tables w/ pricing+comparison heuristics; testimonials w/ author+rating) + 2 AI extractors (vision image-role classifier via openai SDK direct, HowTo disambiguation via callAI) behind schema-ai-element-classifier flag (default off, 120-call shared per-run AiBudget). Threaded one AiBudget per regenerate-all through generateSchemaSuggestions's 3 generateLeanSchema sites (Devin r5 follow-up). Added 4 validator REQUIRED_BY_TYPE entries (Review/AggregateRating/Table/ImageGallery) + 3 schema integrations: ImageGallery (Article+Service), Review[]+AggregateRating (Service+LocalBusiness), Table mainEntity (Service). Pre-emission gates on every new node type (synchronous, per PR1 Devin r2 lesson). 4 new HTML fixtures + 6 new test files + extended integration tests."
         },
         {
+          "id": "schema-entity-graph-workstream-c",
+          "title": "Schema Workstream C \u2014 Entity Graph Hub Dispatch",
+          "source": "claude/schema-v2-brainstorm branch",
+          "est": "1d",
+          "priority": "P0",
+          "sprint": "J",
+          "status": "done",
+          "shippedAt": "2026-04-30",
+          "notes": "Workstream C shipped: hub pages now emit semantically correct schema types with cross-page @id references via assembleSiteContext + SiteContext plumbing into generateLeanSchema. BlogIndex \u2192 Blog with blogPost[] (@id refs, sorted newest-first, capped at 10, numberOfItems = true count). ServiceIndex \u2192 Service + hasOfferCatalog: { @type: OfferCatalog, hasPart[] }. CaseStudyIndex \u2192 CollectionPage + mainEntity: { @type: ItemList, itemListElement[] (positional ListItems) }. All three fall back to CollectionPage when siteContext is absent. Non-hub pages (BlogPosting, Service, AboutPage, etc.) unchanged. 18 integration tests in tests/integration/schema-entity-graph.test.ts."
+        },
+        {
           "id": "schema-page-element-catalog-pr3",
           "title": "Schema Page-Element Catalog PR3 \u2014 polish (codeBlocks, headings/ToC, speakable)",
           "source": "docs/superpowers/specs/2026-04-29-page-element-catalog-design.md \u00a75.3",
