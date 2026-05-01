@@ -123,14 +123,18 @@ export function isCatalogStale(
   return inputMs > storedMs;
 }
 
-/** Returns child @id objects for a hub page when siteContext is present and has children; null otherwise. */
+/** Returns child @id objects for a hub page when siteContext is present and has resolvable children; null otherwise. */
 function resolveHubChildren(input: LeanGeneratorInput): Array<{ id: string }> | null {
   const hubCtx = input.siteContext?.pages.find(p => p.path === input.pageMeta.publishedPath);
   if (!hubCtx || hubCtx.childPaths.length === 0) return null;
-  return hubCtx.childPaths
+  const resolved = hubCtx.childPaths
     .map(cp => input.siteContext!.pages.find(p => p.path === cp))
     .filter((p): p is SiteContextPage => p !== undefined)
     .map(p => ({ id: p.id }));
+  // Defensive: if every childPath failed to resolve (shouldn't happen since childPaths
+  // are populated from the same sitePages array), return null so callers fall back to
+  // CollectionPage instead of emitting an empty hub.
+  return resolved.length > 0 ? resolved : null;
 }
 
 export async function generateLeanSchema(input: LeanGeneratorInput): Promise<LeanGeneratorOutput> {

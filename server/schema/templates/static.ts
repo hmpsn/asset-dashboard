@@ -117,7 +117,7 @@ export function buildBlogIndexSchema(input: {
     'publisher': orgRef(baseUrl),
     'isPartOf': webSiteRef(baseUrl),
     'inLanguage': pageData.inLanguage,
-    'numberOfItems': input.children.length,
+    // numberOfItems is an ItemList property, not a Blog property; Google ignores it on Blog. Omitted.
     'blogPost': cappedBlogPost.length > 0
       ? cappedBlogPost.map(c => ({ '@id': c.id }))
       : undefined,

@@ -1006,13 +1006,14 @@ describe('buildBlogIndexSchema', () => {
     ]);
   });
 
-  it('emits numberOfItems equal to total children, caps blogPost at 10', () => {
+  it('caps blogPost at 10 when more children are provided', () => {
     const manyChildren = Array.from({ length: 15 }, (_, i) => ({
       id: `https://example.com/insights/post-${i}#blogposting`,
     }));
     const schema = buildBlogIndexSchema({ ...hubBaseInput, children: manyChildren });
     const blog = (schema['@graph'] as Array<Record<string, unknown>>)[0];
-    expect(blog['numberOfItems']).toBe(15);
+    // numberOfItems is an ItemList property, not Blog — intentionally omitted.
+    expect(blog['numberOfItems']).toBeUndefined();
     expect((blog['blogPost'] as unknown[]).length).toBe(10);
   });
 
