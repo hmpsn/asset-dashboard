@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../server/anthropic-helpers.js', () => ({
   callAnthropicWithTools: vi.fn(),
+  isAnthropicConfigured: vi.fn(() => true),
 }));
 
 vi.mock('../../../server/schema/extractors/faq.js', () => ({

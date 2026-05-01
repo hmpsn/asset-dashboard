@@ -4,7 +4,7 @@
  * from page content. Always returns; never throws — callers use {} fallback.
  */
 import * as cheerio from 'cheerio';
-import { callAnthropicWithTools } from '../../anthropic-helpers.js';
+import { callAnthropicWithTools, isAnthropicConfigured } from '../../anthropic-helpers.js';
 import type { AnthropicToolDefinition } from '../../anthropic-helpers.js';
 import type { SemanticPageData } from '../../../shared/types/page-elements.js';
 import type { BusinessProfile } from '../data-sources.js';
@@ -228,6 +228,7 @@ export async function extractSemanticData(
     workspaceId?: string;
   },
 ): Promise<SemanticPageData> {
+  if (!isAnthropicConfigured()) return {};
   try {
     const strippedText = stripToMainContent(html);
     const socialHrefs = extractSocialHrefs(html);

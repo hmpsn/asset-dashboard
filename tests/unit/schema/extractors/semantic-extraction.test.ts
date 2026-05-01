@@ -3,6 +3,7 @@ import type { SemanticPageData } from '../../../../shared/types/page-elements.js
 
 vi.mock('../../../../server/anthropic-helpers.js', () => ({
   callAnthropicWithTools: vi.fn(),
+  isAnthropicConfigured: vi.fn(() => true),
 }));
 
 import { callAnthropicWithTools } from '../../../../server/anthropic-helpers.js';

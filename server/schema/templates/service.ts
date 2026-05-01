@@ -35,7 +35,7 @@ export function buildServiceSchema(input: ServiceInput): Record<string, unknown>
         '@id': `${pageData.canonicalUrl}#offer-${i}`,
         'name': o.name,
         'price': o.price,
-        'priceCurrency': o.priceCurrency || 'USD',
+        'priceCurrency': o.priceCurrency || undefined,
         'description': o.description,
       }))
     : undefined;
