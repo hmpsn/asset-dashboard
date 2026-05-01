@@ -493,6 +493,7 @@ export async function inspectUrlForRichResults(
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ inspectionUrl: pageUrl, siteUrl }),
+      signal: AbortSignal.timeout(15_000),
     },
   );
 
@@ -500,6 +501,10 @@ export async function inspectUrlForRichResults(
     const errText = await res.text().catch(() => '');
     if (res.status === 429) {
       log.warn({ siteId }, 'GSC URL Inspection API quota exhausted');
+      return null;
+    }
+    if (res.status >= 400 && res.status < 500) {
+      log.warn({ siteId, status: res.status }, 'GSC URL Inspection API client error — treating as no_gsc');
       return null;
     }
     throw new Error(`GSC URL Inspection error (${res.status}): ${errText.slice(0, 200)}`);

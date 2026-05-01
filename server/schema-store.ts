@@ -37,10 +37,11 @@ const snapshotStmts = createStmtCache(() => ({
   deleteBySite: db.prepare<[siteId: string]>(
     'DELETE FROM schema_snapshots WHERE site_id = ?',
   ),
+  // ws-scope-ok: scoped by snapshot primary key (id is globally unique; one row per site)
   updateSchemaOrgStatus: db.prepare(`
     UPDATE schema_snapshots
     SET schema_org_validation_status = @status, schema_org_validation_details = @details
-    WHERE workspace_id = @workspaceId
+    WHERE id = @id
   `),
 }));
 
@@ -71,12 +72,12 @@ function rowToSnapshot(row: SchemaRow): SchemaSnapshot {
 }
 
 export function updateSnapshotSchemaOrgStatus(
-  workspaceId: string,
+  snapshotId: string,
   status: SchemaOrgValidationStatus,
   details?: SchemaOrgValidationIssue[],
 ): void {
   snapshotStmts().updateSchemaOrgStatus.run({
-    workspaceId,
+    id: snapshotId,
     status,
     details: details && details.length > 0 ? JSON.stringify(details) : null,
   });
