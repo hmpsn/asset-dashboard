@@ -221,7 +221,41 @@ Low risk. No generator changes. Immediate visible benefit: 8 junk pages excluded
 | `tests/schema/site-context.test.ts` | Extend unit tests: role/excluded merging from plan |
 | `tests/integration/schema-exclusion.test.ts` | New — assert excluded pages in snapshot, no schema generated |
 
-### D-PR2: Role → @type override
+### D-PR2: CMS items in hub cross-references
+
+**Context (from Workstream C PR #397 Devin review):** `assembleSiteContext` only receives static pages from `getWorkspacePages`. CMS items (blog posts, case study items) are discovered later via `discoverCmsItemsBySlug` and are not in the page list, so hub pages' `blogPost[]` / `ItemList` arrays never reference CMS children — which are the primary content type for most Webflow blogs.
+
+**Fix:** After CMS discovery in `generateSchemaSuggestions`, build a supplemental CMS path list and pass it into a second-pass siteContext update. Specifically:
+
+```typescript
+// After discoverCmsItemsBySlug, before the CMS generate loop:
+if (siteContext && cmsItems.length > 0) {
+  const cmsPages = cmsItems.map(item => ({
+    id: item.id,
+    title: item.title || item.slug || '',
+    slug: item.slug || '',
+    publishedPath: item.path,
+  }));
+  // Rebuild siteContext with CMS pages included so hub childPaths contain them.
+  siteContext = assembleSiteContext(
+    [...pages, ...cmsPages as never[]],
+    baseUrl,
+    getSchemaPlan(siteId)?.canonicalEntities ?? [],
+  );
+  // Re-generate hub pages whose childPaths changed (they were already processed in the static loop).
+  // Simplest approach: mark them stale so the next full regenerate picks them up.
+  // OR: collect hub page results from the static loop and regenerate inline here.
+}
+```
+
+The simplest correct implementation is a two-pass approach: collect hub page IDs during the static loop, then after CMS discovery, re-run `generateLeanSchema` for any hub page that has CMS children in the updated siteContext and overwrite its result in the `results` array.
+
+| File | Change |
+|------|--------|
+| `server/schema-suggester.ts` | Two-pass siteContext: rebuild after CMS discovery; re-run hub pages with CMS children |
+| `tests/integration/schema-cms-hub.test.ts` | New — assert BlogIndex `blogPost[]` includes CMS item @id refs |
+
+### D-PR3: Role → @type override
 
 Higher risk. Touches generator dispatch and introduces two new template shapes.
 
@@ -242,6 +276,10 @@ Higher risk. Touches generator dispatch and introduces two new template shapes.
 - `npm run typecheck && npx vite build && npx vitest run` — zero failures
 
 **After D-PR2 (staging):**
+- Re-run schema generation on a workspace with a CMS blog: hub page's `blogPost[]` includes CMS item @id refs
+- `npm run typecheck && npx vite build && npx vitest run` — zero failures
+
+**After D-PR3 (staging):**
 - `/discovery` snapshot entry emits `Service` with `potentialAction.@type === 'ReserveAction'`
 - All 20 non-excluded pages still pass validator (zero new errors)
 - `npm run typecheck && npx vite build && npx vitest run` — zero failures
@@ -252,7 +290,7 @@ Higher risk. Touches generator dispatch and introduces two new template shapes.
 
 Follow `docs/PLAN_WRITING_GUIDE.md`. Key constraints from `CLAUDE.md`:
 
-- **Phase-per-PR:** D-PR2 must not start until D-PR1 is merged and green on staging.
+- **Phase-per-PR:** D-PR2 must not start until D-PR1 is merged and green on staging. D-PR3 must not start until D-PR2 is merged and green.
 - **Depends on C:** D-PR1 cannot be dispatched until C's `SiteContext`/`SiteContextPage` interfaces are committed. Pre-commit the interface extensions before any agent starts template work.
 - **File ownership:** `shared/types/schema-plan.ts` is shared by both PRs — lock to one agent at a time.
 - **Model assignments:** Data layer + exclusion wiring → Haiku; role-override dispatch + new templates → Sonnet; integration tests → Sonnet.
