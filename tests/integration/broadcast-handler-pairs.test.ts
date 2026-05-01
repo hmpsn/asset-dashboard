@@ -330,6 +330,10 @@ const KNOWN_UNHANDLED_BROADCASTS = new Set<string>([
   // invalidation is needed. Cross-referenced with LOCAL_ONLY_EVENTS in
   // tests/contract/ws-invalidation-coverage.test.ts.
   'schema:plan_sent',
+
+  // schema:google_validation — background GSC validation result after publish.
+  // Frontend handler pending: Google validation status badges UI is a follow-on task.
+  'schema:google_validation',
 ]);
 
 /**
