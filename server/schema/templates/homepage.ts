@@ -3,7 +3,8 @@
  * that all other pages reference via @id, never duplicating.
  */
 import type { PageData, BusinessProfile } from '../data-sources.js';
-import { dropUndefined } from './helpers.js';
+import type { SemanticPageData } from '../../../shared/types/page-elements.js';
+import { dropUndefined, filterHttpUrls } from './helpers.js';
 
 export interface HomepageInput {
   baseUrl: string;
@@ -12,10 +13,17 @@ export interface HomepageInput {
   businessProfile?: BusinessProfile | null;
   /** When true, WebSite.potentialAction (sitelinks SearchAction) is emitted. Mirrors Workspace.siteHasSearch. */
   siteHasSearch?: boolean;
+  semantics?: SemanticPageData;
 }
 
 export function buildHomepageSchema(input: HomepageInput): Record<string, unknown> {
   const { baseUrl, pageData, businessProfile, siteHasSearch } = input;
+  const { semantics } = input;
+
+  const sameAsUrls = [
+    ...(semantics?.sameAs ?? []),
+    ...(businessProfile?.socialProfiles ?? []),
+  ].filter(Boolean);
 
   const organization = dropUndefined({
     '@type': 'Organization',
@@ -23,12 +31,15 @@ export function buildHomepageSchema(input: HomepageInput): Record<string, unknow
     'name': pageData.publisher.name,
     'url': baseUrl,
     'description': pageData.description,
-    'image': pageData.image,
+    'image': filterHttpUrls([semantics?.primaryImage ?? '', pageData.image ?? ''])[0],
     'logo': pageData.publisher.logoUrl
       ? { '@type': 'ImageObject', 'url': pageData.publisher.logoUrl }
       : undefined,
-    'sameAs': businessProfile?.socialProfiles?.length ? businessProfile.socialProfiles : undefined,
-    'foundedDate': businessProfile?.foundedDate,
+    'sameAs': sameAsUrls.length > 0 ? [...new Set(sameAsUrls)] : undefined,
+    'foundingDate': semantics?.foundingDate || businessProfile?.foundedDate,
+    'numberOfLocations': semantics?.numberOfLocations,
+    'award': semantics?.awards?.length ? semantics.awards : undefined,
+    'slogan': semantics?.highlights?.[0],
     'knowsAbout': pageData.knowsAbout?.length ? pageData.knowsAbout : undefined,
   });
 

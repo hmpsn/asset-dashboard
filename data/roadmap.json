@@ -541,6 +541,17 @@
           "notes": "Workstream C shipped: hub pages now emit semantically correct schema types with cross-page @id references via assembleSiteContext + SiteContext plumbing into generateLeanSchema. BlogIndex \u2192 Blog with blogPost[] (@id refs, sorted newest-first, capped at 10, numberOfItems = true count). ServiceIndex \u2192 Service + hasOfferCatalog: { @type: OfferCatalog, hasPart[] }. CaseStudyIndex \u2192 CollectionPage + mainEntity: { @type: ItemList, itemListElement[] (positional ListItems) }. All three fall back to CollectionPage when siteContext is absent. Non-hub pages (BlogPosting, Service, AboutPage, etc.) unchanged. 18 integration tests in tests/integration/schema-entity-graph.test.ts."
         },
         {
+          "id": "schema-semantic-extraction",
+          "title": "Schema Semantic Extraction & AI-Powered Generation",
+          "source": "docs/superpowers/plans/2026-05-01-schema-semantic-extraction.md",
+          "est": "3d",
+          "priority": "P1",
+          "sprint": "J",
+          "status": "done",
+          "shippedAt": "2026-05-01",
+          "notes": "AI-powered universal page content extraction layer for schema generation. extractSemanticData() (Haiku 4.5 tool_use) extracts phone, address, hours, staff, services, aggregateRating, sameAs, faq, primaryImage per page — stored on PageElementCatalog.semantics. applyPostEnrichment() appends FAQPage/AggregateRating/sameAs/VideoObject nodes to generated schema using extracted semantics with rollback-on-new-errors safety. generateSchemaForUnknownType() generates WebPage-classified pages with non-empty semantics via second Haiku call + static SCHEMA_TYPE_REFERENCE. Validator extended with DEDICATED_VALIDATOR_TYPES guard, unverified-type warnings for unknown Schema.org types, addressCountry in ContactPage. GSC URL Inspection integration: inspectUrlForRichResults() calls GSC API 3 minutes after publish, stores google_validation_status on schema_publish_history. schema.org pre-publish validator: validateWithSchemaOrg() fires at generation time (fire-and-forget, logs only). Migrations 081 (google_validation_status on schema_publish_history) + 082 (schema_org_validation_status on schema_snapshots). WS_EVENTS.SCHEMA_GOOGLE_VALIDATION added. 9 new/modified test files; 5805 tests passing."
+        },
+        {
           "id": "schema-page-element-catalog-pr3",
           "title": "Schema Page-Element Catalog PR3 — polish (codeBlocks, headings/ToC, speakable)",
           "source": "docs/superpowers/specs/2026-04-29-page-element-catalog-design.md §5.3",

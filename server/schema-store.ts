@@ -8,6 +8,7 @@ import db from './db/index.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import type { SchemaOrgValidationStatus, SchemaOrgValidationIssue } from './schema/schema-org-validator.js';
 
 const log = createLogger('schema-store');
 
@@ -18,6 +19,8 @@ export interface SchemaSnapshot {
   createdAt: string;
   results: SchemaPageSuggestion[];
   pageCount: number;
+  schemaOrgValidationStatus?: SchemaOrgValidationStatus;
+  schemaOrgValidationDetails?: SchemaOrgValidationIssue[];
 }
 
 // ── Prepared statements (lazy) ──
@@ -34,6 +37,12 @@ const snapshotStmts = createStmtCache(() => ({
   deleteBySite: db.prepare<[siteId: string]>(
     'DELETE FROM schema_snapshots WHERE site_id = ?',
   ),
+  // ws-scope-ok: scoped by snapshot primary key (id is globally unique; one row per site)
+  updateSchemaOrgStatus: db.prepare(`
+    UPDATE schema_snapshots
+    SET schema_org_validation_status = @status, schema_org_validation_details = @details
+    WHERE id = @id
+  `),
 }));
 
 interface SchemaRow {
@@ -43,6 +52,8 @@ interface SchemaRow {
   created_at: string;
   results: string;
   page_count: number;
+  schema_org_validation_status: string | null;
+  schema_org_validation_details: string | null;
 }
 
 function rowToSnapshot(row: SchemaRow): SchemaSnapshot {
@@ -53,7 +64,23 @@ function rowToSnapshot(row: SchemaRow): SchemaSnapshot {
     createdAt: row.created_at,
     results: parseJsonFallback(row.results, []),
     pageCount: row.page_count,
+    schemaOrgValidationStatus: (row.schema_org_validation_status as SchemaOrgValidationStatus) ?? undefined,
+    schemaOrgValidationDetails: row.schema_org_validation_details
+      ? parseJsonFallback<SchemaOrgValidationIssue[]>(row.schema_org_validation_details, [])
+      : undefined,
   };
+}
+
+export function updateSnapshotSchemaOrgStatus(
+  snapshotId: string,
+  status: SchemaOrgValidationStatus,
+  details?: SchemaOrgValidationIssue[],
+): void {
+  snapshotStmts().updateSchemaOrgStatus.run({
+    id: snapshotId,
+    status,
+    details: details && details.length > 0 ? JSON.stringify(details) : null,
+  });
 }
 
 export function saveSchemaSnapshot(siteId: string, workspaceId: string, results: SchemaPageSuggestion[]): SchemaSnapshot {
@@ -415,6 +442,8 @@ export function savePageTypes(siteId: string, updates: Record<string, string>): 
 
 // ── Schema Publish History (version tracking) ──
 
+export type GoogleValidationStatus = 'google_validated' | 'google_failed' | 'no_gsc';
+
 export interface SchemaPublishEntry {
   id: string;
   siteId: string;
@@ -422,6 +451,8 @@ export interface SchemaPublishEntry {
   workspaceId: string;
   schemaJson: Record<string, unknown>;
   publishedAt: string;
+  googleValidationStatus?: GoogleValidationStatus;
+  googleValidationDetails?: Array<{ type: string; message: string }>;
 }
 
 interface PublishHistoryRow {
@@ -431,6 +462,8 @@ interface PublishHistoryRow {
   workspace_id: string;
   schema_json: string;
   published_at: string;
+  google_validation_status: string | null;
+  google_validation_details: string | null;
 }
 
 const historyStmts = createStmtCache(() => ({
@@ -453,6 +486,11 @@ const historyStmts = createStmtCache(() => ({
     WHERE site_id = ?
     GROUP BY page_id
   `),
+  updateStatus: db.prepare(`
+    UPDATE schema_publish_history
+    SET google_validation_status = @status, google_validation_details = @details
+    WHERE id = @id AND workspace_id = @workspace_id
+  `),
 }));
 
 function rowToPublishEntry(row: PublishHistoryRow): SchemaPublishEntry {
@@ -463,6 +501,10 @@ function rowToPublishEntry(row: PublishHistoryRow): SchemaPublishEntry {
     workspaceId: row.workspace_id,
     schemaJson: parseJsonFallback(row.schema_json, {}),
     publishedAt: row.published_at,
+    googleValidationStatus: (row.google_validation_status as GoogleValidationStatus) ?? undefined,
+    googleValidationDetails: row.google_validation_details
+      ? parseJsonFallback<Array<{ type: string; message: string }>>(row.google_validation_details, [])
+      : undefined,
   };
 }
 
@@ -507,6 +549,20 @@ export function getSchemaPublishEntry(id: string): SchemaPublishEntry | null {
 export function getPublishDatesForSite(siteId: string): Record<string, string> {
   const rows = historyStmts().latestPublishDates.all(siteId) as Array<{ page_id: string; published_at: string }>;
   return Object.fromEntries(rows.map(r => [r.page_id, r.published_at]));
+}
+
+export function updateSchemaGoogleStatus(
+  entryId: string,
+  workspaceId: string,
+  status: GoogleValidationStatus,
+  details?: Array<{ type: string; message: string }>,
+): void {
+  historyStmts().updateStatus.run({
+    id: entryId,
+    workspace_id: workspaceId,
+    status,
+    details: details && details.length > 0 ? JSON.stringify(details) : null,
+  });
 }
 
 export function patchSiteTemplate(

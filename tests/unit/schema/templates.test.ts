@@ -302,7 +302,7 @@ describe('buildLocalBusinessSchema', () => {
       pageData: { ...localInput.pageData, areaServed: 'Austin, TX' },
     };
     const lb = (buildLocalBusinessSchema(withArea)['@graph'] as Array<Record<string, unknown>>).find(n => n['@type'] === 'LocalBusiness');
-    expect(lb?.areaServed).toEqual({ '@type': 'Place', name: 'Austin, TX' });
+    expect(lb?.areaServed).toEqual([{ '@type': 'Place', name: 'Austin, TX' }]);
   });
 });
 
@@ -596,7 +596,7 @@ describe('buildHomepageSchema', () => {
     });
     const org = (schema['@graph'] as Array<Record<string, unknown>>)[0];
     expect(org.sameAs).toEqual(['https://twitter.com/acme']);
-    expect(org.foundedDate).toBe('2020-01-01');
+    expect(org.foundingDate).toBe('2020-01-01');
   });
 
   it('WebSite emits inLanguage but NOT potentialAction (no site-search guarantee)', () => {

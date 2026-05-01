@@ -4849,6 +4849,53 @@ export const CHECKS: Check[] = [
     rationale: 'Counting words on rich-text HTML treats `<p>` and `</p>` as words. The dedicated HTML-aware helpers strip tags first. Same root cause as the section.wordCount drift Devin flagged in PR #356.',
     claudeMdRef: '#code-conventions',
   },
+  {
+    // schema.org uses `foundingDate`, not `foundedDate`. The BusinessProfile internal
+    // field is `foundedDate` (intentional internal naming), but JSON-LD output keys must
+    // match schema.org canonical names. Google silently ignores unrecognised properties,
+    // so `foundedDate` in the output causes the value to be discarded. Caught in PR #406
+    // review; this rule prevents the same mistake in future templates.
+    // Escape hatch: // schema-property-name-ok
+    name: 'schema.org property key foundedDate (should be foundingDate)',
+    pattern: "'foundedDate'[[:space:]]*:",
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/schema/templates/',
+    excludeLines: ['schema-property-name-ok'],
+    message:
+      "JSON-LD output uses 'foundedDate' but schema.org's canonical property is 'foundingDate'. Google silently ignores unrecognised properties, so this value is discarded. Fix: change the output key to 'foundingDate'. The BusinessProfile.foundedDate source field can keep its name — only the JSON-LD key matters. Escape hatch: // schema-property-name-ok",
+    severity: 'error',
+    rationale: "foundedDate is not a schema.org property. foundingDate is. Caught in PR #406 review where the pre-existing wrong key prevented the newly-extracted semantics.foundingDate from reaching Google.",
+  },
+  {
+    // Staff Person nodes emit 'image': s.image directly from AI-extracted data.
+    // s.image originates from Haiku parsing attacker-controllable page HTML, so
+    // non-HTTP scheme URLs (javascript:, data:) must be filtered before they reach
+    // JSON-LD that gets published to live Webflow pages via the Custom Code API.
+    // Correct pattern: filterHttpUrls([s.image ?? ''])[0]
+    // Escape hatch: // staff-image-filter-ok
+    name: "Unfiltered staff image URL in schema template (use filterHttpUrls)",
+    pattern: "'image'[[:space:]]*:[[:space:]]*s\\.image",
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/schema/templates/',
+    excludeLines: ['staff-image-filter-ok'],
+    message:
+      "Staff Person 'image' field uses s.image directly — AI-extracted image URLs must go through filterHttpUrls([s.image ?? ''])[0] before entering JSON-LD output published to live pages. Prevents javascript:/data: scheme injection via Haiku-extracted page content. Escape hatch: // staff-image-filter-ok",
+    severity: 'error',
+    rationale: "s.image is AI-extracted from attacker-controllable page HTML. filterHttpUrls blocks non-http(s) scheme URLs from reaching JSON-LD published to live Webflow pages. Caught in PR #406 review where static.ts missed the fix applied to local-business.ts and service.ts.",
+  },
+  {
+    // Correct pattern: filterHttpUrls([semantics?.primaryImage ?? '', pageData.image ?? ''])[0]
+    // Escape hatch: // primary-image-filter-ok
+    name: "Unfiltered semantics.primaryImage in schema template (use filterHttpUrls)",
+    pattern: "'image'[[:space:]]*:[[:space:]]*semantics?\\??\\.primaryImage",
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/schema/templates/',
+    excludeLines: ['primary-image-filter-ok'],
+    message:
+      "semantics?.primaryImage used directly in 'image' field — AI-extracted image URLs must go through filterHttpUrls([semantics?.primaryImage ?? '', pageData.image ?? ''])[0]. Prevents javascript:/data: scheme injection. Escape hatch: // primary-image-filter-ok",
+    severity: 'error',
+    rationale: "semantics.primaryImage is AI-extracted from attacker-controllable page HTML, same risk as s.image. homepage.ts and service.ts missed this in the PR #406 sweep while article.ts and local-business.ts were correct.",
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
