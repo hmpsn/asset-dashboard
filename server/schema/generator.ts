@@ -230,14 +230,12 @@ function applyPostEnrichment(
       );
     });
     if (primaryNode && !primaryNode.sameAs) {
-      const original = { ...primaryNode };
       primaryNode.sameAs = semantics.sameAs;
       const postFindings = validateLeanSchema(schema, primaryType);
       const newErrors = postFindings.filter(
         f => f.severity === 'error' && !baseFindingKeySet.has(findingKey(f)),
       );
       if (newErrors.length > 0) {
-        Object.assign(primaryNode, original);
         delete primaryNode.sameAs;
       }
     }
@@ -250,11 +248,12 @@ function applyPostEnrichment(
       return typeof t === 'string' && !['BreadcrumbList', 'WebSite', 'Organization', 'FAQPage', 'VideoObject', 'HowTo', 'Review', 'ImageGallery'].includes(t);
     });
     if (primaryNode && !primaryNode.aggregateRating) {
-      const original = { ...primaryNode };
       primaryNode.aggregateRating = {
         '@type': 'AggregateRating',
         'ratingValue': semantics.aggregateRating.ratingValue,
-        'reviewCount': semantics.aggregateRating.reviewCount,
+        ...(semantics.aggregateRating.reviewCount !== undefined && {
+          'reviewCount': semantics.aggregateRating.reviewCount,
+        }),
         'bestRating': 5,
         'worstRating': 1,
       };
@@ -263,7 +262,6 @@ function applyPostEnrichment(
         f => f.severity === 'error' && !baseFindingKeySet.has(findingKey(f)),
       );
       if (newErrors.length > 0) {
-        Object.assign(primaryNode, original);
         delete primaryNode.aggregateRating;
       }
     }
@@ -320,15 +318,19 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
         catalog = { ...catalog, semantics: semanticsExtracted };
         upsertPageElements(workspaceId, pagePath, catalog);
       } catch (err) { // catch-ok: extraction or persistence failure — schema generation continues
-        // The catch covers two distinct failure modes:
+        // The catch covers three distinct failure modes:
         //   1. extractPageElements throws → catalog is undefined; schema falls
         //      back to non-enriched behavior (this is the "skipped" path).
-        //   2. extractPageElements succeeds but upsertPageElements throws (FK
-        //      violation, disk error, etc.) → catalog IS populated and the
-        //      enrichment proceeds in-memory; only persistence is skipped.
+        //   2. extractSemanticData throws (normally it catches internally and
+        //      returns {} — but defensively handled here) → catalog IS populated
+        //      and enrichment proceeds without semantics; only semantics is skipped.
+        //   3. extractPageElements and extractSemanticData succeed but
+        //      upsertPageElements throws (FK violation, disk error, etc.) →
+        //      catalog IS populated and enrichment proceeds in-memory; only
+        //      persistence is skipped.
         // The log distinguishes the two so operators can tell which path fired.
         if (catalog) {
-          log.warn({ err, workspaceId, pagePath }, 'page-element persistence failed; schema enrichment proceeds with in-memory catalog');
+          log.warn({ err, workspaceId, pagePath }, 'page-element extraction or persistence failed; schema enrichment proceeds with in-memory catalog');
         } else {
           log.warn({ err, workspaceId, pagePath }, 'page-element extraction failed; schema enrichment skipped');
         }
