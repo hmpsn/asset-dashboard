@@ -51,6 +51,7 @@ const PUBLISH_TARGET = JSON.stringify({
 // which spawns a child process where mocks don't apply).
 
 async function startTestServer(): Promise<{ server: http.Server; baseUrl: string; stop: () => void }> {
+  delete process.env.APP_PASSWORD; // bypass auth gate in-process
   const { createApp } = await import('../../server/app.js');
   const app = createApp();
   const server = http.createServer(app);

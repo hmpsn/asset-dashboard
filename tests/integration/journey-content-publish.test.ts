@@ -54,6 +54,7 @@ async function startTestServer(): Promise<{
   baseUrl: string;
   stop: () => void;
 }> {
+  delete process.env.APP_PASSWORD; // bypass auth gate in-process
   const { createApp } = await import('../../server/app.js');
   const app = createApp();
   const server = http.createServer(app);
