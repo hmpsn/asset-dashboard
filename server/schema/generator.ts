@@ -35,6 +35,8 @@ import { extractSemanticData } from './extractors/semantic.js';
 import { generateSchemaForUnknownType } from './extractors/schema-generation.js';
 import type { SemanticPageData } from '../../shared/types/page-elements.js';
 import { createLogger } from '../logger.js';
+import { validateWithSchemaOrg } from './schema-org-validator.js';
+import { updateSnapshotSchemaOrgStatus } from '../schema-store.js';
 
 const log = createLogger('schema/generator');
 
@@ -501,6 +503,16 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
 
   // Fix 3: compute rich results eligibility and pass through to caller
   const richResultsEligibility = checkRichResultsEligibility(schema);
+
+  // Fire-and-forget: validate against schema.org API, update snapshot status async
+  // Never awaited — result arrives seconds later, does not affect generation latency
+  if (workspaceId) {
+    validateWithSchemaOrg(schema).then(({ status, issues }) => {
+      updateSnapshotSchemaOrgStatus(workspaceId, status, issues.length > 0 ? issues : undefined);
+    }).catch(() => {
+      // Logged inside validateWithSchemaOrg — nothing to do here
+    });
+  }
 
   // Determine declared types for the suggestion `type` field
   const graph = (schema['@graph'] as Array<Record<string, unknown>>) ?? [];
