@@ -31,6 +31,9 @@ import { checkRichResultsEligibility } from './rich-results.js';
 import type { RichResultEligibility } from './rich-results.js';
 import type { ValidationFinding } from '../../shared/types/schema-validation.js';
 import type { SiteContext, SiteContextPage } from './site-context.js';
+import { extractSemanticData } from './extractors/semantic.js';
+import { generateSchemaForUnknownType } from './extractors/schema-generation.js';
+import type { SemanticPageData } from '../../shared/types/page-elements.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('schema/generator');
@@ -137,6 +140,138 @@ function resolveHubChildren(input: LeanGeneratorInput): Array<{ id: string }> | 
   return resolved.length > 0 ? resolved : null;
 }
 
+/**
+ * Post-enrichment pass: appends FAQPage (from semantics.faq), VideoObject nodes
+ * (from catalog.videos, with semantics fallback), sameAs, and AggregateRating to
+ * the primary org/localbusiness node. Each append uses the existing rollback pattern:
+ * append → validate → if new errors introduced → pop.
+ */
+function applyPostEnrichment(
+  schema: Record<string, unknown>,
+  semantics: SemanticPageData | undefined,
+  catalog: PageElementCatalog | undefined,
+  canonicalUrl: string,
+  primaryType: string,
+  baseValidationFindings: ValidationFinding[],
+): Record<string, unknown> {
+  const graph = schema['@graph'] as Array<Record<string, unknown>>;
+  if (!Array.isArray(graph)) return schema;
+
+  const findingKey = (f: { ruleId: string; type: string; field?: string }) =>
+    `${f.ruleId}::${f.type}::${f.field ?? ''}`;
+  const baseFindingKeySet = new Set(baseValidationFindings.map(findingKey));
+
+  function tryAppend(node: Record<string, unknown>): void {
+    graph.push(node);
+    const postFindings = validateLeanSchema(schema, primaryType);
+    const newErrors = postFindings.filter(
+      f => f.severity === 'error' && !baseFindingKeySet.has(findingKey(f)),
+    );
+    if (newErrors.length > 0) {
+      graph.pop();
+      log.debug({ type: node['@type'], errors: newErrors }, 'post-enrichment: rolled back append due to new errors');
+    }
+  }
+
+  // 1. FAQPage from semantics.faq (only if not already present from extractFaq)
+  const hasFaqPage = graph.some(n => n['@type'] === 'FAQPage');
+  if (!hasFaqPage && (semantics?.faq?.length ?? 0) >= 2) {
+    tryAppend({
+      '@type': 'FAQPage',
+      '@id': `${canonicalUrl}#faq`,
+      'mainEntity': semantics!.faq!.map(pair => ({
+        '@type': 'Question',
+        'name': pair.question,
+        'acceptedAnswer': { '@type': 'Answer', 'text': pair.answer },
+      })),
+    });
+  }
+
+  // 2. VideoObject nodes — catalog.videos is authoritative; semantics.videos supplements only if catalog empty
+  const videoSources = catalog?.videos?.length ? catalog.videos : [];
+  const semanticsVideos = (!videoSources.length && semantics?.videos?.length) ? semantics.videos : [];
+  const existingVideoIds = new Set(graph.filter(n => n['@type'] === 'VideoObject').map(n => n['@id']));
+
+  for (const [idx, v] of videoSources.entries()) {
+    const videoId = `${canonicalUrl}#video-${idx}`;
+    if (!existingVideoIds.has(videoId)) {
+      tryAppend({
+        '@type': 'VideoObject',
+        '@id': videoId,
+        'name': v.title || 'Video',
+        'description': `Video on ${canonicalUrl}`,
+        'thumbnailUrl': v.thumbnailUrl,
+        'embedUrl': v.embedUrl,
+      });
+    }
+  }
+  for (const [idx, v] of semanticsVideos.entries()) {
+    const videoId = `${canonicalUrl}#semvideo-${idx}`;
+    if (!existingVideoIds.has(videoId)) {
+      tryAppend({
+        '@type': 'VideoObject',
+        '@id': videoId,
+        'name': v.name || 'Video',
+        'description': v.description || `Video on ${canonicalUrl}`,
+        'thumbnailUrl': v.thumbnailUrl,
+        'contentUrl': v.contentUrl,
+      });
+    }
+  }
+
+  // 3. sameAs on primary org/localbusiness node
+  if (semantics?.sameAs?.length) {
+    const primaryNode = graph.find(n => {
+      const t = n['@type'];
+      return typeof t === 'string' && (
+        t === 'Organization' || t === 'LocalBusiness' ||
+        ['Dentist', 'Physician', 'LegalService', 'ProfessionalService', 'MedicalBusiness',
+         'HealthAndBeautyBusiness', 'FoodEstablishment', 'Hotel'].includes(t)
+      );
+    });
+    if (primaryNode && !primaryNode.sameAs) {
+      const original = { ...primaryNode };
+      primaryNode.sameAs = semantics.sameAs;
+      const postFindings = validateLeanSchema(schema, primaryType);
+      const newErrors = postFindings.filter(
+        f => f.severity === 'error' && !baseFindingKeySet.has(findingKey(f)),
+      );
+      if (newErrors.length > 0) {
+        Object.assign(primaryNode, original);
+        delete primaryNode.sameAs;
+      }
+    }
+  }
+
+  // 4. AggregateRating on primary node (if not already set)
+  if (semantics?.aggregateRating) {
+    const primaryNode = graph.find(n => {
+      const t = n['@type'];
+      return typeof t === 'string' && !['BreadcrumbList', 'WebSite', 'Organization', 'FAQPage', 'VideoObject', 'HowTo', 'Review', 'ImageGallery'].includes(t);
+    });
+    if (primaryNode && !primaryNode.aggregateRating) {
+      const original = { ...primaryNode };
+      primaryNode.aggregateRating = {
+        '@type': 'AggregateRating',
+        'ratingValue': semantics.aggregateRating.ratingValue,
+        'reviewCount': semantics.aggregateRating.reviewCount,
+        'bestRating': 5,
+        'worstRating': 1,
+      };
+      const postFindings = validateLeanSchema(schema, primaryType);
+      const newErrors = postFindings.filter(
+        f => f.severity === 'error' && !baseFindingKeySet.has(findingKey(f)),
+      );
+      if (newErrors.length > 0) {
+        Object.assign(primaryNode, original);
+        delete primaryNode.aggregateRating;
+      }
+    }
+  }
+
+  return schema;
+}
+
 export async function generateLeanSchema(input: LeanGeneratorInput): Promise<LeanGeneratorOutput> {
   // Fix 1: strip trailing slashes from baseUrl to prevent //path canonical URLs
   const baseUrl = input.baseUrl.replace(/\/+$/, '');
@@ -175,6 +310,14 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
           aiBudget,
           workspaceId,
         });
+        // Sequential after extractPageElements to avoid write-race on the same catalog row.
+        // extractSemanticData is NOT gated by AiBudget — it always runs when catalog is stale.
+        const semanticsExtracted = await extractSemanticData(input.html ?? '', {
+          pageBaseUrl: baseUrl,
+          workspaceBusinessProfile: input.workspace.businessProfile,
+          workspaceId,
+        });
+        catalog = { ...catalog, semantics: semanticsExtracted };
         upsertPageElements(workspaceId, pagePath, catalog);
       } catch (err) { // catch-ok: extraction or persistence failure — schema generation continues
         // The catch covers two distinct failure modes:
@@ -195,6 +338,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
     }
   }
   pageData = { ...pageData, elements: catalog };
+  const semantics = catalog?.semantics;
 
   // Surgical AI: only if no description was found
   if (!pageData.description) {
@@ -220,31 +364,32 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
           pageData,
           businessProfile: input.workspace.businessProfile,
           siteHasSearch: input.workspace.siteHasSearch,
+          semantics,
         });
         reason = 'Local business homepage — LocalBusiness with verified contact info.';
       } else {
-        schema = buildHomepageSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile, siteHasSearch: input.workspace.siteHasSearch });
+        schema = buildHomepageSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile, siteHasSearch: input.workspace.siteHasSearch, semantics });
         reason = 'Homepage — Organization + WebSite (sitewide entities).';
       }
       break;
     case 'BlogPosting':
-      schema = buildArticleSchema({ baseUrl, pageData }, 'BlogPosting');
+      schema = buildArticleSchema({ baseUrl, pageData, semantics }, 'BlogPosting');
       reason = 'Blog post — BlogPosting with author/publisher/dates.';
       break;
     case 'CaseStudy':
-      schema = buildArticleSchema({ baseUrl, pageData }, 'Article');
+      schema = buildArticleSchema({ baseUrl, pageData, semantics }, 'Article');
       reason = 'Case study — Article (not Service) with about="Case study".';
       break;
     case 'Service':
-      schema = buildServiceSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile });
+      schema = buildServiceSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile, semantics });
       reason = 'Service detail page — Service with provider reference.';
       break;
     case 'AboutPage':
-      schema = buildAboutPageSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile });
+      schema = buildAboutPageSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile, semantics });
       reason = 'About page — AboutPage with LocalBusiness mainEntity when address is set.';
       break;
     case 'ContactPage':
-      schema = buildContactPageSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile });
+      schema = buildContactPageSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile, semantics });
       reason = 'Contact page — ContactPage with LocalBusiness mainEntity when address is set.';
       break;
     case 'BlogIndex': {
@@ -281,9 +426,23 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       break;
     }
     case 'Legal':
-    case 'WebPage':
       schema = buildWebPageSchema({ baseUrl, pageData });
-      reason = 'Generic page — WebPage with breadcrumb.';
+      reason = 'Legal page — WebPage with breadcrumb.';
+      break;
+    case 'WebPage':
+      if (semantics && Object.keys(semantics).length > 0) {
+        try {
+          schema = await generateSchemaForUnknownType({ semantics, pageData, workspace: { ...input.workspace, id: input.workspace.id ?? '' }, baseUrl });
+          reason = `Unknown page type — Haiku-generated schema based on extracted page content (category: ${semantics.pageCategory ?? 'unclassified'}).`;
+        } catch (err) {
+          log.warn({ err, pageId: input.pageId }, 'generateSchemaForUnknownType failed; falling back to WebPage');
+          schema = buildWebPageSchema({ baseUrl, pageData });
+          reason = 'Generic page — WebPage (AI generation failed).';
+        }
+      } else {
+        schema = buildWebPageSchema({ baseUrl, pageData });
+        reason = 'Generic page — WebPage with breadcrumb.';
+      }
       break;
     default: {
       // Exhaustiveness check — TS will error here if a new PageKind value is added
@@ -331,6 +490,9 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       (schema['@graph'] as Array<Record<string, unknown>>).pop();
     }
   }
+
+  // Post-enrichment pass: FAQPage (from semantics), VideoObject, sameAs, AggregateRating
+  schema = applyPostEnrichment(schema, semantics, catalog, pageData.canonicalUrl, classified.primaryType, baseValidationFindings);
 
   // Surface validation findings of the FINAL schema (after FAQ resolution) to caller
   const validationFindings = validateLeanSchema(schema, classified.primaryType);
