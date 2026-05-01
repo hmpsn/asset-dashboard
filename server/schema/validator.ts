@@ -97,6 +97,30 @@ const REQUIRED_BY_TYPE: Record<string, RequiredFields> = {
   ImageGallery: {
     required: ['name', 'image'],
   },
+  Dentist: {
+    required: ['name', 'url', 'inLanguage'],
+    recommended: ['telephone', 'address', 'openingHours', 'aggregateRating'],
+  },
+  MedicalBusiness: {
+    required: ['name', 'url', 'inLanguage'],
+    recommended: ['telephone', 'address'],
+  },
+  LegalService: {
+    required: ['name', 'url', 'inLanguage'],
+    recommended: ['telephone', 'areaServed'],
+  },
+  ProfessionalService: {
+    required: ['name', 'url', 'inLanguage'],
+    recommended: ['telephone', 'areaServed'],
+  },
+  Event: {
+    required: ['name', 'startDate', 'location'],
+    recommended: ['endDate', 'description', 'offers', 'organizer'],
+  },
+  Course: {
+    required: ['name', 'description', 'provider'],
+    recommended: ['hasCourseInstance', 'courseCode'],
+  },
 };
 
 function validateBreadcrumb(node: Record<string, unknown>): ValidationFinding[] {
@@ -549,6 +573,29 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
             message: `${t} missing recommended field: ${field}`,
           });
         }
+      }
+    } else {
+      // Unknown type: structural validation only
+      const hasType = typeof node['@type'] === 'string' && node['@type'].length > 0;
+      let hasId = false;
+      try {
+        if (typeof node['@id'] === 'string' && node['@id'].length > 0) {
+          new URL(node['@id']);
+          hasId = true;
+        }
+      } catch { /* invalid URL */ }
+      const hasEmptyValues = Object.values(node).some(v => v === '' || (Array.isArray(v) && v.length === 0));
+      if (!hasType || !hasId || hasEmptyValues) {
+        findings.push({
+          severity: 'warning',
+          type: t,
+          ruleId: 'unverified-type',
+          message: `${t}: unverified schema.org type — structural check only. Issues: ${[
+            !hasType && 'missing @type',
+            !hasId && '@id not a valid URL',
+            hasEmptyValues && 'empty string or array values',
+          ].filter(Boolean).join(', ') || 'none'}`,
+        });
       }
     }
 
