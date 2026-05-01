@@ -4982,6 +4982,15 @@
           "notes": "Replaces 2,558-line schema-suggester.ts pipeline with deterministic 6-module package at server/schema/. URL classifier + per-type templates + canonical data sources + 2 surgical AI extractors (description, FAQ) + per-type validator + thin orchestrator. Output ~72% smaller, validates first time, eliminates duplicate WebPage bug and wrong-type bug for case studies/privacy/index pages. Common types only (BlogPosting, Article, Service, Product, LocalBusiness, AboutPage, ContactPage, CollectionPage, WebPage, Organization, WebSite). Healthcare uses LocalBusiness fallback; subtype escalation deferred to schema-intelligence-layer-v2."
         },
         {
+          "id": "content-post-stat-provenance",
+          "title": "Content Post — Statistics Provenance Check",
+          "est": "1-2d",
+          "priority": "P1",
+          "sprint": "H",
+          "status": "pending",
+          "notes": "Two-part improvement to reduce hallucinated statistics in generated content. (1) Brief-grounding constraint: during brief generation, extract and tag specific statistics found in scraped SERP/competitor/knowledge-base sources as verifiedStats[]. Inject a generation-time instruction to only cite numbers present in the brief research; use directional language ('significantly faster') when no sourced number exists. (2) Post-generation provenance flag: after unification pass, regex-match all numeric claims in the output and cross-reference against the brief research text. Any number not traceable to a source gets flagged in the PostEditor review checklist for human verification before publish. No automated fact-checking; the goal is surfacing the risk to the reviewer, not replacing judgment."
+        },
+        {
           "id": "schema-pillar-2-data-wiring",
           "title": "Schema Pillar 2 — Data Wiring & Cross-References",
           "source": "docs/superpowers/plans/2026-04-29-schema-pillar-2-data-wiring.md",
