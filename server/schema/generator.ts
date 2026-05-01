@@ -123,6 +123,16 @@ export function isCatalogStale(
   return inputMs > storedMs;
 }
 
+/** Returns child @id objects for a hub page when siteContext is present and has children; null otherwise. */
+function resolveHubChildren(input: LeanGeneratorInput): Array<{ id: string }> | null {
+  const hubCtx = input.siteContext?.pages.find(p => p.path === input.pageMeta.publishedPath);
+  if (!hubCtx || hubCtx.childPaths.length === 0) return null;
+  return hubCtx.childPaths
+    .map(cp => input.siteContext!.pages.find(p => p.path === cp))
+    .filter((p): p is SiteContextPage => p !== undefined)
+    .map(p => ({ id: p.id }));
+}
+
 export async function generateLeanSchema(input: LeanGeneratorInput): Promise<LeanGeneratorOutput> {
   // Fix 1: strip trailing slashes from baseUrl to prevent //path canonical URLs
   const baseUrl = input.baseUrl.replace(/\/+$/, '');
@@ -234,14 +244,8 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       reason = 'Contact page — ContactPage with LocalBusiness mainEntity when address is set.';
       break;
     case 'BlogIndex': {
-      const hubCtx = input.siteContext?.pages.find(
-        p => p.path === input.pageMeta.publishedPath,
-      );
-      if (hubCtx && hubCtx.childPaths.length > 0) {
-        const children = hubCtx.childPaths
-          .map(cp => input.siteContext!.pages.find(p => p.path === cp))
-          .filter((p): p is SiteContextPage => p !== undefined)
-          .map(p => ({ id: p.id }));
+      const children = resolveHubChildren(input);
+      if (children) {
         schema = buildBlogIndexSchema({ baseUrl, pageData, children });
         reason = 'Blog index — Blog with cross-page child @id references.';
       } else {
@@ -251,14 +255,8 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       break;
     }
     case 'ServiceIndex': {
-      const hubCtx = input.siteContext?.pages.find(
-        p => p.path === input.pageMeta.publishedPath,
-      );
-      if (hubCtx && hubCtx.childPaths.length > 0) {
-        const children = hubCtx.childPaths
-          .map(cp => input.siteContext!.pages.find(p => p.path === cp))
-          .filter((p): p is SiteContextPage => p !== undefined)
-          .map(p => ({ id: p.id }));
+      const children = resolveHubChildren(input);
+      if (children) {
         schema = buildServiceHubSchema({ baseUrl, pageData, children });
         reason = 'Service index — Service + OfferCatalog with child @id references.';
       } else {
@@ -268,14 +266,8 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       break;
     }
     case 'CaseStudyIndex': {
-      const hubCtx = input.siteContext?.pages.find(
-        p => p.path === input.pageMeta.publishedPath,
-      );
-      if (hubCtx && hubCtx.childPaths.length > 0) {
-        const children = hubCtx.childPaths
-          .map(cp => input.siteContext!.pages.find(p => p.path === cp))
-          .filter((p): p is SiteContextPage => p !== undefined)
-          .map(p => ({ id: p.id }));
+      const children = resolveHubChildren(input);
+      if (children) {
         schema = buildCollectionPageSchema({ baseUrl, pageData, children });
         reason = 'Case study index — CollectionPage + ItemList with child @id references.';
       } else {
