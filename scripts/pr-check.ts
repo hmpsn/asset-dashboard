@@ -4883,6 +4883,19 @@ export const CHECKS: Check[] = [
     severity: 'error',
     rationale: "s.image is AI-extracted from attacker-controllable page HTML. filterHttpUrls blocks non-http(s) scheme URLs from reaching JSON-LD published to live Webflow pages. Caught in PR #406 review where static.ts missed the fix applied to local-business.ts and service.ts.",
   },
+  {
+    // Correct pattern: filterHttpUrls([semantics?.primaryImage ?? '', pageData.image ?? ''])[0]
+    // Escape hatch: // primary-image-filter-ok
+    name: "Unfiltered semantics.primaryImage in schema template (use filterHttpUrls)",
+    pattern: "'image'[[:space:]]*:[[:space:]]*semantics?\\??\\.primaryImage",
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/schema/templates/',
+    excludeLines: ['primary-image-filter-ok'],
+    message:
+      "semantics?.primaryImage used directly in 'image' field — AI-extracted image URLs must go through filterHttpUrls([semantics?.primaryImage ?? '', pageData.image ?? ''])[0]. Prevents javascript:/data: scheme injection. Escape hatch: // primary-image-filter-ok",
+    severity: 'error',
+    rationale: "semantics.primaryImage is AI-extracted from attacker-controllable page HTML, same risk as s.image. homepage.ts and service.ts missed this in the PR #406 sweep while article.ts and local-business.ts were correct.",
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
