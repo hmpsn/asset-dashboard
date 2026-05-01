@@ -130,7 +130,7 @@ export interface SemanticPageData {
     street: string;
     city: string;
     state: string;
-    postalCode: string;
+    postalCode?: string;
     country?: string;
   };
   geo?: { latitude: number; longitude: number };

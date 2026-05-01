@@ -35,8 +35,8 @@ export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Reco
     '@id': `${pageData.canonicalUrl}#article`,
     'headline': pageData.cleanTitle,
     'description': pageData.description,
-    'image': (semantics?.primaryImage || pageData.image)
-      ? [(semantics?.primaryImage || pageData.image)!]
+    'image': filterHttpUrls([semantics?.primaryImage ?? '', pageData.image ?? '']).length > 0
+      ? filterHttpUrls([semantics?.primaryImage ?? '', pageData.image ?? ''])
       : undefined,
     'url': pageData.canonicalUrl,
     'datePublished': pageData.datePublished,

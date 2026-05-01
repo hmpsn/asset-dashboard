@@ -211,7 +211,7 @@ export async function callAnthropicWithTools(opts: {
           const retryAfter = res.headers.get('retry-after');
           let waitMs = Math.min(2000 * Math.pow(2, attempt), 30_000);
           if (retryAfter) waitMs = Math.max(parseInt(retryAfter, 10) * 1000 + 500, waitMs);
-          log.info(`[${feature}] Anthropic tool_use ${res.status}, retrying in ${waitMs}ms (attempt ${attempt + 1}/${maxRetries})`);
+          log.info(`[${feature}] Anthropic tool_use ${res.status}, retrying in ${waitMs}ms (attempt ${attempt + 1}/${maxRetries + 1})`);
           await new Promise(r => setTimeout(r, waitMs));
           continue;
         }
@@ -233,7 +233,7 @@ export async function callAnthropicWithTools(opts: {
       return { toolInput: toolUseBlock.input, promptTokens, completionTokens };
     } catch (err) {
       if (err instanceof Error && err.name === 'TimeoutError' && attempt < maxRetries) {
-        log.info(`[${feature}] Anthropic tool_use timeout, retrying (attempt ${attempt + 1}/${maxRetries})`);
+        log.info(`[${feature}] Anthropic tool_use timeout, retrying (attempt ${attempt + 1}/${maxRetries + 1})`);
         await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
         continue;
       }

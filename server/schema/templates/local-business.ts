@@ -5,7 +5,7 @@
  */
 import type { PageData, BusinessProfile } from '../data-sources.js';
 import type { SemanticPageData } from '../../../shared/types/page-elements.js';
-import { dropUndefined, withBreadcrumb } from './helpers.js';
+import { dropUndefined, withBreadcrumb, filterHttpUrls } from './helpers.js';
 
 export interface LocalBusinessInput {
   baseUrl: string;
@@ -61,7 +61,7 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
     'name': s.name,
     'jobTitle': s.jobTitle,
     'hasCredential': s.credentials,
-    'image': s.image,
+    'image': filterHttpUrls([s.image ?? ''])[0],
     'worksFor': { '@id': `${baseUrl}/#localbusiness` },
   }));
 
@@ -132,7 +132,7 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
     'name': pageData.publisher.name,
     'description': pageData.description,
     'url': baseUrl,
-    'image': semantics?.primaryImage || pageData.image,
+    'image': filterHttpUrls([semantics?.primaryImage ?? '', pageData.image ?? ''])[0],
     'inLanguage': pageData.inLanguage,
     'telephone': phone,
     'email': email,

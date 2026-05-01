@@ -36,6 +36,7 @@ import { generateSchemaForUnknownType } from './extractors/schema-generation.js'
 import type { SemanticPageData } from '../../shared/types/page-elements.js';
 import { createLogger } from '../logger.js';
 import { validateWithSchemaOrg } from './schema-org-validator.js';
+import { filterHttpUrls } from './templates/helpers.js';
 
 const log = createLogger('schema/generator');
 
@@ -154,6 +155,7 @@ function applyPostEnrichment(
   canonicalUrl: string,
   primaryType: string,
   baseValidationFindings: ValidationFinding[],
+  uploadDate: string | undefined,
 ): Record<string, unknown> {
   const graph = schema['@graph'] as Array<Record<string, unknown>>;
   if (!Array.isArray(graph)) return schema;
@@ -193,30 +195,38 @@ function applyPostEnrichment(
   const semanticsVideos = (!videoSources.length && semantics?.videos?.length) ? semantics.videos : [];
   const existingVideoIds = new Set(graph.filter(n => n['@type'] === 'VideoObject').map(n => n['@id']));
 
-  for (const [idx, v] of videoSources.entries()) {
-    const videoId = `${canonicalUrl}#video-${idx}`;
-    if (!existingVideoIds.has(videoId)) {
-      tryAppend({
-        '@type': 'VideoObject',
-        '@id': videoId,
-        'name': v.title || 'Video',
-        'description': `Video on ${canonicalUrl}`,
-        'thumbnailUrl': v.thumbnailUrl,
-        'embedUrl': v.embedUrl,
-      });
+  // VideoObject requires uploadDate — skip entirely when unavailable to avoid
+  // immediate rollback (tryAppend validates and pops on new errors).
+  if (uploadDate) {
+    for (const [idx, v] of videoSources.entries()) {
+      const videoId = `${canonicalUrl}#video-${idx}`;
+      if (!existingVideoIds.has(videoId)) {
+        tryAppend({
+          '@type': 'VideoObject',
+          '@id': videoId,
+          'name': v.title || 'Video',
+          'description': `Video on ${canonicalUrl}`,
+          'uploadDate': uploadDate,
+          'thumbnailUrl': v.thumbnailUrl,
+          'embedUrl': v.embedUrl,
+        });
+      }
     }
-  }
-  for (const [idx, v] of semanticsVideos.entries()) {
-    const videoId = `${canonicalUrl}#semvideo-${idx}`;
-    if (!existingVideoIds.has(videoId)) {
-      tryAppend({
-        '@type': 'VideoObject',
-        '@id': videoId,
-        'name': v.name || 'Video',
-        'description': v.description || `Video on ${canonicalUrl}`,
-        'thumbnailUrl': v.thumbnailUrl,
-        'contentUrl': v.contentUrl,
-      });
+    for (const [idx, v] of semanticsVideos.entries()) {
+      const videoId = `${canonicalUrl}#semvideo-${idx}`;
+      if (!existingVideoIds.has(videoId)) {
+        const safeThumb = filterHttpUrls([v.thumbnailUrl ?? ''])[0];
+        const safeContent = filterHttpUrls([v.contentUrl ?? ''])[0];
+        tryAppend({
+          '@type': 'VideoObject',
+          '@id': videoId,
+          'name': v.name || 'Video',
+          'description': v.description || `Video on ${canonicalUrl}`,
+          'uploadDate': uploadDate,
+          ...(safeThumb ? { 'thumbnailUrl': safeThumb } : {}),
+          ...(safeContent ? { 'contentUrl': safeContent } : {}),
+        });
+      }
     }
   }
 
@@ -242,11 +252,22 @@ function applyPostEnrichment(
     }
   }
 
-  // 4. AggregateRating on primary node (if not already set)
+  // 4. AggregateRating on primary node (if not already set).
+  // Inclusion list mirrors types Google allows AggregateRating on — avoids attaching to
+  // structural nodes (BreadcrumbList, WebSite) or secondary content nodes (FAQPage, VideoObject).
   if (semantics?.aggregateRating) {
+    const AGGREGATE_RATING_TYPES = new Set([
+      'LocalBusiness', 'Organization', 'Service', 'Product', 'Course', 'Event', 'Recipe',
+      'Movie', 'Book', 'SoftwareApplication', 'Offer',
+      // LocalBusiness subtypes
+      'Dentist', 'Physician', 'Attorney', 'LegalService', 'FinancialService',
+      'ProfessionalService', 'HomeAndConstructionBusiness', 'InsuranceAgency', 'RealEstateAgent',
+      'HealthAndBeautyBusiness', 'MedicalBusiness', 'MedicalClinic',
+      'FoodEstablishment', 'Restaurant', 'Hotel', 'Store', 'AutoDealer',
+    ]);
     const primaryNode = graph.find(n => {
       const t = n['@type'];
-      return typeof t === 'string' && !['BreadcrumbList', 'WebSite', 'Organization', 'FAQPage', 'VideoObject', 'HowTo', 'Review', 'ImageGallery'].includes(t);
+      return typeof t === 'string' && AGGREGATE_RATING_TYPES.has(t);
     });
     if (primaryNode && !primaryNode.aggregateRating) {
       primaryNode.aggregateRating = {
@@ -495,7 +516,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
   }
 
   // Post-enrichment pass: FAQPage (from semantics), VideoObject, sameAs, AggregateRating
-  schema = applyPostEnrichment(schema, semantics, catalog, pageData.canonicalUrl, classified.primaryType, baseValidationFindings);
+  schema = applyPostEnrichment(schema, semantics, catalog, pageData.canonicalUrl, classified.primaryType, baseValidationFindings, pageData.datePublished);
 
   // Surface validation findings of the FINAL schema (after FAQ resolution) to caller
   const validationFindings = validateLeanSchema(schema, classified.primaryType);

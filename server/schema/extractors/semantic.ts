@@ -167,15 +167,19 @@ function validateExtracted(raw: Record<string, unknown>, strippedText: string): 
   // Phone: must appear verbatim in stripped text
   if (result.phone) {
     const digits = result.phone.replace(/\D/g, '');
-    if (digits.length < 7 || !strippedText.includes(result.phone.replace(/\s/g, ' '))) {
+    // Mirror stripToMainContent's whitespace collapsing (\s+ → ' ') so phones with
+    // double-space or non-breaking-space separators match correctly.
+    if (digits.length < 7 || !strippedText.includes(result.phone.replace(/\s+/g, ' '))) {
       delete result.phone;
     }
   }
 
-  // Postal code format
+  // Postal code format — only delete the postalCode field, not the entire address.
+  // Non-US postal codes (UK, Canada, Australia, etc.) fail the US-only regex but
+  // the street/city/state fields are still valid and useful.
   if (result.address?.postalCode) {
     if (!/^\d{5}(-\d{4})?$/.test(result.address.postalCode)) {
-      delete result.address;
+      delete result.address.postalCode;
     }
   }
 
@@ -190,9 +194,9 @@ function validateExtracted(raw: Record<string, unknown>, strippedText: string): 
     }
   }
 
-  // Hours: opens/closes must be parseable HH:MM
+  // Hours: opens/closes must be valid HH:MM (0-23 hours, 0-59 minutes)
   if (result.hours) {
-    const TIME_RE = /^\d{1,2}:\d{2}$/;
+    const TIME_RE = /^([01]?\d|2[0-3]):[0-5]\d$/;
     result.hours = result.hours.filter(h => TIME_RE.test(h.opens) && TIME_RE.test(h.closes));
     if (result.hours.length === 0) delete result.hours;
   }

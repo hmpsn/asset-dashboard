@@ -46,7 +46,7 @@ export function buildServiceSchema(input: ServiceInput): Record<string, unknown>
     'name': s.name,
     'jobTitle': s.jobTitle,
     'hasCredential': s.credentials,
-    'image': s.image,
+    'image': filterHttpUrls([s.image ?? ''])[0],
   }));
 
   // PR2: AggregateRating from testimonials WITH ratings
@@ -82,7 +82,7 @@ export function buildServiceSchema(input: ServiceInput): Record<string, unknown>
     '@id': serviceId,
     'name': pageData.cleanTitle,
     'description': pageData.description,
-    'image': pageData.image,
+    'image': semantics?.primaryImage || pageData.image,
     'url': pageData.canonicalUrl,
     'provider': (input.businessProfile?.address?.street || input.businessProfile?.address?.city)
       ? localBusinessRef(baseUrl)

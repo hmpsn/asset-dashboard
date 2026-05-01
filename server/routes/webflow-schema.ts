@@ -91,6 +91,12 @@ function scheduleSchemaGoogleValidation(
       log.info({ publishEntryId, pageUrl, status, issueCount: errorIssues.length }, 'schema google validation complete');
     } catch (err) {
       log.warn({ err, publishEntryId, pageUrl }, 'scheduleSchemaGoogleValidation failed');
+      // Mark as no_gsc so the entry doesn't remain permanently NULL (indistinguishable
+      // from "still waiting"). Any error here means we won't get a result.
+      updateSchemaGoogleStatus(publishEntryId, workspaceId, 'no_gsc');
+      broadcastToWorkspace(workspaceId, WS_EVENTS.SCHEMA_GOOGLE_VALIDATION, {
+        publishEntryId, pageUrl, status: 'no_gsc',
+      });
     }
   }, 3 * 60 * 1000);
 }

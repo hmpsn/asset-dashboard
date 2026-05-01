@@ -523,7 +523,10 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
   //    Review nodes — each pointing at the parent via itemReviewed.@id)
   // Homepage may have BOTH Organization + WebSite (different @types), so the
   // rule is per-type, not "exactly one primary".
-  const ALLOW_MULTIPLE = new Set(['ListItem', 'Review']);
+  // Person is emitted as multiple top-level nodes when semantics.staff has 2+ entries.
+  // VideoObject is emitted once per video (catalog.videos or semantics.videos).
+  // HowToStep is emitted once per step in HowTo nodes.
+  const ALLOW_MULTIPLE = new Set(['ListItem', 'Review', 'Person', 'VideoObject', 'HowToStep']);
   const typeCounts = new Map<string, number>();
   for (const node of graph) {
     const t = node['@type'] as string;
@@ -551,7 +554,18 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
   // These are excluded from the unverified-type warning path.
   // FAQPage/Question/Answer are validated structurally at extraction time (extractFaq guarantees
   // ≥2 pairs with non-empty question+answer), so no redundant re-check here.
-  const DEDICATED_VALIDATOR_TYPES = new Set(['BreadcrumbList', 'ListItem', 'FAQPage', 'Question', 'Answer']);
+  // Types handled by dedicated validators or known structural types — excluded from unverified-type warning.
+  const DEDICATED_VALIDATOR_TYPES = new Set([
+    'BreadcrumbList', 'ListItem', 'FAQPage', 'Question', 'Answer',
+    // Person nodes from semantics.staff are structurally validated upstream (name is required).
+    // VideoObject nodes are validated by REQUIRED_BY_TYPE (name/description/uploadDate).
+    // Suppress unverified-type warnings for these well-known types that templates legitimately emit.
+    'Person', 'PostalAddress', 'OpeningHoursSpecification', 'GeoCoordinates',
+    'AggregateRating', 'Rating', 'Offer', 'OfferCatalog',
+    'HowTo', 'HowToStep', 'ImageGallery', 'ImageObject',
+    'SearchAction', 'EntryPoint', 'LocationFeatureSpecification',
+    'Organization', 'WebPage', 'AboutPage', 'ContactPage',
+  ]);
 
   function validateNodeRecursive(node: Record<string, unknown>) {
     const t = node['@type'] as string;
