@@ -99,7 +99,7 @@ export function buildWebPageSchema(input: StaticInput): Record<string, unknown> 
  * Falls back to buildCollectionPageSchema in the generator when no siteContext.
  *
  * @param children - Pre-sorted SiteContextPage child refs (sorted by date desc, null last).
- *   blogPost is capped at 10; numberOfItems reflects the true total.
+ *   blogPost is capped at 10.
  */
 export function buildBlogIndexSchema(input: {
   baseUrl: string;

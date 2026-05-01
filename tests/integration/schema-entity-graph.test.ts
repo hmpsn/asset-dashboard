@@ -106,10 +106,10 @@ describe('BlogIndex hub dispatch', () => {
     expect(blogPost[2]['@id']).toBe(`${BASE}/blog/post-c#article`);
   });
 
-  it('numberOfItems reflects true count', async () => {
+  it('numberOfItems is not emitted (ItemList property, not Blog)', async () => {
     const out = await generate('/blog', ctx);
     const blog = (out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>)[0];
-    expect(blog['numberOfItems']).toBe(3);
+    expect(blog['numberOfItems']).toBeUndefined();
   });
 
   it('passes validator with zero error findings', async () => {

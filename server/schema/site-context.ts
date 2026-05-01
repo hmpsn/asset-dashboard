@@ -19,7 +19,7 @@ export interface SiteContextPage {
   id: string;
   /** Path of the closest ancestor hub page, or null */
   parentPath: string | null;
-  /** Paths of qualifying child pages (Service, BlogPosting, Article, CaseStudy kinds only).
+  /** Paths of qualifying child pages (Service, BlogPosting, CaseStudy kinds only).
    *  Sorted: date desc (lastPublished) for dated pages, null-date pages last then alpha. */
   childPaths: string[];
 }
