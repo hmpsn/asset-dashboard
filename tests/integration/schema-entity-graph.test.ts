@@ -92,18 +92,18 @@ describe('BlogIndex hub dispatch', () => {
     const blogPost = blog['blogPost'] as Array<{ '@id': string }>;
     expect(blogPost).toHaveLength(3);
     const ids = blogPost.map(p => p['@id']);
-    expect(ids).toContain(`${BASE}/blog/post-a#blogposting`);
-    expect(ids).toContain(`${BASE}/blog/post-b#blogposting`);
-    expect(ids).toContain(`${BASE}/blog/post-c#blogposting`);
+    expect(ids).toContain(`${BASE}/blog/post-a#article`);
+    expect(ids).toContain(`${BASE}/blog/post-b#article`);
+    expect(ids).toContain(`${BASE}/blog/post-c#article`);
   });
 
   it('blogPost[] is sorted newest-first', async () => {
     const out = await generate('/blog', ctx);
     const blog = (out.suggestedSchemas[0].template['@graph'] as Array<Record<string, unknown>>)[0];
     const blogPost = blog['blogPost'] as Array<{ '@id': string }>;
-    expect(blogPost[0]['@id']).toBe(`${BASE}/blog/post-a#blogposting`);
-    expect(blogPost[1]['@id']).toBe(`${BASE}/blog/post-b#blogposting`);
-    expect(blogPost[2]['@id']).toBe(`${BASE}/blog/post-c#blogposting`);
+    expect(blogPost[0]['@id']).toBe(`${BASE}/blog/post-a#article`);
+    expect(blogPost[1]['@id']).toBe(`${BASE}/blog/post-b#article`);
+    expect(blogPost[2]['@id']).toBe(`${BASE}/blog/post-c#article`);
   });
 
   it('numberOfItems reflects true count', async () => {

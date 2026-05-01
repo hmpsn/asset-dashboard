@@ -115,6 +115,7 @@ export function buildBlogIndexSchema(input: {
     'description': pageData.description,
     'url': pageData.canonicalUrl,
     'publisher': orgRef(baseUrl),
+    'isPartOf': webSiteRef(baseUrl),
     'inLanguage': pageData.inLanguage,
     'numberOfItems': input.children.length,
     'blogPost': cappedBlogPost.length > 0

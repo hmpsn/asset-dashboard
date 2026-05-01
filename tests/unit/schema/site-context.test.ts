@@ -37,7 +37,7 @@ describe('assembleSiteContext', () => {
     expect(p).toBeDefined();
     expect(p!.kind).toBe('BlogPosting');
     expect(p!.primaryType).toBe('BlogPosting');
-    expect(p!.id).toBe(`${BASE}/blog/my-post#blogposting`);
+    expect(p!.id).toBe(`${BASE}/blog/my-post#article`);
     expect(p!.parentPath).toBeNull(); // no hub in this page list
     expect(p!.childPaths).toEqual([]);
   });
@@ -57,7 +57,7 @@ describe('assembleSiteContext', () => {
     const byPath = new Map(ctx.pages.map(p => [p.path, p]));
     expect(byPath.get('/')!.id).toBe(`${BASE}/#webpage`);
     expect(byPath.get('/blog')!.id).toBe(`${BASE}/blog#blog`);
-    expect(byPath.get('/blog/post')!.id).toBe(`${BASE}/blog/post#blogposting`);
+    expect(byPath.get('/blog/post')!.id).toBe(`${BASE}/blog/post#article`);
     expect(byPath.get('/services')!.id).toBe(`${BASE}/services#service`);
     expect(byPath.get('/services/design')!.id).toBe(`${BASE}/services/design#service`);
     expect(byPath.get('/our-work')!.id).toBe(`${BASE}/our-work#webpage`);

@@ -38,7 +38,7 @@ const CHILD_KINDS = new Set<PageKind>(['Service', 'BlogPosting', 'CaseStudy']);
 function kindToIdSuffix(kind: PageKind): string {
   switch (kind) {
     case 'Service': return 'service';
-    case 'BlogPosting': return 'blogposting';
+    case 'BlogPosting': return 'article';
     case 'CaseStudy': return 'article';
     case 'BlogIndex': return 'blog';
     case 'ServiceIndex': return 'service';
@@ -67,6 +67,7 @@ export function assembleSiteContext(
   baseUrl: string,
   canonicalEntities: CanonicalEntity[] = [],
 ): SiteContext {
+  baseUrl = baseUrl.replace(/\/+$/, '');
   // Build a path-keyed map for sorting lookups later
   const rawByPath = new Map<string, WebflowPage>();
 

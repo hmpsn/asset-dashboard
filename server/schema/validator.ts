@@ -64,7 +64,7 @@ const REQUIRED_BY_TYPE: Record<string, RequiredFields> = {
     required: ['name', 'url', 'description', 'isPartOf', 'breadcrumb', 'inLanguage'],
   },
   Blog: {
-    required: ['name', 'url', 'publisher'],
+    required: ['name', 'url', 'publisher', 'description', 'inLanguage', 'breadcrumb'],
   },
   OfferCatalog: {
     required: ['name'],
