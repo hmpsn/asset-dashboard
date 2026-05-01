@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { buildArticleSchema } from '../../../server/schema/templates/article.js';
 import { buildServiceSchema, buildProductSchema } from '../../../server/schema/templates/service.js';
 import { buildLocalBusinessSchema } from '../../../server/schema/templates/local-business.js';
-import { buildAboutPageSchema, buildContactPageSchema, buildCollectionPageSchema, buildWebPageSchema } from '../../../server/schema/templates/static.js';
+import { buildAboutPageSchema, buildContactPageSchema, buildCollectionPageSchema, buildWebPageSchema, buildBlogIndexSchema, buildServiceHubSchema } from '../../../server/schema/templates/static.js';
 import { buildHomepageSchema } from '../../../server/schema/templates/homepage.js';
 import { validateLeanSchema } from '../../../server/schema/validator.js';
 
@@ -954,5 +954,186 @@ describe('Service — PR2 enrichment (Review/AggregateRating/Gallery/Table)', ()
     const primary = graph.find(n => n['@type'] === 'Service')!;
     expect(primary.aggregateRating).toBeDefined();
     expect(primary.mainEntity).toBeDefined();
+  });
+});
+
+// ── Hub template tests (Workstream C) ────────────────────────────────
+
+const hubBaseInput = {
+  baseUrl: 'https://example.com',
+  pageData: {
+    title: 'Insights | Acme',
+    cleanTitle: 'Insights',
+    description: 'Our blog',
+    image: undefined,
+    canonicalUrl: 'https://example.com/insights',
+    publisher: { name: 'Acme', logoUrl: 'https://example.com/logo.png' },
+    datePublished: undefined,
+    dateModified: undefined,
+    inLanguage: 'en',
+    articleSection: undefined,
+    breadcrumbs: [
+      { name: 'Home', url: 'https://example.com' },
+      { name: 'Insights', url: 'https://example.com/insights' },
+    ],
+  },
+};
+
+const blogChildren = [
+  { id: 'https://example.com/insights/post-a#blogposting' },
+  { id: 'https://example.com/insights/post-b#blogposting' },
+];
+
+describe('buildBlogIndexSchema', () => {
+  it('emits Blog as primary @type', () => {
+    const schema = buildBlogIndexSchema({ ...hubBaseInput, children: blogChildren });
+    const graph = schema['@graph'] as Array<Record<string, unknown>>;
+    expect(graph[0]['@type']).toBe('Blog');
+  });
+
+  it('@id ends with #blog', () => {
+    const schema = buildBlogIndexSchema({ ...hubBaseInput, children: blogChildren });
+    const blog = (schema['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(blog['@id']).toBe('https://example.com/insights#blog');
+  });
+
+  it('emits blogPost array with correct @id refs', () => {
+    const schema = buildBlogIndexSchema({ ...hubBaseInput, children: blogChildren });
+    const blog = (schema['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(blog['blogPost']).toEqual([
+      { '@id': 'https://example.com/insights/post-a#blogposting' },
+      { '@id': 'https://example.com/insights/post-b#blogposting' },
+    ]);
+  });
+
+  it('caps blogPost at 10 when more children are provided', () => {
+    const manyChildren = Array.from({ length: 15 }, (_, i) => ({
+      id: `https://example.com/insights/post-${i}#blogposting`,
+    }));
+    const schema = buildBlogIndexSchema({ ...hubBaseInput, children: manyChildren });
+    const blog = (schema['@graph'] as Array<Record<string, unknown>>)[0];
+    // numberOfItems is an ItemList property, not Blog — intentionally omitted.
+    expect(blog['numberOfItems']).toBeUndefined();
+    expect((blog['blogPost'] as unknown[]).length).toBe(10);
+  });
+
+  it('emits publisher as orgRef', () => {
+    const schema = buildBlogIndexSchema({ ...hubBaseInput, children: blogChildren });
+    const blog = (schema['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(blog['publisher']).toEqual({ '@id': 'https://example.com/#organization' });
+  });
+
+  it('passes validator with zero error findings', () => {
+    const schema = buildBlogIndexSchema({ ...hubBaseInput, children: blogChildren });
+    const findings = validateLeanSchema(schema, 'Blog');
+    expect(findings.filter((f: { severity: string }) => f.severity === 'error')).toEqual([]);
+  });
+});
+
+const serviceHubInput = {
+  baseUrl: 'https://example.com',
+  pageData: {
+    title: 'Services | Acme',
+    cleanTitle: 'Services',
+    description: 'What we offer',
+    image: undefined,
+    canonicalUrl: 'https://example.com/services',
+    publisher: { name: 'Acme', logoUrl: 'https://example.com/logo.png' },
+    datePublished: undefined,
+    dateModified: undefined,
+    inLanguage: 'en',
+    articleSection: undefined,
+    breadcrumbs: [
+      { name: 'Home', url: 'https://example.com' },
+      { name: 'Services', url: 'https://example.com/services' },
+    ],
+  },
+};
+
+const serviceChildren = [
+  { id: 'https://example.com/services/design#service' },
+  { id: 'https://example.com/services/dev#service' },
+];
+
+describe('buildServiceHubSchema', () => {
+  it('emits Service as primary @type', () => {
+    const schema = buildServiceHubSchema({ ...serviceHubInput, children: serviceChildren });
+    const graph = schema['@graph'] as Array<Record<string, unknown>>;
+    expect(graph[0]['@type']).toBe('Service');
+  });
+
+  it('@id ends with #service', () => {
+    const schema = buildServiceHubSchema({ ...serviceHubInput, children: serviceChildren });
+    const service = (schema['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(service['@id']).toBe('https://example.com/services#service');
+  });
+
+  it('emits hasOfferCatalog with itemListElement refs', () => {
+    const schema = buildServiceHubSchema({ ...serviceHubInput, children: serviceChildren });
+    const service = (schema['@graph'] as Array<Record<string, unknown>>)[0];
+    const catalog = service['hasOfferCatalog'] as Record<string, unknown>;
+    expect(catalog['@type']).toBe('OfferCatalog');
+    expect(catalog['itemListElement']).toEqual([
+      { '@type': 'ListItem', 'position': 1, 'item': { '@id': 'https://example.com/services/design#service' } },
+      { '@type': 'ListItem', 'position': 2, 'item': { '@id': 'https://example.com/services/dev#service' } },
+    ]);
+  });
+
+  it('passes validator with zero error findings', () => {
+    const schema = buildServiceHubSchema({ ...serviceHubInput, children: serviceChildren });
+    const findings = validateLeanSchema(schema, 'Service');
+    expect(findings.filter((f: { severity: string }) => f.severity === 'error')).toEqual([]);
+  });
+});
+
+const caseStudyHubInput = {
+  baseUrl: 'https://example.com',
+  pageData: {
+    title: 'Our Work | Acme',
+    cleanTitle: 'Our Work',
+    description: 'Client projects',
+    image: undefined,
+    canonicalUrl: 'https://example.com/our-work',
+    publisher: { name: 'Acme', logoUrl: 'https://example.com/logo.png' },
+    datePublished: undefined,
+    dateModified: undefined,
+    inLanguage: 'en',
+    articleSection: undefined,
+    breadcrumbs: [
+      { name: 'Home', url: 'https://example.com' },
+      { name: 'Our Work', url: 'https://example.com/our-work' },
+    ],
+  },
+};
+
+const caseStudyChildren = [
+  { id: 'https://example.com/our-work/project-a#article' },
+  { id: 'https://example.com/our-work/project-b#article' },
+];
+
+describe('buildCollectionPageSchema with children (CaseStudyIndex)', () => {
+  it('emits CollectionPage with mainEntity ItemList when children provided', () => {
+    const schema = buildCollectionPageSchema({ ...caseStudyHubInput, children: caseStudyChildren });
+    const pg = (schema['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(pg['@type']).toBe('CollectionPage');
+    const mainEntity = pg['mainEntity'] as Record<string, unknown>;
+    expect(mainEntity['@type']).toBe('ItemList');
+    expect(mainEntity['numberOfItems']).toBe(2);
+    const items = mainEntity['itemListElement'] as Array<Record<string, unknown>>;
+    expect(items).toHaveLength(2);
+    expect(items[0]).toEqual({ '@type': 'ListItem', 'position': 1, 'item': { '@id': 'https://example.com/our-work/project-a#article' } });
+    expect(items[1]).toEqual({ '@type': 'ListItem', 'position': 2, 'item': { '@id': 'https://example.com/our-work/project-b#article' } });
+  });
+
+  it('falls back to plain CollectionPage when no children', () => {
+    const schema = buildCollectionPageSchema(caseStudyHubInput);
+    const pg = (schema['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(pg['mainEntity']).toBeUndefined();
+  });
+
+  it('passes validator with zero error findings when children provided', () => {
+    const schema = buildCollectionPageSchema({ ...caseStudyHubInput, children: caseStudyChildren });
+    const findings = validateLeanSchema(schema, 'CollectionPage');
+    expect(findings.filter((f: { severity: string }) => f.severity === 'error')).toEqual([]);
   });
 });

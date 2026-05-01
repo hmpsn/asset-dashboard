@@ -24,12 +24,13 @@ import type { PageElementCatalog } from '../../shared/types/page-elements.js';
 import { buildArticleSchema } from './templates/article.js';
 import { buildServiceSchema } from './templates/service.js';
 import { buildLocalBusinessSchema } from './templates/local-business.js';
-import { buildAboutPageSchema, buildContactPageSchema, buildCollectionPageSchema, buildWebPageSchema } from './templates/static.js';
+import { buildAboutPageSchema, buildContactPageSchema, buildCollectionPageSchema, buildWebPageSchema, buildBlogIndexSchema, buildServiceHubSchema } from './templates/static.js';
 import { buildHomepageSchema } from './templates/homepage.js';
 import { validateLeanSchema } from './validator.js';
 import { checkRichResultsEligibility } from './rich-results.js';
 import type { RichResultEligibility } from './rich-results.js';
 import type { ValidationFinding } from '../../shared/types/schema-validation.js';
+import type { SiteContext, SiteContextPage } from './site-context.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('schema/generator');
@@ -64,6 +65,12 @@ export interface LeanGeneratorInput {
   existingSchemas?: string[];
   /** Per-regenerate AI budget passed by the schema-suggester orchestrator. PR1 always zero. */
   aiBudget?: AiBudget;
+  /**
+   * Optional cross-page context assembled once per regenerate-all run.
+   * When absent, generator behaves exactly as before (no hub enrichment).
+   * Workstream D will extend SiteContext with role/exclusion fields.
+   */
+  siteContext?: SiteContext;
 }
 
 function detectExistingSchemas(html: string): string[] {
@@ -114,6 +121,20 @@ export function isCatalogStale(
   const inputMs = new Date(inputSourcePublishedAt).getTime();
   if (!Number.isFinite(storedMs) || !Number.isFinite(inputMs)) return true;
   return inputMs > storedMs;
+}
+
+/** Returns child @id objects for a hub page when siteContext is present and has resolvable children; null otherwise. */
+function resolveHubChildren(input: LeanGeneratorInput): Array<{ id: string }> | null {
+  const hubCtx = input.siteContext?.pages.find(p => p.path === input.pageMeta.publishedPath);
+  if (!hubCtx || hubCtx.childPaths.length === 0) return null;
+  const resolved = hubCtx.childPaths
+    .map(cp => input.siteContext!.pages.find(p => p.path === cp))
+    .filter((p): p is SiteContextPage => p !== undefined)
+    .map(p => ({ id: p.id }));
+  // Defensive: if every childPath failed to resolve (shouldn't happen since childPaths
+  // are populated from the same sitePages array), return null so callers fall back to
+  // CollectionPage instead of emitting an empty hub.
+  return resolved.length > 0 ? resolved : null;
 }
 
 export async function generateLeanSchema(input: LeanGeneratorInput): Promise<LeanGeneratorOutput> {
@@ -226,12 +247,39 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       schema = buildContactPageSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile });
       reason = 'Contact page — ContactPage with LocalBusiness mainEntity when address is set.';
       break;
-    case 'BlogIndex':
-    case 'CaseStudyIndex':
-    case 'ServiceIndex':
-      schema = buildCollectionPageSchema({ baseUrl, pageData });
-      reason = `${classified.kind.replace('Index', '')} index — CollectionPage.`;
+    case 'BlogIndex': {
+      const children = resolveHubChildren(input);
+      if (children) {
+        schema = buildBlogIndexSchema({ baseUrl, pageData, children });
+        reason = 'Blog index — Blog with cross-page child @id references.';
+      } else {
+        schema = buildCollectionPageSchema({ baseUrl, pageData });
+        reason = 'Blog index — CollectionPage (no child context available).';
+      }
       break;
+    }
+    case 'ServiceIndex': {
+      const children = resolveHubChildren(input);
+      if (children) {
+        schema = buildServiceHubSchema({ baseUrl, pageData, children });
+        reason = 'Service index — Service + OfferCatalog with child @id references.';
+      } else {
+        schema = buildCollectionPageSchema({ baseUrl, pageData });
+        reason = 'Service index — CollectionPage (no child context available).';
+      }
+      break;
+    }
+    case 'CaseStudyIndex': {
+      const children = resolveHubChildren(input);
+      if (children) {
+        schema = buildCollectionPageSchema({ baseUrl, pageData, children });
+        reason = 'Case study index — CollectionPage + ItemList with child @id references.';
+      } else {
+        schema = buildCollectionPageSchema({ baseUrl, pageData });
+        reason = 'Case study index — CollectionPage (no child context available).';
+      }
+      break;
+    }
     case 'Legal':
     case 'WebPage':
       schema = buildWebPageSchema({ baseUrl, pageData });
