@@ -4,7 +4,7 @@
  */
 import type { PageData, BusinessProfile } from '../data-sources.js';
 import type { SemanticPageData } from '../../../shared/types/page-elements.js';
-import { dropUndefined } from './helpers.js';
+import { dropUndefined, filterHttpUrls } from './helpers.js';
 
 export interface HomepageInput {
   baseUrl: string;
@@ -31,7 +31,7 @@ export function buildHomepageSchema(input: HomepageInput): Record<string, unknow
     'name': pageData.publisher.name,
     'url': baseUrl,
     'description': pageData.description,
-    'image': semantics?.primaryImage || pageData.image,
+    'image': filterHttpUrls([semantics?.primaryImage ?? '', pageData.image ?? ''])[0],
     'logo': pageData.publisher.logoUrl
       ? { '@type': 'ImageObject', 'url': pageData.publisher.logoUrl }
       : undefined,

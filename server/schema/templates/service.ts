@@ -82,7 +82,7 @@ export function buildServiceSchema(input: ServiceInput): Record<string, unknown>
     '@id': serviceId,
     'name': pageData.cleanTitle,
     'description': pageData.description,
-    'image': semantics?.primaryImage || pageData.image,
+    'image': filterHttpUrls([semantics?.primaryImage ?? '', pageData.image ?? ''])[0],
     'url': pageData.canonicalUrl,
     'provider': (input.businessProfile?.address?.street || input.businessProfile?.address?.city)
       ? localBusinessRef(baseUrl)
