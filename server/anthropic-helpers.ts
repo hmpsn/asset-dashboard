@@ -238,6 +238,7 @@ export async function callAnthropicWithTools(opts: {
         continue;
       }
       if (attempt === maxRetries) throw err;
+      log.info(`[${feature}] Anthropic tool_use error: ${err instanceof Error ? err.message : String(err)}, retrying (attempt ${attempt + 1}/${maxRetries + 1})`);
       await new Promise(r => setTimeout(r, 2000 * Math.pow(2, attempt)));
     }
   }

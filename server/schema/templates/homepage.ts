@@ -36,7 +36,7 @@ export function buildHomepageSchema(input: HomepageInput): Record<string, unknow
       ? { '@type': 'ImageObject', 'url': pageData.publisher.logoUrl }
       : undefined,
     'sameAs': sameAsUrls.length > 0 ? [...new Set(sameAsUrls)] : undefined,
-    'foundedDate': semantics?.foundingDate || businessProfile?.foundedDate,
+    'foundingDate': semantics?.foundingDate || businessProfile?.foundedDate,
     'numberOfLocations': semantics?.numberOfLocations,
     'award': semantics?.awards?.length ? semantics.awards : undefined,
     'slogan': semantics?.highlights?.[0],

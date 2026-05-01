@@ -140,7 +140,7 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
     'openingHours': !openingHoursSpec ? businessProfile?.openingHours : undefined,
     'address': semanticsAddress || address,
     'sameAs': sameAs,
-    'foundedDate': semantics?.foundingDate || businessProfile?.foundedDate,
+    'foundingDate': semantics?.foundingDate || businessProfile?.foundedDate,
     'hasOfferCatalog': hasOfferCatalog,
     'parentOrganization': { '@id': `${baseUrl}/#organization` },
     'areaServed': areaServedList,
