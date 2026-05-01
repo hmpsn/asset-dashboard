@@ -549,7 +549,9 @@ export function validateLeanSchema(schema: Record<string, unknown>, _primaryType
   const NESTED_TYPES = new Set(['Table', 'ImageGallery', 'AggregateRating', 'OfferCatalog', 'ItemList']);
   // Types handled by dedicated validators (not in REQUIRED_BY_TYPE but still "known").
   // These are excluded from the unverified-type warning path.
-  const DEDICATED_VALIDATOR_TYPES = new Set(['BreadcrumbList', 'ListItem']);
+  // FAQPage/Question/Answer are validated structurally at extraction time (extractFaq guarantees
+  // ≥2 pairs with non-empty question+answer), so no redundant re-check here.
+  const DEDICATED_VALIDATOR_TYPES = new Set(['BreadcrumbList', 'ListItem', 'FAQPage', 'Question', 'Answer']);
 
   function validateNodeRecursive(node: Record<string, unknown>) {
     const t = node['@type'] as string;
