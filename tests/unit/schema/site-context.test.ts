@@ -60,7 +60,7 @@ describe('assembleSiteContext', () => {
     expect(byPath.get('/blog/post')!.id).toBe(`${BASE}/blog/post#article`);
     expect(byPath.get('/services')!.id).toBe(`${BASE}/services#service`);
     expect(byPath.get('/services/design')!.id).toBe(`${BASE}/services/design#service`);
-    expect(byPath.get('/our-work')!.id).toBe(`${BASE}/our-work#webpage`);
+    expect(byPath.get('/our-work')!.id).toBe(`${BASE}/our-work#collection`);
     expect(byPath.get('/our-work/project-a')!.id).toBe(`${BASE}/our-work/project-a#article`);
     expect(byPath.get('/about')!.id).toBe(`${BASE}/about#webpage`);
   });

@@ -42,6 +42,7 @@ function kindToIdSuffix(kind: PageKind): string {
     case 'CaseStudy': return 'article';
     case 'BlogIndex': return 'blog';
     case 'ServiceIndex': return 'service';
+    case 'CaseStudyIndex': return 'collection';
     default: return 'webpage';
   }
 }
