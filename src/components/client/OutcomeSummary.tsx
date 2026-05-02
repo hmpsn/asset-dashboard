@@ -25,15 +25,15 @@ const ACTION_TYPE_LABELS: Record<ActionType, string> = {
 };
 
 function TrendIcon({ trend }: { trend: LearningsTrend }) {
-  if (trend === 'improving') return <Icon as={TrendingUp} size="md" className="text-emerald-400" />;
-  if (trend === 'declining') return <Icon as={TrendingDown} size="md" className="text-red-400" />;
+  if (trend === 'improving') return <Icon as={TrendingUp} size="md" className="text-accent-success" />;
+  if (trend === 'declining') return <Icon as={TrendingDown} size="md" className="text-accent-danger" />;
   return <Icon as={Minus} size="md" className="text-[var(--brand-text)]" />;
 }
 
 function winRateColor(rate: number): string {
-  if (rate >= 0.6) return 'text-emerald-400';
-  if (rate >= 0.4) return 'text-amber-400';
-  return 'text-red-400';
+  if (rate >= 0.6) return 'text-accent-success';
+  if (rate >= 0.4) return 'text-accent-warning';
+  return 'text-accent-danger';
 }
 
 function winRateBg(rate: number): string {
@@ -67,7 +67,7 @@ function TopThreeWins({ scorecard }: { scorecard: OutcomeScorecard }) {
     <ul className="space-y-2">
       {topCategories.map(cat => (
         <li key={cat.actionType} className="flex items-start gap-2 t-body text-[var(--brand-text-bright)]">
-          <Icon as={CheckCircle2} size="md" className="text-emerald-400 flex-shrink-0 mt-0.5" />
+          <Icon as={CheckCircle2} size="md" className="text-accent-success flex-shrink-0 mt-0.5" />
           <span>
             <span className="font-medium text-[var(--brand-text-bright)]">
               {ACTION_TYPE_LABELS[cat.actionType]}
@@ -173,7 +173,7 @@ function PremiumBreakdown({ scorecard }: { scorecard: OutcomeScorecard }) {
           </div>
           <div className="space-y-1">
             <p className="t-caption text-[var(--brand-text-muted)]">Confirmed wins</p>
-            <p className="text-xl font-semibold text-emerald-400">{totalWins}</p>
+            <p className="text-xl font-semibold text-accent-success">{totalWins}</p>
           </div>
           <div className="space-y-1">
             <p className="t-caption text-[var(--brand-text-muted)]">Pending measurement</p>
@@ -201,7 +201,7 @@ export default function OutcomeSummary({ workspaceId, tier }: OutcomeSummaryProp
     <FeatureFlag flag="outcome-client-reporting">
       <SectionCard>
         <div className="flex items-center gap-2 mb-4">
-          <Icon as={Trophy} size="md" className="text-teal-400" />
+          <Icon as={Trophy} size="md" className="text-accent-brand" />
           <h3 className="t-body font-semibold text-[var(--brand-text-bright)]">Your results</h3>
           <span className="t-caption text-[var(--brand-text-muted)] ml-auto flex items-center gap-1">
             <Icon as={Clock} size="sm" /> Measured over 90 days

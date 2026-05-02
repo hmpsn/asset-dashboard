@@ -66,8 +66,8 @@ export function ServiceInterestCTA({ type, workspaceId, onAction, bookingUrl }: 
   if (mutation.isSuccess) {
     return (
       <div className="mt-3 flex items-center gap-2 px-3.5 py-2.5 rounded-[var(--radius-xl)] bg-teal-500/10 border border-teal-500/20">
-        <CheckCircle className="w-4 h-4 text-teal-400 flex-shrink-0" />
-        <span className="t-caption text-teal-300">
+        <CheckCircle className="w-4 h-4 text-accent-brand flex-shrink-0" />
+        <span className="t-caption text-accent-brand">
           {hasBooking ? "Booked! We'll see you soon." : "Got it — we'll be in touch soon."}
         </span>
       </div>
@@ -79,12 +79,12 @@ export function ServiceInterestCTA({ type, workspaceId, onAction, bookingUrl }: 
     return (
       <div className="mt-3 flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-[var(--radius-xl)] bg-amber-500/10 border border-amber-500/20">
         <div className="flex items-center gap-2">
-          <Clock className="w-4 h-4 text-amber-400 flex-shrink-0" />
-          <span className="t-caption text-amber-300">Please try again in a moment.</span>
+          <Clock className="w-4 h-4 text-accent-warning flex-shrink-0" />
+          <span className="t-caption text-accent-warning">Please try again in a moment.</span>
         </div>
         <button
           onClick={() => mutation.reset()}
-          className="flex items-center gap-1 text-[10px] /* arbitrary-text-ok */ text-amber-400 hover:text-amber-300 transition-colors"
+          className="flex items-center gap-1 text-[10px] /* arbitrary-text-ok */ text-accent-warning hover:text-accent-warning transition-colors"
           aria-label="Retry"
         >
           <RefreshCw className="w-3 h-3" />
@@ -120,15 +120,15 @@ export function ServiceInterestCTA({ type, workspaceId, onAction, bookingUrl }: 
         aria-label={label}
       >
         <div className="text-left">
-          <div className="t-caption font-medium text-teal-300">{label}</div>
-          <div className="text-[10px] /* arbitrary-text-ok */ text-teal-400/60 mt-0.5">{subtext}</div>
+          <div className="t-caption font-medium text-accent-brand">{label}</div>
+          <div className="text-[10px] /* arbitrary-text-ok */ text-accent-brand mt-0.5">{subtext}</div>
         </div>
         {mutation.isPending ? (
-          <Loader2 className="w-3.5 h-3.5 text-teal-400 animate-spin flex-shrink-0" />
+          <Loader2 className="w-3.5 h-3.5 text-accent-brand animate-spin flex-shrink-0" />
         ) : hasBooking ? (
-          <CalendarDays className="w-3.5 h-3.5 text-teal-400 flex-shrink-0 group-hover:scale-110 transition-transform" />
+          <CalendarDays className="w-3.5 h-3.5 text-accent-brand flex-shrink-0 group-hover:scale-110 transition-transform" />
         ) : (
-          <ArrowRight className="w-3.5 h-3.5 text-teal-400 flex-shrink-0 group-hover:translate-x-0.5 transition-transform" />
+          <ArrowRight className="w-3.5 h-3.5 text-accent-brand flex-shrink-0 group-hover:translate-x-0.5 transition-transform" />
         )}
       </button>
     </div>

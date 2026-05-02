@@ -1,5 +1,6 @@
 import { CheckCircle2, Info, ChevronRight, X, type LucideIcon } from 'lucide-react';
 import { SectionCard } from './SectionCard';
+import { IconButton } from './IconButton';
 
 interface NextStep {
   label: string;
@@ -34,47 +35,42 @@ export function NextStepsCard({
   return (
     <SectionCard staggerIndex={staggerIndex} noPadding>
       {/* Title row */}
-      <div className="flex items-center gap-2.5 px-4 py-3 border-b border-zinc-800">
+      <div className="flex items-center gap-2.5 px-4 py-3 border-b border-[var(--brand-border)]">
         <VariantIcon className={`w-4 h-4 ${iconColor} flex-shrink-0`} />
-        <span className="text-sm font-semibold text-zinc-200 flex-1">{title}</span>
+        <span className="t-body font-semibold text-[var(--brand-text-bright)] flex-1">{title}</span>
         {onDismiss && (
-          <button
-            onClick={onDismiss}
-            className="p-1 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
-            aria-label="Dismiss"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
+          <IconButton icon={X} label="Dismiss" size="sm" onClick={onDismiss} />
         )}
       </div>
 
       {/* Step rows */}
-      <div className="divide-y divide-zinc-800/50">
+      <div className="divide-y divide-[var(--brand-border)]">
         {steps.map((step) => {
           const StepIcon = step.icon;
           return (
             <button
               key={step.label}
+              type="button"
               onClick={step.onClick}
               className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-teal-500/5 transition-colors group"
             >
               {StepIcon && (
-                <StepIcon className="w-4 h-4 text-zinc-500 group-hover:text-teal-400 flex-shrink-0 transition-colors" />
+                <StepIcon className="w-4 h-4 text-[var(--brand-text-muted)] group-hover:text-[var(--teal)] flex-shrink-0 transition-colors" />
               )}
               <div className="flex-1 min-w-0">
-                <span className="text-sm text-zinc-300 group-hover:text-teal-300 transition-colors block">
+                <span className="t-body text-[var(--brand-text)] group-hover:text-[var(--teal)] transition-colors block">
                   {step.label}
                 </span>
                 {step.description && (
-                  <p className="text-xs text-zinc-500 mt-0.5 truncate">{step.description}</p>
+                  <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 truncate">{step.description}</p>
                 )}
               </div>
               {step.estimatedTime && (
-                <span className="text-[11px] text-zinc-600 bg-zinc-800 px-1.5 py-0.5 rounded flex-shrink-0">
+                <span className="t-caption-sm text-[var(--brand-text-muted)] bg-[var(--surface-3)] px-1.5 py-0.5 rounded flex-shrink-0">
                   {step.estimatedTime}
                 </span>
               )}
-              <ChevronRight className="w-3.5 h-3.5 text-zinc-600 group-hover:text-teal-400 flex-shrink-0 transition-colors" />
+              <ChevronRight className="w-3.5 h-3.5 text-[var(--brand-text-muted)] group-hover:text-[var(--teal)] flex-shrink-0 transition-colors" />
             </button>
           );
         })}

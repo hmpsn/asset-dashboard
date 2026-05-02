@@ -91,12 +91,12 @@ export function BrandTab({
       <ErrorBoundary label="Business Profile">
         <SectionCard
           title="Contact & Business Info"
-          titleIcon={<Icon as={Building2} size="md" className="text-teal-400" />}
+          titleIcon={<Icon as={Building2} size="md" className="text-accent-brand" />}
           action={
             !editing ? (
               <button
                 onClick={() => setEditing(true)}
-                className="t-caption text-teal-400 hover:text-teal-300 transition-colors flex items-center gap-1"
+                className="t-caption text-accent-brand hover:text-accent-brand transition-colors flex items-center gap-1"
               >
                 Edit <Icon as={ChevronRight} size="sm" />
               </button>
@@ -157,7 +157,7 @@ export function BrandTab({
                   <div className="space-y-1">
                     {businessProfile.socialProfiles.filter(u => u.trim()).map((url, i) => (
                       <a key={i} href={url} target="_blank" rel="noopener noreferrer"
-                        className="block text-teal-400 hover:text-teal-300 truncate t-caption transition-colors">
+                        className="block text-accent-brand hover:text-accent-brand truncate t-caption transition-colors">
                         {url}
                       </a>
                     ))}
@@ -259,7 +259,7 @@ export function BrandTab({
               </div>
 
               {saveError && (
-                <p className="t-caption text-red-400">{saveError}</p>
+                <p className="t-caption text-accent-danger">{saveError}</p>
               )}
               <div className="flex items-center gap-3 pt-1">
                 <Button onClick={handleSave} disabled={saving} loading={saving}>
@@ -281,8 +281,8 @@ export function BrandTab({
       <ErrorBoundary label="Brand Positioning">
         <SectionCard
           title="Brand Positioning"
-          titleIcon={<Icon as={Sparkles} size="md" className="text-teal-400" />}
-          titleExtra={<span className="t-caption-sm px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/20">AI-generated</span>}
+          titleIcon={<Icon as={Sparkles} size="md" className="text-accent-brand" />}
+          titleExtra={<span className="t-caption-sm px-2 py-0.5 rounded-full bg-teal-500/10 text-accent-brand border border-teal-500/20">AI-generated</span>}
         >
           {brandVoiceSummary ? (
             <div className="space-y-3">

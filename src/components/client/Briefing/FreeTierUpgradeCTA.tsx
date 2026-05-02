@@ -1,6 +1,7 @@
 // CLIENT-FACING
 import { useNavigate } from 'react-router-dom';
 import { SectionCard } from '../../ui/SectionCard';
+import { Button } from '../../ui/Button';
 import { clientPath } from '../../../routes';
 
 interface FreeTierUpgradeCTAProps {
@@ -39,13 +40,9 @@ export function FreeTierUpgradeCTA({ workspaceId, betaMode }: FreeTierUpgradeCTA
 
           {/* CTA */}
           <div>
-            <button
-              type="button"
-              onClick={handleUpgrade}
-              className="bg-teal-500 hover:bg-teal-400 text-[var(--brand-text-bright)] px-4 py-2 rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
-            >
+            <Button onClick={handleUpgrade} className="rounded-[var(--radius-lg)]">
               Upgrade to Growth
-            </button>
+            </Button>
           </div>
         </div>
       </SectionCard>

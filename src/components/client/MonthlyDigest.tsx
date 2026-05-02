@@ -55,7 +55,7 @@ export function MonthlyDigestContent({ digest }: { digest: MonthlyDigestData }) 
         {/* Metrics row */}
         {digest.metrics.pagesOptimized > 0 && (
           <div className="flex gap-3 t-caption text-[var(--brand-text-muted)]">
-            <span className="text-teal-400 font-medium">{digest.metrics.pagesOptimized} page{digest.metrics.pagesOptimized === 1 ? '' : 's'} optimized</span>
+            <span className="text-accent-brand font-medium">{digest.metrics.pagesOptimized} page{digest.metrics.pagesOptimized === 1 ? '' : 's'} optimized</span>
           </div>
         )}
 
@@ -63,13 +63,13 @@ export function MonthlyDigestContent({ digest }: { digest: MonthlyDigestData }) 
         {digest.wins.length > 0 && (
           <div>
             <h4 className="t-caption font-medium text-[var(--brand-text)] tracking-wider mb-2 flex items-center gap-1.5">
-              <Icon as={TrendingUp} size="sm" className="text-emerald-400" />
+              <Icon as={TrendingUp} size="sm" className="text-accent-success" />
               Wins this month
             </h4>
             <ul className="space-y-1.5">
               {digest.wins.map((win: DigestItem, i: number) => (
                 <li key={win.insightId ?? i} className="flex items-start gap-2 t-body">
-                  <Icon as={CheckCircle} size="md" className="text-emerald-400 mt-0.5 shrink-0" />
+                  <Icon as={CheckCircle} size="md" className="text-accent-success mt-0.5 shrink-0" />
                   <div>
                     <span className="text-[var(--brand-text-bright)] font-medium">{win.title}</span>
                     <span className="text-[var(--brand-text-muted)] ml-1">— {win.detail}</span>
@@ -101,7 +101,7 @@ export function MonthlyDigestContent({ digest }: { digest: MonthlyDigestData }) 
         {digest.roiHighlights.length > 0 && (
           <div>
             <h4 className="t-caption font-medium text-[var(--brand-text)] tracking-wider mb-2 flex items-center gap-1.5">
-              <Icon as={Award} size="sm" className="text-blue-400" />
+              <Icon as={Award} size="sm" className="text-accent-info" />
               Measurable results
             </h4>
             <ul className="space-y-2">
@@ -110,7 +110,7 @@ export function MonthlyDigestContent({ digest }: { digest: MonthlyDigestData }) 
                   <div className="t-body font-medium text-[var(--brand-text-bright)]">{roi.pageTitle}</div>
                   <div className="t-caption text-[var(--brand-text)] mt-0.5">{roi.action} — {roi.result}</div>
                   {roi.clicksGained > 0 && (
-                    <div className="t-caption text-blue-400 mt-0.5">+{roi.clicksGained.toLocaleString()} clicks</div>
+                    <div className="t-caption text-accent-info mt-0.5">+{roi.clicksGained.toLocaleString()} clicks</div>
                   )}
                 </li>
               ))}

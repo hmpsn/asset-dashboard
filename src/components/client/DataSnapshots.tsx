@@ -60,11 +60,11 @@ export function SearchSnapshot({ overview, trend, comparison, devices, onViewMor
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-[var(--radius-md)] bg-blue-500/15 flex items-center justify-center">
-            <Icon as={Globe} size="md" className="text-blue-400" />
+            <Icon as={Globe} size="md" className="text-accent-info" />
           </div>
           <span className="t-caption font-medium text-[var(--brand-text-bright)]">Google Search</span>
         </div>
-        <button onClick={onViewMore} className="t-caption-sm text-teal-400 hover:text-teal-300 flex items-center gap-0.5">
+        <button onClick={onViewMore} className="t-caption-sm text-accent-brand hover:text-accent-brand flex items-center gap-0.5">
           View details <Icon as={ArrowRight} size="sm" />
         </button>
       </div>
@@ -73,21 +73,21 @@ export function SearchSnapshot({ overview, trend, comparison, devices, onViewMor
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-[var(--surface-3)]/40 rounded-[var(--radius-md)] px-3 py-2.5">
           <div className="flex items-center gap-1.5 mb-0.5">
-            <Icon as={MousePointer} size="sm" className="text-blue-400" />
+            <Icon as={MousePointer} size="sm" className="text-accent-info" />
             <span className="t-caption-sm text-[var(--brand-text-muted)]">Clicks</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-lg font-bold text-blue-400">{formatNum(overview.totalClicks)}</span>
+            <span className="text-lg font-bold text-accent-info">{formatNum(overview.totalClicks)}</span>
             {comparison && <TrendBadge value={comparison.changePercent.clicks} />}
           </div>
         </div>
         <div className="bg-[var(--surface-3)]/40 rounded-[var(--radius-md)] px-3 py-2.5">
           <div className="flex items-center gap-1.5 mb-0.5">
-            <Icon as={Eye} size="sm" className="text-blue-400" />
+            <Icon as={Eye} size="sm" className="text-accent-info" />
             <span className="t-caption-sm text-[var(--brand-text-muted)]">Impressions</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-lg font-bold text-blue-400">{formatNum(overview.totalImpressions)}</span>
+            <span className="text-lg font-bold text-accent-info">{formatNum(overview.totalImpressions)}</span>
             {comparison && <TrendBadge value={comparison.changePercent.impressions} />}
           </div>
         </div>
@@ -113,7 +113,7 @@ export function SearchSnapshot({ overview, trend, comparison, devices, onViewMor
               return (
                 <div key={i} className="flex items-center justify-between t-caption-sm py-1.5 px-2.5 rounded-[var(--radius-md)] bg-[var(--surface-3)]/30">
                   <span className="text-[var(--brand-text-bright)] truncate mr-2">{pagePath}</span>
-                  <span className="text-blue-400 font-medium flex-shrink-0">{formatNum(p.clicks)} clicks</span>
+                  <span className="text-accent-info font-medium flex-shrink-0">{formatNum(p.clicks)} clicks</span>
                 </div>
               );
             })}
@@ -135,7 +135,7 @@ export function SearchSnapshot({ overview, trend, comparison, devices, onViewMor
           <div className="flex items-center gap-3 mt-1.5">
             {devices.map((d, i) => {
               const pct = Math.round((d.clicks / totalDevClicks) * 100);
-              const colors = ['text-blue-400', 'text-teal-400', 'text-amber-400'];
+              const colors = ['text-accent-info', 'text-accent-brand', 'text-accent-warning'];
               return (
                 <span key={i} className={`flex items-center gap-1 t-caption-sm ${colors[i % colors.length]}`}>
                   <DeviceIcon device={d.device} />
@@ -173,11 +173,11 @@ export function AnalyticsSnapshot({ overview, trend, topPages, comparison, newVs
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-[var(--radius-md)] bg-teal-500/15 flex items-center justify-center">
-            <Icon as={Users} size="md" className="text-teal-400" />
+            <Icon as={Users} size="md" className="text-accent-brand" />
           </div>
           <span className="t-caption font-medium text-[var(--brand-text-bright)]">Website Visitors</span>
         </div>
-        <button onClick={onViewMore} className="t-caption-sm text-teal-400 hover:text-teal-300 flex items-center gap-0.5">
+        <button onClick={onViewMore} className="t-caption-sm text-accent-brand hover:text-accent-brand flex items-center gap-0.5">
           View details <Icon as={ArrowRight} size="sm" />
         </button>
       </div>
@@ -187,14 +187,14 @@ export function AnalyticsSnapshot({ overview, trend, topPages, comparison, newVs
         <div className="bg-[var(--surface-3)]/40 rounded-[var(--radius-md)] px-3 py-2.5">
           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Visitors</div>
           <div className="flex items-center gap-1.5">
-            <span className="text-lg font-bold text-teal-400">{formatNum(overview.totalUsers)}</span>
+            <span className="text-lg font-bold text-accent-brand">{formatNum(overview.totalUsers)}</span>
             {comparison && <TrendBadge value={comparison.changePercent.users} />}
           </div>
         </div>
         <div className="bg-[var(--surface-3)]/40 rounded-[var(--radius-md)] px-3 py-2.5">
           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Sessions</div>
           <div className="flex items-center gap-1.5">
-            <span className="text-lg font-bold text-blue-400">{formatNum(overview.totalSessions)}</span>
+            <span className="text-lg font-bold text-accent-info">{formatNum(overview.totalSessions)}</span>
             {comparison && <TrendBadge value={comparison.changePercent.sessions} />}
           </div>
         </div>
@@ -224,10 +224,10 @@ export function AnalyticsSnapshot({ overview, trend, topPages, comparison, newVs
             <div className="h-full bg-blue-500 rounded-r-full" style={{ width: `${retSeg.percentage}%` }} />
           </div>
           <div className="flex items-center justify-between mt-1.5">
-            <span className="flex items-center gap-1 t-caption-sm text-teal-400">
+            <span className="flex items-center gap-1 t-caption-sm text-accent-brand">
               New <span className="text-[var(--brand-text-muted)]">{newSeg.percentage}%</span>
             </span>
-            <span className="flex items-center gap-1 t-caption-sm text-blue-400">
+            <span className="flex items-center gap-1 t-caption-sm text-accent-info">
               Returning <span className="text-[var(--brand-text-muted)]">{retSeg.percentage}%</span>
             </span>
           </div>
@@ -244,7 +244,7 @@ export function AnalyticsSnapshot({ overview, trend, topPages, comparison, newVs
               return (
                 <div key={i} className="flex items-center justify-between t-caption-sm py-1.5 px-2.5 rounded-[var(--radius-md)] bg-[var(--surface-3)]/30">
                   <span className="text-[var(--brand-text-bright)] truncate mr-2 font-mono">{label}</span>
-                  <span className="text-teal-400 font-medium flex-shrink-0">{formatNum(p.pageviews)} views</span>
+                  <span className="text-accent-brand font-medium flex-shrink-0">{formatNum(p.pageviews)} views</span>
                 </div>
               );
             })}
@@ -270,25 +270,25 @@ export function OrganicInsight({ organic, landingPages, newVsReturning }: Organi
   return (
     <div className="space-y-6">
       {/* Organic overview row */}
-      <SectionCard title="Organic Search Traffic" titleIcon={<div className="w-6 h-6 rounded-[var(--radius-md)] bg-emerald-500/15 flex items-center justify-center"><Icon as={Globe} size="md" className="text-emerald-400" /></div>} action={<span className="t-caption-sm text-[var(--brand-text-muted)]">{organic.dateRange.start} — {organic.dateRange.end}</span>}>
+      <SectionCard title="Organic Search Traffic" titleIcon={<div className="w-6 h-6 rounded-[var(--radius-md)] bg-emerald-500/15 flex items-center justify-center"><Icon as={Globe} size="md" className="text-accent-success" /></div>} action={<span className="t-caption-sm text-[var(--brand-text-muted)]">{organic.dateRange.start} — {organic.dateRange.end}</span>}>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="bg-[var(--surface-3)]/40 rounded-[var(--radius-md)] px-3 py-2.5">
             <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Organic visitors</div>
-            <div className="text-lg font-bold text-emerald-400">{formatNum(organic.organicUsers)}</div>
+            <div className="text-lg font-bold text-accent-success">{formatNum(organic.organicUsers)}</div>
             <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{organic.shareOfTotalUsers}% of all traffic</div>
           </div>
           <div className="bg-[var(--surface-3)]/40 rounded-[var(--radius-md)] px-3 py-2.5">
             <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Organic sessions</div>
-            <div className="text-lg font-bold text-blue-400">{formatNum(organic.organicSessions)}</div>
+            <div className="text-lg font-bold text-accent-info">{formatNum(organic.organicSessions)}</div>
           </div>
           <div className="bg-[var(--surface-3)]/40 rounded-[var(--radius-md)] px-3 py-2.5">
             <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Engagement rate</div>
-            <div className="text-lg font-bold text-teal-400">{organic.engagementRate}%</div>
+            <div className="text-lg font-bold text-accent-brand">{organic.engagementRate}%</div>
           </div>
           <div className="bg-[var(--surface-3)]/40 rounded-[var(--radius-md)] px-3 py-2.5">
             <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Avg time on site</div>
-            <div className="text-lg font-bold text-amber-400">
+            <div className="text-lg font-bold text-accent-warning">
               {Math.floor(organic.avgEngagementTime / 60)}m {Math.floor(organic.avgEngagementTime % 60)}s
             </div>
           </div>
@@ -301,7 +301,7 @@ export function OrganicInsight({ organic, landingPages, newVsReturning }: Organi
             <div className="h-full bg-emerald-500 rounded-l-full transition-all" style={{ width: `${organic.shareOfTotalUsers}%` }} />
           </div>
           <div className="flex items-center justify-between mt-1">
-            <span className="t-caption-sm text-emerald-400">Organic {organic.shareOfTotalUsers}%</span>
+            <span className="t-caption-sm text-accent-success">Organic {organic.shareOfTotalUsers}%</span>
             <span className="t-caption-sm text-[var(--brand-text-muted)]">Other {(100 - organic.shareOfTotalUsers).toFixed(1)}%</span>
           </div>
         </div>
@@ -313,13 +313,13 @@ export function OrganicInsight({ organic, landingPages, newVsReturning }: Organi
           <SectionCard title="New vs Returning Visitors">
             <div className="flex items-center gap-6 mb-4">
               <div className="flex-1">
-                <div className="t-caption-sm text-teal-400 mb-0.5">New visitors</div>
-                <div className="text-2xl font-bold text-teal-400">{newSeg.percentage}%</div>
+                <div className="t-caption-sm text-accent-brand mb-0.5">New visitors</div>
+                <div className="text-2xl font-bold text-accent-brand">{newSeg.percentage}%</div>
                 <div className="t-caption-sm text-[var(--brand-text-muted)]">{formatNum(newSeg.users)} users</div>
               </div>
               <div className="flex-1">
-                <div className="t-caption-sm text-blue-400 mb-0.5">Returning visitors</div>
-                <div className="text-2xl font-bold text-blue-400">{retSeg.percentage}%</div>
+                <div className="t-caption-sm text-accent-info mb-0.5">Returning visitors</div>
+                <div className="text-2xl font-bold text-accent-info">{retSeg.percentage}%</div>
                 <div className="t-caption-sm text-[var(--brand-text-muted)]">{formatNum(retSeg.users)} users</div>
               </div>
             </div>
@@ -330,11 +330,11 @@ export function OrganicInsight({ organic, landingPages, newVsReturning }: Organi
             <div className="grid grid-cols-2 gap-3 mt-4">
               <div className="bg-[var(--surface-3)]/30 rounded-[var(--radius-md)] px-3 py-2">
                 <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">New bounce rate</div>
-                <div className={`t-body font-bold ${newSeg.bounceRate > 60 ? 'text-red-400' : 'text-emerald-400'}`}>{newSeg.bounceRate}%</div>
+                <div className={`t-body font-bold ${newSeg.bounceRate > 60 ? 'text-accent-danger' : 'text-accent-success'}`}>{newSeg.bounceRate}%</div>
               </div>
               <div className="bg-[var(--surface-3)]/30 rounded-[var(--radius-md)] px-3 py-2">
                 <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Returning bounce rate</div>
-                <div className={`t-body font-bold ${retSeg.bounceRate > 60 ? 'text-red-400' : 'text-emerald-400'}`}>{retSeg.bounceRate}%</div>
+                <div className={`t-body font-bold ${retSeg.bounceRate > 60 ? 'text-accent-danger' : 'text-accent-success'}`}>{retSeg.bounceRate}%</div>
               </div>
             </div>
           </SectionCard>
@@ -351,8 +351,8 @@ export function OrganicInsight({ organic, landingPages, newVsReturning }: Organi
                   <div key={i} className="flex items-center gap-2 py-1.5 px-2.5 rounded-[var(--radius-md)] hover:bg-[var(--surface-3)]/50 transition-colors">
                     <span className="t-caption-sm text-[var(--brand-text-dim)] w-4 text-right">{i + 1}</span>
                     <span className="t-caption text-[var(--brand-text-bright)] flex-1 truncate font-mono">{label}</span>
-                    <span className="t-caption text-emerald-400 font-medium tabular-nums flex-shrink-0">{formatNum(lp.sessions)}</span>
-                    <span className={`t-caption-sm flex-shrink-0 w-12 text-right ${lp.bounceRate > 70 ? 'text-red-400' : 'text-[var(--brand-text-muted)]'}`}>{lp.bounceRate}%</span>
+                    <span className="t-caption text-accent-success font-medium tabular-nums flex-shrink-0">{formatNum(lp.sessions)}</span>
+                    <span className={`t-caption-sm flex-shrink-0 w-12 text-right ${lp.bounceRate > 70 ? 'text-accent-danger' : 'text-[var(--brand-text-muted)]'}`}>{lp.bounceRate}%</span>
                   </div>
                 );
               })}

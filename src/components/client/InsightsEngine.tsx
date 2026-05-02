@@ -48,7 +48,7 @@ const PRIORITY_CONFIG: Record<RecPriority, { label: string; icon: typeof Zap; co
   fix_now: {
     label: 'Fix Now',
     icon: Zap,
-    color: 'text-red-400',
+    color: 'text-accent-danger',
     bg: 'bg-red-500/10',
     border: 'border-red-500/20',
     description: 'Critical issues on high-traffic pages — fix these first for the biggest impact',
@@ -56,7 +56,7 @@ const PRIORITY_CONFIG: Record<RecPriority, { label: string; icon: typeof Zap; co
   fix_soon: {
     label: 'Fix Soon',
     icon: Clock,
-    color: 'text-amber-400',
+    color: 'text-accent-warning',
     bg: 'bg-amber-500/10',
     border: 'border-amber-500/20',
     description: 'Important improvements that will strengthen your rankings over the next few weeks',
@@ -64,7 +64,7 @@ const PRIORITY_CONFIG: Record<RecPriority, { label: string; icon: typeof Zap; co
   fix_later: {
     label: 'Fix Later',
     icon: CalendarClock,
-    color: 'text-blue-400',
+    color: 'text-accent-info',
     bg: 'bg-blue-500/10',
     border: 'border-blue-500/20',
     description: 'Lower-priority optimizations — good to address when you have capacity',
@@ -72,7 +72,7 @@ const PRIORITY_CONFIG: Record<RecPriority, { label: string; icon: typeof Zap; co
   ongoing: {
     label: 'Continuously Improve',
     icon: RefreshCw,
-    color: 'text-teal-400',
+    color: 'text-accent-brand',
     bg: 'bg-teal-500/10',
     border: 'border-teal-500/20',
     description: 'Content opportunities and strategic improvements to work on over time',
@@ -92,15 +92,15 @@ const TYPE_ICONS: Record<RecType, typeof FileText> = {
 };
 
 const IMPACT_BADGE: Record<string, { label: string; color: string; bg: string }> = {
-  high: { label: 'High Impact', color: 'text-red-400', bg: 'bg-red-500/10' },
-  medium: { label: 'Medium Impact', color: 'text-amber-400', bg: 'bg-amber-500/10' },
-  low: { label: 'Low Impact', color: 'text-blue-400', bg: 'bg-blue-500/10' },
+  high: { label: 'High Impact', color: 'text-accent-danger', bg: 'bg-red-500/10' },
+  medium: { label: 'Medium Impact', color: 'text-accent-warning', bg: 'bg-amber-500/10' },
+  low: { label: 'Low Impact', color: 'text-accent-info', bg: 'bg-blue-500/10' },
 };
 
 const EFFORT_BADGE: Record<string, { label: string; color: string }> = {
-  low: { label: 'Quick Fix', color: 'text-emerald-400' },
-  medium: { label: 'Moderate Effort', color: 'text-amber-400' },
-  high: { label: 'Significant Work', color: 'text-red-400' },
+  low: { label: 'Quick Fix', color: 'text-accent-success' },
+  medium: { label: 'Moderate Effort', color: 'text-accent-warning' },
+  high: { label: 'Significant Work', color: 'text-accent-danger' },
 };
 
 // ─── Component ────────────────────────────────────────────────────
@@ -183,7 +183,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
     return (
       // pr-check-disable-next-line -- InsightsEngine loading state is a top-level client container intentionally using brand signature shape
       <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-8 text-center" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-        <Icon as={Loader2} size="xl" className="text-teal-400 animate-spin mx-auto mb-2" />
+        <Icon as={Loader2} size="xl" className="text-accent-brand animate-spin mx-auto mb-2" />
         <p className="t-caption text-[var(--brand-text-muted)]">Analyzing your site for recommendations...</p>
       </div>
     );
@@ -193,9 +193,9 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
     return (
       // pr-check-disable-next-line -- InsightsEngine error state is a top-level client container intentionally using brand signature shape
       <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-6 text-center" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-        <Icon as={XCircle} size="xl" className="text-red-400 mx-auto mb-2" />
+        <Icon as={XCircle} size="xl" className="text-accent-danger mx-auto mb-2" />
         <p className="t-caption text-[var(--brand-text)]">Failed to load recommendations</p>
-        <button onClick={handleRegenerate} className="mt-2 t-caption text-teal-400 hover:text-teal-300">
+        <button onClick={handleRegenerate} className="mt-2 t-caption text-accent-brand hover:text-accent-brand">
           Try again
         </button>
       </div>
@@ -206,7 +206,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
     return (
       // pr-check-disable-next-line -- InsightsEngine empty state is a top-level client container intentionally using brand signature shape
       <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-8 text-center" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-        <Icon as={Shield} size="2xl" className="text-teal-400 mx-auto mb-3" />
+        <Icon as={Shield} size="2xl" className="text-accent-brand mx-auto mb-3" />
         <p className="t-body font-medium text-[var(--brand-text-bright)]">No recommendations yet</p>
         <p className="t-caption text-[var(--brand-text-muted)] mt-1">Run a site audit to generate prioritized recommendations.</p>
       </div>
@@ -224,15 +224,15 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
       <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
         <div className="px-5 py-4 border-b border-[var(--brand-border)]">
           <div className="flex items-center gap-2">
-            <Icon as={Lightbulb} size="md" className="text-amber-400" />
+            <Icon as={Lightbulb} size="md" className="text-accent-warning" />
             <span className="t-body font-semibold text-[var(--brand-text-bright)]">Action Plan</span>
             <span className="t-caption text-[var(--brand-text-muted)] ml-auto">{activeCount} active · {completedCount} completed</span>
           </div>
           {data.summary.trafficAtRisk > 0 && (
             <p className="t-caption text-[var(--brand-text)] mt-1">
-              <span className="text-amber-400 font-medium">{num(data.summary.trafficAtRisk)} organic clicks/mo</span> are at risk from unresolved issues
+              <span className="text-accent-warning font-medium">{num(data.summary.trafficAtRisk)} organic clicks/mo</span> are at risk from unresolved issues
               {data.summary.estimatedRecoverableClicks > 0 && (
-                <span className="ml-1 text-teal-400">· ~{num(data.summary.estimatedRecoverableClicks)} recoverable</span>
+                <span className="ml-1 text-accent-brand">· ~{num(data.summary.estimatedRecoverableClicks)} recoverable</span>
               )}
             </p>
           )}
@@ -281,7 +281,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                   )}
                 </div>
                 {rec.trafficAtRisk > 0 && (
-                  <span className="t-caption-sm text-teal-400 flex-shrink-0 flex items-center gap-0.5">
+                  <span className="t-caption-sm text-accent-brand flex-shrink-0 flex items-center gap-0.5">
                     <Icon as={MousePointerClick} size="sm" />
                     {num(rec.trafficAtRisk)}
                   </span>
@@ -289,7 +289,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                 {onNavigate && (
                   <button
                     onClick={() => onNavigate(REC_TYPE_TAB[rec.type] || 'seo-audit', { pageSlug: rec.affectedPages[0], recType: rec.type })}
-                    className="flex items-center gap-0.5 t-caption-sm text-teal-400 hover:text-teal-300 transition-colors flex-shrink-0"
+                    className="flex items-center gap-0.5 t-caption-sm text-accent-brand hover:text-accent-brand transition-colors flex-shrink-0"
                   >
                     Fix <Icon as={ArrowUpRight} size="sm" />
                   </button>
@@ -318,7 +318,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
       {/* Header */}
       <div className="px-5 py-4 border-b border-[var(--brand-border)]">
         <div className="flex items-center gap-2">
-          <Icon as={Lightbulb} size="md" className="text-amber-400" />
+          <Icon as={Lightbulb} size="md" className="text-accent-warning" />
           <span className="t-body font-semibold text-[var(--brand-text-bright)]">Prioritized Action Plan</span>
           <div className="ml-auto flex items-center gap-2">
             <span className="t-caption text-[var(--brand-text-muted)]">{activeCount} active · {completedCount} done</span>
@@ -334,14 +334,14 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
         </div>
         {isPremium ? (
           <p className="t-caption text-[var(--brand-text)] mt-1.5 leading-relaxed">
-            <Icon as={Crown} size="sm" className="text-amber-400 mr-1" />
+            <Icon as={Crown} size="sm" className="text-accent-warning mr-1" />
             {STUDIO_NAME} is actively working through these recommendations. Items are prioritized by traffic impact.
           </p>
         ) : (
           <p className="t-caption text-[var(--brand-text)] mt-1.5 leading-relaxed">
             We've analyzed your audit, traffic, and SEO strategy to create a prioritized action plan.
             {data.summary.trafficAtRisk > 0 && (
-              <> <span className="text-amber-400 font-medium">{num(data.summary.trafficAtRisk)} organic clicks/mo</span> are at risk from unresolved issues{data.summary.estimatedRecoverableClicks > 0 ? ` — addressing fix-now and fix-soon items could recover ~${num(data.summary.estimatedRecoverableClicks)} clicks/mo.` : '.'}</>
+              <> <span className="text-accent-warning font-medium">{num(data.summary.trafficAtRisk)} organic clicks/mo</span> are at risk from unresolved issues{data.summary.estimatedRecoverableClicks > 0 ? ` — addressing fix-now and fix-soon items could recover ~${num(data.summary.estimatedRecoverableClicks)} clicks/mo.` : '.'}</>
             )}
           </p>
         )}
@@ -428,12 +428,12 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                                 {effortBadge.label}
                               </span>
                               {rec.status === 'in_progress' && (
-                                <span className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400">
+                                <span className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-accent-brand">
                                   In Progress
                                 </span>
                               )}
                               {isCompleted && (
-                                <span className="t-caption-sm px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center gap-0.5">
+                                <span className="t-caption-sm px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-accent-success flex items-center gap-0.5">
                                   <Icon as={CheckCircle2} size="sm" /> Done
                                 </span>
                               )}
@@ -447,7 +447,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
 
                           {/* Traffic badge */}
                           {rec.trafficAtRisk > 0 && (
-                            <div className="flex items-center gap-1 t-caption-sm text-teal-400 flex-shrink-0">
+                            <div className="flex items-center gap-1 t-caption-sm text-accent-brand flex-shrink-0">
                               <Icon as={MousePointerClick} size="sm" />
                               {num(rec.trafficAtRisk)} clicks
                             </div>
@@ -459,7 +459,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                           <div className="px-5 pb-4 pl-[4.5rem]">
                             {/* Insight */}
                             <div className="flex items-start gap-1.5 mb-3">
-                              <Icon as={Lightbulb} size="sm" className="text-amber-400 flex-shrink-0 mt-0.5" />
+                              <Icon as={Lightbulb} size="sm" className="text-accent-warning flex-shrink-0 mt-0.5" />
                               <p className="t-caption text-[var(--brand-text)] leading-relaxed">{rec.insight}</p>
                             </div>
 
@@ -487,7 +487,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                               <div className="flex gap-4 mb-3">
                                 {rec.trafficAtRisk > 0 && (
                                   <div className="flex items-center gap-1.5 t-caption">
-                                    <Icon as={MousePointerClick} size="sm" className="text-teal-400" />
+                                    <Icon as={MousePointerClick} size="sm" className="text-accent-brand" />
                                     <span className="text-[var(--brand-text)]">{num(rec.trafficAtRisk)} clicks/mo at risk</span>
                                   </div>
                                 )}
@@ -502,8 +502,8 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
 
                             {/* Estimated gain */}
                             <div className="flex items-center gap-1.5 mb-3">
-                              <Icon as={TrendingUp} size="sm" className="text-emerald-400" />
-                              <span className="t-caption text-emerald-400">{rec.estimatedGain}</span>
+                              <Icon as={TrendingUp} size="sm" className="text-accent-success" />
+                              <span className="t-caption text-accent-success">{rec.estimatedGain}</span>
                             </div>
 
                             {/* Action buttons */}
@@ -547,7 +547,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                                       Let Us Fix This — {fmt(rec.productPrice)}
                                     </button>
                                   ) : inCart ? (
-                                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-teal-500/10 text-teal-400 border border-teal-500/20">
+                                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium bg-teal-500/10 text-accent-brand border border-teal-500/20">
                                       <Icon as={ShoppingCart} size="sm" />
                                       In Cart
                                     </span>
@@ -571,7 +571,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
 
                                   {/* Premium upsell for high-value items */}
                                   {rec.impact === 'high' && !isPremium && (
-                                    <span className="flex items-center gap-1 t-caption-sm text-amber-400/70">
+                                    <span className="flex items-center gap-1 t-caption-sm text-accent-warning">
                                       <Icon as={Crown} size="sm" />
                                       Premium handles this for you
                                     </span>
@@ -605,7 +605,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
       {!isPremium && data.summary.fixNow + data.summary.fixSoon > 3 && (
         <div className="px-5 py-3.5 border-t border-[var(--brand-border)] bg-gradient-to-r from-amber-500/5 to-teal-500/5">
           <div className="flex items-center gap-3">
-            <Icon as={Crown} size="lg" className="text-amber-400 flex-shrink-0" />
+            <Icon as={Crown} size="lg" className="text-accent-warning flex-shrink-0" />
             <div className="flex-1">
               <div className="t-caption font-medium text-[var(--brand-text-bright)]">
                 Want {STUDIO_NAME} to handle all {data.summary.fixNow + data.summary.fixSoon} urgent items?
@@ -614,7 +614,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                 Premium clients get hands-free SEO — we implement every recommendation for you.
               </div>
             </div>
-            <span className="t-caption text-amber-400 font-medium flex-shrink-0">$999/mo</span>
+            <span className="t-caption text-accent-warning font-medium flex-shrink-0">$999/mo</span>
           </div>
         </div>
       )}

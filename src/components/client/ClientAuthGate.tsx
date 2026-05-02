@@ -154,7 +154,7 @@ export function ClientAuthGate({
           <div className="flex flex-col items-center mb-6">
             <img src="/logo.svg" alt={STUDIO_NAME} className="h-7 opacity-60 mb-4" />
             <div className="w-12 h-12 rounded-[var(--radius-xl)] bg-teal-500/10 flex items-center justify-center mb-4">
-              <Icon as={Lock} size="xl" className="text-teal-400" />
+              <Icon as={Lock} size="xl" className="text-accent-brand" />
             </div>
             <h2 className="text-lg font-semibold text-[var(--brand-text-bright)]">{ws?.name}</h2>
             <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">
@@ -183,7 +183,7 @@ export function ClientAuthGate({
                 {forgotSent ? (
                   <>
                     <div className="bg-teal-500/10 border border-teal-500/20 p-4 text-center" style={{ borderRadius: 'var(--radius-signature)' }}>
-                      <p className="t-body text-teal-400 font-medium">Check your email</p>
+                      <p className="t-body text-accent-brand font-medium">Check your email</p>
                       <p className="t-caption-sm text-[var(--brand-text)] mt-1">
                         If an account exists with that email, we've sent a password reset link.
                       </p>
@@ -217,7 +217,7 @@ export function ClientAuthGate({
                       className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] px-4 py-3 t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors"
                     />
                     <TurnstileWidget onToken={(t) => { tokenRef.current = t; }} resetTrigger={turnstileReset} />
-                    {authError && <p className="t-caption-sm text-red-400/80">{authError}</p>}
+                    {authError && <p className="t-caption-sm text-accent-danger">{authError}</p>}
                     <Button
                       type="submit"
                       variant="primary"
@@ -246,7 +246,7 @@ export function ClientAuthGate({
                 {resetDone ? (
                   <>
                     <div className="bg-teal-500/10 border border-teal-500/20 p-4 text-center" style={{ borderRadius: 'var(--radius-signature)' }}>
-                      <p className="t-body text-teal-400 font-medium">Password updated!</p>
+                      <p className="t-body text-accent-brand font-medium">Password updated!</p>
                       <p className="t-caption-sm text-[var(--brand-text)] mt-1">You can now sign in with your new password.</p>
                     </div>
                     <Button
@@ -287,7 +287,7 @@ export function ClientAuthGate({
                       placeholder="Confirm new password"
                       className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] px-4 py-3 t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors"
                     />
-                    {authError && <p className="t-caption-sm text-red-400/80">{authError}</p>}
+                    {authError && <p className="t-caption-sm text-accent-danger">{authError}</p>}
                     <Button
                       type="submit"
                       variant="primary"
@@ -329,7 +329,7 @@ export function ClientAuthGate({
                   />
                 </div>
                 <TurnstileWidget onToken={(t) => { tokenRef.current = t; }} resetTrigger={turnstileReset} />
-                {authError && <p className="t-caption-sm text-red-400/80">{authError}</p>}
+                {authError && <p className="t-caption-sm text-accent-danger">{authError}</p>}
                 <Button
                   type="submit"
                   variant="primary"
@@ -378,7 +378,7 @@ export function ClientAuthGate({
                   className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] px-4 py-3 t-body text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors"
                   autoFocus={loginTab === 'password' || showsPasswordLogin}
                 />
-                {authError && <p className="t-caption-sm text-red-400/80 mt-2">{authError}</p>}
+                {authError && <p className="t-caption-sm text-accent-danger mt-2">{authError}</p>}
               </div>
               <Button
                 type="submit"

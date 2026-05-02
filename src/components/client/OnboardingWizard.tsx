@@ -36,7 +36,7 @@ export function OnboardingWizard({
   const [step, setStep] = useState<Step>('welcome');
   const stepIdx = STEPS.indexOf(step);
   const tierLabel = tier === 'premium' ? 'Premium' : tier === 'growth' ? 'Growth' : 'Starter';
-  const tierBg = tier !== 'free' ? 'bg-teal-500/15 border-teal-500/30 text-teal-300' : 'bg-[var(--surface-3)] border-[var(--brand-border)] text-[var(--brand-text)]';
+  const tierBg = tier !== 'free' ? 'bg-teal-500/15 border-teal-500/30 text-accent-brand' : 'bg-[var(--surface-3)] border-[var(--brand-border)] text-[var(--brand-text)]';
 
   const features = [
     { icon: LineChart, label: 'Performance', desc: 'GA4 + Search Console data in one place', available: true, tab: 'performance' },
@@ -48,10 +48,10 @@ export function OnboardingWizard({
   ];
 
   const suggestedActions = [
-    hasGSC && { icon: MousePointerClick, label: 'Explore search performance', desc: 'See which keywords are driving traffic', tab: 'performance', color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' },
-    hasAudit && { icon: Shield, label: 'Check your site health score', desc: 'See how your website stacks up technically', tab: 'health', color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' },
-    hasStrategy && tier !== 'free' && { icon: Target, label: 'Review your SEO strategy', desc: 'Keyword assignments, content gaps, and opportunities', tab: 'strategy', color: 'text-teal-400', bg: 'bg-teal-500/10 border-teal-500/20' },
-    { icon: Sparkles, label: 'Ask your AI advisor a question', desc: 'Try: "What should I focus on this month?"', tab: 'overview', color: 'text-teal-400', bg: 'bg-teal-500/10 border-teal-500/20', action: 'chat' },
+    hasGSC && { icon: MousePointerClick, label: 'Explore search performance', desc: 'See which keywords are driving traffic', tab: 'performance', color: 'text-accent-info', bg: 'bg-blue-500/10 border-blue-500/20' },
+    hasAudit && { icon: Shield, label: 'Check your site health score', desc: 'See how your website stacks up technically', tab: 'health', color: 'text-accent-success', bg: 'bg-emerald-500/10 border-emerald-500/20' },
+    hasStrategy && tier !== 'free' && { icon: Target, label: 'Review your SEO strategy', desc: 'Keyword assignments, content gaps, and opportunities', tab: 'strategy', color: 'text-accent-brand', bg: 'bg-teal-500/10 border-teal-500/20' },
+    { icon: Sparkles, label: 'Ask your AI advisor a question', desc: 'Try: "What should I focus on this month?"', tab: 'overview', color: 'text-accent-brand', bg: 'bg-teal-500/10 border-teal-500/20', action: 'chat' },
   ].filter(Boolean) as { icon: typeof Shield; label: string; desc: string; tab: string; color: string; bg: string; action?: string }[];
 
   const next = () => { if (stepIdx < STEPS.length - 1) setStep(STEPS[stepIdx + 1]); };
@@ -79,14 +79,14 @@ export function OnboardingWizard({
               <div className="absolute -top-20 -right-20 w-48 h-48 rounded-full blur-3xl opacity-15 bg-gradient-to-br from-teal-500 to-emerald-500" />
               <div className="relative text-center">
                 <div className="w-14 h-14 rounded-[var(--radius-xl)] bg-gradient-to-br from-teal-500/20 to-emerald-500/20 ring-1 ring-teal-500/20 flex items-center justify-center mx-auto mb-4">
-                  <Icon as={Sparkles} size="2xl" className="text-teal-400" />
+                  <Icon as={Sparkles} size="2xl" className="text-accent-brand" />
                 </div>
                 <h2 className="text-xl font-bold text-[var(--brand-text-bright)] mb-1">Welcome to your dashboard</h2>
                 <p className="t-body text-[var(--brand-text)]">{workspaceName}</p>
                 {!betaMode && <div className="flex items-center justify-center gap-2 mt-3">
                   <span className={`t-caption-sm px-2.5 py-1 rounded-full border font-semibold ${tierBg}`}>{tierLabel} Plan</span>
                   {isTrial && trialDaysRemaining != null && (
-                    <span className="t-caption-sm px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 font-medium">
+                    <span className="t-caption-sm px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-accent-warning font-medium">
                       {trialDaysRemaining} day{trialDaysRemaining !== 1 ? 's' : ''} left in trial
                     </span>
                   )}
@@ -104,7 +104,7 @@ export function OnboardingWizard({
             {!betaMode && isTrial && (
               <div className="mx-6 mb-4 px-3.5 py-3 bg-gradient-to-r from-blue-500/5 to-teal-500/5 border border-blue-500/15" style={{ borderRadius: 'var(--radius-signature)' }}>
                 <div className="flex items-start gap-2">
-                  <Icon as={Zap} size="md" className="text-blue-400 mt-0.5 flex-shrink-0" />
+                  <Icon as={Zap} size="md" className="text-accent-info mt-0.5 flex-shrink-0" />
                   <div>
                     <div className="t-caption font-semibold text-[var(--brand-text-bright)]">You&apos;re on a free trial</div>
                     <div className="t-caption-sm text-[var(--brand-text)] mt-0.5">Explore all {tierLabel} features for {trialDaysRemaining} more day{trialDaysRemaining !== 1 ? 's' : ''}. No credit card required.</div>
@@ -120,7 +120,7 @@ export function OnboardingWizard({
           <>
             <div className="px-6 pt-4 pb-2 text-center">
               <div className="w-10 h-10 rounded-[var(--radius-xl)] bg-blue-500/10 ring-1 ring-blue-500/20 flex items-center justify-center mx-auto mb-3">
-                <Icon as={BarChart3} size="lg" className="text-blue-400" />
+                <Icon as={BarChart3} size="lg" className="text-accent-info" />
               </div>
               <h2 className="text-lg font-bold text-[var(--brand-text-bright)] mb-1">What&apos;s included</h2>
               <p className="text-[13px] text-[var(--brand-text-muted)]">Everything your dashboard can do</p>
@@ -131,7 +131,7 @@ export function OnboardingWizard({
                 {features.map((f, i) => (
                   <div key={i} className={cn('px-3 py-2.5 rounded-[var(--radius-lg)] border transition-colors', f.available ? 'bg-[var(--surface-3)]/50 border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]' : 'bg-[var(--surface-2)]/50 border-[var(--brand-border)]/50 opacity-50')}>
                     <div className="flex items-center gap-2 mb-1">
-                      <f.icon className={cn('w-3.5 h-3.5', f.available ? 'text-teal-400' : 'text-[var(--brand-border)]')} />
+                      <f.icon className={cn('w-3.5 h-3.5', f.available ? 'text-accent-brand' : 'text-[var(--brand-border)]')} />
                       <span className={cn('t-caption-sm font-semibold', f.available ? 'text-[var(--brand-text-bright)]' : 'text-[var(--brand-text-muted)]')}>{f.label}</span>
                     </div>
                     <div className="t-micro text-[var(--brand-text-muted)] leading-relaxed">{f.desc}</div>
@@ -148,7 +148,7 @@ export function OnboardingWizard({
           <>
             <div className="px-6 pt-4 pb-2 text-center">
               <div className="w-10 h-10 rounded-[var(--radius-xl)] bg-emerald-500/10 ring-1 ring-emerald-500/20 flex items-center justify-center mx-auto mb-3">
-                <Icon as={Trophy} size="lg" className="text-emerald-400" />
+                <Icon as={Trophy} size="lg" className="text-accent-success" />
               </div>
               <h2 className="text-lg font-bold text-[var(--brand-text-bright)] mb-1">Get started</h2>
               <p className="text-[13px] text-[var(--brand-text-muted)]">Here are some things you can do right now</p>

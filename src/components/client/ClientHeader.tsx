@@ -1,8 +1,8 @@
 import React from 'react';
-import { Lock, Sun, Moon, Calendar } from 'lucide-react';
+import { Lock, Sun, Moon, Calendar, LogOut } from 'lucide-react';
 import { SeoCartButton } from './SeoCart';
 import { STUDIO_NAME } from '../../constants';
-import { Icon } from '../ui';
+import { Button, Icon, IconButton } from '../ui';
 import { Modal } from '../ui/overlay/Modal';
 import type { WorkspaceInfo, ClientTab, ClientContentRequest } from './types';
 
@@ -77,7 +77,7 @@ export function ClientHeader({
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-semibold">{ws.name}</h1>
               {!betaMode && ws.isTrial && (
-                <span className="px-2 py-0.5 t-caption-sm uppercase tracking-wider font-semibold rounded-full bg-amber-500/15 text-amber-400/80 border border-amber-500/20">
+                <span className="px-2 py-0.5 t-caption-sm uppercase tracking-wider font-semibold rounded-full bg-amber-500/15 text-accent-warning border border-amber-500/20">
                   Growth Trial{ws.trialDaysRemaining ? ` · ${ws.trialDaysRemaining}d` : ''}
                 </span>
               )}
@@ -89,21 +89,20 @@ export function ClientHeader({
           {/* Client user menu */}
           {clientUser && (
             <div className="flex items-center gap-2 pr-2 border-r border-[var(--brand-border)]">
-              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center text-white t-caption-sm font-bold">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[var(--teal)] to-[var(--emerald)] flex items-center justify-center text-[var(--button-primary-text)] t-caption-sm font-bold">
                 {clientUser.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
               </div>
               <span className="t-caption text-[var(--brand-text-muted)] hidden sm:block">{clientUser.name}</span>
-              <button onClick={handleClientLogout} title="Sign out"
-                className="p-1.5 rounded-md text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)] transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-              </button>
+              <IconButton icon={LogOut} label="Sign out" size="sm" onClick={handleClientLogout} />
             </div>
           )}
           {!betaMode && <SeoCartButton />}
-          <button onClick={toggleTheme} title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            className="p-2 rounded-[var(--radius-lg)] border border-[var(--brand-border)] hover:border-[var(--brand-border-strong)] transition-colors">
-            {theme === 'dark' ? <Icon as={Sun} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={Moon} size="md" className="text-[var(--brand-text-muted)]" />}
-          </button>
+          <IconButton
+            icon={theme === 'dark' ? Sun : Moon}
+            label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            variant="solid"
+            onClick={toggleTheme}
+          />
           {hasAnalytics && (
             // pr-check-disable-next-line -- Date-range segmented control toolbar; interactive control, not a content card
             <div className="relative flex items-center gap-1 bg-[var(--surface-2)] rounded-[var(--radius-lg)] border border-[var(--brand-border)] p-0.5">
@@ -116,7 +115,7 @@ export function ClientHeader({
                 </button>
               ))}
               <button onClick={() => effectiveTier !== 'free' && setShowDatePicker(p => !p)}
-                className={`px-2.5 py-1.5 rounded-md t-caption font-medium transition-colors flex items-center gap-1.5 ${effectiveTier === 'free' ? 'text-[var(--brand-text-faint)] cursor-not-allowed' : customDateRange ? 'bg-teal-600/20 text-teal-300 border border-teal-500/30' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}
+                className={`px-2.5 py-1.5 rounded-md t-caption font-medium transition-colors flex items-center gap-1.5 ${effectiveTier === 'free' ? 'text-[var(--brand-text-faint)] cursor-not-allowed' : customDateRange ? 'bg-teal-600/20 text-accent-brand border border-teal-500/30' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}
                 title={effectiveTier === 'free' ? 'Upgrade to Growth for custom date ranges' : 'Custom date range'}
               >
                 <Icon as={Calendar} size="md" />
@@ -154,18 +153,16 @@ export function ClientHeader({
                 </Modal.Body>
                 <Modal.Footer>
                   <div className="flex items-center gap-2 w-full">
-                    <button onClick={() => setShowDatePicker(false)}
-                      className="flex-1 px-3 py-1.5 t-caption rounded-[var(--radius-lg)] border border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">
+                    <Button onClick={() => setShowDatePicker(false)} variant="secondary" size="sm" className="flex-1">
                       Cancel
-                    </button>
-                    <button onClick={() => {
+                    </Button>
+                    <Button onClick={() => {
                       const s = customStartRef.current?.value;
                       const e = customEndRef.current?.value;
                       if (s && e && s <= e) applyCustomRange(s, e, ws);
-                    }}
-                      className="flex-1 px-3 py-1.5 t-caption rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 text-white font-medium transition-colors">
+                    }} size="sm" className="flex-1">
                       Apply
-                    </button>
+                    </Button>
                   </div>
                 </Modal.Footer>
               </Modal>
@@ -193,12 +190,12 @@ export function ClientHeader({
                 onClick={() => t.locked ? setShowUpgradeModal(true) : setTab(t.id)}
                 className={`flex items-center gap-1.5 px-4 py-3 t-caption font-medium border-b-2 transition-colors whitespace-nowrap ${
                   t.locked ? 'border-transparent text-[var(--brand-text-muted)] cursor-default' :
-                  active ? 'border-teal-500 text-teal-300' :
+                  active ? 'border-teal-500 text-accent-brand' :
                   'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:border-[var(--brand-border-strong)]'
                 }`}>
                 <Icon as={TabIcon} size="md" /> {t.label}
                 {t.locked && <Icon as={Lock} size="sm" className="ml-0.5 text-[var(--brand-text-muted)]" />}
-                {t.id === 'inbox' && (pendingApprovals + pendingReviews + unreadTeamNotes) > 0 && <span className="ml-1 px-1.5 py-0.5 t-caption-sm font-bold rounded-full bg-teal-500 text-white flex-shrink-0 min-w-[20px] text-center leading-tight">{pendingApprovals + pendingReviews + unreadTeamNotes}</span>}
+                {t.id === 'inbox' && (pendingApprovals + pendingReviews + unreadTeamNotes) > 0 && <span className="ml-1 px-1.5 py-0.5 t-caption-sm font-bold rounded-full bg-[var(--teal)] text-[var(--button-primary-text)] flex-shrink-0 min-w-[20px] text-center leading-tight">{pendingApprovals + pendingReviews + unreadTeamNotes}</span>}
                 {t.id === 'content-plan' && contentPlanSummary && contentPlanSummary.reviewCells > 0 && <span className="ml-1 px-1.5 py-0.5 t-caption-sm font-bold rounded-full bg-blue-500 text-white flex-shrink-0 min-w-[20px] text-center leading-tight">{contentPlanSummary.reviewCells}</span>}
                 {!t.locked && tabHasData && !active && t.id !== 'inbox' && <span className="w-2 h-2 rounded-full bg-emerald-400/60" title="Data available" />}
               </button>

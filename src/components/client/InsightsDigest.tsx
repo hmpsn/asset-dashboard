@@ -469,11 +469,11 @@ function mergeInsights(local: DigestInsight[], server: DigestInsight[]): DigestI
 // ─── Color Maps ───
 
 const COLORS: Record<string, { text: string; badge: string }> = {
-  teal:    { text: 'text-teal-400',    badge: 'bg-teal-500/10 text-teal-400' },
-  blue:    { text: 'text-blue-400',    badge: 'bg-blue-500/10 text-blue-400' },
-  emerald: { text: 'text-emerald-400', badge: 'bg-emerald-500/10 text-emerald-400' },
-  amber:   { text: 'text-amber-400',   badge: 'bg-amber-500/10 text-amber-400' },
-  red:     { text: 'text-red-400',     badge: 'bg-red-500/10 text-red-400' },
+  teal:    { text: 'text-accent-brand',    badge: 'bg-teal-500/10 text-accent-brand' },
+  blue:    { text: 'text-accent-info',    badge: 'bg-blue-500/10 text-accent-info' },
+  emerald: { text: 'text-accent-success', badge: 'bg-emerald-500/10 text-accent-success' },
+  amber:   { text: 'text-accent-warning',   badge: 'bg-amber-500/10 text-accent-warning' },
+  red:     { text: 'text-accent-danger',     badge: 'bg-red-500/10 text-accent-danger' },
 };
 
 const SENTIMENT_LABELS: Record<string, string> = {
@@ -508,7 +508,7 @@ export function InsightsDigest(props: InsightsDigestProps) {
     <div className="space-y-6">
       <div className="flex items-center gap-2">
         <div className="w-5 h-5 rounded-md bg-teal-500/15 flex items-center justify-center">
-          <Icon as={Sparkles} size="sm" className="text-teal-400" />
+          <Icon as={Sparkles} size="sm" className="text-accent-brand" />
         </div>
         <span className="t-body font-semibold text-[var(--brand-text-bright)]">Insights</span>
         <span className="t-caption text-[var(--brand-text-muted)]">{all.length} things to know</span>
@@ -553,7 +553,7 @@ export function InsightsDigest(props: InsightsDigestProps) {
 
               {/* Destination hint */}
               {insight.action && (
-                <span className="t-caption-sm text-teal-400 group-hover:text-teal-300 flex items-center gap-1 transition-colors">
+                <span className="t-caption-sm text-accent-brand group-hover:text-accent-brand flex items-center gap-1 transition-colors">
                   {insight.action.label} <Icon as={ArrowRight} size="sm" />
                 </span>
               )}
@@ -602,7 +602,7 @@ export function PerformancePulse({ overview, searchComparison, ga4Overview, ga4C
       label: 'Visitors',
       value: fmtNum(ga4Overview.totalUsers),
       change: ga4Comparison?.changePercent.users,
-      color: 'text-teal-400',
+      color: 'text-accent-brand',
     });
   }
   if (overview) {
@@ -610,20 +610,20 @@ export function PerformancePulse({ overview, searchComparison, ga4Overview, ga4C
       label: 'Search Clicks',
       value: fmtNum(overview.totalClicks),
       change: searchComparison?.changePercent.clicks,
-      color: 'text-blue-400',
+      color: 'text-accent-info',
     });
     metrics.push({
       label: 'Impressions',
       value: fmtNum(overview.totalImpressions),
       change: searchComparison?.changePercent.impressions,
-      color: 'text-blue-400',
+      color: 'text-accent-info',
     });
   } else if (ga4Overview) {
     metrics.push({
       label: 'Sessions',
       value: fmtNum(ga4Overview.totalSessions),
       change: ga4Comparison?.changePercent.sessions,
-      color: 'text-blue-400',
+      color: 'text-accent-info',
     });
   }
   if (audit) {
@@ -642,7 +642,7 @@ export function PerformancePulse({ overview, searchComparison, ga4Overview, ga4C
       metrics.push({
         label: 'Avg Position',
         value: `#${avgP.toFixed(1)}`,
-        color: avgP <= 10 ? 'text-emerald-400' : avgP <= 20 ? 'text-amber-400' : 'text-blue-400',
+        color: avgP <= 10 ? 'text-accent-success' : avgP <= 20 ? 'text-accent-warning' : 'text-accent-info',
       });
     }
   }
@@ -659,7 +659,7 @@ export function PerformancePulse({ overview, searchComparison, ga4Overview, ga4C
           </div>
           {m.change != null && m.change !== 0 && (
             <span className={`t-caption font-medium px-1.5 py-0.5 rounded ${
-              m.change > 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
+              m.change > 0 ? 'bg-emerald-500/10 text-accent-success' : 'bg-red-500/10 text-accent-danger'
             }`}>
               {m.changeLabel || pct(m.change)}
             </span>

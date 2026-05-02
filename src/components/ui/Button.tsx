@@ -18,18 +18,19 @@ export interface ButtonProps
 
 const VARIANT: Record<ButtonVariant, string> = {
   primary:
-    'bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-medium shadow-sm hover:shadow-md',
+    'bg-gradient-to-r from-[var(--teal)] to-[var(--emerald)] text-[var(--button-primary-text)] font-semibold shadow-sm hover:shadow-md',
   secondary:
-    'bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200',
-  ghost: 'bg-transparent hover:bg-zinc-800/50 text-zinc-300',
-  danger: 'bg-red-600 hover:bg-red-500 text-white',
-  link: 'text-teal-400 hover:text-teal-300 underline underline-offset-2 bg-transparent p-0',
+    'bg-[var(--surface-3)] hover:bg-[var(--surface-active)] border border-[var(--brand-border-hover)] text-[var(--brand-text-bright)]',
+  ghost:
+    'bg-transparent hover:bg-[var(--surface-3)]/70 text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]',
+  danger: 'bg-[var(--red)] hover:opacity-90 text-white',
+  link: 'text-[var(--teal)] hover:opacity-90 underline underline-offset-2 bg-transparent p-0',
 };
 
 const SIZE: Record<ButtonSize, string> = {
-  sm: 'px-2.5 py-1 text-[11px]',
-  md: 'px-4 py-2 text-xs',
-  lg: 'px-5 py-2.5 text-sm',
+  sm: 'px-2.5 py-1 t-caption-sm',
+  md: 'px-4 py-2 t-caption',
+  lg: 'px-5 py-2.5 t-body',
 };
 
 const ICON_SIZE: Record<ButtonSize, string> = {

@@ -1,4 +1,5 @@
 import { AlertTriangle, RefreshCw, Wifi, Database } from 'lucide-react';
+import { Button } from './Button';
 
 interface ErrorStateProps {
   title?: string;
@@ -46,23 +47,19 @@ export function ErrorState({
       <div className={`w-12 h-12 rounded-xl ${bgColor} flex items-center justify-center mb-4`}>
         <Icon className={`w-6 h-6 ${iconColor}`} />
       </div>
-      <h3 className="text-lg font-semibold text-zinc-200 mb-2">{title}</h3>
-      <p className="text-sm text-zinc-500 mb-4 max-w-md">{message}</p>
+      <h3 className="t-h2 font-semibold text-[var(--brand-text-bright)] mb-2">{title}</h3>
+      <p className="t-body text-[var(--brand-text-muted)] mb-4 max-w-md">{message}</p>
       {resolvedActions.length > 0 && (
         <div className="flex items-center gap-2">
           {resolvedActions.map((a) => (
-            <button
+            <Button
               key={a.label}
               onClick={a.onClick}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-                a.variant === 'secondary'
-                  ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
-                  : 'bg-teal-600 hover:bg-teal-500 text-white'
-              }`}
+              variant={a.variant === 'secondary' ? 'secondary' : 'primary'}
+              icon={a.variant !== 'secondary' ? RefreshCw : undefined}
             >
-              {a.variant !== 'secondary' && <RefreshCw className="w-3 h-3" />}
               {a.label}
-            </button>
+            </Button>
           ))}
         </div>
       )}

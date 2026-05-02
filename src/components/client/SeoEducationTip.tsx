@@ -74,12 +74,12 @@ export function SeoEducationTip({ tab, workspaceId }: Props) {
       <div className="px-4 py-3">
         <div className="flex items-start gap-3">
           <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-teal-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <Icon as={Lightbulb} size="md" className="text-teal-400" />
+            <Icon as={Lightbulb} size="md" className="text-accent-brand" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <h4 className="t-caption font-semibold text-[var(--brand-text-bright)]">{tip.title}</h4>
-              <span className="t-micro px-1.5 py-0.5 rounded-full bg-teal-500/10 text-teal-400 font-medium">SEO Tip</span>
+              <span className="t-micro px-1.5 py-0.5 rounded-full bg-teal-500/10 text-accent-brand font-medium">SEO Tip</span>
             </div>
             <p className="text-[12px] text-[var(--brand-text)] leading-relaxed">{tip.body}</p>
             {showLearnMore && tip.learnMore && (
@@ -89,7 +89,7 @@ export function SeoEducationTip({ tab, workspaceId }: Props) {
               {tip.learnMore && !showLearnMore && (
                 <button
                   onClick={() => setShowLearnMore(true)}
-                  className="flex items-center gap-1 t-caption-sm text-teal-400 hover:text-teal-300 transition-colors font-medium"
+                  className="flex items-center gap-1 t-caption-sm text-accent-brand hover:text-accent-brand transition-colors font-medium"
                 >
                   Learn more <ChevronRight className="w-3 h-3" />
                 </button>
