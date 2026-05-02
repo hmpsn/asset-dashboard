@@ -29,9 +29,28 @@ import {
   listProducts,
 } from '../stripe.js';
 import { getWorkspace } from '../workspaces.js';
+import { getContentRequest } from '../content-requests.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('stripe');
+
+function validateFullPostUpgradePayment(workspaceId: string, productType: string, contentRequestId: string | undefined, res: import('express').Response): boolean {
+  if (productType !== 'post_polished') return true;
+  if (!contentRequestId) {
+    res.status(409).json({ error: 'Full-post upgrades require an approved brief request' });
+    return false;
+  }
+  const request = getContentRequest(workspaceId, contentRequestId);
+  if (!request) {
+    res.status(404).json({ error: 'Content request not found' });
+    return false;
+  }
+  if (request.serviceType !== 'brief_only' || request.status !== 'approved') {
+    res.status(409).json({ error: 'Only approved brief requests can be upgraded to a full post' });
+    return false;
+  }
+  return true;
+}
 
 // NOTE: Stripe webhook is in server/index.ts — it must be registered before
 // express.json() middleware to receive the raw body needed for signature verification.
@@ -83,6 +102,7 @@ router.post('/api/stripe/create-payment-intent', checkoutLimiter, async (req, re
   const ws = getWorkspace(workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (ws.billingMode === 'external') return res.status(403).json({ error: 'This workspace is billed externally — Stripe payments are disabled' });
+  if (!validateFullPostUpgradePayment(workspaceId, productType, contentRequestId, res)) return;
 
   try {
     const result = await createPaymentIntentForProduct({
@@ -111,6 +131,7 @@ router.post('/api/stripe/create-checkout', checkoutLimiter, async (req, res) => 
   if (ws.billingMode === 'external') return res.status(403).json({ error: 'This workspace is billed externally — Stripe payments are disabled' });
   const config = getProductConfig(productType);
   if (!config) return res.status(400).json({ error: `Unknown product type: ${productType}` });
+  if (!validateFullPostUpgradePayment(workspaceId, productType, contentRequestId, res)) return;
 
   // Build redirect URLs
   const baseUrl = `${req.protocol}://${req.get('host')}`;

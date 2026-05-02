@@ -5,7 +5,7 @@
  * Webflow CMS → post marked published → verifiable state.
  *
  * Failure modes covered:
- *   FM-2  — Phantom success: CMS publish step fails but post is still marked published
+ *   FM-2  — Phantom success guard: CMS publish step fails and post is not marked published
  *   FM-12 — Broken chain: publish succeeds but local state not updated
  *
  * Architecture: in-process HTTP via createApp() + http.createServer() so that
@@ -196,9 +196,9 @@ describe('Journey: Content Publish Pipeline', () => {
     expect(post!.publishedSlug).toBeUndefined();
   });
 
-  // ── 3. Partial chain: CMS create OK, publish fails (FM-2 soft failure) ──
+  // ── 3. Partial chain: CMS create OK, publish fails (FM-2 guard) ──
 
-  it('FM-2 soft failure: post IS marked published even when publish step fails', async () => {
+  it('FM-2 guard: post is not marked published when publish step fails', async () => {
     // Arrange: CMS create succeeds, publish fails
     mockWebflowSuccess(`/collections/${TEST_COLLECTION_ID}/items`, { id: TEST_ITEM_ID });
     mockWebflowError(`/collections/${TEST_COLLECTION_ID}/items/publish`, 500, 'Publish service unavailable');
@@ -210,18 +210,16 @@ describe('Journey: Content Publish Pipeline', () => {
       {},
     );
 
-    // Assert: route returns 200 despite publish failure — this IS the FM-2 behaviour
-    expect(status).toBe(200);
-    const resp = body as { success: boolean; itemId: string };
-    expect(resp.success).toBe(true);
-    expect(resp.itemId).toBe(TEST_ITEM_ID);
+    expect(status).toBe(500);
+    expect((body as { error: string }).error).toContain('Failed to publish CMS item');
 
-    // Assert: post IS marked published (documenting the known FM-2 soft failure)
+    // Assert: item ID is retained for retry, but post is not marked published.
 
     const post = getPost(content.workspaceId, content.postId);
     expect(post).toBeDefined();
     expect(post!.webflowItemId).toBe(TEST_ITEM_ID);
-    expect(post!.publishedAt).toBeDefined();
+    expect(post!.webflowCollectionId).toBe(TEST_COLLECTION_ID);
+    expect(post!.publishedAt).toBeUndefined();
 
     // Assert: the publish endpoint WAS called (attempt was made)
     const requests = getCapturedRequests();

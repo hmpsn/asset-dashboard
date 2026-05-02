@@ -157,6 +157,31 @@ describe('Content Matrices — CRUD', () => {
     expect(res.status).toBe(404);
   });
 
+  it('public content-plan stays hidden until cells are sent for review', async () => {
+    const hiddenRes = await api(`/api/public/content-plan/${testWsId}`);
+    expect(hiddenRes.status).toBe(200);
+    expect(await hiddenRes.json()).toEqual([]);
+
+    const sendRes = await postJson(`/api/content-plan/${testWsId}/${matrixId}/send-samples`, {
+      cellIds: [firstCellId],
+    });
+    expect(sendRes.status).toBe(200);
+    const sent = await sendRes.json();
+    expect(sent.cellsSent).toBe(1);
+
+    const publicRes = await api(`/api/public/content-plan/${testWsId}`);
+    expect(publicRes.status).toBe(200);
+    const publicPlans = await publicRes.json();
+    expect(publicPlans).toHaveLength(1);
+    expect(publicPlans[0].cells).toHaveLength(1);
+    expect(publicPlans[0].cells[0]).toMatchObject({ id: firstCellId, status: 'review' });
+
+    const detailRes = await api(`/api/public/content-plan/${testWsId}/${matrixId}`);
+    expect(detailRes.status).toBe(200);
+    const detail = await detailRes.json();
+    expect(detail.cells.map((c: { id: string }) => c.id)).toEqual([firstCellId]);
+  });
+
   it('DELETE removes the matrix', async () => {
     const res = await del(`/api/content-matrices/${testWsId}/${matrixId}`);
     expect(res.status).toBe(200);

@@ -268,6 +268,7 @@ router.post('/api/content-briefs/:workspaceId/:briefId/send-to-client', requireW
     serviceType: 'brief_only',
     pageType: (brief.pageType as 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource') || 'blog',
     initialStatus: 'brief_generated',
+    dedupe: false,
   });
 
   // Link the brief and set to client_review
@@ -280,8 +281,8 @@ router.post('/api/content-briefs/:workspaceId/:briefId/send-to-client', requireW
 
   // Send email notification
   if (ws?.clientEmail) {
-    const origin = req.get('origin') || req.get('referer')?.replace(/\/[^/]*$/, '') || '';
-    const dashUrl = origin ? `${origin}/dashboard/${req.params.workspaceId}?tab=content` : undefined;
+    const origin = req.get('origin') || `${req.protocol}://${req.get('host')}`;
+    const dashUrl = origin ? `${origin}/client/${req.params.workspaceId}/content` : undefined;
     notifyClientBriefReady({
       clientEmail: ws.clientEmail,
       workspaceName: ws.name,

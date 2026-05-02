@@ -610,6 +610,7 @@ router.get('/api/public/schema-plan/:workspaceId', requireClientPortalAuth(), (r
   if (!ws?.webflowSiteId) return res.status(404).json({ error: 'No site linked' });
   const plan = getSchemaPlan(ws.webflowSiteId);
   if (!plan) return res.json(null);
+  if (!['sent_to_client', 'client_approved', 'client_changes_requested', 'active'].includes(plan.status)) return res.json(null);
   res.json(plan);
 });
 
@@ -621,6 +622,9 @@ router.post('/api/public/schema-plan/:workspaceId/feedback', requireClientPortal
   }
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.webflowSiteId) return res.status(404).json({ error: 'No site linked' });
+  const existing = getSchemaPlan(ws.webflowSiteId);
+  if (!existing) return res.status(404).json({ error: 'No plan found' });
+  if (existing.status !== 'sent_to_client') return res.status(409).json({ error: 'Schema plan is not ready for client feedback' });
 
   const newStatus = action === 'approve' ? 'client_approved' : 'client_changes_requested';
   const plan = updateSchemaPlanStatus(ws.webflowSiteId, newStatus as SchemaSitePlan['status']);

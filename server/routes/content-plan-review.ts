@@ -16,10 +16,44 @@ import { getWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
+import type { ContentMatrix, MatrixCell } from '../../shared/types/content.ts';
 
 const log = createLogger('routes:content-plan-review');
 import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
+
+const CLIENT_VISIBLE_CELL_STATUSES = new Set(['review', 'approved', 'published']);
+
+function clientVisibleCells(cells: MatrixCell[]): MatrixCell[] {
+  return cells.filter(c => CLIENT_VISIBLE_CELL_STATUSES.has(c.status));
+}
+
+function serializeClientMatrix(matrix: ContentMatrix, cells: MatrixCell[], extra: Record<string, unknown> = {}) {
+  return {
+    id: matrix.id,
+    name: matrix.name,
+    stats: {
+      total: cells.length,
+      planned: 0,
+      briefGenerated: 0,
+      drafted: 0,
+      reviewed: cells.filter(c => c.status === 'review' || c.status === 'approved').length,
+      published: cells.filter(c => c.status === 'published').length,
+    },
+    dimensions: matrix.dimensions.map(d => ({ name: d.variableName, values: d.values })),
+    cells: cells.map(c => ({
+      id: c.id,
+      targetKeyword: c.targetKeyword,
+      plannedUrl: c.plannedUrl,
+      status: c.status,
+      variableValues: c.variableValues,
+      hasBrief: !!c.briefId,
+      hasPost: !!c.postId,
+    })),
+    createdAt: matrix.createdAt,
+    ...extra,
+  };
+}
 
 // ── Public endpoints (client portal) ──
 
@@ -34,22 +68,10 @@ router.get('/api/public/content-plan/:workspaceId', (req, res) => {
     if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
     const matrices = listMatrices(req.params.workspaceId);
-    const clientView = matrices.map(m => ({
-      id: m.id,
-      name: m.name,
-      stats: m.stats,
-      dimensions: m.dimensions.map(d => ({ name: d.variableName, values: d.values })),
-      cells: m.cells.map(c => ({
-        id: c.id,
-        targetKeyword: c.targetKeyword,
-        plannedUrl: c.plannedUrl,
-        status: c.status,
-        variableValues: c.variableValues,
-        hasBrief: !!c.briefId,
-        hasPost: !!c.postId,
-      })),
-      createdAt: m.createdAt,
-    }));
+    const clientView = matrices
+      .map(m => ({ matrix: m, cells: clientVisibleCells(m.cells) }))
+      .filter(({ cells }) => cells.length > 0)
+      .map(({ matrix, cells }) => serializeClientMatrix(matrix, cells));
 
     res.json(clientView);
   } catch (err) {
@@ -69,24 +91,13 @@ router.get('/api/public/content-plan/:workspaceId/:matrixId', (req, res) => {
 
     const template = getTemplate(req.params.workspaceId, matrix.templateId);
 
-    res.json({
-      id: matrix.id,
-      name: matrix.name,
+    const cells = clientVisibleCells(matrix.cells);
+    if (!cells.length) return res.json(null);
+
+    res.json(serializeClientMatrix(matrix, cells, {
       templateName: template?.name ?? null,
       templatePageType: template?.pageType ?? null,
-      stats: matrix.stats,
-      dimensions: matrix.dimensions.map(d => ({ name: d.variableName, values: d.values })),
-      cells: matrix.cells.map(c => ({
-        id: c.id,
-        targetKeyword: c.targetKeyword,
-        plannedUrl: c.plannedUrl,
-        status: c.status,
-        variableValues: c.variableValues,
-        hasBrief: !!c.briefId,
-        hasPost: !!c.postId,
-      })),
-      createdAt: matrix.createdAt,
-    });
+    }));
   } catch (err) {
     log.error({ err }, 'Failed to get client matrix view');
     res.status(500).json({ error: 'Failed to get content plan' });
@@ -102,6 +113,11 @@ router.post('/api/public/content-plan/:workspaceId/:matrixId/cells/:cellId/flag'
   if (!comment) return res.status(400).json({ error: 'comment is required' });
 
   try {
+    const matrix = getMatrix(req.params.workspaceId, req.params.matrixId);
+    const cell = matrix?.cells.find(c => c.id === req.params.cellId);
+    if (!matrix || !cell) return res.status(404).json({ error: 'Cell not found' });
+    if (!CLIENT_VISIBLE_CELL_STATUSES.has(cell.status)) return res.status(409).json({ error: 'Cell is not available for client review' });
+
     const updated = updateMatrixCell(
       req.params.workspaceId,
       req.params.matrixId,

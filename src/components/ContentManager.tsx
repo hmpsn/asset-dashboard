@@ -324,7 +324,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                             Approve
                           </button>
                         )}
-                        {(post.status === 'review' || post.status === 'approved') && (
+                        {post.status === 'review' && (
                           <button
                             onClick={() => updateStatus(post.id, 'draft')}
                             disabled={updatingStatus === post.id}

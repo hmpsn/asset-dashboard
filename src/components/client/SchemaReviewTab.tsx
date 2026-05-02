@@ -260,7 +260,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
           )}
 
           {/* Approve / Request Changes */}
-          {(plan.status === 'sent_to_client' || plan.status === 'draft') && (
+          {plan.status === 'sent_to_client' && (
             <div className="px-5 py-4 border-t border-[var(--brand-border)] bg-[var(--surface-2)]/50">
               {showFeedback ? (
                 <div className="space-y-3">

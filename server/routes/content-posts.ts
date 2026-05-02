@@ -228,7 +228,15 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
 
         createCollectionItem(collectionId, fieldData, false, token).then(async (result) => {
           if (result.success && result.itemId) {
-            await publishCollectionItems(collectionId, [result.itemId], token);
+            const publishResult = await publishCollectionItems(collectionId, [result.itemId], token);
+            if (!publishResult.success) {
+              updatePostField(req.params.workspaceId, req.params.postId, {
+                webflowItemId: result.itemId,
+                webflowCollectionId: collectionId,
+              });
+              log.warn(`Auto-publish failed for ${req.params.postId}: ${publishResult.error}`);
+              return;
+            }
             updatePostField(req.params.workspaceId, req.params.postId, {
               webflowItemId: result.itemId,
               webflowCollectionId: collectionId,

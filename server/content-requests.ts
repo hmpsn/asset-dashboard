@@ -114,11 +114,13 @@ export function getContentRequest(workspaceId: string, id: string): ContentTopic
 
 export function createContentRequest(
   workspaceId: string,
-  data: { topic: string; targetKeyword: string; intent: string; priority: string; rationale: string; clientNote?: string; source?: 'strategy' | 'client'; serviceType?: 'brief_only' | 'full_post'; pageType?: ContentTopicRequest['pageType']; initialStatus?: 'pending_payment' | 'requested' | 'brief_generated'; targetPageId?: string; targetPageSlug?: string }
+  data: { topic: string; targetKeyword: string; intent: string; priority: string; rationale: string; clientNote?: string; source?: 'strategy' | 'client'; serviceType?: 'brief_only' | 'full_post'; pageType?: ContentTopicRequest['pageType']; initialStatus?: 'pending_payment' | 'requested' | 'brief_generated'; targetPageId?: string; targetPageSlug?: string; dedupe?: boolean }
 ): ContentTopicRequest {
   // Prevent duplicate requests for the same keyword
-  const existing = stmts().selectByKeyword.get(workspaceId, data.targetKeyword) as RequestRow | undefined;
-  if (existing) return rowToRequest(existing);
+  if (data.dedupe !== false) {
+    const existing = stmts().selectByKeyword.get(workspaceId, data.targetKeyword) as RequestRow | undefined;
+    if (existing) return rowToRequest(existing);
+  }
 
   const request: ContentTopicRequest = {
     id: `creq_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,

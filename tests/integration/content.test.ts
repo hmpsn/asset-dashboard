@@ -20,6 +20,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import db from '../../server/db/index.js';
 import { createTestContext } from './helpers.js';
+import { createContentRequest, getContentRequest, updateContentRequest } from '../../server/content-requests.js';
 
 const ctx = createTestContext(13203);
 const { api, postJson, patchJson, del } = ctx;
@@ -101,6 +102,7 @@ function seedPost(id: string, briefId: string): void {
 function cleanup(): void {
   db.prepare('DELETE FROM content_briefs WHERE workspace_id = ?').run(testWsId);
   db.prepare('DELETE FROM content_posts WHERE workspace_id = ?').run(testWsId);
+  db.prepare('DELETE FROM content_topic_requests WHERE workspace_id = ?').run(testWsId);
 }
 
 afterAll(() => {
@@ -167,6 +169,34 @@ describe('Content Briefs API', () => {
     expect(contentType).toContain('text/html');
     const html = await res.text();
     expect(html).toContain('Updated Brief Title');
+  });
+
+  it('send-to-client creates a fresh review request for a repeated keyword', async () => {
+    const oldRequest = createContentRequest(testWsId, {
+      topic: 'Old request',
+      targetKeyword: 'integration test keyword',
+      intent: 'informational',
+      priority: 'medium',
+      rationale: 'Previously completed request',
+      initialStatus: 'requested',
+      dedupe: false,
+    });
+    updateContentRequest(testWsId, oldRequest.id, { status: 'published' });
+
+    const res = await api(`/api/content-briefs/${testWsId}/${briefId}/send-to-client`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: 'https://app.example.test' },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.requestId).not.toBe(oldRequest.id);
+
+    const request = getContentRequest(testWsId, body.requestId);
+    expect(request).toBeDefined();
+    expect(request?.briefId).toBe(briefId);
+    expect(request?.status).toBe('client_review');
+    expect(getContentRequest(testWsId, oldRequest.id)?.status).toBe('published');
   });
 
   it('DELETE /api/content-briefs/:wsId/:briefId removes brief', async () => {
