@@ -194,7 +194,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
         actions={
           <div className="flex items-center gap-2">
             {workspaceId && data.suggestions.length > 0 && (
-              <Button variant="secondary" size="sm" icon={sentToClient ? Check : Send} onClick={sendSuggestionsToClient} disabled={sendingToClient}>
+              <Button variant="secondary" size="sm" icon={sentToClient ? Check : Send} onClick={sendSuggestionsToClient} disabled={sendingToClient || sentToClient}>
                 {sendingToClient ? 'Sending...' : sentToClient ? 'Sent' : 'Send to Client'}
               </Button>
             )}

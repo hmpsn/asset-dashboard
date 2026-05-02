@@ -360,7 +360,7 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
             {acceptedRules.length > 0 && (
               <div className="flex items-center gap-2">
                 {workspaceId && (
-                  <button onClick={sendAcceptedRulesToClient} disabled={sendingToClient} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-600/15 border border-teal-500/20 hover:bg-teal-600/25 text-teal-300 t-caption-sm font-medium transition-colors disabled:opacity-60">
+                  <button onClick={sendAcceptedRulesToClient} disabled={sendingToClient || sentToClient} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-600/15 border border-teal-500/20 hover:bg-teal-600/25 text-teal-300 t-caption-sm font-medium transition-colors disabled:opacity-60">
                     <Icon as={sentToClient ? Check : Send} size="sm" className={sentToClient ? 'text-emerald-400' : undefined} />
                     {sendingToClient ? 'Sending...' : sentToClient ? 'Sent' : 'Send to Client'}
                   </button>

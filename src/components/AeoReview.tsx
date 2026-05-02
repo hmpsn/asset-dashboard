@@ -398,7 +398,7 @@ export function AeoReview({ workspaceId }: Props) {
                         <span className="flex items-center gap-1"><UIIcon as={Zap} size="sm" className="text-emerald-400" /> {page.quickWinCount} quick wins</span>
                         <button
                           onClick={(e) => { e.stopPropagation(); void sendPageToClient(page); }}
-                          disabled={sendingPage === page.pageUrl}
+                          disabled={sendingPage === page.pageUrl || sentPages.has(page.pageUrl)}
                           className="flex items-center gap-1 text-teal-300 hover:text-teal-200 transition-colors ml-auto disabled:opacity-60"
                         >
                           {sendingPage === page.pageUrl

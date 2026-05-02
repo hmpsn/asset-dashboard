@@ -47,6 +47,32 @@ const stmts = createStmtCache(() => ({
     SELECT * FROM client_actions
     WHERE workspace_id = ? AND id = ?
   `),
+  selectActiveBySource: db.prepare(`
+    SELECT * FROM client_actions
+    WHERE workspace_id = @workspace_id
+      AND source_type = @source_type
+      AND source_id = @source_id
+      AND status IN ('pending', 'approved', 'changes_requested')
+    ORDER BY updated_at DESC
+    LIMIT 1
+  `),
+  countByStatus: db.prepare(`
+    SELECT status, COALESCE(COUNT(*), 0) AS count
+    FROM client_actions
+    WHERE workspace_id = ?
+    GROUP BY status
+  `),
+  selectRecentDecisions: db.prepare(`
+    SELECT * FROM client_actions
+    WHERE workspace_id = ? AND status != 'pending'
+    ORDER BY updated_at DESC
+    LIMIT 5
+  `),
+  pendingQueueStats: db.prepare(`
+    SELECT COALESCE(COUNT(*), 0) AS count, MIN(created_at) AS oldest_created_at
+    FROM client_actions
+    WHERE workspace_id = ? AND status = 'pending'
+  `),
   update: db.prepare(`
     UPDATE client_actions
     SET title = @title,
@@ -99,10 +125,39 @@ export interface CreateClientActionInput {
   priority?: 'high' | 'medium' | 'low';
 }
 
+export interface ClientActionDecisionSummary {
+  title: string;
+  status: ClientActionStatus;
+  sourceType: ClientActionSourceType;
+  updatedAt: string;
+}
+
+export interface ClientActionSummary {
+  pending: number;
+  approved: number;
+  changesRequested: number;
+  completed: number;
+  recentDecisions: ClientActionDecisionSummary[];
+}
+
+export interface ClientActionQueueStats {
+  pending: number;
+  oldestAge: number | null;
+}
+
 export function createClientAction(input: CreateClientActionInput): ClientAction {
   const now = new Date().toISOString();
+  if (input.sourceId) {
+    const existing = stmts().selectActiveBySource.get({
+      workspace_id: input.workspaceId,
+      source_type: input.sourceType,
+      source_id: input.sourceId,
+    }) as ClientActionRow | undefined;
+    if (existing) return rowToAction(existing);
+  }
+
   const action: ClientAction = {
-    id: `ca_${randomUUID().slice(0, 8)}`,
+    id: `ca_${Date.now()}_${randomUUID().slice(0, 8)}`,
     workspaceId: input.workspaceId,
     sourceType: input.sourceType,
     sourceId: input.sourceId,
@@ -173,4 +228,37 @@ export function updateClientAction(
 export function countPendingClientActions(workspaceId: string): number {
   const row = stmts().countPending.get(workspaceId) as { count: number };
   return row.count;
+}
+
+export function summarizeClientActions(workspaceId: string): ClientActionSummary {
+  const rows = stmts().countByStatus.all(workspaceId) as Array<{ status: string; count: number }>;
+  const counts = new Map(rows.map(row => [row.status, row.count]));
+  const recentRows = stmts().selectRecentDecisions.all(workspaceId) as ClientActionRow[];
+  return {
+    pending: counts.get('pending') ?? 0,
+    approved: counts.get('approved') ?? 0,
+    changesRequested: counts.get('changes_requested') ?? 0,
+    completed: counts.get('completed') ?? 0,
+    recentDecisions: recentRows.map(row => {
+      const action = rowToAction(row);
+      return {
+        title: action.title,
+        status: action.status,
+        sourceType: action.sourceType,
+        updatedAt: action.updatedAt,
+      };
+    }),
+  };
+}
+
+export function getClientActionQueueStats(workspaceId: string): ClientActionQueueStats {
+  const row = stmts().pendingQueueStats.get(workspaceId) as {
+    count: number;
+    oldest_created_at: string | null;
+  };
+  const pending = row.count;
+  const oldestAge = pending > 0 && row.oldest_created_at
+    ? Math.floor((Date.now() - new Date(row.oldest_created_at).getTime()) / (60 * 60 * 1000))
+    : null;
+  return { pending, oldestAge };
 }

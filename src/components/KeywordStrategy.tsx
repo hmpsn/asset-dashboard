@@ -340,7 +340,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           {isRealStrategy && (
             <button
               onClick={sendStrategyToClient}
-              disabled={sendingToClient}
+              disabled={sendingToClient || sentToClient}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)] transition-colors disabled:opacity-50 t-caption font-medium"
             >
               <Icon as={sentToClient ? Check : Send} size="sm" className={sentToClient ? 'text-emerald-400' : undefined} />

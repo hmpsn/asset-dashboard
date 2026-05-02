@@ -247,7 +247,7 @@ export default function ContentDecay({ workspaceId }: Props) {
                                 </div>
                                 <button
                                   onClick={() => sendPageToClient(page)}
-                                  disabled={sendingPage === page.page}
+                                  disabled={sendingPage === page.page || sentPages.has(page.page)}
                                   className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] bg-teal-600/15 border border-teal-500/20 text-teal-300 hover:bg-teal-600/25 t-caption-sm font-medium transition-colors disabled:opacity-60"
                                 >
                                   {sendingPage === page.page

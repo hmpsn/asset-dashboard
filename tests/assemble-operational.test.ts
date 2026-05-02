@@ -59,44 +59,7 @@ vi.mock('../server/approvals.js', () => ({
 }));
 
 vi.mock('../server/client-actions.js', () => ({
-  listClientActions: vi.fn(() => [
-    {
-      id: 'ca-old',
-      workspaceId: 'ws-1',
-      sourceType: 'internal_link',
-      title: 'Old pending action',
-      summary: 'Pending action',
-      payload: {},
-      status: 'pending',
-      priority: 'high',
-      createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-      updatedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: 'ca-new',
-      workspaceId: 'ws-1',
-      sourceType: 'content_decay',
-      title: 'New pending action',
-      summary: 'Pending action',
-      payload: {},
-      status: 'pending',
-      priority: 'medium',
-      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-      updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: 'ca-approved',
-      workspaceId: 'ws-1',
-      sourceType: 'keyword_strategy',
-      title: 'Approved action',
-      summary: 'Approved action',
-      payload: {},
-      status: 'approved',
-      priority: 'medium',
-      createdAt: new Date(Date.now() - 10 * 60 * 60 * 1000).toISOString(),
-      updatedAt: new Date(Date.now() - 9 * 60 * 60 * 1000).toISOString(),
-    },
-  ]),
+  getClientActionQueueStats: vi.fn(() => ({ pending: 2, oldestAge: 5 })),
 }));
 
 vi.mock('../server/analytics-annotations.js', () => ({
@@ -248,45 +211,8 @@ describe('assembleOperational', () => {
       } as any,
     ]);
 
-    const { listClientActions } = await import('../server/client-actions.js');
-    vi.mocked(listClientActions).mockReturnValue([
-      {
-        id: 'ca-old',
-        workspaceId: 'ws-1',
-        sourceType: 'internal_link',
-        title: 'Old pending action',
-        summary: 'Pending action',
-        payload: {},
-        status: 'pending',
-        priority: 'high',
-        createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-        updatedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-      } as any,
-      {
-        id: 'ca-new',
-        workspaceId: 'ws-1',
-        sourceType: 'content_decay',
-        title: 'New pending action',
-        summary: 'Pending action',
-        payload: {},
-        status: 'pending',
-        priority: 'medium',
-        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-        updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-      } as any,
-      {
-        id: 'ca-approved',
-        workspaceId: 'ws-1',
-        sourceType: 'keyword_strategy',
-        title: 'Approved action',
-        summary: 'Approved action',
-        payload: {},
-        status: 'approved',
-        priority: 'medium',
-        createdAt: new Date(Date.now() - 10 * 60 * 60 * 1000).toISOString(),
-        updatedAt: new Date(Date.now() - 9 * 60 * 60 * 1000).toISOString(),
-      } as any,
-    ]);
+    const { getClientActionQueueStats } = await import('../server/client-actions.js');
+    vi.mocked(getClientActionQueueStats).mockReturnValue({ pending: 2, oldestAge: 5 });
 
     const { getAnnotations } = await import('../server/analytics-annotations.js');
     vi.mocked(getAnnotations).mockReturnValue([
@@ -500,7 +426,7 @@ describe('assembleOperational', () => {
     const { loadRecommendations } = await import('../server/recommendations.js');
     const { listJobs } = await import('../server/jobs.js');
     const { listBatches } = await import('../server/approvals.js');
-    const { listClientActions } = await import('../server/client-actions.js');
+    const { getClientActionQueueStats } = await import('../server/client-actions.js');
     const { getAnnotations } = await import('../server/analytics-annotations.js');
     const { listAnnotations } = await import('../server/annotations.js');
     const { listWorkOrders } = await import('../server/work-orders.js');
@@ -513,7 +439,7 @@ describe('assembleOperational', () => {
     vi.mocked(loadRecommendations).mockReturnValue({ recommendations: [] } as any);
     vi.mocked(listJobs).mockReturnValue([]);
     vi.mocked(listBatches).mockReturnValue([]);
-    vi.mocked(listClientActions).mockReturnValue([]);
+    vi.mocked(getClientActionQueueStats).mockReturnValue({ pending: 0, oldestAge: null });
     vi.mocked(getAnnotations).mockReturnValue([]);
     vi.mocked(listAnnotations).mockReturnValue([]);
     vi.mocked(listWorkOrders).mockReturnValue([]);

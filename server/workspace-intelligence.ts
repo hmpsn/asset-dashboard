@@ -1397,18 +1397,8 @@ async function assembleClientSignals(
 
   let clientActions: ClientSignalsSlice['clientActions'];
   try {
-    const { listClientActions } = await import('./client-actions.js');
-    const actions = listClientActions(workspaceId);
-    clientActions = {
-      pending: actions.filter(a => a.status === 'pending').length,
-      approved: actions.filter(a => a.status === 'approved').length,
-      changesRequested: actions.filter(a => a.status === 'changes_requested').length,
-      completed: actions.filter(a => a.status === 'completed').length,
-      recentDecisions: actions
-        .filter(a => a.status !== 'pending')
-        .slice(0, 5)
-        .map(a => ({ title: a.title, status: a.status, sourceType: a.sourceType, updatedAt: a.updatedAt })),
-    };
+    const { summarizeClientActions } = await import('./client-actions.js');
+    clientActions = summarizeClientActions(workspaceId);
   } catch (err) {
     log.debug({ err, workspaceId }, 'assembleClientSignals: client actions optional, degrading gracefully');
   }
@@ -1528,16 +1518,8 @@ async function assembleOperational(
 
   let clientActionQueue: OperationalSlice['clientActionQueue'] = { pending: 0, oldestAge: null };
   try {
-    const { listClientActions } = await import('./client-actions.js');
-    const actions = listClientActions(workspaceId).filter(a => a.status === 'pending');
-    let oldestAge: number | null = null;
-    if (actions.length > 0) {
-      const oldest = actions.reduce((min, a) =>
-        new Date(a.createdAt).getTime() < new Date(min.createdAt).getTime() ? a : min,
-      );
-      oldestAge = Math.floor((Date.now() - new Date(oldest.createdAt).getTime()) / (60 * 60 * 1000));
-    }
-    clientActionQueue = { pending: actions.length, oldestAge };
+    const { getClientActionQueueStats } = await import('./client-actions.js');
+    clientActionQueue = getClientActionQueueStats(workspaceId);
   } catch (err) {
     log.debug({ err, workspaceId }, 'assembleOperational: client action queue optional, degrading gracefully');
   }

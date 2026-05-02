@@ -49,6 +49,33 @@ describe('client action routes', () => {
     expect(list.some((a: { id: string }) => a.id === created.id)).toBe(true);
   });
 
+  it('deduplicates active actions by source type and source id', async () => {
+    const sourceId = `internal-links:dedupe:${Date.now()}`;
+    const firstRes = await postJson(`/api/client-actions/${wsId}`, {
+      sourceType: 'internal_link',
+      sourceId,
+      title: 'Review internal links',
+      summary: 'Approve these internal link recommendations.',
+    });
+    expect(firstRes.status).toBe(200);
+    const first = await firstRes.json();
+
+    const secondRes = await postJson(`/api/client-actions/${wsId}`, {
+      sourceType: 'internal_link',
+      sourceId,
+      title: 'Review internal links again',
+      summary: 'This duplicate should return the existing action.',
+    });
+    expect(secondRes.status).toBe(200);
+    const second = await secondRes.json();
+    expect(second.id).toBe(first.id);
+    expect(second.title).toBe(first.title);
+
+    const listRes = await api(`/api/client-actions/${wsId}`);
+    const list = await listRes.json();
+    expect(list.filter((a: { sourceId?: string }) => a.sourceId === sourceId)).toHaveLength(1);
+  });
+
   it('allows a client to approve a pending action, then blocks duplicate responses', async () => {
     const createRes = await postJson(`/api/client-actions/${wsId}`, {
       sourceType: 'content_decay',

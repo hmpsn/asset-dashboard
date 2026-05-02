@@ -230,56 +230,33 @@ vi.mock('../../server/client-signals-store.js', () => ({
 }));
 
 vi.mock('../../server/client-actions.js', () => ({
-  listClientActions: vi.fn(() => [
-    {
-      id: 'ca-pending',
-      workspaceId: 'ws-contract-test',
-      sourceType: 'internal_link',
-      title: 'Review internal links',
-      summary: 'Approve links',
-      payload: {},
-      status: 'pending',
-      priority: 'high',
-      createdAt: '2026-05-01T10:00:00Z',
-      updatedAt: '2026-05-01T10:00:00Z',
-    },
-    {
-      id: 'ca-approved',
-      workspaceId: 'ws-contract-test',
-      sourceType: 'keyword_strategy',
-      title: 'Keyword strategy',
-      summary: 'Approved strategy',
-      payload: {},
-      status: 'approved',
-      priority: 'medium',
-      createdAt: '2026-05-01T11:00:00Z',
-      updatedAt: '2026-05-01T12:00:00Z',
-    },
-    {
-      id: 'ca-changes',
-      workspaceId: 'ws-contract-test',
-      sourceType: 'content_decay',
-      title: 'Refresh page',
-      summary: 'Needs revision',
-      payload: {},
-      status: 'changes_requested',
-      priority: 'medium',
-      createdAt: '2026-05-01T13:00:00Z',
-      updatedAt: '2026-05-01T14:00:00Z',
-    },
-    {
-      id: 'ca-completed',
-      workspaceId: 'ws-contract-test',
-      sourceType: 'redirect_proposal',
-      title: 'Redirects',
-      summary: 'Completed redirects',
-      payload: {},
-      status: 'completed',
-      priority: 'low',
-      createdAt: '2026-05-01T15:00:00Z',
-      updatedAt: '2026-05-01T16:00:00Z',
-    },
-  ]),
+  summarizeClientActions: vi.fn(() => ({
+    pending: 1,
+    approved: 1,
+    changesRequested: 1,
+    completed: 1,
+    recentDecisions: [
+      {
+        title: 'Keyword strategy',
+        status: 'approved',
+        sourceType: 'keyword_strategy',
+        updatedAt: '2026-05-01T12:00:00Z',
+      },
+      {
+        title: 'Refresh page',
+        status: 'changes_requested',
+        sourceType: 'content_decay',
+        updatedAt: '2026-05-01T14:00:00Z',
+      },
+      {
+        title: 'Redirects',
+        status: 'completed',
+        sourceType: 'redirect_proposal',
+        updatedAt: '2026-05-01T16:00:00Z',
+      },
+    ],
+  })),
+  getClientActionQueueStats: vi.fn(() => ({ pending: 1, oldestAge: 24 })),
 }));
 
 vi.mock('../../server/chat-memory.js', () => ({
