@@ -4,6 +4,7 @@ import type {
   SchemaCollectionIdentity,
   SchemaEvidenceSource,
   SchemaFieldEvidence,
+  SchemaFieldResolutionStatus,
 } from './site-inventory';
 
 export type SchemaRoleSource = 'ui' | 'site-plan' | 'collection-map' | 'collection-inferred' | 'auto-detect';
@@ -32,6 +33,7 @@ export interface SchemaGenerationDiagnostics {
   missingRequiredFields?: string[];
   evidenceSources?: Partial<Record<string, SchemaEvidenceSource>>;
   fieldEvidence?: SchemaFieldEvidence[];
+  fieldResolutionStatuses?: SchemaFieldResolutionStatus[];
   richResultsEligibility: SchemaRichResultEligibility[];
   validationStatus: SchemaValidationStatus;
   cmsDeliveryStatus?: SchemaCmsDeliveryStatus;

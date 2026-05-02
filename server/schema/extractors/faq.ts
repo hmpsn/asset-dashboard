@@ -52,10 +52,38 @@ function addPair(
   pairs.push({ question, answer });
 }
 
-export async function extractFaq(html: string): Promise<FaqPair[]> {
+export interface ExtractFaqOptions {
+  /**
+   * Index pages often contain teaser/card questions from child content. Require
+   * a dedicated FAQ wrapper or heading before trusting Q&A patterns there.
+   */
+  requireDedicatedSection?: boolean;
+}
+
+function dedicatedFaqScope($: cheerio.CheerioAPI, $scope: cheerio.Cheerio<any>): cheerio.Cheerio<any> {
+  const explicitContainers = $scope.find('section, article, div, ul, ol').filter((_, el) => {
+    const $el = $(el);
+    const marker = `${$el.attr('id') ?? ''} ${$el.attr('class') ?? ''} ${$el.attr('aria-label') ?? ''}`;
+    const hasMultipleFaqChildren = $el.find('details, button, [role="button"], [aria-expanded], h2, h3, h4, h5, p, li').length >= 2;
+    if (hasMultipleFaqChildren && /\b(faq|faqs|frequently[-_\s]?asked|questions[-_\s]?answers|q[-_&\s]?a)\b/i.test(marker)) return true;
+    const firstHeading = $el.children('h1,h2,h3,h4').first().text();
+    return /\b(faqs?|frequently asked questions|questions (?:and|&) answers)\b/i.test(firstHeading);
+  });
+  if (explicitContainers.length > 0) return explicitContainers;
+  const faqHeading = $scope.find('h1,h2,h3,h4').filter((_, el) => (
+    /\b(faqs?|frequently asked questions|questions (?:and|&) answers)\b/i.test($(el).text())
+  )).first();
+  if (faqHeading.length === 0) return $();
+  return faqHeading.nextUntil('h1,h2,h3');
+}
+
+export async function extractFaq(html: string, opts: ExtractFaqOptions = {}): Promise<FaqPair[]> {
   const $ = cheerio.load(html);
   const scoped = contentScope($);
-  const $scope = scoped.length > 0 ? scoped : ($('body').length > 0 ? $('body') : $.root());
+  const baseScope = scoped.length > 0 ? scoped : ($('body').length > 0 ? $('body') : $.root());
+  const dedicatedScope = dedicatedFaqScope($, baseScope);
+  if (opts.requireDedicatedSection && dedicatedScope.length === 0) return [];
+  const $scope = dedicatedScope.length > 0 ? dedicatedScope : baseScope;
   const pairs: FaqPair[] = [];
   const seen = new Set<string>();
 

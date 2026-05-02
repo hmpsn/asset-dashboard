@@ -200,6 +200,16 @@ function hasGraphType(schema: Record<string, unknown>, type: string): boolean {
   return Array.isArray(graph) && graph.some(node => node['@type'] === type);
 }
 
+function isCollectionIndexKind(kind: PageKind): boolean {
+  return kind === 'BlogIndex' || kind === 'ServiceIndex' || kind === 'CaseStudyIndex';
+}
+
+function hasQuestionLikeContent(html: string): boolean {
+  const text = plainText(html);
+  const matches = text.match(/\b(?:what|why|when|where|which|who|how|can|do|does|did|is|are|should|will|would)[^?]{8,220}\?/gi);
+  return (matches?.length ?? 0) >= 2;
+}
+
 function validationStatus(findings: ValidationFinding[]): 'valid' | 'warnings' | 'errors' {
   if (findings.some(f => f.severity === 'error')) return 'errors';
   if (findings.some(f => f.severity === 'warning')) return 'warnings';
@@ -299,6 +309,11 @@ function buildGenerationDiagnostics(input: {
     missingRequiredFields: skippedSchemaTypes.flatMap(s => s.missingFields ?? []),
     evidenceSources: input.evidenceSources,
     fieldEvidence: input.fieldEvidence,
+    fieldResolutionStatuses: Array.from(new Set(
+      (input.fieldEvidence ?? [])
+        .map(e => e.status)
+        .filter((status): status is NonNullable<typeof status> => Boolean(status)),
+    )),
     richResultsEligibility: input.richResultsEligibility,
     validationStatus: input.validationStatus ?? validationStatus(input.validationFindings),
     cmsDeliveryStatus: input.cmsDeliveryStatus,
@@ -411,6 +426,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
   let schema: Record<string, unknown>;
   let reason: string;
   const offers = extractVisibleOffers(input.html, pageData.cleanTitle || pageData.title);
+  const serviceOffers = pageData.offers && pageData.offers.length > 0 ? pageData.offers : offers;
 
   if (role === 'product') {
     schema = buildProductSchema({ baseUrl, pageData, businessProfile: businessProfileForPage, offers });
@@ -479,6 +495,11 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       } else {
         schema = buildHomepageSchema({ baseUrl, pageData, businessProfile: businessProfileForPage, siteHasSearch: input.workspace.siteHasSearch });
         reason = 'Homepage — Organization + WebSite (sitewide entities).';
+        skippedSchemaTypes.push({
+          type: 'LocalBusiness',
+          reason: 'Homepage LocalBusiness skipped: no verified primary business address.',
+          missingFields: ['address'],
+        });
       }
       break;
     case 'BlogPosting':
@@ -490,8 +511,15 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       reason = 'Case study — Article (not Service) with about="Case study".';
       break;
     case 'Service':
-      schema = buildServiceSchema({ baseUrl, pageData, businessProfile: businessProfileForPage });
+      schema = buildServiceSchema({ baseUrl, pageData, businessProfile: businessProfileForPage, offers: serviceOffers });
       reason = 'Service detail page — Service with provider reference.';
+      if (serviceOffers.length === 0) {
+        skippedSchemaTypes.push({
+          type: 'Offer',
+          reason: 'Offer skipped: no visible or mapped price/currency was verified.',
+          missingFields: ['price', 'priceCurrency'],
+        });
+      }
       break;
     case 'Location':
         schema = buildLocalBusinessSchema({
@@ -502,6 +530,13 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
           industrySubtype,
         });
       reason = 'Location page — LocalBusiness with verified business profile details when available.';
+      if (!businessProfileForPage?.address || !Object.values(businessProfileForPage.address).some(Boolean)) {
+        skippedSchemaTypes.push({
+          type: 'PostalAddress',
+          reason: 'Location address skipped: no verified human-readable address fields were resolved.',
+          missingFields: ['streetAddress', 'addressLocality', 'addressRegion', 'postalCode'],
+        });
+      }
       break;
     case 'AboutPage':
       schema = buildAboutPageSchema({ baseUrl, pageData, businessProfile: businessProfileForPage });
@@ -567,7 +602,8 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
   const baseValidationFindings = validateLeanSchema(schema, classified.primaryType);
 
   // Surgical FAQ enrichment: if the page has accordion FAQ structure, append a FAQPage node.
-  const faqPairs = await extractFaq(input.html || '');
+  const requireDedicatedFaq = isCollectionIndexKind(classified.kind);
+  const faqPairs = await extractFaq(input.html || '', { requireDedicatedSection: requireDedicatedFaq });
   if (faqPairs.length >= 2) {
     const faqNode = {
       '@type': 'FAQPage',
@@ -595,6 +631,13 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       log.debug({ pageId: input.pageId, errors: faqIntroducedFindings }, 'FAQPage extraction produced invalid schema; skipping');
       (schema['@graph'] as Array<Record<string, unknown>>).pop();
     }
+  }
+  if (requireDedicatedFaq && faqPairs.length === 0 && hasQuestionLikeContent(input.html || '')) {
+    skippedSchemaTypes.push({
+      type: 'FAQPage',
+      reason: 'FAQPage skipped: question-like index/card content was found, but no dedicated FAQ section was detected.',
+      missingFields: ['dedicated FAQ section'],
+    });
   }
   if (role === 'faq' && !hasGraphType(schema, 'FAQPage')) {
     skippedSchemaTypes.push({

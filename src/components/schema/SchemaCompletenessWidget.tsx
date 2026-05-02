@@ -26,12 +26,15 @@ interface FieldGroup {
 export function SchemaCompletenessWidget({ pages, workspaceId }: SchemaCompletenessWidgetProps) {
   const navigate = useNavigate();
 
-  const { groups, completenessPct, totalPages, fullyClean } = useMemo(() => {
+  const { groups, completenessPct, totalPages, fullyClean, pagesWithFindings } = useMemo(() => {
     const findingsByField = new Map<string, { severity: 'error' | 'warning'; pages: Set<string> }>();
     let pagesWithIssues = 0;
+    let pagesWithFindings = 0;
 
     for (const page of pages) {
       const findings = page.validationFindings ?? [];
+      const legacyErrors = page.validationErrors ?? [];
+      if (findings.length > 0 || legacyErrors.length > 0) pagesWithFindings++;
       // Only count pages that have AT LEAST ONE finding with a known target
       let hasActionableIssue = false;
       for (const f of findings) {
@@ -61,9 +64,9 @@ export function SchemaCompletenessWidget({ pages, workspaceId }: SchemaCompleten
 
     const totalPages = pages.length;
     const completenessPct = totalPages === 0 ? 100 : Math.round(((totalPages - pagesWithIssues) / totalPages) * 100);
-    const fullyClean = groups.length === 0;
+    const fullyClean = groups.length === 0 && pagesWithFindings === 0;
 
-    return { groups, completenessPct, totalPages, fullyClean };
+    return { groups, completenessPct, totalPages, fullyClean, pagesWithFindings };
   }, [pages]);
 
   if (totalPages === 0) return null;
@@ -82,7 +85,9 @@ export function SchemaCompletenessWidget({ pages, workspaceId }: SchemaCompleten
   return (
     <SectionCard title="Schema profile completeness" className="mb-6">
       <p className="t-caption-sm text-[var(--brand-text-muted)] mb-3">
-        {completenessPct}% complete · {groups.length} field{groups.length === 1 ? '' : 's'} missing across pages.
+        {groups.length > 0
+          ? `${completenessPct}% complete · ${groups.length} field${groups.length === 1 ? '' : 's'} missing across pages.`
+          : `${pagesWithFindings} page${pagesWithFindings === 1 ? '' : 's'} still have schema warnings or errors. Review page diagnostics before treating the profile as complete.`}
       </p>
 
       {/* Progress bar */}

@@ -397,20 +397,32 @@ export function SchemaPageCard({
                 </div>
               )}
               {diagnostics.cmsDeliveryStatus && diagnostics.cmsDeliveryStatus.mode === 'cms-field' && (
-                <div className={cn(
-                  't-caption-sm mb-1',
-                  diagnostics.cmsDeliveryStatus.status === 'blocked' || diagnostics.cmsDeliveryStatus.status === 'failed'
-                    ? 'text-amber-400/80'
-                    : 'text-emerald-400/80',
-                )}>
-                  {diagnostics.cmsDeliveryStatus.message}
+                <div className="mb-1 rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-2 py-1.5">
+                  <div className="t-caption-sm font-medium text-[var(--brand-text)]">CMS delivery</div>
+                  <div className={cn(
+                    't-caption-sm',
+                    diagnostics.cmsDeliveryStatus.status === 'blocked' || diagnostics.cmsDeliveryStatus.status === 'failed'
+                      ? 'text-amber-400/80'
+                      : 'text-emerald-400/80',
+                  )}>
+                    {diagnostics.cmsDeliveryStatus.message}
+                  </div>
                 </div>
               )}
               {diagnostics.fieldEvidence && diagnostics.fieldEvidence.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mb-1.5">
                   {diagnostics.fieldEvidence.slice(0, 6).map((e, i) => (
-                    <span key={`${e.field}-${i}`} className="px-2 py-1 rounded-[var(--radius-md)] t-caption-sm bg-blue-500/8 text-blue-300 border border-blue-500/20">
-                      {e.field}: {e.source}
+                    <span
+                      key={`${e.field}-${i}`}
+                      className={cn(
+                        'px-2 py-1 rounded-[var(--radius-md)] t-caption-sm border',
+                        e.status === 'resolved' || e.status === 'fallback-used'
+                          ? 'bg-blue-500/8 text-blue-300 border-blue-500/20'
+                          : 'bg-amber-500/8 text-amber-300 border-amber-500/20',
+                      )}
+                      title={e.message}
+                    >
+                      {e.field}: {e.status ?? e.source}
                     </span>
                   ))}
                 </div>

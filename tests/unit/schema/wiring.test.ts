@@ -167,6 +167,21 @@ describe('pageKindOverride', () => {
     expect(hasOrganization).toBe(true);
   });
 
+  it('homepage override stays Organization when no primary address is verified', async () => {
+    const output = await generateLeanSchema(
+      makeInput('/', {
+        pageKindOverride: 'Homepage',
+      }),
+    );
+    const graph = getGraph(output);
+    expect(graph.some(n => n['@type'] === 'LocalBusiness')).toBe(false);
+    expect(graph.some(n => n['@type'] === 'Organization')).toBe(true);
+    expect(output.generationDiagnostics?.skippedSchemaTypes).toContainEqual(expect.objectContaining({
+      type: 'LocalBusiness',
+      reason: 'Homepage LocalBusiness skipped: no verified primary business address.',
+    }));
+  });
+
   it('homepage override uses rendered semantic NAP to preserve LocalBusiness output', async () => {
     vi.mocked(getPageElements).mockReturnValueOnce({
       workspaceId: 'ws-test',

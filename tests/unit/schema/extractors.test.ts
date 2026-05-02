@@ -123,6 +123,40 @@ describe('extractFaq', () => {
     ]);
   });
 
+  it('does not treat index/card teaser questions as FAQ without a dedicated section', async () => {
+    const html = `
+      <main>
+        <article class="blog-card">
+          <h2>What does Invisalign cost?</h2>
+          <p>Read the full article.</p>
+        </article>
+        <article class="blog-card">
+          <h2>Can I use insurance?</h2>
+          <p>Read the full article.</p>
+        </article>
+      </main>
+    `;
+    const result = await extractFaq(html, { requireDedicatedSection: true });
+    expect(result).toEqual([]);
+  });
+
+  it('allows dedicated FAQ sections on index pages', async () => {
+    const html = `
+      <section class="faq-section">
+        <h2>Frequently Asked Questions</h2>
+        <h3>What does Invisalign cost?</h3>
+        <p>Pricing depends on treatment complexity and location.</p>
+        <h3>Can I use insurance?</h3>
+        <p>Many plans include orthodontic coverage.</p>
+      </section>
+    `;
+    const result = await extractFaq(html, { requireDedicatedSection: true });
+    expect(result).toEqual([
+      { question: 'What does Invisalign cost?', answer: 'Pricing depends on treatment complexity and location.' },
+      { question: 'Can I use insurance?', answer: 'Many plans include orthodontic coverage.' },
+    ]);
+  });
+
   it('extracts FAQs from accordion button panels', async () => {
     const html = `
       <article>
