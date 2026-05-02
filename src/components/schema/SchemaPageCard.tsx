@@ -14,7 +14,7 @@ import { statusBorderClass, type PageEditStatus } from '../ui/statusConfig';
 import { SchemaEditor } from './SchemaEditor';
 import { SchemaVersionHistory } from './SchemaVersionHistory';
 import type { ValidationFinding } from '../../../shared/types/schema-validation';
-import type { SchemaGenerationDiagnostics } from '../../../shared/types/schema-generation';
+import type { SchemaDeliveryDecision, SchemaGenerationDiagnostics } from '../../../shared/types/schema-generation';
 
 interface SchemaSuggestion {
   type: string;
@@ -64,6 +64,7 @@ export interface SchemaPageCardProps {
   published: boolean;
   publishing: boolean;
   publishError: string | undefined;
+  manualDelivery: SchemaDeliveryDecision | undefined;
   confirmPublish: boolean;
   sentPage: boolean;
   sendingPage: boolean;
@@ -85,6 +86,7 @@ export interface SchemaPageCardProps {
   onToggleSchemaEdit: (pageId: string, template: Record<string, unknown>) => void;
   onSchemaJsonChange: (pageId: string, value: string) => void;
   onCopyTemplate: (suggestion: SchemaSuggestion, pageId: string) => void;
+  onCopyJsonLd: (suggestion: SchemaSuggestion, pageId: string) => void;
   onPublish: (pageId: string, schema: Record<string, unknown>) => void;
   onConfirmPublish: (pageId: string | null) => void;
   onSendToClient: (page: SchemaPageSuggestion) => void;
@@ -100,13 +102,13 @@ export interface SchemaPageCardProps {
 
 export function SchemaPageCard({
   page, isOpen, isRegenLoading, editState, copiedId,
-  published, publishing, publishError, confirmPublish,
+  published, publishing, publishError, manualDelivery, confirmPublish,
   sentPage, sendingPage, editingSchema, editedSchemaJson,
   schemaParseError, showDiff, schemaRecs, workspaceId,
   pageType, isHomepage, savingTemplate, templateSaved,
   onPageTypeChange,
   onToggleExpand, onRegenerate, onToggleDiff, onToggleSchemaEdit,
-  onSchemaJsonChange, onCopyTemplate, onPublish, onConfirmPublish,
+  onSchemaJsonChange, onCopyTemplate, onCopyJsonLd, onPublish, onConfirmPublish,
   onSendToClient, onSaveAsTemplate, onRetract, retracting, retracted,
   getEffectiveSchema, siteId, onRestore, validationStatus,
 }: SchemaPageCardProps) {
@@ -368,7 +370,15 @@ export function SchemaPageCard({
               </div>
               <div className="flex flex-wrap gap-1.5 mb-1.5">
                 <span className="px-2 py-1 rounded-[var(--radius-md)] t-caption-sm bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)]">
-                  {diagnostics.roleSource === 'auto-detect' ? 'Auto-detected' : diagnostics.roleSource === 'site-plan' ? 'Site plan' : 'UI override'}
+                  {diagnostics.roleSource === 'auto-detect'
+                    ? 'Auto-detected'
+                    : diagnostics.roleSource === 'site-plan'
+                      ? 'Site plan'
+                      : diagnostics.roleSource === 'collection-map'
+                        ? 'Collection map'
+                        : diagnostics.roleSource === 'collection-inferred'
+                          ? 'Collection inferred'
+                          : 'UI override'}
                   {diagnostics.effectiveRole ? `: ${diagnostics.effectiveRole}` : ''}
                 </span>
                 <span className={cn(
@@ -382,6 +392,43 @@ export function SchemaPageCard({
                   {diagnostics.validationStatus}
                 </span>
               </div>
+              {diagnostics.collection && (
+                <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1">
+                  Collection: <span className="text-[var(--brand-text)]">{diagnostics.collection.collectionName}</span>
+                  {diagnostics.collection.itemPath ? ` · ${diagnostics.collection.itemPath}` : ''}
+                </div>
+              )}
+              {diagnostics.cmsDeliveryStatus && diagnostics.cmsDeliveryStatus.mode === 'cms-field' && (
+                <div className="mb-1 rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-2 py-1.5">
+                  <div className="t-caption-sm font-medium text-[var(--brand-text)]">CMS delivery</div>
+                  <div className={cn(
+                    't-caption-sm',
+                    diagnostics.cmsDeliveryStatus.status === 'blocked' || diagnostics.cmsDeliveryStatus.status === 'failed'
+                      ? 'text-amber-400/80'
+                      : 'text-emerald-400/80',
+                  )}>
+                    {diagnostics.cmsDeliveryStatus.message}
+                  </div>
+                </div>
+              )}
+              {diagnostics.fieldEvidence && diagnostics.fieldEvidence.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-1.5">
+                  {diagnostics.fieldEvidence.slice(0, 6).map((e, i) => (
+                    <span
+                      key={`${e.field}-${i}`}
+                      className={cn(
+                        'px-2 py-1 rounded-[var(--radius-md)] t-caption-sm border',
+                        e.status === 'resolved' || e.status === 'fallback-used'
+                          ? 'bg-blue-500/8 text-blue-300 border-blue-500/20'
+                          : 'bg-amber-500/8 text-amber-300 border-amber-500/20',
+                      )}
+                      title={e.message}
+                    >
+                      {e.field}: {e.status ?? e.source}
+                    </span>
+                  ))}
+                </div>
+              )}
               {diagnostics.skippedSchemaTypes.length > 0 && (
                 <div className="space-y-1">
                   {diagnostics.skippedSchemaTypes.map((skip, i) => (
@@ -458,7 +505,18 @@ export function SchemaPageCard({
                   {copiedId === `${page.pageId}-${schema.type}` ? (
                     <><Icon as={CheckCircle} size="sm" className="text-emerald-400/80" /> Copied</>
                   ) : (
-                    <><Icon as={Copy} size="sm" /> Copy</>
+                    <><Icon as={Copy} size="sm" /> Copy script</>
+                  )}
+                </button>
+                <button
+                  onClick={() => onCopyJsonLd(schema, page.pageId)}
+                  className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption bg-blue-500/10 hover:bg-blue-500/15 text-blue-400 border border-blue-500/20 transition-colors"
+                  title="Copy JSON only for Webflow Page Settings -> Schema markup"
+                >
+                  {copiedId === `${page.pageId}-${schema.type}-json` ? (
+                    <><Icon as={CheckCircle} size="sm" className="text-emerald-400/80" /> JSON copied</>
+                  ) : (
+                    <><Icon as={Copy} size="sm" /> Copy JSON-LD</>
                   )}
                 </button>
               </div>
@@ -590,6 +648,37 @@ export function SchemaPageCard({
               )}
               {publishError && (
                 <span className="t-caption text-red-400/80">{publishError}</span>
+              )}
+              {manualDelivery?.status === 'manual-required' && (
+                <div className="basis-full rounded-[var(--radius-md)] border border-amber-500/25 bg-amber-500/8 p-3 text-amber-100/90">
+                  <div className="flex items-start gap-2">
+                    <Icon as={AlertTriangle} size="md" className="mt-0.5 text-amber-400/80" />
+                    <div className="min-w-0 space-y-2">
+                      <div>
+                        <div className="t-caption font-semibold text-amber-300">Manual Webflow schema paste required</div>
+                        <p className="t-caption text-amber-100/75">{manualDelivery.message}</p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="t-caption-sm text-amber-100/70">
+                          Target: Webflow Page Settings -&gt; Schema markup
+                          {manualDelivery.characterCount && manualDelivery.apiLimit
+                            ? ` · API payload ${manualDelivery.characterCount}/${manualDelivery.apiLimit} chars`
+                            : ''}
+                        </span>
+                        <button
+                          onClick={() => onCopyJsonLd(schema, page.pageId)}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] t-caption bg-amber-500/12 hover:bg-amber-500/18 text-amber-200 border border-amber-500/25 transition-colors"
+                        >
+                          {copiedId === `${page.pageId}-${schema.type}-json` ? (
+                            <><Icon as={CheckCircle} size="sm" /> JSON copied</>
+                          ) : (
+                            <><Icon as={Copy} size="sm" /> Copy JSON-LD</>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               )}
               {workspaceId && (
                 sentPage ? (

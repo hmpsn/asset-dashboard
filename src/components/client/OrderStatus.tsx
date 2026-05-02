@@ -26,9 +26,9 @@ const STEPS = ['pending', 'in_progress', 'completed'] as const;
 const STEP_LABELS: Record<string, string> = { pending: 'Pending', in_progress: 'In Progress', completed: 'Completed' };
 
 const STATUS_BADGE: Record<string, { label: string; icon: typeof CheckCircle2; color: string; bg: string; border: string }> = {
-  pending:     { label: 'Pending',     icon: Clock,        color: 'text-amber-400',  bg: 'bg-amber-500/10',  border: 'border-amber-500/20' },
-  in_progress: { label: 'In Progress', icon: Loader2,      color: 'text-blue-400',   bg: 'bg-blue-500/10',   border: 'border-blue-500/20' },
-  completed:   { label: 'Completed',   icon: CheckCircle2, color: 'text-emerald-400',  bg: 'bg-emerald-500/10',  border: 'border-emerald-500/20' },
+  pending:     { label: 'Pending',     icon: Clock,        color: 'text-accent-warning',  bg: 'bg-amber-500/10',  border: 'border-amber-500/20' },
+  in_progress: { label: 'In Progress', icon: Loader2,      color: 'text-accent-info',   bg: 'bg-blue-500/10',   border: 'border-blue-500/20' },
+  completed:   { label: 'Completed',   icon: CheckCircle2, color: 'text-accent-success',  bg: 'bg-emerald-500/10',  border: 'border-emerald-500/20' },
   cancelled:   { label: 'Cancelled',   icon: Clock,        color: 'text-[var(--brand-text)]',   bg: 'bg-[var(--surface-3)]/50',   border: 'border-[var(--brand-border)]' },
 };
 
@@ -42,7 +42,7 @@ function StatusStepper({ status }: { status: string }) {
         return (
           <div key={step} className="flex items-center gap-1">
             <div className={`flex items-center gap-1 ${isCurrent ? 'opacity-100' : isActive ? 'opacity-70' : 'opacity-30'}`}>
-              <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-teal-400' : 'bg-[var(--brand-border)]'}`} />
+              <div className={`w-2 h-2 rounded-[var(--radius-pill)] ${isActive ? 'bg-teal-400' : 'bg-[var(--brand-border)]'}`} />
               <span className={`t-micro ${isActive ? 'text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)]'}`}>{STEP_LABELS[step]}</span>
             </div>
             {i < STEPS.length - 1 && (
@@ -73,7 +73,7 @@ export function OrderStatus({ workspaceId }: OrderStatusProps) {
   if (orders.length === 0) return null;
 
   return (
-    <SectionCard title="Your Fix Orders" titleIcon={<Wrench className="w-4 h-4 text-teal-400" />} action={<span className="t-caption-sm text-[var(--brand-text-muted)]">{orders.length} order{orders.length !== 1 ? 's' : ''}</span>} noPadding className="overflow-hidden">
+    <SectionCard title="Your Fix Orders" titleIcon={<Wrench className="w-4 h-4 text-accent-brand" />} action={<span className="t-caption-sm text-[var(--brand-text-muted)]">{orders.length} order{orders.length !== 1 ? 's' : ''}</span>} noPadding className="overflow-hidden">
       <div className="divide-y divide-[var(--brand-border)]/50">
         {orders.map(order => {
           const product = PRODUCT_LABELS[order.productType] || { label: order.productType.replace(/_/g, ' '), icon: FileText };
@@ -95,7 +95,7 @@ export function OrderStatus({ workspaceId }: OrderStatusProps) {
                     {order.completedAt && ` · Done ${new Date(order.completedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
                   </div>
                 </div>
-                <div className={`flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-lg)] text-[11px] font-medium ${badge.bg} ${badge.border} border ${badge.color}`}>
+                <div className={`flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-lg)] t-caption-sm font-medium ${badge.bg} ${badge.border} border ${badge.color}`}>
                   <BadgeIcon className={`w-3 h-3 ${order.status === 'in_progress' ? 'animate-spin' : ''}`} />
                   {badge.label}
                 </div>

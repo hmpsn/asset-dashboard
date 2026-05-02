@@ -45,14 +45,14 @@ describe('ErrorState', () => {
     expect(screen.getByText('Multi')).toBeInTheDocument();
   });
 
-  it('secondary actions have zinc styling', () => {
+  it('secondary actions use styleguide surface styling', () => {
     render(
       <ErrorState
         actions={[{ label: 'Back', onClick: vi.fn(), variant: 'secondary' }]}
       />
     );
     const btn = screen.getByText('Back').closest('button')!;
-    expect(btn.className).toContain('bg-zinc-800');
+    expect(btn.className).toContain('bg-[var(--surface-3)]');
   });
 
   it('has role=alert on container', () => {

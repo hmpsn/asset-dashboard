@@ -144,7 +144,7 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
       {/* ── Floating trigger button ── */}
       {!open && (
         <button onClick={() => setOpen(true)}
-          className="fixed bottom-6 right-6 flex items-center gap-2 px-4 py-3 rounded-full bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white t-body font-medium shadow-lg shadow-purple-900/30 transition-all z-[var(--z-modal)]">
+          className="fixed bottom-6 right-6 flex items-center gap-2 px-4 py-3 rounded-[var(--radius-pill)] bg-gradient-to-r from-[var(--teal)] to-[var(--emerald)] hover:brightness-105 text-white t-body font-medium shadow-lg shadow-black/30 transition-all z-[var(--z-modal)]">
           <Icon as={Bot} size="md" /> Admin Insights
         </button>
       )}
@@ -159,7 +159,7 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
           {/* ── Resize handles ── */}
           {/* Left edge */}
           <div
-            className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-purple-500/20 transition-colors z-[var(--z-sticky)]"
+            className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-accent-brand-soft transition-colors z-[var(--z-sticky)]"
             onPointerDown={onPointerDown('left')}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
@@ -167,7 +167,7 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
           {/* Top edge (floating only) */}
           {!docked && (
             <div
-              className="absolute top-0 left-0 right-0 h-1.5 cursor-row-resize hover:bg-purple-500/20 transition-colors z-[var(--z-sticky)]"
+              className="absolute top-0 left-0 right-0 h-1.5 cursor-row-resize hover:bg-accent-brand-soft transition-colors z-[var(--z-sticky)]"
               onPointerDown={onPointerDown('top')}
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}
@@ -176,7 +176,7 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
           {/* Top-left corner (floating only) */}
           {!docked && (
             <div
-              className="absolute top-0 left-0 w-3 h-3 cursor-nwse-resize hover:bg-purple-500/30 rounded-tl-2xl transition-colors z-[var(--z-dropdown)]"
+              className="absolute top-0 left-0 w-3 h-3 cursor-nwse-resize hover:bg-accent-brand-soft rounded-tl-2xl transition-colors z-[var(--z-dropdown)]"
               onPointerDown={onPointerDown('corner')}
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}
@@ -184,9 +184,9 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
           )}
 
           {/* ── Header ── */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--brand-border)] flex-shrink-0 bg-gradient-to-r from-purple-500/5 to-purple-400/5">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--brand-border)] flex-shrink-0 bg-gradient-to-r from-[color:color-mix(in_srgb,var(--teal)_8%,transparent)] to-[color:color-mix(in_srgb,var(--emerald)_6%,transparent)]">
             <div className="flex items-center gap-2 min-w-0">
-              <Icon as={Bot} size="md" className="text-purple-400 flex-shrink-0" />
+              <Icon as={Bot} size="md" className="text-accent-brand flex-shrink-0" />
               <span className="t-body font-medium text-[var(--brand-text-bright)] truncate">Admin Insights</span>
               <span className="t-caption text-[var(--brand-text-muted)] bg-[var(--surface-3)] px-1.5 py-0.5 rounded truncate max-w-[120px]">{workspaceName}</span>
             </div>
@@ -197,7 +197,7 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
                 </button>
               )}
               <button onClick={toggleHistory} title="Chat history"
-                className={cn('p-1', showHistory ? 'text-purple-400' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}>
+                className={cn('p-1', showHistory ? 'text-accent-brand' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}>
                 <Icon as={MessageSquare} size="md" />
               </button>
               <button onClick={() => setDocked(d => !d)} title={docked ? 'Float panel' : 'Dock to side'}
@@ -220,7 +220,7 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
                   className={cn(
                     'w-full text-left px-3 py-2 rounded-[var(--radius-lg)] border transition-colors',
                     s.id === sessionId
-                      ? 'bg-purple-500/10 border-purple-500/30 text-purple-300'
+                      ? 'bg-accent-brand-soft border-accent-brand-soft text-accent-brand'
                       : 'bg-[var(--surface-3)]/50 border-[var(--brand-border)] text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)]'
                   )}>
                   <div className="t-caption font-medium truncate">{s.title}</div>
@@ -237,7 +237,7 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
               onSend={askAi}
               quickQuestions={ADMIN_QUICK_QUESTIONS}
               placeholder={placeholder}
-              accent="purple"
+              accent="teal"
               suggestionChips={chatMode === 'analyst' ? suggestions : undefined}
               onChipClick={(chip) => {
                 setInput(chip);

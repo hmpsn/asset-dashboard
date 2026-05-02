@@ -36,7 +36,7 @@ export function MediaTab({ siteId, workspaceId, workspaceFolder, queue }: Props)
               onClick={() => setSub(t.id)}
               className={cn(
                 'flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] text-xs font-medium',
-                active ? 'bg-teal-500/10 text-teal-400' : 'text-[var(--brand-text-muted)]',
+                active ? 'bg-teal-500/10 text-accent-brand' : 'text-[var(--brand-text-muted)]',
               )}
             >
               <Icon as={t.icon} size="sm" /> {t.label}

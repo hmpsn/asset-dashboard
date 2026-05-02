@@ -429,6 +429,51 @@ router.post('/api/public/keyword-feedback/:workspaceId/bulk', (req, res) => {
   res.json({ updated: keywords.length });
 });
 
+// Client: remove keyword feedback so a previously removed/restored keyword returns to neutral.
+// broadcast-ok: keyword feedback is internal strategy input, not live workspace content; local UI updates optimistically.
+router.delete('/api/public/keyword-feedback/:workspaceId', (req, res) => {
+  const wsId = req.params.workspaceId;
+  const sessionToken = req.cookies?.[`client_session_${wsId}`];
+  const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
+  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
+  const clientPayload = clientUserToken ? verifyClientToken(clientUserToken) : null;
+  const hasClientUserAuth = clientPayload?.workspaceId === wsId;
+  if (!hasSession && !hasClientUserAuth) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  const ws = getWorkspace(wsId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  const rawKeyword =
+    typeof req.query.keyword === 'string'
+      ? req.query.keyword
+      : typeof req.body?.keyword === 'string'
+        ? req.body.keyword
+        : '';
+  const keyword = rawKeyword.toLowerCase().trim();
+  if (!keyword) return res.status(400).json({ error: 'keyword required' });
+
+  const removeFeedback = db.transaction(() => {
+    const existing = db.prepare('SELECT status, source FROM keyword_feedback WHERE workspace_id = ? AND keyword = ?').get(ws.id, keyword) as { status: string; source: string | null } | undefined;
+    if (!existing) {
+      return { existing: undefined, deleted: false };
+    }
+
+    const result = db.prepare('DELETE FROM keyword_feedback WHERE workspace_id = ? AND keyword = ?').run(ws.id, keyword);
+    return { existing, deleted: result.changes > 0 };
+  });
+  const { existing, deleted } = removeFeedback();
+
+  if (!existing || !deleted) {
+    return res.json({ deleted: keyword, existed: false });
+  }
+
+  log.info(`Client keyword feedback removed: "${keyword}" for workspace ${ws.id} (was ${existing.status})`);
+  // client-visibility-ok: this activity is for internal audit history, not client timeline display.
+  addActivity(wsId, 'client_keyword_feedback', `Client removed keyword feedback: ${keyword} (was ${existing.status})`, 'Via client portal');
+  res.json({ deleted: keyword, existed: true });
+});
+
 // ── Client Business Priorities ──────────────────────────
 // Clients can share their business priorities which get injected into future strategy generations
 

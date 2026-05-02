@@ -51,6 +51,7 @@ export const WS_EVENTS = {
 
   // Schema
   SCHEMA_PLAN_SENT: 'schema:plan_sent',
+  SCHEMA_CMS_MAPPING_UPDATED: 'schema:cms_mapping_updated',
 
   // Outcome tracking
   OUTCOME_ACTION_RECORDED: 'outcome:action_recorded',

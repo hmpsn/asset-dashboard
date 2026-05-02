@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { post, put, getSafe } from '../api/client';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { post, put, get, getSafe } from '../api/client';
 import { schema as schemaApi, schemaImpact as schemaImpactApi, type SchemaImpactData, type SchemaDeploymentImpact } from '../api/seo';
 import type { FixContext } from '../App';
 import { useSchemaSnapshot, useWebflowPages } from '../hooks/admin';
@@ -24,10 +25,12 @@ import { SchemaCompletenessWidget } from './schema/SchemaCompletenessWidget';
 import { KNOWN_TARGET_FIELDS } from './schema/fieldTargets';
 import { PendingApprovals } from './PendingApprovals';
 import { SchemaWorkflowGuide } from './schema/SchemaWorkflowGuide';
-import { SCHEMA_ROLE_INDEX } from '../../shared/types/schema-plan';
+import { SCHEMA_ROLE_INDEX, SCHEMA_ROLE_LABELS } from '../../shared/types/schema-plan';
 import type { ValidationFinding } from '../../shared/types/schema-validation';
-import type { SchemaGenerationDiagnostics } from '../../shared/types/schema-generation';
+import type { SchemaDeliveryDecision, SchemaGenerationDiagnostics, SchemaPublishResponse } from '../../shared/types/schema-generation';
+import type { CmsSchemaFieldMapping, SchemaFieldTarget } from '../../shared/types/site-inventory';
 import { adminPath } from '../routes.js';
+import { queryKeys } from '../lib/queryKeys';
 
 type SchemaSubTab = 'generator' | 'guide';
 
@@ -77,12 +80,34 @@ interface CmsTemplateResult {
   collectionSlug: string;
 }
 
+interface CmsMappingField {
+  slug: string;
+  displayName: string;
+  type: string;
+  target?: SchemaFieldTarget;
+}
+
+interface CmsMappingCollection {
+  collectionId: string;
+  collectionName: string;
+  collectionSlug: string;
+  fields: CmsMappingField[];
+  recommendedFieldSlug?: string;
+  mapping: CmsSchemaFieldMapping | null;
+}
+
+interface CmsMappingsResponse {
+  collections: CmsMappingCollection[];
+}
+
 interface Props {
   siteId: string;
   workspaceId?: string;
   fixContext?: FixContext | null;
   businessProfile?: BusinessProfileContact | null;
 }
+
+const MAX_SCHEMA_MAPPING_COLLECTIONS = 4;
 
 export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfile }: Props) {
   const [schemaSubTab, setSchemaSubTab] = useState<SchemaSubTab>('generator');
@@ -96,6 +121,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
   const [publishing, setPublishing] = useState<Set<string>>(new Set());
   const [published, setPublished] = useState<Set<string>>(new Set());
   const [publishError, setPublishError] = useState<Record<string, string>>({});
+  const [manualDelivery, setManualDelivery] = useState<Record<string, SchemaDeliveryDecision>>({});
   const [scanError, setScanError] = useState<string | null>(null);
   const [confirmPublish, setConfirmPublish] = useState<string | null>(null);
   const [sendingToClient, setSendingToClient] = useState(false);
@@ -156,6 +182,63 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
   const [showDiff, setShowDiff] = useState<Set<string>>(new Set());
   const [cmsCopied, setCmsCopied] = useState(false);
   const [cmsError, setCmsError] = useState<string | null>(null);
+  const [cmsMappingError, setCmsMappingError] = useState<string | null>(null);
+
+  const queryClient = useQueryClient();
+  const cmsMappingsQuery = useQuery({
+    queryKey: queryKeys.admin.schemaCmsFieldMappings(siteId),
+    queryFn: () => get<CmsMappingsResponse>(
+      `/api/webflow/schema-cms-field-mappings/${siteId}?workspaceId=${encodeURIComponent(workspaceId ?? '')}`,
+    ),
+    enabled: !!siteId && !!workspaceId,
+    staleTime: 30_000,
+  });
+  const cmsMappings = cmsMappingsQuery.data?.collections ?? [];
+  const saveCmsMappingMutation = useMutation({
+    mutationFn: async ({ collection, target, slug }: { collection: CmsMappingCollection; target: SchemaFieldTarget; slug: string }) => {
+      const fieldMappings = { ...(collection.mapping?.fieldMappings ?? {}) };
+      const trimmed = slug.trim();
+      if (trimmed) {
+        fieldMappings[target] = trimmed;
+      } else {
+        delete fieldMappings[target];
+      }
+      const mapping = await put<CmsSchemaFieldMapping>(
+        `/api/webflow/schema-cms-field-mappings/${siteId}?workspaceId=${encodeURIComponent(workspaceId ?? '')}`,
+        {
+          collectionId: collection.collectionId,
+          collectionName: collection.collectionName,
+          collectionSlug: collection.collectionSlug,
+          schemaFieldSlug: collection.mapping?.schemaFieldSlug || collection.recommendedFieldSlug,
+          collectionRole: collection.mapping?.collectionRole,
+          fieldMappings,
+        },
+      );
+      return { collectionId: collection.collectionId, mapping };
+    },
+    onMutate: () => setCmsMappingError(null),
+    onSuccess: ({ collectionId, mapping }) => {
+      queryClient.setQueryData<CmsMappingsResponse>(
+        queryKeys.admin.schemaCmsFieldMappings(siteId),
+        old => ({
+          collections: (old?.collections ?? []).map(collection => (
+            collection.collectionId === collectionId ? { ...collection, mapping } : collection
+          )),
+        }),
+      );
+    },
+    onError: err => {
+      setCmsMappingError(err instanceof Error ? err.message : 'Failed to save CMS field mapping');
+    },
+  });
+  const savingCmsMapping = saveCmsMappingMutation.isPending && saveCmsMappingMutation.variables
+    ? `${saveCmsMappingMutation.variables.collection.collectionId}:${saveCmsMappingMutation.variables.target}`
+    : null;
+
+  const saveCmsFieldMapping = (collection: CmsMappingCollection, target: SchemaFieldTarget, slug: string) => {
+    if (!workspaceId) return;
+    saveCmsMappingMutation.mutate({ collection, target, slug });
+  };
 
   // Schema editing state — stores edited JSON string per pageId
   const [editingSchema, setEditingSchema] = useState<Set<string>>(new Set());
@@ -169,7 +252,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
   const { data: snapshotData } = useSchemaSnapshot(siteId);
   const [snapshotDate, setSnapshotDate] = useState<string | null>(null);
   // Hydrate local state from snapshot query when it arrives
-  useEffect(() => {
+  useEffect(() => { // effect-layout-ok: saved snapshot arrives asynchronously from React Query.
     if (snapshotData && snapshotData.results.length > 0 && !data) {
       setData(snapshotData.results as SchemaPageSuggestion[]);
       setSnapshotDate(snapshotData.createdAt);
@@ -188,7 +271,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
   }, [snapshotData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load persisted page types from server on mount
-  useEffect(() => {
+  useEffect(() => { // effect-layout-ok: persisted page types arrive asynchronously from the server.
     if (!siteId) return;
     getSafe<{ pageTypes: Record<string, string> }>(`/api/webflow/schema-page-types/${siteId}?workspaceId=${workspaceId || ''}`, { pageTypes: {} })
       .then(({ pageTypes: saved }) => {
@@ -208,7 +291,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
   }, [fetchedPages]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Stream partial results from background job via WebSocket
-  useEffect(() => {
+  useEffect(() => { // effect-layout-ok: background job results arrive asynchronously via WebSocket.
     if (!jobIdRef.current) return;
     const job = jobs.find(j => j.id === jobIdRef.current);
     if (!job) return;
@@ -310,6 +393,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
         return [...prev, result];
       });
       setExpanded(prev => new Set(prev).add(pageId));
+      setManualDelivery(prev => { const n = { ...prev }; delete n[pageId]; return n; });
     } catch (err) {
       console.error('SchemaSuggester operation failed:', err);
       setScanError('Single page generation failed');
@@ -332,6 +416,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
         } : p);
       });
       setExpanded(prev => new Set(prev).add(pageId));
+      setManualDelivery(prev => { const n = { ...prev }; delete n[pageId]; return n; });
     } catch (err) {
       console.error('SchemaSuggester operation failed:', err);
       // keep existing data
@@ -347,11 +432,16 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
   const publishToWebflow = async (pageId: string, schema: Record<string, unknown>) => {
     setPublishing(prev => new Set(prev).add(pageId));
     setPublishError(prev => { const n = { ...prev }; delete n[pageId]; return n; });
+    setManualDelivery(prev => { const n = { ...prev }; delete n[pageId]; return n; });
     setConfirmPublish(null);
     try {
       const pageData = data?.find(p => p.pageId === pageId);
       const isHomepage = !pageData?.slug || pageData.slug === '/' || pageData.slug === 'index' || pageData.slug === 'home';
-      await post(`/api/webflow/schema-publish/${siteId}`, { pageId, schema, publishAfter: true, isHomepage });
+      const result = await post<SchemaPublishResponse>(`/api/webflow/schema-publish/${siteId}`, { pageId, schema, publishAfter: true, isHomepage });
+      if (result.delivery?.status === 'manual-required') {
+        setManualDelivery(prev => ({ ...prev, [pageId]: result.delivery }));
+        return;
+      }
       setPublished(prev => new Set(prev).add(pageId));
       refreshStates();
     } catch (err) {
@@ -422,6 +512,13 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     const script = `<script type="application/ld+json">\n${json}\n</script>`;
     navigator.clipboard.writeText(script);
     setCopiedId(`${pageId}-${suggestion.type}`);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const copyJsonLd = (suggestion: SchemaSuggestion, pageId: string) => {
+    const json = manualDelivery[pageId]?.jsonLd || JSON.stringify(getEffectiveSchema(pageId, suggestion.template), null, 2);
+    navigator.clipboard.writeText(json);
+    setCopiedId(`${pageId}-${suggestion.type}-json`);
     setTimeout(() => setCopiedId(null), 2000);
   };
 
@@ -578,22 +675,35 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
 
   const PAGE_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
     { value: 'auto', label: 'Auto-detect' },
-    { value: 'homepage', label: 'Homepage' },
-    { value: 'pillar', label: 'Pillar / Product Page' },
-    { value: 'service', label: 'Service Page' },
-    { value: 'audience', label: 'Audience / Use Case' },
-    { value: 'lead-gen', label: 'Lead-Gen / Conversion' },
-    { value: 'blog', label: 'Blog Post' },
-    { value: 'about', label: 'About / Team' },
-    { value: 'contact', label: 'Contact' },
-    { value: 'location', label: 'Location' },
-    { value: 'product', label: 'Product' },
-    { value: 'partnership', label: 'Partnership' },
-    { value: 'faq', label: 'FAQ' },
-    { value: 'case-study', label: 'Case Study' },
-    { value: 'comparison', label: 'Comparison' },
-    { value: 'generic', label: 'General Page' },
+    ...Object.entries(SCHEMA_ROLE_LABELS).map(([value, label]) => ({ value, label })),
   ];
+
+  const fieldMappingTargets: Array<{ target: SchemaFieldTarget; label: string; roles: Array<'location' | 'service'> }> = [
+    { target: 'streetAddress', label: 'Street', roles: ['location'] },
+    { target: 'addressLocality', label: 'City', roles: ['location'] },
+    { target: 'addressRegion', label: 'State', roles: ['location'] },
+    { target: 'postalCode', label: 'ZIP', roles: ['location'] },
+    { target: 'phone', label: 'Phone', roles: ['location'] },
+    { target: 'email', label: 'Email', roles: ['location'] },
+    { target: 'openingHours', label: 'Hours', roles: ['location'] },
+    { target: 'serviceName', label: 'Service name', roles: ['service'] },
+    { target: 'serviceType', label: 'Service type', roles: ['service'] },
+    { target: 'areaServed', label: 'Area served', roles: ['service'] },
+    { target: 'price', label: 'Price', roles: ['service'] },
+    { target: 'priceCurrency', label: 'Currency', roles: ['service'] },
+  ];
+
+  const schemaMappingCollections = cmsMappings
+    .map(collection => {
+      const role = collection.mapping?.collectionRole
+        || (/(location|locations|clinic|clinics|store|stores|branch|branches)/i.test(`${collection.collectionName} ${collection.collectionSlug}`)
+          ? 'location'
+          : /(service|services|treatment|treatments|procedure|procedures)/i.test(`${collection.collectionName} ${collection.collectionSlug}`)
+            ? 'service'
+            : undefined);
+      return role === 'location' || role === 'service' ? { ...collection, schemaRole: role } : null;
+    })
+    .filter((collection): collection is CmsMappingCollection & { schemaRole: 'location' | 'service' } => Boolean(collection));
 
   const filteredInitialPages = availablePages.filter(
     p => !pageSearch || p.title.toLowerCase().includes(pageSearch.toLowerCase()) || p.slug.toLowerCase().includes(pageSearch.toLowerCase())
@@ -611,7 +721,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
           className={cn(
             'flex items-center gap-1.5 px-3 py-2 t-caption font-medium border-b-2 transition-colors -mb-px',
             schemaSubTab === t.id
-              ? 'border-teal-500 text-teal-300'
+              ? 'border-teal-500 text-accent-brand'
               : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'
           )}
         >
@@ -644,7 +754,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
         )}
         <div className="flex flex-col items-center justify-center py-8 gap-4">
           <div className="w-14 h-14 rounded-[var(--radius-xl)] bg-teal-500/10 border border-teal-500/20 flex items-center justify-center">
-            <Icon as={Sparkles} size="2xl" className="text-teal-400" />
+            <Icon as={Sparkles} size="2xl" className="text-accent-brand" />
           </div>
           <div className="text-center space-y-1.5">
             <p className="t-body font-medium text-[var(--brand-text-bright)]">Schema Generator</p>
@@ -660,7 +770,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
             <button
               onClick={fetchCmsTemplatePages}
               disabled={loadingCmsPages}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-[var(--radius-md)] t-body font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-amber-300 border border-amber-500/30 transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-[var(--radius-md)] t-body font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-accent-warning border border-amber-500/30 transition-colors disabled:opacity-50"
             >
               {loadingCmsPages ? <Icon as={Loader2} size="md" className="animate-spin" /> : <Icon as={Database} size="md" />} CMS Templates
             </button>
@@ -669,16 +779,16 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
         <SchemaPlanPanel siteId={siteId} />
         {showBpCallout && (
           <div role="alert" className="rounded-[var(--radius-lg)] border border-amber-500/30 bg-amber-500/10 p-4 flex items-start gap-3">
-            <AlertTriangle size={16} className="text-amber-400 flex-shrink-0 mt-0.5" />
+            <AlertTriangle size={16} className="text-accent-warning flex-shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
-              <p className="t-body text-amber-400 font-medium mb-1">Your business profile is incomplete</p>
+              <p className="t-body text-accent-warning font-medium mb-1">Your business profile is incomplete</p>
               <p className="t-caption text-[var(--brand-text-muted)]">
                 Add your address to unlock LocalBusiness schema on your homepage, /contact, and /about — the highest-value schema type for local businesses.
               </p>
               {workspaceId && (
                 <Link
                   to={adminPath(workspaceId, 'workspace-settings') + '?tab=business-profile'}
-                  className="t-caption text-teal-400 hover:text-teal-300 mt-2 inline-block"
+                  className="t-caption text-accent-brand hover:text-accent-brand mt-2 inline-block"
                 >
                   Complete business profile →
                 </Link>
@@ -707,10 +817,56 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
           onCopyCmsTemplate={copyCmsTemplate}
           onPublishCmsTemplate={publishCmsTemplate}
         />
+        {schemaMappingCollections.length > 0 && (
+          <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-4 space-y-3">
+            <div>
+              <p className="t-body text-[var(--brand-text)] font-medium">Collection field mapping</p>
+              <p className="t-caption-sm text-[var(--brand-text-muted)]">
+                Detected CMS fields can be corrected here so Locations and Services resolve human-readable schema data.
+              </p>
+              {cmsMappingError && (
+                <p className="t-caption-sm text-amber-300 mt-1">{cmsMappingError}</p>
+              )}
+            </div>
+            {schemaMappingCollections.slice(0, MAX_SCHEMA_MAPPING_COLLECTIONS).map(collection => (
+              <div key={collection.collectionId} className="border-t border-[var(--brand-border)]/60 pt-3">
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <span className="t-caption text-[var(--brand-text)]">{collection.collectionName}</span>
+                  <span className="t-caption-sm text-[var(--brand-text-muted)]">{collection.schemaRole}</span>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {fieldMappingTargets.filter(target => target.roles.includes(collection.schemaRole)).map(({ target, label }) => {
+                    const selected = collection.mapping?.fieldMappings?.[target]
+                      ?? collection.fields.find(field => field.target === target)?.slug
+                      ?? '';
+                    return (
+                      <label key={target} className="block">
+                        <span className="t-caption-sm text-[var(--brand-text-muted)]">{label}</span>
+                        <select
+                          value={selected}
+                          disabled={savingCmsMapping === `${collection.collectionId}:${target}`}
+                          onChange={event => saveCmsFieldMapping(collection, target, event.target.value)}
+                          className="mt-1 w-full px-2 py-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption-sm text-[var(--brand-text)] focus:outline-none focus:border-teal-500 disabled:opacity-50"
+                        >
+                          <option value="">Not mapped</option>
+                          {collection.fields.map(field => (
+                            <option key={field.slug} value={field.slug}>
+                              {field.displayName || field.slug} ({field.type})
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         {generatingSingle && (
           <div className="flex items-center gap-2 px-4 py-2 bg-teal-500/10 border border-teal-500/20 rounded-[var(--radius-xl)]">
-            <Icon as={Loader2} size="md" className="animate-spin text-teal-400" />
-            <span className="t-caption text-teal-300">Generating schema for page...</span>
+            <Icon as={Loader2} size="md" className="animate-spin text-accent-brand" />
+            <span className="t-caption text-accent-brand">Generating schema for page...</span>
           </div>
         )}
         {/* Page list with type selectors */}
@@ -778,7 +934,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
                   <button
                     onClick={() => generateSinglePage(p.id)}
                     disabled={generatingSingle === p.id}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-md)] t-caption-sm text-teal-300 bg-teal-600/10 border border-teal-500/20 hover:bg-teal-600/20 transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-md)] t-caption-sm text-accent-brand bg-teal-600/10 border border-teal-500/20 hover:bg-teal-600/20 transition-colors disabled:opacity-50"
                   >
                     {generatingSingle === p.id ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Sparkles} size="sm" />}
                     Generate
@@ -824,7 +980,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3">
         {schemaTabBar}
-        <Icon as={CheckCircle} size="2xl" className="text-emerald-400/80" />
+        <Icon as={CheckCircle} size="2xl" className="text-accent-success" />
         <p className="text-[var(--brand-text-muted)] t-body">No schema suggestions needed</p>
         <button onClick={runScan} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] transition-colors mt-2">
           <Icon as={RefreshCw} size="sm" /> Re-scan
@@ -868,16 +1024,16 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
 
       {showBpCallout && (
         <div role="alert" className="rounded-[var(--radius-lg)] border border-amber-500/30 bg-amber-500/10 p-4 flex items-start gap-3">
-          <AlertTriangle size={16} className="text-amber-400 flex-shrink-0 mt-0.5" />
+          <AlertTriangle size={16} className="text-accent-warning flex-shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
-            <p className="t-body text-amber-400 font-medium mb-1">Your business profile is incomplete</p>
+            <p className="t-body text-accent-warning font-medium mb-1">Your business profile is incomplete</p>
             <p className="t-caption text-[var(--brand-text-muted)]">
               Add your address to unlock LocalBusiness schema on your homepage, /contact, and /about — the highest-value schema type for local businesses.
             </p>
             {workspaceId && (
               <Link
                 to={adminPath(workspaceId, 'workspace-settings') + '?tab=business-profile'}
-                className="t-caption text-teal-400 hover:text-teal-300 mt-2 inline-block"
+                className="t-caption text-accent-brand hover:text-accent-brand mt-2 inline-block"
               >
                 Complete business profile →
               </Link>
@@ -969,8 +1125,8 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
       </div>
       {generatingSingle && (
         <div className="flex items-center gap-2 px-4 py-2 bg-teal-500/10 border border-teal-500/20 rounded-[var(--radius-xl)]">
-          <Icon as={Loader2} size="sm" className="animate-spin text-teal-400" />
-          <span className="t-caption text-teal-300">Generating schema for page...</span>
+          <Icon as={Loader2} size="sm" className="animate-spin text-accent-brand" />
+          <span className="t-caption text-accent-brand">Generating schema for page...</span>
         </div>
       )}
 
@@ -997,7 +1153,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
         </div>
         <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature)' }}>
           <div className="t-caption text-[var(--brand-text-muted)] mb-1">Validated</div>
-          <div className={cn('text-2xl font-bold', pagesWithErrors > 0 ? 'text-amber-400/80' : 'text-emerald-400/80')}>{data.length - pagesWithErrors}/{data.length}</div>
+          <div className={cn('text-2xl font-bold', pagesWithErrors > 0 ? 'text-accent-warning' : 'text-accent-success')}>{data.length - pagesWithErrors}/{data.length}</div>
           <div className="t-caption text-[var(--brand-text-muted)]">
             {pagesWithErrors > 0 ? `${pagesWithErrors} with errors` : pagesWithWarnings > 0 ? `${pagesWithWarnings} with warnings` : 'all passing'}
             {fixesAvailable > 0 && ` · ${fixesAvailable} fix${fixesAvailable === 1 ? '' : 'es'} available`}
@@ -1005,7 +1161,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
         </div>
         <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature)' }}>
           <div className="t-caption text-[var(--brand-text-muted)] mb-1">Existing Schemas</div>
-          <div className="text-2xl font-bold text-emerald-400/80">{pagesWithExisting}</div>
+          <div className="text-2xl font-bold text-accent-success">{pagesWithExisting}</div>
           <div className="t-caption text-[var(--brand-text-muted)]">pages already have JSON-LD</div>
         </div>
       </div>
@@ -1018,18 +1174,18 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
             className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/30 transition-colors"
           >
             <div className="flex items-center gap-2">
-              <Icon as={BarChart3} size="md" className="text-teal-400" />
+              <Icon as={BarChart3} size="md" className="text-accent-brand" />
               <span className="t-caption font-medium text-[var(--brand-text-bright)]">Schema Impact</span>
               <span className="t-caption-sm text-[var(--brand-text-muted)]">{impactData.totalDeployments} deployments tracked</span>
             </div>
             <div className="flex items-center gap-3">
               {impactData.avgClicksDelta !== null && (
-                <span className={cn('t-caption font-medium', impactData.avgClicksDelta >= 0 ? 'text-emerald-400/80' : 'text-red-400/80')}>
+                <span className={cn('t-caption font-medium', impactData.avgClicksDelta >= 0 ? 'text-accent-success' : 'text-accent-danger')}>
                   {impactData.avgClicksDelta >= 0 ? '+' : ''}{impactData.avgClicksDelta} clicks
                 </span>
               )}
               {impactData.avgPositionDelta !== null && (
-                <span className={cn('t-caption font-medium', impactData.avgPositionDelta <= 0 ? 'text-emerald-400/80' : 'text-red-400/80')}>
+                <span className={cn('t-caption font-medium', impactData.avgPositionDelta <= 0 ? 'text-accent-success' : 'text-accent-danger')}>
                   {impactData.avgPositionDelta <= 0 ? '' : '+'}{impactData.avgPositionDelta} pos
                 </span>
               )}
@@ -1053,7 +1209,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
                   <div key={stat.label} className="bg-[var(--surface-2)] px-3 py-2.5">
                     <div className="t-caption-sm text-[var(--brand-text-muted)]">{stat.label}</div>
                     {stat.value !== null ? (
-                      <div className={cn('t-body font-bold', stat.positive(stat.value) ? 'text-emerald-400/80' : 'text-red-400/80')}>
+                      <div className={cn('t-body font-bold', stat.positive(stat.value) ? 'text-accent-success' : 'text-accent-danger')}>
                         {stat.value >= 0 && stat.label !== 'Avg Position' ? '+' : ''}{stat.value}{stat.suffix}
                       </div>
                     ) : (
@@ -1078,7 +1234,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
                     ) : d.before && d.after ? (
                       <div className="flex items-center gap-3 t-caption-sm">
                         <TrendBadge value={d.after.clicks - d.before.clicks} suffix="" showSign label="clicks" hideOnZero={false} />
-                        <span className={d.after.position <= d.before.position ? 'text-emerald-400/80' : 'text-red-400/80'}>
+                        <span className={d.after.position <= d.before.position ? 'text-accent-success' : 'text-accent-danger'}>
                           pos {d.after.position.toFixed(1)}
                         </span>
                       </div>
@@ -1100,12 +1256,12 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
       {summary.total > 0 && (
         <div className="flex items-center gap-3 t-caption-sm text-[var(--brand-text-muted)] mb-2">
           <span className="text-[var(--brand-text)] font-medium">{summary.total} tracked</span>
-          {summary.live > 0 && <><StatusBadge status="live" /><span className="text-teal-400">{summary.live}</span></>}
-          {summary.inReview > 0 && <><StatusBadge status="in-review" /><span className="text-blue-400">{summary.inReview}</span></>}
-          {summary.approved > 0 && <><StatusBadge status="approved" /><span className="text-emerald-400/80">{summary.approved}</span></>}
-          {summary.rejected > 0 && <><StatusBadge status="rejected" /><span className="text-red-400/80">{summary.rejected}</span></>}
-          {summary.issueDetected > 0 && <><StatusBadge status="issue-detected" /><span className="text-amber-400/80">{summary.issueDetected}</span></>}
-          {summary.fixProposed > 0 && <><StatusBadge status="fix-proposed" /><span className="text-blue-400">{summary.fixProposed}</span></>}
+          {summary.live > 0 && <><StatusBadge status="live" /><span className="text-accent-brand">{summary.live}</span></>}
+          {summary.inReview > 0 && <><StatusBadge status="in-review" /><span className="text-accent-info">{summary.inReview}</span></>}
+          {summary.approved > 0 && <><StatusBadge status="approved" /><span className="text-accent-success">{summary.approved}</span></>}
+          {summary.rejected > 0 && <><StatusBadge status="rejected" /><span className="text-accent-danger">{summary.rejected}</span></>}
+          {summary.issueDetected > 0 && <><StatusBadge status="issue-detected" /><span className="text-accent-warning">{summary.issueDetected}</span></>}
+          {summary.fixProposed > 0 && <><StatusBadge status="fix-proposed" /><span className="text-accent-info">{summary.fixProposed}</span></>}
         </div>
       )}
 
@@ -1124,6 +1280,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
               published={published.has(page.pageId)}
               publishing={publishing.has(page.pageId)}
               publishError={publishError[page.pageId]}
+              manualDelivery={manualDelivery[page.pageId]}
               confirmPublish={confirmPublish === page.pageId}
               sentPage={sentPages.has(page.pageId)}
               sendingPage={sendingPage.has(page.pageId)}
@@ -1148,6 +1305,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
               onToggleSchemaEdit={toggleSchemaEdit}
               onSchemaJsonChange={handleSchemaJsonChange}
               onCopyTemplate={copyTemplate}
+              onCopyJsonLd={copyJsonLd}
               onPublish={publishToWebflow}
               onConfirmPublish={setConfirmPublish}
               onSendToClient={sendSingleSchemaToClient}
@@ -1158,6 +1316,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
                   await schemaApi.retract(siteId, pageId);
                   setRetractedPages(prev => new Set(prev).add(pageId));
                   setPublished(prev => { const n = new Set(prev); n.delete(pageId); return n; });
+                  setManualDelivery(prev => { const n = { ...prev }; delete n[pageId]; return n; });
                 } catch (err) {
                   setPublishError(prev => ({ ...prev, [pageId]: err instanceof Error ? err.message : 'Retract failed' }));
                 } finally {
@@ -1186,6 +1345,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
                   });
                 });
                 setPublished(prev => new Set(prev).add(pageId));
+                setManualDelivery(prev => { const n = { ...prev }; delete n[pageId]; return n; });
               }}
             />
           );
@@ -1193,9 +1353,9 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
       </div>
 
       <div className="flex items-start gap-2 px-3 py-2 rounded-[var(--radius-md)] bg-blue-500/5 border border-blue-500/10">
-        <Icon as={Info} size="md" className="text-blue-400 flex-shrink-0 mt-0.5" />
+        <Icon as={Info} size="md" className="text-accent-info flex-shrink-0 mt-0.5" />
         <div className="t-caption text-[var(--brand-text-muted)]">
-          <strong className="text-[var(--brand-text-bright)]">How to use:</strong> Each page gets one unified <code className="text-blue-300">@graph</code> schema with cross-referenced types. Click <strong>Publish to Webflow</strong> to inject it directly into the page's <code className="text-blue-300">&lt;head&gt;</code> via the Custom Code API, or <strong>Copy</strong> to paste it manually. Existing custom code on your pages is never touched — only schema scripts are managed.
+          <strong className="text-[var(--brand-text-bright)]">How to use:</strong> Each page gets one unified <code className="text-accent-info">@graph</code> schema with cross-referenced types. Click <strong>Publish to Webflow</strong> to use the Custom Code API when supported, <strong>Copy script</strong> for manual custom code, or <strong>Copy JSON-LD</strong> for Webflow Page Settings -&gt; Schema markup. Existing custom code on your pages is never touched — only schema scripts are managed.
         </div>
       </div>
     </div>

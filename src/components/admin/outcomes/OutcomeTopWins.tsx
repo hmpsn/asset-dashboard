@@ -48,16 +48,16 @@ export default function OutcomeTopWins({ workspaceId }: Props) {
   return (
     <SectionCard
       title={`Top ${wins.length} Win${wins.length !== 1 ? 's' : ''}`}
-      titleIcon={<Trophy className="w-4 h-4 text-amber-400" />}
+      titleIcon={<Trophy className="w-4 h-4 text-accent-warning" />}
     >
       <div className="space-y-3">
         {wins.map((win) => (
           <div key={win.actionId} className="flex items-start gap-3 py-2 border-b border-[var(--brand-border)] last:border-0">
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-[var(--brand-text-bright)] truncate">
+              <p className="t-caption-sm font-medium text-[var(--brand-text-bright)] truncate">
                 {winLabel(win)}
               </p>
-              <p className="t-caption text-blue-400 mt-0.5">
+              <p className="t-caption text-accent-info mt-0.5">
                 {win.delta.delta_percent >= 0 ? '+' : ''}{win.delta.delta_percent.toFixed(1)}% {win.delta.primary_metric}
               </p>
               <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">{formatOutcomeDate(win.createdAt)}</p>

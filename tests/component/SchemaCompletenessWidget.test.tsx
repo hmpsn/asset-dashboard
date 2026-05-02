@@ -48,14 +48,13 @@ const finding = (severity: 'error' | 'warning', field: string): ValidationFindin
 });
 
 describe('SchemaCompletenessWidget', () => {
-  it('renders the empty-state badge when no actionable findings exist', () => {
+  it('does not call the profile complete when non-actionable schema findings remain', () => {
     // 'image' has no entry in FIELD_TARGETS, so it is non-actionable
     renderWithRouter([
       { pageId: 'p1', validationFindings: [] },
       { pageId: 'p2', validationFindings: [finding('error', 'image')] },
     ]);
-    // Use exact text to distinguish from the card title "Schema profile completeness"
-    expect(screen.getByText(/all pages emit recommended fields/i)).toBeInTheDocument();
+    expect(screen.getByText(/still have schema warnings or errors/i)).toBeInTheDocument();
   });
 
   it('renders progress bar at 50% when half of pages have actionable findings', () => {

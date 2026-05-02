@@ -35,6 +35,7 @@ import type { RichResultEligibility } from './rich-results.js';
 import type { ValidationFinding } from '../../shared/types/schema-validation.js';
 import type { SchemaGenerationDiagnostics, SchemaRoleSource, SkippedSchemaType } from '../../shared/types/schema-generation.js';
 import type { SchemaIndustrySubtype, SchemaPageRole } from '../../shared/types/schema-plan.js';
+import type { SchemaCmsDeliveryStatus, SchemaCollectionIdentity } from '../../shared/types/site-inventory.js';
 import type { SiteContext, SiteContextPage } from './site-context.js';
 import { validateForGoogleRichResults } from '../schema-validator.js';
 import { createLogger } from '../logger.js';
@@ -102,7 +103,11 @@ export interface LeanGeneratorInput {
     source: Exclude<SchemaRoleSource, 'auto-detect'>;
     industrySubtype?: SchemaIndustrySubtype;
   };
+  plannedSchemaRole?: SchemaPageRole;
+  roleDecisionDiagnostics?: SkippedSchemaType[];
   inactivePlanStatus?: string;
+  collectionIdentity?: SchemaCollectionIdentity;
+  cmsDeliveryStatus?: SchemaCmsDeliveryStatus;
 }
 
 function detectExistingSchemas(html: string): string[] {
@@ -195,6 +200,16 @@ function hasGraphType(schema: Record<string, unknown>, type: string): boolean {
   return Array.isArray(graph) && graph.some(node => node['@type'] === type);
 }
 
+function isCollectionIndexKind(kind: PageKind): boolean {
+  return kind === 'BlogIndex' || kind === 'ServiceIndex' || kind === 'CaseStudyIndex';
+}
+
+function hasQuestionLikeContent(html: string): boolean {
+  const text = plainText(html);
+  const matches = text.match(/\b(?:what|why|when|where|which|who|how|can|do|does|did|is|are|should|will|would)[^?]{8,220}\?/gi);
+  return (matches?.length ?? 0) >= 2;
+}
+
 function validationStatus(findings: ValidationFinding[]): 'valid' | 'warnings' | 'errors' {
   if (findings.some(f => f.severity === 'error')) return 'errors';
   if (findings.some(f => f.severity === 'warning')) return 'warnings';
@@ -218,7 +233,52 @@ function roleToDiagnosticsType(role: SchemaPageRole): string | null {
   return map[role] ?? null;
 }
 
+function isOpaqueIdentifier(value: string): boolean {
+  const trimmed = value.trim();
+  return /^[a-f0-9]{24}$/i.test(trimmed) || /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed);
+}
+
+function safePublicText(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const cleaned = value.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, ' ').trim();
+  if (!cleaned || isOpaqueIdentifier(cleaned)) return undefined;
+  return cleaned;
+}
+
+function formatAreaServed(address: { city?: string; state?: string } | undefined): string | undefined {
+  const city = safePublicText(address?.city);
+  const state = safePublicText(address?.state);
+  if (city && state) return `${city}, ${state}`;
+  return city || state;
+}
+
+function mergeSemanticBusinessProfile(
+  semantics: PageElementCatalog['semantics'] | undefined,
+  fallback: WorkspaceSchemaInput['businessProfile'],
+): WorkspaceSchemaInput['businessProfile'] {
+  const semanticAddress = semantics?.address;
+  const fallbackAddress = fallback?.address;
+  const address = {
+    street: safePublicText(semanticAddress?.street) ?? safePublicText(fallbackAddress?.street),
+    city: safePublicText(semanticAddress?.city) ?? safePublicText(fallbackAddress?.city),
+    state: safePublicText(semanticAddress?.state) ?? safePublicText(fallbackAddress?.state),
+    zip: safePublicText(semanticAddress?.postalCode) ?? safePublicText(fallbackAddress?.zip),
+    country: safePublicText(semanticAddress?.country) ?? safePublicText(fallbackAddress?.country),
+  };
+  const hasAddress = Object.values(address).some(Boolean);
+  const phone = safePublicText(semantics?.phone) ?? safePublicText(fallback?.phone);
+  const email = safePublicText(semantics?.email) ?? safePublicText(fallback?.email);
+  if (!fallback && !hasAddress && !phone && !email) return null;
+  return {
+    ...(fallback ?? {}),
+    phone,
+    email,
+    address: hasAddress ? address : fallback?.address,
+  };
+}
+
 function buildGenerationDiagnostics(input: {
+  plannedRole?: SchemaPageRole;
   role?: SchemaPageRole;
   roleSource: SchemaRoleSource;
   emittedTypes: string[];
@@ -227,6 +287,10 @@ function buildGenerationDiagnostics(input: {
   validationFindings: ValidationFinding[];
   validationStatus?: 'valid' | 'warnings' | 'errors';
   inactivePlanStatus?: string;
+  collection?: SchemaCollectionIdentity;
+  cmsDeliveryStatus?: SchemaCmsDeliveryStatus;
+  evidenceSources?: SchemaGenerationDiagnostics['evidenceSources'];
+  fieldEvidence?: SchemaGenerationDiagnostics['fieldEvidence'];
 }): SchemaGenerationDiagnostics {
   const skippedSchemaTypes = [...input.skippedSchemaTypes];
   if (input.inactivePlanStatus && input.roleSource === 'auto-detect') {
@@ -236,13 +300,23 @@ function buildGenerationDiagnostics(input: {
     });
   }
   return {
-    plannedRole: input.role,
+    plannedRole: input.plannedRole ?? input.role,
     effectiveRole: input.role,
     roleSource: input.roleSource,
+    collection: input.collection,
     emittedTypes: input.emittedTypes,
     skippedSchemaTypes,
+    missingRequiredFields: skippedSchemaTypes.flatMap(s => s.missingFields ?? []),
+    evidenceSources: input.evidenceSources,
+    fieldEvidence: input.fieldEvidence,
+    fieldResolutionStatuses: Array.from(new Set(
+      (input.fieldEvidence ?? [])
+        .map(e => e.status)
+        .filter((status): status is NonNullable<typeof status> => Boolean(status)),
+    )),
     richResultsEligibility: input.richResultsEligibility,
     validationStatus: input.validationStatus ?? validationStatus(input.validationFindings),
+    cmsDeliveryStatus: input.cmsDeliveryStatus,
   };
 }
 
@@ -250,18 +324,13 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
   // Fix 1: strip trailing slashes from baseUrl to prevent //path canonical URLs
   const baseUrl = input.baseUrl.replace(/\/+$/, '');
 
-  const businessKind: BusinessKind = input.workspace.businessProfile?.address ? 'local' : 'unknown';
-  const classified: ClassifiedPage = input.pageKindOverride
-    ? {
-        kind: input.pageKindOverride,
-        primaryType: pageKindToPrimaryType(input.pageKindOverride, businessKind),
-        pagePath: input.pageMeta.publishedPath,
-      }
-    : classifyPage(`${baseUrl}${input.pageMeta.publishedPath}`, baseUrl, { businessKind });
   const role = input.schemaRoleOverride?.role;
   const roleSource: SchemaRoleSource = input.schemaRoleOverride?.source ?? 'auto-detect';
   const industrySubtype = input.schemaRoleOverride?.industrySubtype ?? input.workspace.industrySubtype;
   const skippedSchemaTypes: SkippedSchemaType[] = [];
+  if (input.roleDecisionDiagnostics?.length) {
+    skippedSchemaTypes.push(...input.roleDecisionDiagnostics);
+  }
 
   // Fix 2: warn when HTML is empty — existing-schema detection returns [] silently
   if (!input.html || input.html.trim().length === 0) {
@@ -325,7 +394,20 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       log.warn({ err, pageId: input.pageId }, 'page-element extraction failed; planned rich role will fall back conservatively');
     }
   }
-  pageData = { ...pageData, elements: catalog };
+  const businessProfileForPage = mergeSemanticBusinessProfile(catalog?.semantics, input.workspace.businessProfile);
+  pageData = {
+    ...pageData,
+    elements: catalog,
+    areaServed: formatAreaServed(businessProfileForPage?.address) ?? pageData.areaServed,
+  };
+  const businessKind: BusinessKind = businessProfileForPage?.address ? 'local' : 'unknown';
+  const classified: ClassifiedPage = input.pageKindOverride
+    ? {
+        kind: input.pageKindOverride,
+        primaryType: pageKindToPrimaryType(input.pageKindOverride, businessKind),
+        pagePath: input.pageMeta.publishedPath,
+      }
+    : classifyPage(`${baseUrl}${input.pageMeta.publishedPath}`, baseUrl, { businessKind });
 
   // Surgical AI: only if no description was found
   if (!pageData.description) {
@@ -344,9 +426,10 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
   let schema: Record<string, unknown>;
   let reason: string;
   const offers = extractVisibleOffers(input.html, pageData.cleanTitle || pageData.title);
+  const serviceOffers = pageData.offers && pageData.offers.length > 0 ? pageData.offers : offers;
 
   if (role === 'product') {
-    schema = buildProductSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile, offers });
+    schema = buildProductSchema({ baseUrl, pageData, businessProfile: businessProfileForPage, offers });
     reason = offers.length > 0
       ? 'Product page — Product with visible price-backed Offer data.'
       : 'Product page — Product without Offer because no visible price/currency was verified.';
@@ -404,14 +487,19 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
         schema = buildLocalBusinessSchema({
           baseUrl,
           pageData,
-          businessProfile: input.workspace.businessProfile,
+          businessProfile: businessProfileForPage,
           siteHasSearch: input.workspace.siteHasSearch,
           industrySubtype,
         });
         reason = 'Local business homepage — LocalBusiness with verified contact info.';
       } else {
-        schema = buildHomepageSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile, siteHasSearch: input.workspace.siteHasSearch });
+        schema = buildHomepageSchema({ baseUrl, pageData, businessProfile: businessProfileForPage, siteHasSearch: input.workspace.siteHasSearch });
         reason = 'Homepage — Organization + WebSite (sitewide entities).';
+        skippedSchemaTypes.push({
+          type: 'LocalBusiness',
+          reason: 'Homepage LocalBusiness skipped: no verified primary business address.',
+          missingFields: ['address'],
+        });
       }
       break;
     case 'BlogPosting':
@@ -423,25 +511,39 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       reason = 'Case study — Article (not Service) with about="Case study".';
       break;
     case 'Service':
-      schema = buildServiceSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile });
+      schema = buildServiceSchema({ baseUrl, pageData, businessProfile: businessProfileForPage, offers: serviceOffers });
       reason = 'Service detail page — Service with provider reference.';
+      if (serviceOffers.length === 0) {
+        skippedSchemaTypes.push({
+          type: 'Offer',
+          reason: 'Offer skipped: no visible or mapped price/currency was verified.',
+          missingFields: ['price', 'priceCurrency'],
+        });
+      }
       break;
     case 'Location':
-      schema = buildLocalBusinessSchema({
-        baseUrl,
-        pageData,
-        businessProfile: input.workspace.businessProfile,
-        siteHasSearch: input.workspace.siteHasSearch,
-        industrySubtype,
-      });
+        schema = buildLocalBusinessSchema({
+          baseUrl,
+          pageData,
+          businessProfile: businessProfileForPage,
+          siteHasSearch: input.workspace.siteHasSearch,
+          industrySubtype,
+        });
       reason = 'Location page — LocalBusiness with verified business profile details when available.';
+      if (!businessProfileForPage?.address || !Object.values(businessProfileForPage.address).some(Boolean)) {
+        skippedSchemaTypes.push({
+          type: 'PostalAddress',
+          reason: 'Location address skipped: no verified human-readable address fields were resolved.',
+          missingFields: ['streetAddress', 'addressLocality', 'addressRegion', 'postalCode'],
+        });
+      }
       break;
     case 'AboutPage':
-      schema = buildAboutPageSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile });
+      schema = buildAboutPageSchema({ baseUrl, pageData, businessProfile: businessProfileForPage });
       reason = 'About page — AboutPage with LocalBusiness mainEntity when address is set.';
       break;
     case 'ContactPage':
-      schema = buildContactPageSchema({ baseUrl, pageData, businessProfile: input.workspace.businessProfile });
+      schema = buildContactPageSchema({ baseUrl, pageData, businessProfile: businessProfileForPage });
       reason = 'Contact page — ContactPage with LocalBusiness mainEntity when address is set.';
       break;
     case 'BlogIndex': {
@@ -500,7 +602,8 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
   const baseValidationFindings = validateLeanSchema(schema, classified.primaryType);
 
   // Surgical FAQ enrichment: if the page has accordion FAQ structure, append a FAQPage node.
-  const faqPairs = await extractFaq(input.html || '');
+  const requireDedicatedFaq = isCollectionIndexKind(classified.kind);
+  const faqPairs = await extractFaq(input.html || '', { requireDedicatedSection: requireDedicatedFaq });
   if (faqPairs.length >= 2) {
     const faqNode = {
       '@type': 'FAQPage',
@@ -528,6 +631,13 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
       log.debug({ pageId: input.pageId, errors: faqIntroducedFindings }, 'FAQPage extraction produced invalid schema; skipping');
       (schema['@graph'] as Array<Record<string, unknown>>).pop();
     }
+  }
+  if (requireDedicatedFaq && faqPairs.length === 0 && hasQuestionLikeContent(input.html || '')) {
+    skippedSchemaTypes.push({
+      type: 'FAQPage',
+      reason: 'FAQPage skipped: question-like index/card content was found, but no dedicated FAQ section was detected.',
+      missingFields: ['dedicated FAQ section'],
+    });
   }
   if (role === 'faq' && !hasGraphType(schema, 'FAQPage')) {
     skippedSchemaTypes.push({
@@ -562,6 +672,7 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
   const graph = (schema['@graph'] as Array<Record<string, unknown>>) ?? [];
   const declaredTypes = graph.map(n => n['@type']).filter((t): t is string => typeof t === 'string');
   const generationDiagnostics = buildGenerationDiagnostics({
+    plannedRole: input.plannedSchemaRole,
     role,
     roleSource,
     emittedTypes: declaredTypes,
@@ -570,6 +681,10 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
     validationFindings,
     validationStatus: publishValidation.status,
     inactivePlanStatus: input.inactivePlanStatus,
+    collection: input.collectionIdentity,
+    cmsDeliveryStatus: input.cmsDeliveryStatus,
+    evidenceSources: pageData.evidenceSources,
+    fieldEvidence: pageData.fieldEvidence,
   });
 
   return {

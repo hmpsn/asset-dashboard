@@ -5,6 +5,8 @@
 import { createLogger } from './logger.js';
 import { resolvePagePath } from './helpers.js';
 import { webflowFetch, getToken } from './webflow-client.js';
+import { parseJsonFallback } from './db/json-validation.js';
+import type { SchemaDeliveryDecision, SchemaPublishResponse } from '../shared/types/schema-generation.js';
 
 const log = createLogger('webflow-pages');
 
@@ -144,7 +146,9 @@ export async function getSiteSubdomain(siteId: string, tokenOverride?: string): 
 
 // --- Custom Code API: Register, Apply, and Manage inline scripts ---
 
-const SCHEMA_SCRIPT_PREFIX = 'JSON-LD Schema';
+const SCHEMA_SCRIPT_PREFIX = 'JSONLDSchema';
+const LEGACY_SCHEMA_SCRIPT_PREFIXES = ['JSON-LD Schema', 'JSONLD Schema', SCHEMA_SCRIPT_PREFIX];
+const WEBFLOW_INLINE_SCRIPT_LIMIT = 2000;
 
 interface RegisteredScript {
   id: string;
@@ -159,13 +163,29 @@ interface PageCustomCodeBlock {
   version: string;
 }
 
+interface WebflowCustomCodeWriteResult<T = undefined> {
+  data?: T;
+  error?: string;
+  customCodeApiUnavailable?: boolean;
+}
+
+function isWebflowCustomCodeApiUnavailable(status: number, body: string): boolean {
+  if (status !== 403) return false;
+  const parsed = parseJsonFallback<{ code?: unknown; message?: unknown } | null>(body, null);
+  if (parsed?.code === 'invalid_auth_version') return true;
+  if (typeof parsed?.message === 'string' && /not authorized to access this version/i.test(parsed.message)) {
+    return true;
+  }
+  return /invalid_auth_version|not authorized to access this version/i.test(body);
+}
+
 async function registerInlineScript(
   siteId: string,
   sourceCode: string,
   displayName: string,
   version: string,
   tokenOverride?: string,
-): Promise<RegisteredScript | null> {
+): Promise<WebflowCustomCodeWriteResult<RegisteredScript>> {
   const res = await webflowFetch(`/sites/${siteId}/registered_scripts/inline`, {
     method: 'POST',
     body: JSON.stringify({
@@ -178,9 +198,12 @@ async function registerInlineScript(
   if (!res.ok) {
     const text = await res.text();
     log.error(`Failed to register inline script: ${res.status} ${text}`);
-    return null;
+    return {
+      customCodeApiUnavailable: isWebflowCustomCodeApiUnavailable(res.status, text),
+      error: `Failed to register schema script with Webflow (${res.status}: ${text})`,
+    };
   }
-  return await res.json() as RegisteredScript;
+  return { data: await res.json() as RegisteredScript };
 }
 
 async function listRegisteredScripts(siteId: string, tokenOverride?: string): Promise<RegisteredScript[]> {
@@ -201,7 +224,7 @@ async function upsertPageCustomCode(
   pageId: string,
   scripts: PageCustomCodeBlock[],
   tokenOverride?: string,
-): Promise<boolean> {
+): Promise<WebflowCustomCodeWriteResult> {
   const res = await webflowFetch(`/pages/${pageId}/custom_code`, {
     method: 'PUT',
     body: JSON.stringify({ scripts }),
@@ -209,9 +232,79 @@ async function upsertPageCustomCode(
   if (!res.ok) {
     const text = await res.text();
     log.error(`Failed to upsert page custom code: ${res.status} ${text}`);
-    return false;
+    return {
+      customCodeApiUnavailable: isWebflowCustomCodeApiUnavailable(res.status, text),
+      error: `Failed to apply schema to page custom code (${res.status}: ${text})`,
+    };
   }
-  return true;
+  return {};
+}
+
+function schemaScriptDisplayName(pageId: string): string {
+  const safePageId = pageId.slice(0, 12).replace(/[^a-z0-9]/gi, '') || 'Page';
+  return `${SCHEMA_SCRIPT_PREFIX}${safePageId}`.slice(0, 50);
+}
+
+function buildJsonLdInjectionScript(jsonLd: string): string {
+  const safeJson = jsonLd.replace(/<\/script/gi, '<\\/script');
+  return `(()=>{const s=document.createElement("script");s.type="application/ld+json";s.textContent=${JSON.stringify(safeJson)};document.head.appendChild(s);})();`;
+}
+
+function webflowInlineLimitError(length: number): string {
+  return `Schema script is ${length} characters after compaction, exceeding Webflow's 2000 character registered inline script limit. Use CMS schema field delivery or a manual page embed for this rich schema.`;
+}
+
+function jsonLdOnly(schemaJson: Record<string, unknown>): string {
+  return JSON.stringify(schemaJson, null, 2);
+}
+
+function publishedDelivery(jsonLd: string): SchemaDeliveryDecision {
+  return {
+    method: 'webflow-api',
+    status: 'published',
+    message: 'Schema published to Webflow through the Custom Code API.',
+    jsonLd,
+  };
+}
+
+function failedDelivery(
+  jsonLd: string,
+  reason: 'webflow-register-failed' | 'webflow-apply-failed' | 'webflow-inline-script-limit',
+  message: string,
+): SchemaDeliveryDecision {
+  return {
+    method: 'webflow-api',
+    status: 'failed',
+    reason,
+    message,
+    jsonLd,
+  };
+}
+
+function manualNativeSchemaDelivery(jsonLd: string, characterCount: number): SchemaDeliveryDecision {
+  return {
+    method: 'manual-native-schema-field',
+    status: 'manual-required',
+    reason: 'webflow-inline-script-limit',
+    message: 'This schema is too large for Webflow’s registered inline script API. Copy the JSON-LD into Webflow Page Settings -> Schema markup. Webflow’s native Schema markup field is not currently writable through the Data API or MCP.',
+    jsonLd,
+    characterCount,
+    apiLimit: WEBFLOW_INLINE_SCRIPT_LIMIT,
+  };
+}
+
+function manualNativeSchemaDeliveryForCustomCodeApi(jsonLd: string, message: string): SchemaDeliveryDecision {
+  return {
+    method: 'manual-native-schema-field',
+    status: 'manual-required',
+    reason: 'webflow-custom-code-api-unavailable',
+    message,
+    jsonLd,
+  };
+}
+
+function webflowCustomCodeApiUnavailableMessage(): string {
+  return 'Webflow rejected the Custom Code API request for this token/API version. Copy the JSON-LD into Webflow Page Settings -> Schema markup. Webflow’s native Schema markup field is not currently writable through the Data API or MCP.';
 }
 
 export async function publishSchemaToPage(
@@ -219,43 +312,69 @@ export async function publishSchemaToPage(
   pageId: string,
   schemaJson: Record<string, unknown>,
   tokenOverride?: string,
-): Promise<{ success: boolean; error?: string }> {
-  // Escape </script so LLM-sourced string values cannot break out of the JSON-LD
-  // <script> block on the live page (stored-XSS defence-in-depth).
-  // <!-- has no special meaning inside <script type="application/ld+json"> in HTML5
-  // and <\!-- is not a valid JSON escape, so we don't touch HTML comments.
-  const safeJson = JSON.stringify(schemaJson, null, 2)
-    .replace(/<\/script/gi, '<\\/script');
-  const sourceCode = `<script type="application/ld+json">\n${safeJson}\n</script>`;
+): Promise<SchemaPublishResponse> {
+  const jsonLd = jsonLdOnly(schemaJson);
+  const sourceCode = buildJsonLdInjectionScript(JSON.stringify(schemaJson));
+  if (sourceCode.length > WEBFLOW_INLINE_SCRIPT_LIMIT) {
+    return {
+      success: false,
+      delivery: manualNativeSchemaDelivery(jsonLd, sourceCode.length),
+      error: webflowInlineLimitError(sourceCode.length),
+    };
+  }
   const version = `1.0.${Date.now()}`;
-  const displayName = `${SCHEMA_SCRIPT_PREFIX} (${pageId.slice(0, 8)})`;
+  const displayName = schemaScriptDisplayName(pageId);
 
   const allScripts = await listRegisteredScripts(siteId, tokenOverride);
   const ourPreviousScriptIds = new Set(
     allScripts
-      .filter(s => s.displayName.startsWith(SCHEMA_SCRIPT_PREFIX))
+      .filter(s => LEGACY_SCHEMA_SCRIPT_PREFIXES.some(prefix => s.displayName.startsWith(prefix)))
       .map(s => s.id)
   );
 
   const registered = await registerInlineScript(siteId, sourceCode, displayName, version, tokenOverride);
-  if (!registered) {
-    return { success: false, error: 'Failed to register schema script with Webflow' };
+  if (!registered.data) {
+    const error = registered.error || 'Failed to register schema script with Webflow';
+    if (registered.customCodeApiUnavailable) {
+      return {
+        success: false,
+        delivery: manualNativeSchemaDeliveryForCustomCodeApi(jsonLd, webflowCustomCodeApiUnavailableMessage()),
+        error,
+      };
+    }
+    return {
+      success: false,
+      delivery: failedDelivery(jsonLd, 'webflow-register-failed', error),
+      error,
+    };
   }
 
   const existingBlocks = await getPageCustomCode(pageId, tokenOverride);
   const preserved = existingBlocks.filter(block => !ourPreviousScriptIds.has(block.id));
   const updatedBlocks: PageCustomCodeBlock[] = [
     ...preserved,
-    { id: registered.id, location: 'header', version },
+    { id: registered.data.id, location: 'header', version },
   ];
 
   const applied = await upsertPageCustomCode(pageId, updatedBlocks, tokenOverride);
-  if (!applied) {
-    return { success: false, error: 'Failed to apply schema to page custom code' };
+  if (applied.error) {
+    const error = applied.error || 'Failed to apply schema to page custom code';
+    if (applied.customCodeApiUnavailable) {
+      return {
+        success: false,
+        delivery: manualNativeSchemaDeliveryForCustomCodeApi(jsonLd, webflowCustomCodeApiUnavailableMessage()),
+        error,
+      };
+    }
+    return {
+      success: false,
+      delivery: failedDelivery(jsonLd, 'webflow-apply-failed', error),
+      error,
+    };
   }
 
   log.info(`Published schema to page ${pageId}: ${preserved.length} existing scripts preserved, 1 schema added`);
-  return { success: true };
+  return { success: true, published: true, delivery: publishedDelivery(jsonLd) };
 }
 
 export async function publishRawSchemaToPage(
@@ -263,39 +382,69 @@ export async function publishRawSchemaToPage(
   pageId: string,
   rawJsonLd: string,
   tokenOverride?: string,
-): Promise<{ success: boolean; error?: string }> {
-  const safeRaw = rawJsonLd
-    .replace(/<\/script/gi, '<\\/script');
-  const sourceCode = `<script type="application/ld+json">\n${safeRaw}\n</script>`;
+): Promise<SchemaPublishResponse> {
+  const sourceCode = buildJsonLdInjectionScript(rawJsonLd);
+  if (sourceCode.length > WEBFLOW_INLINE_SCRIPT_LIMIT) {
+    const error = webflowInlineLimitError(sourceCode.length);
+    return {
+      success: false,
+      delivery: failedDelivery(rawJsonLd, 'webflow-inline-script-limit', error),
+      error,
+    };
+  }
   const version = `1.0.${Date.now()}`;
-  const displayName = `${SCHEMA_SCRIPT_PREFIX} (${pageId.slice(0, 8)})`;
+  const displayName = schemaScriptDisplayName(pageId);
 
   const allScripts = await listRegisteredScripts(siteId, tokenOverride);
   const ourPreviousScriptIds = new Set(
     allScripts
-      .filter(s => s.displayName.startsWith(SCHEMA_SCRIPT_PREFIX))
+      .filter(s => LEGACY_SCHEMA_SCRIPT_PREFIXES.some(prefix => s.displayName.startsWith(prefix)))
       .map(s => s.id)
   );
 
   const registered = await registerInlineScript(siteId, sourceCode, displayName, version, tokenOverride);
-  if (!registered) {
-    return { success: false, error: 'Failed to register schema script with Webflow' };
+  if (!registered.data) {
+    const error = registered.error || 'Failed to register schema script with Webflow';
+    if (registered.customCodeApiUnavailable) {
+      return {
+        success: false,
+        delivery: manualNativeSchemaDeliveryForCustomCodeApi(rawJsonLd, webflowCustomCodeApiUnavailableMessage()),
+        error,
+      };
+    }
+    return {
+      success: false,
+      delivery: failedDelivery(rawJsonLd, 'webflow-register-failed', error),
+      error,
+    };
   }
 
   const existingBlocks = await getPageCustomCode(pageId, tokenOverride);
   const preserved = existingBlocks.filter(block => !ourPreviousScriptIds.has(block.id));
   const updatedBlocks: PageCustomCodeBlock[] = [
     ...preserved,
-    { id: registered.id, location: 'header', version },
+    { id: registered.data.id, location: 'header', version },
   ];
 
   const applied = await upsertPageCustomCode(pageId, updatedBlocks, tokenOverride);
-  if (!applied) {
-    return { success: false, error: 'Failed to apply CMS template schema to page custom code' };
+  if (applied.error) {
+    const error = applied.error || 'Failed to apply CMS template schema to page custom code';
+    if (applied.customCodeApiUnavailable) {
+      return {
+        success: false,
+        delivery: manualNativeSchemaDeliveryForCustomCodeApi(rawJsonLd, webflowCustomCodeApiUnavailableMessage()),
+        error,
+      };
+    }
+    return {
+      success: false,
+      delivery: failedDelivery(rawJsonLd, 'webflow-apply-failed', error),
+      error,
+    };
   }
 
   log.info(`Published CMS template schema to page ${pageId}`);
-  return { success: true };
+  return { success: true, published: true, delivery: publishedDelivery(rawJsonLd) };
 }
 
 /**
@@ -309,7 +458,7 @@ export async function retractSchemaFromPage(
   const allScripts = await listRegisteredScripts(siteId, tokenOverride);
   const schemaScriptIds = new Set(
     allScripts
-      .filter(s => s.displayName.startsWith(SCHEMA_SCRIPT_PREFIX))
+      .filter(s => LEGACY_SCHEMA_SCRIPT_PREFIXES.some(prefix => s.displayName.startsWith(prefix)))
       .map(s => s.id),
   );
 
@@ -326,8 +475,8 @@ export async function retractSchemaFromPage(
   }
 
   const applied = await upsertPageCustomCode(pageId, toKeep, tokenOverride);
-  if (!applied) {
-    return { success: false, removed: 0, error: 'Failed to update page custom code' };
+  if (applied.error) {
+    return { success: false, removed: 0, error: applied.error || 'Failed to update page custom code' };
   }
 
   log.info(`Retracted ${removedCount} schema script(s) from page ${pageId}`);
@@ -447,6 +596,98 @@ export function buildStaticPathSet(pages: WebflowPage[]): Set<string> {
     paths.add(path);
   }
   return paths;
+}
+
+interface StaticSitemapPathIndex {
+  pathSet: Set<string>;
+  uniqueLeafPaths: Map<string, string | null>;
+}
+
+function normalizeSitemapPath(path: string): string {
+  const trimmed = path.trim();
+  if (!trimmed || trimmed === '/') return '/';
+  const prefixed = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  return prefixed.replace(/\/+$/, '') || '/';
+}
+
+function sitemapPathLeaf(path: string): string {
+  const normalized = normalizeSitemapPath(path);
+  if (normalized === '/') return '';
+  const parts = normalized.split('/').filter(Boolean);
+  return (parts.at(-1) ?? '').toLowerCase();
+}
+
+function normalizeSitemapPathKey(path: string): string {
+  return normalizeSitemapPath(path).toLowerCase();
+}
+
+function canonicalSitemapHost(hostname: string): string {
+  return hostname.toLowerCase().replace(/^www\./, '');
+}
+
+export function buildStaticSitemapPathIndex(sitemapUrls: string[], baseUrl: string): StaticSitemapPathIndex {
+  const pathSet = new Set<string>();
+  const uniqueLeafPaths = new Map<string, string | null>();
+  let baseHost: string | undefined;
+  try {
+    baseHost = canonicalSitemapHost(new URL(baseUrl).hostname);
+  } catch { baseHost = undefined; } // catch-ok: invalid configured base URL means host filtering is unavailable
+
+  for (const sitemapUrl of sitemapUrls) {
+    try {
+      const parsed = new URL(sitemapUrl, baseUrl);
+      if (baseHost && canonicalSitemapHost(parsed.hostname) !== baseHost) continue;
+      const path = normalizeSitemapPath(parsed.pathname);
+      const pathKey = normalizeSitemapPathKey(path);
+      pathSet.add(pathKey);
+      const leaf = sitemapPathLeaf(path);
+      if (!leaf) continue;
+      const previous = uniqueLeafPaths.get(leaf);
+      if (previous === undefined) {
+        uniqueLeafPaths.set(leaf, pathKey);
+      } else if (previous !== pathKey) {
+        uniqueLeafPaths.set(leaf, null);
+      }
+    } catch { /* malformed sitemap URL — ignore */ } // catch-ok
+  }
+
+  return { pathSet, uniqueLeafPaths };
+}
+
+export function resolveStaticPagePathFromSitemap(
+  page: { slug?: string; publishedPath?: string | null },
+  sitemapIndex: StaticSitemapPathIndex,
+): string {
+  const slug = (page.slug ?? '').trim();
+  const current = normalizeSitemapPath(resolvePagePath(page));
+  const slugLeaf = sitemapPathLeaf(slug || current);
+  if (!slugLeaf || slugLeaf === 'index' || slugLeaf === 'home') return current;
+
+  const sitemapPath = sitemapIndex.uniqueLeafPaths.get(slugLeaf);
+  if (!sitemapPath) return current;
+
+  const currentIsLeafFallback = current.toLowerCase() === `/${slugLeaf}`;
+  const currentMissingFromSitemap = !sitemapIndex.pathSet.has(normalizeSitemapPathKey(current));
+  if ((currentIsLeafFallback || currentMissingFromSitemap) && sitemapPath !== current) {
+    return sitemapPath;
+  }
+
+  return current;
+}
+
+export function resolveStaticPagePathsFromSitemap<T extends { slug?: string; publishedPath?: string | null }>(
+  pages: T[],
+  sitemapUrls: string[],
+  baseUrl: string,
+): T[] {
+  if (pages.length === 0 || sitemapUrls.length === 0) return pages;
+  const sitemapIndex = buildStaticSitemapPathIndex(sitemapUrls, baseUrl);
+  return pages.map(page => {
+    const resolvedPath = resolveStaticPagePathFromSitemap(page, sitemapIndex);
+    const currentPath = normalizeSitemapPath(resolvePagePath(page));
+    if (resolvedPath === currentPath) return page;
+    return { ...page, publishedPath: resolvedPath };
+  });
 }
 
 /**

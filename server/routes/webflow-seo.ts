@@ -98,9 +98,13 @@ router.get('/api/webflow/seo-audit/:siteId', requireWorkspaceAccessFromQuery(), 
       // bridge-audit-auto-resolve.
       fireBridge('bridge-audit-auto-resolve', auditWs.id, async () => {
         const { getInsights: fetchAll, resolveInsight: resolve }: typeof AnalyticsInsightsStore = await import('../analytics-insights-store.js'); // dynamic-import-ok
+        const autoResolvableSources = new Set(['bridge-audit-page-health', 'bridge-audit-site-health']);
         const allInsights = fetchAll(auditWs.id);
         const auditFindings = allInsights.filter(
-          i => i.insightType === 'audit_finding' && i.resolutionStatus !== 'resolved',
+          i => i.insightType === 'audit_finding'
+            && i.resolutionStatus !== 'resolved'
+            && i.bridgeSource != null
+            && autoResolvableSources.has(i.bridgeSource),
         );
         if (auditFindings.length === 0) return { modified: 0 };
 

@@ -57,9 +57,9 @@ export function EmailCaptureGate({
         <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-8 shadow-2xl shadow-black/40" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
           <div className="flex flex-col items-center mb-6">
             <div className="w-12 h-12 rounded-[var(--radius-xl)] bg-teal-500/10 flex items-center justify-center mb-4">
-              <Icon as={Mail} size="xl" className="text-teal-400" />
+              <Icon as={Mail} size="xl" className="text-accent-brand" />
             </div>
-            <h2 className="text-lg font-semibold text-[var(--brand-text-bright)]">Welcome to {ws?.name}</h2>
+            <h2 className="t-h2 text-[var(--brand-text-bright)]">Welcome to {ws?.name}</h2>
             <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1 text-center">
               Enter your email to receive performance reports and important updates about your site.
             </p>

@@ -38,7 +38,7 @@ function ReportDetail({ report }: { report: DiagnosticReport }) {
       <PageHeader
         title={`Deep Diagnostic: ${report.affectedPages[0] ?? report.anomalyType}`}
         subtitle={`Completed ${new Date(report.completedAt ?? report.createdAt).toLocaleDateString()}`}
-        icon={<Activity className="w-5 h-5 text-teal-400" />}
+        icon={<Activity className="w-5 h-5 text-accent-brand" />}
       />
 
       {/* At-a-Glance Strip */}
@@ -52,7 +52,7 @@ function ReportDetail({ report }: { report: DiagnosticReport }) {
       {/* Root Causes */}
       {report.rootCauses.length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold text-[var(--brand-text)] mb-3">Root Causes</h2>
+          <h2 className="t-caption text-[var(--brand-text)] mb-3">Root Causes</h2>
           <div className="space-y-2">
             {report.rootCauses.map((cause) => (
               <RootCauseCard key={cause.rank} cause={cause} />
@@ -64,14 +64,14 @@ function ReportDetail({ report }: { report: DiagnosticReport }) {
       {/* Remediation Plan */}
       {report.remediationActions.length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold text-[var(--brand-text)] mb-3">Remediation Plan</h2>
+          <h2 className="t-caption text-[var(--brand-text)] mb-3">Remediation Plan</h2>
           <RemediationPlan actions={report.remediationActions} />
         </div>
       )}
 
       {/* Raw Evidence */}
       <div>
-        <h2 className="text-sm font-semibold text-[var(--brand-text)] mb-3">Evidence</h2>
+        <h2 className="t-caption text-[var(--brand-text)] mb-3">Evidence</h2>
         <EvidenceAccordion context={ctx} />
       </div>
     </div>
@@ -145,14 +145,14 @@ function DiagnosticReportList({ workspaceId }: { workspaceId: string }) {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Diagnostic Reports" icon={<Activity className="w-5 h-5 text-teal-400" />} />
+      <PageHeader title="Diagnostic Reports" icon={<Activity className="w-5 h-5 text-accent-brand" />} />
       {reports.map((r) => (
         <Link key={r.id} to={`?report=${r.id}`} className="block">
           <SectionCard>
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-medium text-[var(--brand-text-bright)]">{pageLabel(r.affectedPages, r.anomalyType)}</h3>
-                <p className="text-xs text-[var(--brand-text-muted)]">{r.anomalyType} - {new Date(r.createdAt).toLocaleDateString()}</p>
+                <h3 className="t-ui text-[var(--brand-text-bright)]">{pageLabel(r.affectedPages, r.anomalyType)}</h3>
+                <p className="t-caption-sm text-[var(--brand-text-muted)]">{r.anomalyType} - {new Date(r.createdAt).toLocaleDateString()}</p>
               </div>
               <Badge
                 label={r.status}

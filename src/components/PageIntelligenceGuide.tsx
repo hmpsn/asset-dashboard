@@ -12,7 +12,7 @@ const SECTIONS = [
   {
     title: 'How Page Analysis Works',
     icon: Search,
-    color: 'text-teal-400',
+    color: 'text-accent-brand',
     bg: 'bg-teal-500/10 border-teal-500/20',
     description: 'Page Intelligence pulls from three data sources to build a complete picture of each page\'s SEO health.',
     items: [
@@ -34,7 +34,7 @@ const SECTIONS = [
   {
     title: 'Reading Optimization Scores',
     icon: Target,
-    color: 'text-amber-400',
+    color: 'text-accent-warning',
     bg: 'bg-amber-500/10 border-amber-500/20',
     description: 'Each page gets a 0–100 optimization score. The score is a weighted composite of six factors.',
     items: [
@@ -68,7 +68,7 @@ const SECTIONS = [
   {
     title: 'The Pages Tab',
     icon: FileText,
-    color: 'text-sky-400',
+    color: 'text-accent-info',
     bg: 'bg-sky-500/10 border-sky-500/20',
     description: 'The Pages tab lists every page fetched from Webflow — both static pages and CMS collection items.',
     items: [
@@ -98,7 +98,7 @@ const SECTIONS = [
   {
     title: 'The Architecture Tab',
     icon: Network,
-    color: 'text-emerald-400',
+    color: 'text-accent-success',
     bg: 'bg-emerald-500/10 border-emerald-500/20',
     description: 'The Architecture tab visualizes the site\'s internal link structure as a hierarchy.',
     items: [
@@ -128,7 +128,7 @@ const SECTIONS = [
   {
     title: 'Taking Action',
     icon: Pencil,
-    color: 'text-teal-400',
+    color: 'text-accent-brand',
     bg: 'bg-teal-500/10 border-teal-500/20',
     description: 'Every page row has direct action shortcuts. No need to manually navigate between tools.',
     items: [
@@ -154,7 +154,7 @@ const SECTIONS = [
   {
     title: 'Page Intelligence vs. SEO Audit',
     icon: Eye,
-    color: 'text-emerald-400',
+    color: 'text-accent-success',
     bg: 'bg-emerald-500/10 border-emerald-500/20',
     description: 'These two tools answer different questions and complement each other.',
     items: [
@@ -180,9 +180,9 @@ const SECTIONS = [
 ];
 
 const SCORE_THRESHOLDS = [
-  { label: 'Needs work', range: '0–49', color: 'text-red-400', bg: 'bg-red-500/10 border-red-500/20' },
-  { label: 'Improving', range: '50–79', color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' },
-  { label: 'Optimized', range: '80–100', color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' },
+  { label: 'Needs work', range: '0–49', color: 'text-accent-danger', bg: 'bg-red-500/10 border-red-500/20' },
+  { label: 'Improving', range: '50–79', color: 'text-accent-warning', bg: 'bg-amber-500/10 border-amber-500/20' },
+  { label: 'Optimized', range: '80–100', color: 'text-accent-success', bg: 'bg-emerald-500/10 border-emerald-500/20' },
 ];
 
 export function PageIntelligenceGuide() {
@@ -201,7 +201,7 @@ export function PageIntelligenceGuide() {
         {SCORE_THRESHOLDS.map(t => (
           <div key={t.label} className={`flex-1 border px-3 py-2.5 rounded-[var(--radius-signature)] ${t.bg}`}>
             <div className={`text-sm font-bold ${t.color}`}>{t.range}</div>
-            <div className="text-[11px] text-[var(--brand-text)] mt-0.5">{t.label}</div>
+            <div className="t-caption-sm text-[var(--brand-text)] mt-0.5">{t.label}</div>
           </div>
         ))}
       </div>
@@ -233,7 +233,7 @@ export function PageIntelligenceGuide() {
                   </ul>
                   <div className="flex items-start gap-1.5 mt-1 pt-1.5 border-t border-[var(--brand-border)]/30">
                     <Icon as={CheckCircle} size="sm" className="text-[var(--brand-text-dim)] mt-0.5 flex-shrink-0" />
-                    <span className="text-[11px] text-[var(--brand-text-muted)] italic">{section.tip}</span>
+                    <span className="t-caption-sm text-[var(--brand-text-muted)] italic">{section.tip}</span>
                   </div>
                 </div>
               </div>
@@ -246,7 +246,7 @@ export function PageIntelligenceGuide() {
       {/* pr-check-disable-next-line -- brand asymmetric signature on guide section card; intentional non-SectionCard chrome */}
       <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 space-y-3 rounded-[var(--radius-signature-lg)]">
         <div className="flex items-center gap-2">
-          <Icon as={Layers} size="md" className="text-teal-400" />
+          <Icon as={Layers} size="md" className="text-accent-brand" />
           <h3 className="text-sm font-medium text-[var(--brand-text-bright)]">What Gets Analyzed Automatically</h3>
         </div>
         <p className="text-xs text-[var(--brand-text)]">
@@ -264,10 +264,10 @@ export function PageIntelligenceGuide() {
             { label: 'GSC performance signals', desc: 'Clicks + impressions weighting' },
           ].map(f => (
             <div key={f.label} className="flex items-start gap-2 px-3 py-2 bg-[var(--surface-3)]/40 rounded-[var(--radius-lg)]">
-              <Icon as={CheckCircle} size="sm" className="text-teal-500 mt-0.5 flex-shrink-0" />
+              <Icon as={CheckCircle} size="sm" className="text-accent-brand mt-0.5 flex-shrink-0" />
               <div>
-                <div className="text-[11px] font-medium text-[var(--brand-text-bright)]">{f.label}</div>
-                <div className="text-[10px] text-[var(--brand-text-muted)]">{f.desc}</div>
+                <div className="t-caption-sm font-medium text-[var(--brand-text-bright)]">{f.label}</div>
+                <div className="t-micro text-[var(--brand-text-muted)]">{f.desc}</div>
               </div>
             </div>
           ))}
@@ -278,7 +278,7 @@ export function PageIntelligenceGuide() {
       {/* pr-check-disable-next-line -- brand asymmetric signature on guide section card; intentional non-SectionCard chrome */}
       <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 space-y-3 rounded-[var(--radius-signature-lg)]">
         <div className="flex items-center gap-2">
-          <Icon as={TrendingUp} size="md" className="text-amber-400" />
+          <Icon as={TrendingUp} size="md" className="text-accent-warning" />
           <h3 className="text-sm font-medium text-[var(--brand-text-bright)]">Recommended Optimization Workflow</h3>
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -292,8 +292,8 @@ export function PageIntelligenceGuide() {
             'Move to next priority page',
             'Check Architecture tab for orphaned pages',
           ].map((step, i) => (
-            <div key={i} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--surface-3)]/50 rounded-[var(--radius-lg)] text-[11px] text-[var(--brand-text)]">
-              <span className="text-amber-400 font-bold">{i + 1}.</span>
+            <div key={i} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--surface-3)]/50 rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text)]">
+              <span className="text-accent-warning font-bold">{i + 1}.</span>
               {step}
             </div>
           ))}
@@ -304,7 +304,7 @@ export function PageIntelligenceGuide() {
       {/* pr-check-disable-next-line -- brand asymmetric signature on guide section card; intentional non-SectionCard chrome */}
       <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5 space-y-3 rounded-[var(--radius-signature-lg)]">
         <div className="flex items-center gap-2">
-          <Icon as={AlertTriangle} size="md" className="text-sky-400" />
+          <Icon as={AlertTriangle} size="md" className="text-accent-info" />
           <h3 className="text-sm font-medium text-[var(--brand-text-bright)]">Score Limitations to Know</h3>
         </div>
         <div className="space-y-2 text-xs text-[var(--brand-text)]">
@@ -328,7 +328,7 @@ export function PageIntelligenceGuide() {
               },
             ].map((item, i) => (
               <li key={i} className="flex items-start gap-2">
-                <Icon as={BarChart3} size="sm" className="text-sky-400 mt-0.5 flex-shrink-0" />
+                <Icon as={BarChart3} size="sm" className="text-accent-info mt-0.5 flex-shrink-0" />
                 <span>
                   <strong className="text-[var(--brand-text-bright)]">{item.label}</strong>
                   {' — '}

@@ -13,9 +13,24 @@ export interface ServiceInput {
   offers?: Array<{ name?: string; price: string; priceCurrency: string; description?: string }>;
 }
 
+function isOpaqueIdentifier(value: string): boolean {
+  const trimmed = value.trim();
+  return /^[a-f0-9]{24}$/i.test(trimmed) || /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed);
+}
+
+function safeText(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const cleaned = value.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, ' ').trim();
+  if (!cleaned || isOpaqueIdentifier(cleaned)) return undefined;
+  return cleaned;
+}
+
 export function buildServiceSchema(input: ServiceInput): Record<string, unknown> {
   const { pageData, baseUrl } = input;
   const serviceId = `${pageData.canonicalUrl}#service`;
+  const safeAreaServed = safeText(pageData.areaServed);
+  const serviceName = safeText(pageData.serviceName) || pageData.cleanTitle;
+  const offers = (input.offers ?? pageData.offers ?? []).filter(offer => safeText(offer.price) && safeText(offer.priceCurrency));
 
   // PR2: AggregateRating from testimonials WITH ratings
   // Filter must match the Review[] emission gate below — both require author + rating.
@@ -48,7 +63,7 @@ export function buildServiceSchema(input: ServiceInput): Record<string, unknown>
   const primary = dropUndefined({
     '@type': 'Service',
     '@id': serviceId,
-    'name': pageData.cleanTitle,
+    'name': serviceName,
     'description': pageData.description,
     'image': pageData.image,
     'url': pageData.canonicalUrl,
@@ -61,8 +76,19 @@ export function buildServiceSchema(input: ServiceInput): Record<string, unknown>
         }),
     'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
     'inLanguage': pageData.inLanguage,
-    'areaServed': pageData.areaServed ? { '@type': 'Place' as const, name: pageData.areaServed } : undefined,
+    'areaServed': safeAreaServed ? { '@type': 'Place' as const, name: safeAreaServed } : undefined,
     'serviceType': pageData.serviceType,
+    'offers': offers.length > 0
+      ? offers.map((offer, idx) => dropUndefined({
+          '@type': 'Offer' as const,
+          '@id': `${pageData.canonicalUrl}#offer-${idx}`,
+          'name': safeText(offer.name) || serviceName,
+          'price': safeText(offer.price),
+          'priceCurrency': safeText(offer.priceCurrency),
+          'description': safeText(offer.description),
+          'url': pageData.canonicalUrl,
+        }))
+      : undefined,
     'aggregateRating': aggregateRating,
     'mainEntity': tableMainEntity,
   });
@@ -140,7 +166,6 @@ export function buildProductSchema(input: ServiceInput): Record<string, unknown>
           'priceCurrency': offer.priceCurrency,
           'description': offer.description,
           'url': pageData.canonicalUrl,
-          'availability': 'https://schema.org/InStock',
         }))
       : undefined,
     'isPartOf': webSiteRef(baseUrl),

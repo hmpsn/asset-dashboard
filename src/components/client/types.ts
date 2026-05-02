@@ -110,9 +110,9 @@ export interface ClientKeywordStrategy {
 }
 
 export const SEV = {
-  error: { bg: 'bg-red-500/10', border: 'border-red-500/20', text: 'text-red-400' },
-  warning: { bg: 'bg-amber-500/10', border: 'border-amber-500/20', text: 'text-amber-400' },
-  info: { bg: 'bg-blue-500/10', border: 'border-blue-500/20', text: 'text-blue-400' },
+  error: { bg: 'bg-red-500/10', border: 'border-red-500/20', text: 'text-accent-danger' },
+  warning: { bg: 'bg-amber-500/10', border: 'border-amber-500/20', text: 'text-accent-warning' },
+  info: { bg: 'bg-blue-500/10', border: 'border-blue-500/20', text: 'text-accent-info' },
 } as const;
 
 export const CAT_LABELS: Record<string, { label: string; color: string }> = {

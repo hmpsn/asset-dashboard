@@ -76,6 +76,7 @@ import type { Job } from './jobs.js';
 import type { SchemaValidation } from './schema-validator.js';
 import type { SiteNode } from './site-architecture.js';
 import type { PageSeoResult, SeoIssue } from './audit-page.js';
+import type { CwvSummary } from './seo-audit.js';
 
 const log = createLogger('workspace-intelligence');
 
@@ -131,7 +132,7 @@ const INTELLIGENCE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 const ALL_SLICES: IntelligenceSlice[] = [
   'seoContext', 'insights', 'learnings', 'pageProfile', 'pageElements',
-  'contentPipeline', 'siteHealth', 'clientSignals', 'operational',
+  'siteInventory', 'contentPipeline', 'siteHealth', 'clientSignals', 'operational',
 ];
 
 export async function buildWorkspaceIntelligence(
@@ -234,7 +235,33 @@ async function assembleSlice(
       if (!opts?.pagePath) break; // pageElements is per-page; no-op without pagePath
       result.pageElements = await assemblePageElements(workspaceId, opts.pagePath);
       break;
+    case 'siteInventory':
+      if (!opts?.siteId || !opts.siteBaseUrl) break;
+      result.siteInventory = await assembleSiteInventory(workspaceId, opts.siteId, opts.siteBaseUrl, opts.webflowToken);
+      break;
   }
+}
+
+async function assembleSiteInventory(
+  workspaceId: string,
+  siteId: string,
+  baseUrl: string,
+  tokenOverride?: string,
+) {
+  const [{ buildSiteInventory }, { getWorkspacePages }, { getWorkspace }] = await Promise.all([
+    import('./schema/site-inventory.js'),
+    import('./workspace-data.js'),
+    import('./workspaces.js'),
+  ]);
+  const pages = await getWorkspacePages(workspaceId, siteId);
+  const workspace = getWorkspace(workspaceId);
+  return buildSiteInventory({
+    siteId,
+    baseUrl,
+    pages,
+    tokenOverride,
+    businessProfile: workspace?.businessProfile ?? null,
+  });
 }
 
 async function assembleSeoContext(
@@ -870,6 +897,7 @@ async function assembleSiteHealth(
   let anomalyCount = 0;
   let anomalyTypes: string[] = [];
   let seoChangeVelocity = 0;
+  let latestAuditCwvSummary: CwvSummary | undefined;
 
   // ── Audit snapshot (reports.ts) ──────────────────────────────────────
   if (siteId) {
@@ -878,6 +906,7 @@ async function assembleSiteHealth(
       const latest = getLatestSnapshot(siteId);
       if (latest) {
         auditScore = latest.audit.siteScore ?? null;
+        latestAuditCwvSummary = latest.audit.cwvSummary;
         // Delta: compare with previous snapshot
         const summaries = listSnapshots(siteId);
         if (summaries.length >= 2) {
@@ -942,6 +971,12 @@ async function assembleSiteHealth(
       log.debug({ workspaceId, err }, 'siteHealth: pagespeed failed — skipping');
     }
   }
+
+  // Desktop CWV currently comes from the homepage/site-level audit summary until
+  // PageSpeed snapshots are keyed by siteId + strategy.
+  const desktopAssessment = latestAuditCwvSummary?.desktop?.assessment;
+  if (desktopAssessment === 'good') cwvPassRate.desktop = 1;
+  else if (desktopAssessment === 'needs-improvement' || desktopAssessment === 'poor') cwvPassRate.desktop = 0;
 
   // ── Redirect chains (redirect-store.ts) ─────────────────────────────
   if (siteId) {

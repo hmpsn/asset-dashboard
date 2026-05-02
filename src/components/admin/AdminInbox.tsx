@@ -4,7 +4,7 @@
  * Color rules (Four Laws of Color):
  *   - Teal: action buttons, status badges for active signals
  *   - Blue: data counts
- *   - No purple (admin AI only, not here)
+ *   - Brand accent: AI/status emphasis when needed
  *   - Status: amber=new, teal=reviewed, zinc=actioned
  */
 import { useState } from 'react';
@@ -27,8 +27,8 @@ const STATUS_LABELS: Record<ClientSignalStatus, string> = {
 };
 
 const STATUS_COLORS: Record<ClientSignalStatus, string> = {
-  new: 'bg-amber-500/10 text-amber-400/80 border-amber-500/20',
-  reviewed: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
+  new: 'bg-amber-500/10 text-accent-warning border-amber-500/20',
+  reviewed: 'bg-teal-500/10 text-accent-brand border-teal-500/20',
   actioned: 'bg-[var(--surface-3)] text-[var(--brand-text-muted)] border-[var(--brand-border)]',
 };
 
@@ -53,14 +53,14 @@ function SignalCard({ signal, workspaceId }: { signal: ClientSignal; workspaceId
         onClick={() => setExpanded(p => !p)}
       >
         <div className="w-6 h-6 rounded-[var(--radius-lg)] bg-teal-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-          <Icon as={MessageSquare} size="sm" className="text-teal-400" />
+          <Icon as={MessageSquare} size="sm" className="text-accent-brand" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="t-caption font-medium text-[var(--brand-text-bright)]">
               {TYPE_LABELS[signal.type] ?? signal.type}
             </span>
-            <span className={`t-caption-sm font-semibold px-1.5 py-0.5 rounded-full border ${STATUS_COLORS[signal.status]}`}>
+            <span className={`t-caption-sm font-semibold px-1.5 py-0.5 rounded-[var(--radius-pill)] border ${STATUS_COLORS[signal.status]}`}>
               {STATUS_LABELS[signal.status]}
             </span>
           </div>
@@ -116,10 +116,10 @@ function SignalCard({ signal, workspaceId }: { signal: ClientSignal; workspaceId
                 onClick={() => handleStatus(s)}
                 disabled={signal.status === s || updateStatus.isPending}
                 className={cn(
-                  't-caption-sm px-2 py-1 rounded-md border transition-colors disabled:opacity-40',
+                  't-caption-sm px-2 py-1 rounded-[var(--radius-md)] border transition-colors disabled:opacity-40',
                   signal.status === s
                     ? STATUS_COLORS[s]
-                    : 'border-[var(--brand-border-hover)] text-[var(--brand-text)] hover:border-teal-500/40 hover:text-teal-400'
+                    : 'border-[var(--brand-border-hover)] text-[var(--brand-text)] hover:border-teal-500/40 hover:text-accent-brand'
                 )}
               >
                 {STATUS_LABELS[s]}
@@ -143,7 +143,7 @@ export function AdminInbox({ workspaceId }: AdminInboxProps) {
   const titleIcon = <Icon as={Inbox} size="md" className="text-[var(--brand-text-muted)]" />;
 
   const newBadge = newSignals.length > 0 ? (
-    <span className="t-caption-sm font-bold px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400/80 border border-amber-500/20">
+    <span className="t-caption-sm font-bold px-1.5 py-0.5 rounded-[var(--radius-pill)] bg-amber-500/10 text-accent-warning border border-amber-500/20">
       {newSignals.length} new
     </span>
   ) : undefined;
@@ -173,7 +173,7 @@ export function AdminInbox({ workspaceId }: AdminInboxProps) {
             className={cn(
               'px-3 py-1 rounded-[var(--radius-lg)] t-caption font-medium transition-colors',
               activeTab === tab
-                ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20'
+                ? 'bg-teal-500/10 text-accent-brand border border-teal-500/20'
                 : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] border border-transparent'
             )}
           >

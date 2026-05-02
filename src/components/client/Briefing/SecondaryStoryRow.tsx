@@ -24,11 +24,11 @@ interface CategoryVisual {
 }
 
 const CATEGORY_VISUALS: Record<BriefingCategory, CategoryVisual> = {
-  win: { Icon: Star, colorClass: 'text-emerald-400' },
-  risk: { Icon: AlertTriangle, colorClass: 'text-amber-400' },
-  opportunity: { Icon: Lightbulb, colorClass: 'text-blue-400' },
-  competitive: { Icon: Search, colorClass: 'text-teal-400' },
-  period_change: { Icon: TrendingUp, colorClass: 'text-blue-400' },
+  win: { Icon: Star, colorClass: 'text-accent-success' },
+  risk: { Icon: AlertTriangle, colorClass: 'text-accent-warning' },
+  opportunity: { Icon: Lightbulb, colorClass: 'text-accent-info' },
+  competitive: { Icon: Search, colorClass: 'text-accent-brand' },
+  period_change: { Icon: TrendingUp, colorClass: 'text-accent-info' },
 };
 
 /**

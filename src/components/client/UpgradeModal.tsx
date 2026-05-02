@@ -16,8 +16,8 @@ export function UpgradeModal({ workspaceId, onClose, onError }: Props) {
       <Modal.Header title="SEO Strategy — Premium Feature" onClose={onClose} />
       <Modal.Body>
         <div className="text-center">
-          <div className="w-14 h-14 rounded-full bg-teal-500/10 border border-teal-500/20 flex items-center justify-center mx-auto mb-4">
-            <Icon as={Sparkles} size="2xl" className="text-teal-400" />
+          <div className="w-14 h-14 rounded-[var(--radius-pill)] bg-teal-500/10 border border-teal-500/20 flex items-center justify-center mx-auto mb-4">
+            <Icon as={Sparkles} size="2xl" className="text-accent-brand" />
           </div>
           <p className="t-body text-[var(--brand-text)] leading-relaxed mb-6">
             Unlock your full keyword strategy with page-level keyword targets, competitor gap analysis, and growth opportunities tailored to your business.
@@ -25,7 +25,7 @@ export function UpgradeModal({ workspaceId, onClose, onError }: Props) {
           <div className="space-y-2 text-left mb-6">
             {['Target keywords mapped to every page', 'Competitor keyword gap analysis', 'Content opportunity recommendations', `Ongoing strategy refinement by ${STUDIO_NAME}`].map(f => (
               <div key={f} className="flex items-center gap-2 t-caption text-[var(--brand-text)]">
-                <Icon as={CheckCircle2} size="sm" className="text-teal-400 flex-shrink-0" />
+                <Icon as={CheckCircle2} size="sm" className="text-accent-brand flex-shrink-0" />
                 {f}
               </div>
             ))}

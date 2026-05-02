@@ -181,7 +181,7 @@ export function InboxTab({
         <div className="flex items-center gap-3 mb-4">
           <Icon as={Inbox} size="lg" className="text-accent-brand" />
           <div>
-            <h2 className="text-xl font-semibold text-[var(--brand-text)]">Inbox</h2>
+            <h2 className="t-h2 text-[var(--brand-text)]">Inbox</h2>
             <p className="t-body text-[var(--brand-text-muted)] mt-0.5">{betaMode ? 'SEO changes and requests — all in one place.' : 'SEO changes, requests, and content — all in one place.'}</p>
           </div>
         </div>
@@ -199,7 +199,7 @@ export function InboxTab({
               <f.icon className="w-3.5 h-3.5" />
               {f.label}
               {f.count && f.count > 0 && (
-                <span className="px-1.5 py-0.5 t-caption-sm font-bold rounded-full bg-teal-500/20 text-accent-brand">{f.count}</span>
+                <span className="px-1.5 py-0.5 t-caption-sm font-bold rounded-[var(--radius-pill)] bg-teal-500/20 text-accent-brand">{f.count}</span>
               )}
             </button>
           ))}
@@ -288,8 +288,8 @@ export function InboxTab({
             <div className="flex items-center gap-2 mb-3">
               <Icon as={ClipboardCheck} size="md" className="text-accent-brand" />
               <span className="t-body font-medium text-[var(--brand-text)]">SEO Changes</span>
-              {pendingApprovals > 0 && <span className="t-caption-sm px-1.5 py-0.5 rounded-full bg-amber-500/15 text-accent-warning border border-amber-500/20">Waiting on you · {pendingApprovals}</span>}
-              {pendingApprovals === 0 && approvalBatches.length > 0 && <span className="t-caption-sm px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-accent-success border border-emerald-500/20">All reviewed</span>}
+              {pendingApprovals > 0 && <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-pill)] bg-amber-500/15 text-accent-warning border border-amber-500/20">Waiting on you · {pendingApprovals}</span>}
+              {pendingApprovals === 0 && approvalBatches.length > 0 && <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-pill)] bg-emerald-500/10 text-accent-success border border-emerald-500/20">All reviewed</span>}
             </div>
           )}
           <ApprovalsTab
@@ -315,8 +315,8 @@ export function InboxTab({
               <span className="t-body font-medium text-[var(--brand-text)]">Requests</span>
               {(() => {
                 const awaitingReply = requests.filter(r => r.notes.length > 0 && r.notes[r.notes.length - 1].author === 'team' && r.status !== 'completed' && r.status !== 'closed').length;
-                if (awaitingReply > 0) return <span className="t-caption-sm px-1.5 py-0.5 rounded-full bg-amber-500/15 text-accent-warning border border-amber-500/20">Team replied · {awaitingReply}</span>;
-                if (pendingRequests > 0) return <span className="t-caption-sm px-1.5 py-0.5 rounded-full bg-blue-500/10 text-accent-info border border-blue-500/20">In progress · {pendingRequests}</span>;
+                if (awaitingReply > 0) return <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-pill)] bg-amber-500/15 text-accent-warning border border-amber-500/20">Team replied · {awaitingReply}</span>;
+                if (pendingRequests > 0) return <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-pill)] bg-blue-500/10 text-accent-info border border-blue-500/20">In progress · {pendingRequests}</span>;
                 return null;
               })()}
             </div>
@@ -352,7 +352,7 @@ export function InboxTab({
             <div className="flex items-center gap-2 mb-3 mt-2">
               <Icon as={Layers} size="md" className="text-accent-brand" />
               <span className="t-body font-medium text-[var(--brand-text)]">Content Plan</span>
-              <span className="t-caption-sm px-1.5 py-0.5 rounded-full bg-teal-500/10 text-accent-brand border border-teal-500/20">{planReviewCount} needs review</span>
+              <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-pill)] bg-teal-500/10 text-accent-brand border border-teal-500/20">{planReviewCount} needs review</span>
             </div>
           )}
           <div className="space-y-2">
@@ -439,8 +439,8 @@ export function InboxTab({
             <div className="flex items-center gap-2 mb-3 mt-2">
               <Icon as={FileText} size="md" className="text-accent-brand" />
               <span className="t-body font-medium text-[var(--brand-text)]">Content</span>
-              {contentReviews > 0 && <span className="t-caption-sm px-1.5 py-0.5 rounded-full bg-amber-500/15 text-accent-warning border border-amber-500/20">Waiting on you · {contentReviews}</span>}
-              {contentReviews === 0 && contentRequests.filter(r => r.status === 'in_progress' || r.status === 'approved').length > 0 && <span className="t-caption-sm px-1.5 py-0.5 rounded-full bg-blue-500/10 text-accent-info border border-blue-500/20">In progress</span>}
+              {contentReviews > 0 && <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-pill)] bg-amber-500/15 text-accent-warning border border-amber-500/20">Waiting on you · {contentReviews}</span>}
+              {contentReviews === 0 && contentRequests.filter(r => r.status === 'in_progress' || r.status === 'approved').length > 0 && <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-pill)] bg-blue-500/10 text-accent-info border border-blue-500/20">In progress</span>}
             </div>
           )}
           <ContentTab

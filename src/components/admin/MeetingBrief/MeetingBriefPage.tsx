@@ -54,7 +54,7 @@ export function MeetingBriefPage({ workspaceId }: Props) {
           action={
             <button
               onClick={() => refetch()}
-              className="mt-4 px-4 py-2 text-sm font-medium rounded-[var(--radius-lg)] bg-[var(--surface-3)] text-[var(--brand-text)] hover:bg-[var(--brand-border)] transition-colors"
+              className="mt-4 px-4 py-2 t-ui rounded-[var(--radius-lg)] bg-[var(--surface-3)] text-[var(--brand-text)] hover:bg-[var(--brand-border)] transition-colors"
             >
               Retry
             </button>
@@ -75,20 +75,20 @@ export function MeetingBriefPage({ workspaceId }: Props) {
             <button
               onClick={() => generate()}
               disabled={isGenerating}
-              className="mt-4 px-4 py-2 text-sm font-medium rounded-[var(--radius-lg)] bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="mt-4 px-4 py-2 t-ui rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isGenerating ? 'Generating\u2026' : 'Generate First Brief'}
             </button>
           }
         />
         {generateError && (
-          <p className="text-xs text-red-400 text-center mt-3">
+          <p className="t-caption-sm text-accent-danger text-center mt-3">
             Generation failed. Please try again.
           </p>
         )}
         {isGenerating && (
           <div className="mt-6">
-            <p className="text-xs text-[var(--brand-text-muted)] text-center mb-4">Analyzing site performance\u2026</p>
+            <p className="t-caption-sm text-[var(--brand-text-muted)] text-center mb-4">Analyzing site performance\u2026</p>
             <BriefSkeleton />
           </div>
         )}
@@ -105,14 +105,14 @@ export function MeetingBriefPage({ workspaceId }: Props) {
       />
 
       {generateError && (
-        <p className="text-xs text-red-400 text-center mb-4">
+        <p className="t-caption-sm text-accent-danger text-center mb-4">
           Generation failed. Please try again.
         </p>
       )}
 
       {isGenerating && (
         <SectionCard className="mb-6">
-          <p className="text-xs text-[var(--brand-text-muted)] text-center mb-4">Analyzing site performance\u2026</p>
+          <p className="t-caption-sm text-[var(--brand-text-muted)] text-center mb-4">Analyzing site performance\u2026</p>
           <BriefSkeleton />
         </SectionCard>
       )}
@@ -121,7 +121,7 @@ export function MeetingBriefPage({ workspaceId }: Props) {
         <ErrorBoundary>
           <SectionCard>
             <div className="mb-6">
-              <p className="text-sm text-[var(--brand-text-bright)] leading-relaxed">{brief.situationSummary}</p>
+              <p className="t-caption-sm text-[var(--brand-text-bright)] leading-relaxed">{brief.situationSummary}</p>
             </div>
             <AtAGlanceStrip metrics={brief.metrics} />
             <BriefSection title="Wins Since Last Review" items={brief.wins} />

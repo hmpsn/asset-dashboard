@@ -138,7 +138,7 @@ function SpreadItemRow({ item }: SpreadItemRowProps): ReactNode {
     <Icon
       as={item.tone === 'win' ? TrendingUp : TrendingDown}
       size="sm"
-      className={item.tone === 'win' ? 'text-emerald-400' : 'text-amber-400'}
+      className={item.tone === 'win' ? 'text-accent-success' : 'text-accent-warning'}
       aria-hidden="true"
     />
   );

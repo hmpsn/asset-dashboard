@@ -14,7 +14,7 @@ function DarkTooltip({ active, payload, label, metrics }: { active?: boolean; pa
       <div className="px-3 py-1.5 space-y-1">
         {metrics.map(m => (
           <div key={m.key} className="flex justify-between t-caption-sm">
-            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: m.color }} />{m.label}</span>
+            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-[var(--radius-pill)] inline-block" style={{ backgroundColor: m.color }} />{m.label}</span>
             <span className="text-[var(--brand-text-bright)] font-medium">{m.fmt ? m.fmt(row[m.key]) : (typeof row[m.key] === 'number' ? row[m.key].toLocaleString() : row[m.key])}</span>
           </div>
         ))}
@@ -53,8 +53,8 @@ export function DualTrendChart({ data, annotations: anns }: { data: PerformanceT
   return (
     <div>
       <div className="flex items-center gap-4 mb-2">
-        <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded bg-blue-400" /><span className="t-caption-sm text-blue-400">Clicks</span></div>
-        <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded bg-teal-400" /><span className="t-caption-sm text-teal-400">Impressions</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded bg-blue-400" /><span className="t-caption-sm text-accent-info">Clicks</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded bg-teal-400" /><span className="t-caption-sm text-accent-brand">Impressions</span></div>
       </div>
       <ResponsiveContainer width="100%" height={120}>
         <AreaChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
@@ -120,7 +120,7 @@ export function ScoreHistoryChart({ history }: { history: Array<{ id: string; cr
                 <div className="px-3 py-1.5 border-b border-[var(--brand-border)] t-caption-sm font-semibold text-[var(--brand-text-bright)]">{row.dateFull}</div>
                 <div className="px-3 py-1.5">
                   <div className="flex justify-between t-caption-sm">
-                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: sc }} />Score</span>
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-[var(--radius-pill)] inline-block" style={{ backgroundColor: sc }} />Score</span>
                     <span className="text-[var(--brand-text-bright)] font-medium">{score}/100</span>
                   </div>
                 </div>
@@ -299,9 +299,9 @@ export function InsightCard({ icon: Icon, color, title, count, desc, items }: {
   items: Array<{ label: string; value: string; sub: string }>;
 }) {
   const colorMap: Record<string, { text: string }> = {
-    amber: { text: 'text-amber-400' }, emerald: { text: 'text-emerald-400' },
-    teal: { text: 'text-teal-400' }, blue: { text: 'text-blue-400' },
-    red: { text: 'text-red-400' }, orange: { text: 'text-orange-400' },
+    amber: { text: 'text-accent-warning' }, emerald: { text: 'text-accent-success' },
+    teal: { text: 'text-accent-brand' }, blue: { text: 'text-accent-info' },
+    red: { text: 'text-accent-danger' }, orange: { text: 'text-accent-orange' },
   };
   const c = colorMap[color] || colorMap.amber;
   // pr-check-disable-next-line -- InsightCard uses brand signature radius as a standalone card surface

@@ -62,7 +62,7 @@ export function BriefingReviewQueue({ workspaceId }: BriefingReviewQueueProps) {
     <button
       onClick={() => genM.mutate()}
       disabled={genM.isPending}
-      className="t-caption px-3 py-1.5 rounded-[var(--radius-md)] bg-teal-600/10 text-teal-400 hover:bg-teal-600/20 border border-teal-600/30 inline-flex items-center gap-1.5 disabled:opacity-50 transition-colors"
+      className="t-caption px-3 py-1.5 rounded-[var(--radius-md)] bg-teal-600/10 text-accent-brand hover:bg-teal-600/20 border border-teal-600/30 inline-flex items-center gap-1.5 disabled:opacity-50 transition-colors"
     >
       <Icon as={RefreshCw} size="sm" />
       Generate now
@@ -71,7 +71,7 @@ export function BriefingReviewQueue({ workspaceId }: BriefingReviewQueueProps) {
 
   if (isLoading) {
     return (
-      <SectionCard title="Weekly Briefings" titleIcon={<Icon as={Sparkles} size="md" className="text-teal-400" />} action={generateNowAction}>
+      <SectionCard title="Weekly Briefings" titleIcon={<Icon as={Sparkles} size="md" className="text-accent-brand" />} action={generateNowAction}>
         <LoadingState message="Loading briefings..." />
       </SectionCard>
     );
@@ -79,7 +79,7 @@ export function BriefingReviewQueue({ workspaceId }: BriefingReviewQueueProps) {
 
   if (isError) {
     return (
-      <SectionCard title="Weekly Briefings" titleIcon={<Icon as={Sparkles} size="md" className="text-teal-400" />} action={generateNowAction}>
+      <SectionCard title="Weekly Briefings" titleIcon={<Icon as={Sparkles} size="md" className="text-accent-brand" />} action={generateNowAction}>
         <ErrorState
           title="Couldn't load briefings"
           message={error instanceof Error ? error.message : 'Try refetching, or check the server logs if the issue persists.'}
@@ -90,7 +90,7 @@ export function BriefingReviewQueue({ workspaceId }: BriefingReviewQueueProps) {
   }
 
   return (
-    <SectionCard title="Weekly Briefings" titleIcon={<Icon as={Sparkles} size="md" className="text-teal-400" />} action={generateNowAction}>
+    <SectionCard title="Weekly Briefings" titleIcon={<Icon as={Sparkles} size="md" className="text-accent-brand" />} action={generateNowAction}>
       {drafts.length === 0 ? (
         <EmptyState
           icon={FileText}
@@ -134,7 +134,7 @@ export function BriefingReviewQueue({ workspaceId }: BriefingReviewQueueProps) {
                         <div className="flex items-center gap-2 flex-wrap">
                           <Badge label={cat.label} color={cat.color} />
                           {s.isHeadline && (
-                            <Icon as={Star} size="sm" className="text-teal-400" aria-label="Headline story" />
+                            <Icon as={Star} size="sm" className="text-accent-brand" aria-label="Headline story" />
                           )}
                         </div>
                         <div className="t-body text-[var(--brand-text-bright)] font-medium">{s.headline}</div>
@@ -149,7 +149,7 @@ export function BriefingReviewQueue({ workspaceId }: BriefingReviewQueueProps) {
                           <button
                             onClick={() => approveM.mutate({ draftId: d.id })}
                             disabled={approveM.isPending}
-                            className="t-caption px-3 py-1.5 rounded-[var(--radius-md)] bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 inline-flex items-center gap-1.5 disabled:opacity-50 transition-colors"
+                            className="t-caption px-3 py-1.5 rounded-[var(--radius-md)] bg-emerald-500/10 text-accent-success hover:bg-emerald-500/20 border border-emerald-500/20 inline-flex items-center gap-1.5 disabled:opacity-50 transition-colors"
                           >
                             <Icon as={Check} size="sm" />
                             Approve
@@ -158,7 +158,7 @@ export function BriefingReviewQueue({ workspaceId }: BriefingReviewQueueProps) {
                         <button
                           onClick={() => publishM.mutate({ draftId: d.id })}
                           disabled={publishM.isPending}
-                          className="t-caption px-3 py-1.5 rounded-[var(--radius-md)] bg-teal-600/15 text-teal-400 hover:bg-teal-600/25 border border-teal-600/30 inline-flex items-center gap-1.5 disabled:opacity-50 transition-colors"
+                          className="t-caption px-3 py-1.5 rounded-[var(--radius-md)] bg-teal-600/15 text-accent-brand hover:bg-teal-600/25 border border-teal-600/30 inline-flex items-center gap-1.5 disabled:opacity-50 transition-colors"
                         >
                           <Icon as={Send} size="sm" />
                           Publish

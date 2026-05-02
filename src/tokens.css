@@ -18,23 +18,29 @@
   --surface-1: #0f1219;        /* Page / app background */
   --surface-2: #18181b;        /* Card surfaces */
   --surface-3: #27272a;        /* Elevated / inner panels */
+  --surface-active: #3f3f46;   /* Pressed / strong hover surfaces */
 
   /* ─── Text ─── */
   --brand-text: #a1a1aa;
   --brand-text-bright: #e4e4e7;
-  --brand-text-muted: #71717a; /* zinc-500 — one step dimmer than body text (#a1a1aa zinc-400) */
-  --brand-text-dim: #52525b;
+  --brand-text-muted: #8b8b94; /* readable captions/labels on dark surfaces */
+  --brand-text-dim: #71717a;
+  --brand-text-faint: #71717a;
+  --brand-text-disabled: #3f3f46;
 
   /* ─── Brand colors ─── */
   --brand-bg: #0f1219;
   --brand-bg-surface: #18181b;
   --brand-bg-elevated: #18181b;
   --brand-bg-card: #27272a;
+  --brand-bg-hover: #27272a;
+  --brand-bg-active: #3f3f46;
 
   --brand-mint: #2dd4bf;
   --brand-mint-hover: #5eead4;
   --brand-mint-dim: rgba(45, 212, 191, 0.1);
   --brand-mint-glow: rgba(45, 212, 191, 0.18);
+  --button-primary-text: #0a1f1b;
 
   --brand-yellow: #ffb600;
   --brand-yellow-dim: rgba(255, 182, 0, 0.1);
@@ -42,6 +48,16 @@
   /* ─── Border ─── */
   --brand-border: #27272a;
   --brand-border-hover: #3f3f46;
+  --brand-border-strong: #52525b;
+
+  /* ─── Shadows / overlays ─── */
+  --brand-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.22);
+  --brand-shadow-md: 0 4px 18px rgba(0, 0, 0, 0.32);
+  --brand-overlay: rgba(0, 0, 0, 0.62);
+
+  /* ─── Scrollbar ─── */
+  --scrollbar-thumb: rgba(165, 186, 201, 0.15);
+  --scrollbar-thumb-hover: rgba(165, 186, 201, 0.24);
 
   /* ─── Border-radius ─── */
   /* Values match public/styleguide.css (4/8/10/12px), which wins over the old
@@ -92,6 +108,8 @@
   --blue-ghost: rgba(96, 165, 250, 0.08); /* 0.08 = subtle info tint (was 0.4 in legacy styleguide — reduced for dark bg legibility) */
   --chart-grid: #27272a;
   --chart-axis: #71717a;
+  --chart-tooltip-bg: #18181b;
+  --chart-tooltip-text: #f4f4f5;
   --chart-area-top: 0.18;
   --chart-area-bot: 0;
   --chart-stroke-width: 1.5;
@@ -127,12 +145,14 @@
   --surface-1: #f8fafc;
   --surface-2: #ffffff;
   --surface-3: #f1f5f9;
+  --surface-active: #dde4ee;
 
   /* Text */
   --brand-text: #334155;
   --brand-text-bright: #0f172a;
   --brand-text-muted: #475569;
   --brand-text-dim: #64748b;
+  --brand-text-faint: #94a3b8;
   --brand-text-disabled: #94a3b8;
 
   /* Brand backgrounds */
@@ -147,6 +167,7 @@
   --brand-mint: #0d9488;
   --brand-mint-hover: #0f766e;
   --brand-mint-dim: rgba(13, 148, 136, 0.08);
+  --button-primary-text: #ffffff;
 
   /* Border */
   --brand-border: rgba(148, 163, 184, 0.2);
@@ -182,7 +203,7 @@
   --zinc-950: #f8fafc;
 
   /* Accent hues (light mode — darker for WCAG contrast) */
-  --teal: #0d9488;
+  --teal: #0f766e;
   --blue: #2563eb;
   --emerald: #047857;
   --purple: #7c3aed;

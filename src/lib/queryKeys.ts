@@ -52,6 +52,7 @@ export const queryKeys = {
     auditSchedule: (wsId: string) => ['admin-audit-schedule', wsId] as const,
     schemaSnapshot: (siteId: string) => ['admin-schema-snapshot', siteId] as const,
     schemaValidations: (siteId: string) => ['admin-schema-validations', siteId] as const,
+    schemaCmsFieldMappings: (siteId: string) => ['admin-schema-cms-field-mappings', siteId] as const,
     llmsTxtFreshness: (wsId: string) => ['admin-llms-txt-freshness', wsId] as const,
     webflowPages: (siteId: string) => ['admin-webflow-pages', siteId] as const,
     webflowAssets: (siteId: string) => ['admin-webflow-assets', siteId] as const,

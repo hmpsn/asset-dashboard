@@ -16,6 +16,18 @@ export interface LocalBusinessInput {
   industrySubtype?: SchemaIndustrySubtype;
 }
 
+function isOpaqueIdentifier(value: string): boolean {
+  const trimmed = value.trim();
+  return /^[a-f0-9]{24}$/i.test(trimmed) || /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed);
+}
+
+function safeText(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const cleaned = value.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, ' ').trim();
+  if (!cleaned || isOpaqueIdentifier(cleaned)) return undefined;
+  return cleaned;
+}
+
 export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<string, unknown> {
   const { pageData, businessProfile, baseUrl, siteHasSearch } = input;
   const isHomepageUsage = pageData.canonicalUrl === baseUrl || pageData.canonicalUrl === `${baseUrl}/`;
@@ -29,14 +41,19 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
       ? 'FinancialService'
       : 'LocalBusiness';
 
-  const address = businessProfile?.address
+  const addressFields = businessProfile?.address
+    ? {
+        streetAddress: safeText(businessProfile.address.street),
+        addressLocality: safeText(businessProfile.address.city),
+        addressRegion: safeText(businessProfile.address.state),
+        postalCode: safeText(businessProfile.address.zip),
+        addressCountry: safeText(businessProfile.address.country),
+      }
+    : undefined;
+  const address = addressFields && Object.values(addressFields).some(Boolean)
     ? dropUndefined({
         '@type': 'PostalAddress',
-        'streetAddress': businessProfile.address.street,
-        'addressLocality': businessProfile.address.city,
-        'addressRegion': businessProfile.address.state,
-        'postalCode': businessProfile.address.zip,
-        'addressCountry': businessProfile.address.country,
+        ...addressFields,
       })
     : undefined;
 
@@ -76,14 +93,14 @@ export function buildLocalBusinessSchema(input: LocalBusinessInput): Record<stri
     'url': lbUrl,
     'image': pageData.image,
     'inLanguage': pageData.inLanguage,
-    'telephone': businessProfile?.phone,
-    'email': businessProfile?.email,
+    'telephone': safeText(businessProfile?.phone),
+    'email': safeText(businessProfile?.email),
     'openingHours': businessProfile?.openingHours,
     'address': address,
     'sameAs': businessProfile?.socialProfiles?.length ? businessProfile.socialProfiles : undefined,
     'foundingDate': businessProfile?.foundedDate,
     'parentOrganization': { '@id': `${baseUrl}/#organization` },
-    'areaServed': pageData.areaServed ? { '@type': 'Place' as const, name: pageData.areaServed } : undefined,
+    'areaServed': safeText(pageData.areaServed) ? { '@type': 'Place' as const, name: safeText(pageData.areaServed) } : undefined,
     'aggregateRating': aggregateRating,
   });
 

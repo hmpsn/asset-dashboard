@@ -178,7 +178,7 @@ function ClientCopyReviewInner({ workspaceId }: ClientCopyReviewProps) {
       <div className="max-w-3xl mx-auto px-4 py-6">
         <SectionCard title="Copy Review" titleIcon={<FileText className="w-4 h-4 text-[var(--brand-text)]" />}>
           <div className="flex flex-col items-center py-8 gap-3">
-            <AlertCircle className="w-8 h-8 text-red-400" />
+            <AlertCircle className="w-8 h-8 text-accent-danger" />
             <p className="t-body text-[var(--brand-text)]">Something went wrong loading your copy review.</p>
             <Button variant="primary" onClick={() => refetchEntries()} className="t-caption px-3 py-1.5">
               Try Again
@@ -215,7 +215,7 @@ function ClientCopyReviewInner({ workspaceId }: ClientCopyReviewProps) {
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-lg font-semibold text-[var(--brand-text-bright)]">Copy Review</h2>
+        <h2 className="t-h2 text-[var(--brand-text-bright)]">Copy Review</h2>
         <p className="t-body text-[var(--brand-text)] mt-1">
           Review your website copy and approve sections or suggest changes.
         </p>
@@ -224,11 +224,11 @@ function ClientCopyReviewInner({ workspaceId }: ClientCopyReviewProps) {
       {/* Summary stats */}
       <div className="flex gap-4 t-caption text-[var(--brand-text)]">
         <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-teal-500" />
+          <span className="w-2 h-2 rounded-[var(--radius-pill)] bg-teal-500" />
           {entries.reduce((n, e) => n + e.copyStatus.clientReviewSections, 0)} awaiting your review
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+          <span className="w-2 h-2 rounded-[var(--radius-pill)] bg-emerald-500" />
           {entries.reduce((n, e) => n + e.copyStatus.approvedSections, 0)} approved
         </span>
       </div>
@@ -301,9 +301,9 @@ function EntryCard({ entry, workspaceId, isExpanded, onToggle, staggerIndex }: E
       {/* Approval progress bar */}
       {copyStatus.totalSections > 0 && (
         <div className="mt-3">
-          <div className="w-full h-1 bg-[var(--surface-3)] rounded-full overflow-hidden">
+          <div className="w-full h-1 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
             <div
-              className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+              className="h-full bg-emerald-500 rounded-[var(--radius-pill)] transition-all duration-500"
               style={{ width: `${copyStatus.approvalPercentage}%` }}
             />
           </div>
@@ -388,11 +388,11 @@ function EntrySections({ workspaceId, entryId }: { workspaceId: string; entryId:
   if (error) {
     return (
       <div className="flex flex-col items-center py-6 gap-2">
-        <AlertCircle className="w-5 h-5 text-red-400" />
+        <AlertCircle className="w-5 h-5 text-accent-danger" />
         <p className="t-caption text-[var(--brand-text)]">Could not load sections.</p>
         <button
           onClick={() => refetch()}
-          className="t-caption text-teal-400 hover:text-teal-300 transition-colors"
+          className="t-caption text-accent-brand hover:text-accent-brand transition-colors"
         >
           Retry
         </button>
@@ -411,7 +411,7 @@ function EntrySections({ workspaceId, entryId }: { workspaceId: string; entryId:
   return (
     <div className="space-y-4">
       {mutationError && (
-        <div className="flex items-center gap-2 t-caption text-red-400 bg-red-500/10 border border-red-500/20 rounded px-3 py-2">
+        <div className="flex items-center gap-2 t-caption text-accent-danger bg-red-500/10 border border-red-500/20 rounded px-3 py-2">
           <AlertCircle className="w-3.5 h-3.5 shrink-0" />
           <span>{mutationError}</span>
         </div>
@@ -536,7 +536,7 @@ function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSugge
 
       {/* Approved confirmation */}
       {isApproved && (
-        <div className="flex items-center gap-1.5 t-caption text-emerald-400">
+        <div className="flex items-center gap-1.5 t-caption text-accent-success">
           <Check className="w-3.5 h-3.5" />
           <span>This section is approved and ready to go.</span>
         </div>

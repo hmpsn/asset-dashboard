@@ -25,9 +25,9 @@ const TAB_TIPS: Record<string, TabTip> = {
     learnMore: 'Technical SEO covers things like page speed, mobile-friendliness, proper HTML structure, and secure connections (HTTPS). These are the foundation that content SEO builds on.',
   },
   strategy: {
-    title: 'Keyword Strategy',
-    body: 'This shows which keywords your pages target and where the opportunities are. "Content gaps" are valuable keywords you\'re not yet targeting — these are your biggest growth opportunities.',
-    learnMore: 'Keywords are the words and phrases people type into Google. Mapping the right keywords to the right pages helps Google understand what each page is about.',
+    title: 'SEO Strategy',
+    body: 'Start with the recommended next steps, then use priority keywords to guide what we should watch, consider, or create around next.',
+    learnMore: 'Adding a priority keyword starts future rank tracking and helps shape later recommendations. Removing one stops future tracking, but historical ranking data is preserved.',
   },
   content: {
     title: 'Content That Ranks',
@@ -52,6 +52,7 @@ export function SeoEducationTip({ tab, workspaceId }: Props) {
   const [visible, setVisible] = useState(false);
   const [showLearnMore, setShowLearnMore] = useState(false);
 
+  // effect-layout-ok -- SEO tip intentionally appears after first paint to avoid competing with initial page load.
   useEffect(() => {
     if (!tip) return;
     const seen = localStorage.getItem(storageKey);
@@ -74,22 +75,22 @@ export function SeoEducationTip({ tab, workspaceId }: Props) {
       <div className="px-4 py-3">
         <div className="flex items-start gap-3">
           <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-teal-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <Icon as={Lightbulb} size="md" className="text-teal-400" />
+            <Icon as={Lightbulb} size="md" className="text-accent-brand" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <h4 className="t-caption font-semibold text-[var(--brand-text-bright)]">{tip.title}</h4>
-              <span className="t-micro px-1.5 py-0.5 rounded-full bg-teal-500/10 text-teal-400 font-medium">SEO Tip</span>
+              <span className="t-micro px-1.5 py-0.5 rounded-[var(--radius-pill)] bg-teal-500/10 text-accent-brand font-medium">SEO Tip</span>
             </div>
-            <p className="text-[12px] text-[var(--brand-text)] leading-relaxed">{tip.body}</p>
+            <p className="t-caption-sm text-[var(--brand-text)] leading-relaxed">{tip.body}</p>
             {showLearnMore && tip.learnMore && (
-              <p className="text-[12px] text-[var(--brand-text-muted)] leading-relaxed mt-2 pl-3 border-l-2 border-teal-500/20">{tip.learnMore}</p>
+              <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed mt-2 pl-3 border-l-2 border-teal-500/20">{tip.learnMore}</p>
             )}
             <div className="flex items-center gap-3 mt-2">
               {tip.learnMore && !showLearnMore && (
                 <button
                   onClick={() => setShowLearnMore(true)}
-                  className="flex items-center gap-1 t-caption-sm text-teal-400 hover:text-teal-300 transition-colors font-medium"
+                  className="flex items-center gap-1 t-caption-sm text-accent-brand hover:text-accent-brand transition-colors font-medium"
                 >
                   Learn more <ChevronRight className="w-3 h-3" />
                 </button>

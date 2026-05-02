@@ -34,23 +34,23 @@ const kdColor = (kd?: number) =>
   !kd
     ? 'text-[var(--brand-text-muted)]'
     : kd <= 30
-    ? 'text-emerald-400'
+    ? 'text-accent-success'
     : kd <= 60
-    ? 'text-amber-400'
+    ? 'text-accent-warning'
     : kd <= 80
-    ? 'text-orange-400'
-    : 'text-red-400';
+    ? 'text-accent-orange'
+    : 'text-accent-danger';
 
 const intentColor = (intent?: string): string => {
   switch (intent) {
     case 'informational':
-      return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
+      return 'text-accent-info bg-blue-500/10 border-blue-500/20';
     case 'commercial':
-      return 'text-teal-400 bg-teal-500/10 border-teal-500/20';
+      return 'text-accent-brand bg-teal-500/10 border-teal-500/20';
     case 'transactional':
-      return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+      return 'text-accent-success bg-emerald-500/10 border-emerald-500/20';
     case 'navigational':
-      return 'text-amber-400 bg-amber-500/10 border-amber-500/20';
+      return 'text-accent-warning bg-amber-500/10 border-amber-500/20';
     default:
       return 'text-[var(--brand-text-muted)] bg-[var(--surface-3)]/30 border-[var(--brand-border)]/20';
   }
@@ -86,9 +86,9 @@ export function RecommendedForYou({
         {visible.map((rec) => {
           const prioColor =
             rec.priority === 'high'
-              ? 'text-red-400 bg-red-500/10 border-red-500/20'
+              ? 'text-accent-danger bg-red-500/10 border-red-500/20'
               : rec.priority === 'medium'
-              ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+              ? 'text-accent-warning bg-amber-500/10 border-amber-500/20'
               : 'text-[var(--brand-text)] bg-[var(--surface-3)]/30 border-[var(--brand-border)]/20';
 
           return (
@@ -101,14 +101,14 @@ export function RecommendedForYou({
                 <span className="t-ui font-medium text-[var(--brand-text-bright)]">
                   {rec.topic}
                   {rec.opportunityScore != null && (
-                    <span className="ml-2 inline-flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 t-caption font-medium text-blue-400">
+                    <span className="ml-2 inline-flex items-center rounded-[var(--radius-pill)] bg-blue-500/10 px-2 py-0.5 t-caption font-medium text-accent-info">
                       {rec.opportunityScore}/100
                     </span>
                   )}
                 </span>
                 <div className="flex items-center gap-2">
                   <span
-                    className={`t-caption-sm uppercase px-1.5 py-0.5 rounded-full border font-medium ${intentColor(rec.intent)}`}
+                    className={`t-caption-sm uppercase px-1.5 py-0.5 rounded-[var(--radius-pill)] border font-medium ${intentColor(rec.intent)}`}
                   >
                     {rec.intent}
                   </span>
@@ -118,7 +118,7 @@ export function RecommendedForYou({
                     {rec.priority}
                   </span>
                   {rec.suggestedPageType && rec.suggestedPageType !== 'blog' && (
-                    <span className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20 font-medium capitalize">
+                    <span className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 text-accent-brand border border-teal-500/20 font-medium capitalize">
                       {rec.suggestedPageType}
                     </span>
                   )}
@@ -128,7 +128,7 @@ export function RecommendedForYou({
               {/* Row 2: target keyword + metrics + tier-aware CTA */}
               <div className="flex items-center justify-between mt-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="t-caption-sm text-teal-400">
+                  <span className="t-caption-sm text-accent-brand">
                     Target keyword: &ldquo;{rec.targetKeyword}&rdquo;
                   </span>
                   {rec.volume != null && (
@@ -151,8 +151,8 @@ export function RecommendedForYou({
                     </span>
                   )}
                   {rec.impressions != null && rec.impressions > 0 && (
-                    <span className="t-caption-sm text-blue-400 flex items-center gap-0.5">
-                      <Icon as={Eye} size="sm" className="text-blue-400" />
+                    <span className="t-caption-sm text-accent-info flex items-center gap-0.5">
+                      <Icon as={Eye} size="sm" className="text-accent-info" />
                       {fmtNum(rec.impressions)} impr
                     </span>
                   )}
@@ -160,8 +160,8 @@ export function RecommendedForYou({
                     const impact = Math.round(rec.volume * 0.103);
                     if (impact < 10) return null;
                     return (
-                      <span className="t-caption-sm text-blue-400/70 flex items-center gap-0.5">
-                        <Icon as={ArrowUpRight} size="sm" className="text-blue-400/70" />
+                      <span className="t-caption-sm text-accent-info flex items-center gap-0.5">
+                        <Icon as={ArrowUpRight} size="sm" className="text-accent-info" />
                         ~{fmtNum(impact)}/mo est. clicks at rank #3
                       </span>
                     );
@@ -173,17 +173,17 @@ export function RecommendedForYou({
                   {tier === 'premium' ? (
                     <button
                       onClick={() => onRequestBrief(rec)}
-                      className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 font-medium hover:bg-teal-600/40 transition-all"
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-accent-brand font-medium hover:bg-teal-600/40 transition-all"
                     >
-                      <Icon as={Check} size="sm" className="text-teal-300" />
+                      <Icon as={Check} size="sm" className="text-accent-brand" />
                       Generate Brief (included) &rarr;
                     </button>
                   ) : (
                     <button
                       onClick={() => onRequestBrief(rec)}
-                      className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 font-medium hover:bg-teal-600/40 transition-all"
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-accent-brand font-medium hover:bg-teal-600/40 transition-all"
                     >
-                      <Icon as={Sparkles} size="sm" className="text-teal-300" />
+                      <Icon as={Sparkles} size="sm" className="text-accent-brand" />
                       Generate Brief &rarr;
                     </button>
                   )}
@@ -193,12 +193,12 @@ export function RecommendedForYou({
               {/* Row 3: trend + SERP features + competitor proof */}
               <div className="flex items-center gap-2 flex-wrap mt-1">
                 {rec.trendDirection === 'rising' && (
-                  <span className="flex items-center gap-0.5 t-caption-sm text-emerald-400 font-medium">
+                  <span className="flex items-center gap-0.5 t-caption-sm text-accent-success font-medium">
                     <TrendBadge value={1} suffix="" iconOnly /> Rising
                   </span>
                 )}
                 {rec.trendDirection === 'declining' && (
-                  <span className="flex items-center gap-0.5 t-caption-sm text-red-400 font-medium">
+                  <span className="flex items-center gap-0.5 t-caption-sm text-accent-danger font-medium">
                     <TrendBadge value={-1} suffix="" iconOnly /> Declining
                   </span>
                 )}
@@ -210,30 +210,30 @@ export function RecommendedForYou({
                 {Array.isArray(rec.serpFeatures) && rec.serpFeatures.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {rec.serpFeatures.includes('featured_snippet') && (
-                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 text-accent-info border border-blue-500/20">
                         ⬜ Snippet
                       </span>
                     )}
                     {rec.serpFeatures.includes('people_also_ask') && (
-                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 text-accent-info border border-blue-500/20">
                         ❓ PAA
                       </span>
                     )}
                     {rec.serpFeatures.includes('video') && (
-                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 text-accent-info border border-blue-500/20">
                         ▶ Video
                       </span>
                     )}
                     {rec.serpFeatures.includes('local_pack') && (
-                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                      <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-blue-500/10 text-accent-info border border-blue-500/20">
                         📍 Local
                       </span>
                     )}
                   </div>
                 )}
                 {rec.competitorProof && (
-                  <span className="flex items-center gap-0.5 t-caption-sm text-orange-400 font-medium">
-                    <Icon as={Swords} size="sm" className="text-orange-400" />
+                  <span className="flex items-center gap-0.5 t-caption-sm text-accent-orange font-medium">
+                    <Icon as={Swords} size="sm" className="text-accent-orange" />
                     {rec.competitorProof}
                   </span>
                 )}
@@ -245,7 +245,7 @@ export function RecommendedForYou({
               {rec.serpTargeting && rec.serpTargeting.length > 0 && (
                 <div className="mt-1.5 pl-2 border-l-2 border-amber-500/20">
                   {rec.serpTargeting.map((tip) => (
-                    <div key={tip} className="t-caption-sm text-amber-400/80 leading-relaxed">
+                    <div key={tip} className="t-caption-sm text-accent-warning leading-relaxed">
                       &rarr; {tip}
                     </div>
                   ))}
@@ -286,7 +286,7 @@ export function RecommendedForYou({
           ) : (
             <button
               onClick={() => setExpanded(true)}
-              className="t-caption-sm text-teal-400 hover:text-teal-300 transition-colors"
+              className="t-caption-sm text-accent-brand hover:text-accent-brand transition-colors"
             >
               Show {hiddenCount} more
             </button>

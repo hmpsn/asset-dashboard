@@ -131,7 +131,7 @@ export function ContentPipelineGuide() {
     <div className="space-y-8 max-w-3xl">
       <div className="space-y-1.5 mb-6">
         <h2 className="text-lg font-bold text-[var(--brand-text-bright)] flex items-center gap-2">
-          <Icon as={Sparkles} size="lg" className="text-teal-400" />
+          <Icon as={Sparkles} size="lg" className="text-accent-brand" />
           Content Pipeline Guide
         </h2>
         <p className="text-xs text-[var(--brand-text-muted)] leading-relaxed max-w-xl">
@@ -150,10 +150,10 @@ export function ContentPipelineGuide() {
           { icon: Eye, label: 'Publish' },
         ].map((step, i) => (
           <div key={step.label} className="flex items-center gap-2 flex-shrink-0">
-            {i > 0 && <Icon as={ArrowRight} size="sm" className="text-teal-500/40" />}
+            {i > 0 && <Icon as={ArrowRight} size="sm" className="text-accent-brand" />}
             <div className="flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-lg)] bg-teal-500/10">
-              <Icon as={step.icon} size="sm" className="text-teal-400" />
-              <span className="t-caption-sm font-medium text-teal-300">{step.label}</span>
+              <Icon as={step.icon} size="sm" className="text-accent-brand" />
+              <span className="t-caption-sm font-medium text-accent-brand">{step.label}</span>
             </div>
           </div>
         ))}
@@ -170,7 +170,7 @@ export function ContentPipelineGuide() {
               className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-[var(--surface-3)]/30 transition-colors rounded-[var(--radius-xl)]"
             >
               <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-teal-500/10 flex items-center justify-center flex-shrink-0">
-                <Icon as={SectionIcon} size="md" className="text-teal-400" />
+                <Icon as={SectionIcon} size="md" className="text-accent-brand" />
               </div>
               <div className="flex-1 min-w-0">
                 <span className="text-sm font-semibold text-[var(--brand-text-bright)] block">{section.title}</span>
@@ -186,9 +186,9 @@ export function ContentPipelineGuide() {
                   {section.steps.map((step, i) => (
                     <div key={i} className="flex gap-3">
                       <div className="flex flex-col items-center flex-shrink-0">
-                        <div className={"w-5 h-5 rounded-full bg-teal-500/15 flex items-center justify-center" // rounded-literal-ok
+                        <div className={"w-5 h-5 rounded-[var(--radius-pill)] bg-teal-500/15 flex items-center justify-center" // rounded-literal-ok
                         }>
-                          <span className="t-caption-sm font-bold text-teal-400">{i + 1}</span>
+                          <span className="t-caption-sm font-bold text-accent-brand">{i + 1}</span>
                         </div>
                         {i < section.steps.length - 1 && (
                           <div className="w-px flex-1 bg-[var(--brand-border)] mt-1" />
@@ -205,8 +205,8 @@ export function ContentPipelineGuide() {
                 {/* Tip */}
                 {section.tip && (
                   <div className="flex items-start gap-2 px-3 py-2.5 rounded-[var(--radius-lg)] bg-amber-500/5 border border-amber-500/15">
-                    <Icon as={Flag} size="sm" className="text-amber-400/80 flex-shrink-0 mt-0.5" />
-                    <span className="t-caption-sm text-amber-300/80 leading-relaxed">{section.tip}</span>
+                    <Icon as={Flag} size="sm" className="text-accent-warning flex-shrink-0 mt-0.5" />
+                    <span className="t-caption-sm text-accent-warning leading-relaxed">{section.tip}</span>
                   </div>
                 )}
               </div>

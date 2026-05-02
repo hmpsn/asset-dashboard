@@ -1,4 +1,4 @@
-import { CheckCircle2, FileText, MessageSquare, Sparkles, X, Zap, DollarSign, TrendingUp, CreditCard, Loader2, RefreshCw } from 'lucide-react';
+import { CheckCircle2, FileText, MessageSquare, Sparkles, X, Zap, DollarSign, ArrowUp, CreditCard, RefreshCw } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { STUDIO_NAME } from '../../constants';
@@ -86,7 +86,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
     },
     {
       id: 'growth', name: 'Growth', price: pricingData?.products?.plan_growth ? `$${pricingData.products.plan_growth.price}` : '$249', tagline: 'AI-powered SEO engine',
-      color: 'text-teal-300', borderColor: 'border-teal-500/30', bgColor: 'bg-teal-500/5',
+      color: 'text-accent-brand', borderColor: 'border-teal-500/30', bgColor: 'bg-teal-500/5',
       featureGroups: [
         { category: 'Everything in Starter, plus:', features: [] },
         { category: 'Strategy & SEO', features: [
@@ -109,7 +109,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
     },
     {
       id: 'premium', name: 'Premium', price: pricingData?.products?.plan_premium ? `$${pricingData.products.plan_premium.price}` : '$999', tagline: 'Managed SEO partnership',
-      color: 'text-teal-200', borderColor: 'border-teal-400/30', bgColor: 'bg-teal-500/5',
+      color: 'text-accent-brand', borderColor: 'border-teal-400/30', bgColor: 'bg-teal-500/5',
       featureGroups: [
         { category: 'Everything in Growth, plus:', features: [] },
         { category: 'Competitor Intelligence', features: [
@@ -135,12 +135,12 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
     <div className="space-y-8">
       {/* Header */}
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-[var(--brand-text)]">Plans & Pricing</h2>
+        <h2 className="t-h2 text-[var(--brand-text)]">Plans & Pricing</h2>
         <p className="t-body text-[var(--brand-text-muted)] mt-2 max-w-md mx-auto">Choose the right plan for your business. All plans include your dedicated client dashboard.</p>
         {isTrial && (
-          <div className="inline-flex items-center gap-2 mt-3 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/20">
-            <Icon as={Zap} size="md" className="text-amber-400" />
-            <span className="t-caption text-amber-300 font-medium">You&apos;re trialing {plans.find(p => p.id === tier)?.name} — {ws.trialDaysRemaining} day{ws.trialDaysRemaining !== 1 ? 's' : ''} remaining</span>
+          <div className="inline-flex items-center gap-2 mt-3 px-4 py-2 rounded-[var(--radius-pill)] bg-amber-500/10 border border-amber-500/20">
+            <Icon as={Zap} size="md" className="text-accent-warning" />
+            <span className="t-caption text-accent-warning font-medium">You&apos;re trialing {plans.find(p => p.id === tier)?.name} — {ws.trialDaysRemaining} day{ws.trialDaysRemaining !== 1 ? 's' : ''} remaining</span>
           </div>
         )}
       </div>
@@ -153,14 +153,14 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
           return (
             <div key={plan.id} className={`relative rounded-[var(--radius-xl)] border p-5 transition-all ${isCurrent ? `${plan.bgColor} ${plan.borderColor} ring-1 ring-offset-0 ${plan.id !== 'free' ? 'ring-teal-500/20' : 'ring-zinc-700'}` : `bg-[var(--surface-2)]/50 border-[var(--brand-border)] hover:border-[var(--brand-border-strong)]`}`}>
               {isCurrent && (
-                <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full t-caption-sm uppercase tracking-wider font-semibold border ${plan.id !== 'free' ? 'bg-teal-500/20 border-teal-500/30 text-teal-300' : 'bg-[var(--surface-3)] border-[var(--brand-border-strong)] text-[var(--brand-text-muted)]'}`}>
+                <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-[var(--radius-pill)] t-caption-sm uppercase tracking-wider font-semibold border ${plan.id !== 'free' ? 'bg-teal-500/20 border-teal-500/30 text-accent-brand' : 'bg-[var(--surface-3)] border-[var(--brand-border-strong)] text-[var(--brand-text-muted)]'}`}>
                   {isTrial ? 'Current Trial' : 'Current Plan'}
                 </div>
               )}
               <div className="pt-2">
-                <h3 className={`text-lg font-bold ${plan.color}`}>{plan.name}</h3>
+                <h3 className={`t-body font-semibold ${plan.color}`}>{plan.name}</h3>
                 <div className="flex items-baseline gap-1 mt-1">
-                  <span className={`text-2xl font-bold ${plan.color}`}>{plan.price}</span>
+                  <span className={`t-stat ${plan.color}`}>{plan.price}</span>
                   {plan.price !== 'Free' && <span className="t-caption text-[var(--brand-text-muted)]">/month</span>}
                 </div>
                 <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1.5 mb-4">{plan.tagline}</p>
@@ -171,7 +171,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                       {group.features.map((f, fi) => (
                         <div key={fi} className="flex items-center gap-2 py-0.5">
                           {f.included ? (
-                            <Icon as={CheckCircle2} size="md" className="flex-shrink-0 text-teal-400" />
+                            <Icon as={CheckCircle2} size="md" className="flex-shrink-0 text-accent-brand" />
                           ) : (
                             <Icon as={X} size="md" className="flex-shrink-0 text-[var(--brand-text-faint)]" />
                           )}
@@ -184,18 +184,20 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                 <div className="mt-5">
                   {isCurrent ? (
                     <div className="space-y-2">
-                      <div className={`w-full py-2 rounded-[var(--radius-lg)] t-caption font-medium text-center border ${plan.id !== 'free' ? 'bg-teal-500/10 border-teal-500/20 text-teal-300' : 'bg-[var(--surface-3)] border-[var(--brand-border-strong)] text-[var(--brand-text-muted)]'}`}>
+                      <div className={`w-full py-2 rounded-[var(--radius-lg)] t-caption font-medium text-center border ${plan.id !== 'free' ? 'bg-teal-500/10 border-teal-500/20 text-accent-brand' : 'bg-[var(--surface-3)] border-[var(--brand-border-strong)] text-[var(--brand-text-muted)]'}`}>
                         {isTrial ? 'Trialing Now' : 'Your Plan'}
                       </div>
                       {plan.id !== 'free' && !isTrial && (
-                        <button
+                        <Button
+                          variant="secondary"
                           onClick={openBillingPortal}
                           disabled={billingLoading}
-                          className="w-full py-2 rounded-[var(--radius-lg)] t-caption-sm font-medium text-center border border-[var(--brand-border-strong)] bg-[var(--surface-3)]/50 hover:bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors flex items-center justify-center gap-1.5"
+                          loading={billingLoading}
+                          icon={billingLoading ? undefined : CreditCard}
+                          className="w-full"
                         >
-                          {billingLoading ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={CreditCard} size="sm" />}
                           Manage Billing
-                        </button>
+                        </Button>
                       )}
                     </div>
                   ) : isUpgrade ? (
@@ -224,7 +226,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
 
       {/* Content pricing section */}
       {(briefPrice != null || fullPostPrice != null) && (
-        <SectionCard title="Content Services" titleIcon={<Icon as={FileText} size="lg" className="text-teal-400" />}>
+        <SectionCard title="Content Services" titleIcon={<Icon as={FileText} size="lg" className="text-accent-brand" />}>
           <p className="t-caption text-[var(--brand-text-muted)] mb-5">Professional content created by {STUDIO_NAME}, tailored to your SEO strategy.</p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -232,10 +234,10 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
               <div className="px-5 py-4 rounded-[var(--radius-xl)] bg-teal-500/5 border border-teal-500/20 hover:border-teal-500/30 transition-colors">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <Icon as={FileText} size="md" className="text-teal-400" />
+                    <Icon as={FileText} size="md" className="text-accent-brand" />
                     <span className="t-body font-semibold text-[var(--brand-text)]">Content Brief</span>
                   </div>
-                  <span className="text-lg font-bold text-teal-300">{fmtPrice(briefPrice)}</span>
+                  <span className="t-stat-sm text-accent-brand">{fmtPrice(briefPrice)}</span>
                 </div>
                 <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">Detailed content strategy document with keyword targets, outline, competitor analysis, and SEO recommendations.</p>
               </div>
@@ -244,10 +246,10 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
               <div className="px-5 py-4 rounded-[var(--radius-xl)] bg-teal-500/5 border border-teal-500/20 hover:border-teal-500/30 transition-colors">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <Icon as={Sparkles} size="md" className="text-teal-400" />
+                    <Icon as={Sparkles} size="md" className="text-accent-brand" />
                     <span className="t-body font-semibold text-[var(--brand-text)]">Full Blog Post</span>
                   </div>
-                  <span className="text-lg font-bold text-teal-300">{fmtPrice(fullPostPrice)}</span>
+                  <span className="t-stat-sm text-accent-brand">{fmtPrice(fullPostPrice)}</span>
                 </div>
                 <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">Complete brief + professionally written article, ready to publish with SEO optimization built in.</p>
               </div>
@@ -256,9 +258,9 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
 
           {tier !== 'free' && (
             <div className="mt-5 text-center">
-              <button onClick={() => navigate(clientPath(workspaceId, 'content', betaMode))} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 t-caption text-white font-medium transition-colors">
-                <Icon as={FileText} size="md" /> Browse Content Opportunities
-              </button>
+              <Button onClick={() => navigate(clientPath(workspaceId, 'content', betaMode))} icon={FileText}>
+                Browse Content Opportunities
+              </Button>
             </div>
           )}
         </SectionCard>
@@ -266,7 +268,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
 
       {/* Content subscription packages */}
       {subData && subData.plans.length > 0 && (
-        <SectionCard title="Monthly Content Packages" titleIcon={<Icon as={RefreshCw} size="lg" className="text-teal-400" />}>
+        <SectionCard title="Monthly Content Packages" titleIcon={<Icon as={RefreshCw} size="lg" className="text-accent-brand" />}>
           <p className="t-caption text-[var(--brand-text-muted)] mb-5">Recurring SEO-optimized content delivered every month, powered by your keyword strategy.</p>
 
           {/* Active subscription banner */}
@@ -275,13 +277,13 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
               <div className="flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <Icon as={CheckCircle2} size="md" className="text-teal-400" />
+                    <Icon as={CheckCircle2} size="md" className="text-accent-brand" />
                     <span className="t-body font-medium text-[var(--brand-text)]">
                       {subData.plans.find(p => p.plan === subData.subscription?.plan)?.displayName || subData.subscription.plan}
                     </span>
                     <span className={`t-caption-sm px-1.5 py-0.5 rounded font-medium ${
-                      subData.subscription.status === 'active' ? 'bg-emerald-500/10 text-emerald-400' :
-                      subData.subscription.status === 'past_due' ? 'bg-red-500/10 text-red-400' :
+                      subData.subscription.status === 'active' ? 'bg-emerald-500/10 text-accent-success' :
+                      subData.subscription.status === 'past_due' ? 'bg-red-500/10 text-accent-danger' :
                       'bg-[var(--surface-3)] text-[var(--brand-text-muted)]'
                     }`}>
                       {subData.subscription.status === 'active' ? 'Active' : subData.subscription.status === 'past_due' ? 'Past Due' : subData.subscription.status}
@@ -292,14 +294,14 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                   </p>
                 </div>
                 <div className="text-right">
-                  <div className="text-lg font-bold text-teal-300">${subData.subscription.priceUsd}<span className="t-caption text-[var(--brand-text-muted)]">/mo</span></div>
+                  <div className="t-stat-sm text-accent-brand">${subData.subscription.priceUsd}<span className="t-caption text-[var(--brand-text-muted)]">/mo</span></div>
                 </div>
               </div>
               {/* Progress */}
               <div className="mt-3">
-                <div className="h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden">
+                <div className="h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full transition-all"
+                    className="h-full bg-gradient-to-r from-teal-500 to-emerald-500 rounded-[var(--radius-pill)] transition-all"
                     style={{ width: `${Math.min(100, (subData.subscription.postsDeliveredThisPeriod / subData.subscription.postsPerMonth) * 100)}%` }}
                   />
                 </div>
@@ -315,7 +317,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                   <h4 className="t-body font-semibold text-[var(--brand-text)]">{plan.displayName}</h4>
                   <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">{plan.description}</p>
                   <div className="flex items-baseline gap-1 mt-3">
-                    <span className="text-xl font-bold text-teal-300">${plan.priceUsd}</span>
+                    <span className="t-stat text-accent-brand">${plan.priceUsd}</span>
                     <span className="t-caption text-[var(--brand-text-muted)]">/mo</span>
                   </div>
                   <Button
@@ -336,10 +338,10 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
 
       {/* ROI teaser for free-tier users */}
       {tier === 'free' && (
-        <div className="bg-gradient-to-r from-emerald-500/8 via-zinc-900 to-blue-500/8 rounded-[var(--radius-xl)] border border-emerald-500/20 p-6">
+        <div className="bg-gradient-to-r from-emerald-500/8 via-[var(--surface-2)] to-blue-500/8 rounded-[var(--radius-xl)] border border-emerald-500/20 p-6">
           <div className="flex items-start gap-4">
             <div className="w-10 h-10 rounded-[var(--radius-xl)] bg-emerald-500/15 flex items-center justify-center flex-shrink-0">
-              <Icon as={DollarSign} size="lg" className="text-emerald-400" />
+              <Icon as={DollarSign} size="lg" className="text-accent-success" />
             </div>
             <div className="flex-1">
               <h3 className="t-body font-semibold text-[var(--brand-text)] mb-1">See the dollar value of your organic traffic</h3>
@@ -348,15 +350,15 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
               </p>
               <div className="grid grid-cols-3 gap-3 mb-3">
                 <div className="bg-[var(--surface-2)]/60 rounded-[var(--radius-lg)] border border-[var(--brand-border)] p-2.5 text-center">
-                  <Icon as={TrendingUp} size="md" className="text-emerald-400 mx-auto mb-1" />
+                  <Icon as={ArrowUp} size="md" className="text-accent-success mx-auto mb-1" />
                   <div className="t-caption-sm text-[var(--brand-text-muted)]">Traffic Value</div>
                 </div>
                 <div className="bg-[var(--surface-2)]/60 rounded-[var(--radius-lg)] border border-[var(--brand-border)] p-2.5 text-center">
-                  <Icon as={DollarSign} size="md" className="text-blue-400 mx-auto mb-1" />
+                  <Icon as={DollarSign} size="md" className="text-accent-info mx-auto mb-1" />
                   <div className="t-caption-sm text-[var(--brand-text-muted)]">Ad Spend Saved</div>
                 </div>
                 <div className="bg-[var(--surface-2)]/60 rounded-[var(--radius-lg)] border border-[var(--brand-border)] p-2.5 text-center">
-                  <Icon as={Sparkles} size="md" className="text-teal-400 mx-auto mb-1" />
+                  <Icon as={Sparkles} size="md" className="text-accent-brand mx-auto mb-1" />
                   <div className="t-caption-sm text-[var(--brand-text-muted)]">Content ROI</div>
                 </div>
               </div>
@@ -369,10 +371,9 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
       {/* pr-check-disable-next-line -- Contact CTA strip; no section header, pure styled row */}
       <div className="text-center py-6 bg-[var(--surface-2)]/50 rounded-[var(--radius-xl)] border border-[var(--brand-border)]">
         <p className="t-body text-[var(--brand-text-muted)] mb-3">Have questions about which plan is right for you?</p>
-        <button onClick={onOpenChat}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-strong)] t-body text-[var(--brand-text)] font-medium transition-colors">
-          <Icon as={MessageSquare} size="md" /> Ask Your AI Advisor
-        </button>
+        <Button variant="secondary" size="lg" icon={MessageSquare} onClick={onOpenChat}>
+          Ask Your AI Advisor
+        </Button>
       </div>
     </div>
   </>);

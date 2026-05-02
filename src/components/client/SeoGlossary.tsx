@@ -162,7 +162,7 @@ export function Explainer({ term }: { term: string }) {
     <span className="relative inline-flex items-center" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="ml-0.5 text-[var(--brand-text-muted)] hover:text-teal-400 transition-colors focus:outline-none"
+        className="ml-0.5 text-[var(--brand-text-muted)] hover:text-accent-brand transition-colors focus:outline-none"
         aria-label={`Learn about ${entry.term}`}
       >
         <HelpCircle className="w-3 h-3" />
@@ -170,7 +170,7 @@ export function Explainer({ term }: { term: string }) {
       {open && (
         // pr-check-disable-next-line -- Glossary term tooltip/popover; absolutely positioned floating element, not a content card
         <div className="absolute z-[var(--z-modal)] bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] shadow-xl p-3 text-left animate-in fade-in slide-in-from-bottom-1 duration-150">
-          <div className="t-caption-sm font-semibold text-teal-400 mb-1">{entry.term}</div>
+          <div className="t-caption-sm font-semibold text-accent-brand mb-1">{entry.term}</div>
           <p className="t-caption-sm text-[var(--brand-text)] leading-relaxed mb-2">{entry.definition}</p>
           <p className="t-micro text-[var(--brand-text)] leading-relaxed">
             <span className="font-medium text-[var(--brand-text-bright)]">Why it matters: </span>{entry.whyItMatters}

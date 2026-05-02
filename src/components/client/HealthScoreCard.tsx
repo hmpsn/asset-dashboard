@@ -23,23 +23,23 @@ export function HealthScoreCard({ score }: HealthScoreCardProps) {
         <MetricRing score={rounded} size={100} />
         <div className="flex-1 min-w-0 space-y-2">
           <div className="flex items-baseline gap-2">
-            <span className={`text-3xl font-bold ${scoreColorClass(rounded)}`}>
+            <span className={`t-stat-lg ${scoreColorClass(rounded)}`}>
               {rounded}
             </span>
             <span className="t-body text-[var(--brand-text-muted)]">/ 100</span>
           </div>
           <p className="t-body text-[var(--brand-text)] leading-relaxed">{label}</p>
-          <div className="flex flex-wrap gap-3 text-[11px] text-[var(--brand-text-muted)]">
+          <div className="flex flex-wrap gap-3 t-caption-sm text-[var(--brand-text-muted)]">
             <span className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              <span className="w-1.5 h-1.5 rounded-[var(--radius-pill)] bg-emerald-400" />
               80+ Healthy
             </span>
             <span className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+              <span className="w-1.5 h-1.5 rounded-[var(--radius-pill)] bg-amber-400" />
               60-79 Needs work
             </span>
             <span className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+              <span className="w-1.5 h-1.5 rounded-[var(--radius-pill)] bg-red-400" />
               Below 60 Critical
             </span>
           </div>

@@ -1,10 +1,10 @@
 import { useState, useRef } from 'react';
 import {
-  MessageSquare, Plus, Loader2, Send, ChevronDown, ChevronUp,
-  CheckCircle2, X, Paperclip, FileText,
+  MessageSquare, Plus, Loader2, Send,
+  CheckCircle2, X, Paperclip, FileText, ChevronDown as ChevronDownIcon,
 } from 'lucide-react';
 import type { ClientRequest, RequestCategory } from './types';
-import { Icon } from '../ui';
+import { Button, ClickableRow, Icon, IconButton } from '../ui';
 import { STUDIO_NAME } from '../../constants';
 import { RenderMarkdown } from './helpers';
 import { post, postForm } from '../../api/client';
@@ -73,16 +73,15 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Icon as={MessageSquare} size="lg" className="text-teal-400" />
+          <Icon as={MessageSquare} size="lg" className="text-accent-brand" />
           <div>
-            <h2 className="text-xl font-semibold text-[var(--brand-text)]">Requests</h2>
+            <h2 className="t-h2 text-[var(--brand-text)]">Requests</h2>
             <p className="t-body text-[var(--brand-text-muted)] mt-1">Submit requests for {STUDIO_NAME} to action on.</p>
           </div>
         </div>
-        <button onClick={() => setShowNewRequest(!showNewRequest)}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-[var(--radius-lg)] t-caption font-medium transition-colors">
-          <Icon as={Plus} size="md" /> New Request
-        </button>
+        <Button onClick={() => setShowNewRequest(!showNewRequest)} icon={Plus} size="sm" className="rounded-[var(--radius-lg)]">
+          New Request
+        </Button>
       </div>
 
       {/* New request form */}
@@ -99,10 +98,9 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
                 { label: 'New Page', cat: 'feature' as RequestCategory, title: 'New page request', desc: 'Page purpose:\n\nTarget URL/slug:\n\nContent outline:' },
                 { label: 'SEO Update', cat: 'seo' as RequestCategory, title: 'SEO update request', desc: 'Pages affected:\n\nKeywords to target:\n\nDetails:' },
               ].map(t => (
-                <button key={t.label} onClick={() => { setNewReqCategory(t.cat); setNewReqTitle(t.title); setNewReqDesc(t.desc); }}
-                  className="px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium border border-[var(--brand-border-strong)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:border-[var(--brand-border-strong)] bg-[var(--surface-3)]/50 transition-colors">
+                <Button key={t.label} onClick={() => { setNewReqCategory(t.cat); setNewReqTitle(t.title); setNewReqDesc(t.desc); }} variant="secondary" size="sm">
                   {t.label}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -150,29 +148,25 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
             <label className="t-caption-sm text-[var(--brand-text-muted)] mb-1 block">Attachments <span className="text-[var(--brand-text-muted)]">(optional — screenshots, docs)</span></label>
             <input type="file" ref={newReqFileRef} className="hidden" multiple accept="image/*,.pdf,.doc,.docx,.txt,.csv"
               onChange={e => { if (e.target.files) setNewReqFiles(prev => [...prev, ...Array.from(e.target.files!)]); e.target.value = ''; }} />
-            <button onClick={() => newReqFileRef.current?.click()} type="button"
-              className="flex items-center gap-1.5 px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:border-[var(--brand-border-strong)] transition-colors">
-              <Icon as={Paperclip} size="md" /> Attach Files
-            </button>
+            <Button onClick={() => newReqFileRef.current?.click()} variant="secondary" icon={Paperclip}>
+              Attach Files
+            </Button>
             {newReqFiles.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {newReqFiles.map((f, i) => (
                   <span key={i} className="flex items-center gap-1 t-caption-sm bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded px-2 py-1 text-[var(--brand-text)]">
                     <Icon as={Paperclip} size="xs" />{f.name}
-                    <button onClick={() => setNewReqFiles(prev => prev.filter((_, j) => j !== i))} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"><Icon as={X} size="xs" /></button>
+                    <IconButton icon={X} label={`Remove ${f.name}`} size="sm" onClick={() => setNewReqFiles(prev => prev.filter((_, j) => j !== i))} />
                   </span>
                 ))}
               </div>
             )}
           </div>
           <div className="flex items-center gap-2 pt-1">
-            <button onClick={submitRequest} disabled={submittingReq || !newReqTitle.trim() || !newReqDesc.trim()}
-              className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-[var(--radius-lg)] t-caption font-medium transition-colors">
-              {submittingReq ? <Icon as={Loader2} size="md" className="animate-spin" /> : <Icon as={Send} size="md" />}
+            <Button onClick={submitRequest} disabled={submittingReq || !newReqTitle.trim() || !newReqDesc.trim()} loading={submittingReq} icon={Send} className="rounded-[var(--radius-lg)]">
               {submittingReq ? 'Submitting...' : 'Submit Request'}
-            </button>
-            <button onClick={() => setShowNewRequest(false)}
-              className="px-3 py-2 t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">Cancel</button>
+            </Button>
+            <Button onClick={() => setShowNewRequest(false)} variant="ghost">Cancel</Button>
           </div>
         </div>
       )}
@@ -191,10 +185,9 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
           </div>
           <h3 className="t-body font-medium text-[var(--brand-text-muted)] mb-1">Need something? We're here to help</h3>
           <p className="t-caption-sm text-[var(--brand-text-muted)] mb-4">Report a bug, request a design change, or suggest an improvement — {STUDIO_NAME} will get right on it.</p>
-          <button onClick={() => setShowNewRequest(true)}
-            className="px-4 py-2 bg-teal-600 hover:bg-teal-500 rounded-[var(--radius-lg)] t-caption font-medium transition-colors">
-            <Icon as={Plus} size="md" className="mr-1" /> Create Your First Request
-          </button>
+          <Button onClick={() => setShowNewRequest(true)} icon={Plus} className="rounded-[var(--radius-lg)]">
+            Create Your First Request
+          </Button>
         </div>
       )}
 
@@ -204,11 +197,11 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
           {requests.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).map(req => {
             const isExpanded = expandedRequest === req.id;
             const statusColors: Record<string, string> = {
-              new: 'bg-blue-500/10 border-blue-500/30 text-blue-400',
-              in_review: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
-              in_progress: 'bg-teal-500/10 border-teal-500/30 text-teal-400',
+              new: 'bg-blue-500/10 border-blue-500/30 text-accent-info',
+              in_review: 'bg-amber-500/10 border-amber-500/30 text-accent-warning',
+              in_progress: 'bg-teal-500/10 border-teal-500/30 text-accent-brand',
               on_hold: 'bg-[var(--surface-3)]/10 border-[var(--brand-border-strong)] text-[var(--brand-text-muted)]',
-              completed: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400',
+              completed: 'bg-emerald-500/10 border-emerald-500/30 text-accent-success',
               closed: 'bg-[var(--surface-3)]/10 border-[var(--brand-border-strong)] text-[var(--brand-text-muted)]',
             };
             const statusLabels: Record<string, string> = {
@@ -222,8 +215,11 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
             const teamNotes = req.notes.filter(n => n.author === 'team').length;
             return ( // pr-check-disable-next-line -- Brand signature radius intentional
               <div key={req.id} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-                <button onClick={() => { setExpandedRequest(isExpanded ? null : req.id); setReqNoteInput(''); }}
-                  className="w-full px-5 py-4 text-left hover:bg-[var(--surface-3)]/30 transition-colors">
+                <ClickableRow
+                  active={isExpanded}
+                  onClick={() => { setExpandedRequest(isExpanded ? null : req.id); setReqNoteInput(''); }}
+                  className="px-5 py-4"
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1">
@@ -236,13 +232,15 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
                         <span className="px-1.5 py-0.5 bg-[var(--surface-3)] rounded text-[var(--brand-text-muted)]">{catLabels[req.category] || req.category}</span>
                         {req.submittedBy && <span className="text-[var(--brand-text-muted)]">by {req.submittedBy}</span>}
                         <span>{new Date(req.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                        {teamNotes > 0 && <span className="text-teal-400">{teamNotes} team note{teamNotes !== 1 ? 's' : ''}</span>}
+                        {teamNotes > 0 && <span className="text-accent-brand">{teamNotes} team note{teamNotes !== 1 ? 's' : ''}</span>}
                         {req.pageUrl && <span className="text-[var(--brand-text-muted)] truncate max-w-[150px]">{req.pageUrl}</span>}
                       </div>
                     </div>
-                    {isExpanded ? <Icon as={ChevronUp} size="md" className="text-[var(--brand-text-muted)] shrink-0" /> : <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] shrink-0" />}
+                    <span className={`text-[var(--brand-text-muted)] shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                      <Icon as={ChevronDownIcon} size="md" />
+                    </span>
                   </div>
-                </button>
+                </ClickableRow>
 
                 {isExpanded && (
                   <div className="border-t border-[var(--brand-border)]">
@@ -265,7 +263,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
                                   : 'bg-[var(--surface-3)]/50 border border-[var(--brand-border-strong)]'
                               }`}>
                                 <div className="flex items-center gap-1.5 mb-0.5">
-                                  <span className={`t-caption-sm font-medium ${note.author === 'team' ? 'text-teal-400' : 'text-[var(--brand-text-muted)]'}`}>
+                                  <span className={`t-caption-sm font-medium ${note.author === 'team' ? 'text-accent-brand' : 'text-[var(--brand-text-muted)]'}`}>
                                     {note.author === 'team' ? STUDIO_NAME : 'You'}
                                   </span>
                                   <span className="t-caption-sm text-[var(--brand-text-muted)]">
@@ -278,11 +276,11 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
                                     {note.attachments.map(att => (
                                       att.mimeType.startsWith('image/') ? (
                                         <a key={att.id} href={`/api/request-attachments/${att.filename}`} target="_blank" rel="noreferrer" className="block">
-                                          <img src={`/api/request-attachments/${att.filename}`} alt={att.originalName} className="max-w-[240px] max-h-[180px] rounded-md border border-[var(--brand-border-strong)]" />
+                                          <img src={`/api/request-attachments/${att.filename}`} alt={att.originalName} className="max-w-[240px] max-h-[180px] rounded-[var(--radius-md)] border border-[var(--brand-border-strong)]" />
                                         </a>
                                       ) : (
                                         <a key={att.id} href={`/api/request-attachments/${att.filename}`} target="_blank" rel="noreferrer"
-                                          className="flex items-center gap-1.5 t-caption-sm text-teal-400 hover:text-teal-300">
+                                          className="flex items-center gap-1.5 t-caption-sm text-accent-brand hover:text-accent-brand">
                                           <Icon as={FileText} size="sm" />{att.originalName} <span className="text-[var(--brand-text-muted)]">({(att.size / 1024).toFixed(0)}KB)</span>
                                         </a>
                                       )
@@ -304,7 +302,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
                             {noteFiles.map((f, i) => (
                               <span key={i} className="flex items-center gap-1 t-caption-sm bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded px-2 py-1 text-[var(--brand-text)]">
                                 <Icon as={Paperclip} size="xs" />{f.name}
-                                <button onClick={() => setNoteFiles(prev => prev.filter((_, j) => j !== i))} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"><Icon as={X} size="xs" /></button>
+                                <IconButton icon={X} label={`Remove ${f.name}`} size="sm" onClick={() => setNoteFiles(prev => prev.filter((_, j) => j !== i))} />
                               </span>
                             ))}
                           </div>
@@ -316,19 +314,14 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
                             className="flex-1 px-3 py-2 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] placeholder-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500" disabled={sendingNote} />
                           <input type="file" ref={noteFileRef} className="hidden" multiple accept="image/*,.pdf,.doc,.docx,.txt,.csv"
                             onChange={e => { if (e.target.files) setNoteFiles(prev => [...prev, ...Array.from(e.target.files!)]); e.target.value = ''; }} />
-                          <button onClick={() => noteFileRef.current?.click()} className="px-2 py-2 bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] transition-colors" title="Attach file">
-                            <Icon as={Paperclip} size="md" className="text-[var(--brand-text-muted)]" />
-                          </button>
-                          <button onClick={() => sendReqNote(req.id)} disabled={sendingNote || (!reqNoteInput.trim() && noteFiles.length === 0)}
-                            className="px-3 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-[var(--radius-lg)] transition-colors">
-                            <Icon as={Send} size="md" />
-                          </button>
+                          <IconButton icon={Paperclip} label="Attach file" variant="solid" onClick={() => noteFileRef.current?.click()} />
+                          <IconButton icon={Send} label="Send note" variant="accent" onClick={() => sendReqNote(req.id)} disabled={sendingNote || (!reqNoteInput.trim() && noteFiles.length === 0)} />
                         </div>
                       </div>
                     )}
                     {(req.status === 'completed' || req.status === 'closed') && (
                       <div className="px-5 py-3 border-t border-[var(--brand-border)]/50">
-                        <div className="flex items-center gap-1.5 t-caption-sm text-emerald-400">
+                        <div className="flex items-center gap-1.5 t-caption-sm text-accent-success">
                           <Icon as={CheckCircle2} size="sm" /> This request has been {req.status}
                         </div>
                       </div>

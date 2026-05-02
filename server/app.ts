@@ -218,6 +218,8 @@ export function createApp(): express.Express {
       if (req.path === '/api/auth/login' && req.method === 'POST') return next();
       if (req.path === '/api/auth/check') return next();
       if (req.path.startsWith('/api/auth/setup') || req.path === '/api/auth/user-login') return next();
+      // Allow unauthenticated feature-flags GET for client-side gating.
+      if (req.path === '/api/feature-flags' && req.method === 'GET') return next();
       // Allow Google OAuth callback (Google redirects here without our auth token)
       if (req.path === '/api/google/callback') return next();
       // Allow public report and client routes

@@ -21,10 +21,10 @@ function formatFreshness(ts: string | null | undefined): { label: string; color:
   if (!ts) return { label: 'Never generated', color: 'text-[var(--brand-text-muted)]' };
   const ageMs = Date.now() - new Date(ts).getTime();
   const hours = ageMs / (1000 * 60 * 60);
-  if (hours < 1) return { label: 'Generated just now', color: 'text-emerald-400' };
-  if (hours < 24) return { label: `Generated ${Math.round(hours)}h ago`, color: 'text-emerald-400' };
-  if (hours < 72) return { label: `Generated ${Math.round(hours / 24)}d ago`, color: 'text-amber-400' };
-  return { label: `Generated ${Math.round(hours / 24)}d ago — consider regenerating`, color: 'text-amber-400' };
+  if (hours < 1) return { label: 'Generated just now', color: 'text-accent-success' };
+  if (hours < 24) return { label: `Generated ${Math.round(hours)}h ago`, color: 'text-accent-success' };
+  if (hours < 72) return { label: `Generated ${Math.round(hours / 24)}d ago`, color: 'text-accent-warning' };
+  return { label: `Generated ${Math.round(hours / 24)}d ago — consider regenerating`, color: 'text-accent-warning' };
 }
 
 export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
@@ -98,7 +98,7 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
         <PageHeader
           title="LLMs.txt Generator"
           subtitle="Generate an LLMs.txt file to help AI models understand your site"
-          icon={<Icon as={Bot} size="lg" className="text-teal-400" />}
+          icon={<Icon as={Bot} size="lg" className="text-accent-brand" />}
         />
         <EmptyState
           icon={Bot}
@@ -126,7 +126,7 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
             </span>
           </span>
         }
-        icon={<Icon as={Bot} size="lg" className="text-teal-400" />}
+        icon={<Icon as={Bot} size="lg" className="text-accent-brand" />}
         actions={
           <div className="flex items-center gap-2">
             {data && (
@@ -135,19 +135,19 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
                   onClick={handleCopy}
                   className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--surface-3)] text-[var(--brand-text)] hover:bg-[var(--brand-border-hover)] transition-colors"
                 >
-                  {copied ? <Icon as={Check} size="sm" className="text-emerald-400" /> : <Icon as={Copy} size="sm" />}
+                  {copied ? <Icon as={Check} size="sm" className="text-accent-success" /> : <Icon as={Copy} size="sm" />}
                   {copied ? 'Copied!' : 'Copy'}
                 </button>
                 <button
                   onClick={handleDownload}
-                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-[var(--radius-md)] bg-teal-500/10 text-teal-400 hover:bg-teal-500/15 transition-colors"
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-[var(--radius-md)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/15 transition-colors"
                 >
                   <Icon as={Download} size="sm" />
                   llms.txt
                 </button>
                 <button
                   onClick={handleDownloadFull}
-                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-[var(--radius-md)] bg-teal-500/10 text-teal-400 hover:bg-teal-500/15 transition-colors"
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-[var(--radius-md)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/15 transition-colors"
                 >
                   <Icon as={Download} size="sm" />
                   llms-full.txt
@@ -168,7 +168,7 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
 
       {loading && !data && (
         <div className="flex items-center justify-center py-24 gap-3">
-          <Icon as={Loader2} size="lg" className="animate-spin text-teal-400" />
+          <Icon as={Loader2} size="lg" className="animate-spin text-accent-brand" />
           <span className="text-sm text-[var(--brand-text)]">Generating LLMs.txt with AI summaries…</span>
         </div>
       )}
@@ -176,7 +176,7 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
       {error && (
         // pr-check-disable-next-line -- brand signature radius intentional for featured error banner surface
         <div className="flex items-start gap-2 px-4 py-3 bg-red-500/5 border border-red-500/15" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-          <span className="text-xs text-red-400">{error}</span>
+          <span className="text-xs text-accent-danger">{error}</span>
         </div>
       )}
 
@@ -195,14 +195,14 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
           {/* Preview */}
           <SectionCard
             title="Preview"
-            titleIcon={<Icon as={FileText} size="md" className="text-teal-400" />}
+            titleIcon={<Icon as={FileText} size="md" className="text-accent-brand" />}
             titleExtra={
               <div className="flex items-center gap-1 ml-2">
                 <button
                   onClick={() => setPreviewMode('index')}
                   className={cn(
-                    't-caption-sm px-2 py-0.5 rounded-full transition-colors',
-                    previewMode === 'index' ? 'bg-teal-500/15 text-teal-400' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]',
+                    't-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] transition-colors',
+                    previewMode === 'index' ? 'bg-teal-500/15 text-accent-brand' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]',
                   )}
                 >
                   llms.txt
@@ -210,8 +210,8 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
                 <button
                   onClick={() => setPreviewMode('full')}
                   className={cn(
-                    't-caption-sm px-2 py-0.5 rounded-full transition-colors',
-                    previewMode === 'full' ? 'bg-teal-500/15 text-teal-400' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]',
+                    't-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] transition-colors',
+                    previewMode === 'full' ? 'bg-teal-500/15 text-accent-brand' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]',
                   )}
                 >
                   llms-full.txt

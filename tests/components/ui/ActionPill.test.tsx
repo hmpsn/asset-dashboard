@@ -11,17 +11,17 @@ describe('ActionPill', () => {
   });
 
   const cases = [
-    ['start', 'teal-500'],
-    ['approve', 'emerald-500'],
-    ['decline', 'red-500'],
-    ['send', 'blue-500'],
-    ['request-changes', 'amber-500'],
+    ['start', 'var(--teal)'],
+    ['approve', 'var(--emerald)'],
+    ['decline', 'var(--red)'],
+    ['send', 'var(--blue)'],
+    ['request-changes', 'var(--amber)'],
   ] as const;
 
-  it.each(cases)('%s variant uses %s color family', (variant, hue) => {
+  it.each(cases)('%s variant uses %s styleguide token', (variant, token) => {
     render(<ActionPill variant={variant}>X</ActionPill>);
     const btn = screen.getByRole('button');
-    expect(btn.className).toContain(hue);
+    expect(btn.className).toContain(token);
   });
 
   it('renders optional icon', () => {

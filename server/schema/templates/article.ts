@@ -13,6 +13,18 @@ export interface ArticleInput {
 
 export type ArticleKind = 'BlogPosting' | 'Article';
 
+function cleanStepText(text: string): string {
+  return text.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function stepName(text: string): string {
+  const cleaned = cleanStepText(text);
+  const label = cleaned.match(/^(.{3,80}?)(?:\s+-\s+|:\s+)/)?.[1]
+    || cleaned.match(/^([^.!?]{8,80})[.!?]\s/)?.[1]
+    || cleaned;
+  return label.length <= 80 ? label : `${label.slice(0, 77).trim()}...`;
+}
+
 export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Record<string, unknown> {
   const { pageData } = input;
 
@@ -64,8 +76,8 @@ export function buildArticleSchema(input: ArticleInput, kind: ArticleKind): Reco
     'step': howToList.steps!.map((s) => ({
       '@type': 'HowToStep' as const,
       'position': s.position,
-      'name': s.name,
-      'text': s.text,
+      'name': stepName(s.name || s.text),
+      'text': cleanStepText(s.text),
     })),
   }) : undefined;
 
