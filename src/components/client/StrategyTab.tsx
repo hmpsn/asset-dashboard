@@ -1,9 +1,9 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { Fragment, useState, useRef, useEffect, useCallback } from 'react';
 import {
   Zap, FileText, Sparkles, Target, CheckCircle2,
   TrendingUp, TrendingDown, Minus, ChevronDown, Layers,
   MessageCircle, BarChart3, Eye, AlertTriangle,
-  ThumbsUp, ThumbsDown, Undo2, Ban, Plus, X, Briefcase, Search,
+  ThumbsUp, ThumbsDown, Undo2, Ban, Plus, X, Briefcase, Search, ArrowUpDown,
 } from 'lucide-react';
 import { TierGate, EmptyState, type Tier, Icon, Button } from '../ui';
 import type { ClientKeywordStrategy, ClientContentRequest } from './types';
@@ -48,6 +48,9 @@ interface StrategyTabProps {
 const kdColor = (kd?: number) => !kd ? 'text-[var(--brand-text-muted)]' : kd <= 30 ? 'text-accent-success' : kd <= 60 ? 'text-accent-warning' : kd <= 80 ? 'text-accent-orange' : 'text-accent-danger';
 const fmtNum = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString();
 const normalizeKeyword = (keyword: string) => keyword.toLowerCase().trim();
+const formatMetricSource = (source?: string) => source
+  ? source.split('_').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join(' ')
+  : 'Not available';
 const intentColor = (intent?: string) => {
   switch (intent) {
     case 'commercial': return 'text-accent-info bg-blue-500/10 border-blue-500/20';
@@ -68,6 +71,7 @@ export interface KeywordFeedback {
 }
 
 type PriorityKeywordStatus = 'client' | 'strategy' | 'suggested';
+type StrategyKeywordSortKey = 'keyword' | 'source' | 'volume' | 'difficulty' | 'rank';
 
 interface PriorityKeywordItem {
   label: string;
@@ -76,6 +80,21 @@ interface PriorityKeywordItem {
   isStrategy: boolean;
   isRequested: boolean;
   status: PriorityKeywordStatus;
+}
+
+interface StrategyKeywordTableRow extends PriorityKeywordItem {
+  sourceLabel: 'Generated strategy' | 'Added by you' | 'Keyword idea';
+  sourceDetail: string;
+  volume?: number;
+  difficulty?: number;
+  currentPosition?: number;
+  pagePath?: string;
+  pageTitle?: string;
+  searchIntent?: string;
+  impressions?: number;
+  clicks?: number;
+  metricsSource?: string;
+  contextSources: string[];
 }
 
 export function StrategyTab({ strategyData, requestedTopics, contentRequests, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal, contentPlanKeywords, onTabChange, workspaceId, setToast, onContentRequested, hidePrices }: StrategyTabProps) {
@@ -155,8 +174,11 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const [addingKeyword, setAddingKeyword] = useState(false);
   const [removingKeyword, setRemovingKeyword] = useState<string | null>(null);
   const [confirmRemoveKeyword, setConfirmRemoveKeyword] = useState<string | null>(null);
-  const [showAllPriorityKeywords, setShowAllPriorityKeywords] = useState(false);
+  const [trackedKeywordsLoading, setTrackedKeywordsLoading] = useState(false);
   const [priorityKeywordSearch, setPriorityKeywordSearch] = useState('');
+  const [includeKeywordIdeas, setIncludeKeywordIdeas] = useState(false);
+  const [expandedKeywordRows, setExpandedKeywordRows] = useState<Set<string>>(new Set());
+  const [keywordSort, setKeywordSort] = useState<{ key: StrategyKeywordSortKey; asc: boolean }>({ key: 'keyword', asc: true });
   const [trackedKeywordsError, setTrackedKeywordsError] = useState(false);
   const [discussingGrowthPage, setDiscussingGrowthPage] = useState<string | null>(null);
   const confirmRemoveKeywordButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -220,11 +242,13 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const loadTrackedKeywords = useCallback(() => {
     if (!workspaceId) return;
     setTrackedKeywordsError(false);
+    setTrackedKeywordsLoading(true);
     trackedKwApi.get(workspaceId)
       .then((data) => {
         setTrackedKeywords(data.keywords || []);
       })
-      .catch(() => { setTrackedKeywordsError(true); });
+      .catch(() => { setTrackedKeywordsError(true); })
+      .finally(() => setTrackedKeywordsLoading(false));
   }, [workspaceId]);
   useEffect(() => {
     if (!workspaceId) return;
@@ -350,22 +374,149 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const strategyKeywords = priorityKeywords.filter(item => item.status === 'client' || item.status === 'strategy');
   const keywordIdeas = priorityKeywords.filter(item => item.status === 'suggested');
   const priorityKeywordSearchTerm = normalizeKeyword(priorityKeywordSearch);
-  const filteredStrategyKeywords = strategyKeywords.filter(item => {
-    const matchesSearch = priorityKeywordSearchTerm ? item.normalized.includes(priorityKeywordSearchTerm) : true;
-    return matchesSearch;
+  const siteMetricMap = new Map((strategyData.siteKeywordMetrics || []).map(metric => [normalizeKeyword(metric.keyword), metric]));
+  const contentGapMap = new Map((strategyData.contentGaps || []).map(gap => [normalizeKeyword(gap.targetKeyword), gap]));
+  const keywordGapMap = new Map((strategyData.keywordGaps || []).map(gap => [normalizeKeyword(gap.keyword), gap]));
+
+  const findKeywordPage = (normalized: string) => {
+    let secondaryMatch: (typeof strategyData.pageMap)[number] | undefined;
+    for (const page of strategyData.pageMap) {
+      if (normalizeKeyword(page.primaryKeyword || '') === normalized) return page;
+      if (!secondaryMatch && (page.secondaryKeywords || []).some(kw => normalizeKeyword(kw) === normalized)) {
+        secondaryMatch = page;
+      }
+    }
+    return secondaryMatch;
+  };
+
+  const buildKeywordRow = (item: PriorityKeywordItem): StrategyKeywordTableRow => {
+    const page = findKeywordPage(item.normalized);
+    const siteMetric = siteMetricMap.get(item.normalized);
+    const contentGap = contentGapMap.get(item.normalized);
+    const keywordGap = keywordGapMap.get(item.normalized);
+    const metricsSource = page?.metricsSource
+      || (siteMetric ? 'strategy metrics' : undefined)
+      || (contentGap ? 'content recommendation' : undefined)
+      || (keywordGap ? 'competitor gap' : undefined);
+    const contextSources = [
+      item.isStrategy ? 'Generated strategy' : null,
+      item.isTracked ? 'Rank tracking' : null,
+      item.isRequested ? 'Client request' : null,
+      page ? 'Page map' : null,
+      contentGap ? 'Content recommendation' : null,
+      keywordGap ? 'Competitor gap' : null,
+    ].filter(Boolean) as string[];
+    const sourceLabel: StrategyKeywordTableRow['sourceLabel'] = item.status === 'suggested'
+      ? 'Keyword idea'
+      : item.isTracked
+        ? 'Added by you'
+        : 'Generated strategy';
+    const sourceDetail = item.status === 'suggested'
+      ? 'Optional keyword clients can add into the active strategy set.'
+      : item.isTracked
+        ? 'Client-added keyword used for future tracking and recommendations.'
+        : 'Keyword from the generated strategy or page map.';
+
+    return {
+      ...item,
+      sourceLabel,
+      sourceDetail,
+      volume: page?.volume ?? siteMetric?.volume ?? contentGap?.volume ?? keywordGap?.volume,
+      difficulty: page?.difficulty ?? siteMetric?.difficulty ?? contentGap?.difficulty ?? keywordGap?.difficulty,
+      currentPosition: page?.currentPosition,
+      pagePath: page?.pagePath,
+      pageTitle: page?.pageTitle,
+      searchIntent: page?.searchIntent ?? contentGap?.intent,
+      impressions: page?.impressions ?? contentGap?.impressions,
+      clicks: page?.clicks,
+      metricsSource,
+      contextSources,
+    };
+  };
+
+  const strategyKeywordRows = strategyKeywords.map(buildKeywordRow);
+  const keywordIdeaRows = keywordIdeas.map(buildKeywordRow);
+  const keywordRows = includeKeywordIdeas ? [...strategyKeywordRows, ...keywordIdeaRows] : strategyKeywordRows;
+  const filteredKeywordRows = keywordRows.filter(row => {
+    if (!priorityKeywordSearchTerm) return true;
+    return row.normalized.includes(priorityKeywordSearchTerm)
+      || normalizeKeyword(row.sourceLabel).includes(priorityKeywordSearchTerm)
+      || normalizeKeyword(row.pagePath || '').includes(priorityKeywordSearchTerm)
+      || normalizeKeyword(row.pageTitle || '').includes(priorityKeywordSearchTerm);
   });
-  const filteredKeywordIdeas = keywordIdeas.filter(item => {
-    const matchesSearch = priorityKeywordSearchTerm ? item.normalized.includes(priorityKeywordSearchTerm) : true;
-    return matchesSearch;
+
+  const compareOptionalNumber = (a?: number, b?: number, asc = true) => {
+    if (a == null && b == null) return 0;
+    if (a == null) return 1;
+    if (b == null) return -1;
+    return asc ? a - b : b - a;
+  };
+
+  const sortedKeywordRows = [...filteredKeywordRows].sort((a, b) => {
+    let result = 0;
+    switch (keywordSort.key) {
+      case 'keyword':
+        result = a.label.localeCompare(b.label);
+        break;
+      case 'source':
+        result = a.sourceLabel.localeCompare(b.sourceLabel) || a.label.localeCompare(b.label);
+        break;
+      case 'volume':
+        result = compareOptionalNumber(a.volume, b.volume, keywordSort.asc) || a.label.localeCompare(b.label);
+        break;
+      case 'difficulty':
+        result = compareOptionalNumber(a.difficulty, b.difficulty, keywordSort.asc) || a.label.localeCompare(b.label);
+        break;
+      case 'rank':
+        result = compareOptionalNumber(a.currentPosition, b.currentPosition, keywordSort.asc) || a.label.localeCompare(b.label);
+        break;
+    }
+    return keywordSort.key === 'volume' || keywordSort.key === 'difficulty' || keywordSort.key === 'rank'
+      ? result
+      : keywordSort.asc ? result : -result;
   });
+
   const hasPriorityKeywordSearch = priorityKeywordSearchTerm.length > 0;
-  const visiblePriorityKeywords = (showAllPriorityKeywords || hasPriorityKeywordSearch)
-    ? filteredStrategyKeywords
-    : filteredStrategyKeywords.slice(0, 18);
-  const hiddenPriorityKeywordCount = Math.max(0, filteredStrategyKeywords.length - visiblePriorityKeywords.length);
   const priorityKeywordEmptyMessage = hasPriorityKeywordSearch
-    ? 'No strategy keywords match that search.'
-    : 'No strategy keywords yet.';
+    ? includeKeywordIdeas
+      ? 'No strategy keywords or keyword ideas match that search.'
+      : 'No strategy keywords match that search.'
+    : includeKeywordIdeas
+      ? 'No strategy keywords or keyword ideas yet.'
+      : 'No strategy keywords yet.';
+  const keywordSearchLabel = includeKeywordIdeas ? 'Search strategy keywords and ideas' : 'Search strategy keywords';
+
+  const handleKeywordSort = (key: StrategyKeywordSortKey) => {
+    setKeywordSort(prev => prev.key === key ? { key, asc: !prev.asc } : { key, asc: key === 'keyword' || key === 'source' || key === 'rank' });
+  };
+
+  const toggleKeywordRow = (normalized: string) => {
+    setExpandedKeywordRows(prev => {
+      const next = new Set(prev);
+      if (next.has(normalized)) next.delete(normalized);
+      else next.add(normalized);
+      return next;
+    });
+  };
+
+  const getKeywordRemovalCopy = (row: StrategyKeywordTableRow) => {
+    if (row.status === 'suggested') return 'Dismissing this idea removes it from this suggestion list.';
+    if (row.isTracked && row.isStrategy) return 'Removing this stops future tracking and marks it as not relevant for future strategy recommendations. Historical ranking data is preserved.';
+    if (row.isTracked) return 'Removing this stops future tracking. Historical ranking data is preserved.';
+    return 'Removing this marks it as not relevant so future strategies avoid using it.';
+  };
+
+  const handleKeywordConfirmKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape' && !removingKeyword) setConfirmRemoveKeyword(null);
+  };
+
+  const keywordSortColumns: Array<{ key: StrategyKeywordSortKey; label: string; align?: 'left' | 'right' }> = [
+    { key: 'keyword', label: 'Keyword' },
+    { key: 'source', label: 'Source' },
+    { key: 'volume', label: 'Monthly searches', align: 'right' },
+    { key: 'difficulty', label: 'KD', align: 'right' },
+    { key: 'rank', label: 'Current rank', align: 'right' },
+  ];
 
   const addStrategyKeyword = async (keyword: string, options?: { clearInput?: boolean }) => {
     if (!workspaceId) return;
@@ -391,7 +542,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       }
       setTrackedKeywords(res.keywords || []);
       if (options?.clearInput) setNewTrackedKeyword('');
-      setToast?.(`"${kw}" added to strategy keywords`);
+      setToast?.('Added to Strategy Keywords. This will guide future recommendations, but it will not rewrite the current strategy instantly.');
     } catch {
       setToast?.('Failed to add keyword');
     } finally {
@@ -467,9 +618,26 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           </div>
         )}
 
-        <div className="flex flex-col gap-1 mb-2 sm:flex-row sm:items-center sm:justify-between">
-          <span className="t-caption-sm font-medium text-[var(--brand-text)]">Current strategy keywords</span>
-          <span className="t-caption-sm text-[var(--brand-text-muted)]">Sorted A-Z. Remove anything that should not guide the strategy.</span>
+        <div className="flex flex-col gap-3 mb-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div className="t-caption-sm font-medium text-[var(--brand-text)]">Current strategy keywords</div>
+            <p className="t-caption-sm text-[var(--brand-text-muted)]">
+              These are inputs for future strategy updates, not an instant regeneration trigger.
+            </p>
+          </div>
+          <label className="inline-flex items-center gap-2 t-caption-sm text-[var(--brand-text)]">
+            <input
+              type="checkbox"
+              checked={includeKeywordIdeas}
+              onChange={e => {
+                setIncludeKeywordIdeas(e.target.checked);
+                setConfirmRemoveKeyword(null);
+              }}
+              className="w-4 h-4 rounded-[var(--radius-sm)] border-[var(--brand-border-strong)] bg-[var(--surface-3)] text-accent-brand focus:ring-teal-500"
+            />
+            Include keyword ideas
+            <span className="text-[var(--brand-text-muted)]">({keywordIdeas.length})</span>
+          </label>
         </div>
         <div className="relative mb-3">
           <Icon as={Search} size="sm" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)] pointer-events-none" />
@@ -480,8 +648,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               setPriorityKeywordSearch(e.target.value);
               setConfirmRemoveKeyword(null);
             }}
-            aria-label="Search strategy keywords and ideas"
-            placeholder="Search strategy keywords and ideas..."
+            aria-label={keywordSearchLabel}
+            placeholder={`${keywordSearchLabel}...`}
             className="w-full bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] pl-8 pr-9 py-1.5 t-caption-sm text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors"
           />
           {priorityKeywordSearch && (
@@ -490,7 +658,6 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               onClick={() => {
                 setPriorityKeywordSearch('');
                 setConfirmRemoveKeyword(null);
-                setShowAllPriorityKeywords(false);
               }}
               className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-[var(--radius-sm)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-2)] transition-colors"
               aria-label="Clear strategy keyword search"
@@ -500,145 +667,213 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           )}
         </div>
 
-        {visiblePriorityKeywords.length > 0 ? (
-          <div className="flex flex-wrap gap-2 mb-3">
-            {visiblePriorityKeywords.map(item => {
-              const confirming = confirmRemoveKeyword === item.normalized;
-              const removing = removingKeyword === item.normalized;
-              const removeLabel = `Remove ${item.label} from strategy keywords`;
-              return (
-                <span key={item.normalized} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-lg)] border t-caption-sm bg-[var(--surface-3)] border-[var(--brand-border-strong)] text-[var(--brand-text)]">
-                  <span className="text-[var(--brand-text)]">{item.label}</span>
-                  {confirming ? (
-                    <>
-                      <button
-                        ref={confirmRemoveKeywordButtonRef}
-                        type="button"
-                        onClick={() => removePriorityKeyword(item)}
-                        disabled={removing}
-                        className="text-accent-danger hover:text-accent-danger transition-colors disabled:opacity-50"
-                      >
-                        {removing ? 'Removing...' : 'Confirm'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setConfirmRemoveKeyword(null)}
-                        disabled={removing}
-                        className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors disabled:opacity-50"
-                      >
-                        Cancel
-                      </button>
-                    </>
-                  ) : (
+        <div className="overflow-x-auto border border-[var(--brand-border)] rounded-[var(--radius-lg)]">
+          <table className="w-full t-caption-sm">
+            <thead>
+              <tr className="border-b border-[var(--brand-border)] bg-[var(--surface-3)]/35">
+                <th className="w-8 px-2 py-2" aria-label="Expand keyword details" />
+                {keywordSortColumns.map(column => (
+                  <th
+                    key={column.key}
+                    aria-sort={keywordSort.key === column.key ? (keywordSort.asc ? 'ascending' : 'descending') : 'none'}
+                    className={`px-3 py-2 font-medium text-[var(--brand-text-muted)] ${column.align === 'right' ? 'text-right' : 'text-left'}`}
+                  >
                     <button
                       type="button"
-                      onClick={() => setConfirmRemoveKeyword(item.normalized)}
-                      className="text-[var(--brand-text-muted)] hover:text-accent-danger transition-colors"
-                      title={removeLabel}
-                      aria-label={removeLabel}
+                      onClick={() => handleKeywordSort(column.key)}
+                      className={`inline-flex items-center gap-1 hover:text-[var(--brand-text)] transition-colors ${column.align === 'right' ? 'ml-auto' : ''}`}
                     >
-                      <Icon as={X} size="sm" />
+                      {column.label}
+                      <Icon as={ArrowUpDown} size="sm" className={keywordSort.key === column.key ? 'text-accent-brand' : 'text-[var(--brand-text-faint)]'} />
                     </button>
-                  )}
-                </span>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="t-caption-sm text-[var(--brand-text-muted)] mb-3">
-            {priorityKeywordEmptyMessage}
-          </p>
-        )}
-        <span className="sr-only" aria-live="polite">
-          {confirmRemoveKeyword ? 'Confirm removal or cancel.' : ''}
-        </span>
-
-        <div className="flex flex-wrap gap-2">
-          {hiddenPriorityKeywordCount > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowAllPriorityKeywords(true)}
-              className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] px-2 py-1 transition-colors"
-            >
-              View all strategy keywords ({filteredStrategyKeywords.length})
-            </button>
-          )}
-          {!hasPriorityKeywordSearch && showAllPriorityKeywords && filteredStrategyKeywords.length > 18 && (
-            <button
-              type="button"
-              onClick={() => setShowAllPriorityKeywords(false)}
-              className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] px-2 py-1 transition-colors"
-            >
-              Show fewer
-            </button>
-          )}
-        </div>
-
-        {keywordIdeas.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-[var(--brand-border)]/50">
-            <div className="flex flex-col gap-1 mb-2 sm:flex-row sm:items-center sm:justify-between">
-              <span className="t-caption-sm font-medium text-[var(--brand-text)]">Keyword ideas to add</span>
-              <span className="t-caption-sm text-[var(--brand-text-muted)]">Optional terms you can add to the strategy.</span>
-            </div>
-            {filteredKeywordIdeas.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {filteredKeywordIdeas.map(item => {
-                  const confirming = confirmRemoveKeyword === item.normalized;
-                  const removing = removingKeyword === item.normalized;
-                  return (
-                    <span key={item.normalized} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-lg)] border t-caption-sm bg-[var(--surface-3)] border-[var(--brand-border-strong)] text-[var(--brand-text)]">
-                      <span>{item.label}</span>
-                      {confirming ? (
-                        <>
+                  </th>
+                ))}
+                <th className="px-3 py-2 text-left font-medium text-[var(--brand-text-muted)]">Page</th>
+                <th className="px-3 py-2 text-right font-medium text-[var(--brand-text-muted)]">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {trackedKeywordsLoading && sortedKeywordRows.length === 0 ? (
+                Array.from({ length: 3 }).map((_, index) => (
+                  <tr key={`keyword-skeleton-${index}`} className="border-b border-[var(--brand-border)]/60">
+                    <td className="px-2 py-3" />
+                    <td className="px-3 py-3"><div className="h-3 w-40 rounded-[var(--radius-pill)] bg-[var(--surface-3)]" /></td>
+                    <td className="px-3 py-3"><div className="h-3 w-24 rounded-[var(--radius-pill)] bg-[var(--surface-3)]" /></td>
+                    <td className="px-3 py-3"><div className="h-3 w-16 ml-auto rounded-[var(--radius-pill)] bg-[var(--surface-3)]" /></td>
+                    <td className="px-3 py-3"><div className="h-3 w-12 ml-auto rounded-[var(--radius-pill)] bg-[var(--surface-3)]" /></td>
+                    <td className="px-3 py-3"><div className="h-3 w-14 ml-auto rounded-[var(--radius-pill)] bg-[var(--surface-3)]" /></td>
+                    <td className="px-3 py-3"><div className="h-3 w-32 rounded-[var(--radius-pill)] bg-[var(--surface-3)]" /></td>
+                    <td className="px-3 py-3"><div className="h-3 w-16 ml-auto rounded-[var(--radius-pill)] bg-[var(--surface-3)]" /></td>
+                  </tr>
+                ))
+              ) : sortedKeywordRows.length > 0 ? sortedKeywordRows.map(row => {
+                const expanded = expandedKeywordRows.has(row.normalized);
+                const confirming = confirmRemoveKeyword === row.normalized;
+                const removing = removingKeyword === row.normalized;
+                const isIdea = row.status === 'suggested';
+                const removeLabel = isIdea ? `Dismiss ${row.label}` : `Remove ${row.label} from strategy keywords`;
+                const sourceClass = row.sourceLabel === 'Added by you'
+                  ? 'text-accent-brand bg-[var(--surface-3)] border-[var(--brand-border-strong)]'
+                  : row.sourceLabel === 'Keyword idea'
+                    ? 'text-[var(--brand-text-muted)] bg-[var(--surface-3)] border-[var(--brand-border)]'
+                    : 'text-accent-info bg-blue-500/10 border-blue-500/20';
+                return (
+                  <Fragment key={row.normalized}>
+                    <tr className="border-b border-[var(--brand-border)]/60 hover:bg-[var(--surface-3)]/30">
+                      <td className="px-2 py-2 align-top">
+                        <button
+                          type="button"
+                          onClick={() => toggleKeywordRow(row.normalized)}
+                          className="p-1 rounded-[var(--radius-sm)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)] transition-colors"
+                          aria-label={`${expanded ? 'Collapse' : 'Expand'} ${row.label} details`}
+                          aria-expanded={expanded}
+                        >
+                          <Icon as={ChevronDown} size="sm" className={`transition-transform ${expanded ? '' : '-rotate-90'}`} />
+                        </button>
+                      </td>
+                      <td className="px-3 py-2 align-top">
+                        <div className="font-medium text-[var(--brand-text)]">{row.label}</div>
+                        {row.searchIntent && (
+                          <div className="mt-0.5 t-caption-sm text-[var(--brand-text-muted)]">{row.searchIntent} intent</div>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 align-top">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] border t-caption-sm ${sourceClass}`}>
+                          {row.sourceLabel}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-right align-top text-[var(--brand-text)] tabular-nums">
+                        {row.volume != null && row.volume > 0 ? `${fmtNum(row.volume)}/mo` : <span className="text-[var(--brand-text-muted)]">Not available</span>}
+                      </td>
+                      <td className="px-3 py-2 text-right align-top tabular-nums">
+                        {row.difficulty != null && row.difficulty > 0 ? (
+                          <span className={kdColor(row.difficulty)} title={kdTooltip(row.difficulty)}>KD {row.difficulty}</span>
+                        ) : (
+                          <span className="text-[var(--brand-text-muted)]">Not available</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right align-top tabular-nums">
+                        {row.currentPosition ? <span className="text-[var(--brand-text)]">#{Math.round(row.currentPosition)}</span> : <span className="text-[var(--brand-text-muted)]">Not ranked</span>}
+                      </td>
+                      <td className="px-3 py-2 align-top">
+                        {row.pagePath ? (
+                          <div>
+                            <div className="text-[var(--brand-text)] max-w-[220px] truncate">{row.pageTitle || row.pagePath}</div>
+                            <div className="t-caption-sm text-[var(--brand-text-muted)] max-w-[220px] truncate">{row.pagePath}</div>
+                          </div>
+                        ) : (
+                          <span className="text-[var(--brand-text-muted)]">Unmapped</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right align-top">
+                        {confirming ? (
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              ref={confirmRemoveKeywordButtonRef}
+                              type="button"
+                              onClick={() => removePriorityKeyword(row)}
+                              onKeyDown={handleKeywordConfirmKeyDown}
+                              disabled={removing}
+                              className="text-accent-danger hover:underline underline-offset-2 transition-colors disabled:opacity-50"
+                            >
+                              {removing ? 'Removing...' : isIdea ? 'Dismiss' : 'Confirm'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmRemoveKeyword(null)}
+                              onKeyDown={handleKeywordConfirmKeyDown}
+                              disabled={removing}
+                              className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : isIdea ? (
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => addStrategyKeyword(row.label)}
+                              disabled={addingKeyword}
+                              className="text-accent-brand hover:underline underline-offset-2 transition-colors disabled:opacity-50"
+                              aria-label={`Add ${row.label} to strategy keywords`}
+                            >
+                              Add to strategy
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmRemoveKeyword(row.normalized)}
+                              className="text-[var(--brand-text-muted)] hover:text-accent-danger transition-colors"
+                              title={removeLabel}
+                              aria-label={removeLabel}
+                            >
+                              <Icon as={X} size="sm" />
+                            </button>
+                          </div>
+                        ) : (
                           <button
-                            ref={confirmRemoveKeywordButtonRef}
                             type="button"
-                            onClick={() => removePriorityKeyword(item)}
-                            disabled={removing}
-                            className="text-accent-danger hover:text-accent-danger transition-colors disabled:opacity-50"
-                          >
-                            {removing ? 'Removing...' : 'Dismiss'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setConfirmRemoveKeyword(null)}
-                            disabled={removing}
-                            className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors disabled:opacity-50"
-                          >
-                            Cancel
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => addStrategyKeyword(item.label)}
-                            disabled={addingKeyword}
-                            className="text-accent-brand hover:underline underline-offset-2 transition-colors disabled:opacity-50"
-                            aria-label={`Add ${item.label} to strategy keywords`}
-                          >
-                            Add
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setConfirmRemoveKeyword(item.normalized)}
+                            onClick={() => setConfirmRemoveKeyword(row.normalized)}
                             className="text-[var(--brand-text-muted)] hover:text-accent-danger transition-colors"
-                            title={`Dismiss ${item.label}`}
-                            aria-label={`Dismiss ${item.label}`}
+                            title={removeLabel}
+                            aria-label={removeLabel}
                           >
                             <Icon as={X} size="sm" />
                           </button>
-                        </>
-                      )}
-                    </span>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="t-caption-sm text-[var(--brand-text-muted)]">No keyword ideas match that search.</p>
-            )}
-          </div>
-        )}
+                        )}
+                      </td>
+                    </tr>
+                    {expanded && (
+                      <tr key={`${row.normalized}-details`} className="border-b border-[var(--brand-border)]/60 bg-[var(--surface-3)]/20">
+                        <td />
+                        <td colSpan={7} className="px-3 py-3">
+                          <div className="grid gap-3 md:grid-cols-3">
+                            <div>
+                              <div className="t-caption-sm font-medium text-[var(--brand-text)] mb-1">Why this is here</div>
+                              <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">{row.sourceDetail}</p>
+                              {row.contextSources.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                  {row.contextSources.map(source => (
+                                    <span key={source} className="px-2 py-0.5 rounded-[var(--radius-pill)] border border-[var(--brand-border)] text-[var(--brand-text-muted)] bg-[var(--surface-2)] t-caption-sm">
+                                      {source}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <div>
+                              <div className="t-caption-sm font-medium text-[var(--brand-text)] mb-1">Available signals</div>
+                              <div className="space-y-1 t-caption-sm text-[var(--brand-text-muted)]">
+                                <div>Impressions: <span className="text-[var(--brand-text)]">{row.impressions != null ? row.impressions.toLocaleString() : 'Not available'}</span></div>
+                                <div>Clicks: <span className="text-[var(--brand-text)]">{row.clicks != null ? row.clicks.toLocaleString() : 'Not available'}</span></div>
+                                <div>Metric source: <span className="text-[var(--brand-text)]">{formatMetricSource(row.metricsSource)}</span></div>
+                              </div>
+                            </div>
+                            <div>
+                              <div className="t-caption-sm font-medium text-[var(--brand-text)] mb-1">If removed</div>
+                              <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">{getKeywordRemovalCopy(row)}</p>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              }) : (
+                <tr>
+                  <td colSpan={8} className="px-4 py-6 text-center t-caption-sm text-[var(--brand-text-muted)]">
+                    {priorityKeywordEmptyMessage}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <span className="sr-only" aria-live="polite">
+          {confirmRemoveKeyword ? 'Confirm removal or cancel.' : ''}
+        </span>
+        <div className="mt-2 t-caption-sm text-[var(--brand-text-muted)]">
+          Showing {sortedKeywordRows.length} of {keywordRows.length} keyword{keywordRows.length === 1 ? '' : 's'}{includeKeywordIdeas ? ' including ideas.' : '.'}
+        </div>
       </div>
     </div>
   );
@@ -671,6 +906,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-4">
             <div className={`t-stat-lg ${healthScore >= 80 ? 'text-accent-success' : healthScore >= 60 ? 'text-accent-warning' : 'text-accent-brand'}`}>
+              {/* score-color-deviation-ok: planning readiness, not a health grade - teal avoids false alarm */}
               {healthScore}<span className="t-caption-sm text-[var(--brand-text-muted)]">/100</span>
             </div>
             <div>
@@ -804,13 +1040,13 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           {feedbackLoadError && (
             <p className="t-caption-sm text-accent-danger">
               Couldn't load your previous keyword feedback - your relevant and not relevant choices may not reflect correctly.{' '}
-              <button onClick={loadFeedback} className="underline hover:text-accent-danger">Retry</button>
+              <button type="button" onClick={loadFeedback} className="underline hover:text-accent-danger">Retry</button>
             </p>
           )}
           {trackedKeywordsError && (
             <p className="t-caption-sm text-accent-danger">
               Couldn't load your strategy keywords.{' '}
-              <button onClick={loadTrackedKeywords} className="underline hover:text-accent-danger">Retry</button>
+              <button type="button" onClick={loadTrackedKeywords} className="underline hover:text-accent-danger">Retry</button>
             </p>
           )}
         </div>

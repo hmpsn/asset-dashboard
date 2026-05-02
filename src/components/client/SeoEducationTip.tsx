@@ -26,8 +26,8 @@ const TAB_TIPS: Record<string, TabTip> = {
   },
   strategy: {
     title: 'SEO Strategy',
-    body: 'Start with the recommended next steps, then use priority keywords to guide what we should watch, consider, or create around next.',
-    learnMore: 'Adding a priority keyword starts future rank tracking and helps shape later recommendations. Removing one stops future tracking, but historical ranking data is preserved.',
+    body: 'Start with the recommended next steps, then use strategy keywords to guide what we should watch, consider, or create around next.',
+    learnMore: 'Adding a strategy keyword starts future rank tracking and helps shape later recommendations. Removing one stops future tracking, but historical ranking data is preserved.',
   },
   content: {
     title: 'Content That Ranks',
@@ -90,7 +90,7 @@ export function SeoEducationTip({ tab, workspaceId }: Props) {
               {tip.learnMore && !showLearnMore && (
                 <button
                   onClick={() => setShowLearnMore(true)}
-                  className="flex items-center gap-1 t-caption-sm text-accent-brand hover:text-accent-brand transition-colors font-medium"
+                  className="flex items-center gap-1 t-caption-sm text-accent-brand hover:underline underline-offset-2 transition-colors font-medium"
                 >
                   Learn more <ChevronRight className="w-3 h-3" />
                 </button>

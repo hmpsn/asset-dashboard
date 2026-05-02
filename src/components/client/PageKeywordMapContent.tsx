@@ -320,7 +320,7 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                               <div className="t-caption-sm text-[var(--brand-text-muted)] py-2">
                                 {page.secondaryKeywords && page.secondaryKeywords.length > 0 ? (
                                   <div>
-                                    <div className="t-caption-sm text-[var(--brand-text)] mb-1.5">Priority keywords (no GSC data yet):</div>
+                                    <div className="t-caption-sm text-[var(--brand-text)] mb-1.5">Strategy keywords (no GSC data yet):</div>
                                     <div className="flex flex-wrap gap-1.5">
                                       <span className="t-caption-sm text-accent-brand bg-teal-500/10 border border-teal-500/20 px-2 py-0.5 rounded-[var(--radius-sm)]">{page.primaryKeyword}</span>
                                       {page.secondaryKeywords.map((kw, i) => (
