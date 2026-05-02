@@ -150,7 +150,7 @@ export function ContentTab({
         <div className="grid grid-cols-4 gap-3">
           {stats.map(s => (
             <div key={s.label} className={`${s.bg} border ${s.border} rounded-[var(--radius-lg)] px-3 py-2 text-center`}>
-              <div className={`text-lg font-bold ${s.color} tabular-nums`}>{s.value}</div>
+              <div className={`t-stat-sm ${s.color} tabular-nums`}>{s.value}</div>
               <div className="t-caption-sm text-[var(--brand-text-muted)] font-medium">{s.label}</div>
             </div>
           ))}
@@ -160,7 +160,7 @@ export function ContentTab({
 
     <div className="flex items-center justify-between mb-1">
       <div>
-        <h2 className="text-xl font-semibold text-[var(--brand-text)]">Content Pipeline</h2>
+        <h2 className="t-h2 text-[var(--brand-text)]">Content Pipeline</h2>
         <p className="t-body text-[var(--brand-text-muted)] mt-1">Track and manage your content requests</p>
       </div>
       <Button onClick={() => setShowTopicForm(!showTopicForm)} icon={Plus} size="sm">

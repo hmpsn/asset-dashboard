@@ -257,7 +257,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       {/* Header + Strategy Health Score */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-[var(--brand-text)]">SEO Keyword Strategy</h2>
+          <h2 className="t-h2 text-[var(--brand-text)]">SEO Keyword Strategy</h2>
           <p className="t-body text-[var(--brand-text-muted)] mt-1">Generated {new Date(strategyData.generatedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
         </div>
       </div>
@@ -276,7 +276,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       {/* pr-check-disable-next-line -- Brand signature radius intentional */}
       <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
         <div className="flex items-center gap-4">
-          <div className={`text-3xl font-bold ${healthScore >= 80 ? 'text-accent-success' : healthScore >= 60 ? 'text-accent-warning' : 'text-accent-brand'}`}>
+          <div className={`t-stat-lg ${healthScore >= 80 ? 'text-accent-success' : healthScore >= 60 ? 'text-accent-warning' : 'text-accent-brand'}`}>
             {healthScore}/100
           </div>
           <div className="flex-1">

@@ -75,7 +75,7 @@ export function ClientHeader({
           <div className="w-px h-8 bg-[var(--brand-border)]" />
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-semibold">{ws.name}</h1>
+              <h1 className="t-h2">{ws.name}</h1>
               {!betaMode && ws.isTrial && (
                 <span className="px-2 py-0.5 t-caption-sm uppercase tracking-wider font-semibold rounded-[var(--radius-pill)] bg-amber-500/15 text-accent-warning border border-amber-500/20">
                   Growth Trial{ws.trialDaysRemaining ? ` · ${ws.trialDaysRemaining}d` : ''}

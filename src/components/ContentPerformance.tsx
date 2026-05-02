@@ -183,7 +183,7 @@ export function ContentPerformance({ workspaceId }: Props) {
       />
 
       {error && (
-        <div className="text-sm text-accent-danger bg-red-500/10 border border-red-500/20 rounded-[var(--radius-lg)] px-4 py-3">{error}</div>
+        <div className="t-caption-sm text-accent-danger bg-red-500/10 border border-red-500/20 rounded-[var(--radius-lg)] px-4 py-3">{error}</div>
       )}
 
       {items.length === 0 && !error ? (
@@ -201,28 +201,28 @@ export function ContentPerformance({ workspaceId }: Props) {
                 <Icon as={MousePointer} size="md" className="text-accent-info" />
                 <span className="t-label text-[var(--brand-text-muted)]">Total Clicks</span>
               </div>
-              <p className="text-xl font-semibold text-[var(--brand-text-bright)]">{totalClicks.toLocaleString()}</p>
+              <p className="t-stat text-[var(--brand-text-bright)]">{totalClicks.toLocaleString()}</p>
             </div>
             <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] px-4 py-3 rounded-[var(--radius-signature)]">
               <div className="flex items-center gap-2 mb-1">
                 <Icon as={Eye} size="md" className="text-accent-cyan" />
                 <span className="t-label text-[var(--brand-text-muted)]">Impressions</span>
               </div>
-              <p className="text-xl font-semibold text-[var(--brand-text-bright)]">{totalImpressions.toLocaleString()}</p>
+              <p className="t-stat text-[var(--brand-text-bright)]">{totalImpressions.toLocaleString()}</p>
             </div>
             <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] px-4 py-3 rounded-[var(--radius-signature)]">
               <div className="flex items-center gap-2 mb-1">
                 <Icon as={Users} size="md" className="text-accent-brand" />
                 <span className="t-label text-[var(--brand-text-muted)]">Sessions</span>
               </div>
-              <p className="text-xl font-semibold text-[var(--brand-text-bright)]">{totalSessions.toLocaleString()}</p>
+              <p className="t-stat text-[var(--brand-text-bright)]">{totalSessions.toLocaleString()}</p>
             </div>
             <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] px-4 py-3 rounded-[var(--radius-signature)]">
               <div className="flex items-center gap-2 mb-1">
                 <Icon as={Target} size="md" className="text-accent-warning" />
                 <span className="t-label text-[var(--brand-text-muted)]">Avg Position</span>
               </div>
-              <p className="text-xl font-semibold text-[var(--brand-text-bright)]">{avgPosition > 0 ? avgPosition.toFixed(1) : '—'}</p>
+              <p className="t-stat text-[var(--brand-text-bright)]">{avgPosition > 0 ? avgPosition.toFixed(1) : '—'}</p>
             </div>
           </div>
 
@@ -265,7 +265,7 @@ export function ContentPerformance({ workspaceId }: Props) {
                     {/* Title + keyword + badges */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-[var(--brand-text-bright)] truncate">{item.topic}</span>
+                        <span className="t-ui text-[var(--brand-text-bright)] truncate">{item.topic}</span>
                         {ptColor && (
                           <span className={`t-micro px-1.5 py-0.5 rounded-[var(--radius-sm)] border ${ptColor}`}>
                             {item.pageType}
@@ -291,15 +291,15 @@ export function ContentPerformance({ workspaceId }: Props) {
                       {item.gsc ? (
                         <>
                           <div className="text-right">
-                            <p className="text-xs font-medium text-[var(--brand-text-bright)]">{item.gsc.clicks.toLocaleString()}</p>
+                            <p className="t-caption-sm font-medium text-[var(--brand-text-bright)]">{item.gsc.clicks.toLocaleString()}</p>
                             <p className="t-micro text-[var(--brand-text-muted)]">clicks</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-xs font-medium text-[var(--brand-text-bright)]">{item.gsc.impressions.toLocaleString()}</p>
+                            <p className="t-caption-sm font-medium text-[var(--brand-text-bright)]">{item.gsc.impressions.toLocaleString()}</p>
                             <p className="t-micro text-[var(--brand-text-muted)]">impressions</p>
                           </div>
                           <div className="text-right">
-                            <p className={`text-xs font-medium ${item.gsc.position <= 10 ? 'text-accent-success' : item.gsc.position <= 20 ? 'text-accent-warning' : 'text-[var(--brand-text)]'}`}>
+                            <p className={`t-caption-sm font-medium ${item.gsc.position <= 10 ? 'text-accent-success' : item.gsc.position <= 20 ? 'text-accent-warning' : 'text-[var(--brand-text)]'}`}>
                               #{item.gsc.position.toFixed(1)}
                             </p>
                             <p className="t-micro text-[var(--brand-text-muted)]">position</p>
@@ -339,19 +339,19 @@ export function ContentPerformance({ workspaceId }: Props) {
                           {item.gsc ? (
                             <div className="grid grid-cols-2 gap-3">
                               <div>
-                                <p className="text-lg font-semibold text-[var(--brand-text-bright)]">{item.gsc.clicks.toLocaleString()}</p>
+                                <p className="t-stat-sm text-[var(--brand-text-bright)]">{item.gsc.clicks.toLocaleString()}</p>
                                 <p className="t-micro text-[var(--brand-text-muted)]">Clicks</p>
                               </div>
                               <div>
-                                <p className="text-lg font-semibold text-[var(--brand-text-bright)]">{item.gsc.impressions.toLocaleString()}</p>
+                                <p className="t-stat-sm text-[var(--brand-text-bright)]">{item.gsc.impressions.toLocaleString()}</p>
                                 <p className="t-micro text-[var(--brand-text-muted)]">Impressions</p>
                               </div>
                               <div>
-                                <p className="text-lg font-semibold text-[var(--brand-text-bright)]">{item.gsc.ctr}%</p>
+                                <p className="t-stat-sm text-[var(--brand-text-bright)]">{item.gsc.ctr}%</p>
                                 <p className="t-micro text-[var(--brand-text-muted)]">CTR</p>
                               </div>
                               <div>
-                                <p className={`text-lg font-semibold ${item.gsc.position <= 10 ? 'text-accent-success' : item.gsc.position <= 20 ? 'text-accent-warning' : 'text-[var(--brand-text-bright)]'}`}>
+                                <p className={`t-stat-sm ${item.gsc.position <= 10 ? 'text-accent-success' : item.gsc.position <= 20 ? 'text-accent-warning' : 'text-[var(--brand-text-bright)]'}`}>
                                   #{item.gsc.position.toFixed(1)}
                                 </p>
                                 <p className="t-micro text-[var(--brand-text-muted)]">Avg Position</p>
@@ -370,19 +370,19 @@ export function ContentPerformance({ workspaceId }: Props) {
                           {item.ga4 ? (
                             <div className="grid grid-cols-2 gap-3">
                               <div>
-                                <p className="text-lg font-semibold text-[var(--brand-text-bright)]">{item.ga4.sessions.toLocaleString()}</p>
+                                <p className="t-stat-sm text-[var(--brand-text-bright)]">{item.ga4.sessions.toLocaleString()}</p>
                                 <p className="t-micro text-[var(--brand-text-muted)]">Sessions</p>
                               </div>
                               <div>
-                                <p className="text-lg font-semibold text-[var(--brand-text-bright)]">{item.ga4.users.toLocaleString()}</p>
+                                <p className="t-stat-sm text-[var(--brand-text-bright)]">{item.ga4.users.toLocaleString()}</p>
                                 <p className="t-micro text-[var(--brand-text-muted)]">Users</p>
                               </div>
                               <div>
-                                <p className="text-lg font-semibold text-[var(--brand-text-bright)]">{item.ga4.bounceRate.toFixed(1)}%</p>
+                                <p className="t-stat-sm text-[var(--brand-text-bright)]">{item.ga4.bounceRate.toFixed(1)}%</p>
                                 <p className="t-micro text-[var(--brand-text-muted)]">Bounce Rate</p>
                               </div>
                               <div>
-                                <p className="text-lg font-semibold text-[var(--brand-text-bright)]">{formatEngagement(item.ga4.avgEngagementTime)}</p>
+                                <p className="t-stat-sm text-[var(--brand-text-bright)]">{formatEngagement(item.ga4.avgEngagementTime)}</p>
                                 <p className="t-micro text-[var(--brand-text-muted)]">Avg Engagement</p>
                               </div>
                             </div>
@@ -394,7 +394,7 @@ export function ContentPerformance({ workspaceId }: Props) {
 
                       {/* Trend chart */}
                       {trendLoading === item.requestId ? (
-                        <div className="flex items-center gap-2 mt-4 text-xs text-[var(--brand-text-muted)]">
+                        <div className="flex items-center gap-2 mt-4 t-caption-sm text-[var(--brand-text-muted)]">
                           <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading trend data...
                         </div>
                       ) : trendData[item.requestId] ? (

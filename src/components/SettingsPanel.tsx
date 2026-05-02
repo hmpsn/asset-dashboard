@@ -129,7 +129,7 @@ export function SettingsPanel() {
   return (
     <div className="max-w-3xl mx-auto space-y-8">
       <div>
-        <h2 className="text-lg font-semibold text-[var(--brand-text-bright)]">Settings</h2>
+        <h2 className="t-h2 text-[var(--brand-text-bright)]">Settings</h2>
         <p className="t-caption mt-0.5 text-[var(--brand-text-muted)]">Account-level connections and configuration</p>
       </div>
 
@@ -141,7 +141,7 @@ export function SettingsPanel() {
             <Icon as={Search} size="md" className="text-accent-info" />
           </div>
           <div className="flex-1">
-            <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Google Account</h3>
+            <h3 className="t-caption text-[var(--brand-text-bright)]">Google Account</h3>
             <p className="t-caption text-[var(--brand-text-muted)]">Connect once to access Search Console &amp; GA4 across all workspaces</p>
           </div>
           {googleStatus?.connected ? (
@@ -185,7 +185,7 @@ export function SettingsPanel() {
         <div className="px-5 py-4 border-b border-[var(--brand-border)]">
           <div className="flex items-center gap-2">
             <Icon as={Globe} size="md" className="text-accent-brand" />
-            <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Webflow Connections</h3>
+            <h3 className="t-caption text-[var(--brand-text-bright)]">Webflow Connections</h3>
           </div>
           <p className="t-caption mt-0.5 text-[var(--brand-text-muted)]">
             Link sites from the workspace dropdown. Generate tokens at{' '}
@@ -198,20 +198,20 @@ export function SettingsPanel() {
           {linked.map(ws => (
             <div key={ws.id} className="px-5 py-3 flex items-center gap-3">
               <Icon as={Check} size="md" className="text-accent-success shrink-0" />
-              <span className="text-sm font-medium text-[var(--brand-text-bright)]">{ws.name}</span>
+              <span className="t-ui text-[var(--brand-text-bright)]">{ws.name}</span>
               <span className="t-caption text-[var(--brand-text-muted)]">{ws.webflowSiteName}</span>
             </div>
           ))}
           {unlinked.map(ws => (
             <div key={ws.id} className="px-5 py-3 flex items-center gap-3 opacity-60">
               <Icon as={Unplug} size="md" className="text-[var(--brand-text-muted)] shrink-0" />
-              <span className="text-sm text-[var(--brand-text-muted)]">{ws.name}</span>
+              <span className="t-caption-sm text-[var(--brand-text-muted)]">{ws.name}</span>
               <span className="t-caption text-[var(--brand-text-muted)] ml-auto">Not linked</span>
             </div>
           ))}
           {workspaces.length === 0 && (
             <div className="px-5 py-4">
-              <p className="text-sm text-[var(--brand-text-muted)]">No workspaces yet. Create one from the workspace dropdown.</p>
+              <p className="t-caption-sm text-[var(--brand-text-muted)]">No workspaces yet. Create one from the workspace dropdown.</p>
             </div>
           )}
         </div>
@@ -221,12 +221,12 @@ export function SettingsPanel() {
       {/* pr-check-disable-next-line -- hand-rolled section card with inner subsections; mirrors SectionCard brand signature intentionally */}
       <section className="bg-[var(--surface-2)] overflow-hidden border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
         <div className="px-5 py-4 border-b border-[var(--brand-border)]">
-          <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">API Keys</h3>
+          <h3 className="t-caption text-[var(--brand-text-bright)]">API Keys</h3>
         </div>
         <div className="px-5 py-3 flex items-center gap-3">
           <Icon as={Check} size="md" className="text-accent-success" />
           <div>
-            <span className="text-sm text-[var(--brand-text-muted)]">OpenAI API Key</span>
+            <span className="t-caption-sm text-[var(--brand-text-muted)]">OpenAI API Key</span>
             <span className="t-caption text-[var(--brand-text-muted)] ml-2">Configured via .env</span>
           </div>
         </div>
@@ -238,7 +238,7 @@ export function SettingsPanel() {
         <div className="px-5 py-4 border-b border-[var(--brand-border)]">
           <div className="flex items-center gap-2">
             <Icon as={Shield} size="md" className="text-accent-brand" />
-            <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Platform Health</h3>
+            <h3 className="t-caption text-[var(--brand-text-bright)]">Platform Health</h3>
           </div>
           <p className="t-caption mt-0.5 text-[var(--brand-text-muted)]">Connection status and workspace overview</p>
         </div>
@@ -290,7 +290,7 @@ export function SettingsPanel() {
             <Icon as={HardDrive} size="md" className="text-accent-warning" />
           </div>
           <div className="flex-1">
-            <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Storage Monitor</h3>
+            <h3 className="t-caption text-[var(--brand-text-bright)]">Storage Monitor</h3>
             <p className="t-caption text-[var(--brand-text-muted)]">Persistent disk usage breakdown &amp; cleanup tools</p>
           </div>
           <button onClick={loadStorage} disabled={storageLoading} className="p-1.5 rounded-[var(--radius-lg)] hover:bg-white/5 transition-colors" title="Refresh">
@@ -423,7 +423,7 @@ export function SettingsPanel() {
             <Icon as={CalendarDays} size="md" className="text-accent-brand" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Booking Link</h3>
+            <h3 className="t-caption text-[var(--brand-text-bright)]">Booking Link</h3>
             <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">Shown as a "Book a call" button in the client AI chat when service interest is detected.</p>
           </div>
         </div>

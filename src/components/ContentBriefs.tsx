@@ -398,7 +398,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
         <div className="bg-[var(--surface-2)] border border-blue-500/20 p-4 space-y-3" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
           <div className="flex items-center gap-2 mb-1">
             <Icon as={PenLine} size="md" className="text-accent-info" />
-            <span className="text-xs font-medium text-[var(--brand-text-bright)]">Generated Posts</span>
+            <span className="t-caption-sm font-medium text-[var(--brand-text-bright)]">Generated Posts</span>
             <span className="t-caption-sm px-1.5 py-0.5 rounded bg-blue-500/10 text-accent-info border border-blue-500/20">{posts.length}</span>
           </div>
           <div className="space-y-2">
@@ -417,7 +417,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-medium text-[var(--brand-text-bright)] truncate">{post.title}</div>
+                      <div className="t-caption-sm font-medium text-[var(--brand-text-bright)] truncate">{post.title}</div>
                       <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">"{post.targetKeyword}" · {post.totalWordCount.toLocaleString()} words</div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
@@ -475,7 +475,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Icon as={Clipboard} size="lg" className="text-accent-brand" />
-            <h2 className="text-sm font-semibold text-[var(--brand-text-bright)]">Content Briefs</h2>
+            <h2 className="t-caption text-[var(--brand-text-bright)]">Content Briefs</h2>
             <span className="t-caption-sm px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{briefs.length} total</span>
           </div>
           <div className="flex items-center gap-2">
@@ -486,7 +486,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
                 value={briefSearch}
                 onChange={e => setBriefSearch(e.target.value)}
                 placeholder="Search briefs..."
-                className="w-48 pl-8 pr-7 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-[var(--brand-border-hover)] focus:outline-none"
+                className="w-48 pl-8 pr-7 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:border-[var(--brand-border-hover)] focus:outline-none"
               />
               {briefSearch && (
                 <button onClick={() => setBriefSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]">

@@ -54,7 +54,7 @@ export default function OutcomeTopWins({ workspaceId }: Props) {
         {wins.map((win) => (
           <div key={win.actionId} className="flex items-start gap-3 py-2 border-b border-[var(--brand-border)] last:border-0">
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-[var(--brand-text-bright)] truncate">
+              <p className="t-caption-sm font-medium text-[var(--brand-text-bright)] truncate">
                 {winLabel(win)}
               </p>
               <p className="t-caption text-accent-info mt-0.5">

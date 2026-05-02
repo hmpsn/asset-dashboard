@@ -178,7 +178,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
               <div className="w-16 h-16 rounded-[var(--radius-xl)] bg-gradient-to-br from-teal-500/20 to-emerald-500/20 ring-1 ring-teal-500/20 flex items-center justify-center mx-auto mb-5">
                 <Icon as={Sparkles} size="2xl" className="text-accent-brand" />
               </div>
-              <h2 className="text-xl font-bold text-[var(--brand-text-bright)] mb-2">Help us create better content for you</h2>
+              <h2 className="t-h2 text-[var(--brand-text-bright)] mb-2">Help us create better content for you</h2>
               <p className="t-body text-[var(--brand-text)] leading-relaxed max-w-md mx-auto mb-6">
                 Answer a few quick questions about your business, audience, and brand voice.
                 This helps {STUDIO_NAME} generate content that sounds like <em>you</em> and resonates with <em>your</em> customers.
@@ -206,7 +206,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
             <div className="space-y-4">
               <div className="flex items-center gap-2 mb-1">
                 <Building2 className="w-5 h-5 text-accent-brand" />
-                <h3 className="text-base font-semibold text-[var(--brand-text-bright)]">About Your Business</h3>
+                <h3 className="t-body font-semibold text-[var(--brand-text-bright)]">About Your Business</h3>
               </div>
               <p className="t-caption-sm text-[var(--brand-text-muted)] -mt-2 mb-3">Tell us about what you do so our content reflects your expertise.</p>
 
@@ -260,7 +260,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
             <div className="space-y-4">
               <div className="flex items-center gap-2 mb-1">
                 <Users className="w-5 h-5 text-accent-brand" />
-                <h3 className="text-base font-semibold text-[var(--brand-text-bright)]">Your Target Audience</h3>
+                <h3 className="t-body font-semibold text-[var(--brand-text-bright)]">Your Target Audience</h3>
               </div>
               <p className="t-caption-sm text-[var(--brand-text-muted)] -mt-2 mb-3">Understanding your audience helps us write content that converts.</p>
 
@@ -315,7 +315,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
             <div className="space-y-4">
               <div className="flex items-center gap-2 mb-1">
                 <Palette className="w-5 h-5 text-accent-brand" />
-                <h3 className="text-base font-semibold text-[var(--brand-text-bright)]">Brand Voice & Tone</h3>
+                <h3 className="t-body font-semibold text-[var(--brand-text-bright)]">Brand Voice & Tone</h3>
               </div>
               <p className="t-caption-sm text-[var(--brand-text-muted)] -mt-2 mb-3">How should content sound? Pick traits that match your brand.</p>
 
@@ -369,7 +369,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
             <div className="space-y-4">
               <div className="flex items-center gap-2 mb-1">
                 <Target className="w-5 h-5 text-accent-brand" />
-                <h3 className="text-base font-semibold text-[var(--brand-text-bright)]">Competitor Landscape</h3>
+                <h3 className="t-body font-semibold text-[var(--brand-text-bright)]">Competitor Landscape</h3>
               </div>
               <p className="t-caption-sm text-[var(--brand-text-muted)] -mt-2 mb-3">Knowing your competition helps us find content gaps and differentiate.</p>
 
@@ -407,7 +407,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
                 <div className="w-12 h-12 rounded-[var(--radius-xl)] bg-emerald-500/10 ring-1 ring-emerald-500/20 flex items-center justify-center mx-auto mb-3">
                   <Check className="w-6 h-6 text-accent-success" />
                 </div>
-                <h3 className="text-base font-semibold text-[var(--brand-text-bright)]">Ready to submit</h3>
+                <h3 className="t-body font-semibold text-[var(--brand-text-bright)]">Ready to submit</h3>
                 <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">Here&apos;s a summary. You can go back to edit any section.</p>
               </div>
 

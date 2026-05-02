@@ -135,7 +135,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
     <div className="space-y-8">
       {/* Header */}
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-[var(--brand-text)]">Plans & Pricing</h2>
+        <h2 className="t-h2 text-[var(--brand-text)]">Plans & Pricing</h2>
         <p className="t-body text-[var(--brand-text-muted)] mt-2 max-w-md mx-auto">Choose the right plan for your business. All plans include your dedicated client dashboard.</p>
         {isTrial && (
           <div className="inline-flex items-center gap-2 mt-3 px-4 py-2 rounded-[var(--radius-pill)] bg-amber-500/10 border border-amber-500/20">
@@ -158,9 +158,9 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                 </div>
               )}
               <div className="pt-2">
-                <h3 className={`text-lg font-bold ${plan.color}`}>{plan.name}</h3>
+                <h3 className={`t-body font-semibold ${plan.color}`}>{plan.name}</h3>
                 <div className="flex items-baseline gap-1 mt-1">
-                  <span className={`text-2xl font-bold ${plan.color}`}>{plan.price}</span>
+                  <span className={`t-stat ${plan.color}`}>{plan.price}</span>
                   {plan.price !== 'Free' && <span className="t-caption text-[var(--brand-text-muted)]">/month</span>}
                 </div>
                 <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1.5 mb-4">{plan.tagline}</p>
@@ -237,7 +237,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                     <Icon as={FileText} size="md" className="text-accent-brand" />
                     <span className="t-body font-semibold text-[var(--brand-text)]">Content Brief</span>
                   </div>
-                  <span className="text-lg font-bold text-accent-brand">{fmtPrice(briefPrice)}</span>
+                  <span className="t-stat-sm text-accent-brand">{fmtPrice(briefPrice)}</span>
                 </div>
                 <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">Detailed content strategy document with keyword targets, outline, competitor analysis, and SEO recommendations.</p>
               </div>
@@ -249,7 +249,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                     <Icon as={Sparkles} size="md" className="text-accent-brand" />
                     <span className="t-body font-semibold text-[var(--brand-text)]">Full Blog Post</span>
                   </div>
-                  <span className="text-lg font-bold text-accent-brand">{fmtPrice(fullPostPrice)}</span>
+                  <span className="t-stat-sm text-accent-brand">{fmtPrice(fullPostPrice)}</span>
                 </div>
                 <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">Complete brief + professionally written article, ready to publish with SEO optimization built in.</p>
               </div>
@@ -294,7 +294,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                   </p>
                 </div>
                 <div className="text-right">
-                  <div className="text-lg font-bold text-accent-brand">${subData.subscription.priceUsd}<span className="t-caption text-[var(--brand-text-muted)]">/mo</span></div>
+                  <div className="t-stat-sm text-accent-brand">${subData.subscription.priceUsd}<span className="t-caption text-[var(--brand-text-muted)]">/mo</span></div>
                 </div>
               </div>
               {/* Progress */}
@@ -317,7 +317,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
                   <h4 className="t-body font-semibold text-[var(--brand-text)]">{plan.displayName}</h4>
                   <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">{plan.description}</p>
                   <div className="flex items-baseline gap-1 mt-3">
-                    <span className="text-xl font-bold text-accent-brand">${plan.priceUsd}</span>
+                    <span className="t-stat text-accent-brand">${plan.priceUsd}</span>
                     <span className="t-caption text-[var(--brand-text-muted)]">/mo</span>
                   </div>
                   <Button

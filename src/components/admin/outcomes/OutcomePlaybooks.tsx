@@ -20,7 +20,7 @@ function PlaybookCard({ playbook }: { playbook: ActionPlaybook }) {
   return (
     <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-4 space-y-3">
       <div className="flex items-start justify-between gap-3">
-        <h3 className="text-sm font-medium text-[var(--brand-text-bright)] capitalize">{playbook.name}</h3>
+        <h3 className="t-ui text-[var(--brand-text-bright)] capitalize">{playbook.name}</h3>
         <Badge label={`${playbook.confidence} confidence`} color={confidenceColor(playbook.confidence)} />
       </div>
 
@@ -28,7 +28,7 @@ function PlaybookCard({ playbook }: { playbook: ActionPlaybook }) {
       <div className="flex flex-wrap items-center gap-1.5">
         {steps.map((step, i) => (
           <span key={i} className="flex items-center gap-1.5">
-            <span className="rounded bg-[var(--surface-3)] px-2 py-0.5 text-xs text-[var(--brand-text-bright)] capitalize">
+            <span className="rounded bg-[var(--surface-3)] px-2 py-0.5 t-caption-sm text-[var(--brand-text-bright)] capitalize">
               {step}
             </span>
             {i < steps.length - 1 && (
@@ -39,7 +39,7 @@ function PlaybookCard({ playbook }: { playbook: ActionPlaybook }) {
       </div>
 
       {/* Stats */}
-      <div className="flex items-center gap-4 text-xs text-[var(--brand-text)]">
+      <div className="flex items-center gap-4 t-caption-sm text-[var(--brand-text)]">
         <span>
           <span className="font-medium text-accent-info">{pct(playbook.historicalWinRate)}</span>{' '}
           win rate
@@ -82,7 +82,7 @@ export default function OutcomePlaybooks({ workspaceId }: Props) {
     <SectionCard
       title="Action Playbooks"
       titleExtra={
-        <span className="text-xs text-[var(--brand-text-muted)]">
+        <span className="t-caption-sm text-[var(--brand-text-muted)]">
           {`${playbooks.length} pattern${playbooks.length === 1 ? '' : 's'} discovered`}
         </span>
       }

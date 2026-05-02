@@ -80,7 +80,7 @@ export function SearchTab({
   return (<>
     {/* Header with takeaway */}
     <div className="mb-2">
-      <h2 className="text-xl font-semibold text-[var(--brand-text)]">Search Performance</h2>
+      <h2 className="t-h2 text-[var(--brand-text)]">Search Performance</h2>
       <p className="t-body text-[var(--brand-text-muted)] mt-1">{overview.dateRange.start} — {overview.dateRange.end}</p>
     </div>
 
@@ -107,22 +107,22 @@ export function SearchTab({
 
           <div className="grid grid-cols-4 gap-3">
             <div className="text-center">
-              <div className={`text-lg font-bold ${insights.page1 > 5 ? 'text-accent-success' : 'text-accent-warning'}`}>{insights.page1}</div>
+              <div className={`t-stat-sm ${insights.page1 > 5 ? 'text-accent-success' : 'text-accent-warning'}`}>{insights.page1}</div>
               <div className="t-caption-sm text-[var(--brand-text-muted)]">Page 1 Rankings</div>
               <div className={`t-caption-sm mt-0.5 ${insights.page1 >= 10 ? 'text-accent-success' : insights.page1 >= 3 ? 'text-accent-warning' : 'text-[var(--brand-text-faint)]'}`}>{insights.page1 >= 10 ? 'Strong visibility' : insights.page1 >= 3 ? 'Room to grow' : 'Building up'}</div>
             </div>
             <div className="text-center">
-              <div className={`text-lg font-bold ${insights.top3 > 2 ? 'text-accent-success' : 'text-accent-warning'}`}>{insights.top3}</div>
+              <div className={`t-stat-sm ${insights.top3 > 2 ? 'text-accent-success' : 'text-accent-warning'}`}>{insights.top3}</div>
               <div className="t-caption-sm text-[var(--brand-text-muted)]">Top 3 Rankings</div>
               <div className={`t-caption-sm mt-0.5 ${insights.top3 >= 5 ? 'text-accent-success' : insights.top3 >= 1 ? 'text-accent-warning' : 'text-[var(--brand-text-faint)]'}`}>{insights.top3 >= 5 ? 'Dominant positions' : insights.top3 >= 1 ? 'Competitive' : 'Opportunity ahead'}</div>
             </div>
             <div className="text-center">
-              <div className={`text-lg font-bold ${overview.avgCtr > 3 ? 'text-accent-success' : overview.avgCtr > 1.5 ? 'text-accent-warning' : 'text-accent-danger'}`}>{overview.avgCtr}%</div>
+              <div className={`t-stat-sm ${overview.avgCtr > 3 ? 'text-accent-success' : overview.avgCtr > 1.5 ? 'text-accent-warning' : 'text-accent-danger'}`}>{overview.avgCtr}%</div>
               <div className="t-caption-sm text-[var(--brand-text-muted)] flex items-center justify-center gap-0.5">Avg CTR<Explainer term="ctr" /></div>
               <div className={`t-caption-sm mt-0.5 ${overview.avgCtr > 3 ? 'text-accent-success' : overview.avgCtr > 1.5 ? 'text-accent-warning' : 'text-accent-danger'}`}>{overview.avgCtr > 3 ? 'Above average' : overview.avgCtr > 1.5 ? 'Typical range' : 'Needs attention'}</div>
             </div>
             <div className="text-center">
-              <div className={`text-lg font-bold ${insights.lowHanging.length > 0 ? 'text-accent-warning' : 'text-accent-success'}`}>{insights.lowHanging.length}</div>
+              <div className={`t-stat-sm ${insights.lowHanging.length > 0 ? 'text-accent-warning' : 'text-accent-success'}`}>{insights.lowHanging.length}</div>
               <div className="t-caption-sm text-[var(--brand-text-muted)]">Opportunities</div>
               <div className={`t-caption-sm mt-0.5 ${insights.lowHanging.length > 5 ? 'text-accent-warning' : insights.lowHanging.length > 0 ? 'text-accent-brand' : 'text-accent-success'}`}>{insights.lowHanging.length > 5 ? 'Quick wins available' : insights.lowHanging.length > 0 ? 'A few to capture' : 'Fully optimized'}</div>
             </div>

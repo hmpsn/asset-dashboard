@@ -155,7 +155,7 @@ export function AnalyticsTab({
   return (<>
     <div className="space-y-6">
     <div>
-      <h2 className="text-xl font-semibold text-[var(--brand-text)]">Analytics</h2>
+      <h2 className="t-h2 text-[var(--brand-text)]">Analytics</h2>
       <p className="t-body text-[var(--brand-text-muted)] mt-1 leading-relaxed">{ga4Overview.dateRange ? `${ga4Overview.dateRange.start} — ${ga4Overview.dateRange.end}` : 'Google Analytics overview'}</p>
     </div>
 
@@ -324,7 +324,7 @@ export function AnalyticsTab({
                 {c.rate > 0 && <span className="t-caption-sm font-medium text-accent-success">{c.rate}%</span>}
               </div>
             </div>
-            <div className="text-xl font-bold text-[var(--brand-text)]">{c.conversions.toLocaleString()}</div>
+            <div className="t-stat text-[var(--brand-text)]">{c.conversions.toLocaleString()}</div>
             <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{c.users.toLocaleString()} users</div>
           </button>
         );

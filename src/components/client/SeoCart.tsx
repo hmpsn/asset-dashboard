@@ -166,7 +166,7 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
             {/* Total */}
             <div className="flex items-center justify-between">
               <span className="t-body text-[var(--brand-text)]">Total</span>
-              <span className="text-lg font-bold text-[var(--brand-text-bright)]">{fmt(totalPrice)}</span>
+              <span className="t-stat-sm text-[var(--brand-text-bright)]">{fmt(totalPrice)}</span>
             </div>
 
             {/* Error */}

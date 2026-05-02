@@ -77,7 +77,7 @@ export function SearchSnapshot({ overview, trend, comparison, devices, onViewMor
             <span className="t-caption-sm text-[var(--brand-text-muted)]">Clicks</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-lg font-bold text-accent-info">{formatNum(overview.totalClicks)}</span>
+            <span className="t-stat-sm text-accent-info">{formatNum(overview.totalClicks)}</span>
             {comparison && <TrendBadge value={comparison.changePercent.clicks} />}
           </div>
         </div>
@@ -87,7 +87,7 @@ export function SearchSnapshot({ overview, trend, comparison, devices, onViewMor
             <span className="t-caption-sm text-[var(--brand-text-muted)]">Impressions</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-lg font-bold text-accent-info">{formatNum(overview.totalImpressions)}</span>
+            <span className="t-stat-sm text-accent-info">{formatNum(overview.totalImpressions)}</span>
             {comparison && <TrendBadge value={comparison.changePercent.impressions} />}
           </div>
         </div>
@@ -187,21 +187,21 @@ export function AnalyticsSnapshot({ overview, trend, topPages, comparison, newVs
         <div className="bg-[var(--surface-3)]/40 rounded-[var(--radius-md)] px-3 py-2.5">
           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Visitors</div>
           <div className="flex items-center gap-1.5">
-            <span className="text-lg font-bold text-accent-brand">{formatNum(overview.totalUsers)}</span>
+            <span className="t-stat-sm text-accent-brand">{formatNum(overview.totalUsers)}</span>
             {comparison && <TrendBadge value={comparison.changePercent.users} />}
           </div>
         </div>
         <div className="bg-[var(--surface-3)]/40 rounded-[var(--radius-md)] px-3 py-2.5">
           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Sessions</div>
           <div className="flex items-center gap-1.5">
-            <span className="text-lg font-bold text-accent-info">{formatNum(overview.totalSessions)}</span>
+            <span className="t-stat-sm text-accent-info">{formatNum(overview.totalSessions)}</span>
             {comparison && <TrendBadge value={comparison.changePercent.sessions} />}
           </div>
         </div>
         <div className="bg-[var(--surface-3)]/40 rounded-[var(--radius-md)] px-3 py-2.5">
           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Page Views</div>
           <div className="flex items-center gap-1.5">
-            <span className="text-lg font-bold text-[var(--brand-text-bright)]">{formatNum(overview.totalPageviews)}</span>
+            <span className="t-stat-sm text-[var(--brand-text-bright)]">{formatNum(overview.totalPageviews)}</span>
             {comparison && <TrendBadge value={comparison.changePercent.pageviews} />}
           </div>
         </div>
@@ -275,20 +275,20 @@ export function OrganicInsight({ organic, landingPages, newVsReturning }: Organi
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="bg-[var(--surface-3)]/40 rounded-[var(--radius-md)] px-3 py-2.5">
             <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Organic visitors</div>
-            <div className="text-lg font-bold text-accent-success">{formatNum(organic.organicUsers)}</div>
+            <div className="t-stat-sm text-accent-success">{formatNum(organic.organicUsers)}</div>
             <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{organic.shareOfTotalUsers}% of all traffic</div>
           </div>
           <div className="bg-[var(--surface-3)]/40 rounded-[var(--radius-md)] px-3 py-2.5">
             <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Organic sessions</div>
-            <div className="text-lg font-bold text-accent-info">{formatNum(organic.organicSessions)}</div>
+            <div className="t-stat-sm text-accent-info">{formatNum(organic.organicSessions)}</div>
           </div>
           <div className="bg-[var(--surface-3)]/40 rounded-[var(--radius-md)] px-3 py-2.5">
             <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Engagement rate</div>
-            <div className="text-lg font-bold text-accent-brand">{organic.engagementRate}%</div>
+            <div className="t-stat-sm text-accent-brand">{organic.engagementRate}%</div>
           </div>
           <div className="bg-[var(--surface-3)]/40 rounded-[var(--radius-md)] px-3 py-2.5">
             <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Avg time on site</div>
-            <div className="text-lg font-bold text-accent-warning">
+            <div className="t-stat-sm text-accent-warning">
               {Math.floor(organic.avgEngagementTime / 60)}m {Math.floor(organic.avgEngagementTime % 60)}s
             </div>
           </div>
@@ -314,12 +314,12 @@ export function OrganicInsight({ organic, landingPages, newVsReturning }: Organi
             <div className="flex items-center gap-6 mb-4">
               <div className="flex-1">
                 <div className="t-caption-sm text-accent-brand mb-0.5">New visitors</div>
-                <div className="text-2xl font-bold text-accent-brand">{newSeg.percentage}%</div>
+                <div className="t-stat text-accent-brand">{newSeg.percentage}%</div>
                 <div className="t-caption-sm text-[var(--brand-text-muted)]">{formatNum(newSeg.users)} users</div>
               </div>
               <div className="flex-1">
                 <div className="t-caption-sm text-accent-info mb-0.5">Returning visitors</div>
-                <div className="text-2xl font-bold text-accent-info">{retSeg.percentage}%</div>
+                <div className="t-stat text-accent-info">{retSeg.percentage}%</div>
                 <div className="t-caption-sm text-[var(--brand-text-muted)]">{formatNum(retSeg.users)} users</div>
               </div>
             </div>
