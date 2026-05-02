@@ -14,7 +14,7 @@ vi.mock('../../../server/schema-store.js', () => ({
   getSchemaCmsFieldMappings: vi.fn(),
 }));
 
-import { buildSiteInventory, isUtilitySchemaPath } from '../../../server/schema/site-inventory.js';
+import { buildSiteInventory, isOpaqueWebflowIdentifier, isUtilitySchemaPath } from '../../../server/schema/site-inventory.js';
 import { discoverCmsItemsBySlug } from '../../../server/webflow-pages.js';
 import { getCollectionSchema, listCollections } from '../../../server/webflow-cms.js';
 import { getSchemaCmsFieldMappings } from '../../../server/schema-store.js';
@@ -110,7 +110,47 @@ describe('schema site inventory', () => {
 
   it('marks utility paths for bulk exclusion', () => {
     expect(isUtilitySchemaPath('/404')).toMatchObject({ isUtility: true });
+    expect(isUtilitySchemaPath('/members/login')).toMatchObject({ isUtility: true });
     expect(isUtilitySchemaPath('/blog/thank-you')).toMatchObject({ isUtility: true });
     expect(isUtilitySchemaPath('/blog/how-to-floss')).toMatchObject({ isUtility: false });
+  });
+
+  it('rejects opaque Webflow reference IDs from location business profile fields', async () => {
+    vi.mocked(listCollections).mockResolvedValue([{ id: 'col-locations', displayName: 'Locations', slug: 'location' }]);
+    vi.mocked(getCollectionSchema).mockResolvedValue({
+      fields: [
+        { id: 'f-city', slug: 'city', displayName: 'City', type: 'PlainText' },
+        { id: 'f-state', slug: 'state', displayName: 'State', type: 'Reference' },
+        { id: 'f-phone', slug: 'phone', displayName: 'Phone', type: 'Phone' },
+      ],
+    });
+    vi.mocked(discoverCmsItemsBySlug).mockResolvedValue({
+      totalFound: 1,
+      items: [{
+        url: 'https://example.com/location/kyle',
+        path: '/location/kyle',
+        pageName: 'Kyle',
+        collectionId: 'col-locations',
+        itemId: 'item-1',
+        lastPublished: null,
+        createdOn: null,
+        fieldData: {
+          city: 'Kyle',
+          state: '65d25be3772349200f0af0ab',
+          phone: '512-555-1212',
+        },
+      }],
+    });
+
+    const inventory = await buildSiteInventory({
+      siteId: 'site-1',
+      baseUrl: 'https://example.com',
+      pages: [],
+    });
+
+    expect(isOpaqueWebflowIdentifier('65d25be3772349200f0af0ab')).toBe(true);
+    expect(inventory.cmsItems[0].itemBusinessProfile?.address).toMatchObject({ city: 'Kyle' });
+    expect(inventory.cmsItems[0].itemBusinessProfile?.address?.state).toBeUndefined();
+    expect(inventory.cmsItems[0].itemBusinessProfile?.phone).toBe('512-555-1212');
   });
 });

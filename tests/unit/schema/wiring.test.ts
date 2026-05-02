@@ -120,6 +120,33 @@ describe('pageKindOverride', () => {
     expect(hasBlogPosting).toBe(false);
   });
 
+  it('does not force BlogPosting for a blog index path with a blog plan role', async () => {
+    const { pageKindForRole } = await import('../../../server/schema-suggester.js');
+    expect(pageKindForRole('blog', '/blog')).toBeUndefined();
+    const output = await generateLeanSchema(makeInput('/blog', {
+      schemaRoleOverride: { role: 'blog', source: 'site-plan' },
+    }));
+    const graph = getGraph(output);
+    expect(graph.some(n => n['@type'] === 'BlogPosting')).toBe(false);
+    expect(graph.some(n => n['@type'] === 'CollectionPage')).toBe(true);
+  });
+
+  it('lets CMS collection roles override weak plan roles but not strong plan roles', async () => {
+    const { shouldCollectionRoleOverridePlan } = await import('../../../server/schema-suggester.js');
+    expect(shouldCollectionRoleOverridePlan({
+      isCmsItem: true,
+      planRole: 'lead-gen',
+      collectionRole: 'location',
+      collectionRoleSource: 'inferred',
+    })).toBe(true);
+    expect(shouldCollectionRoleOverridePlan({
+      isCmsItem: true,
+      planRole: 'service',
+      collectionRole: 'location',
+      collectionRoleSource: 'inferred',
+    })).toBe(false);
+  });
+
   it('homepage override preserves LocalBusiness primary type for local businesses', async () => {
     const output = await generateLeanSchema(
       makeInput('/', {
@@ -137,6 +164,31 @@ describe('pageKindOverride', () => {
     const hasOrganization = graph.some(n => n['@type'] === 'Organization');
     expect(hasLocalBusiness).toBe(true);
     expect(hasOrganization).toBe(true);
+  });
+
+  it('does not emit opaque CMS IDs in public LocalBusiness address or areaServed fields', async () => {
+    const output = await generateLeanSchema(
+      makeInput('/location/kyle', {
+        pageKindOverride: 'Location',
+        workspace: {
+          ...minimalWorkspace,
+          businessProfile: {
+            phone: '512-555-1212',
+            address: {
+              city: 'Kyle',
+              state: '65d25be3772349200f0af0ab',
+            },
+          },
+        },
+      }),
+    );
+    const graph = getGraph(output);
+    const lbNode = graph.find(n => n['@type'] === 'LocalBusiness') as Record<string, unknown>;
+    const address = lbNode.address as Record<string, unknown>;
+    expect(address.addressLocality).toBe('Kyle');
+    expect(address.addressRegion).toBeUndefined();
+    expect(lbNode.areaServed).toEqual({ '@type': 'Place', name: 'Kyle' });
+    expect(JSON.stringify(output.suggestedSchemas[0].template)).not.toContain('65d25be3772349200f0af0ab');
   });
 });
 

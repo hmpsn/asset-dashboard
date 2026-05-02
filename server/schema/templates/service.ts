@@ -13,9 +13,22 @@ export interface ServiceInput {
   offers?: Array<{ name?: string; price: string; priceCurrency: string; description?: string }>;
 }
 
+function isOpaqueIdentifier(value: string): boolean {
+  const trimmed = value.trim();
+  return /^[a-f0-9]{24}$/i.test(trimmed) || /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed);
+}
+
+function safeText(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const cleaned = value.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, ' ').trim();
+  if (!cleaned || isOpaqueIdentifier(cleaned)) return undefined;
+  return cleaned;
+}
+
 export function buildServiceSchema(input: ServiceInput): Record<string, unknown> {
   const { pageData, baseUrl } = input;
   const serviceId = `${pageData.canonicalUrl}#service`;
+  const safeAreaServed = safeText(pageData.areaServed);
 
   // PR2: AggregateRating from testimonials WITH ratings
   // Filter must match the Review[] emission gate below — both require author + rating.
@@ -61,7 +74,7 @@ export function buildServiceSchema(input: ServiceInput): Record<string, unknown>
         }),
     'breadcrumb': breadcrumbRef(pageData.canonicalUrl, pageData.breadcrumbs),
     'inLanguage': pageData.inLanguage,
-    'areaServed': pageData.areaServed ? { '@type': 'Place' as const, name: pageData.areaServed } : undefined,
+    'areaServed': safeAreaServed ? { '@type': 'Place' as const, name: safeAreaServed } : undefined,
     'serviceType': pageData.serviceType,
     'aggregateRating': aggregateRating,
     'mainEntity': tableMainEntity,

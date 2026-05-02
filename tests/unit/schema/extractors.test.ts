@@ -107,6 +107,38 @@ describe('extractFaq', () => {
     expect(callAI).not.toHaveBeenCalled();
   });
 
+  it('extracts FAQs from heading and paragraph pairs', async () => {
+    const html = `
+      <article>
+        <h2>What does Invisalign cost?</h2>
+        <p>Pricing depends on treatment complexity and location.</p>
+        <h2>Can I use insurance?</h2>
+        <p>Many plans include orthodontic coverage.</p>
+      </article>
+    `;
+    const result = await extractFaq(html);
+    expect(result).toEqual([
+      { question: 'What does Invisalign cost?', answer: 'Pricing depends on treatment complexity and location.' },
+      { question: 'Can I use insurance?', answer: 'Many plans include orthodontic coverage.' },
+    ]);
+  });
+
+  it('extracts FAQs from accordion button panels', async () => {
+    const html = `
+      <article>
+        <button aria-controls="a1">What should I bring?</button>
+        <div id="a1">Bring your insurance card.</div>
+        <button aria-controls="a2">Do appointments hurt?</button>
+        <div id="a2">Most cleanings are comfortable.</div>
+      </article>
+    `;
+    const result = await extractFaq(html);
+    expect(result).toEqual([
+      { question: 'What should I bring?', answer: 'Bring your insurance card.' },
+      { question: 'Do appointments hurt?', answer: 'Most cleanings are comfortable.' },
+    ]);
+  });
+
   it('returns empty array when only one Q&A (FAQPage requires 2+)', async () => {
     const html = '<details><summary>Q</summary><p>A</p></details>';
     const result = await extractFaq(html);
