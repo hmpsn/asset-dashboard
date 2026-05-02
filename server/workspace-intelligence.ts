@@ -76,6 +76,7 @@ import type { Job } from './jobs.js';
 import type { SchemaValidation } from './schema-validator.js';
 import type { SiteNode } from './site-architecture.js';
 import type { PageSeoResult, SeoIssue } from './audit-page.js';
+import type { CwvSummary } from './seo-audit.js';
 
 const log = createLogger('workspace-intelligence');
 
@@ -870,6 +871,7 @@ async function assembleSiteHealth(
   let anomalyCount = 0;
   let anomalyTypes: string[] = [];
   let seoChangeVelocity = 0;
+  let latestAuditCwvSummary: CwvSummary | undefined;
 
   // ── Audit snapshot (reports.ts) ──────────────────────────────────────
   if (siteId) {
@@ -878,6 +880,7 @@ async function assembleSiteHealth(
       const latest = getLatestSnapshot(siteId);
       if (latest) {
         auditScore = latest.audit.siteScore ?? null;
+        latestAuditCwvSummary = latest.audit.cwvSummary;
         // Delta: compare with previous snapshot
         const summaries = listSnapshots(siteId);
         if (summaries.length >= 2) {
@@ -942,6 +945,12 @@ async function assembleSiteHealth(
       log.debug({ workspaceId, err }, 'siteHealth: pagespeed failed — skipping');
     }
   }
+
+  // Desktop CWV currently comes from the homepage/site-level audit summary until
+  // PageSpeed snapshots are keyed by siteId + strategy.
+  const desktopAssessment = latestAuditCwvSummary?.desktop?.assessment;
+  if (desktopAssessment === 'good') cwvPassRate.desktop = 1;
+  else if (desktopAssessment === 'needs-improvement' || desktopAssessment === 'poor') cwvPassRate.desktop = 0;
 
   // ── Redirect chains (redirect-store.ts) ─────────────────────────────
   if (siteId) {
