@@ -60,6 +60,8 @@ export function detectSchemaFieldTarget(field: SiteInventoryField): SchemaFieldT
   const key = norm(`${field.slug} ${field.displayName}`);
   if (/\b(schema-json-ld|schema-json|json-ld|jsonld|schema)\b/.test(key)) return 'schemaJsonLd';
   if (/\b(author|writer|written-by|byline)\b/.test(key)) return 'author';
+  if (/\b(service-name|treatment-name|procedure-name|solution-name)\b/.test(key)) return 'serviceName';
+  if (/\b(role|job-title|position)\b/.test(key)) return 'teamRole';
   if (/\b(title|name)\b/.test(key)) return 'title';
   if (/\b(summary|description|excerpt|meta-description)\b/.test(key)) return 'description';
   if (/\b(published|publish-date|date-published|post-date)\b/.test(key)) return 'datePublished';
@@ -73,10 +75,8 @@ export function detectSchemaFieldTarget(field: SiteInventoryField): SchemaFieldT
   if (/\b(phone|telephone|tel)\b/.test(key)) return 'phone';
   if (/\b(email|e-mail)\b/.test(key)) return 'email';
   if (/\b(hours|opening-hours|business-hours|schedule)\b/.test(key)) return 'openingHours';
-  if (/\b(service-name|treatment-name|procedure-name|solution-name)\b/.test(key)) return 'serviceName';
   if (/\b(service-type|service-category|category|treatment-type|procedure-type)\b/.test(key)) return 'serviceType';
   if (/\b(area-served|service-area|served-area|market|markets|region-served)\b/.test(key)) return 'areaServed';
-  if (/\b(role|title|position|job-title)\b/.test(key)) return 'teamRole';
   if (/\b(credential|credentials|license|certification|degree)\b/.test(key)) return 'credentials';
   if (/\b(price|cost|fee|rate)\b/.test(key)) return 'price';
   if (/\b(currency)\b/.test(key)) return 'priceCurrency';
@@ -217,7 +217,7 @@ function deriveBusinessProfile(
       ...(fallback ?? {}),
       phone: phone.value,
       email: email.value,
-      openingHours: openingHours.value ?? fallback?.openingHours,
+      openingHours: openingHours.value,
       address: hasAddress ? address : fallback?.address,
     },
   };

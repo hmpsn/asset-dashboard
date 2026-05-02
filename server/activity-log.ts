@@ -36,6 +36,7 @@ export type ActivityType =
   | 'content_upgraded'
   | 'schema_generated'
   | 'schema_published'
+  | 'schema_mapping_updated'
   | 'schema_plan_generated'
   | 'schema_plan_sent'
   | 'redirects_scanned'

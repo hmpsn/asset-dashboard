@@ -14,7 +14,7 @@ vi.mock('../../../server/schema-store.js', () => ({
   getSchemaCmsFieldMappings: vi.fn(),
 }));
 
-import { buildSiteInventory, isOpaqueWebflowIdentifier, isUtilitySchemaPath } from '../../../server/schema/site-inventory.js';
+import { buildSiteInventory, detectSchemaFieldTarget, isOpaqueWebflowIdentifier, isUtilitySchemaPath } from '../../../server/schema/site-inventory.js';
 import { discoverCmsItemsBySlug } from '../../../server/webflow-pages.js';
 import { getCollectionSchema, listCollections } from '../../../server/webflow-cms.js';
 import { getSchemaCmsFieldMappings } from '../../../server/schema-store.js';
@@ -113,6 +113,27 @@ describe('schema site inventory', () => {
     expect(isUtilitySchemaPath('/members/login')).toMatchObject({ isUtility: true });
     expect(isUtilitySchemaPath('/blog/thank-you')).toMatchObject({ isUtility: true });
     expect(isUtilitySchemaPath('/blog/how-to-floss')).toMatchObject({ isUtility: false });
+  });
+
+  it('prefers specific field targets before generic title and name matches', () => {
+    expect(detectSchemaFieldTarget({
+      id: 'f-service-name',
+      slug: 'service-name',
+      displayName: 'Service Name',
+      type: 'PlainText',
+    })).toBe('serviceName');
+    expect(detectSchemaFieldTarget({
+      id: 'f-job-title',
+      slug: 'job-title',
+      displayName: 'Job Title',
+      type: 'PlainText',
+    })).toBe('teamRole');
+    expect(detectSchemaFieldTarget({
+      id: 'f-name',
+      slug: 'name',
+      displayName: 'Name',
+      type: 'PlainText',
+    })).toBe('title');
   });
 
   it('rejects opaque Webflow reference IDs from location business profile fields', async () => {

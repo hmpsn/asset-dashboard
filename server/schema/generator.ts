@@ -206,7 +206,7 @@ function isCollectionIndexKind(kind: PageKind): boolean {
 
 function hasQuestionLikeContent(html: string): boolean {
   const text = plainText(html);
-  const matches = text.match(/\?/g);
+  const matches = text.match(/\b(?:what|why|when|where|which|who|how|can|do|does|did|is|are|should|will|would)[^?]{8,220}\?/gi);
   return (matches?.length ?? 0) >= 2;
 }
 

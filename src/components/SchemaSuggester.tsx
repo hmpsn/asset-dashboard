@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { post, put, getSafe } from '../api/client';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { post, put, get, getSafe } from '../api/client';
 import { schema as schemaApi, schemaImpact as schemaImpactApi, type SchemaImpactData, type SchemaDeploymentImpact } from '../api/seo';
 import type { FixContext } from '../App';
 import { useSchemaSnapshot, useWebflowPages } from '../hooks/admin';
@@ -29,6 +30,7 @@ import type { ValidationFinding } from '../../shared/types/schema-validation';
 import type { SchemaGenerationDiagnostics } from '../../shared/types/schema-generation';
 import type { CmsSchemaFieldMapping, SchemaFieldTarget } from '../../shared/types/site-inventory';
 import { adminPath } from '../routes.js';
+import { queryKeys } from '../lib/queryKeys';
 
 type SchemaSubTab = 'generator' | 'guide';
 
@@ -105,6 +107,8 @@ interface Props {
   businessProfile?: BusinessProfileContact | null;
 }
 
+const MAX_SCHEMA_MAPPING_COLLECTIONS = 4;
+
 export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfile }: Props) {
   const [schemaSubTab, setSchemaSubTab] = useState<SchemaSubTab>('generator');
   const { forPage: recsForPage, loaded: recsLoaded } = useRecommendations(workspaceId);
@@ -166,8 +170,6 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
   const [showCmsPanel, setShowCmsPanel] = useState(false);
   const [showTypeGuide, setShowTypeGuide] = useState(false);
   const [cmsTemplatePages, setCmsTemplatePages] = useState<CmsTemplatePage[]>([]);
-  const [cmsMappings, setCmsMappings] = useState<CmsMappingCollection[]>([]);
-  const [savingCmsMapping, setSavingCmsMapping] = useState<string | null>(null);
   const [loadingCmsPages, setLoadingCmsPages] = useState(false);
   const [generatingCmsTemplate, setGeneratingCmsTemplate] = useState<string | null>(null);
   const [cmsTemplateResult, setCmsTemplateResult] = useState<CmsTemplateResult | null>(null);
@@ -179,29 +181,29 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
   const [showDiff, setShowDiff] = useState<Set<string>>(new Set());
   const [cmsCopied, setCmsCopied] = useState(false);
   const [cmsError, setCmsError] = useState<string | null>(null);
+  const [cmsMappingError, setCmsMappingError] = useState<string | null>(null);
 
-  useEffect(() => { // effect-layout-ok: optional CMS mapping controls hydrate after paint; generation does not depend on it.
-    if (!workspaceId) return;
-    let cancelled = false;
-    getSafe<CmsMappingsResponse>(
-      `/api/webflow/schema-cms-field-mappings/${siteId}?workspaceId=${encodeURIComponent(workspaceId)}`,
-      { collections: [] },
-    ).then(result => {
-      if (!cancelled) setCmsMappings(result.collections ?? []);
-    });
-    return () => { cancelled = true; };
-  }, [siteId, workspaceId]);
-
-  const saveCmsFieldMapping = async (collection: CmsMappingCollection, target: SchemaFieldTarget, slug: string) => {
-    if (!workspaceId) return;
-    setSavingCmsMapping(`${collection.collectionId}:${target}`);
-    try {
-      const fieldMappings = {
-        ...(collection.mapping?.fieldMappings ?? {}),
-        [target]: slug || undefined,
-      };
-      const saved = await put<CmsSchemaFieldMapping>(
-        `/api/webflow/schema-cms-field-mappings/${siteId}?workspaceId=${encodeURIComponent(workspaceId)}`,
+  const queryClient = useQueryClient();
+  const cmsMappingsQuery = useQuery({
+    queryKey: queryKeys.admin.schemaCmsFieldMappings(siteId),
+    queryFn: () => get<CmsMappingsResponse>(
+      `/api/webflow/schema-cms-field-mappings/${siteId}?workspaceId=${encodeURIComponent(workspaceId ?? '')}`,
+    ),
+    enabled: !!siteId && !!workspaceId,
+    staleTime: 30_000,
+  });
+  const cmsMappings = cmsMappingsQuery.data?.collections ?? [];
+  const saveCmsMappingMutation = useMutation({
+    mutationFn: async ({ collection, target, slug }: { collection: CmsMappingCollection; target: SchemaFieldTarget; slug: string }) => {
+      const fieldMappings = { ...(collection.mapping?.fieldMappings ?? {}) };
+      const trimmed = slug.trim();
+      if (trimmed) {
+        fieldMappings[target] = trimmed;
+      } else {
+        delete fieldMappings[target];
+      }
+      const mapping = await put<CmsSchemaFieldMapping>(
+        `/api/webflow/schema-cms-field-mappings/${siteId}?workspaceId=${encodeURIComponent(workspaceId ?? '')}`,
         {
           collectionId: collection.collectionId,
           collectionName: collection.collectionName,
@@ -211,12 +213,30 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
           fieldMappings,
         },
       );
-      setCmsMappings(prev => prev.map(c => (
-        c.collectionId === collection.collectionId ? { ...c, mapping: saved } : c
-      )));
-    } finally {
-      setSavingCmsMapping(null);
-    }
+      return { collectionId: collection.collectionId, mapping };
+    },
+    onMutate: () => setCmsMappingError(null),
+    onSuccess: ({ collectionId, mapping }) => {
+      queryClient.setQueryData<CmsMappingsResponse>(
+        queryKeys.admin.schemaCmsFieldMappings(siteId),
+        old => ({
+          collections: (old?.collections ?? []).map(collection => (
+            collection.collectionId === collectionId ? { ...collection, mapping } : collection
+          )),
+        }),
+      );
+    },
+    onError: err => {
+      setCmsMappingError(err instanceof Error ? err.message : 'Failed to save CMS field mapping');
+    },
+  });
+  const savingCmsMapping = saveCmsMappingMutation.isPending && saveCmsMappingMutation.variables
+    ? `${saveCmsMappingMutation.variables.collection.collectionId}:${saveCmsMappingMutation.variables.target}`
+    : null;
+
+  const saveCmsFieldMapping = (collection: CmsMappingCollection, target: SchemaFieldTarget, slug: string) => {
+    if (!workspaceId) return;
+    saveCmsMappingMutation.mutate({ collection, target, slug });
   };
 
   // Schema editing state — stores edited JSON string per pageId
@@ -789,8 +809,11 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
               <p className="t-caption-sm text-[var(--brand-text-muted)]">
                 Detected CMS fields can be corrected here so Locations and Services resolve human-readable schema data.
               </p>
+              {cmsMappingError && (
+                <p className="t-caption-sm text-amber-300 mt-1">{cmsMappingError}</p>
+              )}
             </div>
-            {schemaMappingCollections.slice(0, 4).map(collection => (
+            {schemaMappingCollections.slice(0, MAX_SCHEMA_MAPPING_COLLECTIONS).map(collection => (
               <div key={collection.collectionId} className="border-t border-[var(--brand-border)]/60 pt-3">
                 <div className="flex items-center justify-between gap-3 mb-2">
                   <span className="t-caption text-[var(--brand-text)]">{collection.collectionName}</span>
@@ -799,8 +822,8 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                   {fieldMappingTargets.filter(target => target.roles.includes(collection.schemaRole)).map(({ target, label }) => {
                     const selected = collection.mapping?.fieldMappings?.[target]
-                      || collection.fields.find(field => field.target === target)?.slug
-                      || '';
+                      ?? collection.fields.find(field => field.target === target)?.slug
+                      ?? '';
                     return (
                       <label key={target} className="block">
                         <span className="t-caption-sm text-[var(--brand-text-muted)]">{label}</span>

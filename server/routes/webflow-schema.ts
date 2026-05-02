@@ -318,6 +318,24 @@ router.put('/api/webflow/schema-cms-field-mappings/:siteId', requireWorkspaceAcc
     collectionRole: (req.body.collectionRole || undefined) as SchemaPageRole | undefined,
     fieldMappings: normalizeFieldMappings(req.body.fieldMappings),
   });
+  const workspaceId = typeof req.query.workspaceId === 'string' ? req.query.workspaceId : undefined;
+  const ws = workspaceId ? getWorkspace(workspaceId) : listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+  if (ws) {
+    broadcastToWorkspace(ws.id, WS_EVENTS.SCHEMA_CMS_MAPPING_UPDATED, {
+      siteId: req.params.siteId,
+      collectionId: mapping.collectionId,
+      collectionName: mapping.collectionName,
+    });
+    addActivity(
+      ws.id,
+      'schema_mapping_updated',
+      `Updated schema field mapping for ${mapping.collectionName}`,
+      mapping.schemaFieldSlug
+        ? `Schema JSON field: ${mapping.schemaFieldSlug}`
+        : 'Collection schema field mapping updated',
+      { siteId: req.params.siteId, collectionId: mapping.collectionId },
+    );
+  }
   res.json(mapping);
 });
 
