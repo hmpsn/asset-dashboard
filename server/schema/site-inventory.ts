@@ -16,6 +16,7 @@ import { discoverCmsItemsBySlug, toCmsPageId } from '../webflow-pages.js';
 import { getCollectionSchema, listCollections } from '../webflow-cms.js';
 import { getSchemaCmsFieldMappings } from '../schema-store.js';
 import { createLogger } from '../logger.js';
+import { resolvePagePath } from '../helpers.js';
 
 const log = createLogger('schema/site-inventory');
 
@@ -288,7 +289,7 @@ export async function buildSiteInventory(opts: {
   const mappings = getSchemaCmsFieldMappings(opts.siteId);
   const pages: SiteInventoryPage[] = opts.pages.map(page => {
     const slug = page.slug || '';
-    const path = page.publishedPath || (slug ? `/${slug}` : '/');
+    const path = resolvePagePath(page);
     const exclusion = isUtilitySchemaPath(path);
     return {
       pageId: page.id,
@@ -317,7 +318,7 @@ export async function buildSiteInventory(opts: {
     collectionFields.set(collection.id, fields);
   }));
 
-  const staticPaths = new Set(opts.pages.map(page => page.publishedPath || (page.slug ? `/${page.slug}` : '/')));
+  const staticPaths = new Set(opts.pages.map(page => resolvePagePath(page).replace(/\/$/, '').toLowerCase()));
   const { items } = await discoverCmsItemsBySlug(opts.siteId, baseUrl, staticPaths, 1000, opts.tokenOverride);
   const itemCountByCollection = new Map<string, number>();
   for (const item of items) {

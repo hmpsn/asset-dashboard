@@ -449,6 +449,98 @@ export function buildStaticPathSet(pages: WebflowPage[]): Set<string> {
   return paths;
 }
 
+interface StaticSitemapPathIndex {
+  pathSet: Set<string>;
+  uniqueLeafPaths: Map<string, string | null>;
+}
+
+function normalizeSitemapPath(path: string): string {
+  const trimmed = path.trim();
+  if (!trimmed || trimmed === '/') return '/';
+  const prefixed = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  return prefixed.replace(/\/+$/, '') || '/';
+}
+
+function sitemapPathLeaf(path: string): string {
+  const normalized = normalizeSitemapPath(path);
+  if (normalized === '/') return '';
+  const parts = normalized.split('/').filter(Boolean);
+  return (parts.at(-1) ?? '').toLowerCase();
+}
+
+function normalizeSitemapPathKey(path: string): string {
+  return normalizeSitemapPath(path).toLowerCase();
+}
+
+function canonicalSitemapHost(hostname: string): string {
+  return hostname.toLowerCase().replace(/^www\./, '');
+}
+
+export function buildStaticSitemapPathIndex(sitemapUrls: string[], baseUrl: string): StaticSitemapPathIndex {
+  const pathSet = new Set<string>();
+  const uniqueLeafPaths = new Map<string, string | null>();
+  let baseHost: string | undefined;
+  try {
+    baseHost = canonicalSitemapHost(new URL(baseUrl).hostname);
+  } catch { baseHost = undefined; } // catch-ok: invalid configured base URL means host filtering is unavailable
+
+  for (const sitemapUrl of sitemapUrls) {
+    try {
+      const parsed = new URL(sitemapUrl, baseUrl);
+      if (baseHost && canonicalSitemapHost(parsed.hostname) !== baseHost) continue;
+      const path = normalizeSitemapPath(parsed.pathname);
+      const pathKey = normalizeSitemapPathKey(path);
+      pathSet.add(pathKey);
+      const leaf = sitemapPathLeaf(path);
+      if (!leaf) continue;
+      const previous = uniqueLeafPaths.get(leaf);
+      if (previous === undefined) {
+        uniqueLeafPaths.set(leaf, pathKey);
+      } else if (previous !== pathKey) {
+        uniqueLeafPaths.set(leaf, null);
+      }
+    } catch { /* malformed sitemap URL — ignore */ } // catch-ok
+  }
+
+  return { pathSet, uniqueLeafPaths };
+}
+
+export function resolveStaticPagePathFromSitemap(
+  page: { slug?: string; publishedPath?: string | null },
+  sitemapIndex: StaticSitemapPathIndex,
+): string {
+  const slug = (page.slug ?? '').trim();
+  const current = normalizeSitemapPath(resolvePagePath(page));
+  const slugLeaf = sitemapPathLeaf(slug || current);
+  if (!slugLeaf || slugLeaf === 'index' || slugLeaf === 'home') return current;
+
+  const sitemapPath = sitemapIndex.uniqueLeafPaths.get(slugLeaf);
+  if (!sitemapPath) return current;
+
+  const currentIsLeafFallback = current.toLowerCase() === `/${slugLeaf}`;
+  const currentMissingFromSitemap = !sitemapIndex.pathSet.has(normalizeSitemapPathKey(current));
+  if ((currentIsLeafFallback || currentMissingFromSitemap) && sitemapPath !== current) {
+    return sitemapPath;
+  }
+
+  return current;
+}
+
+export function resolveStaticPagePathsFromSitemap<T extends { slug?: string; publishedPath?: string | null }>(
+  pages: T[],
+  sitemapUrls: string[],
+  baseUrl: string,
+): T[] {
+  if (pages.length === 0 || sitemapUrls.length === 0) return pages;
+  const sitemapIndex = buildStaticSitemapPathIndex(sitemapUrls, baseUrl);
+  return pages.map(page => {
+    const resolvedPath = resolveStaticPagePathFromSitemap(page, sitemapIndex);
+    const currentPath = normalizeSitemapPath(resolvePagePath(page));
+    if (resolvedPath === currentPath) return page;
+    return { ...page, publishedPath: resolvedPath };
+  });
+}
+
 /**
  * Canonical formula for synthetic CMS page IDs.
  * All code that creates or looks up a CMS page ID must use this function.
