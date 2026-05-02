@@ -71,7 +71,9 @@ export interface KeywordFeedback {
 }
 
 type PriorityKeywordStatus = 'client' | 'strategy' | 'suggested';
-type StrategyKeywordSortKey = 'keyword' | 'source' | 'volume' | 'difficulty' | 'rank';
+type StrategyKeywordSortKey = 'keyword' | 'role' | 'opportunity' | 'page';
+type StrategyKeywordRole = 'strategy' | 'page' | 'content' | 'idea';
+type OpportunityTone = 'emerald' | 'amber' | 'blue' | 'zinc';
 
 interface PriorityKeywordItem {
   label: string;
@@ -83,8 +85,15 @@ interface PriorityKeywordItem {
 }
 
 interface StrategyKeywordTableRow extends PriorityKeywordItem {
-  sourceLabel: 'Generated strategy' | 'Added by you' | 'Keyword idea';
-  sourceDetail: string;
+  role: StrategyKeywordRole;
+  roleLabel: 'Strategy Keyword' | 'Page Opportunity' | 'Content Opportunity' | 'Keyword Idea';
+  roleDetail: string;
+  opportunityLabel: string;
+  opportunityDetail: string;
+  opportunityTone: OpportunityTone;
+  opportunityScore?: number;
+  nextMoveLabel: string;
+  nextMoveDetail: string;
   volume?: number;
   difficulty?: number;
   currentPosition?: number;
@@ -178,8 +187,9 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const [priorityKeywordSearch, setPriorityKeywordSearch] = useState('');
   const [includeKeywordIdeas, setIncludeKeywordIdeas] = useState(false);
   const [expandedKeywordRows, setExpandedKeywordRows] = useState<Set<string>>(new Set());
-  const [keywordSort, setKeywordSort] = useState<{ key: StrategyKeywordSortKey; asc: boolean }>({ key: 'keyword', asc: true });
+  const [keywordSort, setKeywordSort] = useState<{ key: StrategyKeywordSortKey; asc: boolean }>({ key: 'role', asc: true });
   const [trackedKeywordsError, setTrackedKeywordsError] = useState(false);
+  const [managingKeyword, setManagingKeyword] = useState<string | null>(null);
   const [discussingGrowthPage, setDiscussingGrowthPage] = useState<string | null>(null);
   const confirmRemoveKeywordButtonRef = useRef<HTMLButtonElement | null>(null);
 
@@ -231,6 +241,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         setToast?.(`"${item.label}" removed from strategy keywords. Historical ranking data is preserved.`);
       }
       setConfirmRemoveKeyword(null);
+      setManagingKeyword(null);
     } catch {
       setToast?.('Failed to remove keyword');
     } finally {
@@ -389,11 +400,159 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
     return secondaryMatch;
   };
 
+  const getKeywordRole = (
+    item: PriorityKeywordItem,
+    page: ReturnType<typeof findKeywordPage>,
+    contentGap: ReturnType<typeof contentGapMap.get>,
+  ): Pick<StrategyKeywordTableRow, 'role' | 'roleLabel' | 'roleDetail'> => {
+    if (item.status === 'suggested') {
+      return {
+        role: 'idea',
+        roleLabel: 'Keyword Idea',
+        roleDetail: 'Available to review. It will not guide future recommendations unless it is added to strategy.',
+      };
+    }
+    if (contentGap) {
+      return {
+        role: 'content',
+        roleLabel: 'Content Opportunity',
+        roleDetail: 'This keyword has enough context to support a future content recommendation.',
+      };
+    }
+    if (page) {
+      return {
+        role: 'page',
+        roleLabel: 'Page Opportunity',
+        roleDetail: 'This keyword is connected to a page and can guide page-level recommendations.',
+      };
+    }
+    return {
+      role: 'strategy',
+      roleLabel: 'Strategy Keyword',
+      roleDetail: 'This keyword is part of the active strategy input set for future tracking and recommendations.',
+    };
+  };
+
+  const getOpportunitySignal = (row: {
+    status: PriorityKeywordStatus;
+    opportunityScore?: number;
+    volume?: number;
+    difficulty?: number;
+    currentPosition?: number;
+    pagePath?: string;
+    impressions?: number;
+  }): Pick<StrategyKeywordTableRow, 'opportunityLabel' | 'opportunityDetail' | 'opportunityTone'> => {
+    if (row.status === 'suggested') {
+      return {
+        opportunityLabel: 'Review idea',
+        opportunityDetail: 'This keyword may be useful, but it is not yet part of the active strategy.',
+        opportunityTone: 'amber',
+      };
+    }
+    if (row.opportunityScore != null) {
+      if (row.opportunityScore >= 70) {
+        return {
+          opportunityLabel: 'Strong opportunity',
+          opportunityDetail: `Opportunity score ${row.opportunityScore}/100 based on available demand, difficulty, and signal data.`,
+          opportunityTone: 'emerald',
+        };
+      }
+      if (row.opportunityScore >= 40) {
+        return {
+          opportunityLabel: 'Needs review',
+          opportunityDetail: `Opportunity score ${row.opportunityScore}/100. Useful, but the fit should be reviewed before acting.`,
+          opportunityTone: 'amber',
+        };
+      }
+    }
+    if (row.currentPosition != null && row.currentPosition > 3 && row.currentPosition <= 20) {
+      return {
+        opportunityLabel: 'Within reach',
+        opportunityDetail: `Currently ranking around position ${Math.round(row.currentPosition)}, so improvement work may move it higher.`,
+        opportunityTone: 'emerald',
+      };
+    }
+    if (!row.pagePath) {
+      return {
+        opportunityLabel: 'Needs page fit',
+        opportunityDetail: 'No mapped page is attached yet. Review where this keyword should live before acting.',
+        opportunityTone: 'amber',
+      };
+    }
+    if (row.volume != null && row.volume > 0 && row.difficulty != null && row.difficulty <= 45) {
+      return {
+        opportunityLabel: 'Clear demand',
+        opportunityDetail: 'Search demand is available and the difficulty looks reachable.',
+        opportunityTone: 'emerald',
+      };
+    }
+    if (row.difficulty != null && row.difficulty >= 70) {
+      return {
+        opportunityLabel: 'Competitive',
+        opportunityDetail: 'Difficulty is high, so this may require more authority, content depth, or time.',
+        opportunityTone: 'amber',
+      };
+    }
+    if (row.impressions != null && row.impressions > 0) {
+      return {
+        opportunityLabel: 'Has search signal',
+        opportunityDetail: 'Search Console is already showing impressions for this keyword or mapped page.',
+        opportunityTone: 'blue',
+      };
+    }
+    return {
+      opportunityLabel: 'Needs data',
+      opportunityDetail: 'Volume, difficulty, and rank data are not available yet.',
+      opportunityTone: 'zinc',
+    };
+  };
+
+  const getNextMove = (row: {
+    status: PriorityKeywordStatus;
+    role: StrategyKeywordRole;
+    pagePath?: string;
+    currentPosition?: number;
+  }): Pick<StrategyKeywordTableRow, 'nextMoveLabel' | 'nextMoveDetail'> => {
+    if (row.status === 'suggested') {
+      return {
+        nextMoveLabel: 'Add to strategy',
+        nextMoveDetail: 'Add this idea when it should guide future tracking, page recommendations, and content ideas.',
+      };
+    }
+    if (row.role === 'content') {
+      return {
+        nextMoveLabel: 'Consider content',
+        nextMoveDetail: 'Use this as an input when reviewing future content briefs or full-post recommendations.',
+      };
+    }
+    if (!row.pagePath) {
+      return {
+        nextMoveLabel: 'Map a page',
+        nextMoveDetail: 'Choose or create the page this keyword should support before making page-level changes.',
+      };
+    }
+    if (row.currentPosition != null && row.currentPosition > 3 && row.currentPosition <= 20) {
+      return {
+        nextMoveLabel: 'Improve page',
+        nextMoveDetail: 'Review the mapped page for optimization work that could improve current rankings.',
+      };
+    }
+    return {
+      nextMoveLabel: 'Keep watching',
+      nextMoveDetail: 'Keep this keyword in the strategy set and use it as future recommendations are refreshed.',
+    };
+  };
+
   const buildKeywordRow = (item: PriorityKeywordItem): StrategyKeywordTableRow => {
     const page = findKeywordPage(item.normalized);
     const siteMetric = siteMetricMap.get(item.normalized);
     const contentGap = contentGapMap.get(item.normalized);
     const keywordGap = keywordGapMap.get(item.normalized);
+    const volume = page?.volume ?? siteMetric?.volume ?? contentGap?.volume ?? keywordGap?.volume;
+    const difficulty = page?.difficulty ?? siteMetric?.difficulty ?? contentGap?.difficulty ?? keywordGap?.difficulty;
+    const currentPosition = page?.currentPosition;
+    const pagePath = page?.pagePath;
+    const impressions = page?.impressions ?? contentGap?.impressions;
     const metricsSource = page?.metricsSource
       || (siteMetric ? 'strategy metrics' : undefined)
       || (contentGap ? 'content recommendation' : undefined)
@@ -406,28 +565,37 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       contentGap ? 'Content recommendation' : null,
       keywordGap ? 'Competitor gap' : null,
     ].filter(Boolean) as string[];
-    const sourceLabel: StrategyKeywordTableRow['sourceLabel'] = item.status === 'suggested'
-      ? 'Keyword idea'
-      : item.isTracked
-        ? 'Added by you'
-        : 'Generated strategy';
-    const sourceDetail = item.status === 'suggested'
-      ? 'Optional keyword clients can add into the active strategy set.'
-      : item.isTracked
-        ? 'Client-added keyword used for future tracking and recommendations.'
-        : 'Keyword from the generated strategy or page map.';
+    const role = getKeywordRole(item, page, contentGap);
+    const opportunityScore = contentGap?.opportunityScore;
+    const opportunity = getOpportunitySignal({
+      status: item.status,
+      opportunityScore,
+      volume,
+      difficulty,
+      currentPosition,
+      pagePath,
+      impressions,
+    });
+    const nextMove = getNextMove({
+      status: item.status,
+      role: role.role,
+      pagePath,
+      currentPosition,
+    });
 
     return {
       ...item,
-      sourceLabel,
-      sourceDetail,
-      volume: page?.volume ?? siteMetric?.volume ?? contentGap?.volume ?? keywordGap?.volume,
-      difficulty: page?.difficulty ?? siteMetric?.difficulty ?? contentGap?.difficulty ?? keywordGap?.difficulty,
-      currentPosition: page?.currentPosition,
-      pagePath: page?.pagePath,
+      ...role,
+      ...opportunity,
+      ...nextMove,
+      opportunityScore,
+      volume,
+      difficulty,
+      currentPosition,
+      pagePath,
       pageTitle: page?.pageTitle,
       searchIntent: page?.searchIntent ?? contentGap?.intent,
-      impressions: page?.impressions ?? contentGap?.impressions,
+      impressions,
       clicks: page?.clicks,
       metricsSource,
       contextSources,
@@ -440,16 +608,24 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const filteredKeywordRows = keywordRows.filter(row => {
     if (!priorityKeywordSearchTerm) return true;
     return row.normalized.includes(priorityKeywordSearchTerm)
-      || normalizeKeyword(row.sourceLabel).includes(priorityKeywordSearchTerm)
+      || normalizeKeyword(row.roleLabel).includes(priorityKeywordSearchTerm)
+      || normalizeKeyword(row.opportunityLabel).includes(priorityKeywordSearchTerm)
+      || normalizeKeyword(row.nextMoveLabel).includes(priorityKeywordSearchTerm)
       || normalizeKeyword(row.pagePath || '').includes(priorityKeywordSearchTerm)
       || normalizeKeyword(row.pageTitle || '').includes(priorityKeywordSearchTerm);
   });
 
-  const compareOptionalNumber = (a?: number, b?: number, asc = true) => {
-    if (a == null && b == null) return 0;
-    if (a == null) return 1;
-    if (b == null) return -1;
-    return asc ? a - b : b - a;
+  const roleOrder: Record<StrategyKeywordRole, number> = {
+    content: 0,
+    page: 1,
+    strategy: 2,
+    idea: 3,
+  };
+  const opportunityOrder: Record<OpportunityTone, number> = {
+    emerald: 0,
+    blue: 1,
+    amber: 2,
+    zinc: 3,
   };
 
   const sortedKeywordRows = [...filteredKeywordRows].sort((a, b) => {
@@ -458,22 +634,19 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       case 'keyword':
         result = a.label.localeCompare(b.label);
         break;
-      case 'source':
-        result = a.sourceLabel.localeCompare(b.sourceLabel) || a.label.localeCompare(b.label);
+      case 'role':
+        result = roleOrder[a.role] - roleOrder[b.role] || a.label.localeCompare(b.label);
         break;
-      case 'volume':
-        result = compareOptionalNumber(a.volume, b.volume, keywordSort.asc) || a.label.localeCompare(b.label);
+      case 'opportunity':
+        result = opportunityOrder[a.opportunityTone] - opportunityOrder[b.opportunityTone]
+          || (b.opportunityScore ?? -1) - (a.opportunityScore ?? -1)
+          || a.label.localeCompare(b.label);
         break;
-      case 'difficulty':
-        result = compareOptionalNumber(a.difficulty, b.difficulty, keywordSort.asc) || a.label.localeCompare(b.label);
-        break;
-      case 'rank':
-        result = compareOptionalNumber(a.currentPosition, b.currentPosition, keywordSort.asc) || a.label.localeCompare(b.label);
+      case 'page':
+        result = (a.pageTitle || a.pagePath || 'zz').localeCompare(b.pageTitle || b.pagePath || 'zz') || a.label.localeCompare(b.label);
         break;
     }
-    return keywordSort.key === 'volume' || keywordSort.key === 'difficulty' || keywordSort.key === 'rank'
-      ? result
-      : keywordSort.asc ? result : -result;
+    return keywordSort.asc ? result : -result;
   });
 
   const hasPriorityKeywordSearch = priorityKeywordSearchTerm.length > 0;
@@ -487,7 +660,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const keywordSearchLabel = includeKeywordIdeas ? 'Search strategy keywords and ideas' : 'Search strategy keywords';
 
   const handleKeywordSort = (key: StrategyKeywordSortKey) => {
-    setKeywordSort(prev => prev.key === key ? { key, asc: !prev.asc } : { key, asc: key === 'keyword' || key === 'source' || key === 'rank' });
+    setKeywordSort(prev => prev.key === key ? { key, asc: !prev.asc } : { key, asc: true });
   };
 
   const toggleKeywordRow = (normalized: string) => {
@@ -512,11 +685,34 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
 
   const keywordSortColumns: Array<{ key: StrategyKeywordSortKey; label: string; align?: 'left' | 'right' }> = [
     { key: 'keyword', label: 'Keyword' },
-    { key: 'source', label: 'Source' },
-    { key: 'volume', label: 'Monthly searches', align: 'right' },
-    { key: 'difficulty', label: 'KD', align: 'right' },
-    { key: 'rank', label: 'Current rank', align: 'right' },
+    { key: 'role', label: 'Role' },
+    { key: 'opportunity', label: 'Opportunity' },
+    { key: 'page', label: 'Page' },
   ];
+
+  const roleClass = (role: StrategyKeywordRole) => {
+    switch (role) {
+      case 'content': return 'border-emerald-500/20 bg-emerald-500/8 text-accent-success';
+      case 'page': return 'border-blue-500/20 bg-blue-500/10 text-accent-info';
+      case 'idea': return 'border-amber-500/20 bg-amber-500/8 text-accent-warning';
+      default: return 'border-[var(--brand-border)] bg-[var(--surface-3)] text-[var(--brand-text)]';
+    }
+  };
+
+  const opportunityClass = (tone: OpportunityTone) => {
+    switch (tone) {
+      case 'emerald': return 'border-emerald-500/20 bg-emerald-500/8 text-accent-success';
+      case 'amber': return 'border-amber-500/20 bg-amber-500/8 text-accent-warning';
+      case 'blue': return 'border-blue-500/20 bg-blue-500/10 text-accent-info';
+      default: return 'border-[var(--brand-border)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]';
+    }
+  };
+
+  const getKeywordRemovalActionLabel = (row: StrategyKeywordTableRow) => {
+    if (row.status === 'suggested') return 'Dismiss idea';
+    if (row.isTracked && !row.isStrategy) return 'Stop tracking';
+    return 'Remove from strategy';
+  };
 
   const addStrategyKeyword = async (keyword: string, options?: { clearInput?: boolean }) => {
     if (!workspaceId) return;
@@ -632,6 +828,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               onChange={e => {
                 setIncludeKeywordIdeas(e.target.checked);
                 setConfirmRemoveKeyword(null);
+                setManagingKeyword(null);
               }}
               className="w-4 h-4 rounded-[var(--radius-sm)] border-[var(--brand-border-strong)] bg-[var(--surface-3)] text-accent-brand focus:ring-teal-500"
             />
@@ -647,6 +844,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
             onChange={e => {
               setPriorityKeywordSearch(e.target.value);
               setConfirmRemoveKeyword(null);
+              setManagingKeyword(null);
             }}
             aria-label={keywordSearchLabel}
             placeholder={`${keywordSearchLabel}...`}
@@ -658,6 +856,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               onClick={() => {
                 setPriorityKeywordSearch('');
                 setConfirmRemoveKeyword(null);
+                setManagingKeyword(null);
               }}
               className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-[var(--radius-sm)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-2)] transition-colors"
               aria-label="Clear strategy keyword search"
@@ -688,7 +887,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                     </button>
                   </th>
                 ))}
-                <th className="px-3 py-2 text-left font-medium text-[var(--brand-text-muted)]">Page</th>
+                <th className="px-3 py-2 text-left font-medium text-[var(--brand-text-muted)]">Next move</th>
                 <th className="px-3 py-2 text-right font-medium text-[var(--brand-text-muted)]">Action</th>
               </tr>
             </thead>
@@ -699,26 +898,34 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                     <td className="px-2 py-3" />
                     <td className="px-3 py-3"><div className="h-3 w-40 rounded-[var(--radius-pill)] bg-[var(--surface-3)]" /></td>
                     <td className="px-3 py-3"><div className="h-3 w-24 rounded-[var(--radius-pill)] bg-[var(--surface-3)]" /></td>
-                    <td className="px-3 py-3"><div className="h-3 w-16 ml-auto rounded-[var(--radius-pill)] bg-[var(--surface-3)]" /></td>
-                    <td className="px-3 py-3"><div className="h-3 w-12 ml-auto rounded-[var(--radius-pill)] bg-[var(--surface-3)]" /></td>
-                    <td className="px-3 py-3"><div className="h-3 w-14 ml-auto rounded-[var(--radius-pill)] bg-[var(--surface-3)]" /></td>
+                    <td className="px-3 py-3"><div className="h-3 w-28 rounded-[var(--radius-pill)] bg-[var(--surface-3)]" /></td>
                     <td className="px-3 py-3"><div className="h-3 w-32 rounded-[var(--radius-pill)] bg-[var(--surface-3)]" /></td>
+                    <td className="px-3 py-3"><div className="h-3 w-28 rounded-[var(--radius-pill)] bg-[var(--surface-3)]" /></td>
                     <td className="px-3 py-3"><div className="h-3 w-16 ml-auto rounded-[var(--radius-pill)] bg-[var(--surface-3)]" /></td>
                   </tr>
                 ))
-              ) : sortedKeywordRows.length > 0 ? sortedKeywordRows.map(row => {
+              ) : sortedKeywordRows.length > 0 ? sortedKeywordRows.map((row, index) => {
                 const expanded = expandedKeywordRows.has(row.normalized);
                 const confirming = confirmRemoveKeyword === row.normalized;
                 const removing = removingKeyword === row.normalized;
+                const managing = managingKeyword === row.normalized;
                 const isIdea = row.status === 'suggested';
-                const removeLabel = isIdea ? `Dismiss ${row.label}` : `Remove ${row.label} from strategy keywords`;
-                const sourceClass = row.sourceLabel === 'Added by you'
-                  ? 'text-accent-brand bg-[var(--surface-3)] border-[var(--brand-border-strong)]'
-                  : row.sourceLabel === 'Keyword idea'
-                    ? 'text-[var(--brand-text-muted)] bg-[var(--surface-3)] border-[var(--brand-border)]'
-                    : 'text-accent-info bg-blue-500/10 border-blue-500/20';
+                const removalActionLabel = getKeywordRemovalActionLabel(row);
+                const showRoleGroup = keywordSort.key === 'role' && (index === 0 || sortedKeywordRows[index - 1]?.role !== row.role);
                 return (
                   <Fragment key={row.normalized}>
+                    {showRoleGroup && (
+                      <tr className="border-b border-[var(--brand-border)]/60 bg-[var(--surface-3)]/20">
+                        <td colSpan={7} className="px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] border t-caption-sm font-medium ${roleClass(row.role)}`}>
+                              {row.roleLabel}
+                            </span>
+                            <span className="t-caption-sm text-[var(--brand-text-muted)]">{row.roleDetail}</span>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
                     <tr className="border-b border-[var(--brand-border)]/60 hover:bg-[var(--surface-3)]/30">
                       <td className="px-2 py-2 align-top">
                         <button
@@ -738,22 +945,14 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                         )}
                       </td>
                       <td className="px-3 py-2 align-top">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] border t-caption-sm ${sourceClass}`}>
-                          {row.sourceLabel}
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] border t-caption-sm font-medium ${roleClass(row.role)}`}>
+                          {row.roleLabel}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-right align-top text-[var(--brand-text)] tabular-nums">
-                        {row.volume != null && row.volume > 0 ? `${fmtNum(row.volume)}/mo` : <span className="text-[var(--brand-text-muted)]">Not available</span>}
-                      </td>
-                      <td className="px-3 py-2 text-right align-top tabular-nums">
-                        {row.difficulty != null && row.difficulty > 0 ? (
-                          <span className={kdColor(row.difficulty)} title={kdTooltip(row.difficulty)}>KD {row.difficulty}</span>
-                        ) : (
-                          <span className="text-[var(--brand-text-muted)]">Not available</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-right align-top tabular-nums">
-                        {row.currentPosition ? <span className="text-[var(--brand-text)]">#{Math.round(row.currentPosition)}</span> : <span className="text-[var(--brand-text-muted)]">Not ranked</span>}
+                      <td className="px-3 py-2 align-top">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] border t-caption-sm font-medium ${opportunityClass(row.opportunityTone)}`}>
+                          {row.opportunityLabel}
+                        </span>
                       </td>
                       <td className="px-3 py-2 align-top">
                         {row.pagePath ? (
@@ -765,9 +964,12 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                           <span className="text-[var(--brand-text-muted)]">Unmapped</span>
                         )}
                       </td>
+                      <td className="px-3 py-2 align-top">
+                        <div className="font-medium text-[var(--brand-text)]">{row.nextMoveLabel}</div>
+                      </td>
                       <td className="px-3 py-2 text-right align-top">
                         {confirming ? (
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex flex-wrap items-center justify-end gap-2">
                             <button
                               ref={confirmRemoveKeywordButtonRef}
                               type="button"
@@ -776,11 +978,14 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                               disabled={removing}
                               className="text-accent-danger hover:underline underline-offset-2 transition-colors disabled:opacity-50"
                             >
-                              {removing ? 'Removing...' : isIdea ? 'Dismiss' : 'Confirm'}
+                              {removing ? 'Removing...' : removalActionLabel}
                             </button>
                             <button
                               type="button"
-                              onClick={() => setConfirmRemoveKeyword(null)}
+                              onClick={() => {
+                                setConfirmRemoveKeyword(null);
+                                setManagingKeyword(null);
+                              }}
                               onKeyDown={handleKeywordConfirmKeyDown}
                               disabled={removing}
                               className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors disabled:opacity-50"
@@ -801,35 +1006,43 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                             </button>
                             <button
                               type="button"
-                              onClick={() => setConfirmRemoveKeyword(row.normalized)}
-                              className="text-[var(--brand-text-muted)] hover:text-accent-danger transition-colors"
-                              title={removeLabel}
-                              aria-label={removeLabel}
+                              onClick={() => {
+                                setManagingKeyword(managing ? null : row.normalized);
+                                setConfirmRemoveKeyword(null);
+                                setExpandedKeywordRows(prev => new Set(prev).add(row.normalized));
+                              }}
+                              className="text-accent-brand hover:underline underline-offset-2 transition-colors"
+                              aria-expanded={managing}
+                              aria-label={`Manage ${row.label}`}
                             >
-                              <Icon as={X} size="sm" />
+                              Manage
                             </button>
                           </div>
                         ) : (
                           <button
                             type="button"
-                            onClick={() => setConfirmRemoveKeyword(row.normalized)}
-                            className="text-[var(--brand-text-muted)] hover:text-accent-danger transition-colors"
-                            title={removeLabel}
-                            aria-label={removeLabel}
+                            onClick={() => {
+                              setManagingKeyword(managing ? null : row.normalized);
+                              setConfirmRemoveKeyword(null);
+                              setExpandedKeywordRows(prev => new Set(prev).add(row.normalized));
+                            }}
+                            className="text-accent-brand hover:underline underline-offset-2 transition-colors"
+                            aria-expanded={managing}
+                            aria-label={`Manage ${row.label}`}
                           >
-                            <Icon as={X} size="sm" />
+                            Manage
                           </button>
                         )}
                       </td>
                     </tr>
-                    {expanded && (
+                    {(expanded || managing) && (
                       <tr key={`${row.normalized}-details`} className="border-b border-[var(--brand-border)]/60 bg-[var(--surface-3)]/20">
                         <td />
-                        <td colSpan={7} className="px-3 py-3">
-                          <div className="grid gap-3 md:grid-cols-3">
+                        <td colSpan={6} className="px-3 py-3">
+                          <div className="grid gap-3 lg:grid-cols-4">
                             <div>
                               <div className="t-caption-sm font-medium text-[var(--brand-text)] mb-1">Why this is here</div>
-                              <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">{row.sourceDetail}</p>
+                              <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">{row.roleDetail}</p>
                               {row.contextSources.length > 0 && (
                                 <div className="flex flex-wrap gap-1.5 mt-2">
                                   {row.contextSources.map(source => (
@@ -843,14 +1056,79 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                             <div>
                               <div className="t-caption-sm font-medium text-[var(--brand-text)] mb-1">Available signals</div>
                               <div className="space-y-1 t-caption-sm text-[var(--brand-text-muted)]">
+                                <div>Monthly searches: <span className="text-accent-info">{row.volume != null && row.volume > 0 ? `${fmtNum(row.volume)}/mo` : 'Not available'}</span></div>
+                                <div>Difficulty: <span className={row.difficulty != null && row.difficulty > 0 ? kdColor(row.difficulty) : 'text-[var(--brand-text)]'}>{row.difficulty != null && row.difficulty > 0 ? `KD ${row.difficulty}` : 'Not available'}</span></div>
+                                <div>Current rank: <span className="text-accent-info">{row.currentPosition != null ? `#${Math.round(row.currentPosition)}` : 'Not ranked'}</span></div>
                                 <div>Impressions: <span className="text-[var(--brand-text)]">{row.impressions != null ? row.impressions.toLocaleString() : 'Not available'}</span></div>
                                 <div>Clicks: <span className="text-[var(--brand-text)]">{row.clicks != null ? row.clicks.toLocaleString() : 'Not available'}</span></div>
                                 <div>Metric source: <span className="text-[var(--brand-text)]">{formatMetricSource(row.metricsSource)}</span></div>
                               </div>
                             </div>
                             <div>
-                              <div className="t-caption-sm font-medium text-[var(--brand-text)] mb-1">If removed</div>
-                              <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">{getKeywordRemovalCopy(row)}</p>
+                              <div className="t-caption-sm font-medium text-[var(--brand-text)] mb-1">Opportunity context</div>
+                              <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">{row.opportunityDetail}</p>
+                              <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed mt-2">{row.nextMoveDetail}</p>
+                              {row.difficulty != null && row.difficulty > 0 && kdFraming(row.difficulty) && (
+                                <p className="t-caption-sm text-[var(--brand-text-muted)] mt-2">{kdFraming(row.difficulty)}</p>
+                              )}
+                            </div>
+                            <div>
+                              <div className="t-caption-sm font-medium text-[var(--brand-text)] mb-1">Manage keyword</div>
+                              <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed mb-2">{getKeywordRemovalCopy(row)}</p>
+                              {managing && !confirming ? (
+                                <div className="flex flex-wrap gap-2">
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    icon={CheckCircle2}
+                                    onClick={() => setManagingKeyword(null)}
+                                  >
+                                    Keep in strategy
+                                  </Button>
+                                  <Button
+                                    variant="danger"
+                                    size="sm"
+                                    onClick={() => setConfirmRemoveKeyword(row.normalized)}
+                                  >
+                                    {removalActionLabel}
+                                  </Button>
+                                </div>
+                              ) : confirming ? (
+                                <div className="rounded-[var(--radius-lg)] border border-red-500/20 bg-red-500/8 p-2">
+                                  <p className="t-caption-sm text-accent-danger mb-2">
+                                    Confirm {removalActionLabel.toLowerCase()} for &ldquo;{row.label}&rdquo;?
+                                  </p>
+                                  <div className="flex flex-wrap gap-2">
+                                    <Button
+                                      ref={confirmRemoveKeywordButtonRef}
+                                      variant="danger"
+                                      size="sm"
+                                      loading={removing}
+                                      onClick={() => removePriorityKeyword(row)}
+                                      onKeyDown={handleKeywordConfirmKeyDown}
+                                    >
+                                      {removing ? 'Removing...' : removalActionLabel}
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      disabled={removing}
+                                      onClick={() => setConfirmRemoveKeyword(null)}
+                                      onKeyDown={handleKeywordConfirmKeyDown}
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  onClick={() => setManagingKeyword(row.normalized)}
+                                >
+                                  Manage
+                                </Button>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -860,7 +1138,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 );
               }) : (
                 <tr>
-                  <td colSpan={8} className="px-4 py-6 text-center t-caption-sm text-[var(--brand-text-muted)]">
+                  <td colSpan={7} className="px-4 py-6 text-center t-caption-sm text-[var(--brand-text-muted)]">
                     {priorityKeywordEmptyMessage}
                   </td>
                 </tr>
