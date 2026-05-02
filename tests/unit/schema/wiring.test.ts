@@ -40,6 +40,7 @@ vi.mock('../../../server/ai.js', () => ({
 }));
 
 import { generateLeanSchema } from '../../../server/schema/generator.js';
+import { getPageElements } from '../../../server/page-elements-store.js';
 
 const BASE_URL = 'https://example.com';
 
@@ -164,6 +165,52 @@ describe('pageKindOverride', () => {
     const hasOrganization = graph.some(n => n['@type'] === 'Organization');
     expect(hasLocalBusiness).toBe(true);
     expect(hasOrganization).toBe(true);
+  });
+
+  it('homepage override uses rendered semantic NAP to preserve LocalBusiness output', async () => {
+    vi.mocked(getPageElements).mockReturnValueOnce({
+      workspaceId: 'ws-test',
+      pagePath: '/',
+      sourcePublishedAt: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      catalog: {
+        extractedAt: '2026-01-01T00:00:00.000Z',
+        sourcePublishedAt: null,
+        headings: [],
+        tables: [],
+        images: [],
+        videos: [],
+        lists: [],
+        testimonials: [],
+        codeBlocks: [],
+        citations: [],
+        diagnostics: {
+          aiClassificationCalls: 0,
+          hitAiBudgetCap: false,
+          rawCounts: {},
+        },
+        semantics: {
+          phone: '512-555-1212',
+          address: {
+            street: '1 Main St',
+            city: 'Austin',
+            state: 'TX',
+            postalCode: '78701',
+            country: 'US',
+          },
+        },
+      },
+    });
+    const output = await generateLeanSchema(
+      makeInput('/', {
+        pageKindOverride: 'Homepage',
+      }),
+    );
+    const graph = getGraph(output);
+    const lbNode = graph.find(n => n['@type'] === 'LocalBusiness') as Record<string, unknown> | undefined;
+    expect(lbNode).toBeDefined();
+    expect(lbNode?.telephone).toBe('512-555-1212');
   });
 
   it('does not emit opaque CMS IDs in public LocalBusiness address or areaServed fields', async () => {

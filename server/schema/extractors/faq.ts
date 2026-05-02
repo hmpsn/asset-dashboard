@@ -71,7 +71,9 @@ export async function extractFaq(html: string): Promise<FaqPair[]> {
     const $trigger = $(el);
     const question = $trigger.text();
     const controls = $trigger.attr('aria-controls');
-    const $panel = controls ? $scope.find(`#${controls}`) : $trigger.next();
+    const $panel = controls
+      ? $scope.find('[id]').filter((_, panel) => $(panel).attr('id') === controls).first()
+      : $trigger.next();
     const answer = $panel.text();
     addPair(pairs, seen, question, answer, { explicit: true });
   });

@@ -309,14 +309,6 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
   // Fix 1: strip trailing slashes from baseUrl to prevent //path canonical URLs
   const baseUrl = input.baseUrl.replace(/\/+$/, '');
 
-  const businessKind: BusinessKind = input.workspace.businessProfile?.address ? 'local' : 'unknown';
-  const classified: ClassifiedPage = input.pageKindOverride
-    ? {
-        kind: input.pageKindOverride,
-        primaryType: pageKindToPrimaryType(input.pageKindOverride, businessKind),
-        pagePath: input.pageMeta.publishedPath,
-      }
-    : classifyPage(`${baseUrl}${input.pageMeta.publishedPath}`, baseUrl, { businessKind });
   const role = input.schemaRoleOverride?.role;
   const roleSource: SchemaRoleSource = input.schemaRoleOverride?.source ?? 'auto-detect';
   const industrySubtype = input.schemaRoleOverride?.industrySubtype ?? input.workspace.industrySubtype;
@@ -393,6 +385,14 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
     elements: catalog,
     areaServed: formatAreaServed(businessProfileForPage?.address) ?? pageData.areaServed,
   };
+  const businessKind: BusinessKind = businessProfileForPage?.address ? 'local' : 'unknown';
+  const classified: ClassifiedPage = input.pageKindOverride
+    ? {
+        kind: input.pageKindOverride,
+        primaryType: pageKindToPrimaryType(input.pageKindOverride, businessKind),
+        pagePath: input.pageMeta.publishedPath,
+      }
+    : classifyPage(`${baseUrl}${input.pageMeta.publishedPath}`, baseUrl, { businessKind });
 
   // Surgical AI: only if no description was found
   if (!pageData.description) {

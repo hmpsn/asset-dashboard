@@ -139,6 +139,22 @@ describe('extractFaq', () => {
     ]);
   });
 
+  it('extracts aria-controlled panels whose ids need CSS escaping', async () => {
+    const html = `
+      <article>
+        <button aria-controls="faq:1">What should I bring?</button>
+        <div id="faq:1">Bring your insurance card.</div>
+        <button aria-controls="faq.2">Do appointments hurt?</button>
+        <div id="faq.2">Most cleanings are comfortable.</div>
+      </article>
+    `;
+    const result = await extractFaq(html);
+    expect(result).toEqual([
+      { question: 'What should I bring?', answer: 'Bring your insurance card.' },
+      { question: 'Do appointments hurt?', answer: 'Most cleanings are comfortable.' },
+    ]);
+  });
+
   it('returns empty array when only one Q&A (FAQPage requires 2+)', async () => {
     const html = '<details><summary>Q</summary><p>A</p></details>';
     const result = await extractFaq(html);
