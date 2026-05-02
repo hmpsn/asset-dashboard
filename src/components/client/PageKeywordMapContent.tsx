@@ -70,13 +70,10 @@ function positionColor(pos: number): string {
   return 'text-[var(--brand-text-muted)]';
 }
 
-const ITEMS_PER_PAGE = 20;
-
 export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onContentRequested, keywordFeedback, onApproveKeyword, onDeclineKeyword, onUndoFeedback, isLoadingFeedback }: PageKeywordMapContentProps) {
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['Blog', 'Services']));
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
-  const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
   const [discussingPage, setDiscussingPage] = useState<string | null>(null);
 
   const togglePage = (path: string) => {
@@ -106,13 +103,13 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
 
   const groupedPages = useMemo(() => {
     const groups: Record<string, PageMapItem[]> = {};
-    filteredPages.slice(0, visibleCount).forEach(page => {
+    filteredPages.forEach(page => {
       const folder = getPageFolder(page.pagePath);
       if (!groups[folder]) groups[folder] = [];
       groups[folder].push(page);
     });
     return groups;
-  }, [filteredPages, visibleCount]);
+  }, [filteredPages]);
 
   const toggleFolder = (folder: string) => {
     setExpandedFolders(prev => {
@@ -147,10 +144,7 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
             role="tab"
             aria-selected={activeFilter === tab.id}
             aria-controls="page-keyword-map-panel"
-            onClick={() => {
-              setActiveFilter(tab.id);
-              setVisibleCount(ITEMS_PER_PAGE);
-            }}
+            onClick={() => setActiveFilter(tab.id)}
             className={`px-3 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium transition-colors whitespace-nowrap ${
               activeFilter === tab.id
                 ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]'
@@ -427,22 +421,6 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
         )}
       </div>
 
-      {/* Pagination footer */}
-      {filteredPages.length > ITEMS_PER_PAGE && (
-        <div className="px-4 py-2.5 border-t border-[var(--brand-border)]/50 flex items-center justify-between">
-          <span className="t-caption-sm text-[var(--brand-text-muted)]">
-            Showing {Math.min(visibleCount, filteredPages.length)} of {filteredPages.length} pages
-          </span>
-          {visibleCount < filteredPages.length && (
-              <button
-                onClick={() => setVisibleCount(v => v + ITEMS_PER_PAGE)}
-                className="t-caption-sm text-accent-brand hover:text-[var(--brand-text-bright)] transition-colors font-medium"
-              >
-              Show {Math.min(ITEMS_PER_PAGE, filteredPages.length - visibleCount)} more
-            </button>
-          )}
-        </div>
-      )}
     </div>
   );
 }
