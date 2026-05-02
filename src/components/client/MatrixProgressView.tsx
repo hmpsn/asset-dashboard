@@ -162,9 +162,9 @@ export function MatrixProgressView({ matrix, onCellPreview, onFlagCell, onDownlo
           <span className="t-caption font-medium text-[var(--brand-text-bright)]">Overall Progress</span>
           <span className="t-caption text-[var(--brand-text)]">{progressPercent}%</span>
         </div>
-        <div className="w-full h-3 bg-[var(--surface-3)] rounded-full overflow-hidden">
+        <div className="w-full h-3 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full transition-all"
+            className="h-full bg-gradient-to-r from-teal-500 to-emerald-500 rounded-[var(--radius-pill)] transition-all"
             style={{ width: `${progressPercent}%` }}
           />
         </div>

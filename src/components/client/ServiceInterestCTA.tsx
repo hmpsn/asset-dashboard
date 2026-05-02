@@ -84,7 +84,7 @@ export function ServiceInterestCTA({ type, workspaceId, onAction, bookingUrl }: 
         </div>
         <button
           onClick={() => mutation.reset()}
-          className="flex items-center gap-1 text-[10px] /* arbitrary-text-ok */ text-accent-warning hover:text-accent-warning transition-colors"
+          className="flex items-center gap-1 t-micro text-accent-warning hover:text-accent-warning transition-colors"
           aria-label="Retry"
         >
           <RefreshCw className="w-3 h-3" />
@@ -121,7 +121,7 @@ export function ServiceInterestCTA({ type, workspaceId, onAction, bookingUrl }: 
       >
         <div className="text-left">
           <div className="t-caption font-medium text-accent-brand">{label}</div>
-          <div className="text-[10px] /* arbitrary-text-ok */ text-accent-brand mt-0.5">{subtext}</div>
+          <div className="t-micro text-accent-brand mt-0.5">{subtext}</div>
         </div>
         {mutation.isPending ? (
           <Loader2 className="w-3.5 h-3.5 text-accent-brand animate-spin flex-shrink-0" />

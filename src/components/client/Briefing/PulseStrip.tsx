@@ -136,7 +136,7 @@ export function PulseStrip({ data, isLoading }: PulseStripProps): ReactNode {
           ) : (
             <>
               <div
-                className="flex items-center justify-center rounded-full bg-[var(--surface-3)]/40"
+                className="flex items-center justify-center rounded-[var(--radius-pill)] bg-[var(--surface-3)]/40"
                 style={{ width: 56, height: 56 }}
               >
                 <Shield className="w-5 h-5 text-[var(--brand-text-muted)]" aria-hidden="true" />

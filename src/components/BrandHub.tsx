@@ -128,7 +128,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
       <PageHeader
         title="Brand & AI Context"
         subtitle="Everything that feeds into AI content generation — voice, knowledge, and audience"
-        icon={<Icon as={Sparkles} size="lg" className="text-teal-400" />}
+        icon={<Icon as={Sparkles} size="lg" className="text-accent-brand" />}
       />
 
       {/* tab-deeplink-ok — nothing navigates to BrandHub with ?tab= */}
@@ -153,8 +153,8 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
       {/* ═══ BRAND VOICE ═══ */}
       <SectionCard
         title="Brand Voice & Style"
-        titleIcon={<Icon as={MessageSquare} size="md" className="text-teal-400" />}
-        titleExtra={brandVoice ? <span className="t-caption-sm text-emerald-400 font-medium">(configured)</span> : undefined}
+        titleIcon={<Icon as={MessageSquare} size="md" className="text-accent-brand" />}
+        titleExtra={brandVoice ? <span className="t-caption-sm text-accent-success font-medium">(configured)</span> : undefined}
       >
         <div className="space-y-3">
           <p className="t-caption text-[var(--brand-text-muted)]">
@@ -183,7 +183,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
               type="button"
               onClick={generateBrandVoiceHandler}
               disabled={generatingBrandVoice || !webflowSiteId}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors bg-teal-500/10 text-accent-brand hover:bg-teal-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {generatingBrandVoice ? <><Icon as={Loader2} size="sm" className="animate-spin" /> Crawling site...</> : <><Icon as={Sparkles} size="sm" /> Generate from Website</>}
             </button>
@@ -215,7 +215,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
             />
           )}
           <p className="t-caption-sm text-[var(--brand-text-muted)]">
-            You can also drop <code className="text-teal-400">.txt</code> or <code className="text-teal-400">.md</code> files into the <code className="text-teal-400">brand-docs/</code> folder in your workspace uploads.
+            You can also drop <code className="text-accent-brand">.txt</code> or <code className="text-accent-brand">.md</code> files into the <code className="text-accent-brand">brand-docs/</code> folder in your workspace uploads.
           </p>
         </div>
       </SectionCard>
@@ -223,8 +223,8 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
       {/* ═══ KNOWLEDGE BASE ═══ */}
       <SectionCard
         title="Knowledge Base"
-        titleIcon={<Icon as={BookOpen} size="md" className="text-teal-400" />}
-        titleExtra={ws?.knowledgeBase ? <span className="t-caption-sm text-emerald-400 font-medium">(configured)</span> : undefined}
+        titleIcon={<Icon as={BookOpen} size="md" className="text-accent-brand" />}
+        titleExtra={ws?.knowledgeBase ? <span className="t-caption-sm text-accent-success font-medium">(configured)</span> : undefined}
       >
         <div className="space-y-3">
           <p className="t-caption text-[var(--brand-text-muted)]">Business context for AI — services, capabilities, FAQs, industry info</p>
@@ -260,12 +260,12 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
                 }
               }}
               disabled={generatingKB || !webflowSiteId}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors bg-teal-500/10 text-accent-brand hover:bg-teal-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {generatingKB ? <><Icon as={Loader2} size="md" className="animate-spin" /> Crawling site...</> : <><Icon as={Sparkles} size="md" /> Generate from Website</>}
             </button>
             {kbDraft !== null && kbDraft !== (ws?.knowledgeBase || '') && (
-              <span className="t-caption-sm text-amber-400">Unsaved changes — click outside the textarea to save</span>
+              <span className="t-caption-sm text-accent-warning">Unsaved changes — click outside the textarea to save</span>
             )}
           </div>
           <p className="t-caption-sm text-[var(--brand-text-muted)]">
@@ -278,7 +278,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
       {/* ═══ AUDIENCE PERSONAS ═══ */}
       <SectionCard
         title="Audience Personas"
-        titleIcon={<Icon as={Users} size="md" className="text-blue-400" />}
+        titleIcon={<Icon as={Users} size="md" className="text-accent-info" />}
         action={
           <button
             type="button"
@@ -302,7 +302,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
             {(ws?.personas?.length || 0) > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {ws!.personas!.map(p => (
-                  <span key={p.id} className="t-caption-sm px-2 py-1 rounded-[var(--radius-md)] bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                  <span key={p.id} className="t-caption-sm px-2 py-1 rounded-[var(--radius-md)] bg-blue-500/10 text-accent-info border border-blue-500/20">
                     {p.name}{p.buyingStage ? ` · ${p.buyingStage}` : ''}
                   </span>
                 ))}
@@ -322,7 +322,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
                 <div className="flex items-center justify-between px-3 py-2.5">
                   <div className="flex items-center gap-2">
                     <span className="t-caption font-medium text-[var(--brand-text-bright)]">{p.name}</span>
-                    {p.buyingStage && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">{p.buyingStage}</span>}
+                    {p.buyingStage && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-blue-500/10 text-accent-info border border-blue-500/20">{p.buyingStage}</span>}
                   </div>
                   <div className="flex items-center gap-1">
                     <button
@@ -347,7 +347,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
                       type="button"
                       aria-label={`Delete persona ${p.name}`}
                       onClick={() => setConfirmDeletePersona(p)}
-                      className="p-1 rounded text-[var(--brand-text-muted)] hover:text-red-400"
+                      className="p-1 rounded text-[var(--brand-text-muted)] hover:text-accent-danger"
                     >
                       <Icon as={Trash2} size="sm" />
                     </button>
@@ -508,7 +508,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
                   }
                 }}
                 disabled={generatingPersonas || !webflowSiteId}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors bg-blue-500/10 text-accent-info hover:bg-blue-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {generatingPersonas ? <><Icon as={Loader2} size="md" className="animate-spin" /> Crawling site...</> : <><Icon as={Sparkles} size="md" /> Generate from Website</>}
               </button>
@@ -521,7 +521,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
       {/* ═══ PAGE STRATEGY ═══ */}
       <SectionCard
         title="Page Strategy"
-        titleIcon={<Icon as={Map} size="md" className="text-teal-400" />}
+        titleIcon={<Icon as={Map} size="md" className="text-accent-brand" />}
       >
         {selectedBlueprintId ? (
           <div className="space-y-6">
@@ -546,7 +546,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
       {/* Info footer */}
       <div className="bg-[var(--surface-3)]/30 rounded-[var(--radius-md)] border border-[var(--brand-border)] px-4 py-3">
         <div className="flex items-start gap-2">
-          <Icon as={Sparkles} size="md" className="text-teal-400 mt-0.5 flex-shrink-0" />
+          <Icon as={Sparkles} size="md" className="text-accent-brand mt-0.5 flex-shrink-0" />
           <div className="t-caption-sm text-[var(--brand-text-muted)]">
             <strong className="text-[var(--brand-text)]">How it works:</strong> These three sources — brand voice, knowledge base, and personas — are automatically
             injected into every AI-generated output: content briefs, blog posts, SEO rewrites, and chatbot conversations.

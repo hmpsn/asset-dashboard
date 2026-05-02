@@ -79,11 +79,11 @@ export function SeoEducationTip({ tab, workspaceId }: Props) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <h4 className="t-caption font-semibold text-[var(--brand-text-bright)]">{tip.title}</h4>
-              <span className="t-micro px-1.5 py-0.5 rounded-full bg-teal-500/10 text-accent-brand font-medium">SEO Tip</span>
+              <span className="t-micro px-1.5 py-0.5 rounded-[var(--radius-pill)] bg-teal-500/10 text-accent-brand font-medium">SEO Tip</span>
             </div>
-            <p className="text-[12px] text-[var(--brand-text)] leading-relaxed">{tip.body}</p>
+            <p className="t-caption-sm text-[var(--brand-text)] leading-relaxed">{tip.body}</p>
             {showLearnMore && tip.learnMore && (
-              <p className="text-[12px] text-[var(--brand-text-muted)] leading-relaxed mt-2 pl-3 border-l-2 border-teal-500/20">{tip.learnMore}</p>
+              <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed mt-2 pl-3 border-l-2 border-teal-500/20">{tip.learnMore}</p>
             )}
             <div className="flex items-center gap-3 mt-2">
               {tip.learnMore && !showLearnMore && (

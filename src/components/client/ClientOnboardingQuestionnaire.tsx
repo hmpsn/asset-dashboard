@@ -145,7 +145,11 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
 
   return (
     /* z-index-ok — onboarding overlay above modal scale */
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+    <div
+      className={
+        'fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-4' // fixed-inset-ok -- Onboarding questionnaire is a full-screen multi-step flow.
+      }
+    >
       <div className="bg-[var(--surface-2)] rounded-[var(--radius-xl)] border border-[var(--brand-border)] shadow-2xl max-w-xl w-full max-h-[90vh] overflow-hidden flex flex-col">
 
         {/* Progress bar */}
@@ -153,7 +157,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
           <div className="px-6 pt-4 pb-0">
             <div className="flex items-center gap-1">
               {STEPS.filter(s => s !== 'intro').map((s) => (
-                <div key={s} className={cn('flex-1 h-1 rounded-full transition-all', STEPS.indexOf(s) <= stepIdx ? 'bg-teal-500' : 'bg-[var(--surface-3)]')} />
+                <div key={s} className={cn('flex-1 h-1 rounded-[var(--radius-pill)] transition-all', STEPS.indexOf(s) <= stepIdx ? 'bg-teal-500' : 'bg-[var(--surface-3)]')} />
               ))}
             </div>
             <div className="flex items-center justify-between mt-2">
@@ -491,7 +495,7 @@ function SummaryCard({ icon: Icon, title, filled, onClick, children }: {
         <div className="flex items-center gap-2">
           <Icon className={cn('w-3.5 h-3.5', filled ? 'text-accent-brand' : 'text-[var(--brand-border)]')} />
           <span className="t-caption font-medium text-[var(--brand-text-bright)]">{title}</span>
-          {filled && <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />}
+          {filled && <span className="w-1.5 h-1.5 rounded-[var(--radius-pill)] bg-teal-400" />}
         </div>
         <span className="t-caption-sm text-[var(--brand-text-muted)] group-hover:text-[var(--brand-text)] transition-colors">Edit →</span>
       </div>

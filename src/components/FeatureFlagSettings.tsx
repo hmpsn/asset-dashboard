@@ -162,7 +162,7 @@ export function FeatureFlagSettings() {
     <section className="bg-[var(--surface-2)] overflow-hidden border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
       <div className="px-5 py-4 border-b border-[var(--brand-border)] flex items-center gap-3">
         <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-teal-500/10 flex items-center justify-center">
-          <Icon as={Flag} size="md" className="text-teal-400" />
+          <Icon as={Flag} size="md" className="text-accent-brand" />
         </div>
         <div className="flex-1">
           <h3 className="t-body font-semibold text-[var(--brand-text-bright)]">Feature Flags</h3>
@@ -176,7 +176,7 @@ export function FeatureFlagSettings() {
           <Icon as={Loader2} size="md" className="animate-spin" /> Loading flags...
         </div>
       ) : isError ? (
-        <div className="px-5 py-6 t-caption text-red-400 space-y-1">
+        <div className="px-5 py-6 t-caption text-accent-danger space-y-1">
           <p className="font-medium">Failed to load feature flags</p>
           <p className="text-[var(--brand-text-muted)] font-mono break-all">{error instanceof Error ? error.message : String(error)}</p>
         </div>
@@ -260,9 +260,9 @@ function FlagRow({ flag, disabled, onToggle, onReset }: FlagRowProps) {
       <span
         className={`t-caption-sm px-1.5 py-0.5 rounded font-medium shrink-0 ${
           flag.source === 'db'
-            ? 'bg-teal-500/10 text-teal-400'
+            ? 'bg-teal-500/10 text-accent-brand'
             : flag.source === 'env'
-            ? 'bg-blue-500/10 text-blue-400'
+            ? 'bg-blue-500/10 text-accent-info'
             : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)]'
         }`}
       >

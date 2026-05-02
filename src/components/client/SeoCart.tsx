@@ -18,7 +18,7 @@ export function SeoCartButton() {
   return (
     <Button onClick={toggleCart} icon={ShoppingCart} size="sm" className="relative rounded-[var(--radius-lg)]">
       Cart
-      <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-white text-zinc-900 /* raw-zinc-ok */ rounded-full text-[10px] /* arbitrary-text-ok */ font-bold flex items-center justify-center">
+      <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-white text-[var(--button-primary-text)] rounded-[var(--radius-pill)] t-micro font-bold flex items-center justify-center">
         {totalItems}
       </span>
     </Button>
@@ -56,7 +56,12 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
     <>
       {/* Backdrop */}
       {/* z-index-ok — cart backdrop must sit above modal scale */}
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60]" onClick={closeCart} />
+      <div
+        className={
+          'fixed inset-0 bg-black/50 backdrop-blur-sm z-[60]' // fixed-inset-ok -- Cart uses a drawer backdrop paired with the right-side drawer, not a centered dialog.
+        }
+        onClick={closeCart}
+      />
 
       {/* Drawer */}
       {/* z-index-ok — cart drawer 1 above its own backdrop */}

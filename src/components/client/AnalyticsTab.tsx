@@ -234,7 +234,7 @@ export function AnalyticsTab({
                     <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 mt-3">
                       {ga4Devices.map((d, i) => (
                         <span key={i} className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)]">
-                          <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                          <span className="w-2 h-2 rounded-[var(--radius-pill)] inline-block" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
                           <span className="capitalize">{d.device}</span>
                           <span className="text-[var(--brand-text-muted)]">{d.percentage}%</span>
                         </span>
@@ -320,7 +320,7 @@ export function AnalyticsTab({
             <div className="flex items-center justify-between mb-2">
               <span className="t-caption-sm text-[var(--brand-text-muted)] truncate max-w-[140px]">{eventDisplayName(c.eventName)}</span>
               <div className="flex items-center gap-1.5">
-                {pinned && <span className="w-1.5 h-1.5 rounded-full bg-teal-400" title="Pinned" />}
+                {pinned && <span className="w-1.5 h-1.5 rounded-[var(--radius-pill)] bg-teal-400" title="Pinned" />}
                 {c.rate > 0 && <span className="t-caption-sm font-medium text-accent-success">{c.rate}%</span>}
               </div>
             </div>
@@ -362,7 +362,7 @@ export function AnalyticsTab({
             return ( // pr-check-disable-next-line -- Brand signature radius intentional
               <div key={group.id} className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: group.color }} />
+                  <div className="w-2.5 h-2.5 rounded-[var(--radius-pill)]" style={{ backgroundColor: group.color }} />
                   <h3 className="t-body font-semibold text-[var(--brand-text)]">{group.name}</h3>
                   <span className="t-caption-sm text-[var(--brand-text-muted)] ml-auto">{groupEvents.length} events</span>
                 </div>
@@ -508,8 +508,8 @@ export function AnalyticsTab({
                         </td>
                         <td className="py-2 pr-3 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <div className="w-16 h-1 rounded-full bg-[var(--surface-3)] overflow-hidden">
-                              <div className="h-full rounded-full bg-teal-500/40" style={{ width: `${pct}%` }} />
+                            <div className="w-16 h-1 rounded-[var(--radius-pill)] bg-[var(--surface-3)] overflow-hidden">
+                              <div className="h-full rounded-[var(--radius-pill)] bg-teal-500/40" style={{ width: `${pct}%` }} />
                             </div>
                             <span className="t-caption text-[var(--brand-text)] tabular-nums font-medium">{row.eventCount.toLocaleString()}</span>
                           </div>

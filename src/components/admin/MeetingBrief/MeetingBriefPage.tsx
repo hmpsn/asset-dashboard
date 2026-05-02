@@ -75,14 +75,14 @@ export function MeetingBriefPage({ workspaceId }: Props) {
             <button
               onClick={() => generate()}
               disabled={isGenerating}
-              className="mt-4 px-4 py-2 text-sm font-medium rounded-[var(--radius-lg)] bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="mt-4 px-4 py-2 text-sm font-medium rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isGenerating ? 'Generating\u2026' : 'Generate First Brief'}
             </button>
           }
         />
         {generateError && (
-          <p className="text-xs text-red-400 text-center mt-3">
+          <p className="text-xs text-accent-danger text-center mt-3">
             Generation failed. Please try again.
           </p>
         )}
@@ -105,7 +105,7 @@ export function MeetingBriefPage({ workspaceId }: Props) {
       />
 
       {generateError && (
-        <p className="text-xs text-red-400 text-center mb-4">
+        <p className="text-xs text-accent-danger text-center mb-4">
           Generation failed. Please try again.
         </p>
       )}

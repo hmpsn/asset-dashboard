@@ -282,7 +282,7 @@ export function BrandTab({
         <SectionCard
           title="Brand Positioning"
           titleIcon={<Icon as={Sparkles} size="md" className="text-accent-brand" />}
-          titleExtra={<span className="t-caption-sm px-2 py-0.5 rounded-full bg-teal-500/10 text-accent-brand border border-teal-500/20">AI-generated</span>}
+          titleExtra={<span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-teal-500/10 text-accent-brand border border-teal-500/20">AI-generated</span>}
         >
           {brandVoiceSummary ? (
             <div className="space-y-3">

@@ -125,7 +125,7 @@ export function SearchSnapshot({ overview, trend, comparison, devices, onViewMor
       {devices.length > 0 && (
         <div>
           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1.5">How people find you</div>
-          <div className="flex items-center gap-1.5 h-3 rounded-full overflow-hidden bg-[var(--surface-3)]">
+          <div className="flex items-center gap-1.5 h-3 rounded-[var(--radius-pill)] overflow-hidden bg-[var(--surface-3)]">
             {devices.map((d, i) => {
               const pct = (d.clicks / totalDevClicks) * 100;
               const colors = ['bg-blue-500', 'bg-teal-500', 'bg-amber-500'];
@@ -219,7 +219,7 @@ export function AnalyticsSnapshot({ overview, trend, topPages, comparison, newVs
       {newSeg && retSeg && (
         <div>
           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1.5">New vs returning visitors</div>
-          <div className="flex items-center gap-1.5 h-3 rounded-full overflow-hidden bg-[var(--surface-3)]">
+          <div className="flex items-center gap-1.5 h-3 rounded-[var(--radius-pill)] overflow-hidden bg-[var(--surface-3)]">
             <div className="h-full bg-teal-500 rounded-l-full" style={{ width: `${newSeg.percentage}%` }} />
             <div className="h-full bg-blue-500 rounded-r-full" style={{ width: `${retSeg.percentage}%` }} />
           </div>
@@ -297,7 +297,7 @@ export function OrganicInsight({ organic, landingPages, newVsReturning }: Organi
         {/* Organic share bar */}
         <div className="mt-4">
           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1.5">Share of total traffic from organic search</div>
-          <div className="h-3 rounded-full overflow-hidden bg-[var(--surface-3)] flex">
+          <div className="h-3 rounded-[var(--radius-pill)] overflow-hidden bg-[var(--surface-3)] flex">
             <div className="h-full bg-emerald-500 rounded-l-full transition-all" style={{ width: `${organic.shareOfTotalUsers}%` }} />
           </div>
           <div className="flex items-center justify-between mt-1">
@@ -323,7 +323,7 @@ export function OrganicInsight({ organic, landingPages, newVsReturning }: Organi
                 <div className="t-caption-sm text-[var(--brand-text-muted)]">{formatNum(retSeg.users)} users</div>
               </div>
             </div>
-            <div className="h-4 rounded-full overflow-hidden bg-[var(--surface-3)] flex">
+            <div className="h-4 rounded-[var(--radius-pill)] overflow-hidden bg-[var(--surface-3)] flex">
               <div className="h-full bg-teal-500 rounded-l-full" style={{ width: `${newSeg.percentage}%` }} />
               <div className="h-full bg-blue-500 rounded-r-full" style={{ width: `${retSeg.percentage}%` }} />
             </div>

@@ -146,7 +146,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
       active: { label: 'Active', cls: 'bg-emerald-500/15 text-accent-success border-emerald-500/30' },
     };
     const s = map[status] || map.draft;
-    return <span className={`inline-flex items-center px-2.5 py-1 rounded-full t-caption-sm font-medium border ${s.cls}`}>{s.label}</span>;
+    return <span className={`inline-flex items-center px-2.5 py-1 rounded-[var(--radius-pill)] t-caption-sm font-medium border ${s.cls}`}>{s.label}</span>;
   };
 
   return (
@@ -196,7 +196,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
                 .map(([role, pages]) => (
                   <span
                     key={role}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full t-caption-sm font-medium border ${ROLE_COLORS[role as SchemaPageRole] ?? DEFAULT_ROLE_COLOR}`}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-pill)] t-caption-sm font-medium border ${ROLE_COLORS[role as SchemaPageRole] ?? DEFAULT_ROLE_COLOR}`}
                   >
                     {SCHEMA_ROLE_LABELS[role as SchemaPageRole] || role} ({pages.length})
                   </span>

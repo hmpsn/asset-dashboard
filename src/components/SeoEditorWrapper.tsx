@@ -17,7 +17,7 @@ export function SeoEditorWrapper({ siteId, workspaceId, fixContext }: Props) {
 
   return (
     <div>
-      <div className="flex items-center gap-1 border-b border-zinc-800 pb-0 mb-4">
+      <div className="flex items-center gap-1 border-b border-[var(--brand-border)] pb-0 mb-4">
         {([
           { id: 'pages' as const, label: 'Pages', icon: Pencil },
           { id: 'cms' as const, label: 'CMS Collections', icon: Database },
@@ -27,8 +27,8 @@ export function SeoEditorWrapper({ siteId, workspaceId, fixContext }: Props) {
             onClick={() => setTab(t.id)}
             className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px ${
               tab === t.id
-                ? 'border-teal-500 text-teal-300'
-                : 'border-transparent text-zinc-500 hover:text-zinc-300'
+                ? 'border-[var(--teal)] text-accent-brand'
+                : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
             }`}
           >
             <t.icon className="w-3.5 h-3.5" />

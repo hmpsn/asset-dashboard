@@ -4,7 +4,7 @@ import { get, post, patch, del, getSafe, getText } from '../api/client';
 import {
   Loader2, Trash2, AlertTriangle, PenLine, Clipboard, Search, X, ArrowUpDown,
 } from 'lucide-react';
-import { Icon, cn } from './ui';
+import { Icon, cn, Button, Modal } from './ui';
 import type { FixContext } from '../App';
 import type { ContentBrief, ContentTopicRequest, PostSummary } from '../../shared/types/content';
 import { PostEditor } from './PostEditor';
@@ -343,7 +343,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Icon as={Loader2} size="lg" className="animate-spin text-teal-400" />
+        <Icon as={Loader2} size="lg" className="animate-spin text-accent-brand" />
       </div>
     );
   }
@@ -351,35 +351,38 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
   return (
     <div className="space-y-8">
       {/* Delete Confirmation Modal */}
-      {deleteConfirm && (
-        <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          {/* pr-check-disable-next-line -- modal dialog */}
-          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] p-6 max-w-sm w-full mx-4 shadow-2xl">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0">
-                <Icon as={AlertTriangle} size="lg" className="text-red-400" />
+      <Modal open={Boolean(deleteConfirm)} onClose={() => setDeleteConfirm(null)} size="sm">
+        <Modal.Header
+          title={`Delete ${deleteConfirm?.type === 'brief' ? 'Brief' : 'Request'}?`}
+          onClose={() => setDeleteConfirm(null)}
+        />
+        {deleteConfirm && (
+          <>
+            <Modal.Body>
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-[var(--radius-pill)] bg-red-500/10 flex items-center justify-center flex-shrink-0">
+                  <Icon as={AlertTriangle} size="lg" className="text-accent-danger" />
+                </div>
+                <div className="min-w-0">
+                  <p className="t-caption-sm text-[var(--brand-text-muted)] mb-2">This action cannot be undone.</p>
+                  <p className="t-caption-sm text-[var(--brand-text)]">
+                    <span className="text-[var(--brand-text-bright)] font-medium">&ldquo;{deleteConfirm.label}&rdquo;</span> will be permanently removed.
+                  </p>
+                </div>
               </div>
-              <div>
-                <div className="text-sm font-semibold text-[var(--brand-text-bright)]">Delete {deleteConfirm.type === 'brief' ? 'Brief' : 'Request'}?</div>
-                <div className="text-xs text-[var(--brand-text-muted)] mt-0.5">This action cannot be undone</div>
-              </div>
-            </div>
-            <div className="text-xs text-[var(--brand-text)] mb-4 pl-[52px]">
-              <span className="text-[var(--brand-text-bright)] font-medium">&ldquo;{deleteConfirm.label}&rdquo;</span> will be permanently removed.
-            </div>
-            <div className="flex items-center justify-end gap-2">
-              <button onClick={() => setDeleteConfirm(null)} className="px-4 py-2 rounded-[var(--radius-lg)] text-xs font-medium bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--brand-border-hover)] transition-colors">Cancel</button>
-              <button onClick={executeDelete} className="px-4 py-2 rounded-[var(--radius-lg)] text-xs font-medium bg-red-600 text-white hover:bg-red-500 transition-colors flex items-center gap-1.5">
-                <Icon as={Trash2} size="md" /> Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant="secondary" size="sm" onClick={() => setDeleteConfirm(null)}>Cancel</Button>
+              <Button variant="danger" size="sm" icon={Trash2} onClick={executeDelete}>Delete</Button>
+            </Modal.Footer>
+          </>
+        )}
+      </Modal>
 
       {/* Active Post Editor */}
       {activePostId && (
-        <div className="bg-[var(--surface-2)] border border-blue-500/20 p-4" style={{ borderRadius: '10px 24px 10px 24px' /* asymmetric-radius-ok */ }}>
+        // pr-check-disable-next-line -- Post editor shell uses the brand signature radius outside SectionCard because PostEditor owns its inner chrome.
+        <div className="bg-[var(--surface-2)] border border-blue-500/20 p-4" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
           <PostEditor
             workspaceId={workspaceId}
             postId={activePostId}
@@ -391,19 +394,20 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
 
       {/* Generated Posts list */}
       {posts.length > 0 && !activePostId && (
-        <div className="bg-[var(--surface-2)] border border-blue-500/20 p-4 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' /* asymmetric-radius-ok */ }}>
+        // pr-check-disable-next-line -- Generated-post list is a compact non-SectionCard shell around selectable rows.
+        <div className="bg-[var(--surface-2)] border border-blue-500/20 p-4 space-y-3" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
           <div className="flex items-center gap-2 mb-1">
-            <Icon as={PenLine} size="md" className="text-blue-400" />
+            <Icon as={PenLine} size="md" className="text-accent-info" />
             <span className="text-xs font-medium text-[var(--brand-text-bright)]">Generated Posts</span>
-            <span className="t-caption-sm px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">{posts.length}</span>
+            <span className="t-caption-sm px-1.5 py-0.5 rounded bg-blue-500/10 text-accent-info border border-blue-500/20">{posts.length}</span>
           </div>
           <div className="space-y-2">
             {posts.map(post => {
               const statusColors: Record<string, string> = {
-                generating: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
-                draft: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
-                review: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
-                approved: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+                generating: 'text-accent-warning bg-amber-500/10 border-amber-500/20',
+                draft: 'text-accent-info bg-blue-500/10 border-blue-500/20',
+                review: 'text-accent-cyan bg-cyan-500/10 border-cyan-500/20',
+                approved: 'text-accent-success bg-emerald-500/10 border-emerald-500/20',
               };
               return (
                 <button
@@ -470,7 +474,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Icon as={Clipboard} size="lg" className="text-teal-400" />
+            <Icon as={Clipboard} size="lg" className="text-accent-brand" />
             <h2 className="text-sm font-semibold text-[var(--brand-text-bright)]">Content Briefs</h2>
             <span className="t-caption-sm px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{briefs.length} total</span>
           </div>

@@ -1,4 +1,4 @@
-import { CheckCircle2, FileText, MessageSquare, Sparkles, X, Zap, DollarSign, TrendingUp, CreditCard, RefreshCw } from 'lucide-react';
+import { CheckCircle2, FileText, MessageSquare, Sparkles, X, Zap, DollarSign, ArrowUp, CreditCard, RefreshCw } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { STUDIO_NAME } from '../../constants';
@@ -138,7 +138,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
         <h2 className="text-2xl font-bold text-[var(--brand-text)]">Plans & Pricing</h2>
         <p className="t-body text-[var(--brand-text-muted)] mt-2 max-w-md mx-auto">Choose the right plan for your business. All plans include your dedicated client dashboard.</p>
         {isTrial && (
-          <div className="inline-flex items-center gap-2 mt-3 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/20">
+          <div className="inline-flex items-center gap-2 mt-3 px-4 py-2 rounded-[var(--radius-pill)] bg-amber-500/10 border border-amber-500/20">
             <Icon as={Zap} size="md" className="text-accent-warning" />
             <span className="t-caption text-accent-warning font-medium">You&apos;re trialing {plans.find(p => p.id === tier)?.name} — {ws.trialDaysRemaining} day{ws.trialDaysRemaining !== 1 ? 's' : ''} remaining</span>
           </div>
@@ -153,7 +153,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
           return (
             <div key={plan.id} className={`relative rounded-[var(--radius-xl)] border p-5 transition-all ${isCurrent ? `${plan.bgColor} ${plan.borderColor} ring-1 ring-offset-0 ${plan.id !== 'free' ? 'ring-teal-500/20' : 'ring-zinc-700'}` : `bg-[var(--surface-2)]/50 border-[var(--brand-border)] hover:border-[var(--brand-border-strong)]`}`}>
               {isCurrent && (
-                <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full t-caption-sm uppercase tracking-wider font-semibold border ${plan.id !== 'free' ? 'bg-teal-500/20 border-teal-500/30 text-accent-brand' : 'bg-[var(--surface-3)] border-[var(--brand-border-strong)] text-[var(--brand-text-muted)]'}`}>
+                <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-[var(--radius-pill)] t-caption-sm uppercase tracking-wider font-semibold border ${plan.id !== 'free' ? 'bg-teal-500/20 border-teal-500/30 text-accent-brand' : 'bg-[var(--surface-3)] border-[var(--brand-border-strong)] text-[var(--brand-text-muted)]'}`}>
                   {isTrial ? 'Current Trial' : 'Current Plan'}
                 </div>
               )}
@@ -299,9 +299,9 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
               </div>
               {/* Progress */}
               <div className="mt-3">
-                <div className="h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden">
+                <div className="h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full transition-all"
+                    className="h-full bg-gradient-to-r from-teal-500 to-emerald-500 rounded-[var(--radius-pill)] transition-all"
                     style={{ width: `${Math.min(100, (subData.subscription.postsDeliveredThisPeriod / subData.subscription.postsPerMonth) * 100)}%` }}
                   />
                 </div>
@@ -350,7 +350,7 @@ export function PlansTab({ workspaceId, ws, effectiveTier, briefPrice, fullPostP
               </p>
               <div className="grid grid-cols-3 gap-3 mb-3">
                 <div className="bg-[var(--surface-2)]/60 rounded-[var(--radius-lg)] border border-[var(--brand-border)] p-2.5 text-center">
-                  <Icon as={TrendingUp} size="md" className="text-accent-success mx-auto mb-1" />
+                  <Icon as={ArrowUp} size="md" className="text-accent-success mx-auto mb-1" />
                   <div className="t-caption-sm text-[var(--brand-text-muted)]">Traffic Value</div>
                 </div>
                 <div className="bg-[var(--surface-2)]/60 rounded-[var(--radius-lg)] border border-[var(--brand-border)] p-2.5 text-center">

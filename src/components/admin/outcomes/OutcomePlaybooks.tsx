@@ -41,7 +41,7 @@ function PlaybookCard({ playbook }: { playbook: ActionPlaybook }) {
       {/* Stats */}
       <div className="flex items-center gap-4 text-xs text-[var(--brand-text)]">
         <span>
-          <span className="font-medium text-blue-400">{pct(playbook.historicalWinRate)}</span>{' '}
+          <span className="font-medium text-accent-info">{pct(playbook.historicalWinRate)}</span>{' '}
           win rate
         </span>
         <span>

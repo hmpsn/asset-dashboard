@@ -2,9 +2,9 @@ import { SectionCard } from '../../ui/SectionCard.js';
 import type { RemediationAction } from '../../../../shared/types/diagnostics.js';
 
 const PRIORITY_COLORS = {
-  P0: 'bg-red-500/10 text-red-400',
-  P1: 'bg-amber-500/10 text-amber-400',
-  P2: 'bg-blue-500/10 text-blue-400',
+  P0: 'bg-red-500/10 text-accent-danger',
+  P1: 'bg-amber-500/10 text-accent-warning',
+  P2: 'bg-blue-500/10 text-accent-info',
   P3: 'bg-[var(--surface-3)] text-[var(--brand-text)]',
 } as const;
 
@@ -46,7 +46,7 @@ export function RemediationPlan({ actions }: Props) {
           {action.pageUrls && action.pageUrls.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">
               {action.pageUrls.map((url) => (
-                <span key={url} className="text-xs bg-[var(--surface-1)] text-blue-400 px-2 py-0.5 rounded font-mono truncate max-w-[200px]">
+                <span key={url} className="text-xs bg-[var(--surface-1)] text-accent-info px-2 py-0.5 rounded font-mono truncate max-w-[200px]">
                   {url}
                 </span>
               ))}

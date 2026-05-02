@@ -101,14 +101,14 @@ export function RecommendedForYou({
                 <span className="t-ui font-medium text-[var(--brand-text-bright)]">
                   {rec.topic}
                   {rec.opportunityScore != null && (
-                    <span className="ml-2 inline-flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 t-caption font-medium text-accent-info">
+                    <span className="ml-2 inline-flex items-center rounded-[var(--radius-pill)] bg-blue-500/10 px-2 py-0.5 t-caption font-medium text-accent-info">
                       {rec.opportunityScore}/100
                     </span>
                   )}
                 </span>
                 <div className="flex items-center gap-2">
                   <span
-                    className={`t-caption-sm uppercase px-1.5 py-0.5 rounded-full border font-medium ${intentColor(rec.intent)}`}
+                    className={`t-caption-sm uppercase px-1.5 py-0.5 rounded-[var(--radius-pill)] border font-medium ${intentColor(rec.intent)}`}
                   >
                     {rec.intent}
                   </span>

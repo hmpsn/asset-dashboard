@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react';
-import { AlertTriangle, Info, CheckCircle2, ChevronDown, Shield, FileEdit, Share2, Link2, ExternalLink, FileText, BarChart3, Check, Globe, TrendingUp, Minus, LayoutList, Layers } from 'lucide-react';
+import { AlertTriangle, Info, CheckCircle2, ChevronDown, Shield, FileEdit, Share2, Link2, ExternalLink, FileText, BarChart3, Check, Globe, ArrowUp, Minus, LayoutList, Layers } from 'lucide-react';
 import { MetricRing, Icon, Button, IconButton, ClickableRow } from '../ui';
 import { scoreColorClass, themeColor } from '../ui/constants';
 import { ScoreHistoryChart } from './helpers';
@@ -203,7 +203,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                         onClick={() => copyReportLink(r.permalink, r.id)}
                       />
                       <a href={r.permalink} target="_blank" rel="noopener noreferrer"
-                        className="p-1.5 rounded-md text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)] transition-colors" title="Open report">
+                        className="p-1.5 rounded-[var(--radius-md)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)] transition-colors" title="Open report">
                         <Icon as={ExternalLink} size="md" />
                       </a>
                     </div>
@@ -263,7 +263,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
         const { resolved, newIssues } = auditDetail.auditDiff!;
         const scoreDelta = auditDetail.audit.siteScore - auditDetail.previousScore!;
         const deltaColor = scoreDelta > 0 ? 'text-accent-success' : scoreDelta < 0 ? 'text-accent-danger' : 'text-[var(--brand-text-muted)]';
-        const DeltaIcon = scoreDelta > 0 ? TrendingUp : scoreDelta < 0 ? AlertTriangle : Minus;
+        const DeltaIcon = scoreDelta > 0 ? ArrowUp : scoreDelta < 0 ? AlertTriangle : Minus;
         return (
           // pr-check-disable-next-line -- Compact audit-delta status bar; inline row element, not a content card
           <div className="flex items-center gap-3 px-4 py-2.5 rounded-[var(--radius-xl)] bg-[var(--surface-2)] border border-[var(--brand-border)] t-caption">
@@ -403,7 +403,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                       return (
                         <div key={`${item.pageId}-${i}`} className="px-4 py-3">
                           <div className="flex items-start gap-3">
-                            <span className="w-5 h-5 rounded-full bg-[var(--surface-3)] border border-[var(--brand-border-strong)] flex items-center justify-center flex-shrink-0 t-caption-sm text-[var(--brand-text-muted)] font-medium">{i + 1}</span>
+                            <span className="w-5 h-5 rounded-[var(--radius-pill)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] flex items-center justify-center flex-shrink-0 t-caption-sm text-[var(--brand-text-muted)] font-medium">{i + 1}</span>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
                                 <span className={`t-caption-sm font-medium uppercase ${sc.text}`}>{item.issue.severity}</span>
@@ -592,11 +592,11 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
             {/* View mode toggle */}
             <div className="flex items-center gap-1 bg-[var(--surface-3)] rounded-[var(--radius-lg)] p-0.5">
               <button type="button" onClick={() => setViewMode('by-page')}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md t-caption-sm font-medium transition-colors ${viewMode === 'by-page' ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}>
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium transition-colors ${viewMode === 'by-page' ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}>
                 <Icon as={LayoutList} size="sm" /> By Page
               </button>
               <button type="button" onClick={() => setViewMode('by-fix-type')}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md t-caption-sm font-medium transition-colors ${viewMode === 'by-fix-type' ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}>
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium transition-colors ${viewMode === 'by-fix-type' ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}>
                 <Icon as={Layers} size="sm" /> By Fix Type
               </button>
             </div>
@@ -604,7 +604,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
             <div className="flex items-center gap-1 bg-[var(--surface-3)] rounded-[var(--radius-lg)] p-0.5">
               {(['all', 'error', 'warning'] as const).map(s => (
                 <button key={s} type="button" onClick={() => setSeverityFilter(s)}
-                  className={`px-3 py-2 min-h-[44px] rounded-md t-caption-sm font-medium transition-colors ${
+                  className={`px-3 py-2 min-h-[44px] rounded-[var(--radius-md)] t-caption-sm font-medium transition-colors ${
                     severityFilter === s ? (s === 'all' ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)]' : `${SEV[s].bg} ${SEV[s].text}`) : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'
                   }`}>{s === 'all' ? 'Issues' : s.charAt(0).toUpperCase() + s.slice(1)}</button>
               ))}
@@ -819,7 +819,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                   const info = CAT_LABELS[cat] || { label: cat, color: themeColor('#71717a', '#94a3b8') };
                   return (
                     <div key={cat} className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: info.color }} />
+                      <div className="w-2 h-2 rounded-[var(--radius-pill)] flex-shrink-0" style={{ backgroundColor: info.color }} />
                       <span className="t-caption-sm text-[var(--brand-text-muted)] flex-1">{info.label}</span>
                       <div className="flex items-center gap-1.5 t-caption-sm">
                         {counts.errors > 0 && <span className="text-accent-danger">{counts.errors}E</span>}

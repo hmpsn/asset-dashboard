@@ -36,10 +36,10 @@ function formatSize(bytes: number): string {
 }
 
 function getSizeColor(bytes: number): string {
-  if (bytes > 5 * 1024 * 1024) return 'text-red-400';
-  if (bytes > 2 * 1024 * 1024) return 'text-orange-400';
-  if (bytes > 1 * 1024 * 1024) return 'text-amber-400';
-  return 'text-emerald-400';
+  if (bytes > 5 * 1024 * 1024) return 'text-accent-danger';
+  if (bytes > 2 * 1024 * 1024) return 'text-accent-orange';
+  if (bytes > 1 * 1024 * 1024) return 'text-accent-warning';
+  return 'text-accent-success';
 }
 
 function getBarWidth(size: number, max: number): number {
@@ -97,7 +97,7 @@ function PageWeight({ siteId }: Props) {
   if (!hasRun) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
-        <div className="w-16 h-16 rounded-2xl bg-[var(--surface-2)] flex items-center justify-center">
+        <div className="w-16 h-16 rounded-[var(--radius-xl)] bg-[var(--surface-2)] flex items-center justify-center">
           <Icon as={BarChart3} size="2xl" className="text-[var(--brand-text-muted)]" />
         </div>
         <p className="text-[var(--brand-text)] text-sm">Analyze image weight per page</p>
@@ -112,7 +112,7 @@ function PageWeight({ siteId }: Props) {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3 text-[var(--brand-text-muted)]">
-        <Loader2 className="w-6 h-6 animate-spin text-teal-400" />
+        <Loader2 className="w-6 h-6 animate-spin text-accent-brand" />
         <p className="text-sm">Scanning published pages for image weight...</p>
         <p className="text-xs text-[var(--brand-text-muted)]">This may take 30–60 seconds</p>
       </div>
@@ -124,8 +124,8 @@ function PageWeight({ siteId }: Props) {
       <div className="flex flex-col items-center justify-center py-16 gap-4">
         {error ? (
           <div className="bg-red-500/10 border border-red-500/30 rounded-[var(--radius-lg)] px-4 py-3 max-w-md text-center">
-            <p className="text-red-400 text-sm font-medium mb-1">Page Weight Analysis Failed</p>
-            <p className="text-xs text-red-400/70">{error}</p>
+            <p className="text-accent-danger text-sm font-medium mb-1">Page Weight Analysis Failed</p>
+            <p className="text-xs text-accent-danger">{error}</p>
           </div>
         ) : (
           <EmptyState icon={Layers} title="No results available" description="Run a page weight analysis to see resource metrics." className="py-4" />
@@ -167,7 +167,7 @@ function PageWeight({ siteId }: Props) {
           <div className="text-xs text-[var(--brand-text-muted)] mt-1">Total Asset Size</div>
         </div>
         <div className="bg-[var(--surface-2)] p-5 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
-          <div className={`text-3xl font-bold ${heavyPages > 0 ? 'text-orange-400' : 'text-emerald-400'}`}>{heavyPages}</div>
+          <div className={`text-3xl font-bold ${heavyPages > 0 ? 'text-accent-orange' : 'text-accent-success'}`}>{heavyPages}</div>
           <div className="text-xs text-[var(--brand-text-muted)] mt-1">Heavy Pages (&gt;2MB)</div>
         </div>
         <div className="bg-[var(--surface-2)] p-5 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
@@ -226,9 +226,9 @@ function PageWeight({ siteId }: Props) {
               )}
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium text-[var(--brand-text-bright)] truncate">{page.page}</div>
-                <div className="mt-1.5 h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden">
+                <div className="mt-1.5 h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all duration-500 ${getBarColor(page.totalSize)}`}
+                    className={`h-full rounded-[var(--radius-pill)] transition-all duration-500 ${getBarColor(page.totalSize)}`}
                     style={{ width: `${getBarWidth(page.totalSize, maxSize)}%` }}
                   />
                 </div>
@@ -247,7 +247,7 @@ function PageWeight({ siteId }: Props) {
                   <div key={asset.id} className="flex items-center gap-3 px-4 py-1.5 text-xs">
                     <div className="flex-1 min-w-0 text-[var(--brand-text-muted)] truncate">{asset.name}</div>
                     <span className="text-[var(--brand-text-muted)] flex-shrink-0">{asset.contentType.split('/')[1] || ''}</span>
-                    <span className={`tabular-nums flex-shrink-0 ${asset.size > 500 * 1024 ? 'text-orange-400' : 'text-[var(--brand-text-muted)]'}`}>
+                    <span className={`tabular-nums flex-shrink-0 ${asset.size > 500 * 1024 ? 'text-accent-orange' : 'text-[var(--brand-text-muted)]'}`}>
                       {formatSize(asset.size)}
                     </span>
                   </div>
@@ -259,10 +259,10 @@ function PageWeight({ siteId }: Props) {
       </div>
       {/* Cross-link tip: Asset Manager */}
       {heavyPages > 0 && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] bg-teal-500/5 border border-teal-500/20 text-xs text-teal-300">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] bg-teal-500/5 border border-teal-500/20 text-xs text-accent-brand">
           <Icon as={Images} size="md" className="flex-shrink-0" />
           <span className="flex-1"><strong>{heavyPages} heavy page{heavyPages !== 1 ? 's' : ''}</strong> found. Use the <strong>Asset Manager</strong> tab to compress images and reduce page weight.</span>
-          <Icon as={ArrowRight} size="sm" className="flex-shrink-0 text-teal-400" />
+          <Icon as={ArrowRight} size="sm" className="flex-shrink-0 text-accent-brand" />
         </div>
       )}
     </div>

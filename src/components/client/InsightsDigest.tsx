@@ -507,7 +507,7 @@ export function InsightsDigest(props: InsightsDigestProps) {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
-        <div className="w-5 h-5 rounded-md bg-teal-500/15 flex items-center justify-center">
+        <div className="w-5 h-5 rounded-[var(--radius-md)] bg-teal-500/15 flex items-center justify-center">
           <Icon as={Sparkles} size="sm" className="text-accent-brand" />
         </div>
         <span className="t-body font-semibold text-[var(--brand-text-bright)]">Insights</span>

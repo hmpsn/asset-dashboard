@@ -27,25 +27,25 @@ interface CalendarItem {
 // ── Config ──
 
 const TYPE_CONFIG: Record<ItemType, { icon: typeof FileText; color: string; bg: string; border: string; label: string }> = {
-  brief:   { icon: Clipboard,      color: 'text-teal-400',  bg: 'bg-teal-500/10',  border: 'border-teal-500/20', label: 'Brief' },
-  post:    { icon: FileText,       color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', label: 'Post' },
-  request: { icon: MessageSquare,  color: 'text-blue-400',  bg: 'bg-blue-500/10',  border: 'border-blue-500/20', label: 'Request' },
-  matrix:  { icon: Layers,         color: 'text-teal-400', bg: 'bg-teal-500/10', border: 'border-teal-500/20', label: 'Matrix Cell' },
+  brief:   { icon: Clipboard,      color: 'text-accent-brand',  bg: 'bg-teal-500/10',  border: 'border-teal-500/20', label: 'Brief' },
+  post:    { icon: FileText,       color: 'text-accent-warning', bg: 'bg-amber-500/10', border: 'border-amber-500/20', label: 'Post' },
+  request: { icon: MessageSquare,  color: 'text-accent-info',  bg: 'bg-blue-500/10',  border: 'border-blue-500/20', label: 'Request' },
+  matrix:  { icon: Layers,         color: 'text-accent-brand', bg: 'bg-teal-500/10', border: 'border-teal-500/20', label: 'Matrix Cell' },
 };
 
 const STATUS_ICONS: Record<string, { icon: typeof Clock; color: string }> = {
-  generating:       { icon: Sparkles,     color: 'text-amber-400' },
-  draft:            { icon: PenLine,      color: 'text-blue-400' },
-  review:           { icon: Eye,          color: 'text-cyan-400' },
-  approved:         { icon: CheckCircle2, color: 'text-emerald-400' },
-  requested:        { icon: Send,         color: 'text-blue-400' },
+  generating:       { icon: Sparkles,     color: 'text-accent-warning' },
+  draft:            { icon: PenLine,      color: 'text-accent-info' },
+  review:           { icon: Eye,          color: 'text-accent-cyan' },
+  approved:         { icon: CheckCircle2, color: 'text-accent-success' },
+  requested:        { icon: Send,         color: 'text-accent-info' },
   pending_payment:  { icon: Clock,        color: 'text-[var(--brand-text)]' },
-  brief_generated:  { icon: Clipboard,    color: 'text-teal-400' },
-  client_review:    { icon: Eye,          color: 'text-cyan-400' },
-  in_progress:      { icon: Sparkles,     color: 'text-amber-400' },
-  delivered:        { icon: CheckCircle2, color: 'text-emerald-400' },
-  published:        { icon: Globe,        color: 'text-emerald-400' },
-  declined:         { icon: Clock,        color: 'text-red-400' },
+  brief_generated:  { icon: Clipboard,    color: 'text-accent-brand' },
+  client_review:    { icon: Eye,          color: 'text-accent-cyan' },
+  in_progress:      { icon: Sparkles,     color: 'text-accent-warning' },
+  delivered:        { icon: CheckCircle2, color: 'text-accent-success' },
+  published:        { icon: Globe,        color: 'text-accent-success' },
+  declined:         { icon: Clock,        color: 'text-accent-danger' },
 };
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -163,7 +163,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <div className="w-6 h-6 border-2 rounded-full animate-spin border-[var(--surface-3)] border-t-teal-400" />
+        <div className="w-6 h-6 border-2 rounded-[var(--radius-pill)] animate-spin border-[var(--surface-3)] border-t-teal-400" />
       </div>
     );
   }
@@ -173,7 +173,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Icon as={CalendarIcon} size="lg" className="text-amber-400" />
+          <Icon as={CalendarIcon} size="lg" className="text-accent-warning" />
           <h2 className="text-lg font-semibold text-[var(--brand-text-bright)]">Content Calendar</h2>
         </div>
         <div className="flex items-center gap-2">
@@ -182,7 +182,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
             <button
               key={t}
               onClick={() => setTypeFilter(t)}
-              className={`t-caption-sm px-2.5 py-1 rounded-full border font-medium transition-colors ${
+              className={`t-caption-sm px-2.5 py-1 rounded-[var(--radius-pill)] border font-medium transition-colors ${
                 typeFilter === t
                   ? 'bg-[var(--surface-3)] border-[var(--brand-border-hover)] text-[var(--brand-text-bright)]'
                   : 'bg-[var(--surface-2)] border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
@@ -197,13 +197,13 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
       {/* Month stats */}
       <div className="grid grid-cols-5 gap-3">
         {[
-          { label: 'Briefs', value: stats.briefs, color: 'text-teal-400', bg: 'bg-teal-500/10', border: 'border-teal-500/20' },
-          { label: 'Posts', value: stats.posts, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
-          { label: 'Requests', value: stats.requests, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
-          { label: 'Matrix Cells', value: stats.matrixCells, color: 'text-teal-400', bg: 'bg-teal-500/10', border: 'border-teal-500/20' },
-          { label: 'Published', value: stats.published, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+          { label: 'Briefs', value: stats.briefs, color: 'text-accent-brand', bg: 'bg-teal-500/10', border: 'border-teal-500/20' },
+          { label: 'Posts', value: stats.posts, color: 'text-accent-warning', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
+          { label: 'Requests', value: stats.requests, color: 'text-accent-info', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
+          { label: 'Matrix Cells', value: stats.matrixCells, color: 'text-accent-brand', bg: 'bg-teal-500/10', border: 'border-teal-500/20' },
+          { label: 'Published', value: stats.published, color: 'text-accent-success', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
         ].map(s => (
-          <div key={s.label} className={`border ${s.border} ${s.bg} px-4 py-3`} style={{ borderRadius: '6px 12px 6px 12px' }}>
+          <div key={s.label} className={`border ${s.border} ${s.bg} px-4 py-3`} style={{ borderRadius: 'var(--radius-signature)' }}>
             <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
             <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{s.label}</div>
           </div>
@@ -211,10 +211,11 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
       </div>
 
       {/* Month navigation */}
-      <div className="flex items-center justify-between bg-[var(--surface-2)] border border-[var(--brand-border)] px-4 py-2.5" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      {/* pr-check-disable-next-line -- Calendar navigation toolbar uses brand signature radius as control chrome, not a content card. */}
+      <div className="flex items-center justify-between bg-[var(--surface-2)] border border-[var(--brand-border)] px-4 py-2.5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
         <button
           onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))}
-          className="p-1.5 rounded-lg hover:bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
+          className="p-1.5 rounded-[var(--radius-lg)] hover:bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
         >
           <Icon as={ChevronLeft} size="md" />
         </button>
@@ -231,14 +232,15 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
         </div>
         <button
           onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))}
-          className="p-1.5 rounded-lg hover:bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
+          className="p-1.5 rounded-[var(--radius-lg)] hover:bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
         >
           <Icon as={ChevronRight} size="md" />
         </button>
       </div>
 
       {/* Calendar grid */}
-      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
+      {/* pr-check-disable-next-line -- Calendar grid needs overflow clipping on the brand signature shell. */}
+      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
         {/* Day headers */}
         <div className="grid grid-cols-7 border-b border-[var(--brand-border)]">
           {DAYS.map(d => (
@@ -264,9 +266,9 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
                 } ${!isThisMonth ? 'opacity-40' : ''}`}
               >
                 <div className={`t-caption-sm font-medium mb-1 ${
-                  isToday ? 'text-amber-400' : isThisMonth ? 'text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)]'
+                  isToday ? 'text-accent-warning' : isThisMonth ? 'text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)]'
                 }`}>
-                  {isToday && <span className="inline-block w-5 h-5 leading-5 text-center rounded-full bg-amber-500/20">{day.getDate()}</span>}
+                  {isToday && <span className="inline-block w-5 h-5 leading-5 text-center rounded-[var(--radius-pill)] bg-amber-500/20">{day.getDate()}</span>}
                   {!isToday && day.getDate()}
                 </div>
 
@@ -277,7 +279,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
                     return (
                       <div
                         key={item.id}
-                        className={`text-[9px] px-1 py-0.5 rounded ${cfg.bg} ${cfg.color} truncate leading-tight`}
+                        className={`t-micro px-1 py-0.5 rounded-[var(--radius-sm)] ${cfg.bg} ${cfg.color} truncate leading-tight`}
                         title={item.label}
                       >
                         {item.label}
@@ -285,7 +287,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
                     );
                   })}
                   {dayItems.length > 3 && (
-                    <div className="text-[9px] text-[var(--brand-text-muted)] px-1">+{dayItems.length - 3} more</div>
+                    <div className="t-micro text-[var(--brand-text-muted)] px-1">+{dayItems.length - 3} more</div>
                   )}
                 </div>
               </button>
@@ -296,7 +298,8 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
 
       {/* Selected day detail panel */}
       {selectedDay && (
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
+        // pr-check-disable-next-line -- Selected-day detail is paired with the calendar grid and shares its signature shell.
+        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
           <div className="px-4 py-3 border-b border-[var(--brand-border)]/50 flex items-center justify-between">
             <span className="text-xs font-medium text-[var(--brand-text-bright)]">
               {new Date(selectedDay + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
@@ -317,7 +320,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
 
                 return (
                   <div key={item.id} className="px-4 py-3 flex items-start gap-3 hover:bg-[var(--surface-3)]/30 transition-colors">
-                    <div className={`mt-0.5 p-1.5 rounded-lg ${cfg.bg} border ${cfg.border}`}>
+                    <div className={`mt-0.5 p-1.5 rounded-[var(--radius-lg)] ${cfg.bg} border ${cfg.border}`}>
                       <Icon as={ItemIcon} size="md" className={cfg.color} />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -350,7 +353,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
           action={
             <button
               onClick={() => navigate(adminPath(workspaceId, 'seo-briefs'))}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 transition-colors"
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/20 transition-colors"
             >
               <Icon as={PenLine} size="sm" />
               Create a Brief

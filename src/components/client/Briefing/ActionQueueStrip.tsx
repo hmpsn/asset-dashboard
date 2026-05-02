@@ -164,7 +164,7 @@ export function ActionQueueStrip({
         <button
           type="button"
           onClick={() => navigate(`${clientPath(workspaceId, 'inbox', betaMode)}?tab=approvals`)}
-          className="ml-auto inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/30 border border-amber-400/50 t-caption-sm font-medium text-accent-warning hover:bg-amber-500/40 transition-colors"
+          className="ml-auto inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[var(--radius-pill)] bg-amber-500/30 border border-amber-400/50 t-caption-sm font-medium text-accent-warning hover:bg-amber-500/40 transition-colors"
           aria-label={`${staleCount} urgent items pending`}
         >
           <Clock className="w-3.5 h-3.5" aria-hidden="true" />

@@ -113,11 +113,11 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
         onClick={() => setOpen(true)}
         icon={MessageSquarePlus}
         variant="secondary"
-        className={cn('fixed bottom-6 left-6 rounded-full shadow-lg z-[var(--z-modal-backdrop)] backdrop-blur-sm', chatExpanded ? 'sm:flex hidden' : '')}
+        className={cn('fixed bottom-6 left-6 rounded-[var(--radius-pill)] shadow-lg z-[var(--z-modal-backdrop)] backdrop-blur-sm', chatExpanded ? 'sm:flex hidden' : '')}
       >
         Feedback
         {unreadCount > 0 && (
-          <span className="w-4 h-4 rounded-full bg-[var(--teal)] text-[9px] /* arbitrary-text-ok */ font-bold text-[var(--button-primary-text)] flex items-center justify-center">{unreadCount}</span>
+          <span className="w-4 h-4 rounded-[var(--radius-pill)] bg-[var(--teal)] t-micro font-bold text-[var(--button-primary-text)] flex items-center justify-center">{unreadCount}</span>
         )}
       </Button>
     );
@@ -149,7 +149,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
         {view === 'form' ? (
           submitted ? (
             <div className="flex flex-col items-center justify-center py-12 px-4">
-              <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-3">
+              <div className="w-12 h-12 rounded-[var(--radius-pill)] bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-3">
                 <Icon as={CheckCircle2} size="xl" className="text-accent-success" />
               </div>
               <p className="t-body font-medium text-[var(--brand-text-bright)]">Thank you!</p>
@@ -195,7 +195,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
 
               {/* Auto-context badge */}
               <div className="flex items-center gap-1.5 t-micro text-[var(--brand-text-muted)]">
-                <div className="w-1.5 h-1.5 rounded-full bg-[var(--brand-text-muted)]" />
+                <div className="w-1.5 h-1.5 rounded-[var(--radius-pill)] bg-[var(--brand-text-muted)]" />
                 Context auto-attached: current tab, browser, screen size
               </div>
 
@@ -248,7 +248,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="t-caption-sm font-medium text-[var(--brand-text-bright)] truncate">{item.title}</span>
-                        {hasTeamReply && <span className="w-1.5 h-1.5 rounded-full bg-teal-400 flex-shrink-0" />}
+                        {hasTeamReply && <span className="w-1.5 h-1.5 rounded-[var(--radius-pill)] bg-teal-400 flex-shrink-0" />}
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className={cn('t-micro px-1.5 py-0.5 rounded font-medium', statusCfg.bg, statusCfg.color)}>{statusCfg.label}</span>

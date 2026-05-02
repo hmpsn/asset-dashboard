@@ -20,9 +20,9 @@ const CATEGORIES: { id: Category; label: string }[] = [
 ];
 
 const BADGE: Record<Category, string> = {
-  site_change: 'bg-blue-500/20 text-blue-400',
-  algorithm_update: 'bg-amber-500/20 text-amber-400/80',
-  campaign: 'bg-purple-500/20 text-purple-400',
+  site_change: 'bg-blue-500/20 text-accent-info',
+  algorithm_update: 'bg-amber-500/20 text-accent-warning',
+  campaign: 'bg-accent-brand-soft text-accent-brand',
   other: 'bg-[var(--surface-3)]/50 text-[var(--brand-text)]',
 };
 
@@ -30,7 +30,7 @@ function CategoryBadge({ category }: { category: string }) {
   const cls = BADGE[category as Category] ?? BADGE.other;
   const label = CATEGORIES.find(c => c.id === category)?.label ?? category;
   return (
-    <span className={cn('t-caption px-1.5 py-0.5 rounded-md font-medium', cls)}>{label}</span>
+    <span className={cn('t-caption px-1.5 py-0.5 rounded-[var(--radius-md)] font-medium', cls)}>{label}</span>
   );
 }
 
@@ -73,7 +73,7 @@ export function AnalyticsAnnotations({ workspaceId }: { workspaceId: string }) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Icon as={Loader2} size="lg" className="animate-spin text-teal-400" />
+        <Icon as={Loader2} size="lg" className="animate-spin text-accent-brand" />
       </div>
     );
   }
@@ -81,7 +81,7 @@ export function AnalyticsAnnotations({ workspaceId }: { workspaceId: string }) {
   return (
     <div className="space-y-8">
       <div className="flex items-center gap-2">
-        <Icon as={Flag} size="lg" className="text-amber-400/80" />
+        <Icon as={Flag} size="lg" className="text-accent-warning" />
         <h2 className="text-sm font-semibold text-[var(--brand-text-bright)]">Annotations</h2>
         <span className="t-caption px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{annotations.length}</span>
       </div>
@@ -124,7 +124,7 @@ export function AnalyticsAnnotations({ workspaceId }: { workspaceId: string }) {
       <div className="flex items-center gap-2 flex-wrap">
         <button onClick={() => setFilter('all')}
           className={cn(
-            't-caption px-2.5 py-1 rounded-full border transition-colors',
+            't-caption px-2.5 py-1 rounded-[var(--radius-pill)] border transition-colors',
             filter === 'all' ? 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:border-[var(--brand-border-hover)]',
           )}>
           All
@@ -132,7 +132,7 @@ export function AnalyticsAnnotations({ workspaceId }: { workspaceId: string }) {
         {CATEGORIES.map(c => (
           <button key={c.id} onClick={() => setFilter(c.id)}
             className={cn(
-              't-caption px-2.5 py-1 rounded-full border transition-colors',
+              't-caption px-2.5 py-1 rounded-[var(--radius-pill)] border transition-colors',
               filter === c.id ? 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--brand-text-bright)]' : 'border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:border-[var(--brand-border-hover)]',
             )}>
             {c.label}
@@ -155,7 +155,7 @@ export function AnalyticsAnnotations({ workspaceId }: { workspaceId: string }) {
                   </select>
                   <input type="text" value={editDraft.label} onChange={e => setEditDraft(p => ({ ...p, label: e.target.value }))}
                     className="flex-1 min-w-0 px-2 py-1 bg-[var(--surface-1)] border border-[var(--brand-border-hover)] rounded-[var(--radius-sm)] text-xs text-[var(--brand-text-bright)]" />
-                  <button onClick={saveEdit} disabled={updateMutation.isPending} className="text-teal-400 hover:text-teal-300 flex-shrink-0 p-1" aria-label="Save edit">
+                  <button onClick={saveEdit} disabled={updateMutation.isPending} className="text-accent-brand hover:text-accent-brand flex-shrink-0 p-1" aria-label="Save edit">
                     <Icon as={Check} size="md" />
                   </button>
                   <button onClick={() => setEditId(null)} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] flex-shrink-0 p-1" aria-label="Cancel edit">
@@ -172,7 +172,7 @@ export function AnalyticsAnnotations({ workspaceId }: { workspaceId: string }) {
                     <Icon as={Pencil} size="md" />
                   </button>
                   <button onClick={() => remove(ann.id)}
-                    className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-muted)] hover:text-red-400 transition-all flex-shrink-0 p-1" aria-label="Delete annotation">
+                    className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-muted)] hover:text-accent-danger transition-all flex-shrink-0 p-1" aria-label="Delete annotation">
                     <Icon as={Trash2} size="md" />
                   </button>
                 </>

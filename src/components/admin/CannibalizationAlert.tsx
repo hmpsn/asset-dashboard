@@ -9,15 +9,15 @@ interface Props {
 }
 
 const SEVERITY_CLASSES: Record<CannibalizationWarning['severity'], string> = {
-  high: 'text-red-400 bg-red-500/10 border-red-500/20',
-  medium: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
-  low: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
+  high: 'text-accent-danger bg-red-500/10 border-red-500/20',
+  medium: 'text-accent-warning bg-amber-500/10 border-amber-500/20',
+  low: 'text-accent-info bg-blue-500/10 border-blue-500/20',
 };
 
 const SEVERITY_ICON_COLOR: Record<CannibalizationWarning['severity'], string> = {
-  high: 'text-red-400',
-  medium: 'text-amber-400',
-  low: 'text-blue-400',
+  high: 'text-accent-danger',
+  medium: 'text-accent-warning',
+  low: 'text-accent-info',
 };
 
 /** Strip protocol + domain from a URL, leaving only the path. Falls back to the original string if not a valid URL. */

@@ -469,7 +469,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         <button
           key={t.id}
           onClick={() => setAuditSubTab(t.id)}
-          className={cn('flex items-center gap-1.5 px-3 py-2 t-caption font-medium border-b-2 transition-colors -mb-px', auditSubTab === t.id ? 'border-teal-500 text-teal-300' : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}
+          className={cn('flex items-center gap-1.5 px-3 py-2 t-caption font-medium border-b-2 transition-colors -mb-px', auditSubTab === t.id ? 'border-teal-500 text-accent-brand' : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}
         >
           <Icon as={t.icon} size="md" />
           {t.label}
@@ -483,7 +483,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         <button
           key={t.id}
           onClick={() => setAuditSubTab(t.id)}
-          className={cn('flex items-center gap-1.5 px-3 py-2 t-caption font-medium border-b-2 transition-colors -mb-px', auditSubTab === t.id ? 'border-teal-500 text-teal-300' : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}
+          className={cn('flex items-center gap-1.5 px-3 py-2 t-caption font-medium border-b-2 transition-colors -mb-px', auditSubTab === t.id ? 'border-teal-500 text-accent-brand' : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}
         >
           <Icon as={t.icon} size="md" />
           {t.label}
@@ -492,7 +492,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
       <div className="w-px h-4 bg-[var(--surface-3)] mx-1 self-center" />
       <button
         onClick={() => setAuditSubTab('guide')}
-        className={cn('flex items-center gap-1.5 px-3 py-2 t-caption font-medium border-b-2 transition-colors -mb-px', auditSubTab === 'guide' ? 'border-teal-500 text-teal-300' : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}
+        className={cn('flex items-center gap-1.5 px-3 py-2 t-caption font-medium border-b-2 transition-colors -mb-px', auditSubTab === 'guide' ? 'border-teal-500 text-accent-brand' : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]')}
       >
         <Icon as={BookOpen} size="md" />
         Guide
@@ -503,10 +503,10 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   if (auditSubTab === 'guide') return <div>{auditTabBar}<SeoAuditGuide /></div>;
 
   if (auditSubTab === 'content-decay' && workspaceId) {
-    return <div>{auditTabBar}<Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-full animate-spin border-[var(--brand-border)] border-t-amber-400" /></div>}><ContentDecay workspaceId={workspaceId} /></Suspense></div>;
+    return <div>{auditTabBar}<Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-[var(--radius-pill)] animate-spin border-[var(--brand-border)] border-t-amber-400" /></div>}><ContentDecay workspaceId={workspaceId} /></Suspense></div>;
   }
   if (auditSubTab === 'aeo-review' && workspaceId) {
-    return <div>{auditTabBar}<Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-full animate-spin border-[var(--brand-border)] border-t-purple-400" /></div>}><AeoReview workspaceId={workspaceId} /></Suspense></div>;
+    return <div>{auditTabBar}<Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-[var(--radius-pill)] animate-spin border-[var(--brand-border)] border-t-[var(--teal)]" /></div>}><AeoReview workspaceId={workspaceId} /></Suspense></div>;
   }
   if (auditSubTab === 'history') {
     return <div>{auditTabBar}<AuditHistory siteId={siteId} history={history} onRefresh={loadHistory} /></div>;
@@ -535,7 +535,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
               type="checkbox"
               checked={!skipLinkCheck}
               onChange={e => setSkipLinkCheck(!e.target.checked)}
-              className="rounded border-zinc-600 bg-zinc-800 text-teal-500 focus:ring-teal-500 focus:ring-offset-zinc-900" // raw-zinc-ok
+              className="rounded border-zinc-600 bg-zinc-800 text-accent-brand focus:ring-teal-500 focus:ring-offset-zinc-900" // raw-zinc-ok
             />
             Include dead link scan
           </label>
@@ -631,20 +631,20 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
             size="hero"
             staggerIndex={0}
           />
-          <div className="h-1.5 bg-[var(--surface-2)] rounded-full overflow-hidden">
-            <div className={`h-full rounded-full ${scoreBgBarClass(effectiveData!.siteScore)}`} style={{ width: `${effectiveData!.siteScore}%` }} />
+          <div className="h-1.5 bg-[var(--surface-2)] rounded-[var(--radius-pill)] overflow-hidden">
+            <div className={`h-full rounded-[var(--radius-pill)] ${scoreBgBarClass(effectiveData!.siteScore)}`} style={{ width: `${effectiveData!.siteScore}%` }} />
           </div>
         </div>
         <StatCard label="Pages Scanned" value={effectiveData!.totalPages} size="hero" staggerIndex={0} />
-        <StatCard label="Errors" value={effectiveData!.errors} valueColor="text-red-400" onClick={() => setSeverityFilter(severityFilter === 'error' ? 'all' : 'error')} sub={severityFilter === 'error' ? '↑ Filtering' : 'Click to filter'} className={severityFilter === 'error' ? '!border-red-500/60 !bg-red-500/5' : ''} size="hero" staggerIndex={1} />
-        <StatCard label="Warnings" value={effectiveData!.warnings} valueColor="text-amber-400" onClick={() => setSeverityFilter(severityFilter === 'warning' ? 'all' : 'warning')} sub={severityFilter === 'warning' ? '↑ Filtering' : 'Click to filter'} className={severityFilter === 'warning' ? '!border-amber-500/60 !bg-amber-500/5' : ''} size="hero" staggerIndex={2} />
-        <StatCard label="Info" value={effectiveData!.infos} valueColor="text-blue-400" onClick={() => setSeverityFilter(severityFilter === 'info' ? 'all' : 'info')} sub={severityFilter === 'info' ? '↑ Filtering' : 'Click to filter'} className={severityFilter === 'info' ? '!border-blue-500/60 !bg-blue-500/5' : ''} size="hero" staggerIndex={3} /> {/* blue-ok — info severity-category color, consistent with Errors=red and Warnings=amber */}
+        <StatCard label="Errors" value={effectiveData!.errors} valueColor="text-accent-danger" onClick={() => setSeverityFilter(severityFilter === 'error' ? 'all' : 'error')} sub={severityFilter === 'error' ? '↑ Filtering' : 'Click to filter'} className={severityFilter === 'error' ? '!border-red-500/60 !bg-red-500/5' : ''} size="hero" staggerIndex={1} />
+        <StatCard label="Warnings" value={effectiveData!.warnings} valueColor="text-accent-warning" onClick={() => setSeverityFilter(severityFilter === 'warning' ? 'all' : 'warning')} sub={severityFilter === 'warning' ? '↑ Filtering' : 'Click to filter'} className={severityFilter === 'warning' ? '!border-amber-500/60 !bg-amber-500/5' : ''} size="hero" staggerIndex={2} />
+        <StatCard label="Info" value={effectiveData!.infos} valueColor="text-accent-info" onClick={() => setSeverityFilter(severityFilter === 'info' ? 'all' : 'info')} sub={severityFilter === 'info' ? '↑ Filtering' : 'Click to filter'} className={severityFilter === 'info' ? '!border-blue-500/60 !bg-blue-500/5' : ''} size="hero" staggerIndex={3} /> {/* blue-ok — info severity-category color, consistent with Errors=red and Warnings=amber */}
         {effectiveData!.deadLinkSummary && (
           <StatCard
             label="Broken Links"
             value={effectiveData!.deadLinkSummary.total}
             icon={Link2Off}
-            valueColor={effectiveData!.deadLinkSummary.internal > 0 ? 'text-red-400' : effectiveData!.deadLinkSummary.total > 0 ? 'text-amber-400' : 'text-emerald-400'}
+            valueColor={effectiveData!.deadLinkSummary.internal > 0 ? 'text-accent-danger' : effectiveData!.deadLinkSummary.total > 0 ? 'text-accent-warning' : 'text-accent-success'}
             sub={effectiveData!.deadLinkSummary.total === 0 ? 'All links healthy' : `${effectiveData!.deadLinkSummary.internal} internal · ${effectiveData!.deadLinkSummary.external} external`}
             size="hero"
             staggerIndex={4}
@@ -670,7 +670,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
           <div className="flex items-center gap-2 px-4 py-2.5 rounded-[var(--radius-lg)] bg-[var(--surface-2)]/50 border border-[var(--brand-border)] flex-wrap">
             <span className="t-caption-sm text-[var(--brand-text-muted)] font-medium tracking-wider mr-1">Quick fixes →</span>
             {tips.map(tip => (
-              <span key={tip.tool} className="flex items-center gap-1 t-caption-sm text-teal-400/80 bg-teal-500/5 px-2 py-1 rounded border border-teal-500/10">
+              <span key={tip.tool} className="flex items-center gap-1 t-caption-sm text-accent-brand bg-teal-500/5 px-2 py-1 rounded border border-teal-500/10">
                 <Icon as={tip.icon} size="sm" /> {tip.label}
               </span>
             ))}
@@ -703,8 +703,8 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
                   {issue.value && <div className="t-caption text-[var(--brand-text-muted)] mt-0.5 italic truncate">{issue.value}</div>}
                   {issue.suggestedFix && (
                     <div className="mt-1.5 px-2 py-1.5 rounded bg-emerald-950/40 border border-emerald-800/30">
-                      <div className="t-caption-sm text-emerald-500 font-semibold uppercase tracking-wider mb-0.5">AI Suggestion</div>
-                      <div className="t-caption text-emerald-300">{issue.suggestedFix}</div>
+                      <div className="t-caption-sm text-accent-success font-semibold uppercase tracking-wider mb-0.5">AI Suggestion</div>
+                      <div className="t-caption text-accent-success">{issue.suggestedFix}</div>
                     </div>
                   )}
                 </div>
@@ -762,15 +762,15 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
       {/* Share URL banner */}
       {shareUrl && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-[var(--radius-lg)]" style={{ backgroundColor: 'rgba(45,212,191,0.1)', border: '1px solid rgba(46,217,195,0.2)' }}>
-          <Icon as={Share2} size="md" className="flex-shrink-0 text-teal-400" />
+          <Icon as={Share2} size="md" className="flex-shrink-0 text-accent-brand" />
           <div className="flex-1 min-w-0">
-            <div className="t-caption font-medium text-teal-400">Report saved! Share this link with clients:</div>
+            <div className="t-caption font-medium text-accent-brand">Report saved! Share this link with clients:</div>
             <div className="t-caption text-[var(--brand-text-bright)] truncate mt-0.5 font-mono">{shareUrl}</div>
           </div>
-          <button onClick={copyShareUrl} className="flex items-center gap-1 px-2.5 py-1.5 rounded-md t-caption font-medium transition-colors bg-teal-400 text-[#0f1219]">
+          <button onClick={copyShareUrl} className="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors bg-teal-400 text-[#0f1219]">
             <Icon as={Copy} size="sm" /> {copied ? 'Copied!' : 'Copy'}
           </button>
-          <a href={shareUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md hover:bg-white/10 text-teal-400">
+          <a href={shareUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-[var(--radius-md)] hover:bg-white/10 text-accent-brand">
             <Icon as={ExternalLink} size="md" />
           </a>
           <button onClick={() => setShareUrl(null)} className="p-1 rounded hover:bg-white/10" aria-label="Dismiss share URL">
@@ -816,12 +816,12 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
       {summary.total > 0 && (
         <div className="flex items-center gap-3 t-caption-sm text-[var(--brand-text-muted)] mb-2">
           <span className="text-[var(--brand-text)] font-medium">{summary.total} tracked</span>
-          {summary.live > 0 && <><StatusBadge status="live" /><span className="text-teal-400">{summary.live}</span></>}
-          {summary.inReview > 0 && <><StatusBadge status="in-review" /><span className="text-blue-400">{summary.inReview}</span></>}
-          {summary.approved > 0 && <><StatusBadge status="approved" /><span className="text-emerald-400">{summary.approved}</span></>}
-          {summary.rejected > 0 && <><StatusBadge status="rejected" /><span className="text-red-400">{summary.rejected}</span></>}
-          {summary.issueDetected > 0 && <><StatusBadge status="issue-detected" /><span className="text-amber-400">{summary.issueDetected}</span></>}
-          {summary.fixProposed > 0 && <><StatusBadge status="fix-proposed" /><span className="text-blue-400">{summary.fixProposed}</span></>}
+          {summary.live > 0 && <><StatusBadge status="live" /><span className="text-accent-brand">{summary.live}</span></>}
+          {summary.inReview > 0 && <><StatusBadge status="in-review" /><span className="text-accent-info">{summary.inReview}</span></>}
+          {summary.approved > 0 && <><StatusBadge status="approved" /><span className="text-accent-success">{summary.approved}</span></>}
+          {summary.rejected > 0 && <><StatusBadge status="rejected" /><span className="text-accent-danger">{summary.rejected}</span></>}
+          {summary.issueDetected > 0 && <><StatusBadge status="issue-detected" /><span className="text-accent-warning">{summary.issueDetected}</span></>}
+          {summary.fixProposed > 0 && <><StatusBadge status="fix-proposed" /><span className="text-accent-info">{summary.fixProposed}</span></>}
         </div>
       )}
 
@@ -856,13 +856,13 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
                 <div className="flex items-center gap-3 flex-shrink-0">
                   <StatusBadge status={pageState?.status} />
                   {pageTraffic && (pageTraffic.clicks > 0 || pageTraffic.pageviews > 0) && (
-                    <span className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400 tabular-nums" title={`${pageTraffic.clicks} clicks, ${pageTraffic.impressions} impressions, ${pageTraffic.pageviews} pageviews (28d)`}>
+                    <span className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-accent-brand tabular-nums" title={`${pageTraffic.clicks} clicks, ${pageTraffic.impressions} impressions, ${pageTraffic.pageviews} pageviews (28d)`}>
                       {pageTraffic.clicks > 0 ? `${pageTraffic.clicks.toLocaleString()} clicks` : ''}{pageTraffic.clicks > 0 && pageTraffic.pageviews > 0 ? ' · ' : ''}{pageTraffic.pageviews > 0 ? `${pageTraffic.pageviews.toLocaleString()} views` : ''}
                     </span>
                   )}
-                  {errorCount > 0 && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400">{errorCount} error{errorCount > 1 ? 's' : ''}</span>}
-                  {warningCount > 0 && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">{warningCount} warn</span>}
-                  {page.issues.length === 0 && <Icon as={CheckCircle} size="md" className="text-emerald-400" />}
+                  {errorCount > 0 && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-accent-danger">{errorCount} error{errorCount > 1 ? 's' : ''}</span>}
+                  {warningCount > 0 && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-accent-warning">{warningCount} warn</span>}
+                  {page.issues.length === 0 && <Icon as={CheckCircle} size="md" className="text-accent-success" />}
                   <span className={cn('t-body font-bold tabular-nums', scoreColorClass(page.score))}>{page.score}</span>
                 </div>
               </button>
@@ -876,7 +876,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
                     </div>
                   )}
                   {page.issues.length === 0 ? (
-                    <div className="t-caption text-emerald-400 px-4 py-2">No issues found</div>
+                    <div className="t-caption text-accent-success px-4 py-2">No issues found</div>
                   ) : (
                     page.issues
                       .filter(i => severityFilter === 'all' || i.severity === severityFilter)

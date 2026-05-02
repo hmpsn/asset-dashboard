@@ -276,7 +276,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
                                     {note.attachments.map(att => (
                                       att.mimeType.startsWith('image/') ? (
                                         <a key={att.id} href={`/api/request-attachments/${att.filename}`} target="_blank" rel="noreferrer" className="block">
-                                          <img src={`/api/request-attachments/${att.filename}`} alt={att.originalName} className="max-w-[240px] max-h-[180px] rounded-md border border-[var(--brand-border-strong)]" />
+                                          <img src={`/api/request-attachments/${att.filename}`} alt={att.originalName} className="max-w-[240px] max-h-[180px] rounded-[var(--radius-md)] border border-[var(--brand-border-strong)]" />
                                         </a>
                                       ) : (
                                         <a key={att.id} href={`/api/request-attachments/${att.filename}`} target="_blank" rel="noreferrer"

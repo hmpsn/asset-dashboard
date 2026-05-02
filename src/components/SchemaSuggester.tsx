@@ -597,7 +597,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
           className={cn(
             'flex items-center gap-1.5 px-3 py-2 t-caption font-medium border-b-2 transition-colors -mb-px',
             schemaSubTab === t.id
-              ? 'border-teal-500 text-teal-300'
+              ? 'border-teal-500 text-accent-brand'
               : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'
           )}
         >
@@ -630,7 +630,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
         )}
         <div className="flex flex-col items-center justify-center py-8 gap-4">
           <div className="w-14 h-14 rounded-[var(--radius-xl)] bg-teal-500/10 border border-teal-500/20 flex items-center justify-center">
-            <Icon as={Sparkles} size="2xl" className="text-teal-400" />
+            <Icon as={Sparkles} size="2xl" className="text-accent-brand" />
           </div>
           <div className="text-center space-y-1.5">
             <p className="t-body font-medium text-[var(--brand-text-bright)]">Schema Generator</p>
@@ -646,7 +646,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
             <button
               onClick={fetchCmsTemplatePages}
               disabled={loadingCmsPages}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-[var(--radius-md)] t-body font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-amber-300 border border-amber-500/30 transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-[var(--radius-md)] t-body font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-accent-warning border border-amber-500/30 transition-colors disabled:opacity-50"
             >
               {loadingCmsPages ? <Icon as={Loader2} size="md" className="animate-spin" /> : <Icon as={Database} size="md" />} CMS Templates
             </button>
@@ -655,16 +655,16 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
         <SchemaPlanPanel siteId={siteId} />
         {showBpCallout && (
           <div role="alert" className="rounded-[var(--radius-lg)] border border-amber-500/30 bg-amber-500/10 p-4 flex items-start gap-3">
-            <AlertTriangle size={16} className="text-amber-400 flex-shrink-0 mt-0.5" />
+            <AlertTriangle size={16} className="text-accent-warning flex-shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
-              <p className="t-body text-amber-400 font-medium mb-1">Your business profile is incomplete</p>
+              <p className="t-body text-accent-warning font-medium mb-1">Your business profile is incomplete</p>
               <p className="t-caption text-[var(--brand-text-muted)]">
                 Add your address to unlock LocalBusiness schema on your homepage, /contact, and /about — the highest-value schema type for local businesses.
               </p>
               {workspaceId && (
                 <Link
                   to={adminPath(workspaceId, 'workspace-settings') + '?tab=business-profile'}
-                  className="t-caption text-teal-400 hover:text-teal-300 mt-2 inline-block"
+                  className="t-caption text-accent-brand hover:text-accent-brand mt-2 inline-block"
                 >
                   Complete business profile →
                 </Link>
@@ -695,8 +695,8 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
         />
         {generatingSingle && (
           <div className="flex items-center gap-2 px-4 py-2 bg-teal-500/10 border border-teal-500/20 rounded-[var(--radius-xl)]">
-            <Icon as={Loader2} size="md" className="animate-spin text-teal-400" />
-            <span className="t-caption text-teal-300">Generating schema for page...</span>
+            <Icon as={Loader2} size="md" className="animate-spin text-accent-brand" />
+            <span className="t-caption text-accent-brand">Generating schema for page...</span>
           </div>
         )}
         {/* Page list with type selectors */}
@@ -764,7 +764,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
                   <button
                     onClick={() => generateSinglePage(p.id)}
                     disabled={generatingSingle === p.id}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-md)] t-caption-sm text-teal-300 bg-teal-600/10 border border-teal-500/20 hover:bg-teal-600/20 transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-md)] t-caption-sm text-accent-brand bg-teal-600/10 border border-teal-500/20 hover:bg-teal-600/20 transition-colors disabled:opacity-50"
                   >
                     {generatingSingle === p.id ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Sparkles} size="sm" />}
                     Generate
@@ -810,7 +810,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3">
         {schemaTabBar}
-        <Icon as={CheckCircle} size="2xl" className="text-emerald-400/80" />
+        <Icon as={CheckCircle} size="2xl" className="text-accent-success" />
         <p className="text-[var(--brand-text-muted)] t-body">No schema suggestions needed</p>
         <button onClick={runScan} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] transition-colors mt-2">
           <Icon as={RefreshCw} size="sm" /> Re-scan
@@ -854,16 +854,16 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
 
       {showBpCallout && (
         <div role="alert" className="rounded-[var(--radius-lg)] border border-amber-500/30 bg-amber-500/10 p-4 flex items-start gap-3">
-          <AlertTriangle size={16} className="text-amber-400 flex-shrink-0 mt-0.5" />
+          <AlertTriangle size={16} className="text-accent-warning flex-shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
-            <p className="t-body text-amber-400 font-medium mb-1">Your business profile is incomplete</p>
+            <p className="t-body text-accent-warning font-medium mb-1">Your business profile is incomplete</p>
             <p className="t-caption text-[var(--brand-text-muted)]">
               Add your address to unlock LocalBusiness schema on your homepage, /contact, and /about — the highest-value schema type for local businesses.
             </p>
             {workspaceId && (
               <Link
                 to={adminPath(workspaceId, 'workspace-settings') + '?tab=business-profile'}
-                className="t-caption text-teal-400 hover:text-teal-300 mt-2 inline-block"
+                className="t-caption text-accent-brand hover:text-accent-brand mt-2 inline-block"
               >
                 Complete business profile →
               </Link>
@@ -955,8 +955,8 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
       </div>
       {generatingSingle && (
         <div className="flex items-center gap-2 px-4 py-2 bg-teal-500/10 border border-teal-500/20 rounded-[var(--radius-xl)]">
-          <Icon as={Loader2} size="sm" className="animate-spin text-teal-400" />
-          <span className="t-caption text-teal-300">Generating schema for page...</span>
+          <Icon as={Loader2} size="sm" className="animate-spin text-accent-brand" />
+          <span className="t-caption text-accent-brand">Generating schema for page...</span>
         </div>
       )}
 
@@ -983,7 +983,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
         </div>
         <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature)' }}>
           <div className="t-caption text-[var(--brand-text-muted)] mb-1">Validated</div>
-          <div className={cn('text-2xl font-bold', pagesWithErrors > 0 ? 'text-amber-400/80' : 'text-emerald-400/80')}>{data.length - pagesWithErrors}/{data.length}</div>
+          <div className={cn('text-2xl font-bold', pagesWithErrors > 0 ? 'text-accent-warning' : 'text-accent-success')}>{data.length - pagesWithErrors}/{data.length}</div>
           <div className="t-caption text-[var(--brand-text-muted)]">
             {pagesWithErrors > 0 ? `${pagesWithErrors} with errors` : pagesWithWarnings > 0 ? `${pagesWithWarnings} with warnings` : 'all passing'}
             {fixesAvailable > 0 && ` · ${fixesAvailable} fix${fixesAvailable === 1 ? '' : 'es'} available`}
@@ -991,7 +991,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
         </div>
         <div className="bg-[var(--surface-2)] p-4 border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature)' }}>
           <div className="t-caption text-[var(--brand-text-muted)] mb-1">Existing Schemas</div>
-          <div className="text-2xl font-bold text-emerald-400/80">{pagesWithExisting}</div>
+          <div className="text-2xl font-bold text-accent-success">{pagesWithExisting}</div>
           <div className="t-caption text-[var(--brand-text-muted)]">pages already have JSON-LD</div>
         </div>
       </div>
@@ -1004,18 +1004,18 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
             className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/30 transition-colors"
           >
             <div className="flex items-center gap-2">
-              <Icon as={BarChart3} size="md" className="text-teal-400" />
+              <Icon as={BarChart3} size="md" className="text-accent-brand" />
               <span className="t-caption font-medium text-[var(--brand-text-bright)]">Schema Impact</span>
               <span className="t-caption-sm text-[var(--brand-text-muted)]">{impactData.totalDeployments} deployments tracked</span>
             </div>
             <div className="flex items-center gap-3">
               {impactData.avgClicksDelta !== null && (
-                <span className={cn('t-caption font-medium', impactData.avgClicksDelta >= 0 ? 'text-emerald-400/80' : 'text-red-400/80')}>
+                <span className={cn('t-caption font-medium', impactData.avgClicksDelta >= 0 ? 'text-accent-success' : 'text-accent-danger')}>
                   {impactData.avgClicksDelta >= 0 ? '+' : ''}{impactData.avgClicksDelta} clicks
                 </span>
               )}
               {impactData.avgPositionDelta !== null && (
-                <span className={cn('t-caption font-medium', impactData.avgPositionDelta <= 0 ? 'text-emerald-400/80' : 'text-red-400/80')}>
+                <span className={cn('t-caption font-medium', impactData.avgPositionDelta <= 0 ? 'text-accent-success' : 'text-accent-danger')}>
                   {impactData.avgPositionDelta <= 0 ? '' : '+'}{impactData.avgPositionDelta} pos
                 </span>
               )}
@@ -1039,7 +1039,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
                   <div key={stat.label} className="bg-[var(--surface-2)] px-3 py-2.5">
                     <div className="t-caption-sm text-[var(--brand-text-muted)]">{stat.label}</div>
                     {stat.value !== null ? (
-                      <div className={cn('t-body font-bold', stat.positive(stat.value) ? 'text-emerald-400/80' : 'text-red-400/80')}>
+                      <div className={cn('t-body font-bold', stat.positive(stat.value) ? 'text-accent-success' : 'text-accent-danger')}>
                         {stat.value >= 0 && stat.label !== 'Avg Position' ? '+' : ''}{stat.value}{stat.suffix}
                       </div>
                     ) : (
@@ -1064,7 +1064,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
                     ) : d.before && d.after ? (
                       <div className="flex items-center gap-3 t-caption-sm">
                         <TrendBadge value={d.after.clicks - d.before.clicks} suffix="" showSign label="clicks" hideOnZero={false} />
-                        <span className={d.after.position <= d.before.position ? 'text-emerald-400/80' : 'text-red-400/80'}>
+                        <span className={d.after.position <= d.before.position ? 'text-accent-success' : 'text-accent-danger'}>
                           pos {d.after.position.toFixed(1)}
                         </span>
                       </div>
@@ -1086,12 +1086,12 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
       {summary.total > 0 && (
         <div className="flex items-center gap-3 t-caption-sm text-[var(--brand-text-muted)] mb-2">
           <span className="text-[var(--brand-text)] font-medium">{summary.total} tracked</span>
-          {summary.live > 0 && <><StatusBadge status="live" /><span className="text-teal-400">{summary.live}</span></>}
-          {summary.inReview > 0 && <><StatusBadge status="in-review" /><span className="text-blue-400">{summary.inReview}</span></>}
-          {summary.approved > 0 && <><StatusBadge status="approved" /><span className="text-emerald-400/80">{summary.approved}</span></>}
-          {summary.rejected > 0 && <><StatusBadge status="rejected" /><span className="text-red-400/80">{summary.rejected}</span></>}
-          {summary.issueDetected > 0 && <><StatusBadge status="issue-detected" /><span className="text-amber-400/80">{summary.issueDetected}</span></>}
-          {summary.fixProposed > 0 && <><StatusBadge status="fix-proposed" /><span className="text-blue-400">{summary.fixProposed}</span></>}
+          {summary.live > 0 && <><StatusBadge status="live" /><span className="text-accent-brand">{summary.live}</span></>}
+          {summary.inReview > 0 && <><StatusBadge status="in-review" /><span className="text-accent-info">{summary.inReview}</span></>}
+          {summary.approved > 0 && <><StatusBadge status="approved" /><span className="text-accent-success">{summary.approved}</span></>}
+          {summary.rejected > 0 && <><StatusBadge status="rejected" /><span className="text-accent-danger">{summary.rejected}</span></>}
+          {summary.issueDetected > 0 && <><StatusBadge status="issue-detected" /><span className="text-accent-warning">{summary.issueDetected}</span></>}
+          {summary.fixProposed > 0 && <><StatusBadge status="fix-proposed" /><span className="text-accent-info">{summary.fixProposed}</span></>}
         </div>
       )}
 
@@ -1179,9 +1179,9 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
       </div>
 
       <div className="flex items-start gap-2 px-3 py-2 rounded-[var(--radius-md)] bg-blue-500/5 border border-blue-500/10">
-        <Icon as={Info} size="md" className="text-blue-400 flex-shrink-0 mt-0.5" />
+        <Icon as={Info} size="md" className="text-accent-info flex-shrink-0 mt-0.5" />
         <div className="t-caption text-[var(--brand-text-muted)]">
-          <strong className="text-[var(--brand-text-bright)]">How to use:</strong> Each page gets one unified <code className="text-blue-300">@graph</code> schema with cross-referenced types. Click <strong>Publish to Webflow</strong> to inject it directly into the page's <code className="text-blue-300">&lt;head&gt;</code> via the Custom Code API, or <strong>Copy</strong> to paste it manually. Existing custom code on your pages is never touched — only schema scripts are managed.
+          <strong className="text-[var(--brand-text-bright)]">How to use:</strong> Each page gets one unified <code className="text-accent-info">@graph</code> schema with cross-referenced types. Click <strong>Publish to Webflow</strong> to inject it directly into the page's <code className="text-accent-info">&lt;head&gt;</code> via the Custom Code API, or <strong>Copy</strong> to paste it manually. Existing custom code on your pages is never touched — only schema scripts are managed.
         </div>
       </div>
     </div>

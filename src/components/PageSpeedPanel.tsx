@@ -59,9 +59,9 @@ interface Props {
 }
 
 function scoreColor(score: number): string {
-  if (score >= 90) return 'text-emerald-400';
-  if (score >= 50) return 'text-amber-400';
-  return 'text-red-400';
+  if (score >= 90) return 'text-accent-success';
+  if (score >= 50) return 'text-accent-warning';
+  return 'text-accent-danger';
 }
 
 // scoreRing replaced by MetricRing from ./ui
@@ -93,7 +93,7 @@ function vitalRating(key: string, val: number | null): 'good' | 'needs-improveme
 }
 
 function ratingColor(r: 'good' | 'needs-improvement' | 'poor'): string {
-  return r === 'good' ? 'text-emerald-400' : r === 'needs-improvement' ? 'text-amber-400' : 'text-red-400';
+  return r === 'good' ? 'text-accent-success' : r === 'needs-improvement' ? 'text-accent-warning' : 'text-accent-danger';
 }
 
 function ratingBg(r: 'good' | 'needs-improvement' | 'poor'): string {
@@ -205,7 +205,7 @@ export function PageSpeedPanel({ siteId }: Props) {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="px-2 py-0.5 rounded text-xs bg-teal-500/10 border border-teal-500/20 text-teal-400">Single Page</span>
+          <span className="px-2 py-0.5 rounded text-xs bg-teal-500/10 border border-teal-500/20 text-accent-brand">Single Page</span>
           <span className="text-xs text-[var(--brand-text-muted)]">{result.page}</span>
         </div>
         <div className="flex items-center gap-1.5">
@@ -230,8 +230,8 @@ export function PageSpeedPanel({ siteId }: Props) {
         <div className="flex flex-col items-center gap-2">
           <MetricRing score={result.score} size={100} />
           <div className="text-xs text-[var(--brand-text-muted)]">{strategy === 'mobile' ? 'Mobile' : 'Desktop'}</div>
-          {result.fieldDataAvailable && <div className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400" /* arbitrary-text-ok */>Real users</div>}
-          {!result.fieldDataAvailable && <div className="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 border border-amber-500/20 text-amber-400" /* arbitrary-text-ok */>Lab test</div>}
+          {result.fieldDataAvailable && <div className="px-1.5 py-0.5 rounded-[var(--radius-sm)] t-micro bg-emerald-500/10 border border-emerald-500/20 text-accent-success">Real users</div>}
+          {!result.fieldDataAvailable && <div className="px-1.5 py-0.5 rounded-[var(--radius-sm)] t-micro bg-amber-500/10 border border-amber-500/20 text-accent-warning">Lab test</div>}
         </div>
         <div className="grid grid-cols-3 gap-2">
           <VitalCard label="LCP" value={result.vitals.LCP} formatted={formatMs(result.vitals.LCP)} vitalKey="LCP" />
@@ -246,18 +246,18 @@ export function PageSpeedPanel({ siteId }: Props) {
       {result.opportunities.length > 0 && (
         <div>
           <div className="flex items-center gap-2 text-xs font-medium text-[var(--brand-text)] mb-2">
-            <Icon as={Zap} size="sm" className="text-amber-400" /> Opportunities ({result.opportunities.length})
+            <Icon as={Zap} size="sm" className="text-accent-warning" /> Opportunities ({result.opportunities.length})
           </div>
           <div className="space-y-1">
             {result.opportunities.map(opp => (
               <div key={opp.id} className="flex items-start gap-3 px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-2)] border border-[var(--brand-border)]">
-                <Icon as={AlertTriangle} size="sm" className="mt-0.5 text-amber-400 flex-shrink-0" />
+                <Icon as={AlertTriangle} size="sm" className="mt-0.5 text-accent-warning flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="text-xs text-[var(--brand-text-bright)]">{opp.title}</div>
                   <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 line-clamp-2">{opp.description}</div>
                 </div>
                 {opp.savings && (
-                  <span className="t-caption-sm px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 flex-shrink-0">
+                  <span className="t-caption-sm px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-accent-warning flex-shrink-0">
                     Save {opp.savings}
                   </span>
                 )}
@@ -270,12 +270,12 @@ export function PageSpeedPanel({ siteId }: Props) {
       {result.diagnostics.length > 0 && (
         <div>
           <div className="flex items-center gap-2 text-xs font-medium text-[var(--brand-text)] mb-2">
-            <Icon as={Info} size="sm" className="text-blue-400" /> Diagnostics ({result.diagnostics.length})
+            <Icon as={Info} size="sm" className="text-accent-info" /> Diagnostics ({result.diagnostics.length})
           </div>
           <div className="space-y-1">
             {result.diagnostics.map(diag => (
               <div key={diag.id} className="flex items-start gap-3 px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-2)] border border-[var(--brand-border)]">
-                <Icon as={Info} size="sm" className="mt-0.5 text-blue-400 flex-shrink-0" />
+                <Icon as={Info} size="sm" className="mt-0.5 text-accent-info flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="text-xs text-[var(--brand-text-bright)]">{diag.title}</div>
                   <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 line-clamp-2">{diag.description}</div>
@@ -374,7 +374,7 @@ export function PageSpeedPanel({ siteId }: Props) {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3">
-        <Loader2 className="w-8 h-8 animate-spin text-teal-400" />
+        <Loader2 className="w-8 h-8 animate-spin text-accent-brand" />
         <p className="text-sm text-[var(--brand-text)]">Running PageSpeed analysis...</p>
         <p className="text-xs text-[var(--brand-text-muted)]">Testing via Google PageSpeed Insights API</p>
         <p className="text-xs text-[var(--brand-text-muted)]">This may take 30–60 seconds</p>
@@ -392,8 +392,8 @@ export function PageSpeedPanel({ siteId }: Props) {
       <div className="flex flex-col items-center justify-center py-16 gap-4">
         {error ? (
           <div className="bg-red-500/10 border border-red-500/30 rounded-[var(--radius-lg)] px-4 py-3 max-w-md text-center">
-            <p className="text-red-400 text-sm font-medium mb-1">PageSpeed Analysis Failed</p>
-            <p className="text-xs text-red-400/70">{error}</p>
+            <p className="text-accent-danger text-sm font-medium mb-1">PageSpeed Analysis Failed</p>
+            <p className="text-xs text-accent-danger">{error}</p>
           </div>
         ) : (
           <EmptyState icon={Zap} title="No results available" description="Run a PageSpeed test to see performance metrics." className="py-4" />
@@ -494,7 +494,7 @@ export function PageSpeedPanel({ siteId }: Props) {
                         onClick={() => toggleExpand(`opp-${page.url}`)}
                         className="flex items-center gap-2 text-xs font-medium text-[var(--brand-text)] mb-2"
                       >
-                        <Icon as={Zap} size="sm" className="text-amber-400" />
+                        <Icon as={Zap} size="sm" className="text-accent-warning" />
                         Opportunities ({page.opportunities.length})
                         {expanded.has(`opp-${page.url}`) ? <Icon as={ChevronDown} size="sm" /> : <Icon as={ChevronRight} size="sm" />}
                       </button>
@@ -502,13 +502,13 @@ export function PageSpeedPanel({ siteId }: Props) {
                         <div className="space-y-1 ml-5">
                           {page.opportunities.map(opp => (
                             <div key={opp.id} className="flex items-start gap-3 px-3 py-2 rounded hover:bg-[var(--surface-2)]/30">
-                              <Icon as={AlertTriangle} size="sm" className="mt-0.5 text-amber-400 flex-shrink-0" />
+                              <Icon as={AlertTriangle} size="sm" className="mt-0.5 text-accent-warning flex-shrink-0" />
                               <div className="flex-1 min-w-0">
                                 <div className="text-xs text-[var(--brand-text-bright)]">{opp.title}</div>
                                 <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 line-clamp-2">{opp.description}</div>
                               </div>
                               {opp.savings && (
-                                <span className="t-caption-sm px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 flex-shrink-0">
+                                <span className="t-caption-sm px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-accent-warning flex-shrink-0">
                                   Save {opp.savings}
                                 </span>
                               )}
@@ -526,7 +526,7 @@ export function PageSpeedPanel({ siteId }: Props) {
                         onClick={() => toggleExpand(`diag-${page.url}`)}
                         className="flex items-center gap-2 text-xs font-medium text-[var(--brand-text)] mb-2"
                       >
-                        <Icon as={Info} size="sm" className="text-blue-400" />
+                        <Icon as={Info} size="sm" className="text-accent-info" />
                         Diagnostics ({page.diagnostics.length})
                         {expanded.has(`diag-${page.url}`) ? <Icon as={ChevronDown} size="sm" /> : <Icon as={ChevronRight} size="sm" />}
                       </button>
@@ -534,7 +534,7 @@ export function PageSpeedPanel({ siteId }: Props) {
                         <div className="space-y-1 ml-5">
                           {page.diagnostics.map(diag => (
                             <div key={diag.id} className="flex items-start gap-3 px-3 py-2 rounded hover:bg-[var(--surface-2)]/30">
-                              <Icon as={Info} size="sm" className="mt-0.5 text-blue-400 flex-shrink-0" />
+                              <Icon as={Info} size="sm" className="mt-0.5 text-accent-info flex-shrink-0" />
                               <div className="flex-1 min-w-0">
                                 <div className="text-xs text-[var(--brand-text-bright)]">{diag.title}</div>
                                 <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 line-clamp-2">{diag.description}</div>

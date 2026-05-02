@@ -98,7 +98,7 @@ function ActionRow({ action }: ActionRowProps) {
 
         {/* Delta */}
         {hasDelta && (
-          <span className={`text-xs font-medium shrink-0 ${delta > 0 ? 'text-emerald-400' : delta < 0 ? 'text-red-400' : 'text-[var(--brand-text)]'}`}>
+          <span className={`text-xs font-medium shrink-0 ${delta > 0 ? 'text-accent-success' : delta < 0 ? 'text-accent-danger' : 'text-[var(--brand-text)]'}`}>
             {delta > 0 ? '+' : ''}{delta.toFixed(1)}
           </span>
         )}
@@ -137,16 +137,16 @@ function ActionRow({ action }: ActionRowProps) {
               <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-1.5">Baseline Snapshot</p>
               <div className="flex flex-wrap gap-3">
                 {baseline.position !== undefined && (
-                  <span className="text-xs text-[var(--brand-text)]">Pos: <span className="text-blue-400 font-medium">{baseline.position.toFixed(1)}</span></span>
+                  <span className="text-xs text-[var(--brand-text)]">Pos: <span className="text-accent-info font-medium">{baseline.position.toFixed(1)}</span></span>
                 )}
                 {baseline.clicks !== undefined && (
-                  <span className="text-xs text-[var(--brand-text)]">Clicks: <span className="text-blue-400 font-medium">{baseline.clicks}</span></span>
+                  <span className="text-xs text-[var(--brand-text)]">Clicks: <span className="text-accent-info font-medium">{baseline.clicks}</span></span>
                 )}
                 {baseline.impressions !== undefined && (
-                  <span className="text-xs text-[var(--brand-text)]">Impressions: <span className="text-blue-400 font-medium">{baseline.impressions}</span></span>
+                  <span className="text-xs text-[var(--brand-text)]">Impressions: <span className="text-accent-info font-medium">{baseline.impressions}</span></span>
                 )}
                 {baseline.ctr !== undefined && (
-                  <span className="text-xs text-[var(--brand-text)]">CTR: <span className="text-blue-400 font-medium">{baseline.ctr}%</span></span>
+                  <span className="text-xs text-[var(--brand-text)]">CTR: <span className="text-accent-info font-medium">{baseline.ctr}%</span></span>
                 )}
               </div>
             </div>
@@ -158,7 +158,7 @@ function ActionRow({ action }: ActionRowProps) {
               href={action.pageUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-xs text-teal-400 hover:text-teal-300 transition-colors"
+              className="inline-flex items-center gap-1 text-xs text-accent-brand hover:text-accent-brand transition-colors"
             >
               <ExternalLink className="w-3 h-3" />
               View page
@@ -231,7 +231,7 @@ export default function OutcomeActionFeed({ workspaceId }: Props) {
       ) : (
         <SectionCard
           title={`${actions.length} action${actions.length !== 1 ? 's' : ''}`}
-          titleIcon={<Activity className="w-4 h-4 text-blue-400" />}
+          titleIcon={<Activity className="w-4 h-4 text-accent-info" />}
           noPadding
         >
           <div className="p-4 space-y-2">
