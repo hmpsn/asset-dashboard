@@ -5,6 +5,7 @@
 import { createLogger } from './logger.js';
 import { resolvePagePath } from './helpers.js';
 import { webflowFetch, getToken } from './webflow-client.js';
+import { parseJsonFallback } from './db/json-validation.js';
 import type { SchemaDeliveryDecision, SchemaPublishResponse } from '../shared/types/schema-generation.js';
 
 const log = createLogger('webflow-pages');
@@ -162,13 +163,29 @@ interface PageCustomCodeBlock {
   version: string;
 }
 
+interface WebflowCustomCodeWriteResult<T = undefined> {
+  data?: T;
+  error?: string;
+  customCodeApiUnavailable?: boolean;
+}
+
+function isWebflowCustomCodeApiUnavailable(status: number, body: string): boolean {
+  if (status !== 403) return false;
+  const parsed = parseJsonFallback<{ code?: unknown; message?: unknown } | null>(body, null);
+  if (parsed?.code === 'invalid_auth_version') return true;
+  if (typeof parsed?.message === 'string' && /not authorized to access this version/i.test(parsed.message)) {
+    return true;
+  }
+  return /invalid_auth_version|not authorized to access this version/i.test(body);
+}
+
 async function registerInlineScript(
   siteId: string,
   sourceCode: string,
   displayName: string,
   version: string,
   tokenOverride?: string,
-): Promise<{ script?: RegisteredScript; error?: string }> {
+): Promise<WebflowCustomCodeWriteResult<RegisteredScript>> {
   const res = await webflowFetch(`/sites/${siteId}/registered_scripts/inline`, {
     method: 'POST',
     body: JSON.stringify({
@@ -181,9 +198,12 @@ async function registerInlineScript(
   if (!res.ok) {
     const text = await res.text();
     log.error(`Failed to register inline script: ${res.status} ${text}`);
-    return { error: `Failed to register schema script with Webflow (${res.status}: ${text})` };
+    return {
+      customCodeApiUnavailable: isWebflowCustomCodeApiUnavailable(res.status, text),
+      error: `Failed to register schema script with Webflow (${res.status}: ${text})`,
+    };
   }
-  return { script: await res.json() as RegisteredScript };
+  return { data: await res.json() as RegisteredScript };
 }
 
 async function listRegisteredScripts(siteId: string, tokenOverride?: string): Promise<RegisteredScript[]> {
@@ -204,7 +224,7 @@ async function upsertPageCustomCode(
   pageId: string,
   scripts: PageCustomCodeBlock[],
   tokenOverride?: string,
-): Promise<boolean> {
+): Promise<WebflowCustomCodeWriteResult> {
   const res = await webflowFetch(`/pages/${pageId}/custom_code`, {
     method: 'PUT',
     body: JSON.stringify({ scripts }),
@@ -212,9 +232,12 @@ async function upsertPageCustomCode(
   if (!res.ok) {
     const text = await res.text();
     log.error(`Failed to upsert page custom code: ${res.status} ${text}`);
-    return false;
+    return {
+      customCodeApiUnavailable: isWebflowCustomCodeApiUnavailable(res.status, text),
+      error: `Failed to apply schema to page custom code (${res.status}: ${text})`,
+    };
   }
-  return true;
+  return {};
 }
 
 function schemaScriptDisplayName(pageId: string): string {
@@ -270,6 +293,20 @@ function manualNativeSchemaDelivery(jsonLd: string, characterCount: number): Sch
   };
 }
 
+function manualNativeSchemaDeliveryForCustomCodeApi(jsonLd: string, message: string): SchemaDeliveryDecision {
+  return {
+    method: 'manual-native-schema-field',
+    status: 'manual-required',
+    reason: 'webflow-custom-code-api-unavailable',
+    message,
+    jsonLd,
+  };
+}
+
+function webflowCustomCodeApiUnavailableMessage(): string {
+  return 'Webflow rejected the Custom Code API request for this token/API version. Copy the JSON-LD into Webflow Page Settings -> Schema markup. Webflow’s native Schema markup field is not currently writable through the Data API or MCP.';
+}
+
 export async function publishSchemaToPage(
   siteId: string,
   pageId: string,
@@ -296,8 +333,15 @@ export async function publishSchemaToPage(
   );
 
   const registered = await registerInlineScript(siteId, sourceCode, displayName, version, tokenOverride);
-  if (!registered.script) {
+  if (!registered.data) {
     const error = registered.error || 'Failed to register schema script with Webflow';
+    if (registered.customCodeApiUnavailable) {
+      return {
+        success: false,
+        delivery: manualNativeSchemaDeliveryForCustomCodeApi(jsonLd, webflowCustomCodeApiUnavailableMessage()),
+        error,
+      };
+    }
     return {
       success: false,
       delivery: failedDelivery(jsonLd, 'webflow-register-failed', error),
@@ -309,12 +353,19 @@ export async function publishSchemaToPage(
   const preserved = existingBlocks.filter(block => !ourPreviousScriptIds.has(block.id));
   const updatedBlocks: PageCustomCodeBlock[] = [
     ...preserved,
-    { id: registered.script.id, location: 'header', version },
+    { id: registered.data.id, location: 'header', version },
   ];
 
   const applied = await upsertPageCustomCode(pageId, updatedBlocks, tokenOverride);
-  if (!applied) {
-    const error = 'Failed to apply schema to page custom code';
+  if (applied.error) {
+    const error = applied.error || 'Failed to apply schema to page custom code';
+    if (applied.customCodeApiUnavailable) {
+      return {
+        success: false,
+        delivery: manualNativeSchemaDeliveryForCustomCodeApi(jsonLd, webflowCustomCodeApiUnavailableMessage()),
+        error,
+      };
+    }
     return {
       success: false,
       delivery: failedDelivery(jsonLd, 'webflow-apply-failed', error),
@@ -352,8 +403,15 @@ export async function publishRawSchemaToPage(
   );
 
   const registered = await registerInlineScript(siteId, sourceCode, displayName, version, tokenOverride);
-  if (!registered.script) {
+  if (!registered.data) {
     const error = registered.error || 'Failed to register schema script with Webflow';
+    if (registered.customCodeApiUnavailable) {
+      return {
+        success: false,
+        delivery: manualNativeSchemaDeliveryForCustomCodeApi(rawJsonLd, webflowCustomCodeApiUnavailableMessage()),
+        error,
+      };
+    }
     return {
       success: false,
       delivery: failedDelivery(rawJsonLd, 'webflow-register-failed', error),
@@ -365,12 +423,19 @@ export async function publishRawSchemaToPage(
   const preserved = existingBlocks.filter(block => !ourPreviousScriptIds.has(block.id));
   const updatedBlocks: PageCustomCodeBlock[] = [
     ...preserved,
-    { id: registered.script.id, location: 'header', version },
+    { id: registered.data.id, location: 'header', version },
   ];
 
   const applied = await upsertPageCustomCode(pageId, updatedBlocks, tokenOverride);
-  if (!applied) {
-    const error = 'Failed to apply CMS template schema to page custom code';
+  if (applied.error) {
+    const error = applied.error || 'Failed to apply CMS template schema to page custom code';
+    if (applied.customCodeApiUnavailable) {
+      return {
+        success: false,
+        delivery: manualNativeSchemaDeliveryForCustomCodeApi(rawJsonLd, webflowCustomCodeApiUnavailableMessage()),
+        error,
+      };
+    }
     return {
       success: false,
       delivery: failedDelivery(rawJsonLd, 'webflow-apply-failed', error),
@@ -410,8 +475,8 @@ export async function retractSchemaFromPage(
   }
 
   const applied = await upsertPageCustomCode(pageId, toKeep, tokenOverride);
-  if (!applied) {
-    return { success: false, removed: 0, error: 'Failed to update page custom code' };
+  if (applied.error) {
+    return { success: false, removed: 0, error: applied.error || 'Failed to update page custom code' };
   }
 
   log.info(`Retracted ${removedCount} schema script(s) from page ${pageId}`);

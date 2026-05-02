@@ -13,6 +13,7 @@ export type SchemaDeliveryMethod = 'webflow-api' | 'manual-native-schema-field';
 export type SchemaDeliveryStatus = 'ready' | 'published' | 'manual-required' | 'failed';
 export type SchemaDeliveryReason =
   | 'webflow-inline-script-limit'
+  | 'webflow-custom-code-api-unavailable'
   | 'webflow-register-failed'
   | 'webflow-apply-failed'
   | 'validation-errors';
