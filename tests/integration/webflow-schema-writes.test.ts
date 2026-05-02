@@ -52,6 +52,12 @@ const INVALID_ARTICLE_SCHEMA: Record<string, unknown> = {
 
 const TEST_SITE_ID = 'test-site-fm2';
 const TEST_PAGE_ID = 'test-page-fm2';
+const WEBFLOW_INVALID_AUTH_VERSION_BODY = JSON.stringify({
+  message: 'Your token is not authorized to access this version of the API',
+  code: 'invalid_auth_version',
+  externalReference: null,
+  details: [],
+});
 
 // ---------------------------------------------------------------------------
 // Mock registered-scripts list (needed for listRegisteredScripts call)
@@ -159,6 +165,58 @@ describe('Webflow Schema Writes — FM-2 Phantom Success', () => {
     expect(result.error).toBeTruthy();
     expect(result.delivery.status).toBe('failed');
     expect(result.delivery.reason).toBe('webflow-apply-failed');
+
+    ws.cleanup();
+  });
+
+  it('publishSchemaToPage: Webflow invalid_auth_version on register returns manual native schema fallback', async () => {
+    mockRegisteredScripts(ws.webflowSiteId);
+    mockWebflowError(
+      `/sites/${ws.webflowSiteId}/registered_scripts/inline`,
+      403,
+      WEBFLOW_INVALID_AUTH_VERSION_BODY,
+    );
+
+    const { publishSchemaToPage } = await import('../../server/webflow-pages.js');
+    const result = await publishSchemaToPage(ws.webflowSiteId, TEST_PAGE_ID, VALID_ARTICLE_SCHEMA, ws.webflowToken);
+
+    expect(result.success).toBe(false);
+    expect(result.delivery).toMatchObject({
+      method: 'manual-native-schema-field',
+      status: 'manual-required',
+      reason: 'webflow-custom-code-api-unavailable',
+    });
+    expect(result.delivery.message).toContain('Webflow Page Settings -> Schema markup');
+    expect(result.delivery.jsonLd).toContain('"@context": "https://schema.org"');
+    expect(result.delivery.jsonLd).not.toContain('<script');
+    expect(() => JSON.parse(result.delivery.jsonLd)).not.toThrow();
+
+    const customCodeCalls = getCapturedRequests().filter(r =>
+      r.endpoint.includes(`/pages/${TEST_PAGE_ID}/custom_code`),
+    );
+    expect(customCodeCalls).toHaveLength(0);
+
+    ws.cleanup();
+  });
+
+  it('publishSchemaToPage: Webflow invalid_auth_version on page custom code apply returns manual native schema fallback', async () => {
+    mockRegisteredScripts(ws.webflowSiteId);
+    mockRegisterInlineScript(ws.webflowSiteId);
+    mockGetPageCustomCode(TEST_PAGE_ID);
+    mockWebflowError(`/pages/${TEST_PAGE_ID}/custom_code`, 403, WEBFLOW_INVALID_AUTH_VERSION_BODY);
+
+    const { publishSchemaToPage } = await import('../../server/webflow-pages.js');
+    const result = await publishSchemaToPage(ws.webflowSiteId, TEST_PAGE_ID, VALID_ARTICLE_SCHEMA, ws.webflowToken);
+
+    expect(result.success).toBe(false);
+    expect(result.delivery).toMatchObject({
+      method: 'manual-native-schema-field',
+      status: 'manual-required',
+      reason: 'webflow-custom-code-api-unavailable',
+    });
+    expect(result.delivery.message).toContain('Webflow Page Settings -> Schema markup');
+    expect(result.delivery.jsonLd).not.toContain('<script');
+    expect(() => JSON.parse(result.delivery.jsonLd)).not.toThrow();
 
     ws.cleanup();
   });
@@ -424,6 +482,30 @@ describe('Webflow Schema Writes — FM-2 Phantom Success', () => {
       },
     });
     expect(getCapturedRequests()).toHaveLength(0);
+
+    ws.cleanup();
+  });
+
+  it('publishRawSchemaToPage: Webflow invalid_auth_version returns manual native schema fallback', async () => {
+    mockWebflowSuccess(`/sites/${ws.webflowSiteId}/registered_scripts`, { registeredScripts: [] });
+    mockWebflowError(
+      `/sites/${ws.webflowSiteId}/registered_scripts/inline`,
+      403,
+      WEBFLOW_INVALID_AUTH_VERSION_BODY,
+    );
+
+    const rawJsonLd = JSON.stringify(VALID_ARTICLE_SCHEMA, null, 2);
+    const { publishRawSchemaToPage } = await import('../../server/webflow-pages.js');
+    const result = await publishRawSchemaToPage(ws.webflowSiteId, TEST_PAGE_ID, rawJsonLd, ws.webflowToken);
+
+    expect(result.success).toBe(false);
+    expect(result.delivery).toMatchObject({
+      method: 'manual-native-schema-field',
+      status: 'manual-required',
+      reason: 'webflow-custom-code-api-unavailable',
+      jsonLd: rawJsonLd,
+    });
+    expect(result.delivery.jsonLd).not.toContain('<script');
 
     ws.cleanup();
   });
