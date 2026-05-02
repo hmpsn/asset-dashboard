@@ -156,7 +156,7 @@ export function ClientAuthGate({
             <div className="w-12 h-12 rounded-[var(--radius-xl)] bg-teal-500/10 flex items-center justify-center mb-4">
               <Icon as={Lock} size="xl" className="text-accent-brand" />
             </div>
-            <h2 className="text-lg font-semibold text-[var(--brand-text-bright)]">{ws?.name}</h2>
+            <h2 className="t-h2 text-[var(--brand-text-bright)]">{ws?.name}</h2>
             <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">
               {loginTab === 'user' ? 'Sign in with your account' : 'Enter the password to access this dashboard'}
             </p>

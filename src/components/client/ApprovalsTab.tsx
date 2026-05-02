@@ -169,7 +169,7 @@ export function ApprovalsTab({
       <div className="flex items-center gap-3">
         <Icon as={ClipboardCheck} size="lg" className="text-accent-brand" />
         <div>
-          <h2 className="text-xl font-semibold text-[var(--brand-text)]">SEO Change Approvals</h2>
+          <h2 className="t-h2 text-[var(--brand-text)]">SEO Change Approvals</h2>
           <p className="t-body text-[var(--brand-text-muted)] mt-1 leading-relaxed">Review proposed SEO changes, make edits if needed, then approve to push live.</p>
         </div>
         {pendingApprovals > 0 && (

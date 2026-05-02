@@ -215,7 +215,7 @@ function ClientCopyReviewInner({ workspaceId }: ClientCopyReviewProps) {
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-lg font-semibold text-[var(--brand-text-bright)]">Copy Review</h2>
+        <h2 className="t-h2 text-[var(--brand-text-bright)]">Copy Review</h2>
         <p className="t-body text-[var(--brand-text)] mt-1">
           Review your website copy and approve sections or suggest changes.
         </p>

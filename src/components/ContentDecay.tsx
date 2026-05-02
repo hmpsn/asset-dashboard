@@ -99,11 +99,11 @@ export default function ContentDecay({ workspaceId }: Props) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-[var(--brand-text-bright)] flex items-center gap-2">
+          <h3 className="t-caption text-[var(--brand-text-bright)] flex items-center gap-2">
             <Icon as={ArrowDown} size="md" className="text-accent-warning" />
             Content Decay Monitor
           </h3>
-          <p className="text-xs text-[var(--brand-text-muted)] mt-0.5">
+          <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
             {analysis ? `Last analyzed ${new Date(analysis.analyzedAt).toLocaleDateString()} · ${analysis.totalPages} pages tracked` : 'Detect declining content and get AI refresh recommendations'}
           </p>
         </div>
@@ -131,7 +131,7 @@ export default function ContentDecay({ workspaceId }: Props) {
           {/* Summary cards */}
           <div className="grid grid-cols-4 gap-3">
             <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 text-center rounded-[var(--radius-signature)]">
-              <div className="text-2xl font-bold text-[var(--brand-text-bright)]">{analysis.summary.totalDecaying}</div>
+              <div className="t-stat text-[var(--brand-text-bright)]">{analysis.summary.totalDecaying}</div>
               <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">Declining Pages</div>
             </div>
             {(['critical', 'warning', 'watch'] as const).map(sev => {
@@ -140,7 +140,7 @@ export default function ContentDecay({ workspaceId }: Props) {
               return (
                 <button key={sev} onClick={() => setSeverityFilter(severityFilter === sev ? 'all' : sev)}
                   className={`border p-4 text-center transition-colors rounded-[var(--radius-signature)] ${severityFilter === sev ? `${cfg.bg} ${cfg.border}` : 'bg-[var(--surface-2)] border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]'}`}>
-                  <div className={`text-2xl font-bold ${cfg.text}`}>{count}</div>
+                  <div className={`t-stat ${cfg.text}`}>{count}</div>
                   <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">{cfg.label}</div>
                 </button>
               );
@@ -150,7 +150,7 @@ export default function ContentDecay({ workspaceId }: Props) {
           {/* AI recommendations button - styleguide brand accent */}
           {analysis.summary.totalDecaying > 0 && !analysis.decayingPages.some(p => p.refreshRecommendation) && (
             <button onClick={generateRecommendations} disabled={generatingRecs}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-[var(--radius-lg)] bg-accent-brand-soft border border-accent-brand-soft text-accent-brand hover:bg-accent-brand-soft transition-colors text-xs font-medium disabled:opacity-50">
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-[var(--radius-lg)] bg-accent-brand-soft border border-accent-brand-soft text-accent-brand hover:bg-accent-brand-soft transition-colors t-caption-sm font-medium disabled:opacity-50">
               <Icon as={Sparkles} size="md" className={generatingRecs ? 'animate-pulse' : ''} />
               {generatingRecs ? 'Generating AI refresh recommendations...' : 'Generate AI Refresh Recommendations'}
             </button>
@@ -161,7 +161,7 @@ export default function ContentDecay({ workspaceId }: Props) {
             // pr-check-disable-next-line -- brand asymmetric signature on decaying-pages list outer card; intentional non-SectionCard chrome
             <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
               <div className="px-4 py-3 border-b border-[var(--brand-border)] flex items-center justify-between">
-                <span className="text-xs font-medium text-[var(--brand-text-bright)]">
+                <span className="t-caption-sm font-medium text-[var(--brand-text-bright)]">
                   {severityFilter === 'all' ? 'All Declining Pages' : `${SEV_CONFIG[severityFilter].label} Pages`}
                 </span>
                 <span className="t-caption-sm text-[var(--brand-text-muted)]">{filtered.length} pages</span>
@@ -177,7 +177,7 @@ export default function ContentDecay({ workspaceId }: Props) {
                           <cfg.icon className={`w-3.5 h-3.5 ${cfg.text}`} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-xs font-medium text-[var(--brand-text-bright)] truncate">{page.page}</div>
+                          <div className="t-caption-sm font-medium text-[var(--brand-text-bright)] truncate">{page.page}</div>
                           <div className="flex items-center gap-3 mt-0.5">
                             <span className="t-caption-sm text-accent-danger flex items-center gap-0.5">
                               <Icon as={ArrowDown} size="sm" /> {page.clickDeclinePct}% clicks
@@ -189,7 +189,7 @@ export default function ContentDecay({ workspaceId }: Props) {
                         </div>
                         <div className="flex items-center gap-4 flex-shrink-0 text-right">
                           <div>
-                            <div className={`text-xs font-mono ${page.positionChange > 0 ? 'text-accent-danger' : page.positionChange < 0 ? 'text-accent-success' : 'text-[var(--brand-text-muted)]'}`}>
+                            <div className={`t-caption-sm font-mono ${page.positionChange > 0 ? 'text-accent-danger' : page.positionChange < 0 ? 'text-accent-success' : 'text-[var(--brand-text-muted)]'}`}>
                               {page.positionChange > 0 ? <Icon as={ArrowDown} size="sm" /> : page.positionChange < 0 ? <Icon as={ArrowUp} size="sm" /> : null}
                               {' '}{Math.abs(page.positionChange)} pos
                             </div>
@@ -203,17 +203,17 @@ export default function ContentDecay({ workspaceId }: Props) {
                           <div className="grid grid-cols-3 gap-2 text-center">
                             <div className="bg-[var(--surface-3)]/50 rounded-[var(--radius-lg)] p-2">
                               <div className="t-micro text-[var(--brand-text-muted)]">Clicks</div>
-                              <div className="text-xs font-medium text-accent-danger">{page.previousClicks} → {page.currentClicks}</div>
+                              <div className="t-caption-sm font-medium text-accent-danger">{page.previousClicks} → {page.currentClicks}</div>
                               <div className="t-micro text-accent-danger">{page.clickDeclinePct}%</div>
                             </div>
                             <div className="bg-[var(--surface-3)]/50 rounded-[var(--radius-lg)] p-2">
                               <div className="t-micro text-[var(--brand-text-muted)]">Impressions</div>
-                              <div className={`text-xs font-medium ${page.impressionChangePct < 0 ? 'text-accent-warning' : 'text-accent-success'}`}>{page.previousImpressions} → {page.currentImpressions}</div>
+                              <div className={`t-caption-sm font-medium ${page.impressionChangePct < 0 ? 'text-accent-warning' : 'text-accent-success'}`}>{page.previousImpressions} → {page.currentImpressions}</div>
                               <div className={`t-micro ${page.impressionChangePct < 0 ? 'text-accent-warning' : 'text-accent-success'}`}>{page.impressionChangePct > 0 ? '+' : ''}{page.impressionChangePct}%</div>
                             </div>
                             <div className="bg-[var(--surface-3)]/50 rounded-[var(--radius-lg)] p-2">
                               <div className="t-micro text-[var(--brand-text-muted)]">Position</div>
-                              <div className={`text-xs font-medium ${page.positionChange > 0 ? 'text-accent-danger' : 'text-accent-success'}`}>{page.previousPosition} → {page.currentPosition}</div>
+                              <div className={`t-caption-sm font-medium ${page.positionChange > 0 ? 'text-accent-danger' : 'text-accent-success'}`}>{page.previousPosition} → {page.currentPosition}</div>
                               <div className={`t-micro ${page.positionChange > 0 ? 'text-accent-danger' : 'text-accent-success'}`}>{page.positionChange > 0 ? '+' : ''}{page.positionChange}</div>
                             </div>
                           </div>
@@ -237,8 +237,8 @@ export default function ContentDecay({ workspaceId }: Props) {
           {filtered.length === 0 && analysis.summary.totalDecaying === 0 && (
             // pr-check-disable-next-line -- brand asymmetric signature on no-decay empty state; intentional non-SectionCard chrome
             <div className="text-center py-8 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-signature-lg)]">
-              <div className="text-accent-success text-sm font-medium">All content performing well</div>
-              <p className="text-xs text-[var(--brand-text-muted)] mt-1">No pages showing significant traffic decline</p>
+              <div className="text-accent-success t-ui">All content performing well</div>
+              <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">No pages showing significant traffic decline</p>
             </div>
           )}
         </>

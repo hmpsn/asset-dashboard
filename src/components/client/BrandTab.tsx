@@ -81,7 +81,7 @@ export function BrandTab({
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
       {/* Page header */}
       <div>
-        <h2 className="text-lg font-semibold text-[var(--brand-text)]">Business Profile</h2>
+        <h2 className="t-h2 text-[var(--brand-text)]">Business Profile</h2>
         <p className="t-body text-[var(--brand-text-muted)] mt-0.5">
           Keep your business information up to date. This helps us personalize your SEO strategy.
         </p>

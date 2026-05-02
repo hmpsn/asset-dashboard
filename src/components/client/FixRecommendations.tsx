@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Sparkles, ShoppingCart, Image, FileText, Code2, ArrowRightLeft, Wrench, Crown, MessageSquare, TrendingUp, TrendingDown, Eye, MousePointerClick, ChevronDown, Lightbulb, CheckCircle2, Zap, Shield } from 'lucide-react';
+import { Sparkles, ShoppingCart, Image, FileText, Code2, ArrowRightLeft, Wrench, Crown, MessageSquare, ArrowUp, ArrowDown, Eye, MousePointerClick, ChevronDown, Lightbulb, CheckCircle2, Zap, Shield } from 'lucide-react';
 import { SectionCard } from '../ui';
 import { Icon } from '../ui/Icon';
 import { useCart } from './useCart';
@@ -251,7 +251,7 @@ const typeConfig: Record<string, { icon: typeof FileText; label: string }> = {
   schema: { icon: Code2, label: 'Schema Markup' },
   technical: { icon: Wrench, label: 'Technical Fixes' },
   content: { icon: FileText, label: 'Content Improvements' },
-  content_refresh: { icon: TrendingDown, label: 'Content Refresh' },
+  content_refresh: { icon: ArrowDown, label: 'Content Refresh' },
   performance: { icon: Zap, label: 'Performance' },
   accessibility: { icon: Shield, label: 'Accessibility' },
   strategy: { icon: Sparkles, label: 'Strategy Opportunities' },
@@ -451,11 +451,11 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-[var(--brand-text-bright)]">{cat.label}</span>
+                    <span className="t-ui text-[var(--brand-text-bright)]">{cat.label}</span>
                     <span className="t-caption-sm text-[var(--brand-text-muted)]">{cat.totalPages} {cat.id === 'redirect' ? 'issue' : 'page'}{cat.totalPages !== 1 ? 's' : ''}</span>
                     {cat.highTrafficPages > 0 && (
                       <span className="t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-teal-500/10 border border-teal-500/20 text-accent-brand flex items-center gap-1">
-                        <Icon as={TrendingUp} size="sm" />
+                        <Icon as={ArrowUp} size="sm" />
                         {cat.highTrafficPages} with traffic
                       </span>
                     )}

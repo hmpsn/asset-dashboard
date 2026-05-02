@@ -885,7 +885,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                       <div className="grid grid-cols-3 gap-3">
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                           <div className="t-label text-[var(--brand-text-muted)] mb-1">Optimization</div>
-                          <div className={`text-2xl font-bold ${scoreColorClass(kw.optimizationScore)}`}>
+                          <div className={`t-stat ${scoreColorClass(kw.optimizationScore)}`}>
                             {kw.optimizationScore}<span className="t-caption font-normal text-[var(--brand-text-muted)]">/100</span>
                           </div>
                           <div className="mt-1 h-1 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
@@ -904,7 +904,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                         </div>
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                           <div className="t-label text-[var(--brand-text-muted)] mb-1">Difficulty</div>
-                          <div className={`text-lg font-bold capitalize ${difficultyTextColor(kw.estimatedDifficulty)}`}>{kw.estimatedDifficulty}</div>
+                          <div className={`t-body font-semibold capitalize ${difficultyTextColor(kw.estimatedDifficulty)}`}>{kw.estimatedDifficulty}</div>
                           <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">Cluster: {kw.topicCluster}</div>
                         </div>
                       </div>
@@ -1039,14 +1039,14 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                           </div>
                           <div className="grid grid-cols-4 gap-3 mb-3">
                             <div>
-                              <div className="text-lg font-bold text-[var(--brand-text-bright)]">{cs.wordCount}</div>
+                              <div className="t-stat-sm text-[var(--brand-text-bright)]">{cs.wordCount}</div>
                               <div className="t-label text-[var(--brand-text-muted)]">Words</div>
                             </div>
                             <div>
                               <div className="flex items-center gap-3">
                                 <MetricRing score={cs.readabilityScore} size={64} noAnimation />
                                 <div>
-                                  <div className={`text-lg font-bold ${cs.readabilityScore >= 60 ? 'text-accent-success' : cs.readabilityScore >= 30 ? 'text-accent-warning' : 'text-accent-danger'}`}>
+                                  <div className={`t-stat-sm ${cs.readabilityScore >= 60 ? 'text-accent-success' : cs.readabilityScore >= 30 ? 'text-accent-warning' : 'text-accent-danger'}`}>
                                     {cs.readabilityScore}
                                   </div>
                                   <div className="t-label text-[var(--brand-text-muted)]">Readability</div>
@@ -1054,11 +1054,11 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                               </div>
                             </div>
                             <div>
-                              <div className="text-lg font-bold text-[var(--brand-text-bright)]">{cs.headings.total}</div>
+                              <div className="t-stat-sm text-[var(--brand-text-bright)]">{cs.headings.total}</div>
                               <div className="t-label text-[var(--brand-text-muted)]">Headings</div>
                             </div>
                             <div>
-                              <div className="text-lg font-bold text-[var(--brand-text-bright)]">{cs.avgWordsPerSentence}</div>
+                              <div className="t-stat-sm text-[var(--brand-text-bright)]">{cs.avgWordsPerSentence}</div>
                               <div className="t-label text-[var(--brand-text-muted)]">Words/Sent</div>
                             </div>
                           </div>

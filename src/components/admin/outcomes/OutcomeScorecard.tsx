@@ -32,7 +32,7 @@ function TrendLabel({ trend }: { trend: 'improving' | 'stable' | 'declining' }) 
     declining: { label: 'Declining', color: 'text-accent-danger' },
   };
   const { label, color } = map[trend];
-  return <span className={`text-xs font-medium ${color}`}>{label}</span>;
+  return <span className={`t-caption-sm font-medium ${color}`}>{label}</span>;
 }
 
 export default function OutcomeScorecard({ workspaceId }: Props) {
@@ -67,7 +67,7 @@ export default function OutcomeScorecard({ workspaceId }: Props) {
         action={
           <button
             onClick={() => refetch()}
-            className="text-xs px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/20 transition-colors"
+            className="t-caption-sm px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/20 transition-colors"
           >
             Retry
           </button>
@@ -143,7 +143,7 @@ export default function OutcomeScorecard({ workspaceId }: Props) {
               const pct = Math.round(cat.winRate * 100);
               return (
                 <div key={cat.actionType} className="flex items-center gap-3">
-                  <span className="text-xs text-[var(--brand-text)] w-36 shrink-0">
+                  <span className="t-caption-sm text-[var(--brand-text)] w-36 shrink-0">
                     {ACTION_TYPE_LABELS[cat.actionType] ?? cat.actionType}
                   </span>
                   <div className="flex-1 h-2 bg-[var(--surface-1)] rounded-[var(--radius-pill)] overflow-hidden">
@@ -154,7 +154,7 @@ export default function OutcomeScorecard({ workspaceId }: Props) {
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <span
-                      className="text-xs font-semibold w-8 text-right"
+                      className="t-caption-sm font-semibold w-8 text-right"
                       style={{ color: scoreColor(pct) }}
                     >
                       {pct}%

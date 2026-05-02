@@ -73,7 +73,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
         <div className="w-12 h-12 rounded-[var(--radius-xl)] bg-[var(--surface-3)] flex items-center justify-center mx-auto mb-4">
           <Icon as={Lock} size="xl" className="text-[var(--brand-text-dim)]" />
         </div>
-        <h3 className="text-lg font-semibold text-[var(--brand-text-bright)] mb-2">ROI Dashboard</h3>
+        <h3 className="t-h2 text-[var(--brand-text-bright)] mb-2">ROI Dashboard</h3>
         <p className="t-body text-[var(--brand-text-muted)] max-w-sm mx-auto">
           See the dollar value of your organic traffic and how much you&apos;d pay for it in Google Ads.
           Available on Growth and Premium plans.
@@ -112,7 +112,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
             </div>
             <span className="t-caption text-[var(--brand-text)] font-medium">Organic Traffic Value</span>
           </div>
-          <div className="text-2xl font-bold text-accent-success tracking-tight">{fmtMoneyFull(data.organicTrafficValue)}</div>
+          <div className="t-stat text-accent-success tracking-tight">{fmtMoneyFull(data.organicTrafficValue)}</div>
           <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">
             Monthly value based on {data.totalClicks.toLocaleString()} clicks × ${data.avgCPC.toFixed(2)} avg CPC
           </div>
@@ -126,7 +126,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
             </div>
             <span className="t-caption text-[var(--brand-text)] font-medium">Ad Spend Equivalent</span>
           </div>
-          <div className="text-2xl font-bold text-accent-info tracking-tight">{fmtMoneyFull(data.adSpendEquivalent)}</div>
+          <div className="t-stat text-accent-info tracking-tight">{fmtMoneyFull(data.adSpendEquivalent)}</div>
           <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">
             What this traffic would cost via Google Ads (incl. management fees)
           </div>
@@ -146,7 +146,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
           </div>
           {data.growthPercent != null ? (
             <>
-              <div className={`text-2xl font-bold tracking-tight ${data.growthPercent >= 0 ? 'text-accent-brand' : 'text-accent-warning'}`}>
+              <div className={`t-stat tracking-tight ${data.growthPercent >= 0 ? 'text-accent-brand' : 'text-accent-warning'}`}>
                 {data.growthPercent >= 0 ? '+' : ''}{data.growthPercent.toFixed(1)}%
               </div>
               <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">
@@ -155,7 +155,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
             </>
           ) : (
             <>
-              <div className="text-2xl font-bold text-accent-brand tracking-tight">{data.trackedPages}</div>
+              <div className="t-stat text-accent-brand tracking-tight">{data.trackedPages}</div>
               <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">
                 Pages generating organic value · growth tracking starts next month
               </div>

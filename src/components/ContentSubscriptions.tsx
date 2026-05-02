@@ -97,7 +97,7 @@ export function ContentSubscriptions({ workspaceId }: Props) {
       {loading && (
         <div className="flex items-center justify-center py-12 gap-3 text-[var(--brand-text-muted)]">
           <Icon as={Loader2} size="lg" className="animate-spin" />
-          <p className="text-sm">Loading subscriptions...</p>
+          <p className="t-caption-sm">Loading subscriptions...</p>
         </div>
       )}
 
@@ -106,7 +106,7 @@ export function ContentSubscriptions({ workspaceId }: Props) {
         <SectionCard>
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium text-[var(--brand-text-bright)]">Create Content Subscription</h3>
+              <h3 className="t-ui text-[var(--brand-text-bright)]">Create Content Subscription</h3>
               <button onClick={() => setShowCreate(false)} className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]">
                 <Icon as={XCircle} size="md" />
               </button>
@@ -125,20 +125,20 @@ export function ContentSubscriptions({ workspaceId }: Props) {
                       : 'border-[var(--brand-border)] bg-[var(--surface-3)]/50 hover:border-[var(--brand-border-hover)]'
                   }`}
                 >
-                  <div className="text-sm font-medium text-[var(--brand-text-bright)]">{plan.displayName}</div>
-                  <div className="text-xs text-[var(--brand-text)] mt-1">{plan.description}</div>
-                  <div className="text-lg font-semibold text-accent-brand mt-2">${plan.priceUsd}<span className="text-xs text-[var(--brand-text-muted)]">/mo</span></div>
+                  <div className="t-ui text-[var(--brand-text-bright)]">{plan.displayName}</div>
+                  <div className="t-caption-sm text-[var(--brand-text)] mt-1">{plan.description}</div>
+                  <div className="t-stat-sm text-accent-brand mt-2">${plan.priceUsd}<span className="t-caption-sm text-[var(--brand-text-muted)]">/mo</span></div>
                 </button>
               ))}
             </div>
 
             {/* Topic source */}
             <div>
-              <label className="text-xs text-[var(--brand-text)] block mb-1.5">Topic Source</label>
+              <label className="t-caption-sm text-[var(--brand-text)] block mb-1.5">Topic Source</label>
               <select
                 value={newSource}
                 onChange={e => setNewSource(e.target.value as typeof newSource)}
-                className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 text-sm text-[var(--brand-text-bright)]"
+                className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 t-caption-sm text-[var(--brand-text-bright)]"
               >
                 <option value="strategy_gaps">Strategy Gaps (auto from keyword strategy)</option>
                 <option value="ai_recommended">AI Recommended (AI picks topics)</option>
@@ -148,26 +148,26 @@ export function ContentSubscriptions({ workspaceId }: Props) {
 
             {/* Notes */}
             <div>
-              <label className="text-xs text-[var(--brand-text)] block mb-1.5">Notes (optional)</label>
+              <label className="t-caption-sm text-[var(--brand-text)] block mb-1.5">Notes (optional)</label>
               <textarea
                 value={newNotes}
                 onChange={e => setNewNotes(e.target.value)}
                 placeholder="Any preferences, instructions, or context..."
-                className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 text-sm text-[var(--brand-text-bright)] h-20 resize-none"
+                className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 t-caption-sm text-[var(--brand-text-bright)] h-20 resize-none"
               />
             </div>
 
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setShowCreate(false)}
-                className="px-4 py-2 rounded-[var(--radius-lg)] text-xs font-medium text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
+                className="px-4 py-2 rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreate}
                 disabled={creating}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-lg)] text-xs font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors disabled:opacity-50"
               >
                 <Icon as={creating ? Loader2 : Plus} size="md" className={creating ? 'animate-spin' : ''} />
                 Create Subscription
@@ -183,7 +183,7 @@ export function ContentSubscriptions({ workspaceId }: Props) {
           <div className="flex items-start justify-between">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <h3 className="text-sm font-medium text-[var(--brand-text-bright)]">
+                <h3 className="t-ui text-[var(--brand-text-bright)]">
                   {CONTENT_SUB_PLANS.find(p => p.plan === activeSub.plan)?.displayName || activeSub.plan}
                 </h3>
                 <Badge
@@ -191,19 +191,19 @@ export function ContentSubscriptions({ workspaceId }: Props) {
                   color={STATUS_CONFIG[activeSub.status]?.badgeColor || 'zinc'}
                 />
               </div>
-              <p className="text-xs text-[var(--brand-text)]">
+              <p className="t-caption-sm text-[var(--brand-text)]">
                 ${activeSub.priceUsd}/mo · {activeSub.postsPerMonth} posts per month ·
                 Topic source: {activeSub.topicSource.replace(/_/g, ' ')}
               </p>
               {activeSub.notes && (
-                <p className="text-xs text-[var(--brand-text-muted)] mt-1 italic">{activeSub.notes}</p>
+                <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1 italic">{activeSub.notes}</p>
               )}
             </div>
             <div className="flex items-center gap-2">
               {activeSub.status === 'active' && (
                 <button
                   onClick={() => handleStatusChange(activeSub.id, 'paused')}
-                  className="text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] flex items-center gap-1"
+                  className="t-caption-sm text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] flex items-center gap-1"
                 >
                   <Icon as={PauseCircle} size="md" /> Pause
                 </button>
@@ -211,14 +211,14 @@ export function ContentSubscriptions({ workspaceId }: Props) {
               {activeSub.status === 'paused' && (
                 <button
                   onClick={() => handleStatusChange(activeSub.id, 'active')}
-                  className="text-xs text-accent-brand hover:text-accent-brand flex items-center gap-1"
+                  className="t-caption-sm text-accent-brand hover:text-accent-brand flex items-center gap-1"
                 >
                   <Icon as={CheckCircle2} size="md" /> Resume
                 </button>
               )}
               <button
                 onClick={() => handleDelete(activeSub.id)}
-                className="text-xs text-accent-danger hover:text-accent-danger flex items-center gap-1"
+                className="t-caption-sm text-accent-danger hover:text-accent-danger flex items-center gap-1"
               >
                 <Icon as={Trash2} size="md" /> Delete
               </button>
@@ -227,7 +227,7 @@ export function ContentSubscriptions({ workspaceId }: Props) {
 
           {/* Progress bar */}
           <div className="mt-4">
-            <div className="flex items-center justify-between text-xs text-[var(--brand-text)] mb-1.5">
+            <div className="flex items-center justify-between t-caption-sm text-[var(--brand-text)] mb-1.5">
               <span>Posts delivered this period</span>
               <span className="font-medium text-[var(--brand-text-bright)]">
                 {activeSub.postsDeliveredThisPeriod} / {activeSub.postsPerMonth}
@@ -250,7 +250,7 @@ export function ContentSubscriptions({ workspaceId }: Props) {
           {activeSub.postsDeliveredThisPeriod < activeSub.postsPerMonth && (
             <button
               onClick={() => handleMarkDelivered(activeSub.id)}
-              className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)] transition-colors"
+              className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)] transition-colors"
             >
               <Icon as={FileText} size="md" /> Mark Post Delivered
             </button>
@@ -270,7 +270,7 @@ export function ContentSubscriptions({ workspaceId }: Props) {
       {/* Subscription history */}
       {!loading && subs.length > 1 && (
         <SectionCard>
-          <h3 className="text-sm font-medium text-[var(--brand-text-bright)] mb-3">Subscription History</h3>
+          <h3 className="t-ui text-[var(--brand-text-bright)] mb-3">Subscription History</h3>
           <div className="space-y-2">
             {subs.filter(s => s.id !== activeSub?.id).map(sub => {
               const cfg = STATUS_CONFIG[sub.status];
@@ -279,7 +279,7 @@ export function ContentSubscriptions({ workspaceId }: Props) {
                 <div key={sub.id} className="flex items-center justify-between py-2 px-3 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/50">
                   <div className="flex items-center gap-2">
                     <Icon as={SubIcon} size="md" className={cfg?.color || 'text-[var(--brand-text-muted)]'} />
-                    <span className="text-xs text-[var(--brand-text-bright)]">
+                    <span className="t-caption-sm text-[var(--brand-text-bright)]">
                       {CONTENT_SUB_PLANS.find(p => p.plan === sub.plan)?.displayName || sub.plan}
                     </span>
                     <span className="t-caption-sm text-[var(--brand-text-muted)]">
