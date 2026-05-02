@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { ArrowUpRight, ArrowDownRight, Minus, Layers, MessageCircle, ChevronDown, Search, ThumbsUp, ThumbsDown, Ban, Undo2 } from 'lucide-react';
 import { Icon } from '../ui/Icon.js';
 import type { MetricsSource } from '../../../shared/types/keywords.js';
@@ -40,7 +40,7 @@ interface PageKeywordMapContentProps {
   isLoadingFeedback?: (keyword: string) => boolean;
 }
 
-type FilterTab = 'all' | 'ranking' | 'opportunities' | 'stagnant' | 'falling';
+type FilterTab = 'all' | 'ranking' | 'opportunities' | 'falling';
 
 function getTrendIndicator(current?: number, previous?: number) {
   if (!current || !previous) return null;
@@ -77,6 +77,7 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['Blog', 'Services']));
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
+  const [discussingPage, setDiscussingPage] = useState<string | null>(null);
 
   const togglePage = (path: string) => {
     setExpandedPages(prev => {
@@ -87,19 +88,12 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
     });
   };
 
-  useEffect(() => { setVisibleCount(ITEMS_PER_PAGE); }, [activeFilter]);
-
   const filteredPages = useMemo(() => {
     switch (activeFilter) {
       case 'ranking':
         return pageMap.filter(p => p.currentPosition && p.currentPosition <= 20);
       case 'opportunities':
         return pageMap.filter(p => !p.currentPosition && (p.impressions || 0) > 0);
-      case 'stagnant':
-        return pageMap.filter(p => {
-          if (!p.currentPosition || !p.previousPosition) return false;
-          return Math.abs(p.currentPosition - p.previousPosition) < 2;
-        });
       case 'falling':
         return pageMap.filter(p => {
           if (!p.currentPosition || !p.previousPosition) return false;
@@ -135,15 +129,28 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
     { id: 'opportunities', label: 'Opportunities', count: pageMap.filter(p => !p.currentPosition && (p.impressions || 0) > 0).length },
     { id: 'falling', label: 'Falling', count: pageMap.filter(p => p.currentPosition && p.previousPosition && p.currentPosition > p.previousPosition).length },
   ];
+  const emptyMessage: Record<FilterTab, string> = {
+    all: 'No mapped pages are available yet.',
+    ranking: 'No pages are currently ranking in the top 20.',
+    opportunities: 'No pages are getting impressions without rankings right now.',
+    falling: 'No pages are losing ranking positions right now.',
+  };
 
   return (
     <div className="border-t border-[var(--brand-border)]">
       {/* Filter Tabs */}
-      <div className="flex items-center gap-1 px-4 py-2 border-b border-[var(--brand-border)]/50 overflow-x-auto">
+      <div className="flex items-center gap-1 px-4 py-2 border-b border-[var(--brand-border)]/50 overflow-x-auto" role="tablist" aria-label="Page keyword map filters">
         {filterTabs.map(tab => (
           <button
             key={tab.id}
-            onClick={() => setActiveFilter(tab.id)}
+            id={`page-keyword-map-tab-${tab.id}`}
+            role="tab"
+            aria-selected={activeFilter === tab.id}
+            aria-controls="page-keyword-map-panel"
+            onClick={() => {
+              setActiveFilter(tab.id);
+              setVisibleCount(ITEMS_PER_PAGE);
+            }}
             className={`px-3 py-1.5 rounded-[var(--radius-md)] t-caption-sm font-medium transition-colors whitespace-nowrap ${
               activeFilter === tab.id
                 ? 'bg-[var(--surface-3)] text-[var(--brand-text-bright)]'
@@ -157,10 +164,16 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
       </div>
 
       {/* Grouped Page List */}
-      <div className="max-h-[400px] overflow-y-auto" key={activeFilter}>
+      <div
+        id="page-keyword-map-panel"
+        role="tabpanel"
+        aria-labelledby={`page-keyword-map-tab-${activeFilter}`}
+        className="max-h-[400px] overflow-y-auto"
+        key={activeFilter}
+      >
         {Object.entries(groupedPages).length === 0 ? (
           <div className="px-4 py-8 text-center">
-            <p className="t-caption-sm text-[var(--brand-text-muted)]">No pages match this filter</p>
+            <p className="t-caption-sm text-[var(--brand-text-muted)]">{emptyMessage[activeFilter]}</p>
           </div>
         ) : (
           Object.entries(groupedPages).map(([folder, pages]) => (
@@ -217,7 +230,7 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0 ml-3">
                               {page.impressions != null && page.impressions > 0 && (
-                                <span className="t-caption-sm text-[var(--brand-text-muted)]">{page.impressions.toLocaleString()} imp</span>
+                                <span className="t-caption-sm text-[var(--brand-text-muted)]">{page.impressions.toLocaleString()} impressions</span>
                               )}
                               {page.clicks != null && page.clicks > 0 && (
                                 <span className="t-caption-sm text-[var(--brand-text)]">{page.clicks.toLocaleString()} clicks</span>
@@ -251,10 +264,10 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                                 )}
                                 {/* Inline feedback badge */}
                                 {keywordFeedback?.get(page.primaryKeyword.toLowerCase().trim()) === 'approved' && (
-                                  <span className="text-accent-success bg-emerald-500/10 px-1 py-px rounded-[var(--radius-sm)] border border-emerald-500/20 t-caption-sm flex items-center gap-0.5"><Icon as={ThumbsUp} size="sm" />Approved</span>
+                                  <span className="text-accent-success bg-emerald-500/10 px-1 py-px rounded-[var(--radius-sm)] border border-emerald-500/20 t-caption-sm flex items-center gap-0.5"><Icon as={ThumbsUp} size="sm" />Relevant</span>
                                 )}
                                 {keywordFeedback?.get(page.primaryKeyword.toLowerCase().trim()) === 'declined' && (
-                                  <span className="text-accent-danger bg-red-500/10 px-1 py-px rounded-[var(--radius-sm)] border border-red-500/20 t-caption-sm flex items-center gap-0.5"><Icon as={Ban} size="sm" />Declined</span>
+                                  <span className="text-accent-danger bg-red-500/10 px-1 py-px rounded-[var(--radius-sm)] border border-red-500/20 t-caption-sm flex items-center gap-0.5"><Icon as={Ban} size="sm" />Not relevant</span>
                                 )}
                               </span>
                             )}
@@ -268,15 +281,15 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                               <span className="t-caption-sm text-[var(--brand-text-muted)] inline-flex items-center gap-0.5">
                                 {page.volume.toLocaleString()}/mo
                                 {page.metricsSource === 'partial_match' && (
-                                  <span className="text-accent-warning" title="Metrics from a similar keyword — may not be exact">~</span>
+                                  <span className="text-accent-warning" title="Metrics from a similar keyword - may not be exact">~</span>
                                 )}
                               </span>
                             )}
                             {page.difficulty != null && page.difficulty > 0 && (
                               <span className={`t-caption-sm inline-flex items-center gap-0.5 ${page.difficulty <= 30 ? 'text-accent-success' : page.difficulty <= 60 ? 'text-accent-warning' : 'text-accent-danger'}`}>
-                                KD {page.difficulty}
+                                Difficulty {page.difficulty}
                                 {page.metricsSource === 'partial_match' && (
-                                  <span className="text-accent-warning" title="Metrics from a similar keyword — may not be exact">~</span>
+                                  <span className="text-accent-warning" title="Metrics from a similar keyword - may not be exact">~</span>
                                 )}
                               </span>
                             )}
@@ -335,7 +348,7 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                               if (fbStatus === 'declined') return (
                                 <div className="flex items-center gap-2 mt-2 px-2 py-1.5 rounded-[var(--radius-md)] bg-red-500/5 border border-red-500/20">
                                   <Icon as={Ban} size="sm" className="text-accent-danger flex-shrink-0" />
-                                  <span className="t-caption-sm text-accent-danger flex-1">Declined — excluded from future strategies</span>
+                                  <span className="t-caption-sm text-accent-danger flex-1">Not relevant - excluded from future strategies</span>
                                   {onUndoFeedback && (
                                     <button onClick={() => onUndoFeedback(kw)} disabled={loading} className="t-caption-sm text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] flex items-center gap-0.5 transition-colors disabled:opacity-50">
                                       <Icon as={Undo2} size="sm" /> Restore
@@ -346,7 +359,7 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                               if (fbStatus === 'approved') return (
                                 <div className="flex items-center gap-2 mt-2 px-2 py-1.5 rounded-[var(--radius-md)] bg-emerald-500/5 border border-emerald-500/20">
                                   <Icon as={ThumbsUp} size="sm" className="text-accent-success flex-shrink-0" />
-                                  <span className="t-caption-sm text-accent-success">Approved — prioritized in strategy</span>
+                                  <span className="t-caption-sm text-accent-success">Relevant - can shape future recommendations</span>
                                 </div>
                               );
                               return (
@@ -374,22 +387,31 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                             {isOpportunity && workspaceId && (
                               <div className="mt-2 pt-2 border-t border-[var(--brand-border)]/30 flex justify-end">
                                 <button
-                                  onClick={() => {
-                                    post(`/api/public/content-request/${workspaceId}`, {
-                                      type: 'meeting_discussion',
-                                      targetPage: page.pagePath,
-                                      targetKeyword: page.primaryKeyword,
-                                      notes: 'Page getting impressions but not ranking - discuss optimization strategy',
-                                      priority: 'high'
-                                    }).then(() => {
-                                      setToast?.('Added to meeting agenda');
+                                  onClick={async () => {
+                                    if (discussingPage === page.pagePath) return;
+                                    const topic = `Discuss optimization for ${page.pageTitle || page.pagePath}`;
+                                    const targetKeyword = page.primaryKeyword || page.pageTitle || page.pagePath;
+                                    setDiscussingPage(page.pagePath);
+                                    try {
+                                      await post(`/api/public/content-request/${workspaceId}`, {
+                                        topic,
+                                        targetKeyword,
+                                        rationale: `Page ${page.pagePath} is getting impressions but not ranking. Review optimization strategy.`,
+                                        priority: 'high'
+                                      });
+                                      setToast?.('Optimization request created');
                                       onContentRequested?.();
-                                    }).catch(() => setToast?.('Failed to add to agenda'));
+                                    } catch {
+                                      setToast?.('Failed to create optimization request');
+                                    } finally {
+                                      setDiscussingPage(null);
+                                    }
                                   }}
-                                  className="px-2 py-1 rounded-[var(--radius-sm)] t-caption-sm font-medium text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border)] transition-colors flex items-center gap-1"
+                                  disabled={discussingPage === page.pagePath}
+                                  className="px-2 py-1 rounded-[var(--radius-sm)] t-caption-sm font-medium text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border)] transition-colors flex items-center gap-1 disabled:opacity-50"
                                 >
                                   <Icon as={MessageCircle} size="sm" />
-                                  Discuss
+                                  {discussingPage === page.pagePath ? 'Requesting...' : 'Request Review'}
                                 </button>
                               </div>
                             )}
