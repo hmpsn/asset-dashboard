@@ -35,6 +35,7 @@ import type { RichResultEligibility } from './rich-results.js';
 import type { ValidationFinding } from '../../shared/types/schema-validation.js';
 import type { SchemaGenerationDiagnostics, SchemaRoleSource, SkippedSchemaType } from '../../shared/types/schema-generation.js';
 import type { SchemaIndustrySubtype, SchemaPageRole } from '../../shared/types/schema-plan.js';
+import type { SchemaCmsDeliveryStatus, SchemaCollectionIdentity } from '../../shared/types/site-inventory.js';
 import type { SiteContext, SiteContextPage } from './site-context.js';
 import { validateForGoogleRichResults } from '../schema-validator.js';
 import { createLogger } from '../logger.js';
@@ -103,6 +104,8 @@ export interface LeanGeneratorInput {
     industrySubtype?: SchemaIndustrySubtype;
   };
   inactivePlanStatus?: string;
+  collectionIdentity?: SchemaCollectionIdentity;
+  cmsDeliveryStatus?: SchemaCmsDeliveryStatus;
 }
 
 function detectExistingSchemas(html: string): string[] {
@@ -227,6 +230,10 @@ function buildGenerationDiagnostics(input: {
   validationFindings: ValidationFinding[];
   validationStatus?: 'valid' | 'warnings' | 'errors';
   inactivePlanStatus?: string;
+  collection?: SchemaCollectionIdentity;
+  cmsDeliveryStatus?: SchemaCmsDeliveryStatus;
+  evidenceSources?: SchemaGenerationDiagnostics['evidenceSources'];
+  fieldEvidence?: SchemaGenerationDiagnostics['fieldEvidence'];
 }): SchemaGenerationDiagnostics {
   const skippedSchemaTypes = [...input.skippedSchemaTypes];
   if (input.inactivePlanStatus && input.roleSource === 'auto-detect') {
@@ -239,10 +246,15 @@ function buildGenerationDiagnostics(input: {
     plannedRole: input.role,
     effectiveRole: input.role,
     roleSource: input.roleSource,
+    collection: input.collection,
     emittedTypes: input.emittedTypes,
     skippedSchemaTypes,
+    missingRequiredFields: skippedSchemaTypes.flatMap(s => s.missingFields ?? []),
+    evidenceSources: input.evidenceSources,
+    fieldEvidence: input.fieldEvidence,
     richResultsEligibility: input.richResultsEligibility,
     validationStatus: input.validationStatus ?? validationStatus(input.validationFindings),
+    cmsDeliveryStatus: input.cmsDeliveryStatus,
   };
 }
 
@@ -570,6 +582,10 @@ export async function generateLeanSchema(input: LeanGeneratorInput): Promise<Lea
     validationFindings,
     validationStatus: publishValidation.status,
     inactivePlanStatus: input.inactivePlanStatus,
+    collection: input.collectionIdentity,
+    cmsDeliveryStatus: input.cmsDeliveryStatus,
+    evidenceSources: pageData.evidenceSources,
+    fieldEvidence: pageData.fieldEvidence,
   });
 
   return {

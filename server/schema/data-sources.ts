@@ -6,6 +6,7 @@
 import * as cheerio from 'cheerio';
 import { scrubBrandSuffix } from './templates/helpers.js';
 import type { PageElementCatalog } from '../../shared/types/page-elements.js';
+import type { SchemaEvidenceSource, SchemaFieldEvidence } from '../../shared/types/site-inventory.js';
 import type { BusinessProfileContact } from '../../shared/types/workspace.js';
 import type { SchemaIndustrySubtype } from '../../shared/types/schema-plan.js';
 
@@ -85,6 +86,8 @@ export interface PageData {
   /** Catalog of structural elements detected on the page (videos, HowTo
    *  lists, citations, etc.). Drives conditional schema enrichment. */
   elements?: PageElementCatalog;
+  fieldEvidence?: SchemaFieldEvidence[];
+  evidenceSources?: Partial<Record<string, SchemaEvidenceSource>>;
 }
 
 export interface ExtractInput {
@@ -123,12 +126,11 @@ function deriveArticleSection(publishedPath: string): string | undefined {
   return capitalize(segs[0].replace(/-/g, ' '));
 }
 
-/** Reads common CMS field-data slugs in priority order; Webflow conventions vary by collection. */
-function pickCmsField(fieldData: Record<string, unknown> | null | undefined, slugs: string[]): string | undefined {
+function pickCmsFieldWithSlug(fieldData: Record<string, unknown> | null | undefined, slugs: string[]): { value: string; slug: string } | undefined {
   if (!fieldData) return undefined;
   for (const slug of slugs) {
     const v = fieldData[slug];
-    if (typeof v === 'string' && v.trim()) return v.trim();
+    if (typeof v === 'string' && v.trim()) return { value: v.trim(), slug };
   }
   return undefined;
 }
@@ -178,17 +180,37 @@ export function extractPageData(input: ExtractInput): PageData {
   const image = ogImage || twitterImage || linkImage;
 
   const cmsFieldData = input.pageMeta.cmsFieldData ?? null;
+  const datePublishedCms = pickCmsFieldWithSlug(cmsFieldData, ['published-on', 'published-date', 'date-published']);
+  const dateModifiedCms = pickCmsFieldWithSlug(cmsFieldData, ['updated-on', 'last-updated']);
+  const authorCms = pickCmsFieldWithSlug(cmsFieldData, ['author-name', 'author', 'written-by']);
+  const fieldEvidence: SchemaFieldEvidence[] = [];
+  const evidenceSources: Partial<Record<string, SchemaEvidenceSource>> = {};
+  if (description) evidenceSources.description = 'rendered-html';
+  if (image) evidenceSources.image = 'rendered-html';
+
   const datePublished = $('time[itemprop="datePublished"]').attr('datetime')
-    || pickCmsField(cmsFieldData, ['published-on', 'published-date', 'date-published'])
+    || datePublishedCms?.value
     || input.pageMeta.createdOn
     || input.pageMeta.lastPublished
     || undefined;
   const dateModified = $('time[itemprop="dateModified"]').attr('datetime')
-    || pickCmsField(cmsFieldData, ['updated-on', 'last-updated'])
+    || dateModifiedCms?.value
     || input.pageMeta.lastPublished
     || undefined;
 
-  const author = pickCmsField(cmsFieldData, ['author-name', 'author', 'written-by']) ?? undefined;
+  const author = authorCms?.value ?? undefined;
+  if (datePublishedCms) {
+    evidenceSources.datePublished = `cms-field:${datePublishedCms.slug}`;
+    fieldEvidence.push({ field: 'datePublished', source: `cms-field:${datePublishedCms.slug}` });
+  }
+  if (dateModifiedCms) {
+    evidenceSources.dateModified = `cms-field:${dateModifiedCms.slug}`;
+    fieldEvidence.push({ field: 'dateModified', source: `cms-field:${dateModifiedCms.slug}` });
+  }
+  if (authorCms) {
+    evidenceSources.author = `cms-field:${authorCms.slug}`;
+    fieldEvidence.push({ field: 'author', source: `cms-field:${authorCms.slug}` });
+  }
 
   const inLanguage = input.pageMeta.locale?.trim() || input.workspace.defaultLocale || 'en';
   const articleSection = deriveArticleSection(input.pageMeta.publishedPath);
@@ -228,5 +250,7 @@ export function extractPageData(input: ExtractInput): PageData {
     serviceType,
     knowsAbout: input.workspace.siteKeywordsForKnowsAbout?.slice(0, 5).map(s => s.toLowerCase()),
     elements: input.pageMeta.elements,
+    fieldEvidence,
+    evidenceSources,
   };
 }

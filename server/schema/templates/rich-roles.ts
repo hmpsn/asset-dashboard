@@ -22,7 +22,6 @@ export function buildPricingPageSchema(input: {
     'priceCurrency': offer.priceCurrency,
     'description': offer.description,
     'url': pageData.canonicalUrl,
-    'availability': 'https://schema.org/InStock',
   }));
   const primary = dropUndefined({
     '@type': 'WebPage',

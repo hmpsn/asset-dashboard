@@ -1,4 +1,4 @@
-import { getCollectionSchema, listCollections, discoverCmsItemsBySlug, buildStaticPathSet, toCmsPageId } from './webflow.js';
+import { getCollectionSchema, listCollections } from './webflow.js';
 import { getWorkspacePages } from './workspace-data.js';
 import { listWorkspaces } from './workspaces.js';
 import { generateLeanSchema } from './schema/index.js';
@@ -19,6 +19,8 @@ import { getSchemaPlan } from './schema-store.js';
 import type { PageKind } from './schema/classifier.js';
 import type { SchemaPageRole } from '../shared/types/schema-plan.js';
 import type { SchemaGenerationDiagnostics } from '../shared/types/schema-generation.js';
+import { buildSiteInventory, isUtilitySchemaPath } from './schema/site-inventory.js';
+import type { SchemaCmsDeliveryStatus, SchemaCollectionIdentity, SiteInventoryCmsItem, SiteInventorySlice } from '../shared/types/site-inventory.js';
 
 const log = createLogger('schema');
 
@@ -53,6 +55,8 @@ export interface SchemaPageSuggestion {
   validationFindings?: ValidationFinding[];
   richResultsEligibility?: RichResultEligibility[];
   generationDiagnostics?: SchemaGenerationDiagnostics;
+  collectionIdentity?: SchemaCollectionIdentity;
+  cmsDeliveryStatus?: SchemaCmsDeliveryStatus;
   savedPageType?: string;  // Persisted page type from DB
 }
 
@@ -153,6 +157,8 @@ function resolveRoleOverride(opts: {
   siteId: string;
   pagePath: string;
   ctxPageType?: SchemaPageType;
+  collectionRole?: SchemaPageRole;
+  collectionRoleSource?: 'mapped' | 'inferred' | 'none';
 }) {
   const latestPlan = getSchemaPlan(opts.siteId);
   const activePlan = latestPlan?.status === 'active' ? latestPlan : null;
@@ -175,6 +181,28 @@ function resolveRoleOverride(opts: {
         industrySubtype: planRole.industrySubtype,
       },
       inactivePlanStatus: undefined,
+      activePlan,
+    };
+  }
+  if (opts.collectionRole && opts.collectionRoleSource === 'mapped') {
+    return {
+      pageKindOverride: SCHEMA_ROLE_TO_PAGE_KIND[opts.collectionRole],
+      schemaRoleOverride: {
+        role: opts.collectionRole,
+        source: 'collection-map' as const,
+      },
+      inactivePlanStatus: latestPlan && latestPlan.status !== 'active' ? latestPlan.status : undefined,
+      activePlan,
+    };
+  }
+  if (opts.collectionRole && opts.collectionRoleSource === 'inferred') {
+    return {
+      pageKindOverride: SCHEMA_ROLE_TO_PAGE_KIND[opts.collectionRole],
+      schemaRoleOverride: {
+        role: opts.collectionRole,
+        source: 'collection-inferred' as const,
+      },
+      inactivePlanStatus: latestPlan && latestPlan.status !== 'active' ? latestPlan.status : undefined,
       activePlan,
     };
   }
@@ -369,7 +397,55 @@ function leanToSuggestion(lean: import('./schema/index.js').LeanGeneratorOutput)
     validationFindings: lean.validationFindings,
     richResultsEligibility: lean.richResultsEligibility,
     generationDiagnostics: lean.generationDiagnostics,
+    collectionIdentity: lean.generationDiagnostics?.collection,
+    cmsDeliveryStatus: lean.generationDiagnostics?.cmsDeliveryStatus,
   };
+}
+
+function collectionIdentity(item: SiteInventoryCmsItem): SchemaCollectionIdentity {
+  return {
+    collectionId: item.collectionId,
+    collectionName: item.collectionName,
+    collectionSlug: item.collectionSlug,
+    itemId: item.itemId,
+    itemPath: item.path,
+  };
+}
+
+function cmsDeliveryStatus(item: SiteInventoryCmsItem): SchemaCmsDeliveryStatus {
+  if (!item.collectionId || !item.itemId) {
+    return {
+      mode: 'cms-field',
+      status: 'blocked',
+      message: 'CMS publish blocked: collection item identity was not resolved.',
+    };
+  }
+  if (!item.schemaFieldSlug) {
+    return {
+      mode: 'cms-field',
+      status: 'blocked',
+      message: `CMS publish blocked: no mapped schema field for collection ${item.collectionName || item.collectionId}.`,
+    };
+  }
+  if (!item.schemaFieldAvailable) {
+    return {
+      mode: 'cms-field',
+      status: 'blocked',
+      fieldSlug: item.schemaFieldSlug,
+      message: `CMS publish blocked: mapped field ${item.schemaFieldSlug} was not found on ${item.collectionName || item.collectionId}.`,
+    };
+  }
+  return {
+    mode: 'cms-field',
+    status: 'ready',
+    fieldSlug: item.schemaFieldSlug,
+    message: `CMS field ready: ${item.schemaFieldSlug}.`,
+  };
+}
+
+function shouldSkipBulkPage(path: string, hasActivePlanRole: boolean): boolean {
+  const exclusion = isUtilitySchemaPath(path);
+  return exclusion.isUtility && !hasActivePlanRole;
 }
 
 export async function generateSchemaForPage(
@@ -385,6 +461,77 @@ export async function generateSchemaForPage(
   const baseUrl = await resolveBaseUrl({ liveDomain: ctx.liveDomain, webflowSiteId: siteId }, tokenOverride);
   if (!baseUrl) return null;
 
+  const wsId = ctx.workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
+  const allPages = wsId ? await getWorkspacePages(wsId, siteId) : [];
+  let siteInventory: SiteInventorySlice | undefined;
+  if (wsId) {
+    siteInventory = await buildSiteInventory({
+      siteId,
+      baseUrl,
+      pages: allPages,
+      tokenOverride,
+      businessProfile: ctx._businessProfile ?? null,
+    });
+  }
+
+  const cmsItem = siteInventory?.cmsItems.find(item => item.pageId === pageId);
+  if (cmsItem) {
+    const itemHtml = await fetchPublishedHtml(cmsItem.url);
+    const roleOverride = resolveRoleOverride({
+      siteId,
+      pagePath: cmsItem.path,
+      ctxPageType: ctx.pageType,
+      collectionRole: cmsItem.effectiveRole,
+      collectionRoleSource: cmsItem.roleSource,
+    });
+    let pageKeywords: { primary: string; secondary: string[] } | undefined;
+    if (wsId) {
+      try {
+        const perPageIntel = await buildWorkspaceIntelligence(wsId, { slices: ['seoContext'], pagePath: cmsItem.path });
+        if (perPageIntel?.seoContext?.pageKeywords) {
+          pageKeywords = {
+            primary: perPageIntel.seoContext.pageKeywords.primaryKeyword || '',
+            secondary: perPageIntel.seoContext.pageKeywords.secondaryKeywords || [],
+          };
+        }
+      } catch { /* intelligence not ready — pageKeywords stays undefined */ } // catch-ok
+    }
+    const aiBudget = allocateElementAiBudget();
+    const lean = await generateLeanSchema({
+      pageId: cmsItem.pageId,
+      pageMeta: {
+        title: cmsItem.title,
+        slug: cmsItem.path.replace(/^\//, ''),
+        publishedPath: cmsItem.path,
+        seo: undefined,
+        lastPublished: cmsItem.lastPublished,
+        createdOn: cmsItem.createdOn,
+        cmsFieldData: cmsItem.fieldData,
+        pageKeywords,
+        sourcePublishedAt: cmsItem.lastPublished ?? null,
+      },
+      html: itemHtml || '',
+      baseUrl,
+      workspace: {
+        id: wsId,
+        name: ctx.companyName || '',
+        publisherLogoUrl: ctx.logoUrl ?? null,
+        businessProfile: cmsItem.itemBusinessProfile ?? ctx._businessProfile ?? null,
+        defaultLocale: ctx._defaultLocale ?? 'en',
+        siteKeywordsForKnowsAbout: ctx.siteKeywords,
+        siteHasSearch: ctx._siteHasSearch ?? false,
+        industrySubtype: roleOverride.schemaRoleOverride?.industrySubtype,
+      },
+      aiBudget,
+      pageKindOverride: roleOverride.pageKindOverride,
+      schemaRoleOverride: roleOverride.schemaRoleOverride,
+      inactivePlanStatus: roleOverride.inactivePlanStatus,
+      collectionIdentity: collectionIdentity(cmsItem),
+      cmsDeliveryStatus: cmsDeliveryStatus(cmsItem),
+    });
+    return leanToSuggestion(lean);
+  }
+
   const meta = await fetchPageMeta(pageId, tokenOverride);
   if (!meta) return null;
 
@@ -398,9 +545,7 @@ export async function generateSchemaForPage(
   let publishedPath = isHomepage ? '/' : `/${slug}`;
   let siteContextForPage: SiteContext | undefined;
   try {
-    const wsId = ctx.workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
     if (wsId) {
-      const allPages = await getWorkspacePages(wsId, siteId);
       const matched = allPages.find(p => p.id === pageId);
       if (matched?.publishedPath) {
         publishedPath = matched.publishedPath;
@@ -459,7 +604,7 @@ export async function generateSchemaForPage(
     html: html || '',
     baseUrl,
     workspace: {
-      id: ctx.workspaceId,
+      id: wsId,
       name: ctx.companyName || '',
       publisherLogoUrl: ctx.logoUrl ?? null,
       businessProfile: ctx._businessProfile ?? null,
@@ -504,6 +649,15 @@ export async function generateSchemaSuggestions(
   const pages = wsId ? await getWorkspacePages(wsId, siteId) : [];
   const latestPlan = getSchemaPlan(siteId);
   const activePlan = latestPlan?.status === 'active' ? latestPlan : null;
+  const siteInventory = wsId
+    ? await buildSiteInventory({
+        siteId,
+        baseUrl,
+        pages,
+        tokenOverride,
+        businessProfile: ctx._businessProfile ?? null,
+      })
+    : undefined;
 
   let siteContext: SiteContext | undefined = pages.length > 0
     ? assembleSiteContext(pages, baseUrl, activePlan?.canonicalEntities ?? [])
@@ -521,6 +675,9 @@ export async function generateSchemaSuggestions(
     if (isCancelled?.()) break;
     const slug = page.slug || '';
     const publishedPath = page.publishedPath || (slug ? `/${slug}` : '/');
+    if (shouldSkipBulkPage(publishedPath, !!findPlanRole(activePlan, publishedPath))) {
+      continue;
+    }
     const url = (!slug || slug === 'index') ? baseUrl : `${baseUrl}${publishedPath}`;
     const html = await fetchPublishedHtml(url);
     const roleOverride = resolveRoleOverride({
@@ -586,15 +743,19 @@ export async function generateSchemaSuggestions(
 
   // CMS pages — same lean path
   {
-    const staticPaths = buildStaticPathSet(pages);
-    const { items: cmsItems } = await discoverCmsItemsBySlug(siteId, baseUrl, staticPaths, 1000, tokenOverride);
+    const cmsItems = siteInventory?.cmsItems ?? [];
     for (const item of cmsItems) {
       if (isCancelled?.()) break;
+      if (shouldSkipBulkPage(item.path, !!findPlanRole(activePlan, item.path))) {
+        continue;
+      }
       const itemHtml = await fetchPublishedHtml(item.url);
       const roleOverride = resolveRoleOverride({
         siteId,
         pagePath: item.path,
         ctxPageType: undefined,
+        collectionRole: item.effectiveRole,
+        collectionRoleSource: item.roleSource,
       });
       // Per-page slice fetch for CMS item pageKeywords.
       let cmsPageKeywords: { primary: string; secondary: string[] } | undefined;
@@ -611,9 +772,9 @@ export async function generateSchemaSuggestions(
       }
 
       const itemLean = await generateLeanSchema({
-        pageId: toCmsPageId(item.path),
+        pageId: item.pageId,
         pageMeta: {
-          title: item.pageName,
+          title: item.title,
           slug: item.path.replace(/^\//, ''),
           publishedPath: item.path,
           seo: undefined,
@@ -629,7 +790,7 @@ export async function generateSchemaSuggestions(
           id: wsId,
           name: ctx.companyName || '',
           publisherLogoUrl: ctx.logoUrl ?? null,
-          businessProfile: ctx._businessProfile ?? null,
+          businessProfile: item.itemBusinessProfile ?? ctx._businessProfile ?? null,
           defaultLocale: ctx._defaultLocale ?? 'en',
           siteKeywordsForKnowsAbout: ctx.siteKeywords, // NEW
           siteHasSearch: ctx._siteHasSearch ?? false, // NEW
@@ -639,6 +800,8 @@ export async function generateSchemaSuggestions(
         pageKindOverride: roleOverride.pageKindOverride,
         schemaRoleOverride: roleOverride.schemaRoleOverride,
         inactivePlanStatus: roleOverride.inactivePlanStatus,
+        collectionIdentity: collectionIdentity(item),
+        cmsDeliveryStatus: cmsDeliveryStatus(item),
       });
       results.push(leanToSuggestion(itemLean));
     }

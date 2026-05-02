@@ -57,8 +57,8 @@
           "source": "Schema bulk generation discussion",
           "est": "3-4h",
           "priority": "P1",
-          "notes": "Allow writing generated schema JSON to a designated CMS collection field (e.g. 'schema-markup' rich text or plain text field) via Webflow CMS API. Would enable CMS-driven schema injection without Webflow custom code embeds. Also consider: cap CMS pages in bulk gen, add overall timeout/token budget, skip CMS pages matching existing CMS template.",
-          "status": "pending"
+          "notes": "Implemented first pass: collection-aware siteInventory, CMS collection role inference/mapping, synthetic CMS page IDs in single-page generation, utility-page bulk exclusions, diagnostics with collection identity/evidence/CMS delivery status, and JSON-only CMS field publishing through mapped collection fields such as schema-json-ld. Remaining polish: richer admin mapping UI and broader collection role test coverage.",
+          "status": "done"
         },
         {
           "id": 517,

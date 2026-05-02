@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildArticleSchema } from '../../../server/schema/templates/article.js';
 import { buildServiceSchema, buildProductSchema } from '../../../server/schema/templates/service.js';
+import { buildPricingPageSchema } from '../../../server/schema/templates/rich-roles.js';
 import { buildLocalBusinessSchema } from '../../../server/schema/templates/local-business.js';
 import { buildAboutPageSchema, buildContactPageSchema, buildCollectionPageSchema, buildWebPageSchema, buildBlogIndexSchema, buildServiceHubSchema } from '../../../server/schema/templates/static.js';
 import { buildHomepageSchema } from '../../../server/schema/templates/homepage.js';
@@ -225,6 +226,27 @@ describe('buildProductSchema', () => {
   it('does NOT emit offers when no price provided (no spammy zero-price offers)', () => {
     const node = (buildProductSchema(serviceInput)['@graph'] as Array<Record<string, unknown>>)[0];
     expect(node.offers).toBeUndefined();
+  });
+
+  it('does not claim availability on Product offers without verified inventory evidence', () => {
+    const node = (buildProductSchema({
+      ...serviceInput,
+      offers: [{ name: 'Starter', price: '29', priceCurrency: 'USD' }],
+    })['@graph'] as Array<Record<string, unknown>>)[0];
+    const offers = node.offers as Array<Record<string, unknown>>;
+    expect(offers[0].availability).toBeUndefined();
+  });
+});
+
+describe('buildPricingPageSchema', () => {
+  it('does not claim availability on pricing-page offers without verified inventory evidence', () => {
+    const graph = buildPricingPageSchema({
+      baseUrl: serviceInput.baseUrl,
+      pageData: { ...serviceInput.pageData, canonicalUrl: 'https://example.com/pricing' },
+      offers: [{ name: 'Growth', price: '99', priceCurrency: 'USD' }],
+    })['@graph'] as Array<Record<string, unknown>>;
+    const offer = graph.find(node => node['@type'] === 'Offer');
+    expect(offer?.availability).toBeUndefined();
   });
 });
 

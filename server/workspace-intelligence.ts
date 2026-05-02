@@ -131,7 +131,7 @@ const INTELLIGENCE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 const ALL_SLICES: IntelligenceSlice[] = [
   'seoContext', 'insights', 'learnings', 'pageProfile', 'pageElements',
-  'contentPipeline', 'siteHealth', 'clientSignals', 'operational',
+  'siteInventory', 'contentPipeline', 'siteHealth', 'clientSignals', 'operational',
 ];
 
 export async function buildWorkspaceIntelligence(
@@ -234,7 +234,33 @@ async function assembleSlice(
       if (!opts?.pagePath) break; // pageElements is per-page; no-op without pagePath
       result.pageElements = await assemblePageElements(workspaceId, opts.pagePath);
       break;
+    case 'siteInventory':
+      if (!opts?.siteId || !opts.siteBaseUrl) break;
+      result.siteInventory = await assembleSiteInventory(workspaceId, opts.siteId, opts.siteBaseUrl, opts.webflowToken);
+      break;
   }
+}
+
+async function assembleSiteInventory(
+  workspaceId: string,
+  siteId: string,
+  baseUrl: string,
+  tokenOverride?: string,
+) {
+  const [{ buildSiteInventory }, { getWorkspacePages }, { getWorkspace }] = await Promise.all([
+    import('./schema/site-inventory.js'),
+    import('./workspace-data.js'),
+    import('./workspaces.js'),
+  ]);
+  const pages = await getWorkspacePages(workspaceId, siteId);
+  const workspace = getWorkspace(workspaceId);
+  return buildSiteInventory({
+    siteId,
+    baseUrl,
+    pages,
+    tokenOverride,
+    businessProfile: workspace?.businessProfile ?? null,
+  });
 }
 
 async function assembleSeoContext(
