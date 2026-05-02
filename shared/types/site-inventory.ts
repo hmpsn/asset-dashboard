@@ -34,6 +34,18 @@ export type SchemaEvidenceSource =
   | 'manual-override'
   | 'collection-inference';
 
+export type SiteInventoryFieldValue =
+  | string
+  | number
+  | boolean
+  | null
+  | SiteInventoryFieldValue[]
+  | { [field: string]: SiteInventoryFieldValue | undefined };
+
+export interface SiteInventoryFieldData {
+  [fieldSlug: string]: SiteInventoryFieldValue | undefined;
+}
+
 export interface SiteInventoryField {
   id?: string;
   slug: string;
@@ -85,7 +97,7 @@ export interface SiteInventoryCmsItem {
   itemId: string;
   lastPublished: string | null;
   createdOn: string | null;
-  fieldData: Record<string, unknown> | null;
+  fieldData: SiteInventoryFieldData | null;
   inferredRole?: SchemaPageRole;
   mappedRole?: SchemaPageRole;
   effectiveRole?: SchemaPageRole;

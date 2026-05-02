@@ -3,6 +3,7 @@ import type {
   CmsSchemaFieldMapping,
   SchemaCollectionInventory,
   SchemaFieldTarget,
+  SiteInventoryFieldData,
   SiteInventoryCmsItem,
   SiteInventoryField,
   SiteInventoryPage,
@@ -204,6 +205,7 @@ export async function buildSiteInventory(opts: {
     const collection = collectionMap.get(item.collectionId);
     const fields = collection?.fields ?? [];
     const targets = buildFieldTargets(fields);
+    const fieldData = item.fieldData as SiteInventoryFieldData | null;
     const mappedRole = collection?.mappedRole;
     const inferredRole = collection?.inferredRole;
     const effectiveRole = mappedRole ?? inferredRole;
@@ -219,7 +221,7 @@ export async function buildSiteInventory(opts: {
       itemId: item.itemId,
       lastPublished: item.lastPublished,
       createdOn: item.createdOn,
-      fieldData: item.fieldData,
+      fieldData,
       inferredRole,
       mappedRole,
       effectiveRole,
@@ -230,7 +232,7 @@ export async function buildSiteInventory(opts: {
       exclusionReason: exclusion.reason,
       fieldTargets: targets,
       itemBusinessProfile: effectiveRole === 'location'
-        ? deriveBusinessProfile(item.fieldData, targets, opts.businessProfile)
+        ? deriveBusinessProfile(fieldData, targets, opts.businessProfile)
         : undefined,
     };
   });
