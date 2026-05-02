@@ -60,7 +60,7 @@ export function LinksPanel({ siteId, workspaceId }: Props) {
 
       {/* Tab content */}
       {activeTab === 'redirects' && (
-        <RedirectManager key={`redirects-${siteId}`} siteId={siteId} />
+        <RedirectManager key={`redirects-${siteId}`} siteId={siteId} workspaceId={workspaceId} />
       )}
       {activeTab === 'internal' && (
         <InternalLinks key={`internal-${siteId}`} siteId={siteId} workspaceId={workspaceId} />

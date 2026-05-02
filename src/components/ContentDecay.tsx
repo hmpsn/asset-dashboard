@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { TrendingDown, RefreshCw, AlertTriangle, AlertCircle, Eye, Sparkles, ArrowDown, ArrowUp } from 'lucide-react';
+import { TrendingDown, RefreshCw, AlertTriangle, AlertCircle, Eye, Sparkles, ArrowDown, ArrowUp, Send, Check, Loader2 } from 'lucide-react';
 import { contentDecay } from '../api/content';
+import { clientActions } from '../api/clientActions';
 import { EmptyState, Icon, Button } from './ui';
 
 interface DecayingPage {
@@ -49,6 +50,8 @@ export default function ContentDecay({ workspaceId }: Props) {
   const [generatingRecs, setGeneratingRecs] = useState(false);
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
   const [severityFilter, setSeverityFilter] = useState<'all' | 'critical' | 'warning' | 'watch'>('all');
+  const [sendingPage, setSendingPage] = useState<string | null>(null);
+  const [sentPages, setSentPages] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     setLoading(true);
@@ -82,6 +85,25 @@ export default function ContentDecay({ workspaceId }: Props) {
       if (n.has(page)) n.delete(page); else n.add(page);
       return n;
     });
+  };
+
+  const sendPageToClient = async (page: DecayingPage) => {
+    setSendingPage(page.page);
+    try {
+      await clientActions.create(workspaceId, {
+        sourceType: 'content_decay',
+        sourceId: `content-decay:${page.page}`,
+        title: `Refresh recommendation for ${page.page}`,
+        summary: page.refreshRecommendation || `${page.page} has lost ${page.clickDeclinePct}% of clicks and should be reviewed for a content refresh.`,
+        priority: page.severity === 'critical' ? 'high' : page.severity === 'warning' ? 'medium' : 'low',
+        payload: { page, analyzedAt: analysis?.analyzedAt },
+      });
+      setSentPages(prev => new Set(prev).add(page.page));
+    } catch (err) {
+      console.error('ContentDecay operation failed:', err);
+    } finally {
+      setSendingPage(null);
+    }
   };
 
   const filtered = analysis?.decayingPages.filter(p => severityFilter === 'all' || p.severity === severityFilter) || [];
@@ -219,8 +241,22 @@ export default function ContentDecay({ workspaceId }: Props) {
                           </div>
                           {page.refreshRecommendation && (
                             <div className="bg-purple-500/5 border border-purple-500/15 rounded-[var(--radius-lg)] p-3 mt-2">
-                              <div className="flex items-center gap-1.5 t-caption-sm font-medium text-purple-300 mb-2">
-                                <Icon as={Sparkles} size="md" /> AI Refresh Recommendation
+                              <div className="flex items-center justify-between gap-2 mb-2">
+                                <div className="flex items-center gap-1.5 t-caption-sm font-medium text-purple-300">
+                                  <Icon as={Sparkles} size="md" /> AI Refresh Recommendation
+                                </div>
+                                <button
+                                  onClick={() => sendPageToClient(page)}
+                                  disabled={sendingPage === page.page}
+                                  className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] bg-teal-600/15 border border-teal-500/20 text-teal-300 hover:bg-teal-600/25 t-caption-sm font-medium transition-colors disabled:opacity-60"
+                                >
+                                  {sendingPage === page.page
+                                    ? <Loader2 className="w-3 h-3 animate-spin" />
+                                    : sentPages.has(page.page)
+                                      ? <Icon as={Check} size="sm" className="text-emerald-400" />
+                                      : <Icon as={Send} size="sm" />}
+                                  {sentPages.has(page.page) ? 'Sent' : 'Send to Client'}
+                                </button>
                               </div>
                               <div className="t-caption-sm text-[var(--brand-text-bright)] leading-relaxed whitespace-pre-wrap">{page.refreshRecommendation}</div>
                             </div>

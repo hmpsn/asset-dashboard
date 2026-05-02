@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getSafe, getOptional } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
 import type { AnalyticsInsight } from '../../../shared/types/analytics';
+import type { ClientAction } from '../../../shared/types/client-actions';
 import type {
   AuditSummary, AuditDetail,
   ClientContentRequest, ClientKeywordStrategy, ClientRequest, ApprovalBatch,
@@ -66,6 +67,15 @@ export function useClientApprovals(wsId: string, enabled: boolean) {
   return useQuery({
     queryKey: queryKeys.client.approvals(wsId),
     queryFn: () => getSafe<ApprovalBatch[]>(`/api/public/approvals/${wsId}`, []),
+    enabled,
+    select: (d) => (Array.isArray(d) ? d : []),
+  });
+}
+
+export function useClientActions(wsId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.client.clientActions(wsId),
+    queryFn: () => getSafe<ClientAction[]>(`/api/public/client-actions/${wsId}`, []),
     enabled,
     select: (d) => (Array.isArray(d) ? d : []),
   });

@@ -70,6 +70,9 @@ export const WS_EVENTS = {
   CLIENT_SIGNAL_CREATED: 'client-signal:created',
   CLIENT_SIGNAL_UPDATED: 'client-signal:updated',
 
+  // Client action queue
+  CLIENT_ACTION_UPDATE: 'client-action:update',
+
   // Meeting Brief
   MEETING_BRIEF_GENERATED: 'meeting-brief:generated',
 

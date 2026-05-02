@@ -6,10 +6,11 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Loader2, ChevronDown, ChevronRight, Sparkles, Clock, Zap,
   FileText, User, Calendar, Quote, ListChecks, LayoutList, Table2,
-  BookOpen, EyeOff, RefreshCw,
+  BookOpen, EyeOff, RefreshCw, Send, Check,
 } from 'lucide-react';
 import { aeoScoreColorClass, aeoScoreBgBarClass, Icon as UIIcon, Button } from './ui';
 import { aeoReview as aeoReviewApi } from '../api/seo';
+import { clientActions } from '../api/clientActions';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -97,6 +98,8 @@ export function AeoReview({ workspaceId }: Props) {
   const [expandedChanges, setExpandedChanges] = useState<Set<string>>(new Set());
   const [filterEffort, setFilterEffort] = useState<AeoEffort | 'all'>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
+  const [sendingPage, setSendingPage] = useState<string | null>(null);
+  const [sentPages, setSentPages] = useState<Set<string>>(new Set());
 
   // Load saved review on mount
   useEffect(() => {
@@ -162,6 +165,28 @@ export function AeoReview({ workspaceId }: Props) {
       return next;
     });
   };
+
+  const sendPageToClient = useCallback(async (page: AeoPageReview) => {
+    setSendingPage(page.pageUrl);
+    setError(null);
+    try {
+      const highCount = page.changes.filter(c => c.priority === 'high').length;
+      await clientActions.create(workspaceId, {
+        sourceType: 'aeo_change',
+        sourceId: `aeo:${page.pageUrl}`,
+        title: `AEO recommendations for ${page.pageTitle || page.pageUrl}`,
+        summary: `${page.summary}\n\n${page.changes.length} recommended change${page.changes.length !== 1 ? 's' : ''}, including ${highCount} high-priority item${highCount !== 1 ? 's' : ''}.`,
+        priority: highCount > 0 ? 'high' : 'medium',
+        payload: { page },
+      });
+      setSentPages(prev => new Set(prev).add(page.pageUrl));
+    } catch (err) {
+      console.error('AeoReview operation failed:', err);
+      setError('Failed to send AEO recommendations to client');
+    } finally {
+      setSendingPage(null);
+    }
+  }, [workspaceId]);
 
   // ── Empty state ──
   if (!review && !loading) {
@@ -372,9 +397,21 @@ export function AeoReview({ workspaceId }: Props) {
                         <span className="flex items-center gap-1"><UIIcon as={Clock} size="sm" /> ~{page.estimatedTimeMinutes} min total</span>
                         <span className="flex items-center gap-1"><UIIcon as={Zap} size="sm" className="text-emerald-400" /> {page.quickWinCount} quick wins</span>
                         <button
+                          onClick={(e) => { e.stopPropagation(); void sendPageToClient(page); }}
+                          disabled={sendingPage === page.pageUrl}
+                          className="flex items-center gap-1 text-teal-300 hover:text-teal-200 transition-colors ml-auto disabled:opacity-60"
+                        >
+                          {sendingPage === page.pageUrl
+                            ? <Loader2 className="w-3 h-3 animate-spin" />
+                            : sentPages.has(page.pageUrl)
+                              ? <UIIcon as={Check} size="sm" className="text-emerald-400" />
+                              : <UIIcon as={Send} size="sm" />}
+                          {sentPages.has(page.pageUrl) ? 'Sent' : 'Send to client'}
+                        </button>
+                        <button
                           onClick={(e) => { e.stopPropagation(); runSinglePageReview(page.pageUrl); }}
                           disabled={isRefreshing}
-                          className="flex items-center gap-1 text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors ml-auto"
+                          className="flex items-center gap-1 text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"
                         >
                           {isRefreshing
                             ? <Loader2 className="w-3 h-3 animate-spin" />

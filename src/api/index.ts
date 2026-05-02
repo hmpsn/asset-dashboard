@@ -12,3 +12,4 @@ export {
 export { meetingBriefApi } from './meetingBrief';
 export { briefingApi } from './briefing';
 export { diagnostics } from './diagnostics.js';
+export { clientActions } from './clientActions';

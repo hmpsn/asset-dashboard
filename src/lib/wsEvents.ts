@@ -37,6 +37,7 @@ export const WS_EVENTS = {
   INTELLIGENCE_CACHE_UPDATED: 'intelligence:cache_updated',
   CLIENT_SIGNAL_CREATED: 'client-signal:created',
   CLIENT_SIGNAL_UPDATED: 'client-signal:updated',
+  CLIENT_ACTION_UPDATE: 'client-action:update',
   MEETING_BRIEF_GENERATED: 'meeting-brief:generated',
 
   // Brand Engine (Phase 1 — brandscript, discovery, voice, identity)

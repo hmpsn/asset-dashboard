@@ -22,10 +22,7 @@ import { broadcastToWorkspace } from '../broadcast.js';
 import { notifyApprovalReady } from '../email.js';
 import { getClientActor, requireClientPortalAuth } from '../middleware.js';
 import {
-  updateCollectionItem,
-  publishCollectionItems,
   updatePageSeo,
-  publishSchemaToPage,
 } from '../webflow.js';
 import {
   getWorkspace,
@@ -38,7 +35,6 @@ import {
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { recordAction, getActionBySource } from '../outcome-tracking.js';
 import { captureBaselineFromGsc } from '../outcome-measurement.js';
-import { parseJsonFallback } from '../db/json-validation.js';
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
 
@@ -262,6 +258,9 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
 
   const approved = batch.items.filter(i => i.status === 'approved');
   if (!approved.length) return res.status(400).json({ error: 'No approved items to apply' });
+  if (approved.some(i => (i.field !== 'seoTitle' && i.field !== 'seoDescription') || i.collectionId || i.pageId.startsWith('cms-'))) {
+    return res.status(400).json({ error: 'Only static page SEO title and meta description approvals can be applied by clients in this version.' });
+  }
 
   const results: Array<{ itemId: string; pageId: string; success: boolean; error?: string }> = [];
   const appliedIds: string[] = [];
@@ -276,31 +275,11 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
         throw new Error('CMS pages discovered via sitemap must be updated directly in Webflow — synthetic page ID cannot be written via the API');
       }
       const value = item.clientValue || item.proposedValue;
-      if (item.field === 'schema') {
-        // Schema item — publish JSON-LD to page via schema publisher
-        const schema = parseJsonFallback(value, null);
-        if (!schema) throw new Error('Invalid schema JSON');
-        const result = await publishSchemaToPage(ws.webflowSiteId, item.pageId, schema, token);
-        if (!result.success) throw new Error(result.error || 'Schema publish failed');
-      } else if (item.collectionId) {
-        // CMS item approval (from CmsEditor) — pageId here is a CMS item ID from the
-        // CMS Items API, not a Webflow page ID. collectionId is the collection it belongs to.
-        // This branch must NOT be triggered from SeoEditor: SeoEditor's pageId is a Webflow
-        // page ID, and a page's collectionId means "renders this collection" — not "is an
-        // item in this collection". SeoEditor omits collectionId from approval items to
-        // ensure static pages always fall through to updatePageSeo below.
-        const result = await updateCollectionItem(item.collectionId, item.pageId, { [item.field]: value }, token);
-        if (!result.success) throw new Error(result.error || 'CMS update failed');
-        const pubResult = await publishCollectionItems(item.collectionId, [item.pageId], token);
-        if (!pubResult.success) log.warn(`CMS publish warning for ${item.pageId}: ${pubResult.error}`);
-      } else {
-        // Static page — update via page SEO API (SeoEditor approval flow)
-        const fields = item.field === 'seoTitle'
-          ? { seo: { title: value } }
-          : { seo: { description: value } };
-        const seoResult = await updatePageSeo(item.pageId, fields, token);
-        if (!seoResult.success) throw new Error(seoResult.error || 'SEO update failed');
-      }
+      const fields = item.field === 'seoTitle'
+        ? { seo: { title: value } }
+        : { seo: { description: value } };
+      const seoResult = await updatePageSeo(item.pageId, fields, token);
+      if (!seoResult.success) throw new Error(seoResult.error || 'SEO update failed');
       appliedIds.push(item.id);
       results.push({ itemId: item.id, pageId: item.pageId, success: true });
     } catch (err) {
@@ -315,8 +294,8 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
       if (r.success) {
         updatePageState(req.params.workspaceId, r.pageId, { status: 'live', updatedBy: 'admin' });
         const appliedItem = approved.find(i => i.id === r.itemId);
-        if (appliedItem && (appliedItem.field === 'seoTitle' || appliedItem.field === 'seoDescription' || appliedItem.field === 'schema')) {
-          const fieldName = appliedItem.field === 'seoTitle' ? 'title' : appliedItem.field === 'seoDescription' ? 'description' : 'schema';
+        if (appliedItem && (appliedItem.field === 'seoTitle' || appliedItem.field === 'seoDescription')) {
+          const fieldName = appliedItem.field === 'seoTitle' ? 'title' : 'description';
           recordSeoChange(req.params.workspaceId, r.pageId, appliedItem.pageSlug || '', appliedItem.pageTitle || '', [fieldName], 'approval');
         }
       }

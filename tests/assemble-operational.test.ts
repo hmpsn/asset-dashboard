@@ -58,6 +58,47 @@ vi.mock('../server/approvals.js', () => ({
   ]),
 }));
 
+vi.mock('../server/client-actions.js', () => ({
+  listClientActions: vi.fn(() => [
+    {
+      id: 'ca-old',
+      workspaceId: 'ws-1',
+      sourceType: 'internal_link',
+      title: 'Old pending action',
+      summary: 'Pending action',
+      payload: {},
+      status: 'pending',
+      priority: 'high',
+      createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+      updatedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: 'ca-new',
+      workspaceId: 'ws-1',
+      sourceType: 'content_decay',
+      title: 'New pending action',
+      summary: 'Pending action',
+      payload: {},
+      status: 'pending',
+      priority: 'medium',
+      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+      updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: 'ca-approved',
+      workspaceId: 'ws-1',
+      sourceType: 'keyword_strategy',
+      title: 'Approved action',
+      summary: 'Approved action',
+      payload: {},
+      status: 'approved',
+      priority: 'medium',
+      createdAt: new Date(Date.now() - 10 * 60 * 60 * 1000).toISOString(),
+      updatedAt: new Date(Date.now() - 9 * 60 * 60 * 1000).toISOString(),
+    },
+  ]),
+}));
+
 vi.mock('../server/analytics-annotations.js', () => ({
   getAnnotations: vi.fn(() => [
     { id: 'ann1', date: '2026-03-01', label: 'Traffic spike', pageUrl: '/blog/test' },
@@ -207,6 +248,46 @@ describe('assembleOperational', () => {
       } as any,
     ]);
 
+    const { listClientActions } = await import('../server/client-actions.js');
+    vi.mocked(listClientActions).mockReturnValue([
+      {
+        id: 'ca-old',
+        workspaceId: 'ws-1',
+        sourceType: 'internal_link',
+        title: 'Old pending action',
+        summary: 'Pending action',
+        payload: {},
+        status: 'pending',
+        priority: 'high',
+        createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+        updatedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+      } as any,
+      {
+        id: 'ca-new',
+        workspaceId: 'ws-1',
+        sourceType: 'content_decay',
+        title: 'New pending action',
+        summary: 'Pending action',
+        payload: {},
+        status: 'pending',
+        priority: 'medium',
+        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+        updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+      } as any,
+      {
+        id: 'ca-approved',
+        workspaceId: 'ws-1',
+        sourceType: 'keyword_strategy',
+        title: 'Approved action',
+        summary: 'Approved action',
+        payload: {},
+        status: 'approved',
+        priority: 'medium',
+        createdAt: new Date(Date.now() - 10 * 60 * 60 * 1000).toISOString(),
+        updatedAt: new Date(Date.now() - 9 * 60 * 60 * 1000).toISOString(),
+      } as any,
+    ]);
+
     const { getAnnotations } = await import('../server/analytics-annotations.js');
     vi.mocked(getAnnotations).mockReturnValue([
       { id: 'ann1', date: '2026-03-01', label: 'Traffic spike', pageUrl: '/blog/test' } as any,
@@ -348,6 +429,16 @@ describe('assembleOperational', () => {
     expect(typeof op.approvalQueue?.oldestAge).toBe('number');
   });
 
+  it('computes clientActionQueue with pending count and oldest pending age', async () => {
+    const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
+    const result = await buildWorkspaceIntelligence('ws-1', { slices: ['operational'] });
+
+    const op = result.operational as OperationalSlice;
+    expect(op.clientActionQueue?.pending).toBe(2);
+    expect(op.clientActionQueue?.oldestAge).toBeGreaterThanOrEqual(4);
+    expect(op.clientActionQueue?.oldestAge).toBeLessThanOrEqual(5);
+  });
+
   it('counts recommendations by priority in recommendationQueue', async () => {
     const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
     const result = await buildWorkspaceIntelligence('ws-1', { slices: ['operational'] });
@@ -409,6 +500,7 @@ describe('assembleOperational', () => {
     const { loadRecommendations } = await import('../server/recommendations.js');
     const { listJobs } = await import('../server/jobs.js');
     const { listBatches } = await import('../server/approvals.js');
+    const { listClientActions } = await import('../server/client-actions.js');
     const { getAnnotations } = await import('../server/analytics-annotations.js');
     const { listAnnotations } = await import('../server/annotations.js');
     const { listWorkOrders } = await import('../server/work-orders.js');
@@ -421,6 +513,7 @@ describe('assembleOperational', () => {
     vi.mocked(loadRecommendations).mockReturnValue({ recommendations: [] } as any);
     vi.mocked(listJobs).mockReturnValue([]);
     vi.mocked(listBatches).mockReturnValue([]);
+    vi.mocked(listClientActions).mockReturnValue([]);
     vi.mocked(getAnnotations).mockReturnValue([]);
     vi.mocked(listAnnotations).mockReturnValue([]);
     vi.mocked(listWorkOrders).mockReturnValue([]);
@@ -443,6 +536,8 @@ describe('assembleOperational', () => {
     expect(op.timeSaved).toBeNull();
     expect(op.approvalQueue?.pending).toBe(0);
     expect(op.approvalQueue?.oldestAge).toBeNull();
+    expect(op.clientActionQueue?.pending).toBe(0);
+    expect(op.clientActionQueue?.oldestAge).toBeNull();
     expect(op.recommendationQueue?.fixNow).toBe(0);
     expect(op.recommendationQueue?.fixSoon).toBe(0);
     expect(op.recommendationQueue?.fixLater).toBe(0);

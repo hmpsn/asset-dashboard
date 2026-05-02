@@ -1395,6 +1395,24 @@ async function assembleClientSignals(
     log.debug({ err, workspaceId }, 'assembleClientSignals: latest briefing optional, degrading gracefully');
   }
 
+  let clientActions: ClientSignalsSlice['clientActions'];
+  try {
+    const { listClientActions } = await import('./client-actions.js');
+    const actions = listClientActions(workspaceId);
+    clientActions = {
+      pending: actions.filter(a => a.status === 'pending').length,
+      approved: actions.filter(a => a.status === 'approved').length,
+      changesRequested: actions.filter(a => a.status === 'changes_requested').length,
+      completed: actions.filter(a => a.status === 'completed').length,
+      recentDecisions: actions
+        .filter(a => a.status !== 'pending')
+        .slice(0, 5)
+        .map(a => ({ title: a.title, status: a.status, sourceType: a.sourceType, updatedAt: a.updatedAt })),
+    };
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleClientSignals: client actions optional, degrading gracefully');
+  }
+
   return {
     keywordFeedback,
     contentGapVotes,
@@ -1410,6 +1428,7 @@ async function assembleClientSignals(
     serviceRequests,
     intentSignals,
     latestBriefing,
+    clientActions,
   };
 }
 
@@ -1507,6 +1526,22 @@ async function assembleOperational(
     log.debug({ err, workspaceId }, 'assembleOperational: approval queue optional, degrading gracefully');
   }
 
+  let clientActionQueue: OperationalSlice['clientActionQueue'] = { pending: 0, oldestAge: null };
+  try {
+    const { listClientActions } = await import('./client-actions.js');
+    const actions = listClientActions(workspaceId).filter(a => a.status === 'pending');
+    let oldestAge: number | null = null;
+    if (actions.length > 0) {
+      const oldest = actions.reduce((min, a) =>
+        new Date(a.createdAt).getTime() < new Date(min.createdAt).getTime() ? a : min,
+      );
+      oldestAge = Math.floor((Date.now() - new Date(oldest.createdAt).getTime()) / (60 * 60 * 1000));
+    }
+    clientActionQueue = { pending: actions.length, oldestAge };
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleOperational: client action queue optional, degrading gracefully');
+  }
+
   // Recommendation queue
   let recommendationQueue = { fixNow: 0, fixSoon: 0, fixLater: 0 };
   try {
@@ -1594,6 +1629,7 @@ async function assembleOperational(
     pendingJobs,
     timeSaved,
     approvalQueue,
+    clientActionQueue,
     recommendationQueue,
     actionBacklog,
     detectedPlaybooks,
@@ -2329,9 +2365,10 @@ function formatOperationalSection(ops: OperationalSlice, verbosity: PromptVerbos
   const lines: string[] = ['## Operational'];
 
   const approvals = ops.approvalQueue?.pending ?? 0;
+  const clientActions = ops.clientActionQueue?.pending ?? 0;
   const actions = ops.actionBacklog?.pendingMeasurement ?? 0;
   const recs = (ops.recommendationQueue?.fixNow ?? 0) + (ops.recommendationQueue?.fixSoon ?? 0) + (ops.recommendationQueue?.fixLater ?? 0);
-  lines.push(`Pending: ${approvals} approvals, ${actions} actions awaiting measurement, ${recs} recommendations`);
+  lines.push(`Pending: ${approvals} approvals, ${clientActions} client actions, ${actions} actions awaiting measurement, ${recs} recommendations`);
 
   if (verbosity !== 'compact') {
     if (ops.recommendationQueue) {
@@ -2348,6 +2385,9 @@ function formatOperationalSection(ops: OperationalSlice, verbosity: PromptVerbos
     }
     if (ops.workOrders) {
       lines.push(`Work orders: ${ops.workOrders.active} active, ${ops.workOrders.pending} pending`);
+    }
+    if (ops.clientActionQueue) {
+      lines.push(`Client action queue: ${ops.clientActionQueue.pending} pending${ops.clientActionQueue.oldestAge !== null ? `, oldest ${ops.clientActionQueue.oldestAge}h` : ''}`);
     }
   }
 

@@ -71,6 +71,10 @@ export type ActivityType =
   | 'client_keyword_feedback'
   | 'client_priorities_updated'
   | 'client_content_gap_vote'
+  | 'client_action_sent'
+  | 'client_action_approved'
+  | 'client_action_changes_requested'
+  | 'client_action_completed'
   | 'meeting_brief_generated'
   | 'brandscript_created'
   | 'brandscript_deleted'
@@ -161,7 +165,8 @@ const CLIENT_VISIBLE_TYPES: Set<ActivityType> = new Set([
   'images_optimized', 'links_fixed', 'content_updated', 'content_requested',
   'brief_generated', 'brief_approved', 'briefing_published', 'briefing_auto_published', 'content_upgraded', 'fix_completed',
   'content_published', 'copy_sent_to_client', 'post_approved', 'post_changes_requested',
-  'post_client_edit', 'post_sent_for_review',
+  'post_client_edit', 'post_sent_for_review', 'client_action_sent', 'client_action_approved',
+  'client_action_changes_requested', 'client_action_completed',
 ]);
 
 // --- Prepared statements (lazily initialized after migrations run) ---

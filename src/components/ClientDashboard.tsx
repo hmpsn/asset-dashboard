@@ -9,7 +9,7 @@ import {
   CheckCircle2, LineChart, Trophy, Layers,
   Clock, CreditCard, Building2, Sparkles,
 } from 'lucide-react';
-import { type Tier, Skeleton, OverviewSkeleton, ScannerReveal, Icon } from './ui';
+import { type Tier, Skeleton, OverviewSkeleton, ScannerReveal, Icon, Button, IconButton } from './ui';
 import { STUDIO_NAME, STUDIO_URL } from '../constants';
 import { HealthTab } from './client/HealthTab';
 import { InsightsEngine } from './client/InsightsEngine';
@@ -76,6 +76,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     searchComparison, ga4Comparison, ga4NewVsReturning,
     ga4Organic, ga4LandingPages, anomalies,
     approvalBatches, setApprovalBatches, approvalsLoading, approvalPageKeywords,
+    clientActions,
     activityLog, rankHistory, latestRanks, annotations,
     requests, requestsLoading, contentRequests, setContentRequests,
     sectionErrors, contentPlanSummary, contentPlanKeywords, contentPlanReviewCells,
@@ -181,6 +182,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     'activity:new': () => refetchClient('activity', `/api/public/activity/${workspaceId}?limit=20`),
     'approval:update': () => refetchClient('approvals', `/api/public/approvals/${workspaceId}`),
     'approval:applied': () => refetchClient('approvals', `/api/public/approvals/${workspaceId}`),
+    'client-action:update': () => refetchClient('clientActions', `/api/public/client-actions/${workspaceId}`),
     'request:created': () => refetchClient('requests', `/api/public/requests/${workspaceId}`),
     'request:update': () => refetchClient('requests', `/api/public/requests/${workspaceId}`),
     'content-request:created': () => refetchClient('content', `/api/public/content-requests/${workspaceId}`),
@@ -356,8 +358,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   if (error || !ws) return (
     <div className="min-h-screen bg-[var(--surface-1)] flex items-center justify-center">
       <div className="text-center">
-        <p className="text-red-400/80 t-body mb-3">{error || 'Dashboard not found'}</p>
-        <button onClick={() => window.location.reload()} className="t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] px-3 py-1.5 rounded-[var(--radius-lg)] border border-[var(--brand-border)] hover:border-[var(--brand-border-strong)] transition-colors">Try Again</button>
+        <p className="text-accent-danger t-body mb-3">{error || 'Dashboard not found'}</p>
+        <Button onClick={() => window.location.reload()} variant="secondary" size="sm">Try Again</Button>
       </div>
     </div>
   );
@@ -494,8 +496,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         {/* Trial countdown banner — shows at day 10 and under */}
         {!betaMode && !isExternalBilling && ws.isTrial && (ws.trialDaysRemaining ?? 0) <= 10 && (ws.trialDaysRemaining ?? 0) > 0 && (
           <div className="flex items-center gap-3 px-4 py-3 bg-amber-500/8 border border-amber-500/20" style={{ borderRadius: 'var(--radius-signature)' }}>
-            <Icon as={Clock} size="md" className="text-amber-400/80 flex-shrink-0" />
-            <p className="t-body text-amber-300">
+            <Icon as={Clock} size="md" className="text-accent-warning flex-shrink-0" />
+            <p className="t-body text-accent-warning">
               <strong>{ws.trialDaysRemaining} day{ws.trialDaysRemaining === 1 ? '' : 's'}</strong> left on your Growth trial.
               {' '}Upgrade to keep access to all features.
             </p>
@@ -503,8 +505,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         )}
         {!betaMode && !isExternalBilling && ws.isTrial && (ws.trialDaysRemaining ?? 0) === 0 && (
           <div className="flex items-center gap-3 px-4 py-3 bg-red-500/8 border border-red-500/20" style={{ borderRadius: 'var(--radius-signature)' }}>
-            <Icon as={Clock} size="md" className="text-red-400/80 flex-shrink-0" />
-            <p className="t-body text-red-300">
+            <Icon as={Clock} size="md" className="text-accent-danger flex-shrink-0" />
+            <p className="t-body text-accent-danger">
               Your Growth trial has ended. Some features are now limited.
               {' '}Upgrade to restore full access.
             </p>
@@ -514,8 +516,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         {/* Section loading errors */}
         {Object.keys(sectionErrors).length > 0 && (
           <div className="flex items-start gap-3 px-4 py-3 bg-red-500/8 border border-red-500/15" style={{ borderRadius: 'var(--radius-signature)' }}>
-            <Icon as={AlertTriangle} size="md" className="text-red-400/80 flex-shrink-0 mt-0.5" />
-            <div className="t-body text-red-300 space-y-0.5">
+            <Icon as={AlertTriangle} size="md" className="text-accent-danger flex-shrink-0 mt-0.5" />
+            <div className="t-body text-accent-danger space-y-0.5">
               {Object.values(sectionErrors).map((msg, i) => <p key={i}>{msg} — try refreshing the page.</p>)}
             </div>
           </div>
@@ -553,7 +555,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
         {/* ════════════ INBOX TAB (Approvals + Requests + Content) ════════════ */}
         {tab === 'inbox' && (
-          <InboxTab workspaceId={workspaceId} effectiveTier={effectiveTier} approvalBatches={approvalBatches} approvalsLoading={approvalsLoading} pendingApprovals={pendingApprovals} setApprovalBatches={setApprovalBatches} loadApprovals={loadApprovals} requests={requests} requestsLoading={requestsLoading} clientUser={clientUser} loadRequests={loadRequests} contentRequests={contentRequests} setContentRequests={setContentRequests} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} pricingConfirming={pricingConfirming} setToast={setToast} contentPlanReviewCells={contentPlanReviewCells} pageMap={approvalPageKeywords ?? strategyData?.pageMap} hasCopyEntries={hasCopyEntries} hidePrices={isExternalBilling} />
+          <InboxTab workspaceId={workspaceId} effectiveTier={effectiveTier} approvalBatches={approvalBatches} clientActions={clientActions} approvalsLoading={approvalsLoading} pendingApprovals={pendingApprovals} setApprovalBatches={setApprovalBatches} loadApprovals={loadApprovals} requests={requests} requestsLoading={requestsLoading} clientUser={clientUser} loadRequests={loadRequests} contentRequests={contentRequests} setContentRequests={setContentRequests} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} pricingConfirming={pricingConfirming} setToast={setToast} contentPlanReviewCells={contentPlanReviewCells} pageMap={approvalPageKeywords ?? strategyData?.pageMap} hasCopyEntries={hasCopyEntries} hidePrices={isExternalBilling} />
         )}
 
 
@@ -698,10 +700,10 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       {/* Toast notification */}
       {/* z-index-ok — client toast must float above modal-backdrop but below cart */}
       {toast && (
-        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] px-5 py-3 rounded-[var(--radius-xl)] border shadow-lg backdrop-blur-sm flex items-center gap-2.5 animate-[slideUp_0.3s_ease] ${toast.type === 'success' ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' : 'bg-red-500/15 border-red-500/30 text-red-300'}`}>
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] px-5 py-3 rounded-[var(--radius-xl)] border shadow-lg backdrop-blur-sm flex items-center gap-2.5 animate-[slideUp_0.3s_ease] ${toast.type === 'success' ? 'bg-emerald-500/15 border-emerald-500/30 text-accent-success' : 'bg-red-500/15 border-red-500/30 text-accent-danger'}`}>
           {toast.type === 'success' ? <Icon as={CheckCircle2} size="md" className="flex-shrink-0" /> : <Icon as={AlertTriangle} size="md" className="flex-shrink-0" />}
           <span className="t-caption font-medium">{toast.message}</span>
-          <button onClick={clearToast} className="ml-2 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"><Icon as={X} size="md" /></button>
+          <IconButton icon={X} label="Dismiss notification" size="sm" onClick={clearToast} className="ml-1" />
         </div>
       )}
 
