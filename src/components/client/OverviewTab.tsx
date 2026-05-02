@@ -9,7 +9,7 @@ import { PredictionShowcaseCard } from './PredictionShowcaseCard';
 import { useClientIntelligence } from '../../hooks/client';
 import type { Tier } from '../ui/TierGate';
 import { useNavigate } from 'react-router-dom';
-import { StatCard, MetricRing, Icon} from '../ui';
+import { StatCard, MetricRing, Icon, Button, ClickableRow } from '../ui';
 import { Explainer } from './SeoGlossary';
 import { useBetaMode } from './BetaContext';
 import { InsightsDigest } from './InsightsDigest';
@@ -208,27 +208,27 @@ export function OverviewTab({
     {/* Action-needed banner — full-width, above content grid */}
     {(() => {
       const actions: { label: string; count: number; tab: ClientTab; color: string; icon: string }[] = [];
-      if (pendingApprovals > 0) actions.push({ label: `${pendingApprovals} SEO change${pendingApprovals > 1 ? 's' : ''} to review`, count: pendingApprovals, tab: 'inbox', color: 'text-amber-400', icon: 'approval' });
+      if (pendingApprovals > 0) actions.push({ label: `${pendingApprovals} SEO change${pendingApprovals > 1 ? 's' : ''} to review`, count: pendingApprovals, tab: 'inbox', color: 'text-accent-warning', icon: 'approval' });
       const briefReviews = contentRequests.filter(r => r.status === 'client_review').length;
       const postReviews = contentRequests.filter(r => r.status === 'post_review').length;
-      if (!betaMode && briefReviews > 0) actions.push({ label: `${briefReviews} content brief${briefReviews > 1 ? 's' : ''} ready for review`, count: briefReviews, tab: 'inbox', color: 'text-blue-400', icon: 'content' });
-      if (!betaMode && postReviews > 0) actions.push({ label: `${postReviews} post${postReviews > 1 ? 's' : ''} ready for review`, count: postReviews, tab: 'inbox', color: 'text-blue-400', icon: 'content' });
-      if (unreadTeamNotes > 0) actions.push({ label: `${unreadTeamNotes} request${unreadTeamNotes > 1 ? 's' : ''} with new team replies`, count: unreadTeamNotes, tab: 'inbox', color: 'text-teal-400', icon: 'reply' });
-      if (contentPlanSummary && contentPlanSummary.reviewCells > 0) actions.push({ label: `${contentPlanSummary.reviewCells} content plan page${contentPlanSummary.reviewCells > 1 ? 's' : ''} to review`, count: contentPlanSummary.reviewCells, tab: 'content-plan', color: 'text-blue-400', icon: 'content-plan' });
+      if (!betaMode && briefReviews > 0) actions.push({ label: `${briefReviews} content brief${briefReviews > 1 ? 's' : ''} ready for review`, count: briefReviews, tab: 'inbox', color: 'text-accent-info', icon: 'content' });
+      if (!betaMode && postReviews > 0) actions.push({ label: `${postReviews} post${postReviews > 1 ? 's' : ''} ready for review`, count: postReviews, tab: 'inbox', color: 'text-accent-info', icon: 'content' });
+      if (unreadTeamNotes > 0) actions.push({ label: `${unreadTeamNotes} request${unreadTeamNotes > 1 ? 's' : ''} with new team replies`, count: unreadTeamNotes, tab: 'inbox', color: 'text-accent-brand', icon: 'reply' });
+      if (contentPlanSummary && contentPlanSummary.reviewCells > 0) actions.push({ label: `${contentPlanSummary.reviewCells} content plan page${contentPlanSummary.reviewCells > 1 ? 's' : ''} to review`, count: contentPlanSummary.reviewCells, tab: 'content-plan', color: 'text-accent-info', icon: 'content-plan' });
       if (actions.length === 0) return null;
       const total = actions.reduce((s, a) => s + a.count, 0);
       return (
-        <div className="bg-gradient-to-r from-amber-600/10 via-zinc-900 to-teal-600/10 border border-amber-500/20 px-4 py-3" style={{ borderRadius: 'var(--radius-signature)' }}>
+        <div className="bg-gradient-to-r from-amber-600/10 via-[var(--surface-2)] to-teal-600/10 border border-amber-500/20 px-4 py-3" style={{ borderRadius: 'var(--radius-signature)' }}>
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-5 h-5 rounded-md bg-amber-500/15 flex items-center justify-center"><Icon as={AlertTriangle} size="sm" className="text-amber-400" /></div>
+            <div className="w-5 h-5 rounded-md bg-amber-500/15 flex items-center justify-center"><Icon as={AlertTriangle} size="sm" className="text-accent-warning" /></div>
             <span className="t-caption font-medium text-[var(--brand-text)]">{total} item{total > 1 ? 's' : ''} need{total === 1 ? 's' : ''} your attention</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {actions.map((a, i) => (
-              <button key={i} onClick={() => navigate(clientPath(workspaceId, a.tab, betaMode))} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/60 hover:bg-[var(--surface-3)] border border-[var(--brand-border)]/50 transition-colors text-left">
+              <ClickableRow key={i} onClick={() => navigate(clientPath(workspaceId, a.tab, betaMode))} className="inline-flex w-auto items-center gap-1.5 px-2.5 py-1.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/60 border border-[var(--brand-border)]/50">
                 <span className={`t-caption-sm font-semibold ${a.color}`}>{a.count}</span>
                 <span className="t-caption-sm text-[var(--brand-text-muted)]">{a.label.replace(/^\d+\s*/, '')}</span>
-              </button>
+              </ClickableRow>
             ))}
           </div>
         </div>
@@ -242,23 +242,22 @@ export function OverviewTab({
       const postReviews = contentRequests.filter(r => r.status === 'post_review').length;
       if (strategyData && briefReviews + postReviews === 0) {
         return (
-          <div className="bg-gradient-to-r from-teal-600/10 via-zinc-900 to-emerald-600/10 border border-teal-500/20 px-4 py-3" style={{ borderRadius: 'var(--radius-signature)' }}>
+          <div className="bg-gradient-to-r from-teal-600/10 via-[var(--surface-2)] to-emerald-600/10 border border-teal-500/20 px-4 py-3" style={{ borderRadius: 'var(--radius-signature)' }}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-teal-500/15 flex items-center justify-center">
-                  <Icon as={FileText} size="md" className="text-teal-400" />
+                  <Icon as={FileText} size="md" className="text-accent-brand" />
                 </div>
                 <div>
                   <h3 className="t-body font-medium text-[var(--brand-text)]">Ready to create content?</h3>
                   <p className="t-caption-sm text-[var(--brand-text-muted)]">Your keyword strategy is set up. Generate your first content brief.</p>
                 </div>
               </div>
-              <button 
+              <Button
                 onClick={() => navigate(clientPath(workspaceId, 'inbox', betaMode))}
-                className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
               >
                 Generate Brief
-              </button>
+              </Button>
             </div>
           </div>
         );
@@ -266,23 +265,24 @@ export function OverviewTab({
       
       if (audit && audit.siteScore < 80) {
         return (
-          <div className="bg-gradient-to-r from-amber-600/10 via-zinc-900 to-orange-600/10 border border-amber-500/20 px-4 py-3" style={{ borderRadius: 'var(--radius-signature)' }}>
+          <div className="bg-gradient-to-r from-amber-600/10 via-[var(--surface-2)] to-orange-600/10 border border-amber-500/20 px-4 py-3" style={{ borderRadius: 'var(--radius-signature)' }}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-amber-500/15 flex items-center justify-center">
-                  <Icon as={Shield} size="md" className="text-amber-400" />
+                  <Icon as={Shield} size="md" className="text-accent-warning" />
                 </div>
                 <div>
                   <h3 className="t-body font-medium text-[var(--brand-text)]">Improve your site health</h3>
                   <p className="t-caption-sm text-[var(--brand-text-muted)]">Your site score is {audit.siteScore}/100. Fix issues to boost rankings.</p>
                 </div>
               </div>
-              <button 
+              <Button
+                variant="secondary"
                 onClick={() => navigate(clientPath(workspaceId, 'health', betaMode))}
-                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
+                className="border-amber-500/30 text-accent-warning hover:bg-amber-500/10"
               >
                 View Issues
-              </button>
+              </Button>
             </div>
           </div>
         );
@@ -290,23 +290,24 @@ export function OverviewTab({
       
       if (overview && overview.totalClicks < 100) {
         return (
-          <div className="bg-gradient-to-r from-blue-600/10 via-zinc-900 to-cyan-600/10 border border-blue-500/20 px-4 py-3" style={{ borderRadius: 'var(--radius-signature)' }}>
+          <div className="bg-gradient-to-r from-blue-600/10 via-[var(--surface-2)] to-cyan-600/10 border border-blue-500/20 px-4 py-3" style={{ borderRadius: 'var(--radius-signature)' }}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-blue-500/15 flex items-center justify-center">
-                  <Icon as={Target} size="md" className="text-blue-400" />
+                  <Icon as={Target} size="md" className="text-accent-info" />
                 </div>
                 <div>
                   <h3 className="t-body font-medium text-[var(--brand-text)]">Grow your search traffic</h3>
                   <p className="t-caption-sm text-[var(--brand-text-muted)]">You got {overview.totalClicks} clicks last month. Let's increase that.</p>
                 </div>
               </div>
-              <button 
+              <Button
+                variant="secondary"
                 onClick={() => navigate(clientPath(workspaceId, 'search', betaMode))}
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
+                className="border-blue-500/30 text-accent-info hover:bg-blue-500/10"
               >
                 Find Keywords
-              </button>
+              </Button>
             </div>
           </div>
         );
@@ -358,8 +359,8 @@ export function OverviewTab({
 
         {/* Empty state with setup guidance */}
         {!overview && !audit && !ga4Overview && ( // pr-check-disable-next-line -- Brand signature radius intentional
-          <div className="bg-gradient-to-br from-teal-500/10 via-zinc-900 to-emerald-500/10 border border-[var(--brand-border)] p-8" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-            <div className="w-12 h-12 rounded-[var(--radius-xl)] bg-teal-500/10 flex items-center justify-center mx-auto mb-4"><Icon as={BarChart3} size="xl" className="text-teal-400" /></div>
+          <div className="bg-gradient-to-br from-teal-500/10 via-[var(--surface-2)] to-emerald-500/10 border border-[var(--brand-border)] p-8" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+            <div className="w-12 h-12 rounded-[var(--radius-xl)] bg-teal-500/10 flex items-center justify-center mx-auto mb-4"><Icon as={BarChart3} size="xl" className="text-accent-brand" /></div>
             <h2 className="text-lg font-semibold text-[var(--brand-text)] mb-2">{ws.name}</h2>
             <p className="t-body text-[var(--brand-text-muted)] mb-6 leading-relaxed">We're getting everything set up for you. Here's what we need:</p>
             
@@ -395,36 +396,36 @@ export function OverviewTab({
       <div className="lg:col-span-2 space-y-8">
         {/* Ask the Insights Engine */}
         {/* pr-check-disable-next-line -- Brand signature radius intentional */}
-        <div className="bg-gradient-to-br from-teal-500/5 via-zinc-900 to-zinc-900 border border-teal-500/15 p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+        <div className="bg-gradient-to-br from-teal-500/5 via-[var(--surface-2)] to-[var(--surface-2)] border border-teal-500/15 p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
           <div className="flex items-center gap-2 mb-3">
             <div className="w-6 h-6 rounded-[var(--radius-lg)] bg-teal-500/15 flex items-center justify-center">
-              <Icon as={Sparkles} size="md" className="text-teal-400" />
+              <Icon as={Sparkles} size="md" className="text-accent-brand" />
             </div>
             <span className="t-caption font-medium text-[var(--brand-text)]">Ask the Insights Engine</span>
           </div>
           <p className="t-caption-sm text-[var(--brand-text-muted)] mb-3">Get instant answers about your site's performance, SEO opportunities, and next steps.</p>
           <div className="space-y-1.5">
             {QUICK_QUESTIONS.slice(0, 4).map((q, i) => (
-              <button
+              <ClickableRow
                 key={i}
                 onClick={() => { onOpenChat(); setTimeout(() => onAskAi(q), 100); }}
-                className="w-full text-left px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/40 hover:bg-[var(--surface-3)]/70 border border-[var(--brand-border)]/30 hover:border-teal-500/20 transition-colors t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
+                className="px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/40 border border-[var(--brand-border)]/30 hover:border-teal-500/20 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
               >
                 {q}
-              </button>
+              </ClickableRow>
             ))}
           </div>
           <div className="mt-3 pt-3 border-t border-[var(--brand-border)]/50">
             <p className="t-caption-sm text-[var(--brand-text-faint)] tracking-wider font-medium mb-2">New to SEO? Ask the AI</p>
             <div className="space-y-1">
               {LEARN_SEO_QUESTIONS.slice(0, 3).map((q, i) => (
-                <button
+                <ClickableRow
                   key={i}
                   onClick={() => { onOpenChat(); setTimeout(() => onAskAi(q), 100); }}
-                  className="w-full text-left px-3 py-1.5 rounded-[var(--radius-lg)] hover:bg-emerald-500/5 border border-transparent hover:border-emerald-500/15 transition-colors t-caption-sm text-emerald-400/70 hover:text-emerald-400"
+                  className="px-3 py-1.5 rounded-[var(--radius-lg)] hover:bg-emerald-500/5 border border-transparent hover:border-emerald-500/15 t-caption-sm text-accent-success hover:text-accent-success"
                 >
                   💡 {q}
-                </button>
+                </ClickableRow>
               ))}
             </div>
           </div>
@@ -436,10 +437,10 @@ export function OverviewTab({
           const gaps = strategyData?.contentGaps?.slice(0, 2);
           if (!gaps || gaps.length === 0) return null;
           return ( // pr-check-disable-next-line -- Brand signature radius intentional
-            <div className="bg-gradient-to-br from-teal-950/30 via-zinc-900 to-zinc-900 border border-teal-500/15 p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
+            <div className="bg-gradient-to-br from-teal-500/5 via-[var(--surface-2)] to-[var(--surface-2)] border border-teal-500/15 p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-6 h-6 rounded-[var(--radius-lg)] bg-teal-500/15 flex items-center justify-center">
-                  <Icon as={FileText} size="md" className="text-teal-400" />
+                  <Icon as={FileText} size="md" className="text-accent-brand" />
                 </div>
                 <span className="t-caption font-medium text-[var(--brand-text)]">Content Opportunities</span>
               </div>
@@ -451,12 +452,13 @@ export function OverviewTab({
                   </div>
                 ))}
               </div>
-              <button
+              <Button
+                variant="secondary"
                 onClick={() => navigate(clientPath(workspaceId, 'strategy', betaMode))}
-                className="mt-2 w-full text-center px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600/15 border border-teal-500/20 t-caption-sm text-teal-300 font-medium hover:bg-teal-600/25 transition-colors"
+                className="mt-2 w-full border-teal-500/20 text-accent-brand hover:bg-teal-500/10"
               >
                 View all {strategyData?.contentGaps?.length ?? 0} opportunities
-              </button>
+              </Button>
             </div>
           );
         })()}
@@ -478,7 +480,7 @@ export function OverviewTab({
           return ( // pr-check-disable-next-line -- Brand signature radius intentional
             <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
               <div className="flex items-center gap-2 mb-3">
-                <Icon as={Activity} size="md" className="text-teal-400" />
+                <Icon as={Activity} size="md" className="text-accent-brand" />
                 <span className="t-caption font-medium text-[var(--brand-text)]">Recent Work</span>
               </div>
               <div className="relative">

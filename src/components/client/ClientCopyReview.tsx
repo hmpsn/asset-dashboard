@@ -178,7 +178,7 @@ function ClientCopyReviewInner({ workspaceId }: ClientCopyReviewProps) {
       <div className="max-w-3xl mx-auto px-4 py-6">
         <SectionCard title="Copy Review" titleIcon={<FileText className="w-4 h-4 text-[var(--brand-text)]" />}>
           <div className="flex flex-col items-center py-8 gap-3">
-            <AlertCircle className="w-8 h-8 text-red-400" />
+            <AlertCircle className="w-8 h-8 text-accent-danger" />
             <p className="t-body text-[var(--brand-text)]">Something went wrong loading your copy review.</p>
             <Button variant="primary" onClick={() => refetchEntries()} className="t-caption px-3 py-1.5">
               Try Again
@@ -388,11 +388,11 @@ function EntrySections({ workspaceId, entryId }: { workspaceId: string; entryId:
   if (error) {
     return (
       <div className="flex flex-col items-center py-6 gap-2">
-        <AlertCircle className="w-5 h-5 text-red-400" />
+        <AlertCircle className="w-5 h-5 text-accent-danger" />
         <p className="t-caption text-[var(--brand-text)]">Could not load sections.</p>
         <button
           onClick={() => refetch()}
-          className="t-caption text-teal-400 hover:text-teal-300 transition-colors"
+          className="t-caption text-accent-brand hover:text-accent-brand transition-colors"
         >
           Retry
         </button>
@@ -411,7 +411,7 @@ function EntrySections({ workspaceId, entryId }: { workspaceId: string; entryId:
   return (
     <div className="space-y-4">
       {mutationError && (
-        <div className="flex items-center gap-2 t-caption text-red-400 bg-red-500/10 border border-red-500/20 rounded px-3 py-2">
+        <div className="flex items-center gap-2 t-caption text-accent-danger bg-red-500/10 border border-red-500/20 rounded px-3 py-2">
           <AlertCircle className="w-3.5 h-3.5 shrink-0" />
           <span>{mutationError}</span>
         </div>
@@ -536,7 +536,7 @@ function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSugge
 
       {/* Approved confirmation */}
       {isApproved && (
-        <div className="flex items-center gap-1.5 t-caption text-emerald-400">
+        <div className="flex items-center gap-1.5 t-caption text-accent-success">
           <Check className="w-3.5 h-3.5" />
           <span>This section is approved and ready to go.</span>
         </div>

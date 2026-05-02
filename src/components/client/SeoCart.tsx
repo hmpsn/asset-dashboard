@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, ShoppingCart, Minus, Plus, Trash2, Loader2, Lock, Sparkles, Crown } from 'lucide-react';
 import { useCart } from './useCart';
 import { post } from '../../api/client';
+import { Button, IconButton } from '../ui';
 
 const fmt = (usd: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(usd);
@@ -15,16 +16,12 @@ export function SeoCartButton() {
   const { totalItems, toggleCart } = useCart();
   if (totalItems === 0) return null;
   return (
-    <button
-      onClick={toggleCart}
-      className="relative flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-[var(--radius-lg)] t-caption font-medium transition-colors"
-    >
-      <ShoppingCart className="w-3.5 h-3.5" />
-      <span>Cart</span>
+    <Button onClick={toggleCart} icon={ShoppingCart} size="sm" className="relative rounded-[var(--radius-lg)]">
+      Cart
       <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-white text-zinc-900 /* raw-zinc-ok */ rounded-full text-[10px] /* arbitrary-text-ok */ font-bold flex items-center justify-center">
         {totalItems}
       </span>
-    </button>
+    </Button>
   );
 }
 
@@ -67,13 +64,11 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--brand-border)]">
           <div className="flex items-center gap-2">
-            <ShoppingCart className="w-4 h-4 text-teal-400" />
+            <ShoppingCart className="w-4 h-4 text-accent-brand" />
             <span className="t-body font-semibold text-[var(--brand-text-bright)]">SEO Fix Cart</span>
             <span className="t-caption-sm text-[var(--brand-text-muted)]">({items.length} item{items.length !== 1 ? 's' : ''})</span>
           </div>
-          <button onClick={closeCart} className="w-7 h-7 rounded-[var(--radius-lg)] flex items-center justify-center hover:bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
-            <X className="w-4 h-4" />
-          </button>
+          <IconButton icon={X} label="Close cart" size="sm" onClick={closeCart} />
         </div>
 
         {/* Items */}
@@ -94,7 +89,7 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
                       {item.isFlat ? 'Full site' : `${fmt(item.priceUsd)}/page`}
                     </div>
                   </div>
-                  <div className="t-body font-semibold text-teal-400">
+                  <div className="t-body font-semibold text-accent-brand">
                     {fmt(item.priceUsd * item.quantity)}
                   </div>
                 </div>
@@ -104,36 +99,33 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
                     <span className="t-caption-sm text-[var(--brand-text-muted)]">Flat rate</span>
                   ) : (
                     <div className="flex items-center gap-1">
-                      <button
+                      <IconButton
                         onClick={() => updateQuantity(item.productType, item.quantity - 1)}
-                        className="w-6 h-6 rounded flex items-center justify-center bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text)] transition-colors"
-                      >
-                        <Minus className="w-3 h-3" />
-                      </button>
+                        icon={Minus}
+                        label={`Decrease ${item.displayName} quantity`}
+                        size="sm"
+                        variant="solid"
+                      />
                       <span className="w-8 text-center t-caption font-medium text-[var(--brand-text)]">{item.quantity}</span>
-                      <button
+                      <IconButton
                         onClick={() => updateQuantity(item.productType, item.quantity + 1)}
-                        className="w-6 h-6 rounded flex items-center justify-center bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text)] transition-colors"
-                      >
-                        <Plus className="w-3 h-3" />
-                      </button>
+                        icon={Plus}
+                        label={`Increase ${item.displayName} quantity`}
+                        size="sm"
+                        variant="solid"
+                      />
                       <span className="t-caption-sm text-[var(--brand-text-muted)] ml-1">pages</span>
                     </div>
                   )}
-                  <button
-                    onClick={() => removeItem(item.productType)}
-                    className="w-6 h-6 rounded flex items-center justify-center hover:bg-red-500/10 text-[var(--brand-text-muted)] hover:text-red-400 transition-colors"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
+                  <IconButton icon={Trash2} label={`Remove ${item.displayName}`} size="sm" onClick={() => removeItem(item.productType)} className="hover:text-[var(--red)]" />
                 </div>
 
                 {/* Pack upsell for per-page items */}
                 {!item.isFlat && item.quantity >= 7 && item.quantity < 10 && (
                   <div className="mt-2 px-2.5 py-2 rounded-[var(--radius-lg)] bg-teal-500/5 border border-teal-500/20">
                     <div className="flex items-center gap-1.5">
-                      <Sparkles className="w-3 h-3 text-teal-400" />
-                      <span className="t-caption-sm text-teal-400">
+                      <Sparkles className="w-3 h-3 text-accent-brand" />
+                      <span className="t-caption-sm text-accent-brand">
                         {item.productType === 'fix_meta'
                           ? 'Get the 10-page pack for $179 (save $' + (item.quantity * 20 - 179) + ' more)'
                           : item.productType === 'schema_page'
@@ -155,9 +147,9 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
             {showPremiumNudge && (
               <div className="px-3 py-2.5 rounded-[var(--radius-xl)] bg-gradient-to-r from-amber-500/5 to-orange-500/5 border border-amber-500/20">
                 <div className="flex items-start gap-2">
-                  <Crown className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                  <Crown className="w-4 h-4 text-accent-warning mt-0.5 flex-shrink-0" />
                   <div>
-                    <div className="t-caption-sm font-medium text-amber-300">Premium includes all this</div>
+                    <div className="t-caption-sm font-medium text-accent-warning">Premium includes all this</div>
                     <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
                       For $999/mo, all technical SEO fixes are included with 3 implementation hours.
                     </div>
@@ -174,16 +166,17 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
 
             {/* Error */}
             {error && (
-              <div className="t-caption-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-[var(--radius-lg)] px-3 py-2">
+              <div className="t-caption-sm text-accent-danger bg-red-500/10 border border-red-500/20 rounded-[var(--radius-lg)] px-3 py-2">
                 {error}
               </div>
             )}
 
             {/* Checkout button */}
-            <button
+            <Button
               onClick={handleCheckout}
               disabled={checkingOut}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-[var(--radius-xl)] t-body font-semibold transition-all disabled:opacity-50 bg-gradient-to-r from-teal-600 to-emerald-600 text-white hover:from-teal-500 hover:to-emerald-500 shadow-lg shadow-teal-900/30 active:scale-[0.98]"
+              size="lg"
+              className="w-full rounded-[var(--radius-xl)] shadow-lg shadow-teal-900/30 active:scale-[0.98]"
             >
               {checkingOut ? (
                 <>
@@ -196,14 +189,16 @@ export function SeoCartDrawer({ workspaceId, tier }: SeoCartProps) {
                   <span>Checkout {fmt(totalPrice)}</span>
                 </>
               )}
-            </button>
+            </Button>
 
-            <button
+            <Button
               onClick={clearCart}
-              className="w-full t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] py-1 transition-colors"
+              variant="ghost"
+              size="sm"
+              className="w-full"
             >
               Clear cart
-            </button>
+            </Button>
           </div>
         )}
       </div>

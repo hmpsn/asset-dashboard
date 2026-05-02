@@ -19,15 +19,15 @@ describe('TabBar', () => {
   it('applies active styling to the active tab', () => {
     render(<TabBar tabs={tabs} active="settings" onChange={() => {}} />);
     const settingsBtn = screen.getByText('Settings').closest('button')!;
-    expect(settingsBtn.className).toContain('border-teal-500');
-    expect(settingsBtn.className).toContain('text-teal-200');
+    expect(settingsBtn.className).toContain('border-[var(--teal)]');
+    expect(settingsBtn.className).toContain('text-[var(--teal)]');
   });
 
   it('applies inactive styling to non-active tabs', () => {
     render(<TabBar tabs={tabs} active="home" onChange={() => {}} />);
     const settingsBtn = screen.getByText('Settings').closest('button')!;
     expect(settingsBtn.className).toContain('border-transparent');
-    expect(settingsBtn.className).toContain('text-zinc-400');
+    expect(settingsBtn.className).toContain('text-[var(--brand-text-muted)]');
   });
 
   it('calls onChange with tab id on click', () => {

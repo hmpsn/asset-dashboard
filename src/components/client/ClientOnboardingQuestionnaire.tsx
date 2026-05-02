@@ -172,7 +172,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
           {step === 'intro' && (
             <div className="text-center py-6">
               <div className="w-16 h-16 rounded-[var(--radius-xl)] bg-gradient-to-br from-teal-500/20 to-emerald-500/20 ring-1 ring-teal-500/20 flex items-center justify-center mx-auto mb-5">
-                <Icon as={Sparkles} size="2xl" className="text-teal-400" />
+                <Icon as={Sparkles} size="2xl" className="text-accent-brand" />
               </div>
               <h2 className="text-xl font-bold text-[var(--brand-text-bright)] mb-2">Help us create better content for you</h2>
               <p className="t-body text-[var(--brand-text)] leading-relaxed max-w-md mx-auto mb-6">
@@ -187,7 +187,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
                   { icon: Target, label: 'Competitors', desc: 'Who you compete with' },
                 ].map((item, i) => (
                   <div key={i} className="px-3 py-3 bg-[var(--surface-3)]/50 border border-[var(--brand-border)] text-left" style={{ borderRadius: 'var(--radius-signature)' }}>
-                    <item.icon className="w-4 h-4 text-teal-400 mb-1.5" />
+                    <item.icon className="w-4 h-4 text-accent-brand mb-1.5" />
                     <div className="t-caption-sm font-semibold text-[var(--brand-text-bright)]">{item.label}</div>
                     <div className="t-caption-sm text-[var(--brand-text-muted)]">{item.desc}</div>
                   </div>
@@ -201,7 +201,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
           {step === 'business' && (
             <div className="space-y-4">
               <div className="flex items-center gap-2 mb-1">
-                <Building2 className="w-5 h-5 text-teal-400" />
+                <Building2 className="w-5 h-5 text-accent-brand" />
                 <h3 className="text-base font-semibold text-[var(--brand-text-bright)]">About Your Business</h3>
               </div>
               <p className="t-caption-sm text-[var(--brand-text-muted)] -mt-2 mb-3">Tell us about what you do so our content reflects your expertise.</p>
@@ -255,7 +255,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
           {step === 'audience' && (
             <div className="space-y-4">
               <div className="flex items-center gap-2 mb-1">
-                <Users className="w-5 h-5 text-teal-400" />
+                <Users className="w-5 h-5 text-accent-brand" />
                 <h3 className="text-base font-semibold text-[var(--brand-text-bright)]">Your Target Audience</h3>
               </div>
               <p className="t-caption-sm text-[var(--brand-text-muted)] -mt-2 mb-3">Understanding your audience helps us write content that converts.</p>
@@ -291,7 +291,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
                   {BUYING_STAGE_OPTIONS.map(opt => (
                     <button key={opt.value} onClick={() => setAudience({ ...audience, buyingStage: opt.value })}
                       className={cn('text-left px-3 py-2.5 rounded-[var(--radius-xl)] border transition-all', audience.buyingStage === opt.value ? 'bg-teal-500/10 border-teal-500/30 ring-1 ring-teal-500/20' : 'bg-[var(--surface-3)]/40 border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]')}>
-                      <div className={cn('t-caption-sm font-semibold', audience.buyingStage === opt.value ? 'text-teal-300' : 'text-[var(--brand-text)]')}>{opt.label}</div>
+                      <div className={cn('t-caption-sm font-semibold', audience.buyingStage === opt.value ? 'text-accent-brand' : 'text-[var(--brand-text)]')}>{opt.label}</div>
                       <div className="t-caption-sm text-[var(--brand-text-muted)]">{opt.desc}</div>
                     </button>
                   ))}
@@ -310,7 +310,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
           {step === 'brand' && (
             <div className="space-y-4">
               <div className="flex items-center gap-2 mb-1">
-                <Palette className="w-5 h-5 text-teal-400" />
+                <Palette className="w-5 h-5 text-accent-brand" />
                 <h3 className="text-base font-semibold text-[var(--brand-text-bright)]">Brand Voice & Tone</h3>
               </div>
               <p className="t-caption-sm text-[var(--brand-text-muted)] -mt-2 mb-3">How should content sound? Pick traits that match your brand.</p>
@@ -320,7 +320,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
                 <div className="flex flex-wrap gap-2 mt-1">
                   {PERSONALITY_OPTIONS.map(p => (
                     <button key={p} onClick={() => togglePersonality(p)}
-                      className={cn('px-3 py-1.5 rounded-[var(--radius-lg)] border t-caption-sm font-medium transition-all', brand.personality.includes(p) ? 'bg-teal-500/15 border-teal-500/30 text-teal-300' : 'bg-[var(--surface-3)]/40 border-[var(--brand-border)] text-[var(--brand-text)] hover:border-[var(--brand-border-hover)] hover:text-[var(--brand-text-bright)]')}>
+                      className={cn('px-3 py-1.5 rounded-[var(--radius-lg)] border t-caption-sm font-medium transition-all', brand.personality.includes(p) ? 'bg-teal-500/15 border-teal-500/30 text-accent-brand' : 'bg-[var(--surface-3)]/40 border-[var(--brand-border)] text-[var(--brand-text)] hover:border-[var(--brand-border-hover)] hover:text-[var(--brand-text-bright)]')}>
                       {brand.personality.includes(p) && <Check className="w-3 h-3 inline mr-1" />}{p}
                     </button>
                   ))}
@@ -345,7 +345,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
                 <div className="flex flex-wrap gap-2 mt-1">
                   {CONTENT_FORMAT_OPTIONS.map(f => (
                     <button key={f} onClick={() => toggleFormat(f)}
-                      className={cn('px-3 py-1.5 rounded-[var(--radius-lg)] border t-caption-sm font-medium transition-all', brand.contentFormats.includes(f) ? 'bg-teal-500/15 border-teal-500/30 text-teal-300' : 'bg-[var(--surface-3)]/40 border-[var(--brand-border)] text-[var(--brand-text)] hover:border-[var(--brand-border-hover)] hover:text-[var(--brand-text-bright)]')}>
+                      className={cn('px-3 py-1.5 rounded-[var(--radius-lg)] border t-caption-sm font-medium transition-all', brand.contentFormats.includes(f) ? 'bg-teal-500/15 border-teal-500/30 text-accent-brand' : 'bg-[var(--surface-3)]/40 border-[var(--brand-border)] text-[var(--brand-text)] hover:border-[var(--brand-border-hover)] hover:text-[var(--brand-text-bright)]')}>
                       {brand.contentFormats.includes(f) && <Check className="w-3 h-3 inline mr-1" />}{f}
                     </button>
                   ))}
@@ -364,7 +364,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
           {step === 'competitors' && (
             <div className="space-y-4">
               <div className="flex items-center gap-2 mb-1">
-                <Target className="w-5 h-5 text-teal-400" />
+                <Target className="w-5 h-5 text-accent-brand" />
                 <h3 className="text-base font-semibold text-[var(--brand-text-bright)]">Competitor Landscape</h3>
               </div>
               <p className="t-caption-sm text-[var(--brand-text-muted)] -mt-2 mb-3">Knowing your competition helps us find content gaps and differentiate.</p>
@@ -401,7 +401,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
             <div className="space-y-4">
               <div className="text-center mb-4">
                 <div className="w-12 h-12 rounded-[var(--radius-xl)] bg-emerald-500/10 ring-1 ring-emerald-500/20 flex items-center justify-center mx-auto mb-3">
-                  <Check className="w-6 h-6 text-emerald-400" />
+                  <Check className="w-6 h-6 text-accent-success" />
                 </div>
                 <h3 className="text-base font-semibold text-[var(--brand-text-bright)]">Ready to submit</h3>
                 <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">Here&apos;s a summary. You can go back to edit any section.</p>
@@ -423,7 +423,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
                 </SummaryCard>
 
                 <SummaryCard icon={Palette} title="Brand Voice" filled={brand.personality.length > 0 || !!brand.tone} onClick={() => setStep('brand')}>
-                  {brand.personality.length > 0 && <div className="flex flex-wrap gap-1">{brand.personality.map(p => <span key={p} className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400">{p}</span>)}</div>}
+                  {brand.personality.length > 0 && <div className="flex flex-wrap gap-1">{brand.personality.map(p => <span key={p} className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 text-accent-brand">{p}</span>)}</div>}
                   {brand.tone && <div className="t-caption-sm text-[var(--brand-text)] mt-1 line-clamp-1">{brand.tone}</div>}
                   {!brand.personality.length && !brand.tone && <div className="t-caption-sm text-[var(--brand-text-muted)] italic">Not filled in yet</div>}
                 </SummaryCard>
@@ -435,8 +435,8 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
               </div>
 
               <div className="bg-teal-500/5 border border-teal-500/15 px-4 py-3 mt-4" style={{ borderRadius: 'var(--radius-signature)' }}>
-                <p className="t-caption-sm text-teal-400/80 leading-relaxed">
-                  <strong className="text-teal-300">What happens next:</strong> Your answers will be used to create audience personas, enrich your brand voice, and build a knowledge base — making every piece of content we generate more accurate and on-brand.
+                <p className="t-caption-sm text-accent-brand leading-relaxed">
+                  <strong className="text-accent-brand">What happens next:</strong> Your answers will be used to create audience personas, enrich your brand voice, and build a knowledge base — making every piece of content we generate more accurate and on-brand.
                 </p>
               </div>
             </div>
@@ -489,7 +489,7 @@ function SummaryCard({ icon: Icon, title, filled, onClick, children }: {
     <button onClick={onClick} className="w-full text-left px-4 py-3 bg-[var(--surface-3)]/40 border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] transition-all group" style={{ borderRadius: 'var(--radius-signature)' }}>
       <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-2">
-          <Icon className={cn('w-3.5 h-3.5', filled ? 'text-teal-400' : 'text-[var(--brand-border)]')} />
+          <Icon className={cn('w-3.5 h-3.5', filled ? 'text-accent-brand' : 'text-[var(--brand-border)]')} />
           <span className="t-caption font-medium text-[var(--brand-text-bright)]">{title}</span>
           {filled && <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />}
         </div>

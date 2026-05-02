@@ -161,12 +161,12 @@ export function AnalyticsTab({
 
     {/* GA4 Overview Cards */}
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-      <StatCard size="hero" icon={Users} label="Users" value={ga4Overview.totalUsers.toLocaleString()} valueColor="text-teal-400" delta={ga4Comparison?.changePercent.users} deltaLabel="%" staggerIndex={0} />
-      <StatCard size="hero" icon={LineChartIcon} label="Sessions" value={ga4Overview.totalSessions.toLocaleString()} valueColor="text-blue-400" delta={ga4Comparison?.changePercent.sessions} deltaLabel="%" staggerIndex={1} />
-      <StatCard size="hero" label="Page Views" value={ga4Overview.totalPageviews.toLocaleString()} valueColor="text-teal-400" delta={ga4Comparison?.changePercent.pageviews} deltaLabel="%" staggerIndex={2} />
-      <StatCard size="hero" icon={Clock} label="Avg Duration" value={`${Math.floor(ga4Overview.avgSessionDuration / 60)}m ${Math.floor(ga4Overview.avgSessionDuration % 60)}s`} valueColor="text-amber-400" staggerIndex={3} />
-      <StatCard size="hero" icon={ArrowDownRight} label="Bounce Rate" value={`${ga4Overview.bounceRate}%`} valueColor={ga4Overview.bounceRate > 60 ? 'text-red-400' : 'text-emerald-400'} delta={ga4Comparison?.change.bounceRate || undefined} deltaLabel="pp" invertDelta staggerIndex={4} />
-      <StatCard size="hero" icon={UserPlus} label="New Users" value={`${ga4Overview.newUserPercentage}%`} valueColor="text-teal-400" staggerIndex={5} />
+      <StatCard size="hero" icon={Users} label="Users" value={ga4Overview.totalUsers.toLocaleString()} valueColor="text-accent-brand" delta={ga4Comparison?.changePercent.users} deltaLabel="%" staggerIndex={0} />
+      <StatCard size="hero" icon={LineChartIcon} label="Sessions" value={ga4Overview.totalSessions.toLocaleString()} valueColor="text-accent-info" delta={ga4Comparison?.changePercent.sessions} deltaLabel="%" staggerIndex={1} />
+      <StatCard size="hero" label="Page Views" value={ga4Overview.totalPageviews.toLocaleString()} valueColor="text-accent-brand" delta={ga4Comparison?.changePercent.pageviews} deltaLabel="%" staggerIndex={2} />
+      <StatCard size="hero" icon={Clock} label="Avg Duration" value={`${Math.floor(ga4Overview.avgSessionDuration / 60)}m ${Math.floor(ga4Overview.avgSessionDuration % 60)}s`} valueColor="text-accent-warning" staggerIndex={3} />
+      <StatCard size="hero" icon={ArrowDownRight} label="Bounce Rate" value={`${ga4Overview.bounceRate}%`} valueColor={ga4Overview.bounceRate > 60 ? 'text-accent-danger' : 'text-accent-success'} delta={ga4Comparison?.change.bounceRate || undefined} deltaLabel="pp" invertDelta staggerIndex={4} />
+      <StatCard size="hero" icon={UserPlus} label="New Users" value={`${ga4Overview.newUserPercentage}%`} valueColor="text-accent-brand" staggerIndex={5} />
     </div>
 
     {/* Traffic Trend + Devices row */}
@@ -196,9 +196,9 @@ export function AnalyticsTab({
                   <div className="bg-[var(--surface-2)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] shadow-xl shadow-black/40 min-w-[140px] overflow-hidden">
                     <div className="px-3 py-1.5 border-b border-[var(--brand-border)] t-caption-sm font-semibold text-[var(--brand-text)]">{row.date}</div>
                     <div className="px-3 py-1.5 space-y-1">
-                      <div className="flex justify-between t-caption-sm"><span className="text-teal-400">Users</span><span className="text-[var(--brand-text)] font-medium">{row.users.toLocaleString()}</span></div>
-                      <div className="flex justify-between t-caption-sm"><span className="text-blue-400">Sessions</span><span className="text-[var(--brand-text)] font-medium">{row.sessions.toLocaleString()}</span></div>
-                      <div className="flex justify-between t-caption-sm"><span className="text-teal-400/40">Pageviews</span><span className="text-[var(--brand-text)] font-medium">{row.pageviews.toLocaleString()}</span></div>
+                      <div className="flex justify-between t-caption-sm"><span className="text-accent-brand">Users</span><span className="text-[var(--brand-text)] font-medium">{row.users.toLocaleString()}</span></div>
+                      <div className="flex justify-between t-caption-sm"><span className="text-accent-info">Sessions</span><span className="text-[var(--brand-text)] font-medium">{row.sessions.toLocaleString()}</span></div>
+                      <div className="flex justify-between t-caption-sm"><span className="text-accent-brand">Pageviews</span><span className="text-[var(--brand-text)] font-medium">{row.pageviews.toLocaleString()}</span></div>
                     </div>
                   </div>
                 );
@@ -259,7 +259,7 @@ export function AnalyticsTab({
             <div key={i} className="flex items-center gap-2 py-1.5 px-2 rounded-[var(--radius-lg)] hover:bg-[var(--surface-3)]">
               <span className="t-caption-sm text-[var(--brand-text-muted)] w-5 text-right">{i + 1}</span>
               <span className="t-caption text-[var(--brand-text)] flex-1 truncate font-mono">{p.path}</span>
-              <span className="t-caption text-teal-400 font-medium tabular-nums">{p.pageviews.toLocaleString()}</span>
+              <span className="t-caption text-accent-brand font-medium tabular-nums">{p.pageviews.toLocaleString()}</span>
               <span className="t-caption-sm text-[var(--brand-text-muted)] w-14 text-right">{p.users.toLocaleString()} u</span>
             </div>
           ))}
@@ -278,7 +278,7 @@ export function AnalyticsTab({
               <div key={i} className="relative">
                 <div className="flex items-center gap-2 py-1.5 px-2 rounded-[var(--radius-lg)] relative z-[var(--z-sticky)]">
                   <span className="t-caption text-[var(--brand-text)] flex-1 truncate">{s.source}{s.medium !== '(none)' ? ` / ${s.medium}` : ''}</span>
-                  <span className="t-caption text-blue-400 font-medium tabular-nums">{s.sessions.toLocaleString()}</span>
+                  <span className="t-caption text-accent-info font-medium tabular-nums">{s.sessions.toLocaleString()}</span>
                   <span className="t-caption-sm text-[var(--brand-text-muted)] w-12 text-right">{pct.toFixed(1)}%</span>
                 </div>
                 <div className="absolute inset-0 rounded-[var(--radius-lg)] bg-blue-500/5" style={{ width: `${pct}%` }} />
@@ -321,7 +321,7 @@ export function AnalyticsTab({
               <span className="t-caption-sm text-[var(--brand-text-muted)] truncate max-w-[140px]">{eventDisplayName(c.eventName)}</span>
               <div className="flex items-center gap-1.5">
                 {pinned && <span className="w-1.5 h-1.5 rounded-full bg-teal-400" title="Pinned" />}
-                {c.rate > 0 && <span className="t-caption-sm font-medium text-emerald-400">{c.rate}%</span>}
+                {c.rate > 0 && <span className="t-caption-sm font-medium text-accent-success">{c.rate}%</span>}
               </div>
             </div>
             <div className="text-xl font-bold text-[var(--brand-text)]">{c.conversions.toLocaleString()}</div>
@@ -348,7 +348,7 @@ export function AnalyticsTab({
               emptyLabel="All Pages"
               className="max-w-[240px]"
             />
-            {modulePageLoading[moduleId] && <Icon as={Loader2} size="sm" className="animate-spin text-teal-400" />}
+            {modulePageLoading[moduleId] && <Icon as={Loader2} size="sm" className="animate-spin text-accent-brand" />}
           </div>
         );
       };
@@ -421,7 +421,7 @@ export function AnalyticsTab({
                       <div className="bg-[var(--surface-2)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] shadow-xl shadow-black/40 min-w-[100px] overflow-hidden">
                         <div className="px-3 py-1.5 border-b border-[var(--brand-border)] t-caption-sm font-semibold text-[var(--brand-text)]">{row.date}</div>
                         <div className="px-3 py-1.5">
-                          <div className="flex justify-between t-caption-sm"><span className="text-teal-400">Count</span><span className="text-[var(--brand-text)] font-medium">{row.eventCount.toLocaleString()}</span></div>
+                          <div className="flex justify-between t-caption-sm"><span className="text-accent-brand">Count</span><span className="text-[var(--brand-text)] font-medium">{row.eventCount.toLocaleString()}</span></div>
                         </div>
                       </div>
                     );
@@ -445,7 +445,7 @@ export function AnalyticsTab({
     <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
       <button onClick={() => setShowExplorer(!showExplorer)} className="w-full flex items-center justify-between px-5 py-3 hover:bg-[var(--surface-3)] transition-colors">
         <div className="flex items-center gap-2">
-          <Icon as={Filter} size="md" className="text-teal-400" />
+          <Icon as={Filter} size="md" className="text-accent-brand" />
           <span className="t-body font-medium text-[var(--brand-text-muted)]">Event Explorer</span>
         </div>
         {showExplorer ? <Icon as={ChevronUp} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" />}
@@ -500,7 +500,7 @@ export function AnalyticsTab({
                       <tr key={i} className="border-b border-[var(--brand-border)] hover:bg-[var(--surface-3)]">
                         <td className="py-2 pr-3">
                           <button onClick={() => { setExplorerEvent(row.eventName); runExplorer(row.eventName, explorerPage || undefined); }}
-                            className="t-caption text-teal-400 hover:text-teal-300">{eventDisplayName(row.eventName)}</button>
+                            className="t-caption text-accent-brand hover:text-accent-brand">{eventDisplayName(row.eventName)}</button>
                         </td>
                         <td className="py-2 pr-3">
                           <button onClick={() => { setExplorerPage(row.pagePath); runExplorer(explorerEvent || undefined, row.pagePath); }}

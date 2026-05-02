@@ -4,7 +4,7 @@ import {
   ArrowUpDown, Activity, ChevronDown, ChevronRight, Sparkles, Table2,
 } from 'lucide-react';
 import { RankTrackingSection } from '../shared/RankTable';
-import { CompactStatBar, EmptyState, SectionCard, Icon} from '../ui';
+import { CompactStatBar, EmptyState, SectionCard, Icon, ClickableRow} from '../ui';
 import { DualTrendChart, InsightCard } from './helpers';
 import { Explainer } from './SeoGlossary';
 import type {
@@ -87,16 +87,16 @@ export function SearchTab({
     {/* AI-style takeaway */}
     {/* pr-check-disable-next-line -- AI takeaway summary bar; compact bar with no section header */}
     <div className="bg-[var(--surface-2)]/60 border border-[var(--brand-border)] rounded-[var(--radius-xl)] px-5 py-3.5 flex items-start gap-3">
-      <Icon as={Sparkles} size="md" className="text-teal-400 mt-0.5 shrink-0" />
+      <Icon as={Sparkles} size="md" className="text-accent-brand mt-0.5 shrink-0" />
       <p className="t-caption text-[var(--brand-text)] leading-relaxed">{buildTakeaway(overview, searchComparison, insights)}</p>
     </div>
 
     {/* Compact metrics bar */}
     <CompactStatBar items={[
-      { label: 'Clicks', value: overview.totalClicks.toLocaleString(), valueColor: 'text-blue-400', sub: searchComparison ? `${searchComparison.changePercent.clicks > 0 ? '+' : ''}${searchComparison.changePercent.clicks}%` : undefined, subColor: searchComparison ? (searchComparison.changePercent.clicks >= 0 ? 'text-emerald-400' : 'text-red-400') : undefined },
-      { label: 'Impressions', value: overview.totalImpressions.toLocaleString(), valueColor: 'text-teal-400', sub: searchComparison ? `${searchComparison.changePercent.impressions > 0 ? '+' : ''}${searchComparison.changePercent.impressions}%` : undefined, subColor: searchComparison ? (searchComparison.changePercent.impressions >= 0 ? 'text-emerald-400' : 'text-red-400') : undefined },
-      { label: 'CTR', value: `${overview.avgCtr}%`, valueColor: 'text-emerald-400', sub: searchComparison ? `${searchComparison.change.ctr > 0 ? '+' : ''}${searchComparison.change.ctr}pp` : undefined, subColor: searchComparison ? (searchComparison.change.ctr >= 0 ? 'text-emerald-400' : 'text-red-400') : undefined },
-      { label: 'Avg Position', value: String(overview.avgPosition), valueColor: 'text-amber-400', sub: searchComparison ? `${searchComparison.change.position < 0 ? '↑' : searchComparison.change.position > 0 ? '↓' : ''}${Math.abs(searchComparison.change.position)}` : undefined, subColor: searchComparison ? (searchComparison.change.position <= 0 ? 'text-emerald-400' : 'text-red-400') : undefined },
+      { label: 'Clicks', value: overview.totalClicks.toLocaleString(), valueColor: 'text-accent-info', sub: searchComparison ? `${searchComparison.changePercent.clicks > 0 ? '+' : ''}${searchComparison.changePercent.clicks}%` : undefined, subColor: searchComparison ? (searchComparison.changePercent.clicks >= 0 ? 'text-accent-success' : 'text-accent-danger') : undefined },
+      { label: 'Impressions', value: overview.totalImpressions.toLocaleString(), valueColor: 'text-accent-brand', sub: searchComparison ? `${searchComparison.changePercent.impressions > 0 ? '+' : ''}${searchComparison.changePercent.impressions}%` : undefined, subColor: searchComparison ? (searchComparison.changePercent.impressions >= 0 ? 'text-accent-success' : 'text-accent-danger') : undefined },
+      { label: 'CTR', value: `${overview.avgCtr}%`, valueColor: 'text-accent-success', sub: searchComparison ? `${searchComparison.change.ctr > 0 ? '+' : ''}${searchComparison.change.ctr}pp` : undefined, subColor: searchComparison ? (searchComparison.change.ctr >= 0 ? 'text-accent-success' : 'text-accent-danger') : undefined },
+      { label: 'Avg Position', value: String(overview.avgPosition), valueColor: 'text-accent-warning', sub: searchComparison ? `${searchComparison.change.position < 0 ? '↑' : searchComparison.change.position > 0 ? '↓' : ''}${Math.abs(searchComparison.change.position)}` : undefined, subColor: searchComparison ? (searchComparison.change.position <= 0 ? 'text-accent-success' : 'text-accent-danger') : undefined },
     ]} />
 
     {/* Insights — the hero section */}
@@ -107,24 +107,24 @@ export function SearchTab({
 
           <div className="grid grid-cols-4 gap-3">
             <div className="text-center">
-              <div className={`text-lg font-bold ${insights.page1 > 5 ? 'text-emerald-400' : 'text-amber-400'}`}>{insights.page1}</div>
+              <div className={`text-lg font-bold ${insights.page1 > 5 ? 'text-accent-success' : 'text-accent-warning'}`}>{insights.page1}</div>
               <div className="t-caption-sm text-[var(--brand-text-muted)]">Page 1 Rankings</div>
-              <div className={`t-caption-sm mt-0.5 ${insights.page1 >= 10 ? 'text-emerald-400/70' : insights.page1 >= 3 ? 'text-amber-400/70' : 'text-[var(--brand-text-faint)]'}`}>{insights.page1 >= 10 ? 'Strong visibility' : insights.page1 >= 3 ? 'Room to grow' : 'Building up'}</div>
+              <div className={`t-caption-sm mt-0.5 ${insights.page1 >= 10 ? 'text-accent-success' : insights.page1 >= 3 ? 'text-accent-warning' : 'text-[var(--brand-text-faint)]'}`}>{insights.page1 >= 10 ? 'Strong visibility' : insights.page1 >= 3 ? 'Room to grow' : 'Building up'}</div>
             </div>
             <div className="text-center">
-              <div className={`text-lg font-bold ${insights.top3 > 2 ? 'text-emerald-400' : 'text-amber-400'}`}>{insights.top3}</div>
+              <div className={`text-lg font-bold ${insights.top3 > 2 ? 'text-accent-success' : 'text-accent-warning'}`}>{insights.top3}</div>
               <div className="t-caption-sm text-[var(--brand-text-muted)]">Top 3 Rankings</div>
-              <div className={`t-caption-sm mt-0.5 ${insights.top3 >= 5 ? 'text-emerald-400/70' : insights.top3 >= 1 ? 'text-amber-400/70' : 'text-[var(--brand-text-faint)]'}`}>{insights.top3 >= 5 ? 'Dominant positions' : insights.top3 >= 1 ? 'Competitive' : 'Opportunity ahead'}</div>
+              <div className={`t-caption-sm mt-0.5 ${insights.top3 >= 5 ? 'text-accent-success' : insights.top3 >= 1 ? 'text-accent-warning' : 'text-[var(--brand-text-faint)]'}`}>{insights.top3 >= 5 ? 'Dominant positions' : insights.top3 >= 1 ? 'Competitive' : 'Opportunity ahead'}</div>
             </div>
             <div className="text-center">
-              <div className={`text-lg font-bold ${overview.avgCtr > 3 ? 'text-emerald-400' : overview.avgCtr > 1.5 ? 'text-amber-400' : 'text-red-400'}`}>{overview.avgCtr}%</div>
+              <div className={`text-lg font-bold ${overview.avgCtr > 3 ? 'text-accent-success' : overview.avgCtr > 1.5 ? 'text-accent-warning' : 'text-accent-danger'}`}>{overview.avgCtr}%</div>
               <div className="t-caption-sm text-[var(--brand-text-muted)] flex items-center justify-center gap-0.5">Avg CTR<Explainer term="ctr" /></div>
-              <div className={`t-caption-sm mt-0.5 ${overview.avgCtr > 3 ? 'text-emerald-400/70' : overview.avgCtr > 1.5 ? 'text-amber-400/70' : 'text-red-400/70'}`}>{overview.avgCtr > 3 ? 'Above average' : overview.avgCtr > 1.5 ? 'Typical range' : 'Needs attention'}</div>
+              <div className={`t-caption-sm mt-0.5 ${overview.avgCtr > 3 ? 'text-accent-success' : overview.avgCtr > 1.5 ? 'text-accent-warning' : 'text-accent-danger'}`}>{overview.avgCtr > 3 ? 'Above average' : overview.avgCtr > 1.5 ? 'Typical range' : 'Needs attention'}</div>
             </div>
             <div className="text-center">
-              <div className={`text-lg font-bold ${insights.lowHanging.length > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>{insights.lowHanging.length}</div>
+              <div className={`text-lg font-bold ${insights.lowHanging.length > 0 ? 'text-accent-warning' : 'text-accent-success'}`}>{insights.lowHanging.length}</div>
               <div className="t-caption-sm text-[var(--brand-text-muted)]">Opportunities</div>
-              <div className={`t-caption-sm mt-0.5 ${insights.lowHanging.length > 5 ? 'text-amber-400/70' : insights.lowHanging.length > 0 ? 'text-teal-400/70' : 'text-emerald-400/70'}`}>{insights.lowHanging.length > 5 ? 'Quick wins available' : insights.lowHanging.length > 0 ? 'A few to capture' : 'Fully optimized'}</div>
+              <div className={`t-caption-sm mt-0.5 ${insights.lowHanging.length > 5 ? 'text-accent-warning' : insights.lowHanging.length > 0 ? 'text-accent-brand' : 'text-accent-success'}`}>{insights.lowHanging.length > 5 ? 'Quick wins available' : insights.lowHanging.length > 0 ? 'A few to capture' : 'Fully optimized'}</div>
             </div>
           </div>
         </SectionCard>
@@ -169,20 +169,20 @@ export function SearchTab({
     {/* Raw data tables — collapsible, secondary */}
     {/* pr-check-disable-next-line -- Collapsible raw-data table wrapper with custom toggle button; not a static section card */}
     <div className="bg-[var(--surface-2)] rounded-[var(--radius-xl)] border border-[var(--brand-border)] overflow-hidden">
-      <button
+      <ClickableRow
         onClick={() => setShowRawData(!showRawData)}
-        className="w-full px-5 py-3.5 flex items-center gap-2 hover:bg-[var(--surface-3)]/30 transition-colors text-left"
+        className="px-5 py-3.5 flex items-center gap-2"
       >
         {showRawData ? <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)]" /> : <Icon as={ChevronRight} size="md" className="text-[var(--brand-text-muted)]" />}
         <Icon as={Table2} size="md" className="text-[var(--brand-text-muted)]" />
         <span className="t-body font-medium text-[var(--brand-text)]">Raw Data</span>
         <span className="t-caption-sm text-[var(--brand-text-muted)] ml-1">{overview.topQueries.length} queries, {overview.topPages.length} pages</span>
-      </button>
+      </ClickableRow>
       {showRawData && (
         <>
           <div className="flex items-center gap-1 px-4 pb-1 border-t border-[var(--brand-border)]">
             {(['queries', 'pages'] as const).map(st => (
-              <button key={st} onClick={() => setSearchSubTab(st)}
+              <button key={st} type="button" onClick={() => setSearchSubTab(st)}
                 className={`px-3 py-1.5 rounded-md t-caption font-medium transition-colors ${searchSubTab === st ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}
               >{st === 'queries' ? 'Queries' : 'Pages'}</button>
             ))}
@@ -192,7 +192,7 @@ export function SearchTab({
               <th className="text-left py-3 px-4 text-[var(--brand-text-muted)] font-medium">{searchSubTab === 'queries' ? 'Query' : 'Page'}</th>
               {(['clicks', 'impressions', 'ctr', 'position'] as SortKey[]).map(key => (
                 <th key={key} className="text-right py-3 px-3 text-[var(--brand-text-muted)] font-medium">
-                  <button onClick={() => handleSort(key)} className="flex items-center gap-1 ml-auto hover:text-[var(--brand-text)]">
+                  <button type="button" onClick={() => handleSort(key)} className="flex items-center gap-1 ml-auto hover:text-[var(--brand-text)]">
                     {key === 'ctr' ? 'CTR' : key.charAt(0).toUpperCase() + key.slice(1)}
                     <Explainer term={key === 'ctr' ? 'ctr' : key} />
                     {sortKey === key && <Icon as={ArrowUpDown} size="sm" />}
@@ -204,10 +204,10 @@ export function SearchTab({
               {searchSubTab === 'queries' && sortedQueries().map((q, i) => (
                 <tr key={i} className="border-b border-[var(--brand-border)]/50 hover:bg-[var(--surface-3)]/30">
                   <td className="py-2.5 px-4 text-[var(--brand-text)] font-medium">{q.query}</td>
-                  <td className="py-2.5 px-3 text-right text-blue-400 font-semibold">{q.clicks}</td>
+                  <td className="py-2.5 px-3 text-right text-accent-info font-semibold">{q.clicks}</td>
                   <td className="py-2.5 px-3 text-right text-[var(--brand-text-muted)]">{q.impressions.toLocaleString()}</td>
-                  <td className="py-2.5 px-3 text-right text-emerald-400">{q.ctr}%</td>
-                  <td className="py-2.5 px-3 text-right"><span className={q.position <= 10 ? 'text-emerald-400' : q.position <= 20 ? 'text-amber-400' : 'text-red-400'}>{q.position}</span></td>
+                  <td className="py-2.5 px-3 text-right text-accent-success">{q.ctr}%</td>
+                  <td className="py-2.5 px-3 text-right"><span className={q.position <= 10 ? 'text-accent-success' : q.position <= 20 ? 'text-accent-warning' : 'text-accent-danger'}>{q.position}</span></td>
                 </tr>
               ))}
               {searchSubTab === 'pages' && sortedPages().map((p, i) => {
@@ -216,10 +216,10 @@ export function SearchTab({
                 return (
                   <tr key={i} className="border-b border-[var(--brand-border)]/50 hover:bg-[var(--surface-3)]/30">
                     <td className="py-2.5 px-4 text-[var(--brand-text)] font-medium max-w-xs truncate">{pagePath}</td>
-                    <td className="py-2.5 px-3 text-right text-blue-400 font-semibold">{p.clicks}</td>
+                    <td className="py-2.5 px-3 text-right text-accent-info font-semibold">{p.clicks}</td>
                     <td className="py-2.5 px-3 text-right text-[var(--brand-text-muted)]">{p.impressions.toLocaleString()}</td>
-                    <td className="py-2.5 px-3 text-right text-emerald-400">{p.ctr}%</td>
-                    <td className="py-2.5 px-3 text-right"><span className={p.position <= 10 ? 'text-emerald-400' : p.position <= 20 ? 'text-amber-400' : 'text-red-400'}>{p.position}</span></td>
+                    <td className="py-2.5 px-3 text-right text-accent-success">{p.ctr}%</td>
+                    <td className="py-2.5 px-3 text-right"><span className={p.position <= 10 ? 'text-accent-success' : p.position <= 20 ? 'text-accent-warning' : 'text-accent-danger'}>{p.position}</span></td>
                   </tr>
                 );
               })}

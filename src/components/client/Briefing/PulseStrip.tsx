@@ -121,7 +121,7 @@ export function PulseStrip({ data, isLoading }: PulseStripProps): ReactNode {
                 {siteHealth.delta !== null && siteHealth.delta !== 0 && (
                   <span
                     className={`t-caption-sm font-medium ${
-                      siteHealth.delta > 0 ? 'text-emerald-400' : 'text-red-400'
+                      siteHealth.delta > 0 ? 'text-accent-success' : 'text-accent-danger'
                     }`}
                   >
                     {siteHealth.delta > 0 ? '+' : ''}
@@ -154,7 +154,7 @@ export function PulseStrip({ data, isLoading }: PulseStripProps): ReactNode {
           size="hero"
           label="VISITORS"
           value={fmtVal(visitors.current)}
-          valueColor="text-blue-400"
+          valueColor="text-accent-info"
           delta={fmtDeltaPct(visitors.deltaPercent)}
           deltaLabel="%"
           icon={Users}
@@ -166,7 +166,7 @@ export function PulseStrip({ data, isLoading }: PulseStripProps): ReactNode {
           size="hero"
           label="CLICKS"
           value={clicksValue}
-          valueColor="text-blue-400"
+          valueColor="text-accent-info"
           delta={fmtDeltaPct(clicks.deltaPercent)}
           deltaLabel="%"
           sub={impressionsSub}
@@ -179,7 +179,7 @@ export function PulseStrip({ data, isLoading }: PulseStripProps): ReactNode {
           size="hero"
           label="AVG POSITION"
           value={avgPosValue}
-          valueColor="text-blue-400"
+          valueColor="text-accent-info"
           delta={avgPosDelta}
           deltaLabel="Δ"
           invertDelta

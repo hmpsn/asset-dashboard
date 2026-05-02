@@ -62,6 +62,7 @@ export { Button } from './Button';
 export { IconButton } from './IconButton';
 export { ActionPill } from './ActionPill';
 export { SegmentedControl } from './SegmentedControl';
+export { ClickableRow } from './ClickableRow';
 
 // Forms
 export { FormField, FormInput, FormSelect, FormTextarea, Checkbox, Toggle } from './forms';

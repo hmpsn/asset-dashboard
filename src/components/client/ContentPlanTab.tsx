@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Loader2, Layers, Grid3X3, AlertTriangle } from 'lucide-react';
-import { SectionCard, Badge, EmptyState, Icon} from '../ui';
+import { SectionCard, Badge, EmptyState, Icon, Button, ClickableRow } from '../ui';
 import { MatrixProgressView } from './MatrixProgressView';
 import { contentPlanReview } from '../../api/content';
 import type { ContentMatrix, MatrixCell } from '../matrix/types';
@@ -58,7 +58,7 @@ export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24 gap-3">
-        <Icon as={Loader2} size="lg" className="animate-spin text-teal-400" />
+        <Icon as={Loader2} size="lg" className="animate-spin text-accent-brand" />
         <span className="t-body text-[var(--brand-text-muted)]">Loading content plans…</span>
       </div>
     );
@@ -70,7 +70,7 @@ export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
         icon={AlertTriangle}
         title="Couldn't load content plans"
         description={error}
-        action={<button onClick={loadPlans} className="t-caption px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-500/10 text-teal-400 hover:bg-teal-500/15 transition-colors">Retry</button>}
+        action={<Button onClick={loadPlans} size="sm">Retry</Button>}
       />
     );
   }
@@ -92,12 +92,13 @@ export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
     return (
       <div className="space-y-3">
         {plans.length > 1 && (
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setSelectedMatrixId(null)}
-            className="flex items-center gap-1 t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
           >
             ← All Content Plans
-          </button>
+          </Button>
         )}
         <MatrixProgressView
           workspaceId={workspaceId}
@@ -115,7 +116,7 @@ export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
     <div className="space-y-4">
       <SectionCard
         title="Your Content Plans"
-        titleIcon={<Icon as={Layers} size="md" className="text-teal-400" />}
+        titleIcon={<Icon as={Layers} size="md" className="text-accent-brand" />}
       >
         <div className="space-y-2">
           {plans.map(plan => {
@@ -125,15 +126,15 @@ export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
             const progress = total > 0 ? Math.round((published / total) * 100) : 0;
 
             return (
-              <button
+              <ClickableRow
                 key={plan.id}
                 onClick={() => setSelectedMatrixId(plan.id)}
-                className="w-full flex items-center justify-between px-4 py-3 rounded-[var(--radius-xl)] bg-[var(--surface-3)]/50 hover:bg-[var(--surface-3)] transition-colors text-left group"
+                className="flex items-center justify-between px-4 py-3 rounded-[var(--radius-xl)] bg-[var(--surface-3)]/50 group"
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <Icon as={Grid3X3} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
                   <div className="min-w-0">
-                    <span className="t-body font-medium text-[var(--brand-text)] group-hover:text-white transition-colors truncate block">
+                    <span className="t-body font-medium text-[var(--brand-text)] group-hover:text-[var(--brand-text-bright)] transition-colors truncate block">
                       {plan.name}
                     </span>
                     <span className="t-caption text-[var(--brand-text-muted)]">
@@ -149,7 +150,7 @@ export function ContentPlanTab({ workspaceId, setToast }: ContentPlanTabProps) {
                     <div className="h-full bg-teal-500/50 rounded-full transition-all" style={{ width: `${progress}%` }} />
                   </div>
                 </div>
-              </button>
+              </ClickableRow>
             );
           })}
         </div>

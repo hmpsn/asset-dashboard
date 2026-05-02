@@ -108,11 +108,11 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
         <div className="bg-gradient-to-br from-emerald-500/10 via-[var(--surface-2)] to-[var(--surface-2)] border border-emerald-500/20 p-5" style={{ borderRadius: 'var(--radius-signature)' }}>
           <div className="flex items-center gap-2 mb-3">
             <div className="w-8 h-8 rounded-[var(--radius-md)] bg-emerald-500/15 flex items-center justify-center">
-              <Icon as={DollarSign} size="md" className="text-emerald-400" />
+              <Icon as={DollarSign} size="md" className="text-accent-success" />
             </div>
             <span className="t-caption text-[var(--brand-text)] font-medium">Organic Traffic Value</span>
           </div>
-          <div className="text-2xl font-bold text-emerald-300 tracking-tight">{fmtMoneyFull(data.organicTrafficValue)}</div>
+          <div className="text-2xl font-bold text-accent-success tracking-tight">{fmtMoneyFull(data.organicTrafficValue)}</div>
           <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">
             Monthly value based on {data.totalClicks.toLocaleString()} clicks × ${data.avgCPC.toFixed(2)} avg CPC
           </div>
@@ -122,11 +122,11 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
         <div className="bg-gradient-to-br from-blue-500/10 via-[var(--surface-2)] to-[var(--surface-2)] border border-blue-500/20 p-5" style={{ borderRadius: 'var(--radius-signature)' }}>
           <div className="flex items-center gap-2 mb-3">
             <div className="w-8 h-8 rounded-[var(--radius-md)] bg-blue-500/15 flex items-center justify-center">
-              <Icon as={BarChart3} size="md" className="text-blue-400" />
+              <Icon as={BarChart3} size="md" className="text-accent-info" />
             </div>
             <span className="t-caption text-[var(--brand-text)] font-medium">Ad Spend Equivalent</span>
           </div>
-          <div className="text-2xl font-bold text-blue-300 tracking-tight">{fmtMoneyFull(data.adSpendEquivalent)}</div>
+          <div className="text-2xl font-bold text-accent-info tracking-tight">{fmtMoneyFull(data.adSpendEquivalent)}</div>
           <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">
             What this traffic would cost via Google Ads (incl. management fees)
           </div>
@@ -137,8 +137,8 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
           <div className="flex items-center gap-2 mb-3">
             <div className={`w-8 h-8 rounded-[var(--radius-md)] ${data.growthPercent != null ? (data.growthPercent >= 0 ? 'bg-teal-500/15' : 'bg-amber-500/15') : 'bg-teal-500/15'} flex items-center justify-center`}>
               {data.growthPercent != null
-                ? <Icon as={TrendingUp} size="md" className={data.growthPercent >= 0 ? 'text-teal-400' : 'text-amber-400'} />
-                : <Icon as={Shield} size="md" className="text-teal-400" />}
+                ? <Icon as={TrendingUp} size="md" className={data.growthPercent >= 0 ? 'text-accent-brand' : 'text-accent-warning'} />
+                : <Icon as={Shield} size="md" className="text-accent-brand" />}
             </div>
             <span className="t-caption text-[var(--brand-text)] font-medium">
               {data.growthPercent != null ? 'Month-over-Month' : 'Pages Tracked'}
@@ -146,7 +146,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
           </div>
           {data.growthPercent != null ? (
             <>
-              <div className={`text-2xl font-bold tracking-tight ${data.growthPercent >= 0 ? 'text-teal-300' : 'text-amber-300'}`}>
+              <div className={`text-2xl font-bold tracking-tight ${data.growthPercent >= 0 ? 'text-accent-brand' : 'text-accent-warning'}`}>
                 {data.growthPercent >= 0 ? '+' : ''}{data.growthPercent.toFixed(1)}%
               </div>
               <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">
@@ -155,7 +155,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
             </>
           ) : (
             <>
-              <div className="text-2xl font-bold text-teal-300 tracking-tight">{data.trackedPages}</div>
+              <div className="text-2xl font-bold text-accent-brand tracking-tight">{data.trackedPages}</div>
               <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">
                 Pages generating organic value · growth tracking starts next month
               </div>
@@ -170,7 +170,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
         <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
           <div className="px-5 py-3.5 border-b border-[var(--brand-border)]/60 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Icon as={Target} size="md" className="text-teal-400" />
+              <Icon as={Target} size="md" className="text-accent-brand" />
               <span className="t-caption font-semibold text-[var(--brand-text-bright)]">Traffic Value by Page</span>
             </div>
             <span className="t-caption-sm text-[var(--brand-text-muted)]">{data.pageBreakdown.length} pages</span>
@@ -183,12 +183,12 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
                   <div className="flex-1 min-w-0 mr-4">
                     <div className="t-caption font-medium text-[var(--brand-text-bright)] truncate">{page.pageTitle || page.pagePath}</div>
                     <div className="flex items-center gap-3 mt-0.5">
-                      <span className="t-caption-sm text-teal-400/70 truncate">&ldquo;{page.primaryKeyword}&rdquo;</span>
+                      <span className="t-caption-sm text-accent-brand truncate">&ldquo;{page.primaryKeyword}&rdquo;</span>
                       {page.position && <span className="t-caption-sm text-[var(--brand-text-muted)]">#{page.position.toFixed(1)}</span>}
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <div className="t-caption font-bold text-emerald-300">{fmtMoney(page.trafficValue)}<span className="text-[var(--brand-text-dim)] font-normal">/mo</span></div>
+                    <div className="t-caption font-bold text-accent-success">{fmtMoney(page.trafficValue)}<span className="text-[var(--brand-text-dim)] font-normal">/mo</span></div>
                     <div className="flex items-center justify-end gap-2 mt-0.5">
                       <span className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text-muted)]">
                         <Icon as={MousePointerClick} size="sm" /> {page.clicks}
@@ -214,7 +214,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
             <div className="px-5 py-2.5 border-t border-[var(--brand-border)]/60 text-center">
               <button
                 onClick={() => setShowAllPages(!showAllPages)}
-                className="t-caption-sm text-teal-400 hover:text-teal-300 transition-colors"
+                className="t-caption-sm text-accent-brand hover:text-accent-brand transition-colors"
               >
                 {showAllPages ? 'Show less' : `Show all ${data.pageBreakdown.length} pages`}
               </button>
@@ -229,7 +229,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
         <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
           <div className="px-5 py-3.5 border-b border-[var(--brand-border)]/60 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Icon as={DollarSign} size="md" className="text-emerald-400" />
+              <Icon as={DollarSign} size="md" className="text-accent-success" />
               <span className="t-caption font-semibold text-[var(--brand-text-bright)]">Content ROI Attribution</span>
             </div>
             <div className="flex items-center gap-3">
@@ -237,7 +237,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
                 <>
                   <span className="t-caption-sm text-[var(--brand-text-muted)]">{data.contentROI.postsPublished} published</span>
                   {data.contentROI.totalContentSpend > 0 && (
-                    <span className={`t-caption-sm font-medium ${data.contentROI.roi > 0 ? 'text-emerald-400' : 'text-[var(--brand-text-muted)]'}`}>
+                    <span className={`t-caption-sm font-medium ${data.contentROI.roi > 0 ? 'text-accent-success' : 'text-[var(--brand-text-muted)]'}`}>
                       {data.contentROI.roi > 0 ? '+' : ''}{data.contentROI.roi.toFixed(0)}% ROI
                     </span>
                   )}
@@ -252,20 +252,20 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
                   <div className="flex-1 min-w-0 mr-4">
                     <div className="t-caption font-medium text-[var(--brand-text-bright)] truncate">{item.topic}</div>
                     <div className="flex items-center gap-3 mt-0.5">
-                      <span className="t-caption-sm text-teal-400/70">&ldquo;{item.targetKeyword}&rdquo;</span>
+                      <span className="t-caption-sm text-accent-brand">&ldquo;{item.targetKeyword}&rdquo;</span>
                       {item.targetPageSlug && <span className="t-caption-sm text-[var(--brand-text-muted)] font-mono">{item.targetPageSlug}</span>}
-                      <span className={`t-caption-sm px-1.5 py-0.5 rounded-full ${item.status === 'published' ? 'bg-teal-500/10 text-teal-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                      <span className={`t-caption-sm px-1.5 py-0.5 rounded-full ${item.status === 'published' ? 'bg-teal-500/10 text-accent-brand' : 'bg-emerald-500/10 text-accent-success'}`}>
                         {item.status === 'published' ? 'Published' : 'Delivered'}
                       </span>
                       {item.source === 'matrix' && (
-                        <span className="flex items-center gap-0.5 t-caption-sm px-1.5 py-0.5 rounded-full bg-teal-500/10 text-teal-400">
+                        <span className="flex items-center gap-0.5 t-caption-sm px-1.5 py-0.5 rounded-full bg-teal-500/10 text-accent-brand">
                           <Icon as={Layers} size="sm" /> Content Plan
                         </span>
                       )}
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <div className="t-caption font-bold text-emerald-300">{item.trafficValue > 0 ? fmtMoney(item.trafficValue) : '$0'}<span className="text-[var(--brand-text-dim)] font-normal">/mo</span></div>
+                    <div className="t-caption font-bold text-accent-success">{item.trafficValue > 0 ? fmtMoney(item.trafficValue) : '$0'}<span className="text-[var(--brand-text-dim)] font-normal">/mo</span></div>
                     <div className="flex items-center justify-end gap-2 mt-0.5">
                       <span className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text-muted)]">
                         <Icon as={MousePointerClick} size="sm" /> {item.clicks}
@@ -283,7 +283,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
             <div className="px-5 py-3 border-t border-[var(--brand-border)]/60 bg-emerald-500/5">
               <div className="flex items-center justify-between t-caption-sm">
                 <span className="text-[var(--brand-text)]">Content investment: <span className="text-[var(--brand-text-bright)] font-medium">{fmtMoneyFull(data.contentROI.totalContentSpend)}</span></span>
-                <span className="text-[var(--brand-text)]">Annualized traffic value: <span className="text-emerald-400 font-medium">{fmtMoneyFull(data.contentROI.totalContentValue)}</span></span>
+                <span className="text-[var(--brand-text)]">Annualized traffic value: <span className="text-accent-success font-medium">{fmtMoneyFull(data.contentROI.totalContentValue)}</span></span>
               </div>
             </div>
           )}

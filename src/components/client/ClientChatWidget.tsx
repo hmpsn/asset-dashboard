@@ -2,8 +2,9 @@ import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Sparkles, Send, MessageSquare, X, Lock, Loader2, Plus,
+  Maximize2, Minimize2,
 } from 'lucide-react';
-import { Icon, cn, Button } from '../ui';
+import { Button, ClickableRow, Icon, IconButton, cn } from '../ui';
 import { getOptional, getSafe } from '../../api/client';
 import { clientPath } from '../../routes';
 import { STUDIO_NAME } from '../../constants';
@@ -111,10 +112,10 @@ export function ClientChatWidget({
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--brand-border)] flex-shrink-0">
             <div className="flex items-center gap-2">
-              <Icon as={Sparkles} size="md" className="text-teal-400" />
+              <Icon as={Sparkles} size="md" className="text-accent-brand" />
               <span className="t-body font-medium text-[var(--brand-text-bright)]">Insights Engine</span>
               {!betaMode && chatUsage && chatUsage.tier === 'free' ? (
-                <span className={cn('t-caption-sm px-1.5 py-0.5 rounded font-medium', chatUsage.remaining > 0 ? 'text-[var(--brand-text)] bg-[var(--surface-3)]' : 'text-amber-400/80 bg-amber-500/8 border border-amber-500/20')}>
+                <span className={cn('t-caption-sm px-1.5 py-0.5 rounded font-medium', chatUsage.remaining > 0 ? 'text-[var(--brand-text)] bg-[var(--surface-3)]' : 'text-accent-warning bg-amber-500/8 border border-amber-500/20')}>
                   {chatUsage.remaining}/{chatUsage.limit} left
                 </span>
               ) : (
@@ -123,20 +124,22 @@ export function ClientChatWidget({
             </div>
             <div className="flex items-center gap-1">
               {chatMessages.length > 0 && (
-                <button
+                <IconButton
+                  icon={Plus}
+                  label="New conversation"
+                  size="sm"
                   onClick={() => {
                     setChatSessionId(`cs-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
                     setChatMessages([]);
                     clearIntent();
                     setShowChatHistory(false);
                   }}
-                  title="New conversation"
-                  className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] p-1"
-                >
-                  <Icon as={Plus} size="md" />
-                </button>
+                />
               )}
-              <button
+              <IconButton
+                icon={MessageSquare}
+                label="Chat history"
+                size="sm"
                 onClick={() => {
                   setShowChatHistory(!showChatHistory);
                   if (!showChatHistory && ws) {
@@ -148,28 +151,20 @@ export function ClientChatWidget({
                     }).catch((err) => { console.error('ClientChatWidget operation failed:', err); });
                   }
                 }}
-                title="Chat history"
-                className={cn('p-1', showChatHistory ? 'text-teal-400' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]')}
-              >
-                <Icon as={MessageSquare} size="md" />
-              </button>
-              <button
+                className={showChatHistory ? 'text-[var(--teal)] bg-[var(--surface-3)]' : undefined}
+              />
+              <IconButton
+                icon={chatExpanded ? Minimize2 : Maximize2}
+                label={chatExpanded ? 'Minimize chat' : 'Maximize chat'}
+                size="sm"
                 onClick={() => setChatExpanded(!chatExpanded)}
-                title={chatExpanded ? 'Minimize' : 'Maximize'}
-                className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] p-1"
-              >
-                {chatExpanded ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
-                ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
-                )}
-              </button>
-              <button
+              />
+              <IconButton
+                icon={X}
+                label="Close chat"
+                size="sm"
                 onClick={() => { setChatOpen(false); setChatExpanded(false); }}
-                className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] p-1"
-              >
-                <Icon as={X} size="md" />
-              </button>
+              />
             </div>
           </div>
 
@@ -182,7 +177,7 @@ export function ClientChatWidget({
                   <p className="t-caption-sm text-[var(--brand-text-muted)] italic">No past conversations yet.</p>
                 )}
                 {chatSessions.map(s => (
-                  <button
+                  <ClickableRow
                     key={s.id}
                     onClick={() => {
                       setChatSessionId(s.id);
@@ -200,13 +195,14 @@ export function ClientChatWidget({
                         }).catch((err) => { console.error('ClientChatWidget operation failed:', err); });
                       }
                     }}
-                    className={cn('w-full text-left px-3 py-2 rounded-[var(--radius-lg)] border transition-colors', s.id === chatSessionId ? 'bg-teal-500/10 border-teal-500/30 text-teal-300' : 'bg-[var(--surface-3)]/50 border-[var(--brand-border)] text-[var(--brand-text)] hover:bg-[var(--surface-3)]')}
+                    active={s.id === chatSessionId}
+                    className={cn('px-3 py-2 rounded-[var(--radius-lg)] border', s.id === chatSessionId ? 'border-teal-500/30 text-accent-brand' : 'bg-[var(--surface-3)]/50 border-[var(--brand-border)] text-[var(--brand-text)]')}
                   >
                     <div className="t-caption-sm font-medium truncate">{s.title}</div>
                     <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
                       {s.messageCount} messages · {new Date(s.updatedAt).toLocaleDateString()}
                     </div>
-                  </button>
+                  </ClickableRow>
                 ))}
               </div>
             ) : (
@@ -216,25 +212,25 @@ export function ClientChatWidget({
                     <p className="t-caption-sm text-[var(--brand-text-muted)]">Ask anything about your site performance:</p>
                     <div className="grid grid-cols-1 gap-2">
                       {effectiveQuickQuestions.map((q, i) => (
-                        <button
+                        <ClickableRow
                           key={i}
                           onClick={() => askAi(q)}
-                          className="text-left px-3.5 py-3 min-h-[44px] rounded-[var(--radius-lg)] bg-[var(--surface-3)]/50 hover:bg-[var(--surface-3)] border border-[var(--brand-border)] t-caption-sm text-[var(--brand-text)] transition-colors"
+                          className="px-3.5 py-3 min-h-[44px] rounded-[var(--radius-lg)] bg-[var(--surface-3)]/50 border border-[var(--brand-border)] t-caption-sm text-[var(--brand-text)]"
                         >
-                          <Icon as={MessageSquare} size="sm" className="text-teal-400 mb-1" />{q}
-                        </button>
+                          <Icon as={MessageSquare} size="sm" className="text-accent-brand mb-1" />{q}
+                        </ClickableRow>
                       ))}
                     </div>
                     <div className="pt-3 border-t border-[var(--brand-border)]/50">
                       <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-2">New to SEO? Ask the AI</p>
                       {LEARN_SEO_QUESTIONS.slice(0, 3).map((q, i) => (
-                        <button
+                        <ClickableRow
                           key={`learn-${i}`}
                           onClick={() => askAi(q)}
-                          className="w-full text-left px-3.5 py-2.5 min-h-[44px] rounded-[var(--radius-lg)] hover:bg-emerald-500/5 border border-transparent hover:border-emerald-500/15 transition-colors t-caption-sm text-emerald-400/70 hover:text-emerald-400"
+                          className="px-3.5 py-2.5 min-h-[44px] rounded-[var(--radius-lg)] border border-transparent hover:border-emerald-500/15 t-caption-sm text-accent-success hover:text-accent-success"
                         >
                           💡 {q}
-                        </button>
+                        </ClickableRow>
                       ))}
                     </div>
                   </div>
@@ -245,7 +241,7 @@ export function ClientChatWidget({
                       <div key={i} className={cn('flex gap-3', msg.role === 'user' ? 'justify-end' : '')}>
                         {msg.role === 'assistant' && (
                           <div className="w-6 h-6 rounded-[var(--radius-lg)] bg-teal-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                            <Icon as={Sparkles} size="sm" className="text-teal-400" />
+                            <Icon as={Sparkles} size="sm" className="text-accent-brand" />
                           </div>
                         )}
                         <div className={cn('max-w-[85%] rounded-[var(--radius-xl)] px-3.5 py-2.5', msg.role === 'user' ? 'bg-teal-600/20 border border-teal-500/20 t-caption text-[var(--brand-text-bright)]' : 'bg-[var(--surface-3)]/50 border border-[var(--brand-border)]')}>
@@ -256,7 +252,7 @@ export function ClientChatWidget({
                     {chatLoading && (
                       <div className="flex gap-3">
                         <div className="w-6 h-6 rounded-[var(--radius-lg)] bg-teal-500/10 flex items-center justify-center">
-                          <Icon as={Loader2} size="sm" className="text-teal-400 animate-spin" />
+                          <Icon as={Loader2} size="sm" className="text-accent-brand animate-spin" />
                         </div>
                         <div className="bg-[var(--surface-3)]/50 border border-[var(--brand-border)] rounded-[var(--radius-xl)] px-3.5 py-2.5">
                           <div className="flex gap-1">
@@ -284,23 +280,23 @@ export function ClientChatWidget({
                       <div className="space-y-1.5 pt-1">
                         <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)]">Ask a follow-up</p>
                         {QUICK_QUESTIONS.slice(0, 3).map((q, i) => (
-                          <button
+                          <ClickableRow
                             key={i}
                             onClick={() => askAi(q)}
-                            className="w-full text-left px-3.5 py-2.5 min-h-[44px] rounded-[var(--radius-lg)] bg-[var(--surface-3)]/30 hover:bg-[var(--surface-3)]/60 border border-[var(--brand-border)]/50 t-caption-sm text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
+                            className="px-3.5 py-2.5 min-h-[44px] rounded-[var(--radius-lg)] bg-[var(--surface-3)]/30 border border-[var(--brand-border)]/50 t-caption-sm text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]"
                           >
                             {q}
-                          </button>
+                          </ClickableRow>
                         ))}
                         <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mt-3">New to SEO?</p>
                         {LEARN_SEO_QUESTIONS.slice(0, 2).map((q, i) => (
-                          <button
+                          <ClickableRow
                             key={`learn-${i}`}
                             onClick={() => askAi(q)}
-                            className="w-full text-left px-3.5 py-2.5 min-h-[44px] rounded-[var(--radius-lg)] hover:bg-emerald-500/5 border border-transparent hover:border-emerald-500/15 transition-colors t-caption-sm text-emerald-400/70 hover:text-emerald-400"
+                            className="px-3.5 py-2.5 min-h-[44px] rounded-[var(--radius-lg)] border border-transparent hover:border-emerald-500/15 t-caption-sm text-accent-success hover:text-accent-success"
                           >
                             💡 {q}
-                          </button>
+                          </ClickableRow>
                         ))}
                       </div>
                     )}
@@ -315,10 +311,10 @@ export function ClientChatWidget({
           {!betaMode && chatUsage && chatUsage.tier === 'free' && !chatUsage.allowed ? (
             <div className="px-4 py-3 border-t border-[var(--brand-border)] flex-shrink-0">
               <div className="flex items-center gap-2 px-3 py-2.5 rounded-[var(--radius-lg)] bg-amber-500/5 border border-amber-500/20">
-                <Icon as={Lock} size="sm" className="text-amber-400/80 flex-shrink-0" />
-                <p className="t-caption-sm text-amber-300/80 flex-1">
+                <Icon as={Lock} size="sm" className="text-accent-warning flex-shrink-0" />
+                <p className="t-caption-sm text-accent-warning flex-1">
                   {roiValue && roiValue > 0
-                    ? <>Your organic traffic is worth <span className="font-semibold text-emerald-400">${Math.round(roiValue).toLocaleString()}/mo</span> — unlock unlimited insights with Growth.</>
+                    ? <>Your organic traffic is worth <span className="font-semibold text-accent-success">${Math.round(roiValue).toLocaleString()}/mo</span> — unlock unlimited insights with Growth.</>
                     : <>You've used all {chatUsage.limit} free conversations this month. Upgrade to Growth for unlimited access.</>}
                 </p>
               </div>
@@ -334,13 +330,13 @@ export function ClientChatWidget({
                 className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 t-caption text-[var(--brand-text-bright)] placeholder-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
                 disabled={chatLoading}
               />
-              <button
+              <IconButton
+                icon={Send}
+                label="Send message"
+                variant="accent"
                 onClick={() => askAi(chatInput)}
                 disabled={chatLoading || !chatInput.trim()}
-                className="px-3 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-[var(--radius-lg)] transition-colors"
-              >
-                <Icon as={Send} size="sm" />
-              </button>
+              />
             </div>
           )}
         </div>

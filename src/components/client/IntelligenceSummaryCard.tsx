@@ -32,7 +32,7 @@ export function IntelligenceSummaryCard({ workspaceId, tier }: Props) {
       <div className="grid grid-cols-2 gap-4">
         {/* High-priority insights — all tiers */}
         <div className="flex items-center gap-3 p-3 rounded-[var(--radius-md)] bg-blue-500/5 border border-blue-500/20">
-          <Icon as={Zap} size="md" className="text-blue-400 shrink-0" />
+          <Icon as={Zap} size="md" className="text-accent-info shrink-0" />
           <div>
             <div className="text-lg font-semibold text-[var(--brand-text-bright)]">
               {intel.insightsSummary?.highPriority ?? 0}
@@ -43,7 +43,7 @@ export function IntelligenceSummaryCard({ workspaceId, tier }: Props) {
 
         {/* Briefs in progress — all tiers */}
         <div className="flex items-center gap-3 p-3 rounded-[var(--radius-md)] bg-blue-500/5 border border-blue-500/20">
-          <Icon as={FileText} size="md" className="text-blue-400 shrink-0" />
+          <Icon as={FileText} size="md" className="text-accent-info shrink-0" />
           <div>
             <div className="text-lg font-semibold text-[var(--brand-text-bright)]">
               {intel.pipelineStatus?.briefs.inProgress ?? 0}
@@ -59,7 +59,7 @@ export function IntelligenceSummaryCard({ workspaceId, tier }: Props) {
           feature="intelligence-win-rate"
         >
           <div className="flex items-center gap-3 p-3 rounded-[var(--radius-md)] bg-blue-500/5 border border-blue-500/20 col-span-2">
-            <Icon as={TrendingUp} size="md" className="text-blue-400 shrink-0" />
+            <Icon as={TrendingUp} size="md" className="text-accent-info shrink-0" />
             <div>
               <div className="text-lg font-semibold text-[var(--brand-text-bright)]">
                 {intel.learningHighlights

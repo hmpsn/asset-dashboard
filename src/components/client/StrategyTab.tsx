@@ -45,14 +45,14 @@ interface StrategyTabProps {
   hidePrices?: boolean;
 }
 
-const kdColor = (kd?: number) => !kd ? 'text-[var(--brand-text-muted)]' : kd <= 30 ? 'text-emerald-400' : kd <= 60 ? 'text-amber-400' : kd <= 80 ? 'text-orange-400' : 'text-red-400';
+const kdColor = (kd?: number) => !kd ? 'text-[var(--brand-text-muted)]' : kd <= 30 ? 'text-accent-success' : kd <= 60 ? 'text-accent-warning' : kd <= 80 ? 'text-accent-orange' : 'text-accent-danger';
 const fmtNum = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString();
 const intentColor = (intent?: string) => {
   switch (intent) {
-    case 'commercial': return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
-    case 'informational': return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
-    case 'transactional': return 'text-amber-400 bg-amber-500/10 border-amber-500/20';
-    case 'navigational': return 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20';
+    case 'commercial': return 'text-accent-info bg-blue-500/10 border-blue-500/20';
+    case 'informational': return 'text-accent-success bg-emerald-500/10 border-emerald-500/20';
+    case 'transactional': return 'text-accent-warning bg-amber-500/10 border-amber-500/20';
+    case 'navigational': return 'text-accent-cyan bg-cyan-500/10 border-cyan-500/20';
     default: return 'text-[var(--brand-text-muted)] bg-[var(--surface-3)]/10 border-[var(--brand-border)]/20';
   }
 };
@@ -265,8 +265,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       {/* Unvalidated strategy note */}
       {!strategyData.pageMap.some(p => p.volume && p.volume > 0) && (
         <div className="bg-amber-500/10 border border-amber-500/30 px-4 py-3 flex items-start gap-2.5" style={{ borderRadius: 'var(--radius-signature)' }}>
-          <Icon as={AlertTriangle} size="md" className="text-amber-400 flex-shrink-0 mt-0.5" />
-          <div className="t-caption text-amber-300/90 leading-relaxed">
+          <Icon as={AlertTriangle} size="md" className="text-accent-warning flex-shrink-0 mt-0.5" />
+          <div className="t-caption text-accent-warning leading-relaxed">
             Keyword volume and difficulty metrics are currently unavailable for this strategy. The recommendations are based on AI analysis and site content.
           </div>
         </div>
@@ -276,7 +276,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       {/* pr-check-disable-next-line -- Brand signature radius intentional */}
       <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
         <div className="flex items-center gap-4">
-          <div className={`text-3xl font-bold ${healthScore >= 80 ? 'text-emerald-400' : healthScore >= 60 ? 'text-amber-400' : 'text-teal-400'}`}>
+          <div className={`text-3xl font-bold ${healthScore >= 80 ? 'text-accent-success' : healthScore >= 60 ? 'text-accent-warning' : 'text-accent-brand'}`}>
             {healthScore}/100
           </div>
           <div className="flex-1">
@@ -284,11 +284,11 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               {healthScore >= 80 ? 'Strong strategy foundation' : healthScore >= 60 ? 'Good progress, room to grow' : 'Building your strategy'}
             </div>
             <div className="t-caption text-[var(--brand-text-muted)] mt-0.5">
-              {contentGapsFound > 0 && <span className="text-teal-400">{contentGapsFound} content opportunities</span>}
+              {contentGapsFound > 0 && <span className="text-accent-brand">{contentGapsFound} content opportunities</span>}
               {contentGapsFound > 0 && quickWinsAvailable > 0 && <span className="text-[var(--brand-text-faint)]"> • </span>}
-              {quickWinsAvailable > 0 && <span className="text-amber-400">{quickWinsAvailable} quick wins</span>}
+              {quickWinsAvailable > 0 && <span className="text-accent-warning">{quickWinsAvailable} quick wins</span>}
               {(contentGapsFound > 0 || quickWinsAvailable > 0) && pagesWithGrowthOpps > 0 && <span className="text-[var(--brand-text-faint)]"> • </span>}
-              {pagesWithGrowthOpps > 0 && <span className="text-blue-400">{pagesWithGrowthOpps} pages near ranking</span>}
+              {pagesWithGrowthOpps > 0 && <span className="text-accent-info">{pagesWithGrowthOpps} pages near ranking</span>}
             </div>
           </div>
           <div className="text-right t-caption text-[var(--brand-text-muted)]">
@@ -334,7 +334,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         {(quickWinsAvailable > 0 || pagesWithGrowthOpps > 0) && (
           <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 flex items-center gap-3" style={{ borderRadius: 'var(--radius-signature)' }}>
             <div className="w-10 h-10 rounded-[var(--radius-lg)] bg-amber-500/20 flex items-center justify-center flex-shrink-0">
-              <Icon as={Zap} size="lg" className="text-amber-400" />
+              <Icon as={Zap} size="lg" className="text-accent-warning" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="t-body font-medium text-[var(--brand-text)]">Optimize Existing Pages</div>
@@ -342,7 +342,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
             </div>
             <button
               onClick={() => scrollToSection('optimize-existing', optimizeExistingRef)}
-              className="px-3 py-1.5 rounded-[var(--radius-lg)] bg-amber-600/20 border border-amber-500/30 t-caption-sm text-amber-300 font-medium hover:bg-amber-600/30 transition-colors flex-shrink-0"
+              className="px-3 py-1.5 rounded-[var(--radius-lg)] bg-amber-600/20 border border-amber-500/30 t-caption-sm text-accent-warning font-medium hover:bg-amber-600/30 transition-colors flex-shrink-0"
             >
               View
             </button>
@@ -352,7 +352,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         {/* New Content to Create */}
         <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 flex items-center gap-3" style={{ borderRadius: 'var(--radius-signature)' }}>
           <div className="w-10 h-10 rounded-[var(--radius-lg)] bg-teal-500/20 flex items-center justify-center flex-shrink-0">
-            <Icon as={FileText} size="lg" className="text-teal-400" />
+            <Icon as={FileText} size="lg" className="text-accent-brand" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="t-body font-medium text-[var(--brand-text)]">New Content to Create</div>
@@ -360,7 +360,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           </div>
           <button
             onClick={() => scrollToSection('new-content', newContentRef)}
-            className="px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 font-medium hover:bg-teal-600/30 transition-colors flex-shrink-0"
+            className="px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-accent-brand font-medium hover:bg-teal-600/30 transition-colors flex-shrink-0"
           >
             Explore
           </button>
@@ -369,7 +369,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         {/* Your Keyword Map */}
         <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 flex items-center gap-3" style={{ borderRadius: 'var(--radius-signature)' }}>
           <div className="w-10 h-10 rounded-[var(--radius-lg)] bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-            <Icon as={Layers} size="lg" className="text-blue-400" />
+            <Icon as={Layers} size="lg" className="text-accent-info" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="t-body font-medium text-[var(--brand-text)]">Your Keyword Map</div>
@@ -377,7 +377,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           </div>
           <button
             onClick={() => scrollToSection('page-keyword-map', keywordMapRef)}
-            className="px-3 py-1.5 rounded-[var(--radius-lg)] bg-blue-600/20 border border-blue-500/30 t-caption-sm text-blue-300 font-medium hover:bg-blue-600/30 transition-colors flex-shrink-0"
+            className="px-3 py-1.5 rounded-[var(--radius-lg)] bg-blue-600/20 border border-blue-500/30 t-caption-sm text-accent-info font-medium hover:bg-blue-600/30 transition-colors flex-shrink-0"
           >
             View
           </button>
@@ -388,15 +388,15 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       {(feedbackLoadError || trackedKeywordsError) && (
         <div className="space-y-1">
           {feedbackLoadError && (
-            <p className="t-caption-sm text-red-400/80">
+            <p className="t-caption-sm text-accent-danger">
               Couldn't load your previous keyword feedback — your approvals and declines may not reflect correctly.{' '}
-              <button onClick={loadFeedback} className="underline hover:text-red-400">Retry</button>
+              <button onClick={loadFeedback} className="underline hover:text-accent-danger">Retry</button>
             </p>
           )}
           {trackedKeywordsError && (
-            <p className="t-caption-sm text-red-400/80">
+            <p className="t-caption-sm text-accent-danger">
               Couldn't load your tracked keywords.{' '}
-              <button onClick={loadTrackedKeywords} className="underline hover:text-red-400">Retry</button>
+              <button onClick={loadTrackedKeywords} className="underline hover:text-accent-danger">Retry</button>
             </p>
           )}
         </div>
@@ -411,7 +411,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           >
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded-[var(--radius-lg)] bg-teal-500/20 flex items-center justify-center">
-                <Icon as={Briefcase} size="md" className="text-teal-400" />
+                <Icon as={Briefcase} size="md" className="text-accent-brand" />
               </div>
               <div className="text-left">
                 <div className="t-body font-medium text-[var(--brand-text)]">Your Business Priorities</div>
@@ -437,11 +437,11 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   {priorities.map((p, i) => (
                     <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-1)]/50 border border-[var(--brand-border)]/50 group">
                       <span className={`text-[9px] /* arbitrary-text-ok */ font-medium uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                        p.category === 'growth' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                        p.category === 'brand' ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20' :
-                        p.category === 'product' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
-                        p.category === 'audience' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                        p.category === 'competitive' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                        p.category === 'growth' ? 'bg-emerald-500/10 text-accent-success border border-emerald-500/20' :
+                        p.category === 'brand' ? 'bg-teal-500/10 text-accent-brand border border-teal-500/20' :
+                        p.category === 'product' ? 'bg-blue-500/10 text-accent-info border border-blue-500/20' :
+                        p.category === 'audience' ? 'bg-amber-500/10 text-accent-warning border border-amber-500/20' :
+                        p.category === 'competitive' ? 'bg-red-500/10 text-accent-danger border border-red-500/20' :
                         'bg-[var(--surface-3)]/50 text-[var(--brand-text-muted)] border border-[var(--brand-border-strong)]/30'
                       }`}>{p.category}</span>
                       <span className="t-caption-sm text-[var(--brand-text)] flex-1">{p.text}</span>
@@ -451,7 +451,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                           savePriorities(next);
                         }}
                         disabled={savingPriorities}
-                        className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-faint)] hover:text-red-400 transition-all disabled:opacity-50"
+                        className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-faint)] hover:text-accent-danger transition-all disabled:opacity-50"
                       >
                         <Icon as={X} size="md" />
                       </button>
@@ -494,7 +494,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                     }
                   }}
                   disabled={!newPriority.trim() || savingPriorities || priorities.length >= 10}
-                  className="px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 font-medium hover:bg-teal-600/30 transition-colors flex items-center gap-1 disabled:opacity-40"
+                  className="px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-accent-brand font-medium hover:bg-teal-600/30 transition-colors flex items-center gap-1 disabled:opacity-40"
                 >
                   <Icon as={Plus} size="sm" /> Add
                 </button>
@@ -516,7 +516,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           >
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded-[var(--radius-lg)] bg-teal-500/20 flex items-center justify-center">
-                <Icon as={Plus} size="md" className="text-teal-400" />
+                <Icon as={Plus} size="md" className="text-accent-brand" />
               </div>
               <div className="text-left">
                 <div className="t-body font-medium text-[var(--brand-text)]">Suggest a Keyword</div>
@@ -557,7 +557,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   {requestedKeywords.map(kw => (
                     <div key={kw} className="flex items-center justify-between px-2.5 py-1.5 bg-[var(--surface-3)]/40 rounded-[var(--radius-lg)] border border-[var(--brand-border)]">
                       <span className="t-caption-sm text-[var(--brand-text)]">{kw}</span>
-                      <span className="t-caption-sm text-teal-400/60 font-medium">Pending</span>
+                      <span className="t-caption-sm text-accent-brand font-medium">Pending</span>
                     </div>
                   ))}
                 </div>
@@ -578,7 +578,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           >
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded-[var(--radius-lg)] bg-teal-500/20 flex items-center justify-center">
-                <Icon as={FileText} size="md" className="text-teal-400" />
+                <Icon as={FileText} size="md" className="text-accent-brand" />
               </div>
               <div className="text-left">
                 <div className="t-body font-medium text-[var(--brand-text)]">New Content to Create</div>
@@ -586,7 +586,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="t-caption font-bold text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded-full border border-teal-500/20">{(strategyData.contentGaps?.length || 0) + (strategyData.keywordGaps?.length || 0)}</span>
+              <span className="t-caption font-bold text-accent-brand bg-teal-500/10 px-2 py-0.5 rounded-full border border-teal-500/20">{(strategyData.contentGaps?.length || 0) + (strategyData.keywordGaps?.length || 0)}</span>
               <ChevronDown className={`w-4 h-4 text-[var(--brand-text-muted)] transition-transform ${expandedSections.has('new-content') ? '' : '-rotate-90'}`} />
             </div>
           </button>
@@ -601,7 +601,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               {strategyData.contentGaps && strategyData.contentGaps.length > 0 && (
               <>
               <div className="flex items-center gap-2 mb-2">
-                <Icon as={FileText} size="md" className="text-teal-400" />
+                <Icon as={FileText} size="md" className="text-accent-brand" />
                 <span className="t-caption font-medium text-[var(--brand-text)]">Content Gaps</span>
                 <span className="t-caption-sm text-[var(--brand-text-faint)]">({strategyData.contentGaps.length})</span>
               </div>
@@ -621,7 +621,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                       {/* Row 1: topic title + intent/page-type badges */}
                       <div className="flex items-start justify-between gap-2 mb-1">
                         <span className="t-caption font-semibold text-[var(--brand-text)]">{gap.topic}{gap.opportunityScore != null && (
-                            <span className="ml-2 inline-flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 t-caption font-medium text-blue-400">
+                            <span className="ml-2 inline-flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 t-caption font-medium text-accent-info">
                               {gap.opportunityScore}/100
                             </span>
                           )}</span>
@@ -630,13 +630,13 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                             <span className={`t-caption-sm uppercase px-1.5 py-0.5 rounded-full border font-medium ${intentColor(gap.intent)}`}>{gap.intent}</span>
                           )}
                           {pageType !== 'blog' && (
-                            <span className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20 font-medium capitalize">{pageType}</span>
+                            <span className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 text-accent-brand border border-teal-500/20 font-medium capitalize">{pageType}</span>
                           )}
                         </div>
                       </div>
                       {/* Row 2: target keyword + metrics */}
                       <div className="flex items-center gap-3 flex-wrap mb-1.5">
-                        <span className="t-caption-sm text-teal-400">&ldquo;{gap.targetKeyword}&rdquo;</span>
+                        <span className="t-caption-sm text-accent-brand">&ldquo;{gap.targetKeyword}&rdquo;</span>
                         {gap.volume != null && gap.volume > 0 && (
                           <span className="t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-0.5"><Icon as={BarChart3} size="sm" />{fmtNum(gap.volume)}/mo</span>
                         )}
@@ -649,20 +649,20 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                           </>
                         )}
                         {gap.impressions != null && gap.impressions > 0 && (
-                          <span className="t-caption-sm text-blue-400 flex items-center gap-0.5"><Icon as={Eye} size="sm" />{fmtNum(gap.impressions)} impr</span>
+                          <span className="t-caption-sm text-accent-info flex items-center gap-0.5"><Icon as={Eye} size="sm" />{fmtNum(gap.impressions)} impr</span>
                         )}
                         {isDataValidated && (
-                          <span className="t-caption-sm text-emerald-400/70">✓ data-backed</span>
+                          <span className="t-caption-sm text-accent-success">✓ data-backed</span>
                         )}
                       </div>
                       {/* Trend + SERP + Competitor badges */}
                       {hasTrendOrSerp && (
                         <div className="flex items-center gap-2 flex-wrap mb-1.5">
                           {gap.trendDirection === 'rising' && (
-                            <span className="flex items-center gap-0.5 t-caption-sm text-emerald-400 font-medium"><Icon as={TrendingUp} size="sm" />Rising</span>
+                            <span className="flex items-center gap-0.5 t-caption-sm text-accent-success font-medium"><Icon as={TrendingUp} size="sm" />Rising</span>
                           )}
                           {gap.trendDirection === 'declining' && (
-                            <span className="flex items-center gap-0.5 t-caption-sm text-red-400 font-medium"><Icon as={TrendingDown} size="sm" />Declining</span>
+                            <span className="flex items-center gap-0.5 t-caption-sm text-accent-danger font-medium"><Icon as={TrendingDown} size="sm" />Declining</span>
                           )}
                           {gap.trendDirection === 'stable' && gap.volume && gap.volume > 0 && (
                             <span className="flex items-center gap-0.5 t-caption-sm text-[var(--brand-text-muted)] font-medium"><Icon as={Minus} size="sm" />Stable</span>
@@ -675,13 +675,13 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                               local_pack: '📍 Local',
                             };
                             return (
-                              <span key={feat} className="t-caption-sm px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                              <span key={feat} className="t-caption-sm px-1.5 py-0.5 rounded bg-blue-500/10 text-accent-info border border-blue-500/20">
                                 {labels[feat] ?? feat}
                               </span>
                             );
                           })}
                           {gap.competitorProof && (
-                            <span className="t-caption-sm text-orange-400 font-medium">{gap.competitorProof}</span>
+                            <span className="t-caption-sm text-accent-orange font-medium">{gap.competitorProof}</span>
                           )}
                         </div>
                       )}
@@ -695,8 +695,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                           const loading = isLoadingFeedback(gap.targetKeyword);
                           if (fbStatus === 'declined') return (
                             <div className="flex items-center gap-2 px-2 py-1 rounded-[var(--radius-lg)] bg-red-500/5 border border-red-500/20">
-                              <Icon as={Ban} size="sm" className="text-red-400 flex-shrink-0" />
-                              <span className="t-caption-sm text-red-400">Declined</span>
+                              <Icon as={Ban} size="sm" className="text-accent-danger flex-shrink-0" />
+                              <span className="t-caption-sm text-accent-danger">Declined</span>
                               <button onClick={() => undoFeedback(gap.targetKeyword)} disabled={loading} className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] flex items-center gap-0.5 transition-colors disabled:opacity-50">
                                 <Icon as={Undo2} size="sm" /> Undo
                               </button>
@@ -704,8 +704,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                           );
                           if (fbStatus === 'approved') return (
                             <div className="flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-lg)] bg-emerald-500/5 border border-emerald-500/20">
-                              <Icon as={ThumbsUp} size="sm" className="text-emerald-400" />
-                              <span className="t-caption-sm text-emerald-400">Approved</span>
+                              <Icon as={ThumbsUp} size="sm" className="text-accent-success" />
+                              <span className="t-caption-sm text-accent-success">Approved</span>
                             </div>
                           );
                           return (
@@ -713,14 +713,14 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                               <button
                                 onClick={() => submitFeedback(gap.targetKeyword, 'approved', 'content_gap')}
                                 disabled={loading}
-                                className="flex items-center gap-1 px-2 py-1 rounded t-caption-sm text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+                                className="flex items-center gap-1 px-2 py-1 rounded t-caption-sm text-accent-success bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
                               >
                                 <Icon as={ThumbsUp} size="sm" /> Relevant
                               </button>
                               <button
                                 onClick={() => { setDeclineReason({ keyword: gap.targetKeyword, source: 'content_gap' }); setDeclineReasonText(''); }}
                                 disabled={loading}
-                                className="flex items-center gap-1 px-2 py-1 rounded t-caption-sm text-red-400 bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                                className="flex items-center gap-1 px-2 py-1 rounded t-caption-sm text-accent-danger bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-50"
                               >
                                 <Icon as={ThumbsDown} size="sm" /> Not relevant
                               </button>
@@ -732,27 +732,27 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                           (() => {
                             const s = matchingReq?.status;
                             if (s === 'published') return (
-                              <span className="flex items-center gap-1 t-caption-sm text-emerald-400 bg-emerald-500/10 px-2.5 py-1.5 rounded-[var(--radius-lg)] border border-emerald-500/20 flex-shrink-0">
+                              <span className="flex items-center gap-1 t-caption-sm text-accent-success bg-emerald-500/10 px-2.5 py-1.5 rounded-[var(--radius-lg)] border border-emerald-500/20 flex-shrink-0">
                                 <Icon as={CheckCircle2} size="md" /> Published
                               </span>
                             );
                             if (s === 'delivered') return (
-                              <span className="flex items-center gap-1 t-caption-sm text-teal-400 bg-teal-500/10 px-2.5 py-1.5 rounded-[var(--radius-lg)] border border-teal-500/20 flex-shrink-0">
+                              <span className="flex items-center gap-1 t-caption-sm text-accent-brand bg-teal-500/10 px-2.5 py-1.5 rounded-[var(--radius-lg)] border border-teal-500/20 flex-shrink-0">
                                 <Icon as={CheckCircle2} size="md" /> In Production
                               </span>
                             );
                             if (s === 'approved' || s === 'in_progress') return (
-                              <span className="flex items-center gap-1 t-caption-sm text-teal-400 bg-teal-500/10 px-2.5 py-1.5 rounded-[var(--radius-lg)] border border-teal-500/20 flex-shrink-0">
+                              <span className="flex items-center gap-1 t-caption-sm text-accent-brand bg-teal-500/10 px-2.5 py-1.5 rounded-[var(--radius-lg)] border border-teal-500/20 flex-shrink-0">
                                 <Icon as={Sparkles} size="md" /> In Production
                               </span>
                             );
                             if (s === 'brief_generated' || s === 'client_review') return (
-                              <span className="flex items-center gap-1 t-caption-sm text-amber-400 bg-amber-500/10 px-2.5 py-1.5 rounded-[var(--radius-lg)] border border-amber-500/20 flex-shrink-0">
+                              <span className="flex items-center gap-1 t-caption-sm text-accent-warning bg-amber-500/10 px-2.5 py-1.5 rounded-[var(--radius-lg)] border border-amber-500/20 flex-shrink-0">
                                 <Icon as={FileText} size="md" /> Brief Requested
                               </span>
                             );
                             return (
-                              <span className="flex items-center gap-1 t-caption-sm text-amber-400 bg-amber-500/10 px-2.5 py-1.5 rounded-[var(--radius-lg)] border border-amber-500/20 flex-shrink-0">
+                              <span className="flex items-center gap-1 t-caption-sm text-accent-warning bg-amber-500/10 px-2.5 py-1.5 rounded-[var(--radius-lg)] border border-amber-500/20 flex-shrink-0">
                                 <Icon as={CheckCircle2} size="md" /> Brief Ordered
                               </span>
                             );
@@ -760,7 +760,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                         ) : planStatus ? (
                           <button
                             onClick={() => onTabChange?.('content-plan')}
-                            className="flex items-center gap-1 t-caption-sm text-teal-400 bg-teal-500/10 px-2.5 py-1.5 rounded-[var(--radius-lg)] border border-teal-500/20 flex-shrink-0 hover:bg-teal-500/20 transition-colors"
+                            className="flex items-center gap-1 t-caption-sm text-accent-brand bg-teal-500/10 px-2.5 py-1.5 rounded-[var(--radius-lg)] border border-teal-500/20 flex-shrink-0 hover:bg-teal-500/20 transition-colors"
                             title="View in Content Plan"
                           >
                             <Icon as={Layers} size="md" />
@@ -770,7 +770,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                           <div className="flex items-center gap-2 flex-shrink-0">
                             <button
                               onClick={() => setPricingModal({ serviceType: 'brief_only', topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, source: 'strategy', pageType })}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 font-medium hover:bg-teal-600/40 transition-all"
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-accent-brand font-medium hover:bg-teal-600/40 transition-all"
                             >
                               <Icon as={FileText} size="sm" /> Get Brief
                               {!hidePrices && briefPrice != null && <span className="opacity-70 ml-0.5">{fmtPrice(briefPrice)}</span>}
@@ -778,7 +778,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                             {(hidePrices || fullPostPrice != null) && (
                               <button
                                 onClick={() => setPricingModal({ serviceType: 'full_post', topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, source: 'strategy', pageType })}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] bg-gradient-to-r from-teal-600/30 to-emerald-600/30 border border-teal-500/40 t-caption-sm text-teal-200 font-medium hover:from-teal-600/50 hover:to-emerald-600/50 transition-all"
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] bg-gradient-to-r from-teal-600/30 to-emerald-600/30 border border-teal-500/40 t-caption-sm text-accent-brand font-medium hover:from-teal-600/50 hover:to-emerald-600/50 transition-all"
                               >
                                 <Icon as={Sparkles} size="sm" /> Full Post
                                 {!hidePrices && fullPostPrice != null && <span className="opacity-70 ml-0.5">{fmtPrice(fullPostPrice)}</span>}
@@ -806,7 +806,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               {strategyData.keywordGaps && strategyData.keywordGaps.length > 0 && (
                 <div className="mt-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <Icon as={Target} size="md" className="text-orange-400" />
+                    <Icon as={Target} size="md" className="text-accent-orange" />
                     <span className="t-caption font-medium text-[var(--brand-text)]">Competitor Keyword Gaps</span>
                     <span className="t-caption-sm text-[var(--brand-text-faint)]">({strategyData.keywordGaps.length})</span>
                   </div>
@@ -841,7 +841,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               {strategyData.opportunities.length > 0 && (
                 <div className="mt-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <Icon as={Sparkles} size="md" className="text-teal-400" />
+                    <Icon as={Sparkles} size="md" className="text-accent-brand" />
                     <span className="t-caption font-medium text-[var(--brand-text)]">Keyword Opportunities</span>
                     <span className="t-caption-sm text-[var(--brand-text-faint)]">({strategyData.opportunities.length})</span>
                   </div>
@@ -873,7 +873,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           >
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded-[var(--radius-lg)] bg-amber-500/20 flex items-center justify-center">
-                <Icon as={Zap} size="md" className="text-amber-400" />
+                <Icon as={Zap} size="md" className="text-accent-warning" />
               </div>
               <div className="text-left">
                 <div className="t-body font-medium text-[var(--brand-text)]">Optimize Existing Pages</div>
@@ -881,7 +881,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="t-caption font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">{quickWinsAvailable + pagesWithGrowthOpps}</span>
+              <span className="t-caption font-bold text-accent-warning bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">{quickWinsAvailable + pagesWithGrowthOpps}</span>
               <ChevronDown className={`w-4 h-4 text-[var(--brand-text-muted)] transition-transform ${expandedSections.has('optimize-existing') ? '' : '-rotate-90'}`} />
             </div>
           </button>
@@ -896,13 +896,13 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               {strategyData.quickWins && strategyData.quickWins.length > 0 && (
                 <div className="mb-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <Icon as={Zap} size="md" className="text-amber-400" />
+                    <Icon as={Zap} size="md" className="text-accent-warning" />
                     <span className="t-caption font-medium text-[var(--brand-text)]">Quick Wins</span>
                     <span className="t-caption-sm text-[var(--brand-text-faint)]">({strategyData.quickWins.length})</span>
                   </div>
                   <div className="space-y-2">
                     {strategyData.quickWins.slice(0, expandedSections.has('quick-wins-all') ? undefined : 3).map((qw, i) => {
-                      const impactColor = qw.estimatedImpact === 'high' ? 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30' : qw.estimatedImpact === 'medium' ? 'text-amber-400 bg-amber-500/15 border-amber-500/30' : 'text-[var(--brand-text-muted)] bg-[var(--surface-3)]/30 border-[var(--brand-border-strong)]/20';
+                      const impactColor = qw.estimatedImpact === 'high' ? 'text-accent-success bg-emerald-500/15 border-emerald-500/30' : qw.estimatedImpact === 'medium' ? 'text-accent-warning bg-amber-500/15 border-amber-500/30' : 'text-[var(--brand-text-muted)] bg-[var(--surface-3)]/30 border-[var(--brand-border-strong)]/20';
                       return (
                         <div key={i} className="px-3 py-2.5 rounded-[var(--radius-lg)] bg-[var(--surface-1)]/50 border border-[var(--brand-border)]/80">
                           <div className="flex items-center justify-between">
@@ -958,7 +958,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 return (
                   <>
                     <div className="flex items-center gap-2 mb-2">
-                      <Icon as={TrendingUp} size="md" className="text-blue-400" />
+                      <Icon as={TrendingUp} size="md" className="text-accent-info" />
                       <span className="t-caption font-medium text-[var(--brand-text)]">Growth Opportunities</span>
                       <span className="t-caption-sm text-[var(--brand-text-faint)]">({unranked.length})</span>
                     </div>
@@ -970,10 +970,10 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                               <div className="t-caption-sm font-medium text-[var(--brand-text)] truncate">{page.pageTitle || page.pagePath}</div>
                               <div className="t-caption-sm text-[var(--brand-text-muted)] font-mono truncate">{page.pagePath}</div>
                             </div>
-                            {page.hasImpressions && <span className="t-caption-sm text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20 flex-shrink-0 ml-2">Almost there</span>}
+                            {page.hasImpressions && <span className="t-caption-sm text-accent-info bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20 flex-shrink-0 ml-2">Almost there</span>}
                           </div>
                           {page.primaryKeyword && (
-                            <div className="t-caption-sm text-teal-400/80 mb-2">Target: &ldquo;{page.primaryKeyword}&rdquo;</div>
+                            <div className="t-caption-sm text-accent-brand mb-2">Target: &ldquo;{page.primaryKeyword}&rdquo;</div>
                           )}
                           <div className="t-caption-sm text-[var(--brand-text-muted)] leading-snug flex-1">{page.reasons[0]}</div>
                           <div className="flex items-center justify-between mt-3 pt-3 border-t border-[var(--brand-border)]/50">
@@ -1037,7 +1037,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           >
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded-[var(--radius-lg)] bg-blue-500/20 flex items-center justify-center">
-                <Icon as={Layers} size="md" className="text-blue-400" />
+                <Icon as={Layers} size="md" className="text-accent-info" />
               </div>
               <div className="text-left">
                 <div className="t-body font-medium text-[var(--brand-text)]">Your Keyword Map</div>
@@ -1075,7 +1075,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                     <div className="t-caption-sm text-[var(--brand-text-muted)] tracking-wider mb-1.5">Your keywords</div>
                     <div className="flex flex-wrap gap-2">
                       {clientAdded.map(tk => (
-                        <span key={tk.query} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-lg)] bg-teal-500/10 border border-teal-500/20 t-caption-sm text-teal-400">
+                        <span key={tk.query} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-lg)] bg-teal-500/10 border border-teal-500/20 t-caption-sm text-accent-brand">
                           {tk.query}
                           <button
                             onClick={async () => {
@@ -1085,7 +1085,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                                 setToast?.(`"${tk.query}" removed from tracking`);
                               } catch { setToast?.('Failed to remove keyword'); }
                             }}
-                            className="text-[var(--brand-text-muted)] hover:text-red-400 transition-colors"
+                            className="text-[var(--brand-text-muted)] hover:text-accent-danger transition-colors"
                             title="Remove keyword"
                           >
                             <Icon as={X} size="sm" />
@@ -1128,7 +1128,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   <button
                     type="submit"
                     disabled={addingKeyword || newTrackedKeyword.trim().length < 2}
-                    className="px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 font-medium hover:bg-teal-600/30 transition-colors disabled:opacity-50 flex items-center gap-1"
+                    className="px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-accent-brand font-medium hover:bg-teal-600/30 transition-colors disabled:opacity-50 flex items-center gap-1"
                   >
                     <Icon as={Plus} size="sm" /> Track
                   </button>
@@ -1166,7 +1166,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
             >
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 rounded-[var(--radius-lg)] bg-red-500/20 flex items-center justify-center">
-                  <Icon as={Ban} size="md" className="text-red-400" />
+                  <Icon as={Ban} size="md" className="text-accent-danger" />
                 </div>
                 <div className="text-left">
                   <div className="t-body font-medium text-[var(--brand-text)]">Declined Keywords</div>
@@ -1182,7 +1182,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 <div className="flex flex-wrap gap-2">
                   {declined.map(([kw]) => (
                     <div key={kw} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[var(--radius-lg)] bg-red-500/5 border border-red-500/20">
-                      <span className="t-caption-sm text-red-300">{kw}</span>
+                      <span className="t-caption-sm text-accent-danger">{kw}</span>
                       <button
                         onClick={() => undoFeedback(kw)}
                         disabled={isLoadingFeedback(kw)}
@@ -1205,7 +1205,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           <Modal.Header title="Decline keyword" onClose={() => setDeclineReason(null)} />
           <Modal.Body>
             <p className="t-caption-sm text-[var(--brand-text-muted)] mb-3">
-              <span className="text-red-400 font-medium">&ldquo;{declineReason.keyword}&rdquo;</span> will be excluded from future strategy recommendations.
+              <span className="text-accent-danger font-medium">&ldquo;{declineReason.keyword}&rdquo;</span> will be excluded from future strategy recommendations.
             </p>
             <label className="block t-caption-sm text-[var(--brand-text-muted)] mb-1">Why isn't this keyword relevant? <span className="text-[var(--brand-text-faint)]">(optional)</span></label>
             <textarea
@@ -1230,7 +1230,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   setDeclineReason(null);
                   setDeclineReasonText('');
                 }}
-                className="px-4 py-1.5 rounded-[var(--radius-lg)] bg-red-600/20 border border-red-500/30 t-caption-sm text-red-300 font-medium hover:bg-red-600/30 transition-colors flex items-center gap-1"
+                className="px-4 py-1.5 rounded-[var(--radius-lg)] bg-red-600/20 border border-red-500/30 t-caption-sm text-accent-danger font-medium hover:bg-red-600/30 transition-colors flex items-center gap-1"
               >
                 <Icon as={ThumbsDown} size="sm" /> Decline Keyword
               </button>
