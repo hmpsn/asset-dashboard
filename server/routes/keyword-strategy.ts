@@ -1069,7 +1069,11 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess
         sendProgress('complete', 'All pages are already up to date — no re-analysis needed.', 1.0);
         if (keepalive) clearInterval(keepalive); // prevent setInterval leak on early exit
         activeGenerations.delete(ws.id);
-        decrementUsage(ws.id, 'strategy_generations'); // no AI work done — refund pre-reserved slot
+        try {
+          decrementUsage(ws.id, 'strategy_generations'); // no AI work done — refund pre-reserved slot
+        } catch (err) {
+          log.warn({ err, workspaceId: ws.id }, 'Failed to refund strategy generation usage after incremental no-op');
+        }
         // Match the dual-response pattern used at the normal exit (line ~1999):
         // SSE callers already got progress events + the sendProgress('complete') above.
         // JSON callers need a proper response body — res.end() gives them an empty 200.

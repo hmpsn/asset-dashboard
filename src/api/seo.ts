@@ -134,8 +134,8 @@ export const schemaPlan = {
   update: (siteId: string, pageRoles: PageRoleAssignment[], canonicalEntities?: CanonicalEntity[]) =>
     put<SchemaSitePlan>(`/api/webflow/schema-plan/${siteId}`, { pageRoles, canonicalEntities }),
 
-  sendToClient: (siteId: string) =>
-    post<{ plan: SchemaSitePlan }>(`/api/webflow/schema-plan/${siteId}/send-to-client`),
+  sendToClient: (siteId: string, workspaceId?: string) =>
+    post<{ plan: SchemaSitePlan }>(`/api/webflow/schema-plan/${siteId}/send-to-client${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`),
 
   activate: (siteId: string) =>
     post<SchemaSitePlan>(`/api/webflow/schema-plan/${siteId}/activate`),

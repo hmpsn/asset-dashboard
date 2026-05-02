@@ -45,11 +45,13 @@ export function useWsInvalidation(workspaceId: string | undefined) {
     [WS_EVENTS.CONTENT_REQUEST_CREATED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.client.contentRequests(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.requests(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
     },
     [WS_EVENTS.CONTENT_REQUEST_UPDATE]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.client.contentRequests(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.requests(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
     },
     [WS_EVENTS.ACTIVITY_NEW]: () => {
@@ -75,6 +77,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
     [WS_EVENTS.CONTENT_PUBLISHED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.posts(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.postsDetailAll(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
     },
     [WS_EVENTS.WORK_ORDER_UPDATE]: () => {

@@ -113,7 +113,11 @@ router.post('/api/content-posts/:workspaceId/:postId/publish-to-webflow', requir
     // Publish the CMS item to make it live
     const pubResult = await publishCollectionItems(collectionId, [itemId], token);
     if (!pubResult.success) {
-      log.warn(`CMS publish warning for ${itemId}: ${pubResult.error}`);
+      updatePostField(workspaceId, postId, {
+        webflowItemId: itemId,
+        webflowCollectionId: collectionId,
+      });
+      return res.status(500).json({ error: `Failed to publish CMS item: ${pubResult.error}` });
     }
 
     // Update the post record with publish tracking data

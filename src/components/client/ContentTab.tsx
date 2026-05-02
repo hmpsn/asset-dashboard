@@ -246,7 +246,7 @@ export function ContentTab({
             : 0;
         const isExpanded = expandedContentReq === req.id;
         const brief = req.briefId ? briefPreviews[req.briefId] : null;
-        const canUpgrade = isBriefOnly && ['approved', 'delivered', 'published'].includes(req.status);
+        const canUpgrade = isBriefOnly && req.status === 'approved';
 
         return ( // pr-check-disable-next-line -- Brand signature radius intentional
           <div key={req.id} className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
@@ -519,7 +519,7 @@ export function ContentTab({
                     {/* Export */}
                     <div className="flex items-center gap-2 pt-1">
                       {/* // fetch-ok — fetches HTML for new-window preview, API client is JSON-only */}
-                      <button onClick={() => { const w = window.open('', '_blank'); if (!w) return; w.document.write('<p style="font-family:sans-serif;padding:40px">Loading…</p>'); fetch(`/api/content-briefs/${workspaceId}/${brief.id}/export`).then(r => r.text()).then(html => { w.document.open(); w.document.write(html); w.document.close(); }).catch(() => { w.location.href = `/api/content-briefs/${workspaceId}/${brief.id}/export`; }); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">
+                      <button onClick={() => { const url = `/api/public/content-brief/${workspaceId}/${brief.id}/export`; const w = window.open('', '_blank'); if (!w) return; w.document.write('<p style="font-family:sans-serif;padding:40px">Loading...</p>'); fetch(url).then(r => r.text()).then(html => { w.document.open(); w.document.write(html); w.document.close(); }).catch(() => { w.location.href = url; }); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors">
                         <Icon as={Download} size="sm" /> Download PDF
                       </button>
                     </div>

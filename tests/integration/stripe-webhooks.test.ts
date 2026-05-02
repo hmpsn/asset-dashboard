@@ -41,6 +41,7 @@ import { handleWebhookEvent, initStripeBroadcast } from '../../server/stripe.js'
 import { createPayment, getPaymentBySession, listPayments } from '../../server/payments.js';
 import { getWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { listActivity } from '../../server/activity-log.js';
+import { createContentRequest, getContentRequest, updateContentRequest } from '../../server/content-requests.js';
 
 // ---------------------------------------------------------------------------
 // Test suite
@@ -62,6 +63,7 @@ describe('Stripe Webhooks — FM-2 & FM-5', () => {
     db.prepare('DELETE FROM payments WHERE workspace_id = ?').run(ws.workspaceId);
     db.prepare('DELETE FROM activity_log WHERE workspace_id = ?').run(ws.workspaceId);
     db.prepare('DELETE FROM work_orders WHERE workspace_id = ?').run(ws.workspaceId);
+    db.prepare('DELETE FROM content_topic_requests WHERE workspace_id = ?').run(ws.workspaceId);
     ws.cleanup();
   });
 
@@ -268,6 +270,53 @@ describe('Stripe Webhooks — FM-2 & FM-5', () => {
     const payment = getPaymentBySession(ws.workspaceId, piId);
     expect(payment).toBeDefined();
     expect(payment!.status).toBe('paid');
+  });
+
+  it('payment_intent.succeeded — post_polished upgrades an approved brief request', async () => {
+    const piId = 'pi_test_post_polished_upgrade';
+    const request = createContentRequest(ws.workspaceId, {
+      topic: 'Paid upgrade request',
+      targetKeyword: `paid upgrade ${Date.now()}`,
+      intent: 'informational',
+      priority: 'medium',
+      rationale: 'Stripe webhook regression',
+      serviceType: 'brief_only',
+      initialStatus: 'brief_generated',
+      dedupe: false,
+    });
+    updateContentRequest(ws.workspaceId, request.id, { status: 'approved' });
+
+    createPayment(ws.workspaceId, {
+      workspaceId: ws.workspaceId,
+      stripeSessionId: piId,
+      productType: 'post_polished',
+      amount: 50000,
+      currency: 'usd',
+      status: 'pending',
+      contentRequestId: request.id,
+    });
+
+    const event = createWebhookEvent('payment_intent.succeeded', {
+      id: piId,
+      metadata: {
+        workspaceId: ws.workspaceId,
+        productType: 'post_polished',
+        contentRequestId: request.id,
+      },
+      amount: 50000,
+    });
+
+    await handleWebhookEvent(event as never);
+
+    const updated = getContentRequest(ws.workspaceId, request.id);
+    expect(updated?.serviceType).toBe('full_post');
+    expect(updated?.status).toBe('in_progress');
+    expect(updated?.upgradedAt).toBeDefined();
+    expect(mockBroadcast).toHaveBeenCalledWith(
+      ws.workspaceId,
+      'content-request:update',
+      expect.objectContaining({ id: request.id, status: 'in_progress' }),
+    );
   });
 
   // ── payment_intent.payment_failed ──

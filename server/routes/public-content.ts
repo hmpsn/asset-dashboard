@@ -49,6 +49,32 @@ import {
 
 
 const log = createLogger('public-content');
+function assertClientReviewRequest(workspaceId: string, requestId: string, res: import('express').Response) {
+  const existing = getContentRequest(workspaceId, requestId);
+  if (!existing) {
+    res.status(404).json({ error: 'Request not found' });
+    return null;
+  }
+  if (existing.status !== 'client_review') {
+    res.status(409).json({ error: 'Request is not ready for client review' });
+    return null;
+  }
+  return existing;
+}
+
+function assertUpgradeableBriefRequest(workspaceId: string, requestId: string, res: import('express').Response) {
+  const existing = getContentRequest(workspaceId, requestId);
+  if (!existing) {
+    res.status(404).json({ error: 'Request not found' });
+    return null;
+  }
+  if (existing.serviceType !== 'brief_only' || existing.status !== 'approved') {
+    res.status(409).json({ error: 'Only approved brief requests can be upgraded to a full post' });
+    return null;
+  }
+  return existing;
+}
+
 // --- Public SEO Strategy (client dashboard) ---
 // seoClientView controls tab visibility in the UI; the data is always safe to return
 // and is needed unconditionally by Overview insights, InsightsDigest, and AI chat context.
@@ -212,6 +238,7 @@ router.post('/api/public/content-request/:workspaceId/:id/decline', validate(dec
 
 // Client approves a brief
 router.post('/api/public/content-request/:workspaceId/:id/approve', validate(approveContentRequestSchema), (req, res, next) => {
+  if (!assertClientReviewRequest(req.params.workspaceId, req.params.id, res)) return;
   let updated;
   try {
     updated = updateContentRequest(req.params.workspaceId, req.params.id, { status: 'approved' });
@@ -230,6 +257,7 @@ router.post('/api/public/content-request/:workspaceId/:id/approve', validate(app
 
 // Client requests changes on a brief
 router.post('/api/public/content-request/:workspaceId/:id/request-changes', validate(requestChangesSchema), (req, res, next) => {
+  if (!assertClientReviewRequest(req.params.workspaceId, req.params.id, res)) return;
   const feedback = sanitizeString(req.body.feedback, 2000);
   let updated;
   try {
@@ -259,11 +287,13 @@ router.post('/api/public/content-request/:workspaceId/:id/request-changes', vali
 
 // Client upgrades from brief_only to full_post
 router.post('/api/public/content-request/:workspaceId/:id/upgrade', validate(upgradeContentRequestSchema), (req, res, next) => {
+  if (!assertUpgradeableBriefRequest(req.params.workspaceId, req.params.id, res)) return;
   let updated;
   try {
     updated = updateContentRequest(req.params.workspaceId, req.params.id, {
       serviceType: 'full_post',
       upgradedAt: new Date().toISOString(),
+      status: 'in_progress',
     });
   } catch (err: unknown) {
     if (err instanceof Error && err.name === 'InvalidTransitionError') {

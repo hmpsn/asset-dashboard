@@ -1,11 +1,9 @@
 /**
  * Integration tests — Content Publish Writes (FM-2 Phantom Success)
  *
- * FM-2 risk: the Webflow publish step (step 6 of the route) only logs a warning
- * on failure and continues. The post is marked as published (`publishedAt` set)
- * even though the CMS item was never made live. These tests document and guard
- * that known behaviour, and verify that earlier failures (CMS create/update) DO
- * abort the route with a 500 before any local state is written.
+ * FM-2 risk: the Webflow publish step can fail after CMS item creation. These
+ * tests guard that publish failure aborts the route, preserves the item ID for a
+ * retry, and does not mark the post as published.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import http from 'http';
@@ -328,16 +326,7 @@ describe('Content Publish Writes — FM-2 Phantom Success', () => {
       expect(post!.publishedAt).toBeUndefined();
     });
 
-    // ── FM-2: publish step failure — post still marked as published ──────────
-    //
-    // This is the documented soft-failure (Phantom Success): the CMS item was
-    // created successfully but the publish call failed, leaving the item in draft
-    // state on Webflow. The route only logs a warning and continues, so local
-    // state is still written with publishedAt set.
-    //
-    // This test documents the CURRENT BEHAVIOR, not the ideal behavior. If this
-    // behaviour is ever changed to a hard error, update this test accordingly.
-    it('FM-2: marks post as published even when the publish step fails (soft-failure)', async () => {
+    it('returns 500 and retains the Webflow item ID for retry when the publish step fails', async () => {
       content.cleanup();
       content = seedPublishableContent();
 
@@ -360,20 +349,15 @@ describe('Content Publish Writes — FM-2 Phantom Success', () => {
         {},
       );
 
-      // Route returns 200 despite publish failure — this is the FM-2 behaviour
-      expect(status).toBe(200);
-      const b = body as { success: boolean; itemId: string; post: { publishedAt: string } };
-      expect(b.success).toBe(true);
-      expect(b.itemId).toBe(TEST_ITEM_ID);
+      expect(status).toBe(500);
+      expect((body as { error: string }).error).toContain('Failed to publish CMS item');
 
-      // Local state IS written: the post is marked as published
       const { getPost } = await import('../../server/content-posts.js');
       const post = getPost(content.workspaceId, content.postId);
       expect(post).toBeDefined();
       expect(post!.webflowItemId).toBe(TEST_ITEM_ID);
-      expect(post!.publishedAt).toBeDefined();
-      // publishedAt should be a valid ISO date string
-      expect(() => new Date(post!.publishedAt!).toISOString()).not.toThrow();
+      expect(post!.webflowCollectionId).toBe(TEST_COLLECTION_ID);
+      expect(post!.publishedAt).toBeUndefined();
 
       // Verify the publish endpoint WAS called (the attempt was made)
       const requests = getCapturedRequests();

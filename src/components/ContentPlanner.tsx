@@ -82,12 +82,23 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
     action: 'optimize' | 'generate_briefs' | 'generate_posts' | 'send_review' | 'export_csv' | 'export_docx',
     cellIds: string[],
   ) => {
-    void cellIds;
     if (action === 'export_csv') {
       window.open(contentMatrices.exportMatricesCsv(workspaceId), '_blank');
+      return;
+    }
+    if (action === 'send_review') {
+      if (view.mode !== 'matrix-grid') return;
+      try {
+        setError(null);
+        await contentMatrices.sendSamples(workspaceId, view.matrixId, cellIds);
+        const updated = await contentMatrices.getById(workspaceId, view.matrixId);
+        setMatrices(prev => prev.map(m => m.id === view.matrixId ? updated : m));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to send selected pages for review');
+      }
     }
     // Other bulk actions will be wired to specific endpoints as they're implemented
-  }, [workspaceId]);
+  }, [workspaceId, view]);
 
   const handleCellUpdate = useCallback(async (cellId: string, updates: Partial<MatrixCell>) => {
     if (view.mode !== 'matrix-grid') return;

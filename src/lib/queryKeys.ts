@@ -37,6 +37,7 @@ export const queryKeys = {
     approvals: (wsId: string) => ['admin-approvals', wsId] as const,
     posts: (wsId: string) => ['admin-posts', wsId] as const,
     post: (wsId: string, postId: string) => ['admin-post', wsId, postId] as const,
+    postsDetailAll: (wsId: string) => ['admin-post', wsId] as const,
     postVersions: (wsId: string, postId: string) => ['admin-post-versions', wsId, postId] as const,
     publishTarget: (wsId: string) => ['publish-target', wsId] as const,
     contentCalendar: (wsId: string) => ['content-calendar', wsId] as const,

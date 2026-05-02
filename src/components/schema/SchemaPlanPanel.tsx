@@ -126,7 +126,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
     setSending(true);
     setError(null);
     try {
-      const { plan: updatedPlan } = await schemaPlan.sendToClient(siteId);
+      const { plan: updatedPlan } = await schemaPlan.sendToClient(siteId, plan.workspaceId);
       setPlan(updatedPlan);
       setSuccess('Schema strategy preview sent to client for review');
       setTimeout(() => setSuccess(null), 5000);

@@ -214,6 +214,9 @@ export const contentMatrices = {
   exportMatricesJson: (wsId: string) =>
     `/api/export/${wsId}/matrices?format=json`,
 
+  sendSamples: (wsId: string, matrixId: string, cellIds: string[]) =>
+    post<{ batchId: string; batch: unknown; cellsSent: number }>(`/api/content-plan/${wsId}/${matrixId}/send-samples`, { cellIds }),
+
   exportTemplatesCsv: (wsId: string) =>
     `/api/export/${wsId}/templates?format=csv`,
 

@@ -1,6 +1,6 @@
 import Stripe from 'stripe';
 import { createPayment, updatePayment, getPaymentBySession, type ProductType } from './payments.js';
-import { updateContentRequest } from './content-requests.js';
+import { getContentRequest, updateContentRequest } from './content-requests.js';
 import { addActivity } from './activity-log.js';
 import { getStripeSecretKey, getStripeWebhookSecret, getStripePriceId } from './stripe-config.js';
 import { getWorkspace, updateWorkspace, listWorkspaces } from './workspaces.js';
@@ -96,6 +96,46 @@ export function getProductConfig(type: ProductType): ProductConfig | null {
   };
 }
 
+function validatePostPolishedUpgrade(workspaceId: string, contentRequestId: string | undefined): void {
+  if (!contentRequestId) throw new Error('Full-post upgrades require an approved brief request');
+  const request = getContentRequest(workspaceId, contentRequestId);
+  if (!request) throw new Error('Content request not found');
+  if (request.serviceType !== 'brief_only' || request.status !== 'approved') {
+    throw new Error('Only approved brief requests can be upgraded to a full post');
+  }
+}
+
+function applyContentRequestPayment(workspaceId: string, productType: string, contentRequestId: string | undefined): void {
+  if (!contentRequestId) return;
+  if (productType === 'post_polished') {
+    const request = getContentRequest(workspaceId, contentRequestId);
+    if (!request) {
+      log.warn({ workspaceId, contentRequestId }, 'Paid full-post upgrade references a missing content request');
+      return;
+    }
+    if (request.serviceType !== 'brief_only' || request.status !== 'approved') {
+      log.warn({ workspaceId, contentRequestId, status: request.status, serviceType: request.serviceType }, 'Paid full-post upgrade cannot be applied to request state');
+      return;
+    }
+    updateContentRequest(workspaceId, contentRequestId, {
+      serviceType: 'full_post',
+      upgradedAt: new Date().toISOString(),
+      status: 'in_progress',
+    });
+    _broadcastFn?.(workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: contentRequestId, status: 'in_progress' });
+    return;
+  }
+  try {
+    updateContentRequest(workspaceId, contentRequestId, { status: 'requested' });
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'InvalidTransitionError') {
+      log.info({ workspaceId, contentRequestId, error: err.message }, 'Content request already past requested — skipping status update');
+    } else {
+      throw err;
+    }
+  }
+}
+
 export function listProducts(): ProductConfig[] {
   return (Object.keys(PRODUCT_MAP) as ProductType[]).map(type => getProductConfig(type)!);
 }
@@ -119,6 +159,7 @@ export async function createCheckoutSession(params: CheckoutParams): Promise<{ s
   const config = getProductConfig(params.productType);
   if (!config) throw new Error(`Unknown product type: ${params.productType}`);
   if (!config.stripePriceId) throw new Error(`No Stripe Price ID configured for ${params.productType}. Configure it in Command Center → Payments.`);
+  if (params.productType === 'post_polished') validatePostPolishedUpgrade(params.workspaceId, params.contentRequestId);
 
   const metadata: Record<string, string> = {
     workspaceId: params.workspaceId,
@@ -258,6 +299,7 @@ export async function createPaymentIntentForProduct(params: PaymentIntentParams)
 
   const config = getProductConfig(params.productType);
   if (!config) throw new Error(`Unknown product type: ${params.productType}`);
+  if (params.productType === 'post_polished') validatePostPolishedUpgrade(params.workspaceId, params.contentRequestId);
 
   const amountCents = config.priceUsd * 100;
 
@@ -376,20 +418,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       const productType = session.metadata?.productType || 'unknown';
       const contentRequestId = session.metadata?.contentRequestId;
 
-      // Update content request status if linked — if already fast-tracked past
-      // 'requested', the transition guard will reject it; that's fine, the payment
-      // is still valid and downstream operations must proceed.
-      if (contentRequestId) {
-        try {
-          updateContentRequest(workspaceId, contentRequestId, { status: 'requested' });
-        } catch (err: unknown) {
-          if (err instanceof Error && err.name === 'InvalidTransitionError') {
-            log.info({ workspaceId, contentRequestId, error: err.message }, 'Content request already past requested — skipping status update');
-          } else {
-            throw err;
-          }
-        }
-      }
+      applyContentRequestPayment(workspaceId, productType, contentRequestId);
 
       // Handle tier upgrade
       if (productType === 'plan_growth' || productType === 'plan_premium') {
@@ -519,18 +548,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       const productType = intent.metadata?.productType || 'unknown';
       const contentRequestId = intent.metadata?.contentRequestId;
 
-      // Update content request status if linked — same guard as checkout.session.completed
-      if (contentRequestId) {
-        try {
-          updateContentRequest(workspaceId, contentRequestId, { status: 'requested' });
-        } catch (err: unknown) {
-          if (err instanceof Error && err.name === 'InvalidTransitionError') {
-            log.info({ workspaceId, contentRequestId, error: err.message }, 'Content request already past requested — skipping status update');
-          } else {
-            throw err;
-          }
-        }
-      }
+      applyContentRequestPayment(workspaceId, productType, contentRequestId);
 
       // Handle tier upgrade
       if (productType === 'plan_growth' || productType === 'plan_premium') {
