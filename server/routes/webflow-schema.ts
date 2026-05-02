@@ -426,13 +426,14 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceAccessFromQue
     }
 
     const result = await publishSchemaToPage(req.params.siteId, pageId, schema, token);
+    if (result.delivery.status === 'manual-required') return res.json(result);
     if (!result.success) return res.status(500).json(result);
 
     // Optionally publish the site so changes go live
-    let published = false;
+    let sitePublished = false;
     if (publishAfter) {
       const pubResult = await publishSite(req.params.siteId, token);
-      published = pubResult.success;
+      sitePublished = pubResult.success;
       if (!pubResult.success) {
         log.error({ detail: pubResult.error }, 'Site publish failed');
       }
@@ -468,12 +469,12 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceAccessFromQue
     // Log to activity feed + track edit status
     const pubWs = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
     if (pubWs) {
-      addActivity(pubWs.id, 'schema_published', 'Schema published to Webflow', `Page ${pageId.slice(0, 8)}… — ${published ? 'site published' : 'saved as draft'}`, { pageId });
+      addActivity(pubWs.id, 'schema_published', 'Schema published to Webflow', `Page ${pageId.slice(0, 8)}… — ${sitePublished ? 'site published' : 'saved as draft'}`, { pageId });
       updatePageState(pubWs.id, pageId, { status: 'live', source: 'schema', fields: ['schema'], updatedBy: 'admin' });
       recordSeoChange(pubWs.id, pageId, req.body.pageSlug || '', req.body.pageTitle || '', ['schema'], 'schema');
     }
 
-    res.json({ success: true, published });
+    res.json({ ...result, success: true, published: result.published ?? true, sitePublished });
 
     // Record for outcome tracking (only when workspace is known).
     // Idempotency guard: skip if this page already has a tracked schema action in this workspace.
@@ -541,10 +542,10 @@ router.post('/api/webflow/schema-cms-template/:siteId/publish', requireWorkspace
     const result = await publishRawSchemaToPage(req.params.siteId, pageId, templateString, token);
     if (!result.success) return res.status(500).json(result);
 
-    let published = false;
+    let sitePublished = false;
     if (publishAfter) {
       const pubResult = await publishSite(req.params.siteId, token);
-      published = pubResult.success;
+      sitePublished = pubResult.success;
     }
 
     // Track schema change
@@ -554,7 +555,7 @@ router.post('/api/webflow/schema-cms-template/:siteId/publish', requireWorkspace
       recordSeoChange(cmsWs.id, pageId, req.body.pageSlug || '', req.body.pageTitle || '', ['schema'], 'schema-template');
     }
 
-    res.json({ success: true, published });
+    res.json({ ...result, success: true, published: result.published ?? true, sitePublished });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     log.error({ detail: msg, err }, 'CMS template publish error');
@@ -822,6 +823,7 @@ router.post('/api/webflow/schema-rollback/:siteId', requireWorkspaceAccessFromQu
     // Re-publish the old schema to the Webflow page
     const token = getTokenForSite(req.params.siteId) || undefined;
     const result = await publishSchemaToPage(req.params.siteId, pageId, entry.schemaJson, token);
+    if (result.delivery.status === 'manual-required') return res.status(409).json(result);
     if (!result.success) return res.status(500).json(result);
 
     // Update snapshot with restored schema
@@ -838,7 +840,7 @@ router.post('/api/webflow/schema-rollback/:siteId', requireWorkspaceAccessFromQu
         { pageId, historyId });
     }
 
-    res.json({ success: true, restoredSchema: entry.schemaJson });
+    res.json({ ...result, success: true, restoredSchema: entry.schemaJson });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     log.error({ detail: msg, err }, 'Schema rollback error');

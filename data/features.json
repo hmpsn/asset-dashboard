@@ -33,7 +33,7 @@
     {
       "id": 4,
       "title": "Schema Generator + Publish to Webflow",
-      "oneLiner": "AI-generated JSON-LD schemas with Google validation, collection-aware CMS item schemas, diff view, and Webflow publishing",
+      "oneLiner": "AI-generated JSON-LD schemas with Google validation, collection-aware CMS item schemas, diff view, Webflow publishing, and manual native-schema fallback for oversized static pages",
       "category": "seo",
       "painPoints": ["schema", "technical-seo"],
       "tier": "growth",

@@ -9,6 +9,34 @@ import type {
 
 export type SchemaRoleSource = 'ui' | 'site-plan' | 'collection-map' | 'collection-inferred' | 'auto-detect';
 export type SchemaValidationStatus = 'valid' | 'warnings' | 'errors';
+export type SchemaDeliveryMethod = 'webflow-api' | 'manual-native-schema-field';
+export type SchemaDeliveryStatus = 'ready' | 'published' | 'manual-required' | 'failed';
+export type SchemaDeliveryReason =
+  | 'webflow-inline-script-limit'
+  | 'webflow-register-failed'
+  | 'webflow-apply-failed'
+  | 'validation-errors';
+
+export interface SchemaDeliveryDecision {
+  method: SchemaDeliveryMethod;
+  status: SchemaDeliveryStatus;
+  reason?: SchemaDeliveryReason;
+  message: string;
+  /** JSON-LD only. Never include a <script> wrapper in this value. */
+  jsonLd: string;
+  characterCount?: number;
+  apiLimit?: number;
+}
+
+export interface SchemaPublishResponse {
+  success: boolean;
+  delivery: SchemaDeliveryDecision;
+  /** Whether the schema was written to the page custom-code slot. */
+  published?: boolean;
+  /** Whether the site publish call ran successfully after the schema write. */
+  sitePublished?: boolean;
+  error?: string;
+}
 
 export interface SkippedSchemaType {
   type: string;

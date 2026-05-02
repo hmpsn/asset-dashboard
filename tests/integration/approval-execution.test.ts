@@ -99,6 +99,7 @@ async function runApplyLoop(
         const schema = parseJsonFallback(value, null);
         if (!schema) throw new Error('Invalid schema JSON');
         const result = await publishSchemaToPage(siteId, item.pageId, schema as Record<string, unknown>, token);
+        if (result.delivery.status === 'manual-required') throw new Error(result.delivery.message);
         if (!result.success) throw new Error(result.error || 'Schema publish failed');
       } else if (item.collectionId) {
         const result = await updateCollectionItem(item.collectionId, item.pageId, { [item.field]: value }, token);

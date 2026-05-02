@@ -281,6 +281,9 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
         const schema = parseJsonFallback(value, null);
         if (!schema) throw new Error('Invalid schema JSON');
         const result = await publishSchemaToPage(ws.webflowSiteId, item.pageId, schema, token);
+        if (result.delivery.status === 'manual-required') {
+          throw new Error(result.delivery.message);
+        }
         if (!result.success) throw new Error(result.error || 'Schema publish failed');
       } else if (item.collectionId) {
         // CMS item approval (from CmsEditor) — pageId here is a CMS item ID from the
