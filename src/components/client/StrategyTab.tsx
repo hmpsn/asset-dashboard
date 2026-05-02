@@ -68,7 +68,6 @@ export interface KeywordFeedback {
 }
 
 type PriorityKeywordStatus = 'client' | 'strategy' | 'suggested';
-type PriorityKeywordFilter = 'all' | PriorityKeywordStatus;
 
 interface PriorityKeywordItem {
   label: string;
@@ -78,12 +77,6 @@ interface PriorityKeywordItem {
   isRequested: boolean;
   status: PriorityKeywordStatus;
 }
-
-const priorityKeywordStatusLabels: Record<PriorityKeywordStatus, string> = {
-  client: 'Client priority',
-  strategy: 'Strategy',
-  suggested: 'Suggested',
-};
 
 export function StrategyTab({ strategyData, requestedTopics, contentRequests, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal, contentPlanKeywords, onTabChange, workspaceId, setToast, onContentRequested, hidePrices }: StrategyTabProps) {
   const betaMode = useBetaMode();
@@ -156,7 +149,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const [newPriorityCategory, setNewPriorityCategory] = useState('growth');
   const [savingPriorities, setSavingPriorities] = useState(false);
 
-  // ── Priority keyword state backed by tracked-keyword APIs ──
+  // ── Strategy keyword state backed by tracked-keyword APIs ──
   const [trackedKeywords, setTrackedKeywords] = useState<{ query: string; pinned: boolean; addedAt: string }[]>([]);
   const [newTrackedKeyword, setNewTrackedKeyword] = useState('');
   const [addingKeyword, setAddingKeyword] = useState(false);
@@ -164,7 +157,6 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const [confirmRemoveKeyword, setConfirmRemoveKeyword] = useState<string | null>(null);
   const [showAllPriorityKeywords, setShowAllPriorityKeywords] = useState(false);
   const [priorityKeywordSearch, setPriorityKeywordSearch] = useState('');
-  const [priorityKeywordFilter, setPriorityKeywordFilter] = useState<PriorityKeywordFilter>('all');
   const [trackedKeywordsError, setTrackedKeywordsError] = useState(false);
   const [discussingGrowthPage, setDiscussingGrowthPage] = useState<string | null>(null);
   const confirmRemoveKeywordButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -179,43 +171,42 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
     if (!kw || removingKeyword === kw) return;
     setRemovingKeyword(kw);
     try {
+      let removedTracked = false;
       if (item.isTracked) {
         const data = await trackedKwApi.remove(workspaceId, item.label);
-        if (item.isRequested) {
-          try {
-            await kwFeedbackApi.remove(workspaceId, kw);
-          } catch {
-            // Keep the local removal coherent; the tracked keyword was already removed successfully.
-          }
-          setKeywordFeedback(prev => {
-            const next = new Map(prev);
-            next.delete(kw);
-            return next;
-          });
-        }
         setTrackedKeywords(data.keywords || []);
-        setToast?.(`"${item.label}" removed from client priority. Historical ranking data is preserved.`);
-      } else if (item.status === 'suggested') {
-        await kwFeedbackApi.remove(workspaceId, kw);
-        setKeywordFeedback(prev => {
-          const next = new Map(prev);
-          next.delete(kw);
-          return next;
-        });
-        setToast?.(`"${item.label}" removed from suggested keywords`);
-      } else {
+        removedTracked = true;
+      }
+
+      if (item.isStrategy) {
         await kwFeedbackApi.submit(workspaceId, {
           keyword: kw,
           status: 'declined',
           source: 'topic_cluster',
-          reason: 'Removed from priority keywords',
+          reason: 'Removed from strategy keywords',
         });
         setKeywordFeedback(prev => {
           const next = new Map(prev);
           next.set(kw, 'declined');
           return next;
         });
-        setToast?.(`"${item.label}" removed from strategy keywords - it won't be targeted in future strategies`);
+        setToast?.(`"${item.label}" removed from strategy keywords - it won't guide future recommendations`);
+      } else if (item.isRequested) {
+        try {
+          await kwFeedbackApi.remove(workspaceId, kw);
+        } catch {
+          if (!removedTracked) throw new Error('Failed to remove keyword feedback');
+        }
+        setKeywordFeedback(prev => {
+          const next = new Map(prev);
+          next.delete(kw);
+          return next;
+        });
+        setToast?.(removedTracked
+          ? `"${item.label}" removed from strategy keywords. Historical ranking data is preserved.`
+          : `"${item.label}" removed from keyword ideas`);
+      } else if (removedTracked) {
+        setToast?.(`"${item.label}" removed from strategy keywords. Historical ranking data is preserved.`);
       }
       setConfirmRemoveKeyword(null);
     } catch {
@@ -225,7 +216,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
     }
   }, [workspaceId, removingKeyword, setToast]);
 
-  // Load business priorities + priority keyword data on mount
+  // Load business priorities + strategy keyword data on mount
   const loadTrackedKeywords = useCallback(() => {
     if (!workspaceId) return;
     setTrackedKeywordsError(false);
@@ -356,28 +347,57 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
     }
   });
   const priorityKeywords = [...priorityKeywordMap.values()].sort((a, b) => a.label.localeCompare(b.label));
+  const strategyKeywords = priorityKeywords.filter(item => item.status === 'client' || item.status === 'strategy');
+  const keywordIdeas = priorityKeywords.filter(item => item.status === 'suggested');
   const priorityKeywordSearchTerm = normalizeKeyword(priorityKeywordSearch);
-  const filteredPriorityKeywords = priorityKeywords.filter(item => {
+  const filteredStrategyKeywords = strategyKeywords.filter(item => {
     const matchesSearch = priorityKeywordSearchTerm ? item.normalized.includes(priorityKeywordSearchTerm) : true;
-    const matchesFilter = priorityKeywordFilter === 'all' || item.status === priorityKeywordFilter;
-    return matchesSearch && matchesFilter;
+    return matchesSearch;
+  });
+  const filteredKeywordIdeas = keywordIdeas.filter(item => {
+    const matchesSearch = priorityKeywordSearchTerm ? item.normalized.includes(priorityKeywordSearchTerm) : true;
+    return matchesSearch;
   });
   const hasPriorityKeywordSearch = priorityKeywordSearchTerm.length > 0;
   const visiblePriorityKeywords = (showAllPriorityKeywords || hasPriorityKeywordSearch)
-    ? filteredPriorityKeywords
-    : filteredPriorityKeywords.slice(0, 18);
-  const hiddenPriorityKeywordCount = Math.max(0, filteredPriorityKeywords.length - visiblePriorityKeywords.length);
-  const priorityKeywordFilterTabs: Array<{ id: PriorityKeywordFilter; label: string; count: number }> = [
-    { id: 'all', label: 'All', count: priorityKeywords.length },
-    { id: 'client', label: 'Client priority', count: priorityKeywords.filter(item => item.status === 'client').length },
-    { id: 'strategy', label: 'Strategy', count: priorityKeywords.filter(item => item.status === 'strategy').length },
-    { id: 'suggested', label: 'Suggested', count: priorityKeywords.filter(item => item.status === 'suggested').length },
-  ];
+    ? filteredStrategyKeywords
+    : filteredStrategyKeywords.slice(0, 18);
+  const hiddenPriorityKeywordCount = Math.max(0, filteredStrategyKeywords.length - visiblePriorityKeywords.length);
   const priorityKeywordEmptyMessage = hasPriorityKeywordSearch
-    ? 'No priority keywords match that search.'
-    : priorityKeywordFilter === 'all'
-      ? 'No priority keywords yet.'
-      : `No ${priorityKeywordStatusLabels[priorityKeywordFilter].toLowerCase()} keywords.`;
+    ? 'No strategy keywords match that search.'
+    : 'No strategy keywords yet.';
+
+  const addStrategyKeyword = async (keyword: string, options?: { clearInput?: boolean }) => {
+    if (!workspaceId) return;
+    const kw = keyword.trim();
+    if (!kw || kw.length < 2 || addingKeyword) return;
+    const normalized = normalizeKeyword(kw);
+    const existingPriorityKeyword = priorityKeywordMap.get(normalized);
+    if (existingPriorityKeyword?.isTracked) {
+      setToast?.(`"${kw}" is already a strategy keyword`);
+      if (options?.clearInput) setNewTrackedKeyword('');
+      return;
+    }
+    setAddingKeyword(true);
+    try {
+      const res = await trackedKwApi.add(workspaceId, kw);
+      if (['declined', 'requested'].includes(keywordFeedback.get(normalized) || '')) {
+        try {
+          await kwFeedbackApi.remove(workspaceId, normalized);
+        } catch {
+          // The keyword was added successfully; keep this view aligned with that action.
+        }
+        setKeywordFeedback(prev => { const next = new Map(prev); next.delete(normalized); return next; });
+      }
+      setTrackedKeywords(res.keywords || []);
+      if (options?.clearInput) setNewTrackedKeyword('');
+      setToast?.(`"${kw}" added to strategy keywords`);
+    } catch {
+      setToast?.('Failed to add keyword');
+    } finally {
+      setAddingKeyword(false);
+    }
+  };
 
   const priorityKeywordsPanel = (
     // pr-check-disable-next-line -- Brand signature radius intentional for top-level strategy surface
@@ -390,12 +410,12 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 <Icon as={Target} size="md" className="text-accent-brand" />
               </div>
               <div>
-                <h3 className="t-h3 text-[var(--brand-text)]">Priority Keywords</h3>
-                <p className="t-caption-sm text-[var(--brand-text-muted)]">{priorityKeywords.length} keywords guiding tracking and future recommendations</p>
+                <h3 className="t-h3 text-[var(--brand-text)]">Strategy Keywords</h3>
+                <p className="t-caption-sm text-[var(--brand-text-muted)]">{strategyKeywords.length} keywords guiding tracking and future recommendations</p>
               </div>
             </div>
             <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed max-w-3xl">
-              Adding a priority keyword tells us to track it and consider it in future strategy, page, and content recommendations. It does not rewrite the current strategy instantly.
+              Strategy keywords guide rank tracking, page recommendations, and future content ideas. Changes affect future updates and do not rewrite this strategy instantly.
             </p>
           </div>
           <Button variant="secondary" size="sm" onClick={() => scrollToSection('page-keyword-map', keywordMapRef)} className="self-start">
@@ -408,8 +428,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         {workspaceId && (
           <div className="mb-4">
             <div className="flex flex-col gap-1 mb-2 sm:flex-row sm:items-end sm:justify-between">
-              <label htmlFor="priority-keyword-input" className="t-caption-sm font-medium text-[var(--brand-text)]">
-                Prioritize a keyword
+              <label htmlFor="strategy-keyword-input" className="t-caption-sm font-medium text-[var(--brand-text)]">
+                Add a strategy keyword
               </label>
               <span className="t-caption-sm text-[var(--brand-text-muted)]">
                 Adds it to future tracking and strategy inputs.
@@ -418,38 +438,12 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
-                const kw = newTrackedKeyword.trim();
-                if (!kw || kw.length < 2 || addingKeyword) return;
-                const normalized = normalizeKeyword(kw);
-                const existingPriorityKeyword = priorityKeywordMap.get(normalized);
-                if (existingPriorityKeyword?.isTracked) {
-                  setToast?.(`"${kw}" is already a client priority`);
-                  return;
-                }
-                setAddingKeyword(true);
-                try {
-                  const res = await trackedKwApi.add(workspaceId, kw);
-                  if (['declined', 'requested'].includes(keywordFeedback.get(normalized) || '')) {
-                    try {
-                      await kwFeedbackApi.remove(workspaceId, normalized);
-                    } catch {
-                      // The keyword was prioritized successfully; keep this view aligned with that action.
-                    }
-                    setKeywordFeedback(prev => { const next = new Map(prev); next.delete(normalized); return next; });
-                  }
-                  setTrackedKeywords(res.keywords || []);
-                  setNewTrackedKeyword('');
-                  setToast?.(`"${kw}" added as a client priority`);
-                } catch {
-                  setToast?.('Failed to add keyword');
-                } finally {
-                  setAddingKeyword(false);
-                }
+                await addStrategyKeyword(newTrackedKeyword, { clearInput: true });
               }}
               className="flex flex-col gap-2 sm:flex-row sm:items-center"
             >
               <input
-                id="priority-keyword-input"
+                id="strategy-keyword-input"
                 type="text"
                 value={newTrackedKeyword}
                 onChange={e => setNewTrackedKeyword(e.target.value)}
@@ -467,14 +461,14 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 disabled={addingKeyword || newTrackedKeyword.trim().length < 2}
                 className="px-3 py-2 rounded-[var(--radius-lg)]"
               >
-                {addingKeyword ? 'Prioritizing...' : 'Prioritize keyword'}
+                {addingKeyword ? 'Adding...' : 'Add strategy keyword'}
               </Button>
             </form>
           </div>
         )}
 
         <div className="flex flex-col gap-1 mb-2 sm:flex-row sm:items-center sm:justify-between">
-          <span className="t-caption-sm font-medium text-[var(--brand-text)]">Current priority keywords</span>
+          <span className="t-caption-sm font-medium text-[var(--brand-text)]">Current strategy keywords</span>
           <span className="t-caption-sm text-[var(--brand-text-muted)]">Sorted A-Z. Remove anything that should not guide the strategy.</span>
         </div>
         <div className="relative mb-3">
@@ -486,8 +480,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               setPriorityKeywordSearch(e.target.value);
               setConfirmRemoveKeyword(null);
             }}
-            aria-label="Search priority keywords"
-            placeholder="Search priority keywords..."
+            aria-label="Search strategy keywords and ideas"
+            placeholder="Search strategy keywords and ideas..."
             className="w-full bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] pl-8 pr-9 py-1.5 t-caption-sm text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors"
           />
           {priorityKeywordSearch && (
@@ -499,33 +493,11 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 setShowAllPriorityKeywords(false);
               }}
               className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-[var(--radius-sm)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-2)] transition-colors"
-              aria-label="Clear priority keyword search"
+              aria-label="Clear strategy keyword search"
             >
               <Icon as={X} size="sm" />
             </button>
           )}
-        </div>
-
-        <div className="flex flex-wrap gap-1.5 mb-3" role="group" aria-label="Filter priority keywords">
-          {priorityKeywordFilterTabs.map(tab => (
-            <button
-              key={tab.id}
-              type="button"
-              aria-pressed={priorityKeywordFilter === tab.id}
-              onClick={() => {
-                setPriorityKeywordFilter(tab.id);
-                setConfirmRemoveKeyword(null);
-                setShowAllPriorityKeywords(false);
-              }}
-              className={`px-2.5 py-1 rounded-[var(--radius-lg)] border t-caption-sm transition-colors ${
-                priorityKeywordFilter === tab.id
-                  ? 'bg-teal-500/10 border-teal-500/30 text-accent-brand'
-                  : 'bg-transparent border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)]/50'
-              }`}
-            >
-              {tab.label} <span className="text-[var(--brand-text-muted)]">{tab.count}</span>
-            </button>
-          ))}
         </div>
 
         {visiblePriorityKeywords.length > 0 ? (
@@ -533,24 +505,10 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
             {visiblePriorityKeywords.map(item => {
               const confirming = confirmRemoveKeyword === item.normalized;
               const removing = removingKeyword === item.normalized;
-              const statusLabel = priorityKeywordStatusLabels[item.status];
-              const removeLabel = item.isTracked
-                ? `Remove ${item.label} from future rank tracking`
-                : `Remove ${item.label} from priority keywords`;
-              const chipTone = item.status === 'client'
-                ? 'bg-teal-500/10 border-teal-500/20 text-accent-brand'
-                : item.status === 'suggested'
-                  ? 'bg-teal-500/10 border-teal-500/20 text-accent-brand'
-                  : 'bg-[var(--surface-3)] border-[var(--brand-border-strong)] text-[var(--brand-text)]';
-              const statusTone = item.status === 'client'
-                ? 'text-accent-brand bg-teal-500/10 border-teal-500/20'
-                : item.status === 'suggested'
-                  ? 'text-accent-info bg-blue-500/10 border-blue-500/20'
-                  : 'text-[var(--brand-text-muted)] bg-[var(--surface-2)] border-[var(--brand-border)]';
+              const removeLabel = `Remove ${item.label} from strategy keywords`;
               return (
-                <span key={item.normalized} className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-lg)] border t-caption-sm ${chipTone}`}>
+                <span key={item.normalized} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-lg)] border t-caption-sm bg-[var(--surface-3)] border-[var(--brand-border-strong)] text-[var(--brand-text)]">
                   <span className="text-[var(--brand-text)]">{item.label}</span>
-                  <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-sm)] border ${statusTone}`}>{statusLabel}</span>
                   {confirming ? (
                     <>
                       <button
@@ -592,7 +550,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           </p>
         )}
         <span className="sr-only" aria-live="polite">
-          {confirmRemoveKeyword ? 'Confirm removal or cancel to keep this priority keyword.' : ''}
+          {confirmRemoveKeyword ? 'Confirm removal or cancel.' : ''}
         </span>
 
         <div className="flex flex-wrap gap-2">
@@ -602,10 +560,10 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               onClick={() => setShowAllPriorityKeywords(true)}
               className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] px-2 py-1 transition-colors"
             >
-              View all priority keywords ({filteredPriorityKeywords.length})
+              View all strategy keywords ({filteredStrategyKeywords.length})
             </button>
           )}
-          {!hasPriorityKeywordSearch && showAllPriorityKeywords && filteredPriorityKeywords.length > 18 && (
+          {!hasPriorityKeywordSearch && showAllPriorityKeywords && filteredStrategyKeywords.length > 18 && (
             <button
               type="button"
               onClick={() => setShowAllPriorityKeywords(false)}
@@ -615,6 +573,72 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
             </button>
           )}
         </div>
+
+        {keywordIdeas.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-[var(--brand-border)]/50">
+            <div className="flex flex-col gap-1 mb-2 sm:flex-row sm:items-center sm:justify-between">
+              <span className="t-caption-sm font-medium text-[var(--brand-text)]">Keyword ideas to add</span>
+              <span className="t-caption-sm text-[var(--brand-text-muted)]">Optional terms you can add to the strategy.</span>
+            </div>
+            {filteredKeywordIdeas.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {filteredKeywordIdeas.map(item => {
+                  const confirming = confirmRemoveKeyword === item.normalized;
+                  const removing = removingKeyword === item.normalized;
+                  return (
+                    <span key={item.normalized} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-lg)] border t-caption-sm bg-[var(--surface-3)] border-[var(--brand-border-strong)] text-[var(--brand-text)]">
+                      <span>{item.label}</span>
+                      {confirming ? (
+                        <>
+                          <button
+                            ref={confirmRemoveKeywordButtonRef}
+                            type="button"
+                            onClick={() => removePriorityKeyword(item)}
+                            disabled={removing}
+                            className="text-accent-danger hover:text-accent-danger transition-colors disabled:opacity-50"
+                          >
+                            {removing ? 'Removing...' : 'Dismiss'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmRemoveKeyword(null)}
+                            disabled={removing}
+                            className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => addStrategyKeyword(item.label)}
+                            disabled={addingKeyword}
+                            className="text-accent-brand hover:underline underline-offset-2 transition-colors disabled:opacity-50"
+                            aria-label={`Add ${item.label} to strategy keywords`}
+                          >
+                            Add
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmRemoveKeyword(item.normalized)}
+                            className="text-[var(--brand-text-muted)] hover:text-accent-danger transition-colors"
+                            title={`Dismiss ${item.label}`}
+                            aria-label={`Dismiss ${item.label}`}
+                          >
+                            <Icon as={X} size="sm" />
+                          </button>
+                        </>
+                      )}
+                    </span>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="t-caption-sm text-[var(--brand-text-muted)]">No keyword ideas match that search.</p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -626,7 +650,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         <div>
           <h2 className="t-h2 text-[var(--brand-text)]">SEO Strategy</h2>
           <p className="t-body text-[var(--brand-text-muted)] mt-1">
-            A focused view of what to create, what to improve, and where your priority keywords fit.
+            A focused view of what to create, what to improve, and which keywords guide the strategy.
           </p>
         </div>
       </div>
@@ -673,8 +697,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               <div className="t-body font-semibold text-[var(--brand-text-bright)]">{pagesRanking}/{totalPages}</div>
             </div>
             <div className="rounded-[var(--radius-lg)] bg-[var(--surface-3)]/45 border border-[var(--brand-border)]/60 px-3 py-2">
-              <div className="t-caption-sm text-[var(--brand-text-muted)]">Priority keywords</div>
-              <div className="t-body font-semibold text-[var(--brand-text-bright)]">{priorityKeywords.length}</div>
+              <div className="t-caption-sm text-[var(--brand-text-muted)]">Strategy keywords</div>
+              <div className="t-body font-semibold text-[var(--brand-text-bright)]">{strategyKeywords.length}</div>
             </div>
           </div>
         </div>
@@ -713,7 +737,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       </div>
 
       <div ref={priorityKeywordsRef}>
-        <TierGate tier={effectiveTier} required="growth" feature="Priority Keywords" teaser={`${priorityKeywords.length} keywords`}>
+        <TierGate tier={effectiveTier} required="growth" feature="Strategy Keywords" teaser={`${strategyKeywords.length} keywords`}>
           {priorityKeywordsPanel}
         </TierGate>
       </div>
@@ -763,8 +787,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 <Icon as={Target} size="lg" className="text-accent-info" />
               </div>
               <div className="min-w-0">
-                <div className="t-body font-medium text-[var(--brand-text)]">Guide priority keywords</div>
-                <div className="t-caption-sm text-[var(--brand-text-muted)]">{priorityKeywords.length} keywords shaping the strategy</div>
+                <div className="t-body font-medium text-[var(--brand-text)]">Guide strategy keywords</div>
+                <div className="t-caption-sm text-[var(--brand-text-muted)]">{strategyKeywords.length} keywords shaping the strategy</div>
               </div>
             </div>
             <Button variant="secondary" size="sm" onClick={() => priorityKeywordsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="self-start">
@@ -785,7 +809,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           )}
           {trackedKeywordsError && (
             <p className="t-caption-sm text-accent-danger">
-              Couldn't load your priority keywords.{' '}
+              Couldn't load your strategy keywords.{' '}
               <button onClick={loadTrackedKeywords} className="underline hover:text-accent-danger">Retry</button>
             </p>
           )}
@@ -818,7 +842,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           {expandedSections.has('business-priorities') && (
             <div className="px-4 pb-4 border-t border-[var(--brand-border)]/50">
               <p className="t-caption-sm text-[var(--brand-text-muted)] mt-3 mb-3 leading-relaxed">
-                Share business goals and priorities that should shape future strategy recommendations. Keyword priorities are managed in the Priority Keywords section.
+                Share business goals and priorities that should shape future strategy recommendations. Keywords are managed in the Strategy Keywords section.
               </p>
 
               {/* Existing priorities */}
@@ -964,7 +988,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                           )}
                         </div>
                       </div>
-                      {/* Row 2: priority keyword + metrics */}
+                      {/* Row 2: strategy keyword + metrics */}
                       <div className="flex items-center gap-3 flex-wrap mb-1.5">
                         <span className="t-caption-sm text-accent-brand">&ldquo;{gap.targetKeyword}&rdquo;</span>
                         {gap.volume != null && gap.volume > 0 && (
