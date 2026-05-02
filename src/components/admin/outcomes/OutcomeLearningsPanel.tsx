@@ -51,7 +51,7 @@ function ContentSection({ data }: ContentSectionProps) {
   return (
     <SectionCard
       title="Content"
-      titleIcon={<FileText className="w-4 h-4 text-blue-400" />}
+      titleIcon={<FileText className="w-4 h-4 text-accent-info" />}
       staggerIndex={1}
     >
       <div className="space-y-4">
@@ -63,7 +63,7 @@ function ContentSection({ data }: ContentSectionProps) {
               {formatWins.map(({ label, value }) => (
                 <div key={label} className="flex items-center justify-between">
                   <span className="text-xs text-[var(--brand-text)] capitalize">{label}</span>
-                  <span className="text-xs font-semibold text-emerald-400">{value}</span>
+                  <span className="text-xs font-semibold text-accent-success">{value}</span>
                 </div>
               ))}
             </div>
@@ -129,7 +129,7 @@ function StrategySection({ data }: StrategySectionProps) {
   return (
     <SectionCard
       title="Strategy"
-      titleIcon={<Target className="w-4 h-4 text-blue-400" />}
+      titleIcon={<Target className="w-4 h-4 text-accent-info" />}
       staggerIndex={2}
     >
       <div className="space-y-4">
@@ -141,7 +141,7 @@ function StrategySection({ data }: StrategySectionProps) {
               {difficultyWins.map(({ label, value }) => (
                 <div key={label} className="flex items-center justify-between">
                   <span className="text-xs text-[var(--brand-text)] capitalize">{label}</span>
-                  <span className="text-xs font-semibold text-emerald-400">{value}</span>
+                  <span className="text-xs font-semibold text-accent-success">{value}</span>
                 </div>
               ))}
             </div>
@@ -158,7 +158,7 @@ function StrategySection({ data }: StrategySectionProps) {
               {checkpointWinRates.map(([checkpoint, rate]) => (
                 <div key={checkpoint} className="flex items-center justify-between">
                   <span className="text-xs text-[var(--brand-text)] capitalize">{checkpoint}</span>
-                  <span className="text-xs font-semibold text-emerald-400">{Math.round(rate * 100)}%</span>
+                  <span className="text-xs font-semibold text-accent-success">{Math.round(rate * 100)}%</span>
                 </div>
               ))}
             </div>
@@ -203,7 +203,7 @@ function TechnicalSection({ data }: TechnicalSectionProps) {
   return (
     <SectionCard
       title="Technical"
-      titleIcon={<Wrench className="w-4 h-4 text-blue-400" />}
+      titleIcon={<Wrench className="w-4 h-4 text-accent-info" />}
       staggerIndex={3}
     >
       <div className="space-y-4">
@@ -215,7 +215,7 @@ function TechnicalSection({ data }: TechnicalSectionProps) {
               {fixTypeWins.map(({ label, value }) => (
                 <div key={label} className="flex items-center justify-between">
                   <span className="text-xs text-[var(--brand-text)] capitalize">{label}</span>
-                  <span className="text-xs font-semibold text-emerald-400">{value}</span>
+                  <span className="text-xs font-semibold text-accent-success">{value}</span>
                 </div>
               ))}
             </div>
@@ -303,7 +303,7 @@ export default function OutcomeLearningsPanel({ workspaceId }: Props) {
     <div className="space-y-4">
       {/* Confidence + overall stats header */}
       <SectionCard
-        titleIcon={<Brain className="w-4 h-4 text-blue-400" />}
+        titleIcon={<Brain className="w-4 h-4 text-accent-info" />}
         title="AI Learnings"
         titleExtra={
           <Badge
@@ -316,9 +316,9 @@ export default function OutcomeLearningsPanel({ workspaceId }: Props) {
             <TrendBadge value={1} iconOnly hideOnZero={false} size="md" className="text-[var(--brand-text-muted)]" />
             <span className={`text-xs font-medium ${
               overall.recentTrend === 'improving'
-                ? 'text-emerald-400'
+                ? 'text-accent-success'
                 : overall.recentTrend === 'declining'
-                ? 'text-red-400'
+                ? 'text-accent-danger'
                 : 'text-[var(--brand-text)]'
             }`}>
               {overall.recentTrend}
@@ -329,7 +329,7 @@ export default function OutcomeLearningsPanel({ workspaceId }: Props) {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div>
             <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-0.5">Win Rate</p>
-            <p className="text-xl font-bold text-emerald-400">{pct(overall.totalWinRate)}</p>
+            <p className="text-xl font-bold text-accent-success">{pct(overall.totalWinRate)}</p>
           </div>
           <div>
             <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-0.5">Strong Win Rate</p>
@@ -337,7 +337,7 @@ export default function OutcomeLearningsPanel({ workspaceId }: Props) {
           </div>
           <div>
             <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-0.5">Scored Actions</p>
-            <p className="text-xl font-bold text-blue-400">{learnings.totalScoredActions}</p>
+            <p className="text-xl font-bold text-accent-info">{learnings.totalScoredActions}</p>
           </div>
           <div>
             <p className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] mb-0.5">Top Action</p>
@@ -355,7 +355,7 @@ export default function OutcomeLearningsPanel({ workspaceId }: Props) {
         {content !== null ? (
           <ContentSection data={content} />
         ) : (
-          <SectionCard title="Content" titleIcon={<FileText className="w-4 h-4 text-blue-400" />} staggerIndex={1}>
+          <SectionCard title="Content" titleIcon={<FileText className="w-4 h-4 text-accent-info" />} staggerIndex={1}>
             <NoDataMessage message="Not enough content action data yet" />
           </SectionCard>
         )}
@@ -363,7 +363,7 @@ export default function OutcomeLearningsPanel({ workspaceId }: Props) {
         {strategy !== null ? (
           <StrategySection data={strategy} />
         ) : (
-          <SectionCard title="Strategy" titleIcon={<Target className="w-4 h-4 text-blue-400" />} staggerIndex={2}>
+          <SectionCard title="Strategy" titleIcon={<Target className="w-4 h-4 text-accent-info" />} staggerIndex={2}>
             <NoDataMessage message="Not enough strategy action data yet" />
           </SectionCard>
         )}
@@ -371,7 +371,7 @@ export default function OutcomeLearningsPanel({ workspaceId }: Props) {
         {technical !== null ? (
           <TechnicalSection data={technical} />
         ) : (
-          <SectionCard title="Technical" titleIcon={<Wrench className="w-4 h-4 text-blue-400" />} staggerIndex={3}>
+          <SectionCard title="Technical" titleIcon={<Wrench className="w-4 h-4 text-accent-info" />} staggerIndex={3}>
             <NoDataMessage message="Not enough technical action data yet" />
           </SectionCard>
         )}

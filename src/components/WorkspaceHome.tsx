@@ -122,7 +122,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Icon as={Loader2} size="lg" className="animate-spin text-teal-400" />
+        <Icon as={Loader2} size="lg" className="animate-spin text-accent-brand" />
       </div>
     );
   }
@@ -269,11 +269,11 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       <PageHeader
         title={workspaceName}
         subtitle={webflowSiteName || 'Workspace Dashboard'}
-        icon={<Icon as={Globe} size="lg" className="text-teal-400" />}
+        icon={<Icon as={Globe} size="lg" className="text-accent-brand" />}
         actions={
           <div className="flex items-center gap-3">
             {lastFetched && (
-              <span className={`flex items-center gap-1 t-caption-sm ${isStale ? 'text-amber-400' : 'text-[var(--brand-text-muted)]'}`} title={`Data loaded at ${lastFetched.toLocaleTimeString()}`}>
+              <span className={`flex items-center gap-1 t-caption-sm ${isStale ? 'text-accent-warning' : 'text-[var(--brand-text-muted)]'}`} title={`Data loaded at ${lastFetched.toLocaleTimeString()}`}>
                 <Icon as={Clock} size="sm" />
                 {isStale ? 'Stale — ' : ''}{freshnessLabel}
               </span>
@@ -281,7 +281,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             <button
               onClick={handleRefresh}
               disabled={refreshing}
-              className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-400 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-accent-brand transition-colors disabled:opacity-50"
               title="Refresh all data"
             >
               <Icon as={RefreshCw} size="sm" className={refreshing ? 'animate-spin' : ''} />
@@ -313,7 +313,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
 
       {activeTab === 'meeting-brief' ? (
         <ErrorBoundary label="Meeting Brief">
-          <Suspense fallback={<div className="flex items-center justify-center py-24"><Icon as={Loader2} size="lg" className="animate-spin text-teal-400" /></div>}>
+          <Suspense fallback={<div className="flex items-center justify-center py-24"><Icon as={Loader2} size="lg" className="animate-spin text-accent-brand" /></div>}>
             <MeetingBriefPage workspaceId={workspaceId} />
           </Suspense>
         </ErrorBoundary>
@@ -339,7 +339,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
                 <div className="flex items-baseline gap-1.5">
                   <span className="text-2xl font-bold leading-none text-[var(--brand-text-bright)]">{audit.siteScore}</span>
                   {scoreDelta != null && (
-                    <span className={`t-caption-sm font-medium ${scoreDelta >= 0 ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
+                    <span className={`t-caption-sm font-medium ${scoreDelta >= 0 ? 'text-accent-success' : 'text-accent-danger'}`}>
                       {scoreDelta >= 0 ? '+' : ''}{scoreDelta} pts
                     </span>
                   )}
@@ -477,11 +477,11 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
 
       {/* ── Needs Attention ── */}
       {(urgentActions.length > 0 || setupActions.length > 0) && (() => {
-        const colorMap = { red: 'text-red-400', amber: 'text-amber-400', teal: 'text-teal-400', emerald: 'text-emerald-400' };
+        const colorMap = { red: 'text-accent-danger', amber: 'text-accent-warning', teal: 'text-accent-brand', emerald: 'text-accent-success' };
         const visibleUrgent = showMoreActions ? urgentActions : urgentActions.slice(0, 5);
         const hiddenCount = urgentActions.length - visibleUrgent.length;
         return (
-          <SectionCard title="Needs Attention" titleIcon={<Icon as={AlertTriangle} size="md" className="text-amber-400" />} noPadding>
+          <SectionCard title="Needs Attention" titleIcon={<Icon as={AlertTriangle} size="md" className="text-accent-warning" />} noPadding>
             <div className="divide-y divide-[var(--brand-border)]">
               {visibleUrgent.map((item, i) => {
                 const ItemIcon = item.icon;
@@ -554,7 +554,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
 
       {/* ── SEO Pipeline (Work Status + Change Tracker) ── */}
       {seoStatus.total > 0 ? (
-        <SectionCard title="SEO Pipeline" titleIcon={<Icon as={Layers} size="md" className="text-teal-400" />} noPadding>
+        <SectionCard title="SEO Pipeline" titleIcon={<Icon as={Layers} size="md" className="text-accent-brand" />} noPadding>
           <SeoWorkStatus seoStatus={seoStatus} workspaceId={workspaceId} embedded />
           <SeoChangeImpact workspaceId={workspaceId} hasGsc={!!gscPropertyUrl} embedded />
         </SectionCard>

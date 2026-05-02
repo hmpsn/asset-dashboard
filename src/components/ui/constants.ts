@@ -103,6 +103,7 @@ export const CHART_SERIES_COLORS = {
   amber:   '#fbbf24',  // amber-400
   orange:  '#fb923c',  // orange-400
   red:     '#f87171',  // red-400
+  cyan:    '#22d3ee',  // cyan-400
   purple:  '#a78bfa',  // purple-400 — admin AI charts only
 } as const;
 

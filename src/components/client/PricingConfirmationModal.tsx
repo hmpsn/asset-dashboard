@@ -67,7 +67,12 @@ export function PricingConfirmationModal({
         const fmt = fmtPrice;
         // z-index-ok — pricing modal above standard modal scale
         return (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[70] flex items-center justify-center p-4" onClick={() => !pricingConfirming && setPricingModal(null)}>
+          <div
+            className={
+              'fixed inset-0 bg-black/70 backdrop-blur-md z-[70] flex items-center justify-center p-4' // fixed-inset-ok -- Pricing confirmation coordinates with checkout state above the standard modal layer.
+            }
+            onClick={() => !pricingConfirming && setPricingModal(null)}
+          >
             {/* pr-check-disable-next-line -- pricing modal surface uses brand signature radius intentionally */}
             <div className="relative bg-[var(--surface-2)] border border-[var(--brand-border)]/50 shadow-2xl shadow-black/50 w-full max-w-md overflow-hidden animate-[scaleIn_0.2s_ease-out]" style={{ borderRadius: 'var(--radius-signature-lg)' }} onClick={e => e.stopPropagation()}>
               {/* Close button */}
@@ -83,7 +88,7 @@ export function PricingConfirmationModal({
               {/* Header with gradient */}
               <div className="relative px-6 pt-6 pb-5 overflow-hidden bg-gradient-to-br from-teal-600/15 via-emerald-600/10 to-transparent">
                 {/* Decorative glow */}
-                <div className="absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl opacity-20 bg-teal-500" />
+                <div className="absolute -top-20 -right-20 w-40 h-40 rounded-[var(--radius-pill)] blur-3xl opacity-20 bg-teal-500" />
 
                 <div className="relative flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
@@ -189,7 +194,15 @@ export function PricingConfirmationModal({
 
       {/* Stripe Elements inline payment modal (lazy-loaded — Stripe SDK only fetched on payment) */}
       {stripePayment && (
-        <Suspense fallback={<div className="fixed inset-0 bg-black/60 z-[var(--z-modal)] flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-accent-brand" /></div>}>
+        <Suspense fallback={(
+          <div
+            className={
+              'fixed inset-0 bg-black/60 z-[var(--z-modal)] flex items-center justify-center' // fixed-inset-ok -- Stripe lazy-load fallback mirrors the payment overlay while SDK code loads.
+            }
+          >
+            <Loader2 className="w-8 h-8 animate-spin text-accent-brand" />
+          </div>
+        )}>
           <LazyStripePaymentModal
             clientSecret={stripePayment.clientSecret}
             publishableKey={stripePayment.publishableKey}

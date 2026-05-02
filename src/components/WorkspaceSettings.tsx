@@ -10,7 +10,6 @@ import { IntelligenceProfileTab } from './settings/IntelligenceProfileTab';
 import { PublishSettings } from './PublishSettings';
 import { SectionCard, Icon } from './ui';
 import { get, patch, post } from '../api/client';
-import { themeColor } from './ui/constants';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 
 const LlmsTxtGenerator = lazyWithRetry(() => import('./LlmsTxtGenerator').then(m => ({ default: m.LlmsTxtGenerator })));
@@ -185,7 +184,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                 } catch { toast('Failed to rename', 'error'); }
                 setSavingName(false);
               }}
-              className="p-1 rounded hover:bg-teal-600/20 text-teal-400 transition-colors"
+              className="p-1 rounded hover:bg-teal-600/20 text-accent-brand transition-colors"
             >
               <Icon as={Check} size="md" />
             </button>
@@ -211,7 +210,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
         {([['connections', 'Connections'], ['features', 'Features'], ['publishing', 'Publishing'], ['business-profile', 'Business Profile'], ['intelligence-profile', 'Intelligence Profile'], ['dashboard', 'Client Dashboard'], ['export', 'Data Export'], ['llms-txt', 'LLMs.txt']] as [SectionTab, string][]).map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
             className="px-4 py-2.5 t-caption font-medium border-b-2 transition-colors -mb-px"
-            style={tab === id ? { borderColor: '#2dd4bf', color: '#2dd4bf' } : { borderColor: 'transparent', color: themeColor('#71717a', '#94a3b8') }}>
+            style={tab === id ? { borderColor: 'var(--teal)', color: 'var(--teal)' } : { borderColor: 'transparent', color: 'var(--brand-text-muted)' }}>
             {label}
           </button>
         ))}
@@ -289,7 +288,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
 
       {tab === 'llms-txt' && (
         <SectionCard title="LLMs.txt Configuration">
-          <Suspense fallback={<div className="flex items-center justify-center py-12"><div className="w-5 h-5 border-2 rounded-full animate-spin border-[var(--surface-3)] border-t-teal-400" /></div>}>
+          <Suspense fallback={<div className="flex items-center justify-center py-12"><div className="w-5 h-5 border-2 rounded-[var(--radius-pill)] animate-spin border-[var(--surface-3)] border-t-teal-400" /></div>}>
             <LlmsTxtGenerator key={`llms-${workspaceId}`} workspaceId={workspaceId} />
           </Suspense>
         </SectionCard>
@@ -314,7 +313,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
                 <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{item.desc}</div>
               </div>
               <div className="flex items-center gap-2">
-                <a href={`/api/export/${workspaceId}/${item.key}?format=csv`} download className="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
+                <a href={`/api/export/${workspaceId}/${item.key}?format=csv`} download className="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-accent-brand hover:bg-teal-600/30 transition-colors">
                   <Icon as={Download} size="sm" /> CSV
                 </a>
                 <a href={`/api/export/${workspaceId}/${item.key}?format=json`} download className="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium bg-[var(--surface-3)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">

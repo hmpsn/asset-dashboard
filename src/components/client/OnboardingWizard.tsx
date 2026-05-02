@@ -59,14 +59,19 @@ export function OnboardingWizard({
 
   return (
     /* z-index-ok — onboarding wizard above modal scale */
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={onDismiss}>
+    <div
+      className={
+        'fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-4' // fixed-inset-ok -- Welcome tour is a dismissible full-screen overlay, not a reusable dialog.
+      }
+      onClick={onDismiss}
+    >
       <div className="bg-[var(--surface-2)] rounded-[var(--radius-xl)] border border-[var(--brand-border)] shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
 
         {/* Step indicator */}
         <div className="flex items-center justify-center gap-2 pt-5 pb-1">
           {STEPS.map((s, i) => (
             <div key={s} className="flex items-center gap-2">
-              <div className={cn('w-2 h-2 rounded-full transition-all', i <= stepIdx ? 'bg-teal-400 scale-110' : 'bg-[var(--brand-border)]')} />
+              <div className={cn('w-2 h-2 rounded-[var(--radius-pill)] transition-all', i <= stepIdx ? 'bg-teal-400 scale-110' : 'bg-[var(--brand-border)]')} />
               {i < STEPS.length - 1 && <div className={cn('w-6 h-px', i < stepIdx ? 'bg-teal-500/40' : 'bg-[var(--surface-3)]')} />}
             </div>
           ))}
@@ -76,7 +81,7 @@ export function OnboardingWizard({
         {step === 'welcome' && (
           <>
             <div className="relative px-6 pt-4 pb-6 overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(45,212,191,0.08), transparent)' }}>
-              <div className="absolute -top-20 -right-20 w-48 h-48 rounded-full blur-3xl opacity-15 bg-gradient-to-br from-teal-500 to-emerald-500" />
+              <div className="absolute -top-20 -right-20 w-48 h-48 rounded-[var(--radius-pill)] blur-3xl opacity-15 bg-gradient-to-br from-teal-500 to-emerald-500" />
               <div className="relative text-center">
                 <div className="w-14 h-14 rounded-[var(--radius-xl)] bg-gradient-to-br from-teal-500/20 to-emerald-500/20 ring-1 ring-teal-500/20 flex items-center justify-center mx-auto mb-4">
                   <Icon as={Sparkles} size="2xl" className="text-accent-brand" />
@@ -84,9 +89,9 @@ export function OnboardingWizard({
                 <h2 className="text-xl font-bold text-[var(--brand-text-bright)] mb-1">Welcome to your dashboard</h2>
                 <p className="t-body text-[var(--brand-text)]">{workspaceName}</p>
                 {!betaMode && <div className="flex items-center justify-center gap-2 mt-3">
-                  <span className={`t-caption-sm px-2.5 py-1 rounded-full border font-semibold ${tierBg}`}>{tierLabel} Plan</span>
+                  <span className={`t-caption-sm px-2.5 py-1 rounded-[var(--radius-pill)] border font-semibold ${tierBg}`}>{tierLabel} Plan</span>
                   {isTrial && trialDaysRemaining != null && (
-                    <span className="t-caption-sm px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-accent-warning font-medium">
+                    <span className="t-caption-sm px-2.5 py-1 rounded-[var(--radius-pill)] bg-amber-500/15 border border-amber-500/30 text-accent-warning font-medium">
                       {trialDaysRemaining} day{trialDaysRemaining !== 1 ? 's' : ''} left in trial
                     </span>
                   )}
@@ -95,7 +100,7 @@ export function OnboardingWizard({
             </div>
 
             <div className="px-6 pb-2">
-              <p className="text-[13px] text-[var(--brand-text)] text-center leading-relaxed">
+              <p className="t-caption-sm text-[var(--brand-text)] text-center leading-relaxed">
                 {STUDIO_NAME} has set up a personalized insights dashboard for you.
                 Let&apos;s take a quick tour of what&apos;s available.
               </p>
@@ -123,7 +128,7 @@ export function OnboardingWizard({
                 <Icon as={BarChart3} size="lg" className="text-accent-info" />
               </div>
               <h2 className="text-lg font-bold text-[var(--brand-text-bright)] mb-1">What&apos;s included</h2>
-              <p className="text-[13px] text-[var(--brand-text-muted)]">Everything your dashboard can do</p>
+              <p className="t-caption-sm text-[var(--brand-text-muted)]">Everything your dashboard can do</p>
             </div>
 
             <div className="px-6 py-4">
@@ -151,7 +156,7 @@ export function OnboardingWizard({
                 <Icon as={Trophy} size="lg" className="text-accent-success" />
               </div>
               <h2 className="text-lg font-bold text-[var(--brand-text-bright)] mb-1">Get started</h2>
-              <p className="text-[13px] text-[var(--brand-text-muted)]">Here are some things you can do right now</p>
+              <p className="t-caption-sm text-[var(--brand-text-muted)]">Here are some things you can do right now</p>
             </div>
 
             <div className="px-6 py-4 space-y-2">

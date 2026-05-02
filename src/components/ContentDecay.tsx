@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { TrendingDown, RefreshCw, AlertTriangle, AlertCircle, Eye, Sparkles, ArrowDown, ArrowUp } from 'lucide-react';
+import { RefreshCw, AlertTriangle, AlertCircle, Eye, Sparkles, ArrowDown, ArrowUp } from 'lucide-react';
 import { contentDecay } from '../api/content';
 import { EmptyState, Icon, Button } from './ui';
 
@@ -37,9 +37,9 @@ interface Props {
 }
 
 const SEV_CONFIG = {
-  critical: { label: 'Critical', bg: 'bg-red-500/10', border: 'border-red-500/20', text: 'text-red-400', icon: AlertTriangle },
-  warning: { label: 'Warning', bg: 'bg-amber-500/10', border: 'border-amber-500/20', text: 'text-amber-400', icon: AlertCircle },
-  watch: { label: 'Watch', bg: 'bg-blue-500/10', border: 'border-blue-500/20', text: 'text-blue-400', icon: Eye },
+  critical: { label: 'Critical', bg: 'bg-red-500/10', border: 'border-red-500/20', text: 'text-accent-danger', icon: AlertTriangle },
+  warning: { label: 'Warning', bg: 'bg-amber-500/10', border: 'border-amber-500/20', text: 'text-accent-warning', icon: AlertCircle },
+  watch: { label: 'Watch', bg: 'bg-blue-500/10', border: 'border-blue-500/20', text: 'text-accent-info', icon: Eye },
 };
 
 export default function ContentDecay({ workspaceId }: Props) {
@@ -89,7 +89,7 @@ export default function ContentDecay({ workspaceId }: Props) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <div className="w-5 h-5 border-2 rounded-full animate-spin border-[var(--brand-border)] border-t-teal-400" />
+        <div className="w-5 h-5 border-2 rounded-[var(--radius-pill)] animate-spin border-[var(--brand-border)] border-t-teal-400" />
       </div>
     );
   }
@@ -100,7 +100,7 @@ export default function ContentDecay({ workspaceId }: Props) {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-[var(--brand-text-bright)] flex items-center gap-2">
-            <Icon as={TrendingDown} size="md" className="text-amber-400" />
+            <Icon as={ArrowDown} size="md" className="text-accent-warning" />
             Content Decay Monitor
           </h3>
           <p className="text-xs text-[var(--brand-text-muted)] mt-0.5">
@@ -122,7 +122,7 @@ export default function ContentDecay({ workspaceId }: Props) {
       {!analysis && !analyzing && (
         // pr-check-disable-next-line -- brand asymmetric signature on decay analytics summary; intentional non-SectionCard chrome
         <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-signature-lg)]">
-          <EmptyState icon={TrendingDown} title="No decay analysis yet" description="Run an analysis to detect content losing search traffic" className="py-12" />
+          <EmptyState icon={ArrowDown} title="No decay analysis yet" description="Run an analysis to detect content losing search traffic" className="py-12" />
         </div>
       )}
 
@@ -147,10 +147,10 @@ export default function ContentDecay({ workspaceId }: Props) {
             })}
           </div>
 
-          {/* AI recommendations button - purple is valid: admin AI surface */}
+          {/* AI recommendations button - styleguide brand accent */}
           {analysis.summary.totalDecaying > 0 && !analysis.decayingPages.some(p => p.refreshRecommendation) && (
             <button onClick={generateRecommendations} disabled={generatingRecs}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-[var(--radius-lg)] bg-purple-600/10 border border-purple-500/20 text-purple-300 hover:bg-purple-600/20 transition-colors text-xs font-medium disabled:opacity-50">
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-[var(--radius-lg)] bg-accent-brand-soft border border-accent-brand-soft text-accent-brand hover:bg-accent-brand-soft transition-colors text-xs font-medium disabled:opacity-50">
               <Icon as={Sparkles} size="md" className={generatingRecs ? 'animate-pulse' : ''} />
               {generatingRecs ? 'Generating AI refresh recommendations...' : 'Generate AI Refresh Recommendations'}
             </button>
@@ -179,7 +179,7 @@ export default function ContentDecay({ workspaceId }: Props) {
                         <div className="flex-1 min-w-0">
                           <div className="text-xs font-medium text-[var(--brand-text-bright)] truncate">{page.page}</div>
                           <div className="flex items-center gap-3 mt-0.5">
-                            <span className="t-caption-sm text-red-400 flex items-center gap-0.5">
+                            <span className="t-caption-sm text-accent-danger flex items-center gap-0.5">
                               <Icon as={ArrowDown} size="sm" /> {page.clickDeclinePct}% clicks
                             </span>
                             <span className="t-caption-sm text-[var(--brand-text-muted)]">
@@ -189,37 +189,37 @@ export default function ContentDecay({ workspaceId }: Props) {
                         </div>
                         <div className="flex items-center gap-4 flex-shrink-0 text-right">
                           <div>
-                            <div className={`text-xs font-mono ${page.positionChange > 0 ? 'text-red-400' : page.positionChange < 0 ? 'text-emerald-400' : 'text-[var(--brand-text-muted)]'}`}>
+                            <div className={`text-xs font-mono ${page.positionChange > 0 ? 'text-accent-danger' : page.positionChange < 0 ? 'text-accent-success' : 'text-[var(--brand-text-muted)]'}`}>
                               {page.positionChange > 0 ? <Icon as={ArrowDown} size="sm" /> : page.positionChange < 0 ? <Icon as={ArrowUp} size="sm" /> : null}
                               {' '}{Math.abs(page.positionChange)} pos
                             </div>
-                            <div className="text-[10px] text-[var(--brand-text-muted)]">now #{page.currentPosition}</div>
+                            <div className="t-micro text-[var(--brand-text-muted)]">now #{page.currentPosition}</div>
                           </div>
-                          <span className={`text-[10px] font-medium px-2 py-0.5 rounded ${cfg.bg} ${cfg.text}`} /* arbitrary-text-ok */>{cfg.label}</span>
+                          <span className={`t-micro font-medium px-2 py-0.5 rounded-[var(--radius-sm)] ${cfg.bg} ${cfg.text}`}>{cfg.label}</span>
                         </div>
                       </button>
                       {isExpanded && (
                         <div className="px-4 pb-3 pl-13 space-y-2">
                           <div className="grid grid-cols-3 gap-2 text-center">
                             <div className="bg-[var(--surface-3)]/50 rounded-[var(--radius-lg)] p-2">
-                              <div className="text-[10px] text-[var(--brand-text-muted)]">Clicks</div>
-                              <div className="text-xs font-medium text-red-400">{page.previousClicks} → {page.currentClicks}</div>
-                              <div className="text-[10px] text-red-400/70" /* arbitrary-text-ok */>{page.clickDeclinePct}%</div>
+                              <div className="t-micro text-[var(--brand-text-muted)]">Clicks</div>
+                              <div className="text-xs font-medium text-accent-danger">{page.previousClicks} → {page.currentClicks}</div>
+                              <div className="t-micro text-accent-danger">{page.clickDeclinePct}%</div>
                             </div>
                             <div className="bg-[var(--surface-3)]/50 rounded-[var(--radius-lg)] p-2">
-                              <div className="text-[10px] text-[var(--brand-text-muted)]">Impressions</div>
-                              <div className={`text-xs font-medium ${page.impressionChangePct < 0 ? 'text-amber-400' : 'text-emerald-400'}`}>{page.previousImpressions} → {page.currentImpressions}</div>
-                              <div className={`text-[10px] ${page.impressionChangePct < 0 ? 'text-amber-400/70' : 'text-emerald-400/70'}`} /* arbitrary-text-ok */>{page.impressionChangePct > 0 ? '+' : ''}{page.impressionChangePct}%</div>
+                              <div className="t-micro text-[var(--brand-text-muted)]">Impressions</div>
+                              <div className={`text-xs font-medium ${page.impressionChangePct < 0 ? 'text-accent-warning' : 'text-accent-success'}`}>{page.previousImpressions} → {page.currentImpressions}</div>
+                              <div className={`t-micro ${page.impressionChangePct < 0 ? 'text-accent-warning' : 'text-accent-success'}`}>{page.impressionChangePct > 0 ? '+' : ''}{page.impressionChangePct}%</div>
                             </div>
                             <div className="bg-[var(--surface-3)]/50 rounded-[var(--radius-lg)] p-2">
-                              <div className="text-[10px] text-[var(--brand-text-muted)]">Position</div>
-                              <div className={`text-xs font-medium ${page.positionChange > 0 ? 'text-red-400' : 'text-emerald-400'}`}>{page.previousPosition} → {page.currentPosition}</div>
-                              <div className={`text-[10px] ${page.positionChange > 0 ? 'text-red-400/70' : 'text-emerald-400/70'}`} /* arbitrary-text-ok */>{page.positionChange > 0 ? '+' : ''}{page.positionChange}</div>
+                              <div className="t-micro text-[var(--brand-text-muted)]">Position</div>
+                              <div className={`text-xs font-medium ${page.positionChange > 0 ? 'text-accent-danger' : 'text-accent-success'}`}>{page.previousPosition} → {page.currentPosition}</div>
+                              <div className={`t-micro ${page.positionChange > 0 ? 'text-accent-danger' : 'text-accent-success'}`}>{page.positionChange > 0 ? '+' : ''}{page.positionChange}</div>
                             </div>
                           </div>
                           {page.refreshRecommendation && (
-                            <div className="bg-purple-500/5 border border-purple-500/15 rounded-[var(--radius-lg)] p-3 mt-2">
-                              <div className="flex items-center gap-1.5 t-caption-sm font-medium text-purple-300 mb-2">
+                            <div className="bg-accent-brand-soft border border-accent-brand-soft rounded-[var(--radius-lg)] p-3 mt-2">
+                              <div className="flex items-center gap-1.5 t-caption-sm font-medium text-accent-brand mb-2">
                                 <Icon as={Sparkles} size="md" /> AI Refresh Recommendation
                               </div>
                               <div className="t-caption-sm text-[var(--brand-text-bright)] leading-relaxed whitespace-pre-wrap">{page.refreshRecommendation}</div>
@@ -237,7 +237,7 @@ export default function ContentDecay({ workspaceId }: Props) {
           {filtered.length === 0 && analysis.summary.totalDecaying === 0 && (
             // pr-check-disable-next-line -- brand asymmetric signature on no-decay empty state; intentional non-SectionCard chrome
             <div className="text-center py-8 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-signature-lg)]">
-              <div className="text-emerald-400 text-sm font-medium">All content performing well</div>
+              <div className="text-accent-success text-sm font-medium">All content performing well</div>
               <p className="text-xs text-[var(--brand-text-muted)] mt-1">No pages showing significant traffic decline</p>
             </div>
           )}

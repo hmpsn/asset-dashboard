@@ -224,11 +224,11 @@ function ClientCopyReviewInner({ workspaceId }: ClientCopyReviewProps) {
       {/* Summary stats */}
       <div className="flex gap-4 t-caption text-[var(--brand-text)]">
         <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-teal-500" />
+          <span className="w-2 h-2 rounded-[var(--radius-pill)] bg-teal-500" />
           {entries.reduce((n, e) => n + e.copyStatus.clientReviewSections, 0)} awaiting your review
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+          <span className="w-2 h-2 rounded-[var(--radius-pill)] bg-emerald-500" />
           {entries.reduce((n, e) => n + e.copyStatus.approvedSections, 0)} approved
         </span>
       </div>
@@ -301,9 +301,9 @@ function EntryCard({ entry, workspaceId, isExpanded, onToggle, staggerIndex }: E
       {/* Approval progress bar */}
       {copyStatus.totalSections > 0 && (
         <div className="mt-3">
-          <div className="w-full h-1 bg-[var(--surface-3)] rounded-full overflow-hidden">
+          <div className="w-full h-1 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
             <div
-              className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+              className="h-full bg-emerald-500 rounded-[var(--radius-pill)] transition-all duration-500"
               style={{ width: `${copyStatus.approvalPercentage}%` }}
             />
           </div>

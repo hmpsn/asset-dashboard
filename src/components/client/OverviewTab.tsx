@@ -220,7 +220,7 @@ export function OverviewTab({
       return (
         <div className="bg-gradient-to-r from-amber-600/10 via-[var(--surface-2)] to-teal-600/10 border border-amber-500/20 px-4 py-3" style={{ borderRadius: 'var(--radius-signature)' }}>
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-5 h-5 rounded-md bg-amber-500/15 flex items-center justify-center"><Icon as={AlertTriangle} size="sm" className="text-accent-warning" /></div>
+            <div className="w-5 h-5 rounded-[var(--radius-md)] bg-amber-500/15 flex items-center justify-center"><Icon as={AlertTriangle} size="sm" className="text-accent-warning" /></div>
             <span className="t-caption font-medium text-[var(--brand-text)]">{total} item{total > 1 ? 's' : ''} need{total === 1 ? 's' : ''} your attention</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -366,19 +366,19 @@ export function OverviewTab({
             
             <div className="space-y-3 max-w-md mx-auto">
               <div className="flex items-center gap-3 t-body">
-                <div className="w-6 h-6 rounded-full bg-[var(--surface-3)] flex items-center justify-center flex-shrink-0">
+                <div className="w-6 h-6 rounded-[var(--radius-pill)] bg-[var(--surface-3)] flex items-center justify-center flex-shrink-0">
                   <Icon as={Search} size="sm" className="text-[var(--brand-text-muted)]" />
                 </div>
                 <span className="text-[var(--brand-text)]">Connect Google Search Console</span>
               </div>
               <div className="flex items-center gap-3 t-body">
-                <div className="w-6 h-6 rounded-full bg-[var(--surface-3)] flex items-center justify-center flex-shrink-0">
+                <div className="w-6 h-6 rounded-[var(--radius-pill)] bg-[var(--surface-3)] flex items-center justify-center flex-shrink-0">
                   <Icon as={BarChart3} size="sm" className="text-[var(--brand-text-muted)]" />
                 </div>
                 <span className="text-[var(--brand-text)]">Connect Google Analytics</span>
               </div>
               <div className="flex items-center gap-3 t-body">
-                <div className="w-6 h-6 rounded-full bg-[var(--surface-3)] flex items-center justify-center flex-shrink-0">
+                <div className="w-6 h-6 rounded-[var(--radius-pill)] bg-[var(--surface-3)] flex items-center justify-center flex-shrink-0">
                   <Icon as={Shield} size="sm" className="text-[var(--brand-text-muted)]" />
                 </div>
                 <span className="text-[var(--brand-text)]">Run first site audit</span>
@@ -490,7 +490,7 @@ export function OverviewTab({
                     const cfg = icons[entry.type] || { color: '#94a3b8', label: 'Note' };
                     return (
                       <div key={entry.id} className="flex items-start gap-2.5 pl-0">
-                        <div className="w-[11px] h-[11px] rounded-full border-2 flex-shrink-0 mt-1 z-[var(--z-sticky)]" style={{ borderColor: cfg.color, backgroundColor: themeColor('#0f1219', '#f8fafc') }} />
+                        <div className="w-[11px] h-[11px] rounded-[var(--radius-pill)] border-2 flex-shrink-0 mt-1 z-[var(--z-sticky)]" style={{ borderColor: cfg.color, backgroundColor: themeColor('#0f1219', '#f8fafc') }} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5">
                             <span className="t-caption-sm font-medium px-1 py-0.5 rounded" style={{ backgroundColor: `${cfg.color}15`, color: cfg.color }}>{cfg.label}</span>

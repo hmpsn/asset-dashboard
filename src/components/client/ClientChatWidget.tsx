@@ -102,7 +102,7 @@ export function ClientChatWidget({
           onClick={() => setChatOpen(true)}
           icon={Sparkles}
           size="lg"
-          className="fixed bottom-6 right-6 rounded-full shadow-lg shadow-teal-900/30 z-[var(--z-modal)]"
+          className="fixed bottom-6 right-6 rounded-[var(--radius-pill)] shadow-lg shadow-teal-900/30 z-[var(--z-modal)]"
         >
           Insights Engine
         </Button>
@@ -256,9 +256,9 @@ export function ClientChatWidget({
                         </div>
                         <div className="bg-[var(--surface-3)]/50 border border-[var(--brand-border)] rounded-[var(--radius-xl)] px-3.5 py-2.5">
                           <div className="flex gap-1">
-                            <div className="w-1.5 h-1.5 rounded-full bg-[var(--brand-text-muted)] animate-bounce" />
-                            <div className="w-1.5 h-1.5 rounded-full bg-[var(--brand-text-muted)] animate-bounce" style={{ animationDelay: '150ms' }} />
-                            <div className="w-1.5 h-1.5 rounded-full bg-[var(--brand-text-muted)] animate-bounce" style={{ animationDelay: '300ms' }} />
+                            <div className="w-1.5 h-1.5 rounded-[var(--radius-pill)] bg-[var(--brand-text-muted)] animate-bounce" />
+                            <div className="w-1.5 h-1.5 rounded-[var(--radius-pill)] bg-[var(--brand-text-muted)] animate-bounce" style={{ animationDelay: '150ms' }} />
+                            <div className="w-1.5 h-1.5 rounded-[var(--radius-pill)] bg-[var(--brand-text-muted)] animate-bounce" style={{ animationDelay: '300ms' }} />
                           </div>
                         </div>
                       </div>

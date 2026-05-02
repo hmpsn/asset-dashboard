@@ -60,19 +60,19 @@ interface Workspace {
 }
 
 const STATUS_OPTIONS: { value: RequestStatus; label: string; color: string }[] = [
-  { value: 'new', label: 'New', color: 'bg-blue-500/10 border-blue-500/30 text-blue-400' },
-  { value: 'in_review', label: 'In Review', color: 'bg-amber-500/10 border-amber-500/30 text-amber-400' },
-  { value: 'in_progress', label: 'In Progress', color: 'bg-teal-500/10 border-teal-500/30 text-teal-400' },
+  { value: 'new', label: 'New', color: 'bg-blue-500/10 border-blue-500/30 text-accent-info' },
+  { value: 'in_review', label: 'In Review', color: 'bg-amber-500/10 border-amber-500/30 text-accent-warning' },
+  { value: 'in_progress', label: 'In Progress', color: 'bg-teal-500/10 border-teal-500/30 text-accent-brand' },
   { value: 'on_hold', label: 'On Hold', color: 'bg-[var(--surface-3)] border-[var(--brand-border-hover)] text-[var(--brand-text)]' },
-  { value: 'completed', label: 'Completed', color: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' },
+  { value: 'completed', label: 'Completed', color: 'bg-emerald-500/10 border-emerald-500/30 text-accent-success' },
   { value: 'closed', label: 'Closed', color: 'bg-[var(--surface-3)] border-[var(--brand-border-hover)] text-[var(--brand-text-muted)]' },
 ];
 
 const PRIORITY_OPTIONS: { value: RequestPriority; label: string; color: string }[] = [
   { value: 'low', label: 'Low', color: 'text-[var(--brand-text)]' },
-  { value: 'medium', label: 'Medium', color: 'text-blue-400' },
-  { value: 'high', label: 'High', color: 'text-amber-400' },
-  { value: 'urgent', label: 'Urgent', color: 'text-red-400' },
+  { value: 'medium', label: 'Medium', color: 'text-accent-info' },
+  { value: 'high', label: 'High', color: 'text-accent-warning' },
+  { value: 'urgent', label: 'Urgent', color: 'text-accent-danger' },
 ];
 
 const CAT_LABELS: Record<string, string> = {
@@ -219,7 +219,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Icon as={MessageSquare} size="lg" className="text-teal-400" />
+          <Icon as={MessageSquare} size="lg" className="text-accent-brand" />
           <div>
             <h2 className="text-sm font-semibold text-[var(--brand-text-bright)]">Client Requests</h2>
             <p className="t-caption mt-0.5 text-[var(--brand-text-muted)]">Review, respond to, and manage client requests across workspaces.</p>
@@ -234,9 +234,9 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
           <div className="flex items-center gap-6">
             {[
               { label: 'Total', value: counts.total, cls: 'text-[var(--brand-text-bright)]' },
-              { label: 'New', value: counts.new, cls: 'text-blue-400' },
-              { label: 'Active', value: counts.in_progress, cls: 'text-teal-400' },
-              { label: 'Resolved', value: counts.completed, cls: 'text-emerald-400' },
+              { label: 'New', value: counts.new, cls: 'text-accent-info' },
+              { label: 'Active', value: counts.in_progress, cls: 'text-accent-brand' },
+              { label: 'Resolved', value: counts.completed, cls: 'text-accent-success' },
             ].map(s => (
               <div key={s.label} className="text-center">
                 <div className={cn('text-xl font-bold', s.cls)}>{s.value}</div>
@@ -246,7 +246,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
           </div>
           {counts.total > 0 && (
             <div className="text-right">
-              <div className="text-lg font-bold text-emerald-400">
+              <div className="text-lg font-bold text-accent-success">
                 {Math.round((counts.completed / counts.total) * 100)}%
               </div>
               <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)]">Complete</div>
@@ -254,8 +254,8 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
           )}
         </div>
         {counts.total > 0 && (
-          <div className="h-2 bg-[var(--surface-1)] rounded-full overflow-hidden">
-            <div className="h-full rounded-full transition-all duration-500 bg-emerald-400" style={{ width: `${(counts.completed / counts.total) * 100}%` }} />
+          <div className="h-2 bg-[var(--surface-1)] rounded-[var(--radius-pill)] overflow-hidden">
+            <div className="h-full rounded-[var(--radius-pill)] transition-all duration-500 bg-emerald-400" style={{ width: `${(counts.completed / counts.total) * 100}%` }} />
           </div>
         )}
       </div>
@@ -266,24 +266,24 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
           <Icon as={Filter} size="sm" className="text-[var(--brand-text-muted)]" />
         </div>
         <select value={wsFilter} onChange={e => setWsFilter(e.target.value)}
-          className="px-2.5 py-1.5 rounded-lg t-caption bg-[var(--surface-2)] border border-[var(--brand-border)] text-[var(--brand-text-bright)]">
+          className="px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption bg-[var(--surface-2)] border border-[var(--brand-border)] text-[var(--brand-text-bright)]">
           <option value="all">All Workspaces</option>
           {workspaces.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
         </select>
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as RequestStatus | 'all')}
-          className="px-2.5 py-1.5 rounded-lg t-caption bg-[var(--surface-2)] border border-[var(--brand-border)] text-[var(--brand-text-bright)]">
+          className="px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption bg-[var(--surface-2)] border border-[var(--brand-border)] text-[var(--brand-text-bright)]">
           <option value="all">All Statuses</option>
           {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
         <select value={catFilter} onChange={e => setCatFilter(e.target.value as RequestCategory | 'all')}
-          className="px-2.5 py-1.5 rounded-lg t-caption bg-[var(--surface-2)] border border-[var(--brand-border)] text-[var(--brand-text-bright)]">
+          className="px-2.5 py-1.5 rounded-[var(--radius-lg)] t-caption bg-[var(--surface-2)] border border-[var(--brand-border)] text-[var(--brand-text-bright)]">
           <option value="all">All Categories</option>
           {Object.entries(CAT_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
         <div className="flex-1 min-w-[140px] max-w-[240px] relative ml-auto">
           <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)]" />
           <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search requests..."
-            className="w-full pl-7 pr-3 py-1.5 rounded-lg t-caption bg-[var(--surface-2)] border border-[var(--brand-border)] text-[var(--brand-text-bright)]" />
+            className="w-full pl-7 pr-3 py-1.5 rounded-[var(--radius-lg)] t-caption bg-[var(--surface-2)] border border-[var(--brand-border)] text-[var(--brand-text-bright)]" />
         </div>
       </div>
 
@@ -306,9 +306,9 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
       {/* Bulk action bar */}
       {selected.size > 0 && (
         // pr-check-disable-next-line -- floating bulk-action toolbar
-        <div className="rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap bg-[var(--surface-2)] border-2 border-teal-400" style={{ boxShadow: '0 0 12px rgba(45,212,191,0.1)' }}>
+        <div className="rounded-[var(--radius-xl)] px-4 py-3 flex items-center gap-3 flex-wrap bg-[var(--surface-2)] border-2 border-[var(--teal)]" style={{ boxShadow: '0 0 12px color-mix(in srgb, var(--teal) 10%, transparent)' }}>
           <div className="flex items-center gap-2">
-            <Icon as={CheckCheck} size="md" className="text-teal-400" />
+            <Icon as={CheckCheck} size="md" className="text-accent-brand" />
             <span className="text-xs font-semibold text-[var(--brand-text-bright)]">{selected.size} selected</span>
           </div>
           <div className="h-4 w-px bg-[var(--brand-border)]" />
@@ -323,7 +323,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
           </div>
           <div className="h-4 w-px bg-[var(--brand-border)]" />
           <button onClick={bulkDelete} disabled={bulkUpdating}
-            className="flex items-center gap-1 px-2 py-1 rounded t-caption font-medium text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50">
+            className="flex items-center gap-1 px-2 py-1 rounded t-caption font-medium text-accent-danger hover:bg-red-500/10 transition-colors disabled:opacity-50">
             <Icon as={Trash2} size="sm" /> Delete
           </button>
           <button onClick={() => setSelected(new Set())} className="ml-auto t-caption hover:underline text-[var(--brand-text-muted)]">
@@ -355,7 +355,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
             const next = nextStatus(req.status);
 
             return (
-              <div key={req.id} className={cn('rounded-xl overflow-hidden transition-all bg-[var(--surface-2)] border border-[var(--brand-border)]', isSelected && 'ring-1 ring-teal-400')}>
+              <div key={req.id} className={cn('rounded-[var(--radius-xl)] overflow-hidden transition-all bg-[var(--surface-2)] border border-[var(--brand-border)]', isSelected && 'ring-1 ring-teal-400')}>
                 {/* Row header */}
                 <div className="flex items-center">
                   {/* Checkbox */}
@@ -388,7 +388,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                           </span>
                           {req.submittedBy && <span className="text-[var(--brand-text-bright)]">by {req.submittedBy}</span>}
                           <span><Clock className="w-2.5 h-2.5 inline mr-0.5" />{new Date(req.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                          {unreadTeam > 0 && <span className="text-teal-400">{unreadTeam} client note{unreadTeam !== 1 ? 's' : ''}</span>}
+                          {unreadTeam > 0 && <span className="text-accent-brand">{unreadTeam} client note{unreadTeam !== 1 ? 's' : ''}</span>}
                           {req.pageUrl && (
                             <span className="flex items-center gap-0.5 truncate max-w-[140px]">
                               <ExternalLink className="w-2.5 h-2.5" />{req.pageUrl}
@@ -403,14 +403,14 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                   <div className="flex items-center gap-1 px-3 flex-shrink-0">
                     {next && !isDone && (
                       <button onClick={() => quickStatus(req.id, next)}
-                        className={cn('flex items-center gap-1 px-2 py-1 rounded t-caption font-medium transition-colors', next === 'completed' ? 'bg-emerald-400/10 text-emerald-400' : 'bg-teal-400/10 text-teal-400')}
+                        className={cn('flex items-center gap-1 px-2 py-1 rounded t-caption font-medium transition-colors', next === 'completed' ? 'bg-emerald-400/10 text-accent-success' : 'bg-teal-400/10 text-accent-brand')}
                         title={next === 'in_progress' ? 'Start working' : next === 'completed' ? 'Mark complete' : next}>
                         {next === 'in_progress' ? <><Play className="w-3 h-3" /> Start</> : <><CheckCircle2 className="w-3 h-3" /> Done</>}
                       </button>
                     )}
                     {isDone && (
                       <button onClick={() => quickStatus(req.id, 'in_progress')}
-                        className="flex items-center gap-1 px-2 py-1 rounded t-caption font-medium transition-colors bg-teal-400/10 text-teal-400"
+                        className="flex items-center gap-1 px-2 py-1 rounded t-caption font-medium transition-colors bg-teal-400/10 text-accent-brand"
                         title="Reopen task">
                         <ArrowRight className="w-3 h-3" /> Reopen
                       </button>
@@ -446,7 +446,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                       </div>
                       <button onClick={() => deleteReq(req.id)}
                         className="ml-auto p-1.5 rounded hover:bg-red-500/10 transition-colors" title="Delete request">
-                        <Icon as={Trash2} size="md" className="text-red-400" />
+                        <Icon as={Trash2} size="md" className="text-accent-danger" />
                       </button>
                     </div>
 
@@ -470,9 +470,9 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                         <div className="space-y-2 max-h-[300px] overflow-y-auto">
                           {req.notes.map(note => (
                             <div key={note.id} className={cn('flex gap-2', note.author === 'team' && 'justify-end')}>
-                              <div className={cn('max-w-[80%] rounded-lg px-3 py-2', note.author === 'team' ? 'bg-teal-400/8 border border-teal-400/15' : 'bg-[var(--surface-1)] border border-[var(--brand-border)]')}>
+                              <div className={cn('max-w-[80%] rounded-[var(--radius-lg)] px-3 py-2', note.author === 'team' ? 'bg-teal-400/8 border border-teal-400/15' : 'bg-[var(--surface-1)] border border-[var(--brand-border)]')}>
                                 <div className="flex items-center gap-1.5 mb-0.5">
-                                  <span className={cn('t-caption font-medium', note.author === 'team' ? 'text-teal-400' : 'text-[var(--brand-text-muted)]')}>
+                                  <span className={cn('t-caption font-medium', note.author === 'team' ? 'text-accent-brand' : 'text-[var(--brand-text-muted)]')}>
                                     {note.author === 'team' ? 'You (Team)' : 'Client'}
                                   </span>
                                   <span className="t-caption text-[var(--brand-text-muted)]">
@@ -485,11 +485,11 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                                     {note.attachments.map(att => (
                                       att.mimeType.startsWith('image/') ? (
                                         <a key={att.id} href={`/api/request-attachments/${att.filename}`} target="_blank" rel="noreferrer" className="block">
-                                          <img src={`/api/request-attachments/${att.filename}`} alt={att.originalName} className="max-w-[240px] max-h-[180px] rounded-md border border-[var(--brand-border)]" />
+                                          <img src={`/api/request-attachments/${att.filename}`} alt={att.originalName} className="max-w-[240px] max-h-[180px] rounded-[var(--radius-md)] border border-[var(--brand-border)]" />
                                         </a>
                                       ) : (
                                         <a key={att.id} href={`/api/request-attachments/${att.filename}`} target="_blank" rel="noreferrer"
-                                          className="flex items-center gap-1.5 t-caption hover:underline text-teal-400">
+                                          className="flex items-center gap-1.5 t-caption hover:underline text-accent-brand">
                                           <FileText className="w-3 h-3" />{att.originalName} <span className="text-[var(--brand-text-muted)]">({(att.size / 1024).toFixed(0)}KB)</span>
                                         </a>
                                       )
@@ -519,15 +519,15 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                         <input value={expandedId === req.id ? noteInput : ''} onChange={e => setNoteInput(e.target.value)}
                           onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendNote(req.id)}
                           placeholder="Send a note to the client..."
-                          className="flex-1 px-3 py-2 rounded-lg t-caption border border-[var(--brand-border)] text-[var(--brand-text-bright)] bg-[var(--surface-1)]"
+                          className="flex-1 px-3 py-2 rounded-[var(--radius-lg)] t-caption border border-[var(--brand-border)] text-[var(--brand-text-bright)] bg-[var(--surface-1)]"
                           disabled={sendingNote} />
                         <input type="file" ref={noteFileRef} className="hidden" multiple accept="image/*,.pdf,.doc,.docx,.txt,.csv"
                           onChange={e => { if (e.target.files) setNoteFiles(prev => [...prev, ...Array.from(e.target.files!)]); e.target.value = ''; }} />
-                        <button onClick={() => noteFileRef.current?.click()} className="px-2 py-2 rounded-lg transition-colors border border-[var(--brand-border)] bg-[var(--surface-1)]" title="Attach file">
+                        <button onClick={() => noteFileRef.current?.click()} className="px-2 py-2 rounded-[var(--radius-lg)] transition-colors border border-[var(--brand-border)] bg-[var(--surface-1)]" title="Attach file">
                           <Icon as={Paperclip} size="md" className="text-[var(--brand-text-muted)]" />
                         </button>
                         <button onClick={() => sendNote(req.id)} disabled={sendingNote || (!noteInput.trim() && noteFiles.length === 0)}
-                          className="px-3 py-2 rounded-lg transition-colors disabled:opacity-50 bg-teal-400 text-black">
+                          className="px-3 py-2 rounded-[var(--radius-lg)] transition-colors disabled:opacity-50 bg-teal-400 text-black">
                           <Icon as={Send} size="md" />
                         </button>
                       </div>
@@ -536,14 +536,14 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                     {/* Status hints */}
                     {req.status === 'completed' && (
                       <div className="px-5 py-2 border-t border-[var(--brand-border)]">
-                        <div className="flex items-center gap-1.5 t-caption text-emerald-400">
+                        <div className="flex items-center gap-1.5 t-caption text-accent-success">
                           <CheckCircle2 className="w-3 h-3" /> Marked as completed — visible to client
                         </div>
                       </div>
                     )}
                     {req.status === 'new' && (
                       <div className="px-5 py-2 border-t border-[var(--brand-border)]">
-                        <div className="flex items-center gap-1.5 t-caption text-blue-400">
+                        <div className="flex items-center gap-1.5 t-caption text-accent-info">
                           <AlertTriangle className="w-3 h-3" /> New request — change status to let the client know you&apos;re on it
                         </div>
                       </div>

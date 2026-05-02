@@ -51,8 +51,8 @@ export function ShippingVelocityChart({ items }: { items: RoadmapItem[] }) {
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 200 }}>
         <defs>
           <linearGradient id="vel-grad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#2dd4bf" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="#2dd4bf" stopOpacity="0.02" />
+            <stop offset="0%" stopColor={CHART_SERIES_COLORS.teal} stopOpacity="0.3" />
+            <stop offset="100%" stopColor={CHART_SERIES_COLORS.teal} stopOpacity="0.02" />
           </linearGradient>
         </defs>
         {[0, 0.25, 0.5, 0.75, 1].map(f => {

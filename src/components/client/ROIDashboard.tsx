@@ -200,9 +200,9 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
                   </div>
                 </div>
                 {/* Value bar */}
-                <div className="h-1 rounded-full bg-[var(--surface-3)] overflow-hidden">
+                <div className="h-1 rounded-[var(--radius-pill)] bg-[var(--surface-3)] overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-emerald-500/60 to-emerald-400/40 transition-all"
+                    className="h-full rounded-[var(--radius-pill)] bg-gradient-to-r from-emerald-500/60 to-emerald-400/40 transition-all"
                     style={{ width: `${Math.max((page.trafficValue / maxValue) * 100, 2)}%` }}
                   />
                 </div>
@@ -254,11 +254,11 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
                     <div className="flex items-center gap-3 mt-0.5">
                       <span className="t-caption-sm text-accent-brand">&ldquo;{item.targetKeyword}&rdquo;</span>
                       {item.targetPageSlug && <span className="t-caption-sm text-[var(--brand-text-muted)] font-mono">{item.targetPageSlug}</span>}
-                      <span className={`t-caption-sm px-1.5 py-0.5 rounded-full ${item.status === 'published' ? 'bg-teal-500/10 text-accent-brand' : 'bg-emerald-500/10 text-accent-success'}`}>
+                      <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-pill)] ${item.status === 'published' ? 'bg-teal-500/10 text-accent-brand' : 'bg-emerald-500/10 text-accent-success'}`}>
                         {item.status === 'published' ? 'Published' : 'Delivered'}
                       </span>
                       {item.source === 'matrix' && (
-                        <span className="flex items-center gap-0.5 t-caption-sm px-1.5 py-0.5 rounded-full bg-teal-500/10 text-accent-brand">
+                        <span className="flex items-center gap-0.5 t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-pill)] bg-teal-500/10 text-accent-brand">
                           <Icon as={Layers} size="sm" /> Content Plan
                         </span>
                       )}

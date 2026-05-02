@@ -4,7 +4,7 @@ import {
   PauseCircle, AlertTriangle, FileText, Settings2,
 } from 'lucide-react';
 import { contentSubscriptions } from '../api/misc';
-import { PageHeader, SectionCard, Badge, EmptyState, Icon } from './ui';
+import { PageHeader, SectionCard, Badge, EmptyState, Icon, Button } from './ui';
 import type { ContentSubscription, ContentSubPlan } from '../../shared/types/content';
 import { CONTENT_SUB_PLANS } from '../../shared/types/content';
 
@@ -15,10 +15,10 @@ interface Props {
 type BadgeColor = 'teal' | 'blue' | 'emerald' | 'amber' | 'red' | 'orange' | 'zinc';
 
 const STATUS_CONFIG: Record<string, { icon: typeof CheckCircle2; color: string; label: string; badgeColor: BadgeColor }> = {
-  active:    { icon: CheckCircle2,  color: 'text-emerald-400', label: 'Active',    badgeColor: 'emerald' },
-  pending:   { icon: Loader2,       color: 'text-amber-400',   label: 'Pending',   badgeColor: 'amber' },
+  active:    { icon: CheckCircle2,  color: 'text-accent-success', label: 'Active',    badgeColor: 'emerald' },
+  pending:   { icon: Loader2,       color: 'text-accent-warning',   label: 'Pending',   badgeColor: 'amber' },
   paused:    { icon: PauseCircle,   color: 'text-[var(--brand-text)]',    label: 'Paused',    badgeColor: 'zinc' },
-  past_due:  { icon: AlertTriangle, color: 'text-red-400',     label: 'Past Due',  badgeColor: 'red' },
+  past_due:  { icon: AlertTriangle, color: 'text-accent-danger',     label: 'Past Due',  badgeColor: 'red' },
   cancelled: { icon: XCircle,       color: 'text-[var(--brand-text-muted)]',    label: 'Cancelled', badgeColor: 'zinc' },
 };
 
@@ -84,12 +84,13 @@ export function ContentSubscriptions({ workspaceId }: Props) {
         subtitle="Recurring monthly content packages"
         icon={<Icon as={RefreshCw} size="md" className="text-[var(--brand-text-muted)]" />}
         actions={
-          <button
+          <Button
             onClick={() => setShowCreate(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white transition-colors"
+            icon={Plus}
+            size="sm"
           >
-            <Icon as={Plus} size="md" /> New Subscription
-          </button>
+            New Subscription
+          </Button>
         }
       />
 
@@ -117,7 +118,7 @@ export function ContentSubscriptions({ workspaceId }: Props) {
                 <button
                   key={plan.plan}
                   onClick={() => setNewPlan(plan.plan)}
-                  style={{ borderRadius: '6px 12px 6px 12px' }}
+                  style={{ borderRadius: 'var(--radius-signature)' }}
                   className={`p-4 border text-left transition-colors ${
                     newPlan === plan.plan
                       ? 'border-teal-500 bg-teal-500/10'
@@ -126,7 +127,7 @@ export function ContentSubscriptions({ workspaceId }: Props) {
                 >
                   <div className="text-sm font-medium text-[var(--brand-text-bright)]">{plan.displayName}</div>
                   <div className="text-xs text-[var(--brand-text)] mt-1">{plan.description}</div>
-                  <div className="text-lg font-semibold text-teal-400 mt-2">${plan.priceUsd}<span className="text-xs text-[var(--brand-text-muted)]">/mo</span></div>
+                  <div className="text-lg font-semibold text-accent-brand mt-2">${plan.priceUsd}<span className="text-xs text-[var(--brand-text-muted)]">/mo</span></div>
                 </button>
               ))}
             </div>
@@ -137,7 +138,7 @@ export function ContentSubscriptions({ workspaceId }: Props) {
               <select
                 value={newSource}
                 onChange={e => setNewSource(e.target.value as typeof newSource)}
-                className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-lg px-3 py-2 text-sm text-[var(--brand-text-bright)]"
+                className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 text-sm text-[var(--brand-text-bright)]"
               >
                 <option value="strategy_gaps">Strategy Gaps (auto from keyword strategy)</option>
                 <option value="ai_recommended">AI Recommended (AI picks topics)</option>
@@ -152,21 +153,21 @@ export function ContentSubscriptions({ workspaceId }: Props) {
                 value={newNotes}
                 onChange={e => setNewNotes(e.target.value)}
                 placeholder="Any preferences, instructions, or context..."
-                className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-lg px-3 py-2 text-sm text-[var(--brand-text-bright)] h-20 resize-none"
+                className="w-full bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] px-3 py-2 text-sm text-[var(--brand-text-bright)] h-20 resize-none"
               />
             </div>
 
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setShowCreate(false)}
-                className="px-4 py-2 rounded-lg text-xs font-medium text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
+                className="px-4 py-2 rounded-[var(--radius-lg)] text-xs font-medium text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreate}
                 disabled={creating}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-lg)] text-xs font-medium bg-teal-600 hover:bg-teal-500 text-white transition-colors disabled:opacity-50"
               >
                 <Icon as={creating ? Loader2 : Plus} size="md" className={creating ? 'animate-spin' : ''} />
                 Create Subscription
@@ -210,14 +211,14 @@ export function ContentSubscriptions({ workspaceId }: Props) {
               {activeSub.status === 'paused' && (
                 <button
                   onClick={() => handleStatusChange(activeSub.id, 'active')}
-                  className="text-xs text-teal-400 hover:text-teal-300 flex items-center gap-1"
+                  className="text-xs text-accent-brand hover:text-accent-brand flex items-center gap-1"
                 >
                   <Icon as={CheckCircle2} size="md" /> Resume
                 </button>
               )}
               <button
                 onClick={() => handleDelete(activeSub.id)}
-                className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1"
+                className="text-xs text-accent-danger hover:text-accent-danger flex items-center gap-1"
               >
                 <Icon as={Trash2} size="md" /> Delete
               </button>
@@ -232,9 +233,9 @@ export function ContentSubscriptions({ workspaceId }: Props) {
                 {activeSub.postsDeliveredThisPeriod} / {activeSub.postsPerMonth}
               </span>
             </div>
-            <div className="h-2 bg-[var(--surface-3)] rounded-full overflow-hidden">
+            <div className="h-2 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full transition-all"
+                className="h-full bg-gradient-to-r from-teal-500 to-emerald-500 rounded-[var(--radius-pill)] transition-all"
                 style={{ width: `${Math.min(100, (activeSub.postsDeliveredThisPeriod / activeSub.postsPerMonth) * 100)}%` }}
               />
             </div>
@@ -249,7 +250,7 @@ export function ContentSubscriptions({ workspaceId }: Props) {
           {activeSub.postsDeliveredThisPeriod < activeSub.postsPerMonth && (
             <button
               onClick={() => handleMarkDelivered(activeSub.id)}
-              className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)] transition-colors"
+              className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)] transition-colors"
             >
               <Icon as={FileText} size="md" /> Mark Post Delivered
             </button>
@@ -275,7 +276,7 @@ export function ContentSubscriptions({ workspaceId }: Props) {
               const cfg = STATUS_CONFIG[sub.status];
               const SubIcon = cfg?.icon || Settings2;
               return (
-                <div key={sub.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-[var(--surface-3)]/50">
+                <div key={sub.id} className="flex items-center justify-between py-2 px-3 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/50">
                   <div className="flex items-center gap-2">
                     <Icon as={SubIcon} size="md" className={cfg?.color || 'text-[var(--brand-text-muted)]'} />
                     <span className="text-xs text-[var(--brand-text-bright)]">

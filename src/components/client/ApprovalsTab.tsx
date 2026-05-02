@@ -173,7 +173,7 @@ export function ApprovalsTab({
           <p className="t-body text-[var(--brand-text-muted)] mt-1 leading-relaxed">Review proposed SEO changes, make edits if needed, then approve to push live.</p>
         </div>
         {pendingApprovals > 0 && (
-          <span className="ml-auto px-2 py-0.5 t-caption-sm font-medium rounded-full bg-teal-500/20 border border-teal-500/30 text-accent-brand">
+          <span className="ml-auto px-2 py-0.5 t-caption-sm font-medium rounded-[var(--radius-pill)] bg-teal-500/20 border border-teal-500/30 text-accent-brand">
             {pendingApprovals} pending
           </span>
         )}
@@ -240,10 +240,10 @@ export function ApprovalsTab({
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                {batchPending > 0 && <span className="t-caption-sm px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-accent-warning">{batchPending} pending</span>}
-                {batchApproved > 0 && <span className="t-caption-sm px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-accent-success">{batchApproved} approved</span>}
-                {batchApplied > 0 && <span className="t-caption-sm px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-accent-info">{batchApplied} applied</span>}
-                {batchRejected > 0 && <span className="t-caption-sm px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/30 text-accent-danger">{batchRejected} rejected</span>}
+                {batchPending > 0 && <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-amber-500/10 border border-amber-500/30 text-accent-warning">{batchPending} pending</span>}
+                {batchApproved > 0 && <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-emerald-500/10 border border-emerald-500/30 text-accent-success">{batchApproved} approved</span>}
+                {batchApplied > 0 && <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-blue-500/10 border border-blue-500/30 text-accent-info">{batchApplied} applied</span>}
+                {batchRejected > 0 && <span className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-red-500/10 border border-red-500/30 text-accent-danger">{batchRejected} rejected</span>}
               </div>
             </div>
 

@@ -802,19 +802,19 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
           <span className="font-medium text-[var(--brand-text-bright)]">{pages.length}</span> pages
         </div>
         {missingTitles > 0 && (
-          <span className="text-xs px-2 py-0.5 rounded bg-amber-500/8 border border-amber-500/30 text-amber-400/80">
+          <span className="text-xs px-2 py-0.5 rounded bg-amber-500/8 border border-amber-500/30 text-accent-warning">
             {missingTitles} missing SEO titles
           </span>
         )}
         {missingDescs > 0 && (
-          <span className="text-xs px-2 py-0.5 rounded bg-red-500/8 border border-red-500/30 text-red-400/80">
+          <span className="text-xs px-2 py-0.5 rounded bg-red-500/8 border border-red-500/30 text-accent-danger">
             {missingDescs} missing meta descriptions
           </span>
         )}
         <div className="flex-1" />
         <button
           onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.admin.seoEditor(siteId) })}
-          className="p-1.5 rounded text-[var(--brand-text-muted)] hover:text-teal-400 hover:bg-[var(--surface-3)] transition-colors"
+          className="p-1.5 rounded text-[var(--brand-text-muted)] hover:text-accent-brand hover:bg-[var(--surface-3)] transition-colors"
           title="Refresh pages from Webflow"
         >
           <Icon as={RefreshCw} size="md" />
@@ -845,7 +845,9 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
           onClick={handlePublish}
           disabled={publishing}
           className={`flex items-center gap-1.5 px-4 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium transition-colors ${
-            published ? 'bg-emerald-600 text-white' : 'bg-white text-black hover:bg-zinc-200' /* raw-zinc-ok: light button on dark UI */
+            published
+              ? 'bg-[var(--emerald)] text-white'
+              : 'bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--surface-active)]'
           }`}
         >
           <Icon as={publishing ? Loader2 : published ? Check : Upload} size="sm" className={publishing ? 'animate-spin' : ''} />
@@ -861,7 +863,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         />
       )}
       {bulkResults && (
-        <div className="flex items-center gap-2 px-4 py-3 bg-emerald-500/8 border border-emerald-500/30 rounded-[var(--radius-lg)] text-sm text-emerald-300">
+        <div className="flex items-center gap-2 px-4 py-3 bg-emerald-500/8 border border-emerald-500/30 rounded-[var(--radius-lg)] text-sm text-accent-success">
           <Icon as={Check} size="md" /> {bulkResults}
         </div>
       )}
@@ -881,24 +883,24 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         <div className="flex items-center gap-3 t-caption-sm text-[var(--brand-text-muted)]">
           <span className="text-[var(--brand-text)] font-medium">{summary.total} tracked</span>
           {summary.live > 0 && <StatusBadge status="live" />}
-          {summary.live > 0 && <span className="text-teal-400">{summary.live}</span>}
+          {summary.live > 0 && <span className="text-accent-brand">{summary.live}</span>}
           {summary.inReview > 0 && <StatusBadge status="in-review" />}
-          {summary.inReview > 0 && <span className="text-amber-400">{summary.inReview}</span>}
+          {summary.inReview > 0 && <span className="text-accent-warning">{summary.inReview}</span>}
           {summary.approved > 0 && <StatusBadge status="approved" />}
-          {summary.approved > 0 && <span className="text-emerald-400/80">{summary.approved}</span>}
+          {summary.approved > 0 && <span className="text-accent-success">{summary.approved}</span>}
           {summary.rejected > 0 && <StatusBadge status="rejected" />}
-          {summary.rejected > 0 && <span className="text-red-400/80">{summary.rejected}</span>}
+          {summary.rejected > 0 && <span className="text-accent-danger">{summary.rejected}</span>}
           {summary.issueDetected > 0 && <StatusBadge status="issue-detected" />}
-          {summary.issueDetected > 0 && <span className="text-amber-400/80">{summary.issueDetected}</span>}
+          {summary.issueDetected > 0 && <span className="text-accent-warning">{summary.issueDetected}</span>}
           {summary.fixProposed > 0 && <StatusBadge status="fix-proposed" />}
-          {summary.fixProposed > 0 && <span className="text-blue-400">{summary.fixProposed}</span>}
+          {summary.fixProposed > 0 && <span className="text-accent-info">{summary.fixProposed}</span>}
           {workspaceId && (
             <button
               onClick={async () => {
                 await post(`/api/workspaces/${workspaceId}/page-states/clear`, { status: 'all' });
                 refreshStates();
               }}
-              className="ml-auto t-caption-sm text-[var(--brand-text-muted)] hover:text-red-400 underline underline-offset-2 transition-colors"
+              className="ml-auto t-caption-sm text-[var(--brand-text-muted)] hover:text-accent-danger underline underline-offset-2 transition-colors"
             >
               reset all
             </button>
@@ -913,7 +915,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
             await post(`/api/workspaces/${workspaceId}/page-states/clear`, { status: 'all' });
             refreshStates();
           }}
-          className="t-caption-sm text-[var(--brand-text-muted)] hover:text-red-400 underline underline-offset-2 transition-colors"
+          className="t-caption-sm text-[var(--brand-text-muted)] hover:text-accent-danger underline underline-offset-2 transition-colors"
         >
           Reset page tracking
         </button>
@@ -924,9 +926,9 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         <div className="flex items-center gap-3">
           {bulkAnalyzeProgress ? (
             <div className="flex items-center gap-2 px-3 py-2 bg-teal-500/10 border border-teal-500/30 rounded-[var(--radius-lg)]">
-              <Icon as={Loader2} size="md" className="animate-spin text-teal-400" />
+              <Icon as={Loader2} size="md" className="animate-spin text-accent-brand" />
               <span className="text-xs text-[var(--brand-text-bright)]">Analyzing {bulkAnalyzeProgress.done}/{bulkAnalyzeProgress.total} pages...</span>
-              <button onClick={() => { if (bulkAnalyzeJobId) { cancelJob(bulkAnalyzeJobId); setBulkAnalyzeJobId(null); setBulkAnalyzeProgress(null); queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId!) }); } }} className="t-caption-sm text-red-400 hover:text-red-300 ml-2">Cancel</button>
+              <button onClick={() => { if (bulkAnalyzeJobId) { cancelJob(bulkAnalyzeJobId); setBulkAnalyzeJobId(null); setBulkAnalyzeProgress(null); queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId!) }); } }} className="t-caption-sm text-accent-danger hover:text-accent-danger ml-2">Cancel</button>
             </div>
           ) : (
             <button
@@ -943,7 +945,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
             </button>
           )}
           {analyzedPages.size > 0 && !bulkAnalyzeProgress && (
-            <span className="t-caption-sm text-emerald-400/80">{analyzedPages.size}/{pages.length} pages have analysis on file</span>
+            <span className="t-caption-sm text-accent-success">{analyzedPages.size}/{pages.length} pages have analysis on file</span>
           )}
         </div>
       )}
@@ -954,7 +956,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
           onClick={() => setShowCmsOnly(prev => !prev)}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-xs font-medium transition-colors border ${
             showCmsOnly
-              ? 'bg-teal-600/20 border-teal-500/40 text-teal-300'
+              ? 'bg-teal-600/20 border-teal-500/40 text-accent-brand'
               : 'bg-[var(--surface-3)] border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
           }`}
         >
@@ -977,7 +979,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       />
 
       {hasUnsaved && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/8 border border-amber-500/30 rounded-[var(--radius-lg)] text-xs text-amber-400/80">
+        <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/8 border border-amber-500/30 rounded-[var(--radius-lg)] text-xs text-accent-warning">
           <Icon as={AlertCircle} size="md" /> You have unsaved changes. Save individual pages then publish to go live.
         </div>
       )}
@@ -1019,7 +1021,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         {filteredPages.map(page => (
           <div key={page.id}>
             {page.source === 'cms' && (
-              <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-500/8 border border-amber-500/20 rounded t-caption-sm text-amber-400/80 mb-1">
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-500/8 border border-amber-500/20 rounded t-caption-sm text-accent-warning mb-1">
                 <Icon as={AlertCircle} size="sm" />
                 Manual apply required — CMS pages must be updated directly in Webflow
               </div>

@@ -8,6 +8,7 @@ import { useAnalyticsOverview } from '../hooks/admin/useAnalyticsOverview';
 import { useInsightFeed } from '../hooks/admin/useInsightFeed';
 import { useToggleSet } from '../hooks/useToggleSet';
 import { fmtNum } from '../utils/formatNumbers';
+import { CHART_SERIES_COLORS } from './ui/constants';
 
 interface Props {
   workspaceId: string;
@@ -17,12 +18,12 @@ interface Props {
 }
 
 const ALL_OVERVIEW_LINES: TrendLine[] = [
-  { key: 'clicks', color: '#60a5fa', yAxisId: 'left', label: 'Clicks' },
-  { key: 'impressions', color: '#22d3ee', yAxisId: 'left', label: 'Impressions' },
-  { key: 'ctr', color: '#f59e0b', yAxisId: 'right', label: 'Avg CTR' },
-  { key: 'position', color: '#ef4444', yAxisId: 'right', label: 'Avg Position' },
-  { key: 'users', color: '#14b8a6', yAxisId: 'left', label: 'Users' },
-  { key: 'sessions', color: '#3b82f6', yAxisId: 'left', label: 'Sessions' },
+  { key: 'clicks', color: CHART_SERIES_COLORS.blue, yAxisId: 'left', label: 'Clicks' },
+  { key: 'impressions', color: CHART_SERIES_COLORS.cyan, yAxisId: 'left', label: 'Impressions' },
+  { key: 'ctr', color: CHART_SERIES_COLORS.orange, yAxisId: 'right', label: 'Avg CTR' },
+  { key: 'position', color: CHART_SERIES_COLORS.red, yAxisId: 'right', label: 'Avg Position' },
+  { key: 'users', color: CHART_SERIES_COLORS.teal, yAxisId: 'left', label: 'Users' },
+  { key: 'sessions', color: CHART_SERIES_COLORS.blue, yAxisId: 'left', label: 'Sessions' },
 ];
 
 type CardKey = 'clicks' | 'impressions' | 'ctr' | 'position' | 'users' | 'sessions';
@@ -41,21 +42,21 @@ const GSC_CARDS: CardConfig[] = [
   {
     key: 'clicks',
     label: 'Clicks',
-    color: '#60a5fa',
+    color: CHART_SERIES_COLORS.blue,
     formatValue: (o) => fmtNum(o.gscClicks),
     getDelta: (o) => o.gscClicksDelta,
   },
   {
     key: 'impressions',
     label: 'Impressions',
-    color: '#22d3ee',
+    color: CHART_SERIES_COLORS.cyan,
     formatValue: (o) => fmtNum(o.gscImpressions),
     getDelta: (o) => o.gscImpressionsDelta,
   },
   {
     key: 'ctr',
     label: 'Avg CTR',
-    color: '#f59e0b',
+    color: CHART_SERIES_COLORS.orange,
     formatValue: (o) => o.gscImpressions > 0
       ? `${((o.gscClicks / o.gscImpressions) * 100).toFixed(1)}%`
       : '0.0%',
@@ -64,7 +65,7 @@ const GSC_CARDS: CardConfig[] = [
   {
     key: 'position',
     label: 'Avg Position',
-    color: '#ef4444',
+    color: CHART_SERIES_COLORS.red,
     invertDelta: true,
     deltaSuffix: '',  // raw spots, not percentage
     formatValue: (o) => o.gscPosition.toFixed(1),
@@ -77,14 +78,14 @@ const ALL_CARDS: CardConfig[] = [
   {
     key: 'users',
     label: 'Users',
-    color: '#14b8a6',
+    color: CHART_SERIES_COLORS.teal,
     formatValue: (o) => fmtNum(o.ga4Users),
     getDelta: (o) => o.ga4UsersDelta,
   },
   {
     key: 'sessions',
     label: 'Sessions',
-    color: '#3b82f6',
+    color: CHART_SERIES_COLORS.blue,
     formatValue: (o) => fmtNum(o.ga4Sessions),
     getDelta: (o) => o.ga4SessionsDelta,
   },
@@ -112,7 +113,7 @@ export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4Prop
   if (overview.isLoading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Icon as={Loader2} size="lg" className="animate-spin text-teal-400" />
+        <Icon as={Loader2} size="lg" className="animate-spin text-accent-brand" />
         <span className="ml-2 text-sm text-[var(--brand-text-muted)]">Loading analytics...</span>
       </div>
     );

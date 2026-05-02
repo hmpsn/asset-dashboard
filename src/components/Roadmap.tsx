@@ -12,6 +12,7 @@ import { RoadmapBacklogView } from './RoadmapBacklogView';
 import { roadmap as roadmapApi, features as featuresApi } from '../api/misc';
 import { queryKeys } from '../lib/queryKeys';
 import { filtersFromParams, deriveAllTags } from '../lib/roadmapFilters';
+import { CHART_SERIES_COLORS } from './ui/constants';
 import type { SprintData } from '../../shared/types/roadmap';
 import type { FeaturesData } from '../../shared/types/features';
 
@@ -125,14 +126,14 @@ export function Roadmap() {
       <PageHeader
         title="Roadmap"
         subtitle={`${total} items · ${done} done · ${inProgress} active · ${pending} pending`}
-        icon={<MapIcon className="w-5 h-5 text-teal-400" />}
+        icon={<MapIcon className="w-5 h-5 text-accent-brand" />}
       />
 
       <div className="grid grid-cols-4 gap-3">
-        <StatCard label="Total Items" value={total} icon={MapIcon} iconColor="#2dd4bf" size="hero" staggerIndex={0} />
-        <StatCard label="Completed" value={done} icon={CheckCircle2} iconColor="#4ade80" size="hero" staggerIndex={1} />
-        <StatCard label="In Progress" value={inProgress} icon={Clock} iconColor="#fbbf24" size="hero" staggerIndex={2} />
-        <StatCard label="Completion" value={total > 0 ? `${Math.round((done / total) * 100)}%` : '0%'} icon={Rocket} iconColor="#60a5fa" size="hero" staggerIndex={3} />
+        <StatCard label="Total Items" value={total} icon={MapIcon} iconColor={CHART_SERIES_COLORS.teal} size="hero" staggerIndex={0} />
+        <StatCard label="Completed" value={done} icon={CheckCircle2} iconColor={CHART_SERIES_COLORS.emerald} size="hero" staggerIndex={1} />
+        <StatCard label="In Progress" value={inProgress} icon={Clock} iconColor={CHART_SERIES_COLORS.amber} size="hero" staggerIndex={2} />
+        <StatCard label="Completion" value={total > 0 ? `${Math.round((done / total) * 100)}%` : '0%'} icon={Rocket} iconColor={CHART_SERIES_COLORS.blue} size="hero" staggerIndex={3} />
       </div>
 
       <ShippingVelocityChart items={allItems} />
@@ -141,16 +142,16 @@ export function Roadmap() {
         <div className="px-4 py-3">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-medium text-[var(--brand-text)]">Overall Progress</span>
-            {currentSprint && <span className="t-caption text-teal-400">Current: {currentSprint.name}</span>}
+            {currentSprint && <span className="t-caption text-accent-brand">Current: {currentSprint.name}</span>}
           </div>
-          <div className="h-2.5 bg-[var(--surface-1)] rounded-full overflow-hidden flex">
+          <div className="h-2.5 bg-[var(--surface-1)] rounded-[var(--radius-pill)] overflow-hidden flex">
             {done > 0 && <div className="h-full bg-emerald-500 transition-all" style={{ width: `${(done / total) * 100}%` }} />}
             {inProgress > 0 && <div className="h-full bg-teal-400 transition-all" style={{ width: `${(inProgress / total) * 100}%` }} />}
           </div>
           <div className="flex items-center gap-4 mt-1.5 t-caption text-[var(--brand-text-muted)]">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Done ({done})</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-teal-400" /> Active ({inProgress})</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[var(--brand-border-hover)]" /> Pending ({pending})</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-[var(--radius-pill)] bg-emerald-500" /> Done ({done})</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-[var(--radius-pill)] bg-teal-400" /> Active ({inProgress})</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-[var(--radius-pill)] bg-[var(--brand-border-hover)]" /> Pending ({pending})</span>
           </div>
         </div>
       </SectionCard>

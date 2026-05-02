@@ -27,9 +27,9 @@ function TrendIcon({ trend }: { trend: 'improving' | 'stable' | 'declining' }) {
 
 function TrendLabel({ trend }: { trend: 'improving' | 'stable' | 'declining' }) {
   const map = {
-    improving: { label: 'Improving', color: 'text-emerald-400' },
+    improving: { label: 'Improving', color: 'text-accent-success' },
     stable: { label: 'Stable', color: 'text-[var(--brand-text)]' },
-    declining: { label: 'Declining', color: 'text-red-400' },
+    declining: { label: 'Declining', color: 'text-accent-danger' },
   };
   const { label, color } = map[trend];
   return <span className={`text-xs font-medium ${color}`}>{label}</span>;
@@ -44,7 +44,7 @@ export default function OutcomeScorecard({ workspaceId }: Props) {
         {/* Win rate ring + stat cards */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
           <div className="flex flex-col items-center justify-center bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] p-6">
-            <Skeleton className="w-36 h-36 rounded-full" />
+            <Skeleton className="w-36 h-36 rounded-[var(--radius-pill)]" />
             <Skeleton className="w-20 h-3 mt-3" />
           </div>
           <div className="lg:col-span-3 grid grid-cols-3 gap-3">
@@ -67,7 +67,7 @@ export default function OutcomeScorecard({ workspaceId }: Props) {
         action={
           <button
             onClick={() => refetch()}
-            className="text-xs px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 transition-colors"
+            className="text-xs px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/20 transition-colors"
           >
             Retry
           </button>
@@ -111,7 +111,7 @@ export default function OutcomeScorecard({ workspaceId }: Props) {
             value={scorecard.totalTracked}
             icon={Activity}
             iconColor="#60a5fa"
-            valueColor="text-blue-400"
+            valueColor="text-accent-info"
             sub="actions logged"
             staggerIndex={0}
           />
@@ -120,7 +120,7 @@ export default function OutcomeScorecard({ workspaceId }: Props) {
             value={scorecard.totalScored}
             icon={BarChart2}
             iconColor={scoreColor(winRateScore)}
-            valueColor={winRateScore >= 80 ? 'text-emerald-400' : winRateScore >= 60 ? 'text-amber-400' : 'text-red-400'}
+            valueColor={winRateScore >= 80 ? 'text-accent-success' : winRateScore >= 60 ? 'text-accent-warning' : 'text-accent-danger'}
             sub={`${Math.round(scorecard.strongWinRate * 100)}% strong wins`}
             staggerIndex={1}
           />
@@ -137,7 +137,7 @@ export default function OutcomeScorecard({ workspaceId }: Props) {
 
       {/* Category breakdown */}
       {scorecard.byCategory.length > 0 && (
-        <SectionCard title="Win Rate by Action Type" titleIcon={<BarChart2 className="w-4 h-4 text-blue-400" />}>
+        <SectionCard title="Win Rate by Action Type" titleIcon={<BarChart2 className="w-4 h-4 text-accent-info" />}>
           <div className="space-y-3">
             {scorecard.byCategory.map((cat) => {
               const pct = Math.round(cat.winRate * 100);
@@ -146,9 +146,9 @@ export default function OutcomeScorecard({ workspaceId }: Props) {
                   <span className="text-xs text-[var(--brand-text)] w-36 shrink-0">
                     {ACTION_TYPE_LABELS[cat.actionType] ?? cat.actionType}
                   </span>
-                  <div className="flex-1 h-2 bg-[var(--surface-1)] rounded-full overflow-hidden">
+                  <div className="flex-1 h-2 bg-[var(--surface-1)] rounded-[var(--radius-pill)] overflow-hidden">
                     <div
-                      className={`h-full rounded-full transition-all duration-700 ${scoreBgBarClass(pct)}`}
+                      className={`h-full rounded-[var(--radius-pill)] transition-all duration-700 ${scoreBgBarClass(pct)}`}
                       style={{ width: `${pct}%` }}
                     />
                   </div>

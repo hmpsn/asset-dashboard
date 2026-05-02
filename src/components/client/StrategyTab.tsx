@@ -303,8 +303,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               <span>Content Gaps</span>
               <span>{contentScore}/40</span>
             </div>
-            <div className="h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden">
-              <div className="h-full bg-teal-500/60 rounded-full" style={{ width: `${(contentScore / 40) * 100}%` }} />
+            <div className="h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
+              <div className="h-full bg-teal-500/60 rounded-[var(--radius-pill)]" style={{ width: `${(contentScore / 40) * 100}%` }} />
             </div>
           </div>
           <div>
@@ -312,8 +312,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               <span>Quick Wins</span>
               <span>{quickWinScore}/30</span>
             </div>
-            <div className="h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden">
-              <div className="h-full bg-amber-500/60 rounded-full" style={{ width: `${(quickWinScore / 30) * 100}%` }} />
+            <div className="h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
+              <div className="h-full bg-amber-500/60 rounded-[var(--radius-pill)]" style={{ width: `${(quickWinScore / 30) * 100}%` }} />
             </div>
           </div>
           <div>
@@ -321,8 +321,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               <span>Coverage</span>
               <span>{coverageScore}/30</span>
             </div>
-            <div className="h-1.5 bg-[var(--surface-3)] rounded-full overflow-hidden">
-              <div className="h-full bg-emerald-500/60 rounded-full" style={{ width: `${(coverageScore / 30) * 100}%` }} />
+            <div className="h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
+              <div className="h-full bg-emerald-500/60 rounded-[var(--radius-pill)]" style={{ width: `${(coverageScore / 30) * 100}%` }} />
             </div>
           </div>
         </div>
@@ -436,7 +436,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 <div className="space-y-1.5 mb-3">
                   {priorities.map((p, i) => (
                     <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-1)]/50 border border-[var(--brand-border)]/50 group">
-                      <span className={`text-[9px] /* arbitrary-text-ok */ font-medium uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                      <span className={`t-micro font-medium px-1.5 py-0.5 rounded-[var(--radius-sm)] ${
                         p.category === 'growth' ? 'bg-emerald-500/10 text-accent-success border border-emerald-500/20' :
                         p.category === 'brand' ? 'bg-teal-500/10 text-accent-brand border border-teal-500/20' :
                         p.category === 'product' ? 'bg-blue-500/10 text-accent-info border border-blue-500/20' :
@@ -586,7 +586,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="t-caption font-bold text-accent-brand bg-teal-500/10 px-2 py-0.5 rounded-full border border-teal-500/20">{(strategyData.contentGaps?.length || 0) + (strategyData.keywordGaps?.length || 0)}</span>
+              <span className="t-caption font-bold text-accent-brand bg-teal-500/10 px-2 py-0.5 rounded-[var(--radius-pill)] border border-teal-500/20">{(strategyData.contentGaps?.length || 0) + (strategyData.keywordGaps?.length || 0)}</span>
               <ChevronDown className={`w-4 h-4 text-[var(--brand-text-muted)] transition-transform ${expandedSections.has('new-content') ? '' : '-rotate-90'}`} />
             </div>
           </button>
@@ -621,13 +621,13 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                       {/* Row 1: topic title + intent/page-type badges */}
                       <div className="flex items-start justify-between gap-2 mb-1">
                         <span className="t-caption font-semibold text-[var(--brand-text)]">{gap.topic}{gap.opportunityScore != null && (
-                            <span className="ml-2 inline-flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 t-caption font-medium text-accent-info">
+                            <span className="ml-2 inline-flex items-center rounded-[var(--radius-pill)] bg-blue-500/10 px-2 py-0.5 t-caption font-medium text-accent-info">
                               {gap.opportunityScore}/100
                             </span>
                           )}</span>
                         <div className="flex items-center gap-1.5 flex-shrink-0">
                           {gap.intent && (
-                            <span className={`t-caption-sm uppercase px-1.5 py-0.5 rounded-full border font-medium ${intentColor(gap.intent)}`}>{gap.intent}</span>
+                            <span className={`t-caption-sm uppercase px-1.5 py-0.5 rounded-[var(--radius-pill)] border font-medium ${intentColor(gap.intent)}`}>{gap.intent}</span>
                           )}
                           {pageType !== 'blog' && (
                             <span className="t-caption-sm px-1.5 py-0.5 rounded bg-teal-500/10 text-accent-brand border border-teal-500/20 font-medium capitalize">{pageType}</span>
@@ -776,13 +776,15 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                               {!hidePrices && briefPrice != null && <span className="opacity-70 ml-0.5">{fmtPrice(briefPrice)}</span>}
                             </button>
                             {(hidePrices || fullPostPrice != null) && (
-                              <button
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                icon={Sparkles}
                                 onClick={() => setPricingModal({ serviceType: 'full_post', topic: gap.topic, targetKeyword: gap.targetKeyword, intent: gap.intent, priority: gap.priority, rationale: gap.rationale, source: 'strategy', pageType })}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] bg-gradient-to-r from-teal-600/30 to-emerald-600/30 border border-teal-500/40 t-caption-sm text-accent-brand font-medium hover:from-teal-600/50 hover:to-emerald-600/50 transition-all"
                               >
-                                <Icon as={Sparkles} size="sm" /> Full Post
+                                Full Post
                                 {!hidePrices && fullPostPrice != null && <span className="opacity-70 ml-0.5">{fmtPrice(fullPostPrice)}</span>}
-                              </button>
+                              </Button>
                             )}
                           </div>
                         ))}
@@ -881,7 +883,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="t-caption font-bold text-accent-warning bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">{quickWinsAvailable + pagesWithGrowthOpps}</span>
+              <span className="t-caption font-bold text-accent-warning bg-amber-500/10 px-2 py-0.5 rounded-[var(--radius-pill)] border border-amber-500/20">{quickWinsAvailable + pagesWithGrowthOpps}</span>
               <ChevronDown className={`w-4 h-4 text-[var(--brand-text-muted)] transition-transform ${expandedSections.has('optimize-existing') ? '' : '-rotate-90'}`} />
             </div>
           </button>

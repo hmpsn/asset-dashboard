@@ -99,19 +99,26 @@ input::placeholder, textarea::placeholder {
 .text-accent-orange { color: var(--orange); }
 .text-accent-cyan { color: var(--cyan); }
 .hover\:text-accent-brand:hover, .group:hover .group-hover\:text-accent-brand { color: var(--teal); }
+.hover\:text-accent-info:hover { color: var(--blue); }
 .hover\:text-accent-success:hover { color: var(--emerald); }
 .hover\:text-accent-warning:hover { color: var(--amber); }
 .hover\:text-accent-danger:hover { color: var(--red); }
+.hover\:text-accent-orange:hover { color: var(--orange); }
+.hover\:text-accent-cyan:hover { color: var(--cyan); }
 .bg-accent-brand-soft { background-color: color-mix(in srgb, var(--teal) 10%, transparent); }
 .bg-accent-info-soft { background-color: color-mix(in srgb, var(--blue) 10%, transparent); }
 .bg-accent-success-soft { background-color: color-mix(in srgb, var(--emerald) 10%, transparent); }
 .bg-accent-warning-soft { background-color: color-mix(in srgb, var(--amber) 10%, transparent); }
 .bg-accent-danger-soft { background-color: color-mix(in srgb, var(--red) 10%, transparent); }
+.bg-accent-orange-soft { background-color: color-mix(in srgb, var(--orange) 10%, transparent); }
+.bg-accent-cyan-soft { background-color: color-mix(in srgb, var(--cyan) 10%, transparent); }
 .border-accent-brand-soft { border-color: color-mix(in srgb, var(--teal) 25%, transparent); }
 .border-accent-info-soft { border-color: color-mix(in srgb, var(--blue) 25%, transparent); }
 .border-accent-success-soft { border-color: color-mix(in srgb, var(--emerald) 25%, transparent); }
 .border-accent-warning-soft { border-color: color-mix(in srgb, var(--amber) 25%, transparent); }
 .border-accent-danger-soft { border-color: color-mix(in srgb, var(--red) 25%, transparent); }
+.border-accent-orange-soft { border-color: color-mix(in srgb, var(--orange) 25%, transparent); }
+.border-accent-cyan-soft { border-color: color-mix(in srgb, var(--cyan) 25%, transparent); }
 
 :is(
   [class~="text-teal-200"], [class~="text-teal-300"], [class~="text-teal-400"],

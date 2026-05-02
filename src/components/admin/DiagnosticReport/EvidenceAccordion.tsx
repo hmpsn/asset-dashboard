@@ -46,9 +46,9 @@ export function EvidenceAccordion({ context }: Props) {
                 {context.positionHistory.slice(-30).map((p) => (
                   <tr key={p.date} className="text-[var(--brand-text)] border-b border-[var(--surface-2)]">
                     <td className="py-1 pr-4 font-mono">{p.date}</td>
-                    <td className="text-right py-1 pr-4 text-blue-400">{p.position.toFixed(1)}</td>
-                    <td className="text-right py-1 pr-4 text-blue-400">{p.clicks}</td>
-                    <td className="text-right py-1 text-blue-400">{p.impressions}</td>
+                    <td className="text-right py-1 pr-4 text-accent-info">{p.position.toFixed(1)}</td>
+                    <td className="text-right py-1 pr-4 text-accent-info">{p.clicks}</td>
+                    <td className="text-right py-1 text-accent-info">{p.impressions}</td>
                   </tr>
                 ))}
               </tbody>
@@ -70,8 +70,8 @@ export function EvidenceAccordion({ context }: Props) {
                 {context.queryBreakdown.map((q) => (
                   <tr key={q.query} className="text-[var(--brand-text)] border-b border-[var(--surface-2)]">
                     <td className="py-1 pr-4 font-mono truncate max-w-[200px]">{q.query}</td>
-                    <td className="text-right py-1 pr-4 text-blue-400">{q.currentClicks}</td>
-                    <td className="text-right py-1 text-blue-400">{q.currentPosition.toFixed(1)}</td>
+                    <td className="text-right py-1 pr-4 text-accent-info">{q.currentClicks}</td>
+                    <td className="text-right py-1 text-accent-info">{q.currentPosition.toFixed(1)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -85,7 +85,7 @@ export function EvidenceAccordion({ context }: Props) {
           <div className="space-y-1">
             {context.redirectProbe.chain.map((hop, i) => (
               <div key={i} className="flex items-center gap-2 text-xs">
-                <span className={`font-mono px-1.5 py-0.5 rounded ${hop.status === 301 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                <span className={`font-mono px-1.5 py-0.5 rounded ${hop.status === 301 ? 'bg-emerald-500/10 text-accent-success' : 'bg-amber-500/10 text-accent-warning'}`}>
                   {hop.status}
                 </span>
                 <span className="text-[var(--brand-text)] font-mono truncate">{hop.url}</span>
@@ -99,7 +99,7 @@ export function EvidenceAccordion({ context }: Props) {
         <AccordionSection title={`Internal Links (${context.internalLinks.count} found, median: ${context.internalLinks.siteMedian})`}>
           <div className="space-y-1">
             {context.internalLinks.topLinkingPages.map((page) => (
-              <div key={page} className="text-xs text-blue-400 font-mono truncate">{page}</div>
+              <div key={page} className="text-xs text-accent-info font-mono truncate">{page}</div>
             ))}
           </div>
         </AccordionSection>
@@ -111,7 +111,7 @@ export function EvidenceAccordion({ context }: Props) {
             {context.backlinks.topDomains.map((d) => (
               <div key={d.domain} className="flex justify-between text-xs">
                 <span className="text-[var(--brand-text)]">{d.domain}</span>
-                <span className="text-blue-400">{d.backlinksCount} links</span>
+                <span className="text-accent-info">{d.backlinksCount} links</span>
               </div>
             ))}
           </div>

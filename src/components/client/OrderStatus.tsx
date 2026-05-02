@@ -42,7 +42,7 @@ function StatusStepper({ status }: { status: string }) {
         return (
           <div key={step} className="flex items-center gap-1">
             <div className={`flex items-center gap-1 ${isCurrent ? 'opacity-100' : isActive ? 'opacity-70' : 'opacity-30'}`}>
-              <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-teal-400' : 'bg-[var(--brand-border)]'}`} />
+              <div className={`w-2 h-2 rounded-[var(--radius-pill)] ${isActive ? 'bg-teal-400' : 'bg-[var(--brand-border)]'}`} />
               <span className={`t-micro ${isActive ? 'text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)]'}`}>{STEP_LABELS[step]}</span>
             </div>
             {i < STEPS.length - 1 && (
@@ -95,7 +95,7 @@ export function OrderStatus({ workspaceId }: OrderStatusProps) {
                     {order.completedAt && ` · Done ${new Date(order.completedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
                   </div>
                 </div>
-                <div className={`flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-lg)] text-[11px] font-medium ${badge.bg} ${badge.border} border ${badge.color}`}>
+                <div className={`flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-lg)] t-caption-sm font-medium ${badge.bg} ${badge.border} border ${badge.color}`}>
                   <BadgeIcon className={`w-3 h-3 ${order.status === 'in_progress' ? 'animate-spin' : ''}`} />
                   {badge.label}
                 </div>

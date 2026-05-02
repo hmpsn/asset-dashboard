@@ -2,8 +2,8 @@ import { SectionCard } from '../../ui/SectionCard.js';
 import type { RootCause } from '../../../../shared/types/diagnostics.js';
 
 const CONFIDENCE_COLORS = {
-  high: 'bg-emerald-500/10 text-emerald-400',
-  medium: 'bg-amber-500/10 text-amber-400',
+  high: 'bg-emerald-500/10 text-accent-success',
+  medium: 'bg-amber-500/10 text-accent-warning',
   low: 'bg-[var(--surface-3)] text-[var(--brand-text-muted)]',
 } as const;
 
@@ -28,7 +28,7 @@ export function RootCauseCard({ cause }: Props) {
         <ul className="space-y-1">
           {cause.evidence.map((e, i) => (
             <li key={i} className="text-xs text-[var(--brand-text-muted)] flex items-start gap-2">
-              <span className="text-blue-400 mt-0.5">-</span>
+              <span className="text-accent-info mt-0.5">-</span>
               <span>{e}</span>
             </li>
           ))}

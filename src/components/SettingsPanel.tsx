@@ -138,7 +138,7 @@ export function SettingsPanel() {
       <section className="bg-[var(--surface-2)] overflow-hidden border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
         <div className="px-5 py-4 flex items-center gap-3 border-b border-[var(--brand-border)]">
           <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-blue-500/10 flex items-center justify-center">
-            <Icon as={Search} size="md" className="text-blue-400" />
+            <Icon as={Search} size="md" className="text-accent-info" />
           </div>
           <div className="flex-1">
             <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Google Account</h3>
@@ -146,7 +146,7 @@ export function SettingsPanel() {
           </div>
           {googleStatus?.connected ? (
             <div className="flex items-center gap-2">
-              <span className="t-caption-sm font-medium text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full">Connected</span>
+              <span className="t-caption-sm font-medium text-accent-success bg-emerald-500/10 px-2 py-1 rounded-[var(--radius-pill)]">Connected</span>
               <button onClick={disconnectGoogle} className="p-1.5 rounded-[var(--radius-lg)] hover:bg-white/5 transition-colors" title="Disconnect Google">
                 <Icon as={LogOut} size="md" className="text-[var(--brand-text-muted)]" />
               </button>
@@ -156,7 +156,7 @@ export function SettingsPanel() {
               <Icon as={LogIn} size="sm" /> Connect Google
             </button>
           ) : (
-            <span className="t-caption-sm text-amber-400/80 bg-amber-500/8 px-2 py-1 rounded-full">Not configured</span>
+            <span className="t-caption-sm text-accent-warning bg-amber-500/8 px-2 py-1 rounded-[var(--radius-pill)]">Not configured</span>
           )}
         </div>
 
@@ -169,7 +169,7 @@ export function SettingsPanel() {
             ) : gscSites.length > 0 ? (
               <div className="flex flex-wrap gap-1.5 py-1">
                 {gscSites.map(s => (
-                  <span key={s.siteUrl} className="t-caption-sm px-2 py-1 rounded-md bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{s.siteUrl}</span>
+                  <span key={s.siteUrl} className="t-caption-sm px-2 py-1 rounded-[var(--radius-md)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{s.siteUrl}</span>
                 ))}
               </div>
             ) : (
@@ -184,12 +184,12 @@ export function SettingsPanel() {
       <section className="bg-[var(--surface-2)] overflow-hidden border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
         <div className="px-5 py-4 border-b border-[var(--brand-border)]">
           <div className="flex items-center gap-2">
-            <Icon as={Globe} size="md" className="text-teal-400" />
+            <Icon as={Globe} size="md" className="text-accent-brand" />
             <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Webflow Connections</h3>
           </div>
           <p className="t-caption mt-0.5 text-[var(--brand-text-muted)]">
             Link sites from the workspace dropdown. Generate tokens at{' '}
-            <a href="https://webflow.com/dashboard/account/integrations" target="_blank" rel="noopener noreferrer" className="text-teal-400 hover:text-teal-300 inline-flex items-center gap-0.5">
+            <a href="https://webflow.com/dashboard/account/integrations" target="_blank" rel="noopener noreferrer" className="text-accent-brand hover:text-accent-brand inline-flex items-center gap-0.5">
               webflow.com <Icon as={ExternalLink} size="sm" />
             </a>
           </p>
@@ -197,7 +197,7 @@ export function SettingsPanel() {
         <div className="divide-y divide-[var(--brand-border)]">
           {linked.map(ws => (
             <div key={ws.id} className="px-5 py-3 flex items-center gap-3">
-              <Icon as={Check} size="md" className="text-emerald-400 shrink-0" />
+              <Icon as={Check} size="md" className="text-accent-success shrink-0" />
               <span className="text-sm font-medium text-[var(--brand-text-bright)]">{ws.name}</span>
               <span className="t-caption text-[var(--brand-text-muted)]">{ws.webflowSiteName}</span>
             </div>
@@ -224,7 +224,7 @@ export function SettingsPanel() {
           <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">API Keys</h3>
         </div>
         <div className="px-5 py-3 flex items-center gap-3">
-          <Icon as={Check} size="md" className="text-emerald-400" />
+          <Icon as={Check} size="md" className="text-accent-success" />
           <div>
             <span className="text-sm text-[var(--brand-text-muted)]">OpenAI API Key</span>
             <span className="t-caption text-[var(--brand-text-muted)] ml-2">Configured via .env</span>
@@ -237,7 +237,7 @@ export function SettingsPanel() {
       <section className="bg-[var(--surface-2)] overflow-hidden border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
         <div className="px-5 py-4 border-b border-[var(--brand-border)]">
           <div className="flex items-center gap-2">
-            <Icon as={Shield} size="md" className="text-teal-400" />
+            <Icon as={Shield} size="md" className="text-accent-brand" />
             <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Platform Health</h3>
           </div>
           <p className="t-caption mt-0.5 text-[var(--brand-text-muted)]">Connection status and workspace overview</p>
@@ -258,7 +258,7 @@ export function SettingsPanel() {
                   <Icon as={c.icon} size="sm" className="text-[var(--brand-text-muted)]" />
                   <span className="t-caption text-[var(--brand-text)] flex-1">{c.label}</span>
                   {c.ok
-                    ? <Icon as={Wifi} size="sm" className="text-emerald-400/80" />
+                    ? <Icon as={Wifi} size="sm" className="text-accent-success" />
                     : <Icon as={WifiOff} size="sm" className="text-[var(--brand-border-hover)]" />}
                 </div>
               ))}
@@ -287,7 +287,7 @@ export function SettingsPanel() {
       <section className="bg-[var(--surface-2)] overflow-hidden border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
         <div className="px-5 py-4 border-b border-[var(--brand-border)] flex items-center gap-3">
           <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-amber-500/8 flex items-center justify-center">
-            <Icon as={HardDrive} size="md" className="text-amber-400/80" />
+            <Icon as={HardDrive} size="md" className="text-accent-warning" />
           </div>
           <div className="flex-1">
             <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Storage Monitor</h3>
@@ -306,7 +306,7 @@ export function SettingsPanel() {
                 <span className="t-caption font-medium text-[var(--brand-text)]">{formatBytes(storage.totalBytes)}</span>
                 <span className="t-caption-sm text-[var(--brand-text-muted)]">{storage.totalFiles.toLocaleString()} files</span>
               </div>
-              <div className="h-3 bg-[var(--surface-3)] rounded-full overflow-hidden flex">
+              <div className="h-3 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden flex">
                 {storage.breakdown.slice(0, 6).map((d, i) => {
                   const pct = storage.totalBytes > 0 ? (d.bytes / storage.totalBytes) * 100 : 0;
                   if (pct < 0.5) return null;
@@ -320,10 +320,10 @@ export function SettingsPanel() {
             <div className="space-y-1">
               {storage.breakdown.map((d, i) => {
                 const pct = storage.totalBytes > 0 ? (d.bytes / storage.totalBytes) * 100 : 0;
-                const colors = ['text-amber-400', 'text-teal-400', 'text-blue-400', 'text-orange-400', 'text-red-400', 'text-emerald-400'];
+                const colors = ['text-accent-warning', 'text-accent-brand', 'text-accent-info', 'text-accent-orange', 'text-accent-danger', 'text-accent-success'];
                 return (
                   <div key={d.name} className="flex items-center gap-2 py-1">
-                    <span className={`w-1.5 h-1.5 rounded-full ${colors[i % colors.length].replace('text-', 'bg-')}`} />
+                    <span className={`w-1.5 h-1.5 rounded-[var(--radius-pill)] ${colors[i % colors.length].replace('text-', 'bg-')}`} />
                     <span className="t-caption text-[var(--brand-text-muted)] flex-1 truncate">{d.label}</span>
                     <span className="t-caption-sm text-[var(--brand-text-muted)] tabular-nums">{d.fileCount} files</span>
                     <span className="t-caption font-medium text-[var(--brand-text)] tabular-nums w-16 text-right">{formatBytes(d.bytes)}</span>
@@ -360,7 +360,7 @@ export function SettingsPanel() {
                   disabled={!!pruning}
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] transition-colors text-left"
                 >
-                  <Icon as={Trash2} size="sm" className="text-amber-400/80 shrink-0" />
+                  <Icon as={Trash2} size="sm" className="text-accent-warning shrink-0" />
                   <div className="flex-1">
                     <span className="t-caption text-[var(--brand-text)]">Prune old backups</span>
                     <span className="t-caption-sm text-[var(--brand-text-muted)] ml-1.5">Keep last 3 days</span>
@@ -384,7 +384,7 @@ export function SettingsPanel() {
                   disabled={!!pruning}
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] transition-colors text-left"
                 >
-                  <Icon as={Trash2} size="sm" className="text-teal-400 shrink-0" />
+                  <Icon as={Trash2} size="sm" className="text-accent-brand shrink-0" />
                   <div className="flex-1">
                     <span className="t-caption text-[var(--brand-text)]">Prune chat history</span>
                     <span className="t-caption-sm text-[var(--brand-text-muted)] ml-1.5">&gt;90 days old</span>
@@ -396,7 +396,7 @@ export function SettingsPanel() {
                   disabled={!!pruning}
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] transition-colors text-left"
                 >
-                  <Icon as={Trash2} size="sm" className="text-red-400 shrink-0" />
+                  <Icon as={Trash2} size="sm" className="text-accent-danger shrink-0" />
                   <div className="flex-1">
                     <span className="t-caption text-[var(--brand-text)]">Prune activity logs</span>
                     <span className="t-caption-sm text-[var(--brand-text-muted)] ml-1.5">&gt;6 months old</span>
@@ -420,7 +420,7 @@ export function SettingsPanel() {
       <section className="bg-[var(--surface-2)] overflow-hidden border border-[var(--brand-border)]" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
         <div className="px-5 py-4 flex items-center gap-3 border-b border-[var(--brand-border)]">
           <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-teal-500/10 flex items-center justify-center">
-            <Icon as={CalendarDays} size="md" className="text-teal-400" />
+            <Icon as={CalendarDays} size="md" className="text-accent-brand" />
           </div>
           <div>
             <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">Booking Link</h3>
@@ -453,7 +453,7 @@ export function SettingsPanel() {
             </button>
           </div>
           {bookingUrl && (
-            <a href={bookingUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 t-caption-sm text-teal-400 hover:text-teal-300 transition-colors">
+            <a href={bookingUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 t-caption-sm text-accent-brand hover:text-accent-brand transition-colors">
               <Icon as={ExternalLink} size="sm" /> Preview link
             </a>
           )}

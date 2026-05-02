@@ -48,7 +48,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <Icon as={Loader2} size="lg" className="animate-spin text-teal-400" />
+        <Icon as={Loader2} size="lg" className="animate-spin text-accent-brand" />
       </div>
     );
   }
@@ -79,19 +79,19 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
 
   // Needs attention items — priority sorted
   const attentionItems: Array<{ label: string; value: string; color: string; icon: typeof Bell; priority: number }> = [];
-  if (totalNewRequests > 0) attentionItems.push({ label: `${totalNewRequests} new client request${totalNewRequests > 1 ? 's' : ''}`, value: 'Requests', color: 'text-red-400', icon: Bell, priority: 2 });
-  if (totalPendingApprovals > 0) attentionItems.push({ label: `${totalPendingApprovals} pending approval${totalPendingApprovals > 1 ? 's' : ''}`, value: 'Approvals', color: 'text-teal-400', icon: ClipboardCheck, priority: 3 });
-  if (totalPendingContent > 0) attentionItems.push({ label: `${totalPendingContent} content brief${totalPendingContent > 1 ? 's' : ''} awaiting review`, value: 'Content', color: 'text-amber-400', icon: FileText, priority: 4 });
-  if (totalPendingWorkOrders > 0) attentionItems.push({ label: `${totalPendingWorkOrders} purchased fix${totalPendingWorkOrders > 1 ? 'es' : ''} awaiting fulfillment`, value: 'Work Orders', color: 'text-teal-400', icon: ClipboardCheck, priority: 5 });
+  if (totalNewRequests > 0) attentionItems.push({ label: `${totalNewRequests} new client request${totalNewRequests > 1 ? 's' : ''}`, value: 'Requests', color: 'text-accent-danger', icon: Bell, priority: 2 });
+  if (totalPendingApprovals > 0) attentionItems.push({ label: `${totalPendingApprovals} pending approval${totalPendingApprovals > 1 ? 's' : ''}`, value: 'Approvals', color: 'text-accent-brand', icon: ClipboardCheck, priority: 3 });
+  if (totalPendingContent > 0) attentionItems.push({ label: `${totalPendingContent} content brief${totalPendingContent > 1 ? 's' : ''} awaiting review`, value: 'Content', color: 'text-accent-warning', icon: FileText, priority: 4 });
+  if (totalPendingWorkOrders > 0) attentionItems.push({ label: `${totalPendingWorkOrders} purchased fix${totalPendingWorkOrders > 1 ? 'es' : ''} awaiting fulfillment`, value: 'Work Orders', color: 'text-accent-brand', icon: ClipboardCheck, priority: 5 });
   const rejectedWorkspaces = data.filter(w => (w.pageStates?.rejected || 0) > 0);
   const totalRejected = rejectedWorkspaces.reduce((s, w) => s + (w.pageStates?.rejected || 0), 0);
-  if (totalRejected > 0) attentionItems.push({ label: `${totalRejected} rejected change${totalRejected > 1 ? 's' : ''} need revision`, value: 'Rejected', color: 'text-red-400', icon: AlertTriangle, priority: 6 });
+  if (totalRejected > 0) attentionItems.push({ label: `${totalRejected} rejected change${totalRejected > 1 ? 's' : ''} need revision`, value: 'Rejected', color: 'text-accent-danger', icon: AlertTriangle, priority: 6 });
   const lowScoreWorkspaces = data.filter(w => w.audit && w.audit.score < 60);
-  if (lowScoreWorkspaces.length > 0) attentionItems.push({ label: `${lowScoreWorkspaces.length} workspace${lowScoreWorkspaces.length > 1 ? 's' : ''} with health score below 60`, value: 'Health', color: 'text-red-400', icon: AlertTriangle, priority: 7 });
+  if (lowScoreWorkspaces.length > 0) attentionItems.push({ label: `${lowScoreWorkspaces.length} workspace${lowScoreWorkspaces.length > 1 ? 's' : ''} with health score below 60`, value: 'Health', color: 'text-accent-danger', icon: AlertTriangle, priority: 7 });
   const unlinkWorkspaces = data.filter(w => !w.webflowSiteId);
-  if (unlinkWorkspaces.length > 0) attentionItems.push({ label: `${unlinkWorkspaces.length} workspace${unlinkWorkspaces.length > 1 ? 's' : ''} with no site linked`, value: 'Setup', color: 'text-amber-400', icon: Globe, priority: 8 });
+  if (unlinkWorkspaces.length > 0) attentionItems.push({ label: `${unlinkWorkspaces.length} workspace${unlinkWorkspaces.length > 1 ? 's' : ''} with no site linked`, value: 'Setup', color: 'text-accent-warning', icon: Globe, priority: 8 });
   const atRiskWorkspaces = data.filter(w => (w.churnSignals?.critical || 0) > 0 || (w.churnSignals?.warning || 0) > 0);
-  if (atRiskWorkspaces.length > 0) attentionItems.push({ label: `${atRiskWorkspaces.length} workspace${atRiskWorkspaces.length > 1 ? 's' : ''} at risk of churn`, value: 'Churn', color: atRiskWorkspaces.some(w => (w.churnSignals?.critical || 0) > 0) ? 'text-red-400' : 'text-amber-400', icon: Flag, priority: 1.5 });
+  if (atRiskWorkspaces.length > 0) attentionItems.push({ label: `${atRiskWorkspaces.length} workspace${atRiskWorkspaces.length > 1 ? 's' : ''} at risk of churn`, value: 'Churn', color: atRiskWorkspaces.some(w => (w.churnSignals?.critical || 0) > 0) ? 'text-accent-danger' : 'text-accent-warning', icon: Flag, priority: 1.5 });
   attentionItems.sort((a, b) => a.priority - b.priority);
 
   return (
@@ -99,7 +99,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
       <PageHeader
         title="Command Center"
         subtitle={`${data.length} workspace${data.length !== 1 ? 's' : ''} · ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`}
-        icon={<Icon as={Rocket} size="lg" className="text-teal-400" />}
+        icon={<Icon as={Rocket} size="lg" className="text-accent-brand" />}
         actions={
           <div className="flex items-center gap-2">
             <button onClick={() => navigate('/prospect')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] transition-all">
@@ -108,13 +108,13 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
             <button onClick={() => navigate('/roadmap')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] border border-[var(--brand-border)] hover:border-[var(--brand-border-hover)] transition-all">
               <Icon as={Map} size="sm" /> Roadmap
             </button>
-            <button onClick={() => navigate('/ai-usage')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-amber-400/80 hover:text-amber-300 bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20 transition-all">
+            <button onClick={() => navigate('/ai-usage')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-accent-warning hover:text-accent-warning bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20 transition-all">
               <Icon as={Zap} size="sm" /> AI Usage
             </button>
-            <button onClick={() => navigate('/revenue')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-emerald-400/80 hover:text-emerald-300 bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/20 transition-all">
+            <button onClick={() => navigate('/revenue')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-accent-success hover:text-accent-success bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/20 transition-all">
               <Icon as={DollarSign} size="sm" /> Revenue
             </button>
-            <button onClick={() => navigate('/features')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-teal-400/80 hover:text-teal-300 bg-teal-500/5 hover:bg-teal-500/10 border border-teal-500/20 transition-all">
+            <button onClick={() => navigate('/features')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-accent-brand hover:text-accent-brand bg-teal-500/5 hover:bg-teal-500/10 border border-teal-500/20 transition-all">
               <Icon as={Layers} size="sm" /> Features
             </button>
           </div>
@@ -123,7 +123,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
 
       {/* ── Needs Attention ── */}
       {attentionItems.length > 0 && (
-        <SectionCard title="Needs Attention" titleIcon={<Icon as={AlertTriangle} size="md" className="text-amber-400" />} noPadding>
+        <SectionCard title="Needs Attention" titleIcon={<Icon as={AlertTriangle} size="md" className="text-accent-warning" />} noPadding>
           <div className="divide-y divide-[var(--brand-border)]">
             {attentionItems.map((item, i) => {
               const ItemIcon = item.icon;
@@ -160,8 +160,8 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
             title={`Online Now · ${totalOnline}`}
             titleIcon={
               <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-[var(--radius-pill)] bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-[var(--radius-pill)] h-3 w-3 bg-emerald-500" />
               </span>
             }
             noPadding
@@ -170,7 +170,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
               {Object.entries(presence).map(([wsId, users]) =>
                 users.map(u => (
                   <div key={`${wsId}-${u.userId}`} className="flex items-center gap-3 px-4 py-2.5">
-                    <div className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-500/15 text-emerald-400 t-caption font-bold flex-shrink-0">
+                    <div className="flex items-center justify-center w-7 h-7 rounded-[var(--radius-pill)] bg-emerald-500/15 text-accent-success t-caption font-bold flex-shrink-0">
                       {(u.name || u.email)[0].toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -211,11 +211,11 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                     : hasAlerts || isAtRisk ? 'border-amber-500/30'
                     : 'border-[var(--brand-border)]'
                 )}
-                style={{ borderRadius: '10px 24px 10px 24px' }}
+                style={{ borderRadius: 'var(--radius-signature-lg)' /* pr-check-disable-next-line -- Workspace selector rows are interactive list items with custom presence/risk borders. */ }}
               >
                 {/* New request badge */}
                 {ws.requests.new > 0 && (
-                  <div className="absolute -top-2 -right-2 flex items-center gap-1 px-2 py-0.5 rounded-full t-caption-sm font-bold bg-red-500 text-white shadow-lg">
+                  <div className="absolute -top-2 -right-2 flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-pill)] t-caption-sm font-bold bg-red-500 text-white shadow-lg">
                     <Icon as={Bell} size="sm" /> {ws.requests.new} new
                   </div>
                 )}
@@ -224,10 +224,10 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                 {onlineUsers.length > 0 && (
                   <div className="flex items-center gap-2 px-3 py-1.5 -mx-5 -mt-5 mb-3 rounded-t-xl bg-emerald-500/10 border-b border-emerald-500/20">
                     <span className="relative flex h-2.5 w-2.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-[var(--radius-pill)] bg-emerald-400 opacity-75" />
+                      <span className="relative inline-flex rounded-[var(--radius-pill)] h-2.5 w-2.5 bg-emerald-500" />
                     </span>
-                    <span className="t-caption-sm font-semibold text-emerald-400">
+                    <span className="t-caption-sm font-semibold text-accent-success">
                       {onlineUsers.map(u => u.name || u.email.split('@')[0]).join(', ')} online now
                     </span>
                   </div>
@@ -236,30 +236,30 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                 {/* Top row: name + badges + site info */}
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div className="flex items-center gap-2 min-w-0">
-                    <h3 className="t-caption font-semibold truncate group-hover:text-teal-400 transition-colors text-[var(--brand-text-bright)]">{ws.name}</h3>
+                    <h3 className="t-caption font-semibold truncate group-hover:text-accent-brand transition-colors text-[var(--brand-text-bright)]">{ws.name}</h3>
                     {isAtRisk && (
                       <span className={cn(
-                        'flex-shrink-0 flex items-center gap-1 px-1.5 py-0.5 t-micro font-bold rounded-md border',
+                        'flex-shrink-0 flex items-center gap-1 px-1.5 py-0.5 t-micro font-bold rounded-[var(--radius-md)] border',
                         (ws.churnSignals?.critical || 0) > 0
-                          ? 'bg-red-500/15 text-red-400 border-red-500/20'
-                          : 'bg-amber-500/15 text-amber-400 border-amber-500/20'
+                          ? 'bg-red-500/15 text-accent-danger border-red-500/20'
+                          : 'bg-amber-500/15 text-accent-warning border-amber-500/20'
                       )}>
                         <Icon as={Flag} size="sm" />
                         At Risk
                       </span>
                     )}
                     {ws.isTrial && (
-                      <span className="flex-shrink-0 px-1.5 py-0.5 t-micro font-bold rounded-md bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                      <span className="flex-shrink-0 px-1.5 py-0.5 t-micro font-bold rounded-[var(--radius-md)] bg-amber-500/15 text-accent-warning border border-amber-500/20">
                         Trial{ws.trialDaysRemaining != null ? ` · ${ws.trialDaysRemaining}d` : ''}
                       </span>
                     )}
                     {ws.tier && ws.tier !== 'free' && !ws.isTrial && (
-                      <span className="flex-shrink-0 px-1.5 py-0.5 t-micro font-bold rounded-md border bg-teal-500/15 text-teal-400 border-teal-500/20">{ws.tier}</span>
+                      <span className="flex-shrink-0 px-1.5 py-0.5 t-micro font-bold rounded-[var(--radius-md)] border bg-teal-500/15 text-accent-brand border-teal-500/20">{ws.tier}</span>
                     )}
                   </div>
                   <div className="flex items-center gap-2 t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">
                     {ws.webflowSiteName && <span className="flex items-center gap-1"><Icon as={Globe} size="sm" />{ws.webflowSiteName}</span>}
-                    {!ws.webflowSiteId && <span className="flex items-center gap-1 text-amber-400"><Icon as={AlertTriangle} size="sm" />No site linked</span>}
+                    {!ws.webflowSiteId && <span className="flex items-center gap-1 text-accent-warning"><Icon as={AlertTriangle} size="sm" />No site linked</span>}
                     {ws.hasGsc && <span className="flex items-center gap-1"><Icon as={Search} size="sm" />GSC</span>}
                     {ws.hasGa4 && <span className="flex items-center gap-1"><Icon as={BarChart3} size="sm" />GA4</span>}
                     {ws.hasPassword && <span className="flex items-center gap-1"><Icon as={Lock} size="sm" />Client</span>}
@@ -278,7 +278,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                           <div className="flex items-center gap-1.5">
                             <span className="t-caption-sm font-medium text-[var(--brand-text-muted)]">Health</span>
                             {scoreDelta !== null && scoreDelta !== 0 && (
-                              <span className={cn('flex items-center t-caption-sm font-medium', scoreDelta > 0 ? 'text-emerald-400' : 'text-red-400')}>
+                              <span className={cn('flex items-center t-caption-sm font-medium', scoreDelta > 0 ? 'text-accent-success' : 'text-accent-danger')}>
                                 {scoreDelta > 0 ? <ArrowUpRight className="w-2.5 h-2.5" /> : <ArrowDownRight className="w-2.5 h-2.5" />}
                                 {Math.abs(scoreDelta)}
                               </span>
@@ -286,9 +286,9 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                             {scoreDelta === 0 && <Minus className="w-2.5 h-2.5 text-[var(--brand-text-muted)]" />}
                           </div>
                           <div className="t-caption-sm text-[var(--brand-text-muted)]">
-                            {ws.audit.errors > 0 && <span className="text-red-400">{ws.audit.errors} err</span>}
+                            {ws.audit.errors > 0 && <span className="text-accent-danger">{ws.audit.errors} err</span>}
                             {ws.audit.errors > 0 && ws.audit.warnings > 0 && ' · '}
-                            {ws.audit.warnings > 0 && <span className="text-amber-400">{ws.audit.warnings} warn</span>}
+                            {ws.audit.warnings > 0 && <span className="text-accent-warning">{ws.audit.warnings} warn</span>}
                           </div>
                         </div>
                       </>
@@ -304,8 +304,8 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                     <div className="t-caption-sm font-medium text-[var(--brand-text-muted)] mb-0.5">Requests</div>
                     {ws.requests.total > 0 ? (
                       <div className="flex items-center gap-2 t-caption-sm">
-                        {ws.requests.new > 0 && <span className="text-red-400 font-medium">{ws.requests.new} new</span>}
-                        {ws.requests.active > 0 && <span className="text-teal-400">{ws.requests.active} active</span>}
+                        {ws.requests.new > 0 && <span className="text-accent-danger font-medium">{ws.requests.new} new</span>}
+                        {ws.requests.active > 0 && <span className="text-accent-brand">{ws.requests.active} active</span>}
                         {ws.requests.latestDate && <span className="text-[var(--brand-text-muted)]">{timeAgo(ws.requests.latestDate)}</span>}
                       </div>
                     ) : (
@@ -320,9 +320,9 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                     <div className="t-caption-sm font-medium text-[var(--brand-text-muted)] mb-0.5">Approvals</div>
                     {ws.approvals.total > 0 ? (
                       ws.approvals.pending > 0 ? (
-                        <div className="t-caption-sm text-teal-400 font-medium">{ws.approvals.pending} pending</div>
+                        <div className="t-caption-sm text-accent-brand font-medium">{ws.approvals.pending} pending</div>
                       ) : (
-                        <div className="flex items-center gap-1 t-caption-sm text-emerald-400">
+                        <div className="flex items-center gap-1 t-caption-sm text-accent-success">
                           <CheckCircle2 className="w-2.5 h-2.5" /> All clear
                         </div>
                       )
@@ -338,9 +338,9 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                     <div className="t-caption-sm font-medium text-[var(--brand-text-muted)] mb-0.5">Content</div>
                     {(ws.contentRequests?.total || 0) > 0 ? (
                       <div className="flex items-center gap-2 t-caption-sm">
-                        {(ws.contentRequests?.pending || 0) > 0 && <span className="text-amber-400 font-medium">{ws.contentRequests!.pending} pending</span>}
-                        {(ws.contentRequests?.inProgress || 0) > 0 && <span className="text-blue-400">{ws.contentRequests!.inProgress} in progress</span>}
-                        {(ws.contentRequests?.delivered || 0) > 0 && <span className="text-teal-400">{ws.contentRequests!.delivered} delivered</span>}
+                        {(ws.contentRequests?.pending || 0) > 0 && <span className="text-accent-warning font-medium">{ws.contentRequests!.pending} pending</span>}
+                        {(ws.contentRequests?.inProgress || 0) > 0 && <span className="text-accent-info">{ws.contentRequests!.inProgress} in progress</span>}
+                        {(ws.contentRequests?.delivered || 0) > 0 && <span className="text-accent-brand">{ws.contentRequests!.delivered} delivered</span>}
                       </div>
                     ) : (
                       <div className="t-caption-sm text-[var(--brand-text-muted)]">None</div>
@@ -354,11 +354,11 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                       <div>
                         <div className="t-caption-sm font-medium text-[var(--brand-text-muted)] mb-0.5">SEO Status</div>
                         <div className="flex flex-wrap gap-1">
-                          {(ws.pageStates?.issueDetected || 0) > 0 && <span className="t-micro px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400">{ws.pageStates!.issueDetected} issues</span>}
-                          {(ws.pageStates?.inReview || 0) > 0 && <span className="t-micro px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400">{ws.pageStates!.inReview} in review</span>}
-                          {(ws.pageStates?.approved || 0) > 0 && <span className="t-micro px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">{ws.pageStates!.approved} approved</span>}
-                          {(ws.pageStates?.rejected || 0) > 0 && <span className="t-micro px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-red-400">{ws.pageStates!.rejected} rejected</span>}
-                          {(ws.pageStates?.live || 0) > 0 && <span className="t-micro px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400">{ws.pageStates!.live} live</span>}
+                          {(ws.pageStates?.issueDetected || 0) > 0 && <span className="t-micro px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-accent-warning">{ws.pageStates!.issueDetected} issues</span>}
+                          {(ws.pageStates?.inReview || 0) > 0 && <span className="t-micro px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-accent-brand">{ws.pageStates!.inReview} in review</span>}
+                          {(ws.pageStates?.approved || 0) > 0 && <span className="t-micro px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-accent-success">{ws.pageStates!.approved} approved</span>}
+                          {(ws.pageStates?.rejected || 0) > 0 && <span className="t-micro px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-accent-danger">{ws.pageStates!.rejected} rejected</span>}
+                          {(ws.pageStates?.live || 0) > 0 && <span className="t-micro px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-accent-brand">{ws.pageStates!.live} live</span>}
                         </div>
                       </div>
                     </>
@@ -373,9 +373,9 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
       {/* ── Client Feedback ── */}
       {feedback.length > 0 && (() => {
         const fbTypeIcon: Record<string, typeof Bug> = { bug: Bug, feature: Lightbulb, general: MessageCircle };
-        const fbTypeColor: Record<string, string> = { bug: 'text-red-400', feature: 'text-amber-400', general: 'text-teal-400' };
+        const fbTypeColor: Record<string, string> = { bug: 'text-accent-danger', feature: 'text-accent-warning', general: 'text-accent-brand' };
         const fbTypeBg: Record<string, string> = { bug: 'bg-red-500/10', feature: 'bg-amber-500/10', general: 'bg-teal-500/10' };
-        const fbStatusColor: Record<string, string> = { new: 'text-blue-400 bg-blue-500/10', acknowledged: 'text-amber-400 bg-amber-500/10', fixed: 'text-emerald-400 bg-emerald-500/10', wontfix: 'text-[var(--brand-text-muted)] bg-[var(--surface-3)]' };
+        const fbStatusColor: Record<string, string> = { new: 'text-accent-info bg-blue-500/10', acknowledged: 'text-accent-warning bg-amber-500/10', fixed: 'text-accent-success bg-emerald-500/10', wontfix: 'text-[var(--brand-text-muted)] bg-[var(--surface-3)]' };
         const fbStatusLabel: Record<string, string> = { new: 'New', acknowledged: 'Acknowledged', fixed: 'Resolved', wontfix: 'Noted' };
         const newCount = feedback.filter(f => f.status === 'new').length;
 
@@ -401,7 +401,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
         return (
           <SectionCard
             title={`Client Feedback${newCount > 0 ? ` · ${newCount} new` : ''}`}
-            titleIcon={<Icon as={MessageSquarePlus} size="md" className="text-teal-400" />}
+            titleIcon={<Icon as={MessageSquarePlus} size="md" className="text-accent-brand" />}
             noPadding
           >
             <div className="divide-y divide-[var(--brand-border)]">
@@ -432,7 +432,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                         {item.replies.length > 0 && (
                           <div className="mt-2 space-y-1.5">
                             {item.replies.map(r => (
-                              <div key={r.id} className={cn('rounded-[var(--radius-lg)] px-2.5 py-1.5 t-caption-sm', r.author === 'team' ? 'bg-teal-500/5 border border-teal-500/10 text-teal-300' : 'bg-[var(--surface-3)] border border-[var(--brand-border-hover)] text-[var(--brand-text)]')}>
+                              <div key={r.id} className={cn('rounded-[var(--radius-lg)] px-2.5 py-1.5 t-caption-sm', r.author === 'team' ? 'bg-teal-500/5 border border-teal-500/10 text-accent-brand' : 'bg-[var(--surface-3)] border border-[var(--brand-border-hover)] text-[var(--brand-text)]')}>
                                 <span className="font-medium">{r.author === 'team' ? 'You' : 'Client'}:</span> {r.content}
                               </div>
                             ))}
@@ -442,10 +442,10 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                         {/* Actions */}
                         <div className="flex items-center gap-2 mt-2">
                           {item.status === 'new' && (
-                            <button onClick={() => handleStatusChange(item.workspaceId, item.id, 'acknowledged')} className="t-micro px-2 py-1 rounded bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors">Acknowledge</button>
+                            <button onClick={() => handleStatusChange(item.workspaceId, item.id, 'acknowledged')} className="t-micro px-2 py-1 rounded bg-amber-500/10 text-accent-warning hover:bg-amber-500/20 transition-colors">Acknowledge</button>
                           )}
                           {(item.status === 'new' || item.status === 'acknowledged') && (
-                            <button onClick={() => handleStatusChange(item.workspaceId, item.id, 'fixed')} className="t-micro px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors">Resolve</button>
+                            <button onClick={() => handleStatusChange(item.workspaceId, item.id, 'fixed')} className="t-micro px-2 py-1 rounded bg-emerald-500/10 text-accent-success hover:bg-emerald-500/20 transition-colors">Resolve</button>
                           )}
                           {item.status !== 'wontfix' && item.status !== 'fixed' && (
                             <button onClick={() => handleStatusChange(item.workspaceId, item.id, 'wontfix')} className="t-micro px-2 py-1 rounded bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:bg-[var(--brand-border-hover)] hover:border-[var(--brand-border-hover)] border border-[var(--brand-border)] transition-colors">Won't Fix</button>
@@ -503,7 +503,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                   key={entry.id}
                   className="flex items-start gap-3 px-4 py-2.5"
                 >
-                  <EntryIcon className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-teal-400" />
+                  <EntryIcon className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-accent-brand" />
                   <div className="flex-1 min-w-0">
                     <div className="t-caption text-[var(--brand-text-bright)]">{entry.title}</div>
                     {entry.description && <div className="t-caption-sm mt-0.5 text-[var(--brand-text-muted)]">{entry.description}</div>}

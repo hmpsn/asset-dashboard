@@ -286,7 +286,7 @@ export function ContentTab({
                   return (
                     <div key={step} className="flex items-center flex-1">
                       <div className="flex flex-col items-center flex-1">
-                        <div className={`w-full h-1.5 rounded-full ${isComplete ? (isCurrent ? (req.status === 'pending_payment' ? 'bg-amber-400' : req.status === 'changes_requested' ? 'bg-orange-400' : 'bg-teal-400') : 'bg-teal-500/40') : 'bg-[var(--surface-3)]'}`} />
+                        <div className={`w-full h-1.5 rounded-[var(--radius-pill)] ${isComplete ? (isCurrent ? (req.status === 'pending_payment' ? 'bg-amber-400' : req.status === 'changes_requested' ? 'bg-orange-400' : 'bg-teal-400') : 'bg-teal-500/40') : 'bg-[var(--surface-3)]'}`} />
                         <span className={`t-caption-sm mt-1 ${isCurrent ? (req.status === 'pending_payment' ? 'text-accent-warning font-medium' : req.status === 'changes_requested' ? 'text-accent-orange font-medium' : 'text-accent-brand font-medium') : isComplete ? 'text-[var(--brand-text-muted)]' : 'text-[var(--brand-text-faint)]'}`}>{stepLabels[i]}</span>
                       </div>
                     </div>
@@ -413,7 +413,7 @@ export function ContentTab({
                           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1.5">Keywords to Include</div>
                           <div className="flex flex-wrap gap-1.5">
                             {brief.secondaryKeywords.map((kw: string, i: number) => (
-                              <span key={i} className="t-caption-sm px-2 py-0.5 rounded-full bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{kw}</span>
+                              <span key={i} className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]">{kw}</span>
                             ))}
                           </div>
                         </div>
@@ -423,7 +423,7 @@ export function ContentTab({
                           <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1.5">Topics to Reference</div>
                           <div className="flex flex-wrap gap-1.5">
                             {brief.topicalEntities.map((entity: string, i: number) => (
-                              <span key={i} className="t-caption-sm px-2 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/20 text-accent-brand">{entity}</span>
+                              <span key={i} className="t-caption-sm px-2 py-0.5 rounded-[var(--radius-pill)] bg-teal-500/10 border border-teal-500/20 text-accent-brand">{entity}</span>
                             ))}
                           </div>
                         </div>

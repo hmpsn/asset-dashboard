@@ -90,18 +90,18 @@ type SortBy = 'priority' | 'position' | 'volume' | 'score';
 
 function positionColor(pos?: number) {
   if (!pos) return 'text-[var(--brand-text-muted)]';
-  if (pos <= 3) return 'text-emerald-400';
-  if (pos <= 10) return 'text-teal-400';
-  if (pos <= 20) return 'text-amber-400';
-  return 'text-red-400';
+  if (pos <= 3) return 'text-accent-success';
+  if (pos <= 10) return 'text-accent-brand';
+  if (pos <= 20) return 'text-accent-warning';
+  return 'text-accent-danger';
 }
 
 function kdColor(kd?: number) {
   if (kd === undefined) return 'text-[var(--brand-text-muted)]';
-  if (kd <= 30) return 'text-emerald-400';
-  if (kd <= 50) return 'text-amber-400';
-  if (kd <= 70) return 'text-orange-400';
-  return 'text-red-400';
+  if (kd <= 30) return 'text-accent-success';
+  if (kd <= 50) return 'text-accent-warning';
+  if (kd <= 70) return 'text-accent-orange';
+  return 'text-accent-danger';
 }
 
 function kdLabel(kd?: number) {
@@ -114,10 +114,10 @@ function kdLabel(kd?: number) {
 
 function intentColor(intent?: string) {
   switch (intent) {
-    case 'commercial': return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
-    case 'informational': return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
-    case 'transactional': return 'text-amber-400 bg-amber-500/10 border-amber-500/20';
-    case 'navigational': return 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20';
+    case 'commercial': return 'text-accent-info bg-blue-500/10 border-blue-500/20';
+    case 'informational': return 'text-accent-success bg-emerald-500/10 border-emerald-500/20';
+    case 'transactional': return 'text-accent-warning bg-amber-500/10 border-amber-500/20';
+    case 'navigational': return 'text-accent-cyan bg-cyan-500/10 border-cyan-500/20';
     default: return 'text-[var(--brand-text)] bg-[var(--surface-3)]/50 border-[var(--brand-border)]';
   }
 }
@@ -130,9 +130,9 @@ function intentIcon(intent: string): string {
 }
 
 function difficultyTextColor(d: string): string {
-  if (d === 'low') return 'text-emerald-400';
-  if (d === 'medium') return 'text-amber-400';
-  return 'text-red-400';
+  if (d === 'low') return 'text-accent-success';
+  if (d === 'medium') return 'text-accent-warning';
+  return 'text-accent-danger';
 }
 
 function opportunityScore(p: PageKeywordMap) {
@@ -489,7 +489,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-6 h-6 animate-spin text-teal-400" />
+        <Loader2 className="w-6 h-6 animate-spin text-accent-brand" />
         <span className="ml-3 t-body text-[var(--brand-text)]">Loading page intelligence...</span>
       </div>
     );
@@ -510,7 +510,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
       />
 
       {activeTab === 'architecture' && (
-        <Suspense fallback={<div className="flex items-center justify-center py-24"><div className="w-5 h-5 border-2 rounded-full animate-spin border-[var(--brand-border)] border-t-teal-400" /></div>}>
+        <Suspense fallback={<div className="flex items-center justify-center py-24"><div className="w-5 h-5 border-2 rounded-[var(--radius-pill)] animate-spin border-[var(--brand-border)] border-t-teal-400" /></div>}>
           <SiteArchitecture key={`arch-${workspaceId}`} workspaceId={workspaceId} />
         </Suspense>
       )}
@@ -525,17 +525,17 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
           <h3 className="t-body font-semibold text-[var(--brand-text-bright)]">Page Intelligence</h3>
           <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
             {unifiedPages.length} pages
-            {cmsCount > 0 && <span className="text-blue-400"> · {cmsCount} CMS</span>}
+            {cmsCount > 0 && <span className="text-accent-info"> · {cmsCount} CMS</span>}
             {withStrategy > 0 && <span> · {withStrategy} with strategy</span>}
-            {analyzedCount > 0 && <span className="text-teal-400"> · {analyzedCount} analyzed</span>}
+            {analyzedCount > 0 && <span className="text-accent-brand"> · {analyzedCount} analyzed</span>}
           </p>
         </div>
         {/* Analyze All */}
         {bulkProgress ? (
           <div className="flex items-center gap-2 px-3 py-2 bg-teal-500/10 border border-teal-500/30 rounded-[var(--radius-lg)]">
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400" />
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-brand" />
             <span className="t-caption text-[var(--brand-text-bright)]">Analyzing {bulkProgress.done}/{bulkProgress.total}...</span>
-            <Button variant="ghost" size="sm" className="ml-2 text-red-400 hover:text-red-300" onClick={() => { if (bulkJobIdRef.current) cancelBgJob(bulkJobIdRef.current); else cancelBulkRef.current = true; }}>Cancel</Button>
+            <Button variant="ghost" size="sm" className="ml-2 text-accent-danger hover:text-accent-danger" onClick={() => { if (bulkJobIdRef.current) cancelBgJob(bulkJobIdRef.current); else cancelBulkRef.current = true; }}>Cancel</Button>
           </div>
         ) : (
           <div className="flex items-center gap-2">
@@ -599,8 +599,8 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
       {fixQueue.length > 0 && (
         <div className="bg-amber-500/5 border border-amber-500/20 rounded-[var(--radius-lg)] p-3">
           <div className="flex items-center gap-2 mb-2">
-            <Icon as={Zap} size="md" className="text-amber-400" />
-            <span className="t-caption font-semibold text-amber-300">Fix These First</span>
+            <Icon as={Zap} size="md" className="text-accent-warning" />
+            <span className="t-caption font-semibold text-accent-warning">Fix These First</span>
             <span className="text-[10px] text-[var(--brand-text-muted)] ml-auto">ranked by traffic × optimization gap</span>{/* // arbitrary-text-ok */}
           </div>
           <div className="space-y-1.5">
@@ -608,7 +608,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
               <button
                 key={item.page.id}
                 onClick={() => setExpanded(expanded === item.page.id ? null : item.page.id)}
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-[var(--surface-3)]/50 transition-colors text-left"
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-[var(--radius-md)] hover:bg-[var(--surface-3)]/50 transition-colors text-left"
               >
                 <span className="text-[10px] font-mono text-[var(--brand-text-muted)] w-4">{i + 1}.</span>{/* // arbitrary-text-ok */}
                 <span className="t-caption-sm text-[var(--brand-text-bright)] truncate flex-1">{item.page.title || item.page.path}</span>
@@ -618,13 +618,13 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                   >{item.impressions.toLocaleString()} imp</span>
                 )}
                 <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${ // arbitrary-text-ok
-                  item.score < 40 ? 'text-red-400 bg-red-500/10' :
-                  item.score < 60 ? 'text-amber-400 bg-amber-500/10' :
-                  'text-yellow-400 bg-yellow-500/10'
+                  item.score < 40 ? 'text-accent-danger bg-red-500/10' :
+                  item.score < 60 ? 'text-accent-warning bg-amber-500/10' :
+                  'text-accent-warning bg-yellow-500/10'
                 }`}>
                   {item.score}/100
                 </span>
-                <span className="text-[10px] text-amber-400/70 font-mono w-12 text-right">↑{item.impact}</span>{/* // arbitrary-text-ok */}
+                <span className="text-[10px] text-accent-warning font-mono w-12 text-right">↑{item.impact}</span>{/* // arbitrary-text-ok */}
               </button>
             ))}
           </div>
@@ -649,7 +649,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
               key={s}
               onClick={() => { if (sortBy === s) setSortDir(d => d === 'desc' ? 'asc' : 'desc'); else { setSortBy(s); setSortDir('desc'); } }}
               className={`px-2 py-1 rounded t-caption-sm font-medium transition-colors flex items-center gap-0.5 ${
-                sortBy === s ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)] hover:text-[var(--brand-text-bright)]'
+                sortBy === s ? 'bg-teal-500/20 text-accent-brand border border-teal-500/30' : 'bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)] hover:text-[var(--brand-text-bright)]'
               }`}
             >
               {s === 'priority' ? 'Priority' : s === 'score' ? 'Score' : s.charAt(0).toUpperCase() + s.slice(1)}
@@ -681,7 +681,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
               >
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   {isAnalyzing ? (
-                    <Loader2 className="w-3.5 h-3.5 text-teal-400 animate-spin flex-shrink-0" />
+                    <Loader2 className="w-3.5 h-3.5 text-accent-brand animate-spin flex-shrink-0" />
                   ) : isExpanded ? (
                     <Icon as={ChevronDown} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
                   ) : (
@@ -691,7 +691,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                     <div className="flex items-center gap-1.5">
                       <span className="t-caption text-[var(--brand-text-bright)] truncate">{page.title}</span>
                       {page.source === 'cms' && (
-                        <span className="text-[9px] px-1 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0" // arbitrary-text-ok
+                        <span className="text-[9px] px-1 py-0.5 rounded bg-blue-500/10 text-accent-info border border-blue-500/20 shrink-0" // arbitrary-text-ok
                         >CMS</span>
                       )}
                     </div>
@@ -700,24 +700,24 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                   {sp?.searchIntent && (
-                    <span className={`t-caption-sm px-1.5 py-0.5 rounded-full border font-medium ${intentColor(sp.searchIntent)}`}>
+                    <span className={`t-caption-sm px-1.5 py-0.5 rounded-[var(--radius-pill)] border font-medium ${intentColor(sp.searchIntent)}`}>
                       {sp.searchIntent}
                     </span>
                   )}
                   {sp?.primaryKeyword && (
-                    <span className="inline-flex items-center gap-1 t-caption-sm text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded max-w-[200px]">
+                    <span className="inline-flex items-center gap-1 t-caption-sm text-accent-brand bg-teal-500/10 px-1.5 py-0.5 rounded max-w-[200px]">
                       <span className="truncate">{sp.primaryKeyword}</span>
                       <button
                         onClick={e => { e.stopPropagation(); trackKeyword(sp.primaryKeyword); }}
                         title={trackedKeywords.has(sp.primaryKeyword) ? 'Tracking' : 'Track in Rank Tracker'}
-                        className={`flex-shrink-0 transition-colors ${trackedKeywords.has(sp.primaryKeyword) ? 'text-emerald-400' : 'text-teal-600 hover:text-teal-300'}`}
+                        className={`flex-shrink-0 transition-colors ${trackedKeywords.has(sp.primaryKeyword) ? 'text-accent-success' : 'text-accent-brand hover:text-accent-brand'}`}
                       >
                         {trackedKeywords.has(sp.primaryKeyword) ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
                       </button>
                     </span>
                   )}
                   {sp?.validated === false && (
-                    <span className="text-[10px] text-amber-400 bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/20" title="Keyword not validated in SEMRush">{/* // arbitrary-text-ok */}
+                    <span className="text-[10px] text-accent-warning bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/20" title="Keyword not validated in SEMRush">{/* // arbitrary-text-ok */}
                       Unvalidated
                     </span>
                   )}
@@ -754,13 +754,13 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                               onClick={() => trackKeyword(sp.primaryKeyword)}
                               title={trackedKeywords.has(sp.primaryKeyword) ? 'Tracking' : 'Track in Rank Tracker'}
                               className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border transition-colors ${ // arbitrary-text-ok
-                                                                                                                               trackedKeywords.has(sp.primaryKeyword) ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-teal-500/30 bg-teal-500/10 text-teal-400 hover:bg-teal-500/20'}`}
+                                                                                                                               trackedKeywords.has(sp.primaryKeyword) ? 'border-emerald-500/30 bg-emerald-500/10 text-accent-success' : 'border-teal-500/30 bg-teal-500/10 text-accent-brand hover:bg-teal-500/20'}`}
                             >
                               {trackedKeywords.has(sp.primaryKeyword) ? <><Check className="w-2.5 h-2.5" /> Tracking</> : <><Plus className="w-2.5 h-2.5" /> Track</>}
                             </button>
                           </div>
                         </div>
-                        <button onClick={() => startEdit(page)} className="p-1 text-[var(--brand-text-muted)] hover:text-teal-400 transition-colors" title="Edit keywords">
+                        <button onClick={() => startEdit(page)} className="p-1 text-[var(--brand-text-muted)] hover:text-accent-brand transition-colors" title="Edit keywords">
                           <Pencil className="w-3 h-3" />
                         </button>
                       </div>
@@ -776,7 +776,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                       <div className="flex flex-wrap gap-3 mt-1">
                         {sp.volume != null && sp.volume > 0 && (
                           <div className="t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-1">
-                            <Icon as={BarChart3} size="sm" className="text-orange-400" />
+                            <Icon as={BarChart3} size="sm" className="text-accent-orange" />
                             <span className="text-[var(--brand-text-bright)] font-medium">{sp.volume.toLocaleString()}</span>/mo
                           </div>
                         )}
@@ -789,8 +789,8 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                         )}
                         {sp.cpc !== undefined && sp.cpc > 0 && (
                           <div className="t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-1">
-                            <Icon as={DollarSign} size="sm" className="text-emerald-400" />
-                            CPC: <span className="text-emerald-400 font-medium">${sp.cpc.toFixed(2)}</span>
+                            <Icon as={DollarSign} size="sm" className="text-accent-success" />
+                            CPC: <span className="text-accent-success font-medium">${sp.cpc.toFixed(2)}</span>
                           </div>
                         )}
                         {sp.impressions !== undefined && (
@@ -876,7 +876,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                       <div className="flex items-center justify-between">
                         <span className="t-label text-[var(--brand-text-muted)]">AI Analysis</span>
                         <button onClick={() => analyzePage(page)} disabled={isAnalyzing}
-                          className="t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-400 flex items-center gap-1 transition-colors disabled:opacity-50">
+                          className="t-caption-sm text-[var(--brand-text-muted)] hover:text-accent-brand flex items-center gap-1 transition-colors disabled:opacity-50">
                           {isAnalyzing ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Sparkles className="w-2.5 h-2.5" />} Re-analyze
                         </button>
                       </div>
@@ -888,14 +888,14 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                           <div className={`text-2xl font-bold ${scoreColorClass(kw.optimizationScore)}`}>
                             {kw.optimizationScore}<span className="t-caption font-normal text-[var(--brand-text-muted)]">/100</span>
                           </div>
-                          <div className="mt-1 h-1 bg-[var(--surface-3)] rounded-full overflow-hidden">
-                            <div className={`h-full rounded-full ${scoreBgBarClass(kw.optimizationScore)}`} style={{ width: `${kw.optimizationScore}%` }} />
+                          <div className="mt-1 h-1 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
+                            <div className={`h-full rounded-[var(--radius-pill)] ${scoreBgBarClass(kw.optimizationScore)}`} style={{ width: `${kw.optimizationScore}%` }} />
                           </div>
                         </div>
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                           <div className="t-label text-[var(--brand-text-muted)] mb-1">Search Intent</div>
                           <div className="flex items-center gap-2">
-                            <span className="w-6 h-6 rounded-full bg-teal-500/20 text-teal-400 flex items-center justify-center t-caption font-bold">{intentIcon(kw.searchIntent)}</span>
+                            <span className="w-6 h-6 rounded-[var(--radius-pill)] bg-teal-500/20 text-accent-brand flex items-center justify-center t-caption font-bold">{intentIcon(kw.searchIntent)}</span>
                             <div>
                               <div className="t-body font-medium text-[var(--brand-text-bright)] capitalize">{kw.searchIntent}</div>
                               <div className="t-caption-sm text-[var(--brand-text-muted)]">{Math.round(kw.searchIntentConfidence * 100)}% confidence</div>
@@ -912,13 +912,13 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                       {/* Primary keyword presence */}
                       <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                         <div className="flex items-center gap-2 mb-2">
-                          <Icon as={Target} size="md" className="text-teal-400" />
+                          <Icon as={Target} size="md" className="text-accent-brand" />
                           <span className="t-caption font-medium text-[var(--brand-text-bright)]">Primary Keyword: <span className="text-white">{kw.primaryKeyword}</span></span>
                           <button
                             onClick={() => trackKeyword(kw.primaryKeyword)}
                             title={trackedKeywords.has(kw.primaryKeyword) ? 'Tracking' : 'Track in Rank Tracker'}
                             className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border transition-colors ${ // arbitrary-text-ok
-                                                                                                                             trackedKeywords.has(kw.primaryKeyword) ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-teal-500/30 bg-teal-500/10 text-teal-400 hover:bg-teal-500/20'}`}
+                                                                                                                             trackedKeywords.has(kw.primaryKeyword) ? 'border-emerald-500/30 bg-emerald-500/10 text-accent-success' : 'border-teal-500/30 bg-teal-500/10 text-accent-brand hover:bg-teal-500/20'}`}
                           >
                             {trackedKeywords.has(kw.primaryKeyword) ? <><Check className="w-2.5 h-2.5" /> Tracking</> : <><Plus className="w-2.5 h-2.5" /> Track</>}
                           </button>
@@ -929,8 +929,8 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                             const present = kw.primaryKeywordPresence[key];
                             return (
                               <div key={key} className="flex items-center gap-1">
-                                {present ? <Icon as={CheckCircle} size="sm" className="text-emerald-400" /> : <Icon as={AlertCircle} size="sm" className="text-red-400" />}
-                                <span className={`t-caption-sm ${present ? 'text-emerald-400' : 'text-red-400'}`}>{labels[key]}</span>
+                                {present ? <Icon as={CheckCircle} size="sm" className="text-accent-success" /> : <Icon as={AlertCircle} size="sm" className="text-accent-danger" />}
+                                <span className={`t-caption-sm ${present ? 'text-accent-success' : 'text-accent-danger'}`}>{labels[key]}</span>
                               </div>
                             );
                           })}
@@ -941,23 +941,23 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                       <div className="grid grid-cols-2 gap-3">
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                           <div className="flex items-center gap-2 mb-2">
-                            <Icon as={Tag} size="md" className="text-blue-400" />
+                            <Icon as={Tag} size="md" className="text-accent-info" />
                             <span className="t-caption font-medium text-[var(--brand-text-bright)]">Secondary Keywords</span>
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {kw.secondaryKeywords.map((k, i) => (
-                              <span key={i} className="t-caption-sm px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400">{k}</span>
+                              <span key={i} className="t-caption-sm px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-accent-info">{k}</span>
                             ))}
                           </div>
                         </div>
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                           <div className="flex items-center gap-2 mb-2">
-                            <Icon as={TrendingUp} size="md" className="text-emerald-400" />
+                            <Icon as={TrendingUp} size="md" className="text-accent-success" />
                             <span className="t-caption font-medium text-[var(--brand-text-bright)]">Long-Tail Keywords</span>
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {kw.longTailKeywords.map((k, i) => (
-                              <span key={i} className="t-caption-sm px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">{k}</span>
+                              <span key={i} className="t-caption-sm px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-accent-success">{k}</span>
                             ))}
                           </div>
                         </div>
@@ -967,12 +967,12 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                       {kw.competitorKeywords.length > 0 && (
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                           <div className="flex items-center gap-2 mb-2">
-                            <Icon as={Zap} size="md" className="text-amber-400" />
+                            <Icon as={Zap} size="md" className="text-accent-warning" />
                             <span className="t-caption font-medium text-[var(--brand-text-bright)]">Competitor Keywords</span>
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {kw.competitorKeywords.map((k, i) => (
-                              <span key={i} className="t-caption-sm px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400">{k}</span>
+                              <span key={i} className="t-caption-sm px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-accent-warning">{k}</span>
                             ))}
                           </div>
                         </div>
@@ -986,13 +986,13 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                           {kw.contentGaps.length > 0 && (
                             <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                               <div className="flex items-center gap-2 mb-2">
-                                <Icon as={AlertCircle} size="md" className="text-orange-400" />
+                                <Icon as={AlertCircle} size="md" className="text-accent-orange" />
                                 <span className="t-caption font-medium text-[var(--brand-text-bright)]">Content Gaps</span>
                               </div>
                               <ul className="space-y-1">
                                 {kw.contentGaps.map((gap, i) => (
                                   <li key={i} className="t-caption text-[var(--brand-text)] flex items-start gap-1.5">
-                                    <span className="text-orange-400 mt-0.5">-</span> {gap}
+                                    <span className="text-accent-orange mt-0.5">-</span> {gap}
                                   </li>
                                 ))}
                               </ul>
@@ -1003,7 +1003,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                             {kw.optimizationIssues.length > 0 && (
                               <div className="bg-[var(--surface-2)] p-3 border border-red-500/20 rounded-[var(--radius-signature)]">
                                 <div className="flex items-center gap-2 mb-2">
-                                  <Icon as={AlertCircle} size="md" className="text-red-400" />
+                                  <Icon as={AlertCircle} size="md" className="text-accent-danger" />
                                   <span className="t-caption font-medium text-[var(--brand-text-bright)]">Issues</span>
                                 </div>
                                 <ul className="space-y-1">
@@ -1016,7 +1016,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                             {kw.recommendations.length > 0 && (
                               <div className="bg-[var(--surface-2)] p-3 border border-emerald-500/20 rounded-[var(--radius-signature)]">
                                 <div className="flex items-center gap-2 mb-2">
-                                  <Icon as={Sparkles} size="md" className="text-emerald-400" />
+                                  <Icon as={Sparkles} size="md" className="text-accent-success" />
                                   <span className="t-caption font-medium text-[var(--brand-text-bright)]">Recommendations</span>
                                 </div>
                                 <ul className="space-y-1">
@@ -1034,7 +1034,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                       {cs && (
                         <div className="bg-[var(--surface-2)] p-3 border border-[var(--brand-border)] rounded-[var(--radius-signature)]">
                           <div className="flex items-center gap-2 mb-3">
-                            <Icon as={BarChart3} size="md" className="text-cyan-400" />
+                            <Icon as={BarChart3} size="md" className="text-accent-cyan" />
                             <span className="t-caption font-medium text-[var(--brand-text-bright)]">Content Metrics</span>
                           </div>
                           <div className="grid grid-cols-4 gap-3 mb-3">
@@ -1046,7 +1046,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                               <div className="flex items-center gap-3">
                                 <MetricRing score={cs.readabilityScore} size={64} noAnimation />
                                 <div>
-                                  <div className={`text-lg font-bold ${cs.readabilityScore >= 60 ? 'text-emerald-400' : cs.readabilityScore >= 30 ? 'text-amber-400' : 'text-red-400'}`}>
+                                  <div className={`text-lg font-bold ${cs.readabilityScore >= 60 ? 'text-accent-success' : cs.readabilityScore >= 30 ? 'text-accent-warning' : 'text-accent-danger'}`}>
                                     {cs.readabilityScore}
                                   </div>
                                   <div className="t-label text-[var(--brand-text-muted)]">Readability</div>
@@ -1067,8 +1067,8 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                               <div className="t-label text-[var(--brand-text-muted)] mb-1.5">Top Words in Content</div>
                               <div className="flex flex-wrap gap-1">
                                 {cs.topKeywords.slice(0, 10).map((tk, i) => (
-                                  <span key={i} className="t-caption-sm px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
-                                    {tk.word} <span className="text-cyan-600">({tk.density}%)</span>
+                                  <span key={i} className="t-caption-sm px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-accent-cyan">
+                                    {tk.word} <span className="text-accent-cyan">({tk.density}%)</span>
                                   </span>
                                 ))}
                               </div>
@@ -1076,11 +1076,11 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                           )}
                           <div className="flex items-center gap-4 mt-3">
                             <div className="flex items-center gap-1.5">
-                              {cs.titleOk ? <Icon as={CheckCircle} size="sm" className="text-emerald-400" /> : <Icon as={AlertCircle} size="sm" className="text-amber-400" />}
+                              {cs.titleOk ? <Icon as={CheckCircle} size="sm" className="text-accent-success" /> : <Icon as={AlertCircle} size="sm" className="text-accent-warning" />}
                               <span className="t-caption-sm text-[var(--brand-text)]">Title: {cs.titleLength} chars</span>
                             </div>
                             <div className="flex items-center gap-1.5">
-                              {cs.descOk ? <Icon as={CheckCircle} size="sm" className="text-emerald-400" /> : <Icon as={AlertCircle} size="sm" className="text-amber-400" />}
+                              {cs.descOk ? <Icon as={CheckCircle} size="sm" className="text-accent-success" /> : <Icon as={AlertCircle} size="sm" className="text-accent-warning" />}
                               <span className="t-caption-sm text-[var(--brand-text)]">Desc: {cs.descLength} chars</span>
                             </div>
                             <div className="flex items-center gap-1.5">
@@ -1097,9 +1097,9 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                   {!kw && hasPersistedAnalysis && !isAnalyzing && (
                     <div className="pt-2 border-t border-[var(--brand-border)]">
                       <div className="flex items-center justify-between">
-                        <span className="t-caption-sm text-emerald-400">Analysis on file (run {new Date(sp!.analysisGeneratedAt!).toLocaleDateString()})</span>
+                        <span className="t-caption-sm text-accent-success">Analysis on file (run {new Date(sp!.analysisGeneratedAt!).toLocaleDateString()})</span>
                         <button onClick={() => analyzePage(page)}
-                          className="t-caption-sm text-[var(--brand-text-muted)] hover:text-teal-400 flex items-center gap-1 transition-colors">
+                          className="t-caption-sm text-[var(--brand-text-muted)] hover:text-accent-brand flex items-center gap-1 transition-colors">
                           <Sparkles className="w-2.5 h-2.5" /> Run fresh analysis
                         </button>
                       </div>
@@ -1114,7 +1114,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                           )}
                           {sp!.optimizationIssues && sp!.optimizationIssues.length > 0 && (
                             <div className="t-caption-sm text-[var(--brand-text)]">
-                              <span className="text-red-400 font-medium">{sp!.optimizationIssues.length} issues</span> · {sp!.optimizationIssues.slice(0, 2).join(' · ')}
+                              <span className="text-accent-danger font-medium">{sp!.optimizationIssues.length} issues</span> · {sp!.optimizationIssues.slice(0, 2).join(' · ')}
                               {sp!.optimizationIssues.length > 2 && ` +${sp!.optimizationIssues.length - 2} more`}
                             </div>
                           )}
@@ -1127,7 +1127,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                   <div className="flex items-center gap-2 pt-3 mt-1 border-t border-[var(--brand-border)]/60 flex-wrap">
                     <button
                       onClick={() => navigate(adminPath(workspaceId, 'seo-editor'), { state: { fixContext: { targetRoute: 'seo-editor', pageSlug: page.slug, pageName: page.title } } })}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-teal-400 bg-teal-500/10 hover:bg-teal-500/15 border border-teal-500/20 transition-all"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-accent-brand bg-teal-500/10 hover:bg-teal-500/15 border border-teal-500/20 transition-all"
                     >
                       <Icon as={Pencil} size="sm" /> Fix in SEO Editor
                     </button>
@@ -1150,14 +1150,14 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                           },
                         });
                       }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-teal-400 bg-teal-500/10 hover:bg-teal-500/15 border border-teal-500/20 transition-all"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-accent-brand bg-teal-500/10 hover:bg-teal-500/15 border border-teal-500/20 transition-all"
                     >
                       <Icon as={BookOpen} size="sm" /> Create Brief
                     </button>
                     {(kw?.optimizationIssues?.some(i => /schema|structured data/i.test(i)) || sp?.optimizationIssues?.some(i => /schema|structured data/i.test(i))) && (
                       <button
                         onClick={() => navigate(adminPath(workspaceId, 'seo-schema'), { state: { fixContext: { targetRoute: 'seo-schema', pageSlug: page.slug, pageName: page.title } } })}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-teal-400 bg-teal-500/10 hover:bg-teal-500/15 border border-teal-500/20 transition-all"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] t-caption-sm font-medium text-accent-brand bg-teal-500/10 hover:bg-teal-500/15 border border-teal-500/20 transition-all"
                       >
                         <Icon as={Code2} size="sm" /> Add Schema
                       </button>

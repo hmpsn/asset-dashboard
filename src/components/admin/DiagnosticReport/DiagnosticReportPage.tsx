@@ -38,7 +38,7 @@ function ReportDetail({ report }: { report: DiagnosticReport }) {
       <PageHeader
         title={`Deep Diagnostic: ${report.affectedPages[0] ?? report.anomalyType}`}
         subtitle={`Completed ${new Date(report.completedAt ?? report.createdAt).toLocaleDateString()}`}
-        icon={<Activity className="w-5 h-5 text-teal-400" />}
+        icon={<Activity className="w-5 h-5 text-accent-brand" />}
       />
 
       {/* At-a-Glance Strip */}
@@ -145,7 +145,7 @@ function DiagnosticReportList({ workspaceId }: { workspaceId: string }) {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Diagnostic Reports" icon={<Activity className="w-5 h-5 text-teal-400" />} />
+      <PageHeader title="Diagnostic Reports" icon={<Activity className="w-5 h-5 text-accent-brand" />} />
       {reports.map((r) => (
         <Link key={r.id} to={`?report=${r.id}`} className="block">
           <SectionCard>

@@ -77,7 +77,7 @@ export function ClientHeader({
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-semibold">{ws.name}</h1>
               {!betaMode && ws.isTrial && (
-                <span className="px-2 py-0.5 t-caption-sm uppercase tracking-wider font-semibold rounded-full bg-amber-500/15 text-accent-warning border border-amber-500/20">
+                <span className="px-2 py-0.5 t-caption-sm uppercase tracking-wider font-semibold rounded-[var(--radius-pill)] bg-amber-500/15 text-accent-warning border border-amber-500/20">
                   Growth Trial{ws.trialDaysRemaining ? ` · ${ws.trialDaysRemaining}d` : ''}
                 </span>
               )}
@@ -89,7 +89,7 @@ export function ClientHeader({
           {/* Client user menu */}
           {clientUser && (
             <div className="flex items-center gap-2 pr-2 border-r border-[var(--brand-border)]">
-              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[var(--teal)] to-[var(--emerald)] flex items-center justify-center text-[var(--button-primary-text)] t-caption-sm font-bold">
+              <div className="w-7 h-7 rounded-[var(--radius-pill)] bg-gradient-to-br from-[var(--teal)] to-[var(--emerald)] flex items-center justify-center text-[var(--button-primary-text)] t-caption-sm font-bold">
                 {clientUser.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
               </div>
               <span className="t-caption text-[var(--brand-text-muted)] hidden sm:block">{clientUser.name}</span>
@@ -108,14 +108,14 @@ export function ClientHeader({
             <div className="relative flex items-center gap-1 bg-[var(--surface-2)] rounded-[var(--radius-lg)] border border-[var(--brand-border)] p-0.5">
               {[7, 28, 90, 180, 365].map(d => (
                 <button key={d} onClick={() => changeDays(d, ws)}
-                  className={`px-3 py-2 min-h-[44px] rounded-md t-caption font-medium transition-colors ${!customDateRange && days === d ? 'bg-[var(--surface-3)] text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}
+                  className={`px-3 py-2 min-h-[44px] rounded-[var(--radius-md)] t-caption font-medium transition-colors ${!customDateRange && days === d ? 'bg-[var(--surface-3)] text-[var(--brand-text)]' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}
                 >
                   {d >= 365 ? '1y' : d >= 180 ? '6mo' : `${d}d`}
-                  {!customDateRange && days === d && <span className="block text-[9px] text-[var(--brand-text-muted)] font-normal">vs prev {d >= 365 ? '1y' : d >= 180 ? '6mo' : `${d}d`}</span>}
+                  {!customDateRange && days === d && <span className="block t-micro text-[var(--brand-text-muted)] font-normal">vs prev {d >= 365 ? '1y' : d >= 180 ? '6mo' : `${d}d`}</span>}
                 </button>
               ))}
               <button onClick={() => effectiveTier !== 'free' && setShowDatePicker(p => !p)}
-                className={`px-2.5 py-1.5 rounded-md t-caption font-medium transition-colors flex items-center gap-1.5 ${effectiveTier === 'free' ? 'text-[var(--brand-text-faint)] cursor-not-allowed' : customDateRange ? 'bg-teal-600/20 text-accent-brand border border-teal-500/30' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}
+                className={`px-2.5 py-1.5 rounded-[var(--radius-md)] t-caption font-medium transition-colors flex items-center gap-1.5 ${effectiveTier === 'free' ? 'text-[var(--brand-text-faint)] cursor-not-allowed' : customDateRange ? 'bg-teal-600/20 text-accent-brand border border-teal-500/30' : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'}`}
                 title={effectiveTier === 'free' ? 'Upgrade to Growth for custom date ranges' : 'Custom date range'}
               >
                 <Icon as={Calendar} size="md" />
@@ -195,9 +195,9 @@ export function ClientHeader({
                 }`}>
                 <Icon as={TabIcon} size="md" /> {t.label}
                 {t.locked && <Icon as={Lock} size="sm" className="ml-0.5 text-[var(--brand-text-muted)]" />}
-                {t.id === 'inbox' && (pendingApprovals + pendingReviews + unreadTeamNotes) > 0 && <span className="ml-1 px-1.5 py-0.5 t-caption-sm font-bold rounded-full bg-[var(--teal)] text-[var(--button-primary-text)] flex-shrink-0 min-w-[20px] text-center leading-tight">{pendingApprovals + pendingReviews + unreadTeamNotes}</span>}
-                {t.id === 'content-plan' && contentPlanSummary && contentPlanSummary.reviewCells > 0 && <span className="ml-1 px-1.5 py-0.5 t-caption-sm font-bold rounded-full bg-blue-500 text-white flex-shrink-0 min-w-[20px] text-center leading-tight">{contentPlanSummary.reviewCells}</span>}
-                {!t.locked && tabHasData && !active && t.id !== 'inbox' && <span className="w-2 h-2 rounded-full bg-emerald-400/60" title="Data available" />}
+                {t.id === 'inbox' && (pendingApprovals + pendingReviews + unreadTeamNotes) > 0 && <span className="ml-1 px-1.5 py-0.5 t-caption-sm font-bold rounded-[var(--radius-pill)] bg-[var(--teal)] text-[var(--button-primary-text)] flex-shrink-0 min-w-[20px] text-center leading-tight">{pendingApprovals + pendingReviews + unreadTeamNotes}</span>}
+                {t.id === 'content-plan' && contentPlanSummary && contentPlanSummary.reviewCells > 0 && <span className="ml-1 px-1.5 py-0.5 t-caption-sm font-bold rounded-[var(--radius-pill)] bg-blue-500 text-white flex-shrink-0 min-w-[20px] text-center leading-tight">{contentPlanSummary.reviewCells}</span>}
+                {!t.locked && tabHasData && !active && t.id !== 'inbox' && <span className="w-2 h-2 rounded-[var(--radius-pill)] bg-emerald-400/60" title="Data available" />}
               </button>
             );
           })}

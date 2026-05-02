@@ -26,8 +26,8 @@ function trendLabel(trend: LearningsTrend): string {
 }
 
 function trendColor(trend: LearningsTrend): string {
-  if (trend === 'improving') return 'text-emerald-400';
-  if (trend === 'declining') return 'text-red-400';
+  if (trend === 'improving') return 'text-accent-success';
+  if (trend === 'declining') return 'text-accent-danger';
   return 'text-[var(--brand-text)]';
 }
 
@@ -67,12 +67,12 @@ function AggregateStats({ workspaces }: { workspaces: WorkspaceOutcomeOverview[]
       <StatCard
         label="Scored (30d)"
         value={totalScored.toString()}
-        valueColor="text-blue-400"
+        valueColor="text-accent-info"
       />
       <StatCard
         label="Need attention"
         value={attentionCount.toString()}
-        valueColor={attentionCount > 0 ? 'text-amber-400' : 'text-[var(--brand-text)]'}
+        valueColor={attentionCount > 0 ? 'text-accent-warning' : 'text-[var(--brand-text)]'}
       />
     </div>
   );
@@ -91,12 +91,12 @@ function WorkspaceRow({ ws }: { ws: WorkspaceOutcomeOverview }) {
           <span className="text-sm font-medium text-[var(--brand-text-bright)]">{ws.workspaceName}</span>
           {ws.attentionNeeded && (
             <span title={ws.attentionReason ?? 'Needs attention'}>
-              <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+              <AlertTriangle className="w-3.5 h-3.5 text-accent-warning flex-shrink-0" />
             </span>
           )}
         </div>
         {ws.attentionReason && (
-          <p className="text-xs text-amber-400/70 mt-0.5">{ws.attentionReason}</p>
+          <p className="text-xs text-accent-warning mt-0.5">{ws.attentionReason}</p>
         )}
       </td>
 
@@ -119,7 +119,7 @@ function WorkspaceRow({ ws }: { ws: WorkspaceOutcomeOverview }) {
       </td>
 
       {/* Scored last 30d */}
-      <td className="py-3 px-4 text-sm text-blue-400">
+      <td className="py-3 px-4 text-sm text-accent-info">
         {ws.scoredLast30d}
       </td>
 
@@ -218,7 +218,7 @@ export default function OutcomesOverview() {
               {/* Workspace table */}
               <SectionCard>
                 <div className="flex items-center gap-2 mb-4">
-                  <Activity className="w-4 h-4 text-blue-400" />
+                  <Activity className="w-4 h-4 text-accent-info" />
                   <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">All workspaces</h3>
                   <span className="text-xs text-[var(--brand-text-muted)] ml-auto">
                     {workspaces.length} {workspaces.length === 1 ? 'workspace' : 'workspaces'}

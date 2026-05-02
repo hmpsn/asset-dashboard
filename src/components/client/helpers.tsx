@@ -14,7 +14,7 @@ function DarkTooltip({ active, payload, label, metrics }: { active?: boolean; pa
       <div className="px-3 py-1.5 space-y-1">
         {metrics.map(m => (
           <div key={m.key} className="flex justify-between t-caption-sm">
-            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: m.color }} />{m.label}</span>
+            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-[var(--radius-pill)] inline-block" style={{ backgroundColor: m.color }} />{m.label}</span>
             <span className="text-[var(--brand-text-bright)] font-medium">{m.fmt ? m.fmt(row[m.key]) : (typeof row[m.key] === 'number' ? row[m.key].toLocaleString() : row[m.key])}</span>
           </div>
         ))}
@@ -120,7 +120,7 @@ export function ScoreHistoryChart({ history }: { history: Array<{ id: string; cr
                 <div className="px-3 py-1.5 border-b border-[var(--brand-border)] t-caption-sm font-semibold text-[var(--brand-text-bright)]">{row.dateFull}</div>
                 <div className="px-3 py-1.5">
                   <div className="flex justify-between t-caption-sm">
-                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: sc }} />Score</span>
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-[var(--radius-pill)] inline-block" style={{ backgroundColor: sc }} />Score</span>
                     <span className="text-[var(--brand-text-bright)] font-medium">{score}/100</span>
                   </div>
                 </div>

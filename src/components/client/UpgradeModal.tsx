@@ -16,7 +16,7 @@ export function UpgradeModal({ workspaceId, onClose, onError }: Props) {
       <Modal.Header title="SEO Strategy — Premium Feature" onClose={onClose} />
       <Modal.Body>
         <div className="text-center">
-          <div className="w-14 h-14 rounded-full bg-teal-500/10 border border-teal-500/20 flex items-center justify-center mx-auto mb-4">
+          <div className="w-14 h-14 rounded-[var(--radius-pill)] bg-teal-500/10 border border-teal-500/20 flex items-center justify-center mx-auto mb-4">
             <Icon as={Sparkles} size="2xl" className="text-accent-brand" />
           </div>
           <p className="t-body text-[var(--brand-text)] leading-relaxed mb-6">
