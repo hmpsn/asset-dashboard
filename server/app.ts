@@ -73,6 +73,7 @@ import intelligenceRouter from './routes/intelligence.js';
 import debugRouter from './routes/debug.js';
 import suggestedBriefsRouter from './routes/suggested-briefs.js';
 import clientSignalsRouter from './routes/client-signals.js';
+import clientActionsRouter from './routes/client-actions.js';
 import meetingBriefRouter from './routes/meeting-brief.js';
 import brandscriptRoutes from './routes/brandscript.js';
 import voiceCalibrationRoutes from './routes/voice-calibration.js';
@@ -321,6 +322,7 @@ export function createApp(): express.Express {
   app.use(debugRouter);
   app.use(suggestedBriefsRouter);
   app.use(clientSignalsRouter);
+  app.use(clientActionsRouter);
   app.use(meetingBriefRouter);
   app.use(brandscriptRoutes);
   app.use(voiceCalibrationRoutes);

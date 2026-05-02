@@ -87,6 +87,9 @@ export function ApprovalsTab({
     b.items.length > 0 && b.items.every(i => i.status === 'applied')
   ).length;
 
+  const isClientApplyableBatch = (batch: ApprovalBatch) =>
+    batch.items.every(i => (i.field === 'seoTitle' || i.field === 'seoDescription') && !i.collectionId && !i.pageId.startsWith('cms-'));
+
   const filteredBatches = approvalBatches.filter(batch => {
     if (batchFilter === 'needs-action') return batch.items.some(i => i.status === 'pending' || !i.status);
     if (batchFilter === 'ready') return isReady(batch);
@@ -574,7 +577,7 @@ export function ApprovalsTab({
                     Approve All ({batchPending})
                   </Button>
                 )}
-                {batchApproved > 0 && (
+                {batchApproved > 0 && isClientApplyableBatch(batch) && (
                   <Button
                     onClick={() => applyApprovedBatch(batch.id)}
                     disabled={isApplying}

@@ -242,7 +242,7 @@ export const contentPlanReview = {
     post<{ batchId: string; batch: unknown }>(`/api/content-plan/${wsId}/${matrixId}/send-template-review`, {}),
 
   sendSamples: (wsId: string, matrixId: string, cellIds: string[]) =>
-    post<{ batchId: string; batch: unknown; cellsSent: number }>(`/api/content-plan/${wsId}/${matrixId}/send-samples`, { cellIds }),
+    contentMatrices.sendSamples(wsId, matrixId, cellIds),
 
   batchApprove: (wsId: string, matrixId: string) =>
     post<{ ok: boolean; approvedCount: number; totalCells: number }>(`/api/content-plan/${wsId}/${matrixId}/batch-approve`, {}),

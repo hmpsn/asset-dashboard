@@ -229,6 +229,36 @@ vi.mock('../../server/client-signals-store.js', () => ({
   countAllSignals: vi.fn(() => 0),
 }));
 
+vi.mock('../../server/client-actions.js', () => ({
+  summarizeClientActions: vi.fn(() => ({
+    pending: 1,
+    approved: 1,
+    changesRequested: 1,
+    completed: 1,
+    recentDecisions: [
+      {
+        title: 'Keyword strategy',
+        status: 'approved',
+        sourceType: 'keyword_strategy',
+        updatedAt: '2026-05-01T12:00:00Z',
+      },
+      {
+        title: 'Refresh page',
+        status: 'changes_requested',
+        sourceType: 'content_decay',
+        updatedAt: '2026-05-01T14:00:00Z',
+      },
+      {
+        title: 'Redirects',
+        status: 'completed',
+        sourceType: 'redirect_proposal',
+        updatedAt: '2026-05-01T16:00:00Z',
+      },
+    ],
+  })),
+  getClientActionQueueStats: vi.fn(() => ({ pending: 1, oldestAge: 24 })),
+}));
+
 vi.mock('../../server/chat-memory.js', () => ({
   getMonthlyConversationCount: vi.fn(() => 0),
   listSessions: vi.fn(() => []),
@@ -827,9 +857,17 @@ describe('contract: ClientSignalsSlice field population', () => {
       expect(typeof result.intentSignals.totalCount).toBe('number');
       expect(Array.isArray(result.intentSignals.recentTypes)).toBe(true);
     }
+
+    if (result.clientActions !== undefined) {
+      expect(typeof result.clientActions.pending).toBe('number');
+      expect(typeof result.clientActions.approved).toBe('number');
+      expect(typeof result.clientActions.changesRequested).toBe('number');
+      expect(typeof result.clientActions.completed).toBe('number');
+      expect(Array.isArray(result.clientActions.recentDecisions)).toBe(true);
+    }
   });
 
-  it('assembler always populates churnSignals, engagement, feedbackItems, serviceRequests', async () => {
+  it('assembler always populates churnSignals, engagement, feedbackItems, serviceRequests, clientActions', async () => {
     const result = await getSlice<ClientSignalsSlice>('clientSignals');
 
     // These are always set in the assembler's return statement
@@ -837,6 +875,17 @@ describe('contract: ClientSignalsSlice field population', () => {
     expect(result.engagement).toBeDefined();
     expect(result.feedbackItems).toBeDefined();
     expect(result.serviceRequests).toBeDefined();
+    expect(result.clientActions).toBeDefined();
+  });
+
+  it('summarizes client action response patterns and recent decisions', async () => {
+    const result = await getSlice<ClientSignalsSlice>('clientSignals');
+
+    expect(result.clientActions?.pending).toBe(1);
+    expect(result.clientActions?.approved).toBe(1);
+    expect(result.clientActions?.changesRequested).toBe(1);
+    expect(result.clientActions?.completed).toBe(1);
+    expect(result.clientActions?.recentDecisions.map(d => d.status)).toEqual(['approved', 'changes_requested', 'completed']);
   });
 });
 
@@ -903,9 +952,13 @@ describe('contract: OperationalSlice field population', () => {
         expect(typeof result.insightAcceptanceRate.rate).toBe('number');
       }
     }
+    if (result.clientActionQueue !== undefined) {
+      expect(typeof result.clientActionQueue.pending).toBe('number');
+      expect(result.clientActionQueue.oldestAge === null || typeof result.clientActionQueue.oldestAge === 'number').toBe(true);
+    }
   });
 
-  it('assembler always populates timeSaved, approvalQueue, recommendationQueue, actionBacklog, detectedPlaybooks, workOrders, insightAcceptanceRate', async () => {
+  it('assembler always populates timeSaved, approvalQueue, recommendationQueue, actionBacklog, detectedPlaybooks, workOrders, insightAcceptanceRate, clientActionQueue', async () => {
     const result = await getSlice<OperationalSlice>('operational');
 
     // These are always set in the assembler return statement
@@ -916,6 +969,7 @@ describe('contract: OperationalSlice field population', () => {
     expect(result.actionBacklog).toBeDefined();
     expect(result.detectedPlaybooks).toBeDefined();
     expect(result.workOrders).toBeDefined();
+    expect(result.clientActionQueue).toBeDefined();
     // insightAcceptanceRate can be null when no insights exist
     expect(result.insightAcceptanceRate === null || result.insightAcceptanceRate === undefined || typeof result.insightAcceptanceRate === 'object').toBe(true);
   });

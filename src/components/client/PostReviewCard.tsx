@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Check, X, ChevronDown, ChevronUp, Edit3, Loader2 } from 'lucide-react';
 import { Button, ClickableRow, Icon } from '../ui';
 import type { ClientContentRequest } from './types';
-import type { GeneratedPost, ContentTopicRequest } from '../../../shared/types/content';
+import type { GeneratedPost, ContentTopicRequest, PostSection } from '../../../shared/types/content';
 import { publicPostReview } from '../../api/content';
 import { queryKeys } from '../../lib/queryKeys';
 import { countWordsFromHtml } from '../../lib/utils';
@@ -38,6 +38,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
   const [post, setPost] = useState<GeneratedPost | undefined>(undefined);
   // Editor state — unconditional, even though they're only used when post is loaded
   const [editingSection, setEditingSection] = useState<number | null>(null);
+  const [editingMeta, setEditingMeta] = useState(false);
   const [editingIntro, setEditingIntro] = useState(false);
   const [editingConclusion, setEditingConclusion] = useState(false);
   const [feedback, setFeedback] = useState('');
@@ -45,11 +46,46 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
   const [submitting, setSubmitting] = useState(false);
   const [approving, setApproving] = useState(false);
 
+  const invalidatePostPreview = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.client.postPreview(workspaceId, request.postId) });
+  };
+
+  const updateLocalPost = (updates: Partial<GeneratedPost>) => {
+    setPost(prev => prev ? { ...prev, ...updates } : prev);
+  };
+
+  const updateLocalSection = (index: number, updates: Partial<PostSection>) => {
+    setPost(prev => prev ? {
+      ...prev,
+      sections: prev.sections.map(section => section.index === index ? { ...section, ...updates } : section),
+    } : prev);
+  };
+
+  const { scheduleAutoSave: scheduleTitleSave, flush: flushTitle, saveStatus: titleSaveStatus } = useAutoSave(
+    async (title: string) => {
+      const updated = await publicPostReview.clientEdit(workspaceId, post!.id, { title });
+      setPost(updated);
+      invalidatePostPreview();
+    },
+    1200,
+    () => { setToast({ message: 'Failed to save title', type: 'error' }); },
+  );
+
+  const { scheduleAutoSave: scheduleMetaSave, flush: flushMeta, saveStatus: metaSaveStatus } = useAutoSave(
+    async (metaDescription: string) => {
+      const updated = await publicPostReview.clientEdit(workspaceId, post!.id, { metaDescription });
+      setPost(updated);
+      invalidatePostPreview();
+    },
+    1200,
+    () => { setToast({ message: 'Failed to save meta description', type: 'error' }); },
+  );
+
   const { scheduleAutoSave: scheduleIntroSave, flush: flushIntro, saveStatus: introSaveStatus } = useAutoSave(
     async (html: string) => {
       const updated = await publicPostReview.clientEdit(workspaceId, post!.id, { introduction: html });
       setPost(updated);
-      queryClient.invalidateQueries({ queryKey: queryKeys.client.postPreview(workspaceId, request.postId) });
+      invalidatePostPreview();
     },
     2000,
     () => { setToast({ message: 'Failed to save introduction', type: 'error' }); },
@@ -66,7 +102,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
     }];
     const updated = await publicPostReview.clientEdit(workspaceId, post!.id, { sections });
     setPost(updated);
-    queryClient.invalidateQueries({ queryKey: queryKeys.client.postPreview(workspaceId, request.postId) });
+    invalidatePostPreview();
   };
   const { scheduleAutoSave: scheduleSectionSave, flush: flushSection, saveStatus: sectionSaveStatus } = useAutoSave(
     autoSaveSectionContent,
@@ -74,20 +110,49 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
     () => { setToast({ message: 'Failed to save section', type: 'error' }); },
   );
 
+  const autoSaveSectionHeading = async (heading: string) => {
+    if (editingSection === null) return;
+    const existing = post!.sections.find(s => s.index === editingSection);
+    const content = existing?.content ?? '';
+    const sections = [{
+      index: editingSection,
+      heading,
+      content,
+      wordCount: existing?.wordCount ?? countWordsFromHtml(content),
+    }];
+    const updated = await publicPostReview.clientEdit(workspaceId, post!.id, { sections });
+    setPost(updated);
+    invalidatePostPreview();
+  };
+  const { scheduleAutoSave: scheduleSectionHeadingSave, flush: flushSectionHeading, saveStatus: sectionHeadingSaveStatus } = useAutoSave(
+    autoSaveSectionHeading,
+    1200,
+    () => { setToast({ message: 'Failed to save heading', type: 'error' }); },
+  );
+
   const { scheduleAutoSave: scheduleConclusionSave, flush: flushConclusion, saveStatus: conclusionSaveStatus } = useAutoSave(
     async (html: string) => {
       const updated = await publicPostReview.clientEdit(workspaceId, post!.id, { conclusion: html });
       setPost(updated);
-      queryClient.invalidateQueries({ queryKey: queryKeys.client.postPreview(workspaceId, request.postId) });
+      invalidatePostPreview();
     },
     2000,
     () => { setToast({ message: 'Failed to save conclusion', type: 'error' }); },
   );
 
-  // Sync fetched post into local state once (so edits can update it without refetching).
-  // This runs on every render but is guarded by `!post` so it only fires on the first
-  // render where fetchedPost arrives. Safe to do during render (no side effects).
-  if (fetchedPost && !post) setPost(fetchedPost);
+  useEffect(() => {
+    if (!fetchedPost) return;
+    setPost(prev => prev?.id === fetchedPost.id ? prev : fetchedPost);
+  }, [fetchedPost]);
+
+  async function flushPendingEdits() {
+    await flushTitle();
+    await flushMeta();
+    await flushIntro();
+    await flushSectionHeading();
+    await flushSection();
+    await flushConclusion();
+  }
 
   // Early returns AFTER all hooks — this is the correct order per Rules of Hooks
   if (postLoading) return <p className="t-caption text-[var(--brand-text-muted)] mt-3 animate-pulse">Loading post…</p>;
@@ -96,6 +161,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
   async function handleApprove() {
     setApproving(true);
     try {
+      await flushPendingEdits();
       const updated = await publicPostReview.approvePost(workspaceId, request.id);
       onUpdate(toClientRequest(updated, request));
       setToast({ message: 'Post approved! Your team has been notified.', type: 'success' });
@@ -113,6 +179,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
     }
     setSubmitting(true);
     try {
+      await flushPendingEdits();
       const updated = await publicPostReview.requestPostChanges(workspaceId, request.id, feedback.trim());
       onUpdate(toClientRequest(updated, request));
       setToast({ message: 'Feedback sent to your team.', type: 'success' });
@@ -126,10 +193,69 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
   return (
     <div className="space-y-4 mt-3">
       {/* Post header */}
-      <div className="px-1">
-        <h3 className="t-body font-semibold text-[var(--brand-text-bright)]">{post.title}</h3>
-        {post.metaDescription && (
-          <p className="t-caption text-[var(--brand-text)] mt-1 italic">{post.metaDescription}</p>
+      <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)]/60 p-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="text-base font-semibold leading-snug text-[var(--brand-text-bright)]">{post.title}</h3>
+            {post.metaDescription && (
+              <p className="t-caption text-[var(--brand-text)] mt-1 italic leading-relaxed">{post.metaDescription}</p>
+            )}
+          </div>
+          {!editingMeta && (
+            <Button
+              onClick={() => setEditingMeta(true)}
+              variant="link"
+              size="sm"
+              icon={Edit3}
+              className="shrink-0"
+            >
+              Edit
+            </Button>
+          )}
+        </div>
+        {editingMeta && (
+          <div className="mt-3 space-y-3">
+            <label className="block">
+              <span className="t-label text-[var(--brand-text-muted)]">Title</span>
+              <input
+                value={post.title}
+                onChange={e => {
+                  updateLocalPost({ title: e.target.value });
+                  scheduleTitleSave(e.target.value);
+                }}
+                className="mt-1 w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-sm text-[var(--brand-text-bright)] focus:border-teal-500/50 focus:outline-none"
+              />
+            </label>
+            <label className="block">
+              <span className="t-label text-[var(--brand-text-muted)]">Meta description</span>
+              <textarea
+                value={post.metaDescription}
+                onChange={e => {
+                  updateLocalPost({ metaDescription: e.target.value });
+                  scheduleMetaSave(e.target.value);
+                }}
+                rows={3}
+                className="mt-1 w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] t-caption text-[var(--brand-text)] focus:border-teal-500/50 focus:outline-none resize-y"
+              />
+            </label>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={async () => { await flushTitle(); await flushMeta(); setEditingMeta(false); }}
+                variant="secondary"
+                size="sm"
+              >
+                Done
+              </Button>
+              {(titleSaveStatus === 'saving' || metaSaveStatus === 'saving') && (
+                <span className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Saving...
+                </span>
+              )}
+              {(titleSaveStatus === 'saved' || metaSaveStatus === 'saved') && titleSaveStatus !== 'saving' && metaSaveStatus !== 'saving' && (
+                <span className="t-caption-sm text-accent-success">Saved</span>
+              )}
+            </div>
+          </div>
         )}
       </div>
 
@@ -152,7 +278,12 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
           <div className="space-y-2">
             <RichTextEditor
               initialValue={post.introduction}
-              onChange={scheduleIntroSave}
+              onChange={(html) => {
+                updateLocalPost({ introduction: html });
+                scheduleIntroSave(html);
+              }}
+              variant="client"
+              minHeight="180px"
             />
             <div className="flex gap-2 items-center">
               <Button
@@ -174,7 +305,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
           </div>
         ) : (
           <div
-            className="t-caption text-[var(--brand-text)] leading-relaxed prose prose-invert prose-sm max-w-none"
+            className="text-sm text-[var(--brand-text)] leading-7 prose prose-invert prose-sm max-w-none"
             dangerouslySetInnerHTML={{ __html: post.introduction }}
           />
         )}
@@ -187,7 +318,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
             <span className="t-caption font-semibold text-[var(--brand-text-bright)]">{section.heading}</span>
             {editingSection !== section.index && (
               <Button
-                onClick={async () => { await flushSection(); setEditingSection(section.index); }}
+                onClick={async () => { await flushSectionHeading(); await flushSection(); setEditingSection(section.index); }}
                 variant="link"
                 size="sm"
                 icon={Edit3}
@@ -198,31 +329,47 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
           </div>
           {editingSection === section.index ? (
             <div className="space-y-2">
+              <label className="block">
+                <span className="t-label text-[var(--brand-text-muted)]">Heading</span>
+                <input
+                  value={section.heading}
+                  onChange={e => {
+                    updateLocalSection(section.index, { heading: e.target.value });
+                    scheduleSectionHeadingSave(e.target.value);
+                  }}
+                  className="mt-1 w-full px-3 py-2 bg-[var(--surface-1)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-sm font-semibold text-[var(--brand-text-bright)] focus:border-teal-500/50 focus:outline-none"
+                />
+              </label>
               <RichTextEditor
                 initialValue={section.content}
-                onChange={scheduleSectionSave}
+                onChange={(html) => {
+                  updateLocalSection(section.index, { content: html, wordCount: countWordsFromHtml(html) });
+                  scheduleSectionSave(html);
+                }}
+                variant="client"
+                minHeight="220px"
               />
               <div className="flex gap-2 items-center">
                 <Button
-                  onClick={async () => { await flushSection(); setEditingSection(null); }}
+                  onClick={async () => { await flushSectionHeading(); await flushSection(); setEditingSection(null); }}
                   variant="secondary"
                   size="sm"
                 >
                   Done
                 </Button>
-                {sectionSaveStatus === 'saving' && (
+                {(sectionSaveStatus === 'saving' || sectionHeadingSaveStatus === 'saving') && (
                   <span className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
-                    <Loader2 className="w-3 h-3 animate-spin" /> Saving…
+                    <Loader2 className="w-3 h-3 animate-spin" /> Saving...
                   </span>
                 )}
-                {sectionSaveStatus === 'saved' && (
+                {(sectionSaveStatus === 'saved' || sectionHeadingSaveStatus === 'saved') && sectionSaveStatus !== 'saving' && sectionHeadingSaveStatus !== 'saving' && (
                   <span className="t-caption-sm text-accent-success">Saved</span>
                 )}
               </div>
             </div>
           ) : (
             <div
-              className="t-caption text-[var(--brand-text)] leading-relaxed prose prose-invert prose-sm max-w-none"
+              className="text-sm text-[var(--brand-text)] leading-7 prose prose-invert prose-sm max-w-none"
               dangerouslySetInnerHTML={{ __html: section.content }}
             />
           )}
@@ -248,7 +395,12 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
           <div className="space-y-2">
             <RichTextEditor
               initialValue={post.conclusion}
-              onChange={scheduleConclusionSave}
+              onChange={(html) => {
+                updateLocalPost({ conclusion: html });
+                scheduleConclusionSave(html);
+              }}
+              variant="client"
+              minHeight="180px"
             />
             <div className="flex gap-2 items-center">
               <Button
@@ -270,7 +422,7 @@ export function PostReviewCard({ request, workspaceId, onUpdate, setToast }: Pos
           </div>
         ) : (
           <div
-            className="t-caption text-[var(--brand-text)] leading-relaxed prose prose-invert prose-sm max-w-none"
+            className="text-sm text-[var(--brand-text)] leading-7 prose prose-invert prose-sm max-w-none"
             dangerouslySetInnerHTML={{ __html: post.conclusion }}
           />
         )}

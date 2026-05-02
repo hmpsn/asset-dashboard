@@ -76,6 +76,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     searchComparison, ga4Comparison, ga4NewVsReturning,
     ga4Organic, ga4LandingPages, anomalies,
     approvalBatches, setApprovalBatches, approvalsLoading, approvalPageKeywords,
+    clientActions,
     activityLog, rankHistory, latestRanks, annotations,
     requests, requestsLoading, contentRequests, setContentRequests,
     sectionErrors, contentPlanSummary, contentPlanKeywords, contentPlanReviewCells,
@@ -181,6 +182,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     'activity:new': () => refetchClient('activity', `/api/public/activity/${workspaceId}?limit=20`),
     'approval:update': () => refetchClient('approvals', `/api/public/approvals/${workspaceId}`),
     'approval:applied': () => refetchClient('approvals', `/api/public/approvals/${workspaceId}`),
+    'client-action:update': () => refetchClient('clientActions', `/api/public/client-actions/${workspaceId}`),
     'request:created': () => refetchClient('requests', `/api/public/requests/${workspaceId}`),
     'request:update': () => refetchClient('requests', `/api/public/requests/${workspaceId}`),
     'content-request:created': () => refetchClient('content', `/api/public/content-requests/${workspaceId}`),
@@ -553,7 +555,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
         {/* ════════════ INBOX TAB (Approvals + Requests + Content) ════════════ */}
         {tab === 'inbox' && (
-          <InboxTab workspaceId={workspaceId} effectiveTier={effectiveTier} approvalBatches={approvalBatches} approvalsLoading={approvalsLoading} pendingApprovals={pendingApprovals} setApprovalBatches={setApprovalBatches} loadApprovals={loadApprovals} requests={requests} requestsLoading={requestsLoading} clientUser={clientUser} loadRequests={loadRequests} contentRequests={contentRequests} setContentRequests={setContentRequests} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} pricingConfirming={pricingConfirming} setToast={setToast} contentPlanReviewCells={contentPlanReviewCells} pageMap={approvalPageKeywords ?? strategyData?.pageMap} hasCopyEntries={hasCopyEntries} hidePrices={isExternalBilling} />
+          <InboxTab workspaceId={workspaceId} effectiveTier={effectiveTier} approvalBatches={approvalBatches} clientActions={clientActions} approvalsLoading={approvalsLoading} pendingApprovals={pendingApprovals} setApprovalBatches={setApprovalBatches} loadApprovals={loadApprovals} requests={requests} requestsLoading={requestsLoading} clientUser={clientUser} loadRequests={loadRequests} contentRequests={contentRequests} setContentRequests={setContentRequests} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} pricingConfirming={pricingConfirming} setToast={setToast} contentPlanReviewCells={contentPlanReviewCells} pageMap={approvalPageKeywords ?? strategyData?.pageMap} hasCopyEntries={hasCopyEntries} hidePrices={isExternalBilling} />
         )}
 
 

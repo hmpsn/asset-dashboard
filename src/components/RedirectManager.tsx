@@ -3,9 +3,11 @@ import {
   Loader2, ArrowRight, AlertTriangle, AlertCircle, CheckCircle,
   RefreshCw, ChevronDown, ChevronRight, ExternalLink, Search as SearchIcon,
   CornerDownRight, Ban, Link2, Download, Copy, Check, Sparkles, Edit3, X,
+  Send,
 } from 'lucide-react';
 import { PageHeader, StatCard, Icon, SectionCard, cn } from './ui';
 import { redirects } from '../api/misc';
+import { clientActions } from '../api/clientActions';
 import { themeColor } from './ui/constants';
 
 interface RedirectHop {
@@ -59,11 +61,12 @@ interface RedirectScanResult {
 
 interface Props {
   siteId: string;
+  workspaceId?: string;
 }
 
 type ViewFilter = 'all' | 'redirects' | 'chains' | '404s' | 'errors';
 
-export function RedirectManager({ siteId }: Props) {
+export function RedirectManager({ siteId, workspaceId }: Props) {
   const [data, setData] = useState<RedirectScanResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -75,6 +78,8 @@ export function RedirectManager({ siteId }: Props) {
   const [editDraft, setEditDraft] = useState('');
   const [copiedRules, setCopiedRules] = useState(false);
   const [snapshotDate, setSnapshotDate] = useState<string | null>(null);
+  const [sendingToClient, setSendingToClient] = useState(false);
+  const [sentToClient, setSentToClient] = useState(false);
 
   // Load saved redirect snapshot on mount
   useEffect(() => {
@@ -161,6 +166,32 @@ export function RedirectManager({ siteId }: Props) {
     navigator.clipboard.writeText(text);
     setCopiedRules(true);
     setTimeout(() => setCopiedRules(false), 2000);
+  };
+
+  const sendAcceptedRulesToClient = async () => {
+    if (!workspaceId || acceptedRules.length === 0) return;
+    setSendingToClient(true);
+    setError(null);
+    try {
+      await clientActions.create(workspaceId, {
+        sourceType: 'redirect_proposal',
+        sourceId: `redirects:${snapshotDate || data?.scannedAt || new Date().toISOString()}`,
+        title: `Redirect recommendations (${acceptedRules.length})`,
+        summary: `Review ${acceptedRules.length} redirect proposal${acceptedRules.length !== 1 ? 's' : ''}. These are manual or agency-executed for v1 and are not written directly to Webflow by the client.`,
+        priority: acceptedRules.length > 3 ? 'high' : 'medium',
+        payload: {
+          scannedAt: snapshotDate || data?.scannedAt,
+          rules: acceptedRules,
+          summary: data?.summary,
+        },
+      });
+      setSentToClient(true);
+    } catch (err) {
+      console.error('RedirectManager operation failed:', err);
+      setError('Failed to send redirect proposals to client');
+    } finally {
+      setSendingToClient(false);
+    }
   };
 
   const toggleChain = (idx: number) => {
@@ -328,6 +359,12 @@ export function RedirectManager({ siteId }: Props) {
             </div>
             {acceptedRules.length > 0 && (
               <div className="flex items-center gap-2">
+                {workspaceId && (
+                  <button onClick={sendAcceptedRulesToClient} disabled={sendingToClient || sentToClient} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-600/15 border border-teal-500/20 hover:bg-teal-600/25 text-teal-300 t-caption-sm font-medium transition-colors disabled:opacity-60">
+                    <Icon as={sentToClient ? Check : Send} size="sm" className={sentToClient ? 'text-emerald-400' : undefined} />
+                    {sendingToClient ? 'Sending...' : sentToClient ? 'Sent' : 'Send to Client'}
+                  </button>
+                )}
                 <button onClick={copyRulesToClipboard} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--brand-text)] t-caption-sm font-medium transition-colors">
                   {copiedRules ? <Icon as={Check} size="sm" className="text-emerald-400" /> : <Icon as={Copy} size="sm" />}
                   {copiedRules ? 'Copied!' : 'Copy All'}

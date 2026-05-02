@@ -159,6 +159,14 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.clientSignals(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
     },
+    [WS_EVENTS.CLIENT_ACTION_UPDATE]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.client.clientActions(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.clientActions(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligence(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+    },
     [WS_EVENTS.MEETING_BRIEF_GENERATED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.meetingBrief(workspaceId) });

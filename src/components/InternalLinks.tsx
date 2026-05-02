@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import {
   Loader2, ArrowRight, RefreshCw, ExternalLink, Search as SearchIcon,
   Link, AlertCircle, ChevronDown, ChevronRight, ArrowUpRight,
-  AlertTriangle, Copy, Check, LayoutList, List,
+  AlertTriangle, Copy, Check, LayoutList, List, Send,
 } from 'lucide-react';
 import { PageHeader, StatCard, Icon, Button } from './ui';
 import { webflow } from '../api/seo';
+import { clientActions } from '../api/clientActions';
 
 interface LinkSuggestion {
   fromPage: string;
@@ -59,6 +60,8 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
   const [viewMode, setViewMode] = useState<'list' | 'grouped'>('list');
   const [copied, setCopied] = useState<number | null>(null);
   const [showOrphans, setShowOrphans] = useState(false);
+  const [sendingToClient, setSendingToClient] = useState(false);
+  const [sentToClient, setSentToClient] = useState(false);
 
   const runAnalysis = async () => {
     setLoading(true);
@@ -115,6 +118,37 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
     low: data?.suggestions.filter(s => s.priority === 'low').length || 0,
   };
 
+  const sendSuggestionsToClient = async () => {
+    if (!workspaceId || !data || filtered.length === 0) return;
+    setSendingToClient(true);
+    setError(null);
+    try {
+      const high = filtered.filter(s => s.priority === 'high').length;
+      await clientActions.create(workspaceId, {
+        sourceType: 'internal_link',
+        sourceId: `internal-links:${data.analyzedAt}`,
+        title: `Internal link recommendations (${filtered.length})`,
+        summary: `Review ${filtered.length} internal link recommendation${filtered.length !== 1 ? 's' : ''}. ${high} high-priority link${high !== 1 ? 's' : ''} ${high === 1 ? 'needs' : 'need'} attention first.`,
+        priority: high > 0 ? 'high' : 'medium',
+        payload: {
+          analyzedAt: data.analyzedAt,
+          suggestions: filtered,
+          summary: {
+            pageCount: data.pageCount,
+            existingLinkCount: data.existingLinkCount,
+            orphanCount: data.orphanCount ?? 0,
+          },
+        },
+      });
+      setSentToClient(true);
+    } catch (err) {
+      console.error('InternalLinks operation failed:', err);
+      setError('Failed to send internal link recommendations to client');
+    } finally {
+      setSendingToClient(false);
+    }
+  };
+
   if (!data && !loading) {
     return (
       <div className="space-y-8">
@@ -158,9 +192,16 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
         title="Internal Linking Suggestions"
         subtitle={`Analyzed ${data.pageCount}${data.attemptedPageCount && data.attemptedPageCount !== data.pageCount ? `/${data.attemptedPageCount}` : ''} pages · ${data.existingLinkCount} existing internal links · ${data.suggestions.length} suggestions`}
         actions={
-          <Button variant="secondary" size="sm" icon={RefreshCw} onClick={runAnalysis} disabled={loading}>
-            Reanalyze
-          </Button>
+          <div className="flex items-center gap-2">
+            {workspaceId && data.suggestions.length > 0 && (
+              <Button variant="secondary" size="sm" icon={sentToClient ? Check : Send} onClick={sendSuggestionsToClient} disabled={sendingToClient || sentToClient}>
+                {sendingToClient ? 'Sending...' : sentToClient ? 'Sent' : 'Send to Client'}
+              </Button>
+            )}
+            <Button variant="secondary" size="sm" icon={RefreshCw} onClick={runAnalysis} disabled={loading}>
+              Reanalyze
+            </Button>
+          </div>
         }
       />
 
