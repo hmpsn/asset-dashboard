@@ -63,9 +63,9 @@ function getPageFolder(path: string): string {
 }
 
 function positionColor(pos: number): string {
-  if (pos <= 3) return 'text-accent-success';
+  if (pos <= 3) return 'text-accent-success font-semibold';
   if (pos <= 10) return 'text-accent-success';
-  if (pos <= 20) return 'text-accent-warning';
+  if (pos <= 20) return 'text-accent-warning font-semibold';
   if (pos <= 50) return 'text-accent-warning';
   return 'text-[var(--brand-text-muted)]';
 }
@@ -125,14 +125,14 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
 
   const filterTabs: { id: FilterTab; label: string; count: number }[] = [
     { id: 'all', label: 'All Pages', count: pageMap.length },
-    { id: 'ranking', label: 'Top 20', count: pageMap.filter(p => p.currentPosition && p.currentPosition <= 20).length },
-    { id: 'opportunities', label: 'Opportunities', count: pageMap.filter(p => !p.currentPosition && (p.impressions || 0) > 0).length },
+    { id: 'ranking', label: 'Ranking', count: pageMap.filter(p => p.currentPosition && p.currentPosition <= 20).length },
+    { id: 'opportunities', label: 'Needs Review', count: pageMap.filter(p => !p.currentPosition && (p.impressions || 0) > 0).length },
     { id: 'falling', label: 'Falling', count: pageMap.filter(p => p.currentPosition && p.previousPosition && p.currentPosition > p.previousPosition).length },
   ];
   const emptyMessage: Record<FilterTab, string> = {
     all: 'No mapped pages are available yet.',
-    ranking: 'No pages are currently ranking in the top 20.',
-    opportunities: 'No pages are getting impressions without rankings right now.',
+    ranking: 'No mapped pages are currently ranking in the top 20.',
+    opportunities: 'No pages need ranking review right now.',
     falling: 'No pages are losing ranking positions right now.',
   };
 
@@ -158,7 +158,7 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
             }`}
           >
             {tab.label}
-            <span className="ml-1.5 text-[var(--brand-text-dim)]">{tab.count}</span>
+            <span className="ml-1.5 text-[var(--brand-text-muted)]">{tab.count}</span>
           </button>
         ))}
       </div>
@@ -186,7 +186,7 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                 <div className="flex items-center gap-2">
                   <Icon as={Layers} size="md" className="text-[var(--brand-text-muted)]" />
                   <span className="t-caption-sm font-medium text-[var(--brand-text)]">{folder}</span>
-                  <span className="t-caption-sm text-[var(--brand-text-dim)]">{pages.length} pages</span>
+                  <span className="t-caption-sm text-[var(--brand-text-muted)]">{pages.length} pages</span>
                 </div>
                 <svg
                   className={`w-3.5 h-3.5 text-[var(--brand-text-muted)] transition-transform ${expandedFolders.has(folder) ? '' : '-rotate-90'}`}
@@ -272,7 +272,7 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                               </span>
                             )}
                             {kwCount > 0 && (
-                              <span className="t-caption-sm text-[var(--brand-text-dim)] flex items-center gap-0.5">
+                              <span className="t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-0.5">
                                 <Icon as={Search} size="sm" />
                                 {kwCount} keywords
                               </span>
@@ -326,7 +326,7 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                               <div className="t-caption-sm text-[var(--brand-text-muted)] py-2">
                                 {page.secondaryKeywords && page.secondaryKeywords.length > 0 ? (
                                   <div>
-                                    <div className="t-caption-sm text-[var(--brand-text)] mb-1.5">Target keywords (no GSC data yet):</div>
+                                    <div className="t-caption-sm text-[var(--brand-text)] mb-1.5">Priority keywords (no GSC data yet):</div>
                                     <div className="flex flex-wrap gap-1.5">
                                       <span className="t-caption-sm text-accent-brand bg-teal-500/10 border border-teal-500/20 px-2 py-0.5 rounded-[var(--radius-sm)]">{page.primaryKeyword}</span>
                                       {page.secondaryKeywords.map((kw, i) => (
@@ -434,10 +434,10 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
             Showing {Math.min(visibleCount, filteredPages.length)} of {filteredPages.length} pages
           </span>
           {visibleCount < filteredPages.length && (
-            <button
-              onClick={() => setVisibleCount(v => v + ITEMS_PER_PAGE)}
-              className="t-caption-sm text-accent-brand hover:text-accent-brand transition-colors font-medium"
-            >
+              <button
+                onClick={() => setVisibleCount(v => v + ITEMS_PER_PAGE)}
+                className="t-caption-sm text-accent-brand hover:text-[var(--brand-text-bright)] transition-colors font-medium"
+              >
               Show {Math.min(ITEMS_PER_PAGE, filteredPages.length - visibleCount)} more
             </button>
           )}
