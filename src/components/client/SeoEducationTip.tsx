@@ -25,9 +25,9 @@ const TAB_TIPS: Record<string, TabTip> = {
     learnMore: 'Technical SEO covers things like page speed, mobile-friendliness, proper HTML structure, and secure connections (HTTPS). These are the foundation that content SEO builds on.',
   },
   strategy: {
-    title: 'Keyword Strategy',
-    body: 'This shows which keywords your pages target and where the opportunities are. "Content gaps" are valuable keywords you\'re not yet targeting — these are your biggest growth opportunities.',
-    learnMore: 'Keywords are the words and phrases people type into Google. Mapping the right keywords to the right pages helps Google understand what each page is about.',
+    title: 'SEO Strategy',
+    body: 'Start with the recommended next steps, then use priority keywords to guide what we should watch, consider, or create around next.',
+    learnMore: 'Adding a priority keyword starts future rank tracking and helps shape later recommendations. Removing one stops future tracking, but historical ranking data is preserved.',
   },
   content: {
     title: 'Content That Ranks',
@@ -52,6 +52,7 @@ export function SeoEducationTip({ tab, workspaceId }: Props) {
   const [visible, setVisible] = useState(false);
   const [showLearnMore, setShowLearnMore] = useState(false);
 
+  // effect-layout-ok -- SEO tip intentionally appears after first paint to avoid competing with initial page load.
   useEffect(() => {
     if (!tip) return;
     const seen = localStorage.getItem(storageKey);
