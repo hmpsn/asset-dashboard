@@ -24,7 +24,7 @@ import { SchemaCompletenessWidget } from './schema/SchemaCompletenessWidget';
 import { KNOWN_TARGET_FIELDS } from './schema/fieldTargets';
 import { PendingApprovals } from './PendingApprovals';
 import { SchemaWorkflowGuide } from './schema/SchemaWorkflowGuide';
-import { SCHEMA_ROLE_INDEX } from '../../shared/types/schema-plan';
+import { SCHEMA_ROLE_INDEX, SCHEMA_ROLE_LABELS } from '../../shared/types/schema-plan';
 import type { ValidationFinding } from '../../shared/types/schema-validation';
 import type { SchemaGenerationDiagnostics } from '../../shared/types/schema-generation';
 import { adminPath } from '../routes.js';
@@ -578,21 +578,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
 
   const PAGE_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
     { value: 'auto', label: 'Auto-detect' },
-    { value: 'homepage', label: 'Homepage' },
-    { value: 'pillar', label: 'Pillar / Product Page' },
-    { value: 'service', label: 'Service Page' },
-    { value: 'audience', label: 'Audience / Use Case' },
-    { value: 'lead-gen', label: 'Lead-Gen / Conversion' },
-    { value: 'blog', label: 'Blog Post' },
-    { value: 'about', label: 'About / Team' },
-    { value: 'contact', label: 'Contact' },
-    { value: 'location', label: 'Location' },
-    { value: 'product', label: 'Product' },
-    { value: 'partnership', label: 'Partnership' },
-    { value: 'faq', label: 'FAQ' },
-    { value: 'case-study', label: 'Case Study' },
-    { value: 'comparison', label: 'Comparison' },
-    { value: 'generic', label: 'General Page' },
+    ...Object.entries(SCHEMA_ROLE_LABELS).map(([value, label]) => ({ value, label })),
   ];
 
   const filteredInitialPages = availablePages.filter(

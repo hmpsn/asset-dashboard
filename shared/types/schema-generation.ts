@@ -1,6 +1,12 @@
 import type { SchemaPageRole } from './schema-plan';
+import type {
+  SchemaCmsDeliveryStatus,
+  SchemaCollectionIdentity,
+  SchemaEvidenceSource,
+  SchemaFieldEvidence,
+} from './site-inventory';
 
-export type SchemaRoleSource = 'ui' | 'site-plan' | 'auto-detect';
+export type SchemaRoleSource = 'ui' | 'site-plan' | 'collection-map' | 'collection-inferred' | 'auto-detect';
 export type SchemaValidationStatus = 'valid' | 'warnings' | 'errors';
 
 export interface SkippedSchemaType {
@@ -20,8 +26,13 @@ export interface SchemaGenerationDiagnostics {
   plannedRole?: SchemaPageRole;
   effectiveRole?: SchemaPageRole;
   roleSource: SchemaRoleSource;
+  collection?: SchemaCollectionIdentity;
   emittedTypes: string[];
   skippedSchemaTypes: SkippedSchemaType[];
+  missingRequiredFields?: string[];
+  evidenceSources?: Partial<Record<string, SchemaEvidenceSource>>;
+  fieldEvidence?: SchemaFieldEvidence[];
   richResultsEligibility: SchemaRichResultEligibility[];
   validationStatus: SchemaValidationStatus;
+  cmsDeliveryStatus?: SchemaCmsDeliveryStatus;
 }

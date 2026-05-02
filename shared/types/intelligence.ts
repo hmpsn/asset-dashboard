@@ -7,6 +7,7 @@ import type { DiagnosticStatus } from './diagnostics.js';
 import type { KeywordStrategy, AudiencePersona, PageKeywordMap } from './workspace.js';
 import type { BriefingSummary } from './briefing.js';
 import type { PageElementCatalog } from './page-elements.js';
+import type { SiteInventorySlice } from './site-inventory.js';
 import type {
   TrackedAction,
   ActionOutcome,
@@ -28,7 +29,8 @@ export type IntelligenceSlice =
   | 'siteHealth'
   | 'clientSignals'
   | 'operational'
-  | 'pageElements';
+  | 'pageElements'
+  | 'siteInventory';
 
 // ── Options ─────────────────────────────────────────────────────────────
 
@@ -41,6 +43,12 @@ export interface IntelligenceOptions {
   learningsDomain?: 'content' | 'strategy' | 'technical' | 'all';
   /** Token budget hint for downstream prompt formatting */
   tokenBudget?: number;
+  /** Optional Webflow site id for siteInventory assembly. */
+  siteId?: string;
+  /** Optional resolved live base URL for siteInventory assembly. */
+  siteBaseUrl?: string;
+  /** Optional Webflow token for live CMS inventory assembly. */
+  webflowToken?: string;
   /**
    * Opt-in: fetch backlink profile from the configured SEO data provider.
    * OFF by default — the provider call adds network latency and costs credits.
@@ -63,6 +71,8 @@ export interface WorkspaceIntelligence {
   /** Per-page structural element catalog (videos, HowTo lists, citations, etc.).
    *  Populated when buildWorkspaceIntelligence is called with opts.pagePath. */
   pageElements?: PageElementSlice;
+  /** Site/page/CMS inventory for collection-aware schema generation. */
+  siteInventory?: SiteInventorySlice;
   contentPipeline?: ContentPipelineSlice;
   siteHealth?: SiteHealthSlice;
   clientSignals?: ClientSignalsSlice;

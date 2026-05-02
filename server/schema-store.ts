@@ -4,6 +4,7 @@
  */
 import type { SchemaPageSuggestion } from './schema-suggester.js';
 import type { SchemaSitePlan, CanonicalEntity, PageRoleAssignment } from '../shared/types/schema-plan.ts';
+import type { CmsSchemaFieldMapping } from '../shared/types/site-inventory.ts';
 import db from './db/index.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
@@ -411,6 +412,68 @@ export function savePageTypes(siteId: string, updates: Record<string, string>): 
     }
   });
   runMany();
+}
+
+// ── CMS collection schema field mappings ──
+
+interface CmsFieldMappingRow {
+  site_id: string;
+  collection_id: string;
+  collection_name: string;
+  collection_slug: string;
+  schema_field_slug: string | null;
+  collection_role: string | null;
+  updated_at: string;
+}
+
+const cmsFieldMappingStmts = createStmtCache(() => ({
+  upsert: db.prepare(`
+    INSERT OR REPLACE INTO schema_cms_field_mappings
+      (site_id, collection_id, collection_name, collection_slug, schema_field_slug, collection_role, updated_at)
+    VALUES (@site_id, @collection_id, @collection_name, @collection_slug, @schema_field_slug, @collection_role, @updated_at)
+  `),
+  getBySite: db.prepare<[siteId: string]>(
+    `SELECT * FROM schema_cms_field_mappings WHERE site_id = ? ORDER BY collection_name ASC`,
+  ),
+  getByCollection: db.prepare<[siteId: string, collectionId: string]>(
+    `SELECT * FROM schema_cms_field_mappings WHERE site_id = ? AND collection_id = ?`,
+  ),
+}));
+
+function rowToCmsFieldMapping(row: CmsFieldMappingRow): CmsSchemaFieldMapping {
+  return {
+    siteId: row.site_id,
+    collectionId: row.collection_id,
+    collectionName: row.collection_name,
+    collectionSlug: row.collection_slug,
+    schemaFieldSlug: row.schema_field_slug || undefined,
+    collectionRole: (row.collection_role || undefined) as CmsSchemaFieldMapping['collectionRole'],
+    updatedAt: row.updated_at,
+  };
+}
+
+export function getSchemaCmsFieldMappings(siteId: string): CmsSchemaFieldMapping[] {
+  const rows = cmsFieldMappingStmts().getBySite.all(siteId) as CmsFieldMappingRow[];
+  return rows.map(rowToCmsFieldMapping);
+}
+
+export function getSchemaCmsFieldMapping(siteId: string, collectionId: string): CmsSchemaFieldMapping | null {
+  const row = cmsFieldMappingStmts().getByCollection.get(siteId, collectionId) as CmsFieldMappingRow | undefined;
+  return row ? rowToCmsFieldMapping(row) : null;
+}
+
+export function saveSchemaCmsFieldMapping(mapping: Omit<CmsSchemaFieldMapping, 'updatedAt'> & { updatedAt?: string }): CmsSchemaFieldMapping {
+  const updatedAt = mapping.updatedAt || new Date().toISOString();
+  cmsFieldMappingStmts().upsert.run({
+    site_id: mapping.siteId,
+    collection_id: mapping.collectionId,
+    collection_name: mapping.collectionName,
+    collection_slug: mapping.collectionSlug,
+    schema_field_slug: mapping.schemaFieldSlug || null,
+    collection_role: mapping.collectionRole || null,
+    updated_at: updatedAt,
+  });
+  return { ...mapping, updatedAt };
 }
 
 // ── Schema Publish History (version tracking) ──

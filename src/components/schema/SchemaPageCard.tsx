@@ -368,7 +368,15 @@ export function SchemaPageCard({
               </div>
               <div className="flex flex-wrap gap-1.5 mb-1.5">
                 <span className="px-2 py-1 rounded-[var(--radius-md)] t-caption-sm bg-[var(--surface-3)] text-[var(--brand-text-muted)] border border-[var(--brand-border)]">
-                  {diagnostics.roleSource === 'auto-detect' ? 'Auto-detected' : diagnostics.roleSource === 'site-plan' ? 'Site plan' : 'UI override'}
+                  {diagnostics.roleSource === 'auto-detect'
+                    ? 'Auto-detected'
+                    : diagnostics.roleSource === 'site-plan'
+                      ? 'Site plan'
+                      : diagnostics.roleSource === 'collection-map'
+                        ? 'Collection map'
+                        : diagnostics.roleSource === 'collection-inferred'
+                          ? 'Collection inferred'
+                          : 'UI override'}
                   {diagnostics.effectiveRole ? `: ${diagnostics.effectiveRole}` : ''}
                 </span>
                 <span className={cn(
@@ -382,6 +390,31 @@ export function SchemaPageCard({
                   {diagnostics.validationStatus}
                 </span>
               </div>
+              {diagnostics.collection && (
+                <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1">
+                  Collection: <span className="text-[var(--brand-text)]">{diagnostics.collection.collectionName}</span>
+                  {diagnostics.collection.itemPath ? ` · ${diagnostics.collection.itemPath}` : ''}
+                </div>
+              )}
+              {diagnostics.cmsDeliveryStatus && diagnostics.cmsDeliveryStatus.mode === 'cms-field' && (
+                <div className={cn(
+                  't-caption-sm mb-1',
+                  diagnostics.cmsDeliveryStatus.status === 'blocked' || diagnostics.cmsDeliveryStatus.status === 'failed'
+                    ? 'text-amber-400/80'
+                    : 'text-emerald-400/80',
+                )}>
+                  {diagnostics.cmsDeliveryStatus.message}
+                </div>
+              )}
+              {diagnostics.fieldEvidence && diagnostics.fieldEvidence.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-1.5">
+                  {diagnostics.fieldEvidence.slice(0, 6).map((e, i) => (
+                    <span key={`${e.field}-${i}`} className="px-2 py-1 rounded-[var(--radius-md)] t-caption-sm bg-blue-500/8 text-blue-300 border border-blue-500/20">
+                      {e.field}: {e.source}
+                    </span>
+                  ))}
+                </div>
+              )}
               {diagnostics.skippedSchemaTypes.length > 0 && (
                 <div className="space-y-1">
                   {diagnostics.skippedSchemaTypes.map((skip, i) => (

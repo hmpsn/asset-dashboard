@@ -140,7 +140,6 @@ export function buildProductSchema(input: ServiceInput): Record<string, unknown>
           'priceCurrency': offer.priceCurrency,
           'description': offer.description,
           'url': pageData.canonicalUrl,
-          'availability': 'https://schema.org/InStock',
         }))
       : undefined,
     'isPartOf': webSiteRef(baseUrl),
