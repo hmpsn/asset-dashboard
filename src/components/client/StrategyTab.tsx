@@ -69,7 +69,7 @@ export interface KeywordFeedback {
 
 export function StrategyTab({ strategyData, requestedTopics, contentRequests, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal, contentPlanKeywords, onTabChange, workspaceId, setToast, onContentRequested, hidePrices }: StrategyTabProps) {
   const betaMode = useBetaMode();
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['optimize-existing', 'new-content', 'page-keyword-map']));
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['new-content', 'optimize-existing']));
 
   // ── Keyword Feedback State ──
   const [keywordFeedback, setKeywordFeedback] = useState<Map<string, 'approved' | 'declined' | 'requested'>>(new Map());
@@ -161,16 +161,17 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const [newPriorityCategory, setNewPriorityCategory] = useState('growth');
   const [savingPriorities, setSavingPriorities] = useState(false);
 
-  // ── Tracked Keywords State ──
+  // ── Priority keyword state backed by tracked-keyword APIs ──
   const [trackedKeywords, setTrackedKeywords] = useState<{ query: string; pinned: boolean; addedAt: string }[]>([]);
   const [newTrackedKeyword, setNewTrackedKeyword] = useState('');
   const [addingKeyword, setAddingKeyword] = useState(false);
   const [removingKeyword, setRemovingKeyword] = useState<string | null>(null);
   const [confirmRemoveKeyword, setConfirmRemoveKeyword] = useState<string | null>(null);
+  const [showAllPriorityKeywords, setShowAllPriorityKeywords] = useState(false);
   const [trackedKeywordsError, setTrackedKeywordsError] = useState(false);
   const [discussingGrowthPage, setDiscussingGrowthPage] = useState<string | null>(null);
 
-  // Load business priorities + tracked keywords on mount
+  // Load business priorities + priority keyword data on mount
   const loadTrackedKeywords = useCallback(() => {
     if (!workspaceId) return;
     setTrackedKeywordsError(false);
@@ -254,21 +255,37 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const coverageScore = Math.round((pagesRanking / Math.max(1, totalPages)) * 30);
   const healthScore = contentScore + quickWinScore + coverageScore;
 
-  const sectionCount = [
-    contentGapsFound > 0,
-    quickWinsAvailable > 0,
-    pagesWithGrowthOpps > 0,
-    keywordGapCount > 0,
-    strategyData.opportunities.length > 0
-  ].filter(Boolean).length;
+  const totalPageImprovements = quickWinsAvailable + pagesWithGrowthOpps;
+  const priorityKeywordMap = new Map<string, { label: string; source: 'strategy' | 'client' | 'requested' }>();
+  strategyData.siteKeywords.forEach(kw => {
+    const normalized = normalizeKeyword(kw);
+    if (normalized) priorityKeywordMap.set(normalized, { label: kw, source: 'strategy' });
+  });
+  trackedKeywords.forEach(tk => {
+    const normalized = normalizeKeyword(tk.query);
+    if (normalized && !priorityKeywordMap.has(normalized)) {
+      priorityKeywordMap.set(normalized, { label: tk.query, source: 'client' });
+    }
+  });
+  requestedKeywords.forEach(kw => {
+    const normalized = normalizeKeyword(kw);
+    if (normalized && !priorityKeywordMap.has(normalized)) {
+      priorityKeywordMap.set(normalized, { label: kw, source: 'requested' });
+    }
+  });
+  const priorityKeywords = [...priorityKeywordMap.values()];
+  const visiblePriorityKeywords = showAllPriorityKeywords ? priorityKeywords : priorityKeywords.slice(0, 18);
+  const hiddenPriorityKeywordCount = Math.max(0, priorityKeywords.length - visiblePriorityKeywords.length);
 
   return (
     <div className="space-y-8">
-      {/* Header + Strategy Health Score */}
+      {/* Header + Strategy Snapshot */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="t-h2 text-[var(--brand-text)]">SEO Keyword Strategy</h2>
-          <p className="t-body text-[var(--brand-text-muted)] mt-1">Generated {new Date(strategyData.generatedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+          <h2 className="t-h2 text-[var(--brand-text)]">SEO Strategy</h2>
+          <p className="t-body text-[var(--brand-text-muted)] mt-1">
+            A focused view of what to create, what to improve, and where your priority keywords fit.
+          </p>
         </div>
       </div>
 
@@ -282,35 +299,47 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         </div>
       )}
 
-      {/* Strategy Health Score Card */}
+      {/* Strategy Snapshot */}
       {/* pr-check-disable-next-line -- Brand signature radius intentional */}
       <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-        <div className="flex items-center gap-4">
-          <div className={`t-stat-lg ${healthScore >= 80 ? 'text-accent-success' : healthScore >= 60 ? 'text-accent-warning' : 'text-accent-brand'}`}>
-            {healthScore}/100
-          </div>
-          <div className="flex-1">
-            <div className="t-body font-medium text-[var(--brand-text)]">
-              {healthScore >= 80 ? 'Strong action plan' : healthScore >= 60 ? 'Good opportunity mix' : 'Building your strategy'}
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-4">
+            <div className={`t-stat-lg ${healthScore >= 80 ? 'text-accent-success' : healthScore >= 60 ? 'text-accent-warning' : 'text-accent-brand'}`}>
+              {healthScore}<span className="t-caption-sm text-[var(--brand-text-muted)]">/100</span>
             </div>
-            <div className="t-caption text-[var(--brand-text-muted)] mt-0.5">
-              {contentGapsFound > 0 && <span className="text-accent-brand">{contentGapsFound} content opportunities</span>}
-              {contentGapsFound > 0 && quickWinsAvailable > 0 && <span className="text-[var(--brand-text-faint)]"> • </span>}
-              {quickWinsAvailable > 0 && <span className="text-accent-warning">{quickWinsAvailable} quick wins</span>}
-              {(contentGapsFound > 0 || quickWinsAvailable > 0) && pagesWithGrowthOpps > 0 && <span className="text-[var(--brand-text-faint)]"> • </span>}
-              {pagesWithGrowthOpps > 0 && <span className="text-accent-info">{pagesWithGrowthOpps} pages near ranking</span>}
+            <div>
+              <div className="t-caption-sm font-medium uppercase tracking-wider text-[var(--brand-text-muted)]">Strategy Snapshot</div>
+              <div className="t-body font-medium text-[var(--brand-text)]">
+                {healthScore >= 80 ? 'Strong action plan' : healthScore >= 60 ? 'Good opportunity mix' : 'Building your strategy'}
+              </div>
+              <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
+                Generated {new Date(strategyData.generatedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+              </p>
             </div>
           </div>
-          <div className="text-right t-caption text-[var(--brand-text-muted)]">
-            <div>{pagesRanking}/{totalPages} pages ranking</div>
-            <div>{sectionCount} active sections</div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:w-[560px]">
+            <div className="rounded-[var(--radius-lg)] bg-[var(--surface-3)]/45 border border-[var(--brand-border)]/60 px-3 py-2">
+              <div className="t-caption-sm text-[var(--brand-text-muted)]">Create content</div>
+              <div className="t-body font-semibold text-[var(--brand-text-bright)]">{contentGapsFound}</div>
+            </div>
+            <div className="rounded-[var(--radius-lg)] bg-[var(--surface-3)]/45 border border-[var(--brand-border)]/60 px-3 py-2">
+              <div className="t-caption-sm text-[var(--brand-text-muted)]">Improve pages</div>
+              <div className="t-body font-semibold text-[var(--brand-text-bright)]">{totalPageImprovements}</div>
+            </div>
+            <div className="rounded-[var(--radius-lg)] bg-[var(--surface-3)]/45 border border-[var(--brand-border)]/60 px-3 py-2">
+              <div className="t-caption-sm text-[var(--brand-text-muted)]">Ranking coverage</div>
+              <div className="t-body font-semibold text-[var(--brand-text-bright)]">{pagesRanking}/{totalPages}</div>
+            </div>
+            <div className="rounded-[var(--radius-lg)] bg-[var(--surface-3)]/45 border border-[var(--brand-border)]/60 px-3 py-2">
+              <div className="t-caption-sm text-[var(--brand-text-muted)]">Priority keywords</div>
+              <div className="t-body font-semibold text-[var(--brand-text-bright)]">{priorityKeywords.length}</div>
+            </div>
           </div>
         </div>
-        {/* Progress bars */}
-        <div className="grid grid-cols-3 gap-3 mt-3 pt-3 border-t border-[var(--brand-border)]/50">
+        <div className="grid grid-cols-1 gap-3 mt-4 pt-4 border-t border-[var(--brand-border)]/50 md:grid-cols-3">
           <div>
             <div className="flex items-center justify-between t-caption-sm text-[var(--brand-text-muted)] mb-1">
-              <span>New Content</span>
+              <span>Content readiness</span>
               <span>{contentScore}/40</span>
             </div>
             <div className="h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
@@ -319,7 +348,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           </div>
           <div>
             <div className="flex items-center justify-between t-caption-sm text-[var(--brand-text-muted)] mb-1">
-              <span>Existing Pages</span>
+              <span>Page improvements</span>
               <span>{quickWinScore}/30</span>
             </div>
             <div className="h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
@@ -328,7 +357,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           </div>
           <div>
             <div className="flex items-center justify-between t-caption-sm text-[var(--brand-text-muted)] mb-1">
-              <span>Coverage</span>
+              <span>Ranking coverage</span>
               <span>{coverageScore}/30</span>
             </div>
             <div className="h-1.5 bg-[var(--surface-3)] rounded-[var(--radius-pill)] overflow-hidden">
@@ -337,63 +366,63 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           </div>
         </div>
         <p className="t-caption-sm text-[var(--brand-text-muted)] mt-3">
-          This score reflects how much actionable SEO strategy is ready to work through. Ranking coverage is the site-health signal.
+          This is a planning-readiness score, not a grade. It shows how much clear SEO work is ready to review or move into production.
         </p>
       </div>
 
-      {/* ── TOP SUMMARY BAR (3 consolidated sections) ── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {/* Optimize Existing Pages */}
+      {/* ── RECOMMENDED NEXT STEPS ── */}
+      <div className="space-y-3">
+        <div>
+          <h3 className="t-h3 text-[var(--brand-text)]">Recommended Next Steps</h3>
+          <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">Start here. These are the clearest places to review, request, or give direction.</p>
+        </div>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 flex flex-col gap-3" style={{ borderRadius: 'var(--radius-signature)' }}>
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-[var(--radius-lg)] bg-teal-500/20 flex items-center justify-center flex-shrink-0">
+                <Icon as={FileText} size="lg" className="text-accent-brand" />
+              </div>
+              <div className="min-w-0">
+                <div className="t-body font-medium text-[var(--brand-text)]">Review new content ideas</div>
+                <div className="t-caption-sm text-[var(--brand-text-muted)]">{contentGapsFound} strongest content recommendations</div>
+              </div>
+            </div>
+            <Button variant="secondary" size="sm" onClick={() => scrollToSection('new-content', newContentRef)} className="self-start">
+              Review Ideas
+            </Button>
+          </div>
+
         {(quickWinsAvailable > 0 || pagesWithGrowthOpps > 0) && (
-          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 flex items-center gap-3" style={{ borderRadius: 'var(--radius-signature)' }}>
-            <div className="w-10 h-10 rounded-[var(--radius-lg)] bg-amber-500/20 flex items-center justify-center flex-shrink-0">
-              <Icon as={Zap} size="lg" className="text-accent-warning" />
+          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 flex flex-col gap-3" style={{ borderRadius: 'var(--radius-signature)' }}>
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-[var(--radius-lg)] bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                <Icon as={Zap} size="lg" className="text-accent-warning" />
+              </div>
+              <div className="min-w-0">
+                <div className="t-body font-medium text-[var(--brand-text)]">Improve existing pages</div>
+                <div className="t-caption-sm text-[var(--brand-text-muted)]">{totalPageImprovements} page improvements to work through</div>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="t-body font-medium text-[var(--brand-text)]">Optimize Existing Pages</div>
-              <div className="t-caption-sm text-[var(--brand-text-muted)]">{quickWinsAvailable + pagesWithGrowthOpps} improvements found</div>
-            </div>
-            <button
-              onClick={() => scrollToSection('optimize-existing', optimizeExistingRef)}
-              className="px-3 py-1.5 rounded-[var(--radius-lg)] bg-amber-600/20 border border-amber-500/30 t-caption-sm text-accent-warning font-medium hover:bg-amber-600/30 transition-colors flex-shrink-0"
-            >
-              View
-            </button>
+            <Button variant="secondary" size="sm" onClick={() => scrollToSection('optimize-existing', optimizeExistingRef)} className="self-start">
+              Review Pages
+            </Button>
           </div>
         )}
 
-        {/* New Content to Create */}
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 flex items-center gap-3" style={{ borderRadius: 'var(--radius-signature)' }}>
-          <div className="w-10 h-10 rounded-[var(--radius-lg)] bg-teal-500/20 flex items-center justify-center flex-shrink-0">
-            <Icon as={FileText} size="lg" className="text-accent-brand" />
+          <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 flex flex-col gap-3" style={{ borderRadius: 'var(--radius-signature)' }}>
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-[var(--radius-lg)] bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                <Icon as={Target} size="lg" className="text-accent-info" />
+              </div>
+              <div className="min-w-0">
+                <div className="t-body font-medium text-[var(--brand-text)]">Guide priority keywords</div>
+                <div className="t-caption-sm text-[var(--brand-text-muted)]">{priorityKeywords.length} keywords shaping the strategy</div>
+              </div>
+            </div>
+            <Button variant="secondary" size="sm" onClick={() => scrollToSection('page-keyword-map', keywordMapRef)} className="self-start">
+              View Keywords
+            </Button>
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="t-body font-medium text-[var(--brand-text)]">New Content to Create</div>
-            <div className="t-caption-sm text-[var(--brand-text-muted)]">{newContentTopicCount} topics identified</div>
-          </div>
-          <button
-            onClick={() => scrollToSection('new-content', newContentRef)}
-            className="px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-accent-brand font-medium hover:bg-teal-600/30 transition-colors flex-shrink-0"
-          >
-            Explore
-          </button>
-        </div>
-
-        {/* Your Keyword Map */}
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4 flex items-center gap-3" style={{ borderRadius: 'var(--radius-signature)' }}>
-          <div className="w-10 h-10 rounded-[var(--radius-lg)] bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-            <Icon as={Layers} size="lg" className="text-accent-info" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="t-body font-medium text-[var(--brand-text)]">Your Keyword Map</div>
-            <div className="t-caption-sm text-[var(--brand-text-muted)]">{totalPages} pages mapped</div>
-          </div>
-          <button
-            onClick={() => scrollToSection('page-keyword-map', keywordMapRef)}
-            className="px-3 py-1.5 rounded-[var(--radius-lg)] bg-blue-600/20 border border-blue-500/30 t-caption-sm text-accent-info font-medium hover:bg-blue-600/30 transition-colors flex-shrink-0"
-          >
-            View
-          </button>
         </div>
       </div>
 
@@ -408,14 +437,14 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           )}
           {trackedKeywordsError && (
             <p className="t-caption-sm text-accent-danger">
-              Couldn't load your tracked keywords.{' '}
+              Couldn't load your priority keywords.{' '}
               <button onClick={loadTrackedKeywords} className="underline hover:text-accent-danger">Retry</button>
             </p>
           )}
         </div>
       )}
 
-      {/* ── BUSINESS PRIORITIES (client driver's seat) ── */}
+      {/* ── GUIDE THIS STRATEGY (client driver's seat) ── */}
       {workspaceId && prioritiesLoaded && ( // pr-check-disable-next-line -- Brand signature radius intentional
         <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
           <button
@@ -427,11 +456,11 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 <Icon as={Briefcase} size="md" className="text-accent-brand" />
               </div>
               <div className="text-left">
-                <div className="t-body font-medium text-[var(--brand-text)]">Your Business Priorities</div>
+                <div className="t-body font-medium text-[var(--brand-text)]">Guide This Strategy</div>
                 <div className="t-caption-sm text-[var(--brand-text-muted)]">
                   {priorities.length > 0
-                    ? `${priorities.length} priorities shaping your strategy`
-                    : 'Tell us what matters most to your business'}
+                    ? `${priorities.length} priorities and ${requestedKeywords.length} keyword ideas saved`
+                    : 'Tell us what matters most'}
                 </div>
               </div>
             </div>
@@ -441,7 +470,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           {expandedSections.has('business-priorities') && (
             <div className="px-4 pb-4 border-t border-[var(--brand-border)]/50">
               <p className="t-caption-sm text-[var(--brand-text-muted)] mt-3 mb-3 leading-relaxed">
-                Share your business goals and priorities. These will be factored into your next strategy generation so recommendations align with what matters most to you.
+                Share goals and priority keyword ideas in one place. These inputs shape future strategy recommendations, but they do not publish anything or regenerate the strategy immediately.
               </p>
 
               {/* Existing priorities */}
@@ -464,7 +493,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                           savePriorities(next);
                         }}
                         disabled={savingPriorities}
-                        className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-faint)] hover:text-accent-danger transition-all disabled:opacity-50"
+                        className="opacity-0 group-hover:opacity-100 text-[var(--brand-text-muted)] hover:text-accent-danger transition-all disabled:opacity-50"
                       >
                         <Icon as={X} size="md" />
                       </button>
@@ -497,7 +526,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                     }
                   }}
                   placeholder="e.g., We're launching a new product line in Q3..."
-                  className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] px-3 py-1.5 t-caption-sm text-[var(--brand-text)] placeholder:text-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500"
+                  className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] px-3 py-1.5 t-caption-sm text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500"
                 />
                 <button
                   onClick={() => {
@@ -513,81 +542,64 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 </button>
               </div>
               {priorities.length >= 10 && (
-                <p className="t-caption-sm text-[var(--brand-text-faint)] mt-1.5">Maximum 10 priorities reached</p>
+                <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1.5">Maximum 10 priorities reached</p>
               )}
-            </div>
-          )}
-        </div>
-      )}
 
-      {/* ── SUGGEST A KEYWORD ── */}
-      {workspaceId && ( // pr-check-disable-next-line -- Brand signature radius intentional
-        <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-          <button
-            onClick={() => toggleSection('suggest-keyword')}
-            className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50 transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-[var(--radius-lg)] bg-teal-500/20 flex items-center justify-center">
-                <Icon as={Plus} size="md" className="text-accent-brand" />
-              </div>
-              <div className="text-left">
-                <div className="t-body font-medium text-[var(--brand-text)]">Suggest a Keyword</div>
-                <div className="t-caption-sm text-[var(--brand-text-muted)]">
-                  {requestedKeywords.length > 0
-                    ? `${requestedKeywords.length} keyword${requestedKeywords.length > 1 ? 's' : ''} submitted`
-                    : 'Ask us to consider a keyword'}
+              <div className="mt-4 pt-4 border-t border-[var(--brand-border)]/50">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-6 h-6 rounded-[var(--radius-lg)] bg-blue-500/20 flex items-center justify-center">
+                    <Icon as={Target} size="md" className="text-accent-info" />
+                  </div>
+                  <div>
+                    <div className="t-body font-medium text-[var(--brand-text)]">Add a Priority Keyword</div>
+                    <div className="t-caption-sm text-[var(--brand-text-muted)]">Ask us to consider a keyword in a future strategy.</div>
+                  </div>
                 </div>
-              </div>
-            </div>
-            <ChevronDown className={`w-4 h-4 text-[var(--brand-text-muted)] transition-transform ${expandedSections.has('suggest-keyword') ? '' : '-rotate-90'}`} />
-          </button>
-
-          {expandedSections.has('suggest-keyword') && (
-            <div className="px-4 pb-4 border-t border-[var(--brand-border)]/50">
-              <p className="t-caption-sm text-[var(--brand-text-muted)] mt-3 mb-3 leading-relaxed">
-                Have a keyword idea? Submit it here and we will review it for your next strategy. This does not start rank tracking by itself.
-              </p>
-              <div className="flex items-center gap-2">
-                <input
-                  value={suggestKeyword}
-                  onChange={e => setSuggestKeyword(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      submitKeywordRequest();
-                    }
-                  }}
-                  placeholder="e.g., best project management tools"
-                  className="flex-1 px-3 py-2 t-caption bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] text-[var(--brand-text)] placeholder:text-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500/50"
-                />
-                <Button
-                  onClick={submitKeywordRequest}
-                  disabled={!suggestKeyword.trim() || suggestingKeyword}
-                  loading={suggestingKeyword}
-                >
-                  {suggestingKeyword ? 'Submitting...' : 'Submit'}
-                </Button>
-              </div>
-              {requestedKeywords.length > 0 && (
-                <div className="mt-3 space-y-1">
-                  <div className="t-caption-sm text-[var(--brand-text-faint)] tracking-wider font-medium">Your Suggestions</div>
-                  {requestedKeywords.map(kw => (
-                    <div key={kw} className="flex items-center justify-between px-2.5 py-1.5 bg-[var(--surface-3)]/40 rounded-[var(--radius-lg)] border border-[var(--brand-border)]">
-                      <span className="t-caption-sm text-[var(--brand-text)]">{kw}</span>
-                      <span className="t-caption-sm text-accent-brand font-medium">Pending</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    value={suggestKeyword}
+                    onChange={e => setSuggestKeyword(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        submitKeywordRequest();
+                      }
+                    }}
+                    placeholder="e.g., webflow agency austin"
+                    className="flex-1 px-3 py-2 t-caption bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500/50"
+                  />
+                  <Button
+                    onClick={submitKeywordRequest}
+                    disabled={!suggestKeyword.trim() || suggestingKeyword}
+                    loading={suggestingKeyword}
+                  >
+                    {suggestingKeyword ? 'Submitting...' : 'Submit'}
+                  </Button>
+                </div>
+                {requestedKeywords.length > 0 && (
+                  <div className="mt-3">
+                    <div className="t-caption-sm text-[var(--brand-text-muted)] mb-1.5">Submitted keyword ideas</div>
+                    <div className="flex flex-wrap gap-2">
+                      {requestedKeywords.slice(0, 8).map(kw => (
+                        <span key={kw} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-lg)] bg-blue-500/10 border border-blue-500/20 t-caption-sm text-accent-info">
+                          {kw}
+                        </span>
+                      ))}
+                      {requestedKeywords.length > 8 && (
+                        <span className="t-caption-sm text-[var(--brand-text-muted)] px-2 py-1">+{requestedKeywords.length - 8} more</span>
+                      )}
                     </div>
-                  ))}
-                </div>
-              )}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
       )}
 
-      {/* ── NEW CONTENT TO CREATE (Content Gaps + Keyword Opps + Competitor Gaps) ── */}
+      {/* ── CREATE CONTENT (Strong recommendations + keyword ideas) ── */}
       <div ref={newContentRef}>
-        <TierGate tier={effectiveTier} required="growth" feature="New Content to Create" teaser={`${newContentTopicCount} content topics identified - upgrade to unlock recommendations`}>
+        <TierGate tier={effectiveTier} required="growth" feature="Create Content" teaser={`${newContentTopicCount} content ideas identified - upgrade to unlock recommendations`}>
         {/* pr-check-disable-next-line -- Brand signature radius intentional */}
         <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
           <button
@@ -599,8 +611,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 <Icon as={FileText} size="md" className="text-accent-brand" />
               </div>
               <div className="text-left">
-                <div className="t-body font-medium text-[var(--brand-text)]">New Content to Create</div>
-                <div className="t-caption-sm text-[var(--brand-text-muted)]">{newContentTopicCount} new topics identified</div>
+                <div className="t-body font-medium text-[var(--brand-text)]">Create Content</div>
+                <div className="t-caption-sm text-[var(--brand-text-muted)]">{contentGapsFound} strong ideas · {keywordGapCount} review candidates</div>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -612,16 +624,16 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           {expandedSections.has('new-content') && (
             <div className="px-4 pb-4 border-t border-[var(--brand-border)]/50">
               <p className="t-caption-sm text-[var(--brand-text-muted)] mt-3 mb-3 leading-relaxed">
-                New page ideas and competitor search terms to review before your next content plan. Extra page keyword ideas are listed separately below.
+                Clear new-page recommendations come first. Noisier keyword ideas are separated below so they can be reviewed without feeling like automatic recommendations.
               </p>
 
-              {/* Content Gaps sub-section */}
+              {/* Strong Recommendations sub-section */}
               {strategyData.contentGaps && strategyData.contentGaps.length > 0 && (
               <>
               <div className="flex items-center gap-2 mb-2">
                 <Icon as={FileText} size="md" className="text-accent-brand" />
-                <span className="t-caption font-medium text-[var(--brand-text)]">Content Gaps</span>
-                <span className="t-caption-sm text-[var(--brand-text-faint)]">({strategyData.contentGaps.length})</span>
+                <span className="t-caption font-medium text-[var(--brand-text)]">Strong Recommendations</span>
+                <span className="t-caption-sm text-[var(--brand-text-muted)]">({strategyData.contentGaps.length})</span>
               </div>
               <div className="space-y-2">
                 {[...strategyData.contentGaps]
@@ -652,7 +664,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                           )}
                         </div>
                       </div>
-                      {/* Row 2: target keyword + metrics */}
+                      {/* Row 2: priority keyword + metrics */}
                       <div className="flex items-center gap-3 flex-wrap mb-1.5">
                         <span className="t-caption-sm text-accent-brand">&ldquo;{gap.targetKeyword}&rdquo;</span>
                         {gap.volume != null && gap.volume > 0 && (
@@ -822,16 +834,16 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               </>
               )}
 
-              {/* Competitor Keyword Gaps sub-section */}
+              {/* Review Keyword Ideas sub-section */}
               {strategyData.keywordGaps && strategyData.keywordGaps.length > 0 && (
                 <div className="mt-4">
                   <div className="flex items-center gap-2 mb-2">
                     <Icon as={Target} size="md" className="text-accent-orange" />
-                    <span className="t-caption font-medium text-[var(--brand-text)]">Competitor Keyword Gaps</span>
-                    <span className="t-caption-sm text-[var(--brand-text-faint)]">({strategyData.keywordGaps.length})</span>
+                    <span className="t-caption font-medium text-[var(--brand-text)]">Review Keyword Ideas</span>
+                    <span className="t-caption-sm text-[var(--brand-text-muted)]">({strategyData.keywordGaps.length})</span>
                   </div>
                   <p className="t-caption-sm text-[var(--brand-text-muted)] mb-2">
-                    Search terms seen in competitor or market data. Treat these as review candidates, not automatic recommendations.
+                    Search terms seen in competitor or market data. These are review candidates, not automatic recommendations.
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {strategyData.keywordGaps.slice(0, expandedSections.has('competitor-gaps-all') ? undefined : 6).map((gap, i) => (
@@ -859,13 +871,13 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 </div>
               )}
 
-              {/* Keyword Opportunities sub-section */}
+              {/* Additional Page Ideas sub-section */}
               {strategyData.opportunities.length > 0 && (
                 <div className="mt-4">
                   <div className="flex items-center gap-2 mb-2">
                     <Icon as={Sparkles} size="md" className="text-accent-brand" />
-                    <span className="t-caption font-medium text-[var(--brand-text)]">Keyword Opportunities</span>
-                    <span className="t-caption-sm text-[var(--brand-text-faint)]">({strategyData.opportunities.length})</span>
+                    <span className="t-caption font-medium text-[var(--brand-text)]">Additional Page Ideas</span>
+                    <span className="t-caption-sm text-[var(--brand-text-muted)]">({strategyData.opportunities.length})</span>
                   </div>
                   <p className="t-caption-sm text-[var(--brand-text-muted)] mb-2">Additional keywords your existing pages could target.</p>
                   <div className="flex flex-wrap gap-1.5">
@@ -884,7 +896,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         </TierGate>
       </div>
 
-      {/* ── OPTIMIZE EXISTING PAGES (Quick Wins + Growth Opportunities merged) ── */}
+      {/* ── IMPROVE PAGES (Quick Wins + Growth Opportunities merged) ── */}
       {(quickWinsAvailable > 0 || pagesWithGrowthOpps > 0) && (
       <div ref={optimizeExistingRef}>
         {/* pr-check-disable-next-line -- Brand signature radius intentional */}
@@ -898,7 +910,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 <Icon as={Zap} size="md" className="text-accent-warning" />
               </div>
               <div className="text-left">
-                <div className="t-body font-medium text-[var(--brand-text)]">Optimize Existing Pages</div>
+                <div className="t-body font-medium text-[var(--brand-text)]">Improve Pages</div>
                 <div className="t-caption-sm text-[var(--brand-text-muted)]">{quickWinsAvailable + pagesWithGrowthOpps} improvements across your site</div>
               </div>
             </div>
@@ -911,7 +923,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           {expandedSections.has('optimize-existing') && (
             <div className="px-4 pb-4 border-t border-[var(--brand-border)]/50">
               <p className="t-caption-sm text-[var(--brand-text-muted)] mt-3 mb-3 leading-relaxed">
-                These are improvements to pages you already have — sorted by estimated impact. Quick wins are low-effort fixes; growth opportunities are pages with untapped potential.
+                These are improvements to pages you already have, sorted by estimated impact. Quick wins are lower-effort fixes; growth opportunities are pages with untapped potential.
               </p>
 
               {/* Quick Wins sub-section */}
@@ -920,7 +932,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   <div className="flex items-center gap-2 mb-2">
                     <Icon as={Zap} size="md" className="text-accent-warning" />
                     <span className="t-caption font-medium text-[var(--brand-text)]">Quick Wins</span>
-                    <span className="t-caption-sm text-[var(--brand-text-faint)]">({strategyData.quickWins.length})</span>
+                    <span className="t-caption-sm text-[var(--brand-text-muted)]">({strategyData.quickWins.length})</span>
                   </div>
                   <div className="space-y-2">
                     {strategyData.quickWins.slice(0, expandedSections.has('quick-wins-all') ? undefined : 3).map((qw, i) => {
@@ -981,8 +993,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   <>
                     <div className="flex items-center gap-2 mb-2">
                       <Icon as={TrendingUp} size="md" className="text-accent-info" />
-                      <span className="t-caption font-medium text-[var(--brand-text)]">Growth Opportunities</span>
-                      <span className="t-caption-sm text-[var(--brand-text-faint)]">({unranked.length})</span>
+                      <span className="t-caption font-medium text-[var(--brand-text)]">Pages to Review</span>
+                      <span className="t-caption-sm text-[var(--brand-text-muted)]">({unranked.length})</span>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       {unranked.slice(0, expandedSections.has('growth-opportunities-all') ? undefined : 3).map(page => (
@@ -995,7 +1007,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                             {page.hasImpressions && <span className="t-caption-sm text-accent-info bg-blue-500/10 px-1.5 py-0.5 rounded-[var(--radius-sm)] border border-blue-500/20 flex-shrink-0 ml-2">Almost there</span>}
                           </div>
                           {page.primaryKeyword && (
-                            <div className="t-caption-sm text-accent-brand mb-2">Target: &ldquo;{page.primaryKeyword}&rdquo;</div>
+                            <div className="t-caption-sm text-accent-brand mb-2">Keyword: &ldquo;{page.primaryKeyword}&rdquo;</div>
                           )}
                           <div className="t-caption-sm text-[var(--brand-text-muted)] leading-snug flex-1">{page.reasons[0]}</div>
                           <div className="flex items-center justify-between mt-3 pt-3 border-t border-[var(--brand-border)]/50">
@@ -1057,9 +1069,9 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       </div>
       )}
 
-      {/* ── YOUR KEYWORD MAP (Page Map + Target Keywords + Tracked Keywords) ── */}
+      {/* ── KEYWORD MAP (advanced page + priority keyword detail) ── */}
       <div ref={keywordMapRef}>
-      <TierGate tier={effectiveTier} required="growth" feature="Your Keyword Map" teaser={`${strategyData.pageMap.length} pages tracked`}>
+      <TierGate tier={effectiveTier} required="growth" feature="Keyword Map" teaser={`${strategyData.pageMap.length} pages tracked`}>
         {/* pr-check-disable-next-line -- Brand signature radius intentional */}
         <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
           <button
@@ -1071,8 +1083,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 <Icon as={Layers} size="md" className="text-accent-info" />
               </div>
               <div className="text-left">
-                <div className="t-body font-medium text-[var(--brand-text)]">Your Keyword Map</div>
-                <div className="t-caption-sm text-[var(--brand-text-muted)]">{strategyData.pageMap.length} pages mapped · {strategyData.siteKeywords.length} target keywords</div>
+                <div className="t-body font-medium text-[var(--brand-text)]">Keyword Map</div>
+                <div className="t-caption-sm text-[var(--brand-text-muted)]">{strategyData.pageMap.length} pages mapped · {priorityKeywords.length} priority keywords</div>
               </div>
             </div>
             <ChevronDown className={`w-4 h-4 text-[var(--brand-text-muted)] transition-transform ${expandedSections.has('page-keyword-map') ? '' : '-rotate-90'}`} />
@@ -1080,88 +1092,92 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
 
           {expandedSections.has('page-keyword-map') && (
             <>
-            {/* Target Keywords sub-section */}
+            {/* Priority Keywords sub-section */}
             <div className="px-4 pt-3 pb-3 border-t border-[var(--brand-border)]/50">
               <div className="flex items-center gap-2 mb-2">
                 <Icon as={Target} size="md" className="text-[var(--brand-text-muted)]" />
-                <span className="t-caption font-medium text-[var(--brand-text)]">Target Keywords</span>
-                <span className="t-caption-sm text-[var(--brand-text-faint)]">({strategyData.siteKeywords.length})</span>
+                <span className="t-caption font-medium text-[var(--brand-text)]">Priority Keywords</span>
+                <span className="t-caption-sm text-[var(--brand-text-muted)]">({priorityKeywords.length})</span>
               </div>
               <p className="t-caption-sm text-[var(--brand-text-muted)] mb-3 leading-relaxed">
-                Tracking a keyword adds it to rank monitoring going forward. Target keywords already in this strategy appear above; additional tracked keywords appear as Your keywords. Removing a keyword stops future tracking, keeps historical ranking data, and does not regenerate this strategy immediately.
+                Priority keywords are the search themes we are watching or considering. Adding one helps guide future tracking and recommendations; removing a client-added keyword stops future tracking but keeps historical ranking data.
               </p>
               <div className="flex flex-wrap gap-2 mb-3">
-                {strategyData.siteKeywords.slice(0, 15).map(kw => (
-                  <span key={kw} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--brand-border-strong)] t-caption-sm text-[var(--brand-text-muted)]">
-                    {kw}
-                  </span>
-                ))}
-                {strategyData.siteKeywords.length > 15 && (
-                  <span className="t-caption-sm text-[var(--brand-text-muted)] px-2 py-1">+{strategyData.siteKeywords.length - 15} more</span>
+                {visiblePriorityKeywords.map(item => {
+                  const normalized = normalizeKeyword(item.label);
+                  const confirming = item.source === 'client' && confirmRemoveKeyword === normalized;
+                  const removing = item.source === 'client' && removingKeyword === normalized;
+                  const chipTone = item.source === 'client'
+                    ? 'bg-teal-500/10 border-teal-500/20 text-accent-brand'
+                    : item.source === 'requested'
+                      ? 'bg-blue-500/10 border-blue-500/20 text-accent-info'
+                      : 'bg-[var(--surface-3)] border-[var(--brand-border-strong)] text-[var(--brand-text-muted)]';
+                  return (
+                    <span key={`${item.source}-${normalized}`} className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-lg)] border t-caption-sm ${chipTone}`}>
+                      {item.label}
+                      {item.source === 'requested' && <span className="text-[var(--brand-text-muted)]">pending</span>}
+                      {item.source === 'client' && (confirming ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!workspaceId || removing) return;
+                              setRemovingKeyword(normalized);
+                              try {
+                                const data = await trackedKwApi.remove(workspaceId, item.label);
+                                setTrackedKeywords(data.keywords || []);
+                                setConfirmRemoveKeyword(null);
+                                setToast?.(`"${item.label}" removed from future tracking. Historical ranking data is preserved.`);
+                              } catch { setToast?.('Failed to remove keyword'); }
+                              finally { setRemovingKeyword(null); }
+                            }}
+                            disabled={removing}
+                            className="text-accent-danger hover:text-accent-danger transition-colors disabled:opacity-50"
+                          >
+                            {removing ? 'Removing...' : 'Confirm'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmRemoveKeyword(null)}
+                            disabled={removing}
+                            className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmRemoveKeyword(normalized)}
+                          className="text-[var(--brand-text-muted)] hover:text-accent-danger transition-colors"
+                          title={`Remove ${item.label} from future rank tracking`}
+                          aria-label={`Remove ${item.label} from future rank tracking`}
+                        >
+                          <Icon as={X} size="sm" />
+                        </button>
+                      ))}
+                    </span>
+                  );
+                })}
+                {hiddenPriorityKeywordCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllPriorityKeywords(true)}
+                    className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] px-2 py-1 transition-colors"
+                  >
+                    View all {priorityKeywords.length}
+                  </button>
+                )}
+                {showAllPriorityKeywords && priorityKeywords.length > 18 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllPriorityKeywords(false)}
+                    className="t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] px-2 py-1 transition-colors"
+                  >
+                    Show fewer
+                  </button>
                 )}
               </div>
-              {/* Client-added keywords */}
-              {(() => {
-                const strategySet = new Set(strategyData.siteKeywords.map(normalizeKeyword));
-                const clientAdded = trackedKeywords.filter(tk => !strategySet.has(normalizeKeyword(tk.query)));
-                return clientAdded.length > 0 ? (
-                  <div className="mb-3">
-                    <div className="t-caption-sm text-[var(--brand-text-muted)] tracking-wider mb-1.5">Your keywords</div>
-                    <div className="flex flex-wrap gap-2">
-                      {clientAdded.map(tk => {
-                        const normalized = normalizeKeyword(tk.query);
-                        const confirming = confirmRemoveKeyword === normalized;
-                        const removing = removingKeyword === normalized;
-                        return (
-                          <span key={tk.query} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-lg)] bg-teal-500/10 border border-teal-500/20 t-caption-sm text-accent-brand">
-                            {tk.query}
-                            {confirming ? (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    if (!workspaceId || removing) return;
-                                    setRemovingKeyword(normalized);
-                                    try {
-                                      const data = await trackedKwApi.remove(workspaceId, tk.query);
-                                      setTrackedKeywords(data.keywords || []);
-                                      setConfirmRemoveKeyword(null);
-                                      setToast?.(`"${tk.query}" removed from future tracking. Historical ranking data is preserved.`);
-                                    } catch { setToast?.('Failed to remove keyword'); }
-                                    finally { setRemovingKeyword(null); }
-                                  }}
-                                  disabled={removing}
-                                  className="text-accent-danger hover:text-accent-danger transition-colors disabled:opacity-50"
-                                >
-                                  {removing ? 'Removing...' : 'Confirm'}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setConfirmRemoveKeyword(null)}
-                                  disabled={removing}
-                                  className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors disabled:opacity-50"
-                                >
-                                  Cancel
-                                </button>
-                              </>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => setConfirmRemoveKeyword(normalized)}
-                                className="text-[var(--brand-text-muted)] hover:text-accent-danger transition-colors"
-                                title={`Remove ${tk.query} from future rank tracking`}
-                                aria-label={`Remove ${tk.query} from future rank tracking`}
-                              >
-                                <Icon as={X} size="sm" />
-                              </button>
-                            )}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : null;
-              })()}
               {/* Add keyword input */}
               {workspaceId && (
                 <form
@@ -1170,10 +1186,9 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                     const kw = newTrackedKeyword.trim();
                     if (!kw || kw.length < 2 || addingKeyword) return;
                     const normalized = normalizeKeyword(kw);
-                    const strategySet = new Set(strategyData.siteKeywords.map(normalizeKeyword));
                     const alreadyTracked = trackedKeywords.some(tk => normalizeKeyword(tk.query) === normalized);
                     if (alreadyTracked) {
-                      setToast?.(`"${kw}" is already being tracked`);
+                      setToast?.(`"${kw}" is already a priority keyword`);
                       return;
                     }
                     setAddingKeyword(true);
@@ -1181,9 +1196,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                       const res = await post(`/api/public/tracked-keywords/${workspaceId}`, { keyword: kw });
                       setTrackedKeywords((res as { keywords: typeof trackedKeywords }).keywords || []);
                       setNewTrackedKeyword('');
-                      setToast?.(strategySet.has(normalized)
-                        ? `"${kw}" added to tracking. It already appears above as a target keyword.`
-                        : `"${kw}" added to future rank tracking`);
+                      setToast?.(`"${kw}" added as a priority keyword`);
                     } catch {
                       setToast?.('Failed to add keyword');
                     } finally {
@@ -1196,9 +1209,9 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                     type="text"
                     value={newTrackedKeyword}
                     onChange={e => setNewTrackedKeyword(e.target.value)}
-                    placeholder="Add a keyword to track..."
+                    placeholder="Add a priority keyword..."
                     disabled={addingKeyword}
-                    className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] px-3 py-1.5 t-caption-sm text-[var(--brand-text)] placeholder:text-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500 transition-colors"
+                    className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] px-3 py-1.5 t-caption-sm text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors"
                     maxLength={120}
                   />
                   <button
@@ -1206,7 +1219,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                     disabled={addingKeyword || newTrackedKeyword.trim().length < 2}
                     className="px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm text-accent-brand font-medium hover:bg-teal-600/30 transition-colors disabled:opacity-50 flex items-center gap-1"
                   >
-                    <Icon as={Plus} size="sm" /> {addingKeyword ? 'Tracking...' : 'Track'}
+                    <Icon as={Plus} size="sm" /> {addingKeyword ? 'Adding...' : 'Add'}
                   </button>
                 </form>
               )}
@@ -1283,12 +1296,12 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
             <p className="t-caption-sm text-[var(--brand-text-muted)] mb-3">
               <span className="text-accent-danger font-medium">&ldquo;{declineReason.keyword}&rdquo;</span> will be excluded from future strategy recommendations.
             </p>
-            <label className="block t-caption-sm text-[var(--brand-text-muted)] mb-1">Why isn't this keyword relevant? <span className="text-[var(--brand-text-faint)]">(optional)</span></label>
+            <label className="block t-caption-sm text-[var(--brand-text-muted)] mb-1">Why isn't this keyword relevant? <span className="text-[var(--brand-text-muted)]">(optional)</span></label>
             <textarea
               value={declineReasonText}
               onChange={e => setDeclineReasonText(e.target.value)}
               placeholder="e.g., We don't offer this service, too competitive, not our target audience..."
-              className="w-full bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] px-3 py-2 t-body text-[var(--brand-text)] placeholder:text-[var(--brand-text-dim)] focus:outline-none focus:border-teal-500 resize-none h-20"
+              className="w-full bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] px-3 py-2 t-body text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 resize-none h-20"
               autoFocus
             />
           </Modal.Body>
