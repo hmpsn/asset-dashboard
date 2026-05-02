@@ -27,6 +27,7 @@ import { SchemaWorkflowGuide } from './schema/SchemaWorkflowGuide';
 import { SCHEMA_ROLE_INDEX, SCHEMA_ROLE_LABELS } from '../../shared/types/schema-plan';
 import type { ValidationFinding } from '../../shared/types/schema-validation';
 import type { SchemaGenerationDiagnostics } from '../../shared/types/schema-generation';
+import type { CmsSchemaFieldMapping, SchemaFieldTarget } from '../../shared/types/site-inventory';
 import { adminPath } from '../routes.js';
 
 type SchemaSubTab = 'generator' | 'guide';
@@ -75,6 +76,26 @@ interface CmsTemplateResult {
   fieldsUsed: string[];
   collectionName: string;
   collectionSlug: string;
+}
+
+interface CmsMappingField {
+  slug: string;
+  displayName: string;
+  type: string;
+  target?: SchemaFieldTarget;
+}
+
+interface CmsMappingCollection {
+  collectionId: string;
+  collectionName: string;
+  collectionSlug: string;
+  fields: CmsMappingField[];
+  recommendedFieldSlug?: string;
+  mapping: CmsSchemaFieldMapping | null;
+}
+
+interface CmsMappingsResponse {
+  collections: CmsMappingCollection[];
 }
 
 interface Props {
@@ -145,6 +166,8 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
   const [showCmsPanel, setShowCmsPanel] = useState(false);
   const [showTypeGuide, setShowTypeGuide] = useState(false);
   const [cmsTemplatePages, setCmsTemplatePages] = useState<CmsTemplatePage[]>([]);
+  const [cmsMappings, setCmsMappings] = useState<CmsMappingCollection[]>([]);
+  const [savingCmsMapping, setSavingCmsMapping] = useState<string | null>(null);
   const [loadingCmsPages, setLoadingCmsPages] = useState(false);
   const [generatingCmsTemplate, setGeneratingCmsTemplate] = useState<string | null>(null);
   const [cmsTemplateResult, setCmsTemplateResult] = useState<CmsTemplateResult | null>(null);
@@ -156,6 +179,45 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
   const [showDiff, setShowDiff] = useState<Set<string>>(new Set());
   const [cmsCopied, setCmsCopied] = useState(false);
   const [cmsError, setCmsError] = useState<string | null>(null);
+
+  useEffect(() => { // effect-layout-ok: optional CMS mapping controls hydrate after paint; generation does not depend on it.
+    if (!workspaceId) return;
+    let cancelled = false;
+    getSafe<CmsMappingsResponse>(
+      `/api/webflow/schema-cms-field-mappings/${siteId}?workspaceId=${encodeURIComponent(workspaceId)}`,
+      { collections: [] },
+    ).then(result => {
+      if (!cancelled) setCmsMappings(result.collections ?? []);
+    });
+    return () => { cancelled = true; };
+  }, [siteId, workspaceId]);
+
+  const saveCmsFieldMapping = async (collection: CmsMappingCollection, target: SchemaFieldTarget, slug: string) => {
+    if (!workspaceId) return;
+    setSavingCmsMapping(`${collection.collectionId}:${target}`);
+    try {
+      const fieldMappings = {
+        ...(collection.mapping?.fieldMappings ?? {}),
+        [target]: slug || undefined,
+      };
+      const saved = await put<CmsSchemaFieldMapping>(
+        `/api/webflow/schema-cms-field-mappings/${siteId}?workspaceId=${encodeURIComponent(workspaceId)}`,
+        {
+          collectionId: collection.collectionId,
+          collectionName: collection.collectionName,
+          collectionSlug: collection.collectionSlug,
+          schemaFieldSlug: collection.mapping?.schemaFieldSlug || collection.recommendedFieldSlug,
+          collectionRole: collection.mapping?.collectionRole,
+          fieldMappings,
+        },
+      );
+      setCmsMappings(prev => prev.map(c => (
+        c.collectionId === collection.collectionId ? { ...c, mapping: saved } : c
+      )));
+    } finally {
+      setSavingCmsMapping(null);
+    }
+  };
 
   // Schema editing state — stores edited JSON string per pageId
   const [editingSchema, setEditingSchema] = useState<Set<string>>(new Set());
@@ -169,7 +231,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
   const { data: snapshotData } = useSchemaSnapshot(siteId);
   const [snapshotDate, setSnapshotDate] = useState<string | null>(null);
   // Hydrate local state from snapshot query when it arrives
-  useEffect(() => {
+  useEffect(() => { // effect-layout-ok: saved snapshot arrives asynchronously from React Query.
     if (snapshotData && snapshotData.results.length > 0 && !data) {
       setData(snapshotData.results as SchemaPageSuggestion[]);
       setSnapshotDate(snapshotData.createdAt);
@@ -188,7 +250,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
   }, [snapshotData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load persisted page types from server on mount
-  useEffect(() => {
+  useEffect(() => { // effect-layout-ok: persisted page types arrive asynchronously from the server.
     if (!siteId) return;
     getSafe<{ pageTypes: Record<string, string> }>(`/api/webflow/schema-page-types/${siteId}?workspaceId=${workspaceId || ''}`, { pageTypes: {} })
       .then(({ pageTypes: saved }) => {
@@ -208,7 +270,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
   }, [fetchedPages]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Stream partial results from background job via WebSocket
-  useEffect(() => {
+  useEffect(() => { // effect-layout-ok: background job results arrive asynchronously via WebSocket.
     if (!jobIdRef.current) return;
     const job = jobs.find(j => j.id === jobIdRef.current);
     if (!job) return;
@@ -581,6 +643,33 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     ...Object.entries(SCHEMA_ROLE_LABELS).map(([value, label]) => ({ value, label })),
   ];
 
+  const fieldMappingTargets: Array<{ target: SchemaFieldTarget; label: string; roles: Array<'location' | 'service'> }> = [
+    { target: 'streetAddress', label: 'Street', roles: ['location'] },
+    { target: 'addressLocality', label: 'City', roles: ['location'] },
+    { target: 'addressRegion', label: 'State', roles: ['location'] },
+    { target: 'postalCode', label: 'ZIP', roles: ['location'] },
+    { target: 'phone', label: 'Phone', roles: ['location'] },
+    { target: 'email', label: 'Email', roles: ['location'] },
+    { target: 'openingHours', label: 'Hours', roles: ['location'] },
+    { target: 'serviceName', label: 'Service name', roles: ['service'] },
+    { target: 'serviceType', label: 'Service type', roles: ['service'] },
+    { target: 'areaServed', label: 'Area served', roles: ['service'] },
+    { target: 'price', label: 'Price', roles: ['service'] },
+    { target: 'priceCurrency', label: 'Currency', roles: ['service'] },
+  ];
+
+  const schemaMappingCollections = cmsMappings
+    .map(collection => {
+      const role = collection.mapping?.collectionRole
+        || (/(location|locations|clinic|clinics|store|stores|branch|branches)/i.test(`${collection.collectionName} ${collection.collectionSlug}`)
+          ? 'location'
+          : /(service|services|treatment|treatments|procedure|procedures)/i.test(`${collection.collectionName} ${collection.collectionSlug}`)
+            ? 'service'
+            : undefined);
+      return role === 'location' || role === 'service' ? { ...collection, schemaRole: role } : null;
+    })
+    .filter((collection): collection is CmsMappingCollection & { schemaRole: 'location' | 'service' } => Boolean(collection));
+
   const filteredInitialPages = availablePages.filter(
     p => !pageSearch || p.title.toLowerCase().includes(pageSearch.toLowerCase()) || p.slug.toLowerCase().includes(pageSearch.toLowerCase())
   );
@@ -693,6 +782,49 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
           onCopyCmsTemplate={copyCmsTemplate}
           onPublishCmsTemplate={publishCmsTemplate}
         />
+        {schemaMappingCollections.length > 0 && (
+          <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-4 space-y-3">
+            <div>
+              <p className="t-body text-[var(--brand-text)] font-medium">Collection field mapping</p>
+              <p className="t-caption-sm text-[var(--brand-text-muted)]">
+                Detected CMS fields can be corrected here so Locations and Services resolve human-readable schema data.
+              </p>
+            </div>
+            {schemaMappingCollections.slice(0, 4).map(collection => (
+              <div key={collection.collectionId} className="border-t border-[var(--brand-border)]/60 pt-3">
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <span className="t-caption text-[var(--brand-text)]">{collection.collectionName}</span>
+                  <span className="t-caption-sm text-[var(--brand-text-muted)]">{collection.schemaRole}</span>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {fieldMappingTargets.filter(target => target.roles.includes(collection.schemaRole)).map(({ target, label }) => {
+                    const selected = collection.mapping?.fieldMappings?.[target]
+                      || collection.fields.find(field => field.target === target)?.slug
+                      || '';
+                    return (
+                      <label key={target} className="block">
+                        <span className="t-caption-sm text-[var(--brand-text-muted)]">{label}</span>
+                        <select
+                          value={selected}
+                          disabled={savingCmsMapping === `${collection.collectionId}:${target}`}
+                          onChange={event => saveCmsFieldMapping(collection, target, event.target.value)}
+                          className="mt-1 w-full px-2 py-1 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded t-caption-sm text-[var(--brand-text)] focus:outline-none focus:border-teal-500 disabled:opacity-50"
+                        >
+                          <option value="">Not mapped</option>
+                          {collection.fields.map(field => (
+                            <option key={field.slug} value={field.slug}>
+                              {field.displayName || field.slug} ({field.type})
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         {generatingSingle && (
           <div className="flex items-center gap-2 px-4 py-2 bg-teal-500/10 border border-teal-500/20 rounded-[var(--radius-xl)]">
             <Icon as={Loader2} size="md" className="animate-spin text-teal-400" />

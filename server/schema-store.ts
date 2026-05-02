@@ -423,14 +423,15 @@ interface CmsFieldMappingRow {
   collection_slug: string;
   schema_field_slug: string | null;
   collection_role: string | null;
+  field_mappings: string | null;
   updated_at: string;
 }
 
 const cmsFieldMappingStmts = createStmtCache(() => ({
   upsert: db.prepare(`
     INSERT OR REPLACE INTO schema_cms_field_mappings
-      (site_id, collection_id, collection_name, collection_slug, schema_field_slug, collection_role, updated_at)
-    VALUES (@site_id, @collection_id, @collection_name, @collection_slug, @schema_field_slug, @collection_role, @updated_at)
+      (site_id, collection_id, collection_name, collection_slug, schema_field_slug, collection_role, field_mappings, updated_at)
+    VALUES (@site_id, @collection_id, @collection_name, @collection_slug, @schema_field_slug, @collection_role, @field_mappings, @updated_at)
   `),
   getBySite: db.prepare<[siteId: string]>(
     `SELECT * FROM schema_cms_field_mappings WHERE site_id = ? ORDER BY collection_name ASC`,
@@ -448,6 +449,7 @@ function rowToCmsFieldMapping(row: CmsFieldMappingRow): CmsSchemaFieldMapping {
     collectionSlug: row.collection_slug,
     schemaFieldSlug: row.schema_field_slug || undefined,
     collectionRole: (row.collection_role || undefined) as CmsSchemaFieldMapping['collectionRole'],
+    fieldMappings: parseJsonFallback(row.field_mappings, undefined),
     updatedAt: row.updated_at,
   };
 }
@@ -471,6 +473,7 @@ export function saveSchemaCmsFieldMapping(mapping: Omit<CmsSchemaFieldMapping, '
     collection_slug: mapping.collectionSlug,
     schema_field_slug: mapping.schemaFieldSlug || null,
     collection_role: mapping.collectionRole || null,
+    field_mappings: mapping.fieldMappings ? JSON.stringify(mapping.fieldMappings) : null,
     updated_at: updatedAt,
   });
   return { ...mapping, updatedAt };

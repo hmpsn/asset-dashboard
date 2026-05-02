@@ -18,7 +18,10 @@ export type SchemaFieldTarget =
   | 'addressCountry'
   | 'phone'
   | 'email'
+  | 'openingHours'
   | 'serviceName'
+  | 'serviceType'
+  | 'areaServed'
   | 'teamRole'
   | 'credentials'
   | 'price'
@@ -61,6 +64,7 @@ export interface CmsSchemaFieldMapping {
   collectionSlug: string;
   schemaFieldSlug?: string;
   collectionRole?: SchemaPageRole;
+  fieldMappings?: Partial<Record<SchemaFieldTarget, string>>;
   updatedAt: string;
 }
 
@@ -73,6 +77,7 @@ export interface SchemaCollectionInventory {
   roleSource: SchemaCollectionRoleSource;
   fields: SiteInventoryField[];
   schemaFieldSlug?: string;
+  fieldMappings?: Partial<Record<SchemaFieldTarget, string>>;
   schemaFieldAvailable: boolean;
   itemCount: number;
 }
@@ -107,7 +112,9 @@ export interface SiteInventoryCmsItem {
   isUtility: boolean;
   exclusionReason?: string;
   fieldTargets: Partial<Record<SchemaFieldTarget, string>>;
+  fieldEvidence?: SchemaFieldEvidence[];
   itemBusinessProfile?: BusinessProfileContact;
+  itemServiceProfile?: SchemaServiceProfile;
 }
 
 export interface SiteInventorySlice {
@@ -135,7 +142,31 @@ export interface SchemaCmsDeliveryStatus {
   hash?: string;
 }
 
+export type SchemaFieldResolutionStatus =
+  | 'resolved'
+  | 'skipped-unresolved-reference'
+  | 'skipped-empty'
+  | 'skipped-invalid'
+  | 'fallback-used';
+
 export interface SchemaFieldEvidence {
   field: string;
   source: SchemaEvidenceSource;
+  status?: SchemaFieldResolutionStatus;
+  fieldSlug?: string;
+  message?: string;
+}
+
+export interface SchemaServiceOffer {
+  name?: string;
+  price: string;
+  priceCurrency: string;
+  description?: string;
+}
+
+export interface SchemaServiceProfile {
+  serviceName?: string;
+  serviceType?: string;
+  areaServed?: string;
+  offers?: SchemaServiceOffer[];
 }

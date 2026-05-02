@@ -209,6 +209,32 @@ describe('buildServiceSchema', () => {
     const node = (buildServiceSchema(withType)['@graph'] as Array<Record<string, unknown>>)[0];
     expect(node.serviceType).toBe('Web Design');
   });
+
+  it('Service emits verified Offer only when price and currency are available', () => {
+    const withOffer = {
+      ...serviceInput,
+      pageData: {
+        ...serviceInput.pageData,
+        serviceName: 'Webflow Buildout',
+        offers: [{ name: 'Starter', price: '1999', priceCurrency: 'USD' }],
+      },
+    };
+    const withOfferNode = (buildServiceSchema(withOffer)['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(withOfferNode.name).toBe('Webflow Buildout');
+    expect(withOfferNode.offers).toEqual([expect.objectContaining({
+      '@type': 'Offer',
+      name: 'Starter',
+      price: '1999',
+      priceCurrency: 'USD',
+    })]);
+
+    const missingCurrency = {
+      ...serviceInput,
+      offers: [{ name: 'Starter', price: '1999', priceCurrency: '' }],
+    };
+    const missingCurrencyNode = (buildServiceSchema(missingCurrency)['@graph'] as Array<Record<string, unknown>>)[0];
+    expect(missingCurrencyNode.offers).toBeUndefined();
+  });
 });
 
 describe('buildProductSchema', () => {

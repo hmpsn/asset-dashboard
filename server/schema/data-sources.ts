@@ -6,7 +6,7 @@
 import * as cheerio from 'cheerio';
 import { scrubBrandSuffix } from './templates/helpers.js';
 import type { PageElementCatalog } from '../../shared/types/page-elements.js';
-import type { SchemaEvidenceSource, SchemaFieldEvidence } from '../../shared/types/site-inventory.js';
+import type { SchemaEvidenceSource, SchemaFieldEvidence, SchemaFieldTarget, SchemaServiceOffer, SchemaServiceProfile } from '../../shared/types/site-inventory.js';
 import type { BusinessProfileContact } from '../../shared/types/workspace.js';
 import type { SchemaIndustrySubtype } from '../../shared/types/schema-plan.js';
 
@@ -21,6 +21,12 @@ export interface PageMetaInput {
   locale?: string | null;
   /** When this page is a Webflow CMS item, the resolved fieldData blob from /collections/:id/items/:itemId. */
   cmsFieldData?: Record<string, unknown> | null;
+  /** Resolved collection field targets from the siteInventory slice. */
+  cmsFieldTargets?: Partial<Record<SchemaFieldTarget, string>>;
+  /** Field-level resolution evidence assembled from rendered/CMS/fallback sources. */
+  fieldEvidence?: SchemaFieldEvidence[];
+  /** Service-specific CMS context assembled from collection field mappings. */
+  serviceProfile?: SchemaServiceProfile;
   /** Per-page keyword strategy from seoContext slice. Populated when buildWorkspaceIntelligence
    *  is called with opts.pagePath. Drives Article.keywords schema field emission. */
   pageKeywords?: { primary: string; secondary: string[] };
@@ -81,6 +87,10 @@ export interface PageData {
   areaServed?: string;
   /** ServiceType derived from URL slug for Service template. */
   serviceType?: string;
+  /** Service display name resolved from a mapped CMS field when available. */
+  serviceName?: string;
+  /** Verified offers resolved from visible content or mapped CMS fields. */
+  offers?: SchemaServiceOffer[];
   /** Top-N siteKeywords for Organization.knowsAbout — passed through from workspace. */
   knowsAbout?: string[];
   /** Catalog of structural elements detected on the page (videos, HowTo
@@ -183,7 +193,7 @@ export function extractPageData(input: ExtractInput): PageData {
   const datePublishedCms = pickCmsFieldWithSlug(cmsFieldData, ['published-on', 'published-date', 'date-published']);
   const dateModifiedCms = pickCmsFieldWithSlug(cmsFieldData, ['updated-on', 'last-updated']);
   const authorCms = pickCmsFieldWithSlug(cmsFieldData, ['author-name', 'author', 'written-by']);
-  const fieldEvidence: SchemaFieldEvidence[] = [];
+  const fieldEvidence: SchemaFieldEvidence[] = [...(input.pageMeta.fieldEvidence ?? [])];
   const evidenceSources: Partial<Record<string, SchemaEvidenceSource>> = {};
   if (description) evidenceSources.description = 'rendered-html';
   if (image) evidenceSources.image = 'rendered-html';
@@ -227,7 +237,9 @@ export function extractPageData(input: ExtractInput): PageData {
 
   // Derive Service.serviceType from URL slug.
   const slug = leafSlug(input.pageMeta.publishedPath);
-  const serviceType = slug ? capitalizeSlugSegment(slug) : undefined;
+  const serviceType = input.pageMeta.serviceProfile?.serviceType || (slug ? capitalizeSlugSegment(slug) : undefined);
+  const serviceName = input.pageMeta.serviceProfile?.serviceName;
+  const serviceAreaServed = input.pageMeta.serviceProfile?.areaServed;
 
   return {
     title,
@@ -246,8 +258,10 @@ export function extractPageData(input: ExtractInput): PageData {
     inLanguage,
     breadcrumbs: buildBreadcrumbs(input.pageMeta.publishedPath, cleanTitle, input.baseUrl),
     keywords,
-    areaServed,
+    areaServed: serviceAreaServed || areaServed,
     serviceType,
+    serviceName,
+    offers: input.pageMeta.serviceProfile?.offers,
     knowsAbout: input.workspace.siteKeywordsForKnowsAbout?.slice(0, 5).map(s => s.toLowerCase()),
     elements: input.pageMeta.elements,
     fieldEvidence,

@@ -29,8 +29,8 @@ import {
   publishRawSchemaToPage,
   retractSchemaFromPage,
 } from '../webflow.js';
-import { buildSiteInventory, getRecommendedSchemaFieldSlug } from '../schema/site-inventory.js';
-import type { SchemaCmsDeliveryStatus } from '../../shared/types/site-inventory.ts';
+import { buildSiteInventory, detectSchemaFieldTarget, getRecommendedSchemaFieldSlug } from '../schema/site-inventory.js';
+import type { SchemaCmsDeliveryStatus, SchemaFieldTarget } from '../../shared/types/site-inventory.ts';
 import { listWorkspaces, getTokenForSite, updatePageState, getWorkspace, getClientPortalUrl } from '../workspaces.js';
 import { getWorkspaceAllPages } from '../workspace-data.js';
 import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
@@ -230,7 +230,15 @@ router.get('/api/webflow/schema-cms-field-mappings/:siteId', requireWorkspaceAcc
     const collections = await listCollections(siteId, token);
     const detected = await Promise.all(collections.map(async collection => {
       const schema = await getCollectionSchema(collection.id, token);
-      const fields = schema.fields;
+      const fields = schema.fields.map(field => ({
+        ...field,
+        target: detectSchemaFieldTarget({
+          id: field.id,
+          slug: field.slug,
+          displayName: field.displayName,
+          type: field.type,
+        }),
+      }));
       const mapped = mappings.find(m => m.collectionId === collection.id);
       const recommended = fields.find(f => f.slug === getRecommendedSchemaFieldSlug())
         ?? fields.find(f => /schema|json-?ld/i.test(`${f.slug} ${f.displayName}`));
@@ -256,11 +264,49 @@ const cmsFieldMappingSchema = z.object({
   collectionName: z.string().min(1),
   collectionSlug: z.string().optional().default(''),
   schemaFieldSlug: z.string().optional(),
+  fieldMappings: z.record(z.string(), z.string()).optional(),
   collectionRole: z.string().optional().refine(
     role => !role || role in SCHEMA_ROLE_LABELS,
     'collectionRole must be a supported schema role',
   ),
 });
+
+const VALID_SCHEMA_FIELD_TARGETS = new Set<SchemaFieldTarget>([
+  'title',
+  'description',
+  'author',
+  'datePublished',
+  'dateModified',
+  'image',
+  'locationName',
+  'streetAddress',
+  'addressLocality',
+  'addressRegion',
+  'postalCode',
+  'addressCountry',
+  'phone',
+  'email',
+  'openingHours',
+  'serviceName',
+  'serviceType',
+  'areaServed',
+  'teamRole',
+  'credentials',
+  'price',
+  'priceCurrency',
+  'videoUrl',
+  'schemaJsonLd',
+]);
+
+function normalizeFieldMappings(raw: Record<string, string> | undefined): Partial<Record<SchemaFieldTarget, string>> | undefined {
+  if (!raw) return undefined;
+  const out: Partial<Record<SchemaFieldTarget, string>> = {};
+  for (const [target, slug] of Object.entries(raw)) {
+    if (!VALID_SCHEMA_FIELD_TARGETS.has(target as SchemaFieldTarget)) continue;
+    if (typeof slug === 'string' && slug.trim()) out[target as SchemaFieldTarget] = slug.trim();
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
 
 router.put('/api/webflow/schema-cms-field-mappings/:siteId', requireWorkspaceAccessFromQuery(), validate(cmsFieldMappingSchema), (req, res) => {
   const mapping = saveSchemaCmsFieldMapping({
@@ -270,6 +316,7 @@ router.put('/api/webflow/schema-cms-field-mappings/:siteId', requireWorkspaceAcc
     collectionSlug: req.body.collectionSlug || '',
     schemaFieldSlug: req.body.schemaFieldSlug || undefined,
     collectionRole: (req.body.collectionRole || undefined) as SchemaPageRole | undefined,
+    fieldMappings: normalizeFieldMappings(req.body.fieldMappings),
   });
   res.json(mapping);
 });

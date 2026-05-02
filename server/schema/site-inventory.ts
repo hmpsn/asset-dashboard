@@ -2,7 +2,9 @@ import type { BusinessProfileContact } from '../../shared/types/workspace.js';
 import type {
   CmsSchemaFieldMapping,
   SchemaCollectionInventory,
+  SchemaFieldEvidence,
   SchemaFieldTarget,
+  SchemaServiceProfile,
   SiteInventoryFieldData,
   SiteInventoryCmsItem,
   SiteInventoryField,
@@ -54,7 +56,7 @@ function inferRoleFromText(text: string, fields: SiteInventoryField[]): SchemaPa
   return undefined;
 }
 
-function targetForField(field: SiteInventoryField): SchemaFieldTarget | undefined {
+export function detectSchemaFieldTarget(field: SiteInventoryField): SchemaFieldTarget | undefined {
   const key = norm(`${field.slug} ${field.displayName}`);
   if (/\b(schema-json-ld|schema-json|json-ld|jsonld|schema)\b/.test(key)) return 'schemaJsonLd';
   if (/\b(author|writer|written-by|byline)\b/.test(key)) return 'author';
@@ -70,6 +72,10 @@ function targetForField(field: SiteInventoryField): SchemaFieldTarget | undefine
   if (/\b(country)\b/.test(key)) return 'addressCountry';
   if (/\b(phone|telephone|tel)\b/.test(key)) return 'phone';
   if (/\b(email|e-mail)\b/.test(key)) return 'email';
+  if (/\b(hours|opening-hours|business-hours|schedule)\b/.test(key)) return 'openingHours';
+  if (/\b(service-name|treatment-name|procedure-name|solution-name)\b/.test(key)) return 'serviceName';
+  if (/\b(service-type|service-category|category|treatment-type|procedure-type)\b/.test(key)) return 'serviceType';
+  if (/\b(area-served|service-area|served-area|market|markets|region-served)\b/.test(key)) return 'areaServed';
   if (/\b(role|title|position|job-title)\b/.test(key)) return 'teamRole';
   if (/\b(credential|credentials|license|certification|degree)\b/.test(key)) return 'credentials';
   if (/\b(price|cost|fee|rate)\b/.test(key)) return 'price';
@@ -109,32 +115,139 @@ function fieldValueToString(value: unknown): string | undefined {
   return undefined;
 }
 
-function valueAsString(fieldData: SiteInventoryFieldData | null | undefined, slug: string | undefined): string | undefined {
-  if (!fieldData || !slug) return undefined;
-  return fieldValueToString(fieldData[slug]);
+function hasOpaqueReferenceValue(value: unknown): boolean {
+  if (typeof value === 'string') return isOpaqueWebflowIdentifier(value);
+  if (Array.isArray(value)) return value.some(hasOpaqueReferenceValue);
+  if (value && typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    const displayKeys = ['name', 'displayName', 'title', 'label', 'text', 'slug', 'url'];
+    if (displayKeys.some(key => fieldValueToString(obj[key]))) return false;
+    return Object.values(obj).some(hasOpaqueReferenceValue);
+  }
+  return false;
+}
+
+function resolutionFor(
+  fieldData: SiteInventoryFieldData | null | undefined,
+  slug: string | undefined,
+  field: string,
+): { value?: string; evidence: SchemaFieldEvidence } {
+  if (!fieldData || !slug) {
+    return {
+      evidence: {
+        field,
+        source: 'collection-inference',
+        status: 'skipped-empty',
+        message: `${field} skipped: no CMS field mapped.`,
+      },
+    };
+  }
+  const raw = fieldData[slug];
+  const value = fieldValueToString(raw);
+  if (value) {
+    return {
+      value,
+      evidence: {
+        field,
+        source: `cms-field:${slug}`,
+        status: 'resolved',
+        fieldSlug: slug,
+      },
+    };
+  }
+  const status = hasOpaqueReferenceValue(raw) ? 'skipped-unresolved-reference' : 'skipped-empty';
+  return {
+    evidence: {
+      field,
+      source: `cms-field:${slug}`,
+      status,
+      fieldSlug: slug,
+      message: status === 'skipped-unresolved-reference'
+        ? `${field} skipped: CMS reference value was unresolved.`
+        : `${field} skipped: CMS field was empty.`,
+    },
+  };
+}
+
+function withFallback(
+  resolved: { value?: string; evidence: SchemaFieldEvidence },
+  fallback: string | undefined,
+  field: string,
+): { value?: string; evidence: SchemaFieldEvidence } {
+  if (resolved.value) return resolved;
+  const cleanFallback = cleanPublicFieldValue(fallback ?? '');
+  if (!cleanFallback) return resolved;
+  return {
+    value: cleanFallback,
+    evidence: {
+      field,
+      source: 'business-profile',
+      status: 'fallback-used',
+      message: `${field} used workspace business profile fallback.`,
+    },
+  };
 }
 
 function deriveBusinessProfile(
   fieldData: SiteInventoryFieldData | null,
   targets: Partial<Record<SchemaFieldTarget, string>>,
   fallback: BusinessProfileContact | null | undefined,
-): BusinessProfileContact | undefined {
+): { profile?: BusinessProfileContact; fieldEvidence: SchemaFieldEvidence[] } {
+  const street = withFallback(resolutionFor(fieldData, targets.streetAddress, 'streetAddress'), fallback?.address?.street, 'streetAddress');
+  const city = withFallback(resolutionFor(fieldData, targets.addressLocality, 'addressLocality'), fallback?.address?.city, 'addressLocality');
+  const state = withFallback(resolutionFor(fieldData, targets.addressRegion, 'addressRegion'), fallback?.address?.state, 'addressRegion');
+  const zip = withFallback(resolutionFor(fieldData, targets.postalCode, 'postalCode'), fallback?.address?.zip, 'postalCode');
+  const country = withFallback(resolutionFor(fieldData, targets.addressCountry, 'addressCountry'), fallback?.address?.country, 'addressCountry');
+  const phone = withFallback(resolutionFor(fieldData, targets.phone, 'phone'), fallback?.phone, 'phone');
+  const email = withFallback(resolutionFor(fieldData, targets.email, 'email'), fallback?.email, 'email');
+  const openingHours = withFallback(resolutionFor(fieldData, targets.openingHours, 'openingHours'), fallback?.openingHours, 'openingHours');
   const address = {
-    street: valueAsString(fieldData, targets.streetAddress),
-    city: valueAsString(fieldData, targets.addressLocality),
-    state: valueAsString(fieldData, targets.addressRegion),
-    zip: valueAsString(fieldData, targets.postalCode),
-    country: valueAsString(fieldData, targets.addressCountry),
+    street: street.value,
+    city: city.value,
+    state: state.value,
+    zip: zip.value,
+    country: country.value,
   };
   const hasAddress = Object.values(address).some(Boolean);
-  const phone = valueAsString(fieldData, targets.phone) || fallback?.phone;
-  const email = valueAsString(fieldData, targets.email) || fallback?.email;
-  if (!hasAddress && !phone && !email) return undefined;
+  const evidence = [street, city, state, zip, country, phone, email, openingHours].map(r => r.evidence);
+  if (!hasAddress && !phone.value && !email.value && !openingHours.value) return { fieldEvidence: evidence };
   return {
-    ...(fallback ?? {}),
-    phone,
-    email,
-    address: hasAddress ? address : fallback?.address,
+    fieldEvidence: evidence,
+    profile: {
+      ...(fallback ?? {}),
+      phone: phone.value,
+      email: email.value,
+      openingHours: openingHours.value ?? fallback?.openingHours,
+      address: hasAddress ? address : fallback?.address,
+    },
+  };
+}
+
+function deriveServiceProfile(
+  fieldData: SiteInventoryFieldData | null,
+  targets: Partial<Record<SchemaFieldTarget, string>>,
+  fallbackName: string,
+): { profile?: SchemaServiceProfile; fieldEvidence: SchemaFieldEvidence[] } {
+  const serviceName = resolutionFor(fieldData, targets.serviceName ?? targets.title, 'serviceName');
+  const serviceType = resolutionFor(fieldData, targets.serviceType, 'serviceType');
+  const areaServed = resolutionFor(fieldData, targets.areaServed, 'areaServed');
+  const price = resolutionFor(fieldData, targets.price, 'price');
+  const priceCurrency = resolutionFor(fieldData, targets.priceCurrency, 'priceCurrency');
+  const evidence = [serviceName, serviceType, areaServed, price, priceCurrency].map(r => r.evidence);
+  const hasOffer = !!(price.value && priceCurrency.value);
+  const profile: SchemaServiceProfile = {
+    serviceName: serviceName.value || cleanPublicFieldValue(fallbackName),
+    serviceType: serviceType.value,
+    areaServed: areaServed.value,
+    offers: hasOffer ? [{
+      name: serviceName.value || cleanPublicFieldValue(fallbackName),
+      price: price.value!,
+      priceCurrency: priceCurrency.value!,
+    }] : undefined,
+  };
+  return {
+    profile: Object.values(profile).some(Boolean) ? profile : undefined,
+    fieldEvidence: evidence,
   };
 }
 
@@ -145,10 +258,16 @@ function mappingFor(
   return mappings.find(m => m.collectionId === collectionId);
 }
 
-function buildFieldTargets(fields: SiteInventoryField[]): Partial<Record<SchemaFieldTarget, string>> {
+function buildFieldTargets(
+  fields: SiteInventoryField[],
+  mapping?: CmsSchemaFieldMapping,
+): Partial<Record<SchemaFieldTarget, string>> {
   const targets: Partial<Record<SchemaFieldTarget, string>> = {};
   for (const field of fields) {
     if (field.target && !targets[field.target]) targets[field.target] = field.slug;
+  }
+  for (const [target, slug] of Object.entries(mapping?.fieldMappings ?? {}) as Array<[SchemaFieldTarget, string]>) {
+    if (slug) targets[target] = slug;
   }
   return targets;
 }
@@ -192,7 +311,7 @@ export async function buildSiteInventory(opts: {
         displayName: f.displayName,
         type: f.type,
       };
-      field.target = targetForField(field);
+      field.target = detectSchemaFieldTarget(field);
       return field;
     });
     collectionFields.set(collection.id, fields);
@@ -221,6 +340,7 @@ export async function buildSiteInventory(opts: {
       roleSource: mapping?.collectionRole ? 'mapped' : inferredRole ? 'inferred' : 'none',
       fields,
       schemaFieldSlug,
+      fieldMappings: mapping?.fieldMappings,
       schemaFieldAvailable: canStoreSchemaJson(schemaField),
       itemCount: itemCountByCollection.get(collection.id) ?? 0,
     };
@@ -230,12 +350,19 @@ export async function buildSiteInventory(opts: {
   const cmsItems: SiteInventoryCmsItem[] = items.map(item => {
     const collection = collectionMap.get(item.collectionId);
     const fields = collection?.fields ?? [];
-    const targets = buildFieldTargets(fields);
+    const mapping = mappingFor(mappings, item.collectionId);
+    const targets = buildFieldTargets(fields, mapping);
     const fieldData = item.fieldData as SiteInventoryFieldData | null;
     const mappedRole = collection?.mappedRole;
     const inferredRole = collection?.inferredRole;
     const effectiveRole = mappedRole ?? inferredRole;
     const exclusion = isUtilitySchemaPath(item.path);
+    const businessResolution = effectiveRole === 'location'
+      ? deriveBusinessProfile(fieldData, targets, opts.businessProfile)
+      : { fieldEvidence: [] };
+    const serviceResolution = effectiveRole === 'service'
+      ? deriveServiceProfile(fieldData, targets, item.pageName)
+      : { fieldEvidence: [] };
     return {
       pageId: toCmsPageId(item.path),
       title: item.pageName,
@@ -257,9 +384,9 @@ export async function buildSiteInventory(opts: {
       isUtility: exclusion.isUtility,
       exclusionReason: exclusion.reason,
       fieldTargets: targets,
-      itemBusinessProfile: effectiveRole === 'location'
-        ? deriveBusinessProfile(fieldData, targets, opts.businessProfile)
-        : undefined,
+      fieldEvidence: [...businessResolution.fieldEvidence, ...serviceResolution.fieldEvidence],
+      itemBusinessProfile: businessResolution.profile,
+      itemServiceProfile: serviceResolution.profile,
     };
   });
 

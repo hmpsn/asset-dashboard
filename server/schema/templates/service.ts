@@ -29,6 +29,8 @@ export function buildServiceSchema(input: ServiceInput): Record<string, unknown>
   const { pageData, baseUrl } = input;
   const serviceId = `${pageData.canonicalUrl}#service`;
   const safeAreaServed = safeText(pageData.areaServed);
+  const serviceName = safeText(pageData.serviceName) || pageData.cleanTitle;
+  const offers = (input.offers ?? pageData.offers ?? []).filter(offer => safeText(offer.price) && safeText(offer.priceCurrency));
 
   // PR2: AggregateRating from testimonials WITH ratings
   // Filter must match the Review[] emission gate below — both require author + rating.
@@ -61,7 +63,7 @@ export function buildServiceSchema(input: ServiceInput): Record<string, unknown>
   const primary = dropUndefined({
     '@type': 'Service',
     '@id': serviceId,
-    'name': pageData.cleanTitle,
+    'name': serviceName,
     'description': pageData.description,
     'image': pageData.image,
     'url': pageData.canonicalUrl,
@@ -76,6 +78,17 @@ export function buildServiceSchema(input: ServiceInput): Record<string, unknown>
     'inLanguage': pageData.inLanguage,
     'areaServed': safeAreaServed ? { '@type': 'Place' as const, name: safeAreaServed } : undefined,
     'serviceType': pageData.serviceType,
+    'offers': offers.length > 0
+      ? offers.map((offer, idx) => dropUndefined({
+          '@type': 'Offer' as const,
+          '@id': `${pageData.canonicalUrl}#offer-${idx}`,
+          'name': safeText(offer.name) || serviceName,
+          'price': safeText(offer.price),
+          'priceCurrency': safeText(offer.priceCurrency),
+          'description': safeText(offer.description),
+          'url': pageData.canonicalUrl,
+        }))
+      : undefined,
     'aggregateRating': aggregateRating,
     'mainEntity': tableMainEntity,
   });

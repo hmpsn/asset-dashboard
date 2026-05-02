@@ -57,7 +57,7 @@
           "source": "Schema bulk generation discussion",
           "est": "3-4h",
           "priority": "P1",
-          "notes": "Implemented first pass: collection-aware siteInventory, CMS collection role inference/mapping, synthetic CMS page IDs in single-page generation, utility-page bulk exclusions, diagnostics with collection identity/evidence/CMS delivery status, and JSON-only CMS field publishing through mapped collection fields such as schema-json-ld. Remaining polish: richer admin mapping UI and broader collection role test coverage.",
+          "notes": "Implemented first pass: collection-aware siteInventory, CMS collection role inference/mapping, synthetic CMS page IDs in single-page generation, utility-page bulk exclusions, diagnostics with collection identity/evidence/CMS delivery status, and JSON-only CMS field publishing through mapped collection fields such as schema-json-ld. Follow-up quality pass added persisted Detect + Map bindings for location/service fields, human-readable reference resolution, Service.offers from verified price/currency, safer homepage LocalBusiness gating, FAQ index suppression, and clearer schema-vs-CMS diagnostics. Remaining polish: broader collection role test coverage and deeper Webflow reference dereferencing where the API only returns IDs.",
           "status": "done"
         },
         {
