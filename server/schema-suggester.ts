@@ -1,4 +1,4 @@
-import { getCollectionSchema, listCollections } from './webflow.js';
+import { discoverSitemapUrls, getCollectionSchema, listCollections, resolveStaticPagePathsFromSitemap } from './webflow.js';
 import { getWorkspacePages } from './workspace-data.js';
 import { listWorkspaces } from './workspaces.js';
 import { generateLeanSchema } from './schema/index.js';
@@ -8,7 +8,7 @@ import { createLogger } from './logger.js';
 import type { ContentBrief } from '../shared/types/content.ts';
 import type { SchemaValidation } from './schema-validator.js';
 import { fetchPageMeta } from './seo-audit.js';
-import { fetchPublishedHtml } from './helpers.js';
+import { fetchPublishedHtml, resolvePagePath } from './helpers.js';
 import { resolveBaseUrl } from './url-helpers.js';
 import { createAiBudget } from './schema/extractors/page-elements/ai-budget.js';
 import type { AiBudget } from './schema/extractors/page-elements/ai-budget.js';
@@ -536,7 +536,9 @@ export async function generateSchemaForPage(
   if (!baseUrl) return null;
 
   const wsId = ctx.workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
-  const allPages = wsId ? await getWorkspacePages(wsId, siteId) : [];
+  const rawPages = wsId ? await getWorkspacePages(wsId, siteId) : [];
+  const sitemapUrls = rawPages.length > 0 ? await discoverSitemapUrls(baseUrl) : [];
+  const allPages = resolveStaticPagePathsFromSitemap(rawPages, sitemapUrls, baseUrl);
   let siteInventory: SiteInventorySlice | undefined;
   if (wsId) {
     siteInventory = await buildSiteInventory({
@@ -639,7 +641,7 @@ export async function generateSchemaForPage(
     }
   } catch { /* page list failure — fall back to derived path */ } // catch-ok
 
-  const url = isHomepage ? baseUrl : `${baseUrl}${publishedPath}`;
+  const url = publishedPath === '/' ? baseUrl : `${baseUrl}${publishedPath}`;
   const html = await fetchPublishedHtml(url);
   const roleOverride = resolveRoleOverride({
     siteId,
@@ -728,7 +730,9 @@ export async function generateSchemaSuggestions(
   if (!baseUrl) return [];
 
   const wsId = ctx.workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
-  const pages = wsId ? await getWorkspacePages(wsId, siteId) : [];
+  const rawPages = wsId ? await getWorkspacePages(wsId, siteId) : [];
+  const sitemapUrls = rawPages.length > 0 ? await discoverSitemapUrls(baseUrl) : [];
+  const pages = resolveStaticPagePathsFromSitemap(rawPages, sitemapUrls, baseUrl);
   const latestPlan = getSchemaPlan(siteId);
   const activePlan = latestPlan?.status === 'active' ? latestPlan : null;
   const siteInventory = wsId
@@ -757,12 +761,12 @@ export async function generateSchemaSuggestions(
   for (const page of pages) {
     if (isCancelled?.()) break;
     const slug = page.slug || '';
-    const publishedPath = page.publishedPath || (slug ? `/${slug}` : '/');
+    const publishedPath = resolvePagePath(page);
     if (shouldSkipBulkPage(publishedPath, findPlanRole(activePlan, publishedPath)?.role)) {
       recordSkippedUtility(skippedUtilities, publishedPath);
       continue;
     }
-    const url = (!slug || slug === 'index') ? baseUrl : `${baseUrl}${publishedPath}`;
+    const url = publishedPath === '/' ? baseUrl : `${baseUrl}${publishedPath}`;
     const html = await fetchPublishedHtml(url);
     const roleOverride = resolveRoleOverride({
       siteId,

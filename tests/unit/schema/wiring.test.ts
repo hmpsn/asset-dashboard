@@ -296,3 +296,88 @@ describe('WebPage node on homepage', () => {
     expect(hasWebPage).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Group 5: static page path resolution
+// ---------------------------------------------------------------------------
+describe('static sitemap path resolution', () => {
+  it('recovers a nested static page path from sitemap when Webflow only exposes the leaf slug', async () => {
+    const {
+      buildStaticSitemapPathIndex,
+      resolveStaticPagePathFromSitemap,
+    } = await import('../../../server/webflow-pages.js');
+    const index = buildStaticSitemapPathIndex([
+      'https://example.com/',
+      'https://example.com/services',
+      'https://example.com/services/veneers',
+    ], BASE_URL);
+
+    expect(resolveStaticPagePathFromSitemap({ slug: 'veneers', publishedPath: '/veneers' }, index))
+      .toBe('/services/veneers');
+  });
+
+  it('accepts sitemap URLs from the equivalent www host', async () => {
+    const {
+      buildStaticSitemapPathIndex,
+      resolveStaticPagePathFromSitemap,
+    } = await import('../../../server/webflow-pages.js');
+    const index = buildStaticSitemapPathIndex([
+      'https://www.example.com/services/veneers',
+    ], 'https://example.com');
+
+    expect(resolveStaticPagePathFromSitemap({ slug: 'veneers', publishedPath: '/veneers' }, index))
+      .toBe('/services/veneers');
+  });
+
+  it('normalizes sitemap path casing consistently before returning an enriched path', async () => {
+    const {
+      buildStaticSitemapPathIndex,
+      resolveStaticPagePathFromSitemap,
+    } = await import('../../../server/webflow-pages.js');
+    const index = buildStaticSitemapPathIndex([
+      'https://example.com/Services/Veneers',
+      'https://example.com/services/veneers',
+    ], BASE_URL);
+
+    expect(resolveStaticPagePathFromSitemap({ slug: 'veneers', publishedPath: '/veneers' }, index))
+      .toBe('/services/veneers');
+  });
+
+  it('keeps a static page path unchanged when it already matches the sitemap', async () => {
+    const {
+      buildStaticSitemapPathIndex,
+      resolveStaticPagePathFromSitemap,
+    } = await import('../../../server/webflow-pages.js');
+    const index = buildStaticSitemapPathIndex([
+      'https://example.com/services/veneers',
+    ], BASE_URL);
+
+    expect(resolveStaticPagePathFromSitemap({ slug: 'veneers', publishedPath: '/services/veneers' }, index))
+      .toBe('/services/veneers');
+  });
+
+  it('does not override static paths when sitemap leaf matches are ambiguous', async () => {
+    const {
+      buildStaticSitemapPathIndex,
+      resolveStaticPagePathFromSitemap,
+    } = await import('../../../server/webflow-pages.js');
+    const index = buildStaticSitemapPathIndex([
+      'https://example.com/services/veneers',
+      'https://example.com/cosmetic/veneers',
+    ], BASE_URL);
+
+    expect(resolveStaticPagePathFromSitemap({ slug: 'veneers', publishedPath: '/veneers' }, index))
+      .toBe('/veneers');
+  });
+
+  it('enriches page objects before site context and schema generation consume them', async () => {
+    const { resolveStaticPagePathsFromSitemap } = await import('../../../server/webflow-pages.js');
+    const pages = resolveStaticPagePathsFromSitemap([
+      { id: 'page-veneers', slug: 'veneers', publishedPath: '/veneers' },
+    ], [
+      'https://example.com/services/veneers',
+    ], BASE_URL);
+
+    expect(pages[0].publishedPath).toBe('/services/veneers');
+  });
+});
