@@ -21,6 +21,19 @@ import { contentScope } from './content-scope.js';
 
 const HOWTO_RE = /\b(how\s+to|step-by-step|tutorial|walkthrough)\b/i;
 const MIN_HOWTO_STEPS = 3;
+const MAX_STEP_NAME_LENGTH = 80;
+
+export function cleanHowToStepText(text: string): string {
+  return text.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+export function makeHowToStepName(text: string): string {
+  const cleaned = cleanHowToStepText(text);
+  const labelMatch = cleaned.match(/^(.{3,80}?)(?:\s+-\s+|:\s+)/);
+  const candidate = labelMatch?.[1] || cleaned.match(/^([^.!?]{8,80})[.!?]\s/)?.[1] || cleaned;
+  if (candidate.length <= MAX_STEP_NAME_LENGTH) return candidate;
+  return `${candidate.slice(0, MAX_STEP_NAME_LENGTH - 3).trim()}...`;
+}
 
 function findNearbyHowToHeading($: cheerio.CheerioAPI, $list: ReturnType<cheerio.CheerioAPI>): boolean {
   // 1) Page <h1>
@@ -56,9 +69,9 @@ export function extractLists($: cheerio.CheerioAPI): PageList[] {
       if (findNearbyHowToHeading($, $list)) {
         isHowToLike = true;
         steps = items.map((li, i) => {
-          const text = $(li).text().trim();
+          const text = cleanHowToStepText($(li).text());
           return {
-            name: text,
+            name: makeHowToStepName(text),
             text,
             position: i + 1,
           };

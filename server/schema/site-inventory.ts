@@ -34,8 +34,8 @@ function norm(s: string): string {
 export function isUtilitySchemaPath(path: string): { isUtility: boolean; reason?: string } {
   const p = path === '/' ? '/' : path.toLowerCase().replace(/\/$/, '');
   if (/^\/(?:401|403|404|500)$/.test(p)) return { isUtility: true, reason: 'system error page' };
-  if (/^\/(?:login|log-in|signin|sign-in|password|protected|search)$/.test(p)) return { isUtility: true, reason: 'system utility page' };
-  if (/(^|\/)(thank-you|thanks|success|confirmation|confirmed)$/.test(p)) return { isUtility: true, reason: 'post-conversion utility page' };
+  if (/(^|\/)(?:login|log-in|signin|sign-in|password|protected|search)(?:\/|$)/.test(p)) return { isUtility: true, reason: 'system utility page' };
+  if (/(^|\/)(thank-you|thanks|success|confirmation|confirmed)(?:\/|$)/.test(p)) return { isUtility: true, reason: 'post-conversion utility page' };
   return { isUtility: false };
 }
 
@@ -78,18 +78,44 @@ function targetForField(field: SiteInventoryField): SchemaFieldTarget | undefine
   return undefined;
 }
 
-function valueAsString(fieldData: Record<string, unknown> | null | undefined, slug: string | undefined): string | undefined {
-  if (!fieldData || !slug) return undefined;
-  const value = fieldData[slug];
-  if (typeof value === 'string' && value.trim()) return value.trim();
-  if (value && typeof value === 'object' && 'url' in value && typeof (value as { url?: unknown }).url === 'string') {
-    return ((value as { url: string }).url).trim();
+export function isOpaqueWebflowIdentifier(value: string): boolean {
+  const trimmed = value.trim();
+  return /^[a-f0-9]{24}$/i.test(trimmed) || /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed);
+}
+
+function cleanPublicFieldValue(value: string): string | undefined {
+  const trimmed = value.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, ' ').trim();
+  if (!trimmed || isOpaqueWebflowIdentifier(trimmed)) return undefined;
+  return trimmed;
+}
+
+function fieldValueToString(value: unknown): string | undefined {
+  if (typeof value === 'string') return cleanPublicFieldValue(value);
+  if (typeof value === 'number' || typeof value === 'boolean') return cleanPublicFieldValue(String(value));
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const resolved = fieldValueToString(item);
+      if (resolved) return resolved;
+    }
+    return undefined;
+  }
+  if (value && typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    for (const key of ['name', 'displayName', 'title', 'label', 'text', 'slug', 'url']) {
+      const resolved = fieldValueToString(obj[key]);
+      if (resolved) return resolved;
+    }
   }
   return undefined;
 }
 
+function valueAsString(fieldData: SiteInventoryFieldData | null | undefined, slug: string | undefined): string | undefined {
+  if (!fieldData || !slug) return undefined;
+  return fieldValueToString(fieldData[slug]);
+}
+
 function deriveBusinessProfile(
-  fieldData: Record<string, unknown> | null,
+  fieldData: SiteInventoryFieldData | null,
   targets: Partial<Record<SchemaFieldTarget, string>>,
   fallback: BusinessProfileContact | null | undefined,
 ): BusinessProfileContact | undefined {

@@ -23,6 +23,7 @@ import { isFeatureEnabled } from '../../../feature-flags.js';
 import { callAI } from '../../../ai.js';
 import { tryConsumeAiBudget } from './ai-budget.js';
 import type { AiBudget } from './ai-budget.js';
+import { cleanHowToStepText, makeHowToStepName } from './howto.js';
 import { createLogger } from '../../../logger.js';
 
 const log = createLogger('schema/extractors/howto-ai-fallback');
@@ -95,11 +96,14 @@ export async function aiDisambiguateHowTo(
       }
       const parsed: AiResponse = JSON.parse(text);
       if (parsed.howTo === true) {
-        const steps: HowToStep[] = items.map((text, idx) => ({
-          name: text,
-          text,
-          position: idx + 1,
-        }));
+        const steps: HowToStep[] = items.map((rawText, idx) => {
+          const stepText = cleanHowToStepText(rawText);
+          return {
+            name: makeHowToStepName(stepText),
+            text: stepText,
+            position: idx + 1,
+          };
+        });
         result.push({ ...list, isHowToLike: true, steps });
       } else {
         result.push(list);

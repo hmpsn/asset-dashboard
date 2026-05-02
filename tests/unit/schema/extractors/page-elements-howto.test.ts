@@ -77,6 +77,22 @@ describe('extractLists (HowTo detection)', () => {
     expect(lists[0].itemCount).toBe(3);
   });
 
+  it('keeps full HowTo step text but shortens verbose names', () => {
+    const $ = cheerio.load(`
+      <article>
+        <h1>How to complete treatment</h1>
+        <ol>
+          <li>Initial Consultation: The journey begins with an initial consultation where your dentist evaluates your teeth and goals.</li>
+          <li>3D Scanning: A digital scan creates a precise model for your treatment plan.</li>
+          <li>Retainers for Life: Retainers help maintain alignment after treatment is complete.</li>
+        </ol>
+      </article>
+    `);
+    const steps = extractLists($)[0].steps!;
+    expect(steps[0].name).toBe('Initial Consultation');
+    expect(steps[0].text).toContain('The journey begins with an initial consultation');
+  });
+
   it('requires at least 3 items to flag as HowTo (2-item ol is too thin per Google guidelines)', () => {
     const $ = cheerio.load(`
       <article>

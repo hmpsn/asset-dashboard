@@ -143,6 +143,45 @@ export const SCHEMA_ROLE_TO_PAGE_KIND: Partial<Record<SchemaPageRole, PageKind>>
   generic:      'WebPage',
 };
 
+const WEAK_CMS_PLAN_ROLES = new Set<SchemaPageRole>([
+  'generic',
+  'lead-gen',
+  'audience',
+  'pillar',
+  'partnership',
+  'comparison',
+]);
+
+export function isWeakCmsPlanRole(role: SchemaPageRole): boolean {
+  return WEAK_CMS_PLAN_ROLES.has(role);
+}
+
+export function shouldCollectionRoleOverridePlan(opts: {
+  isCmsItem?: boolean;
+  planRole?: SchemaPageRole;
+  collectionRole?: SchemaPageRole;
+  collectionRoleSource?: 'mapped' | 'inferred' | 'none';
+}): boolean {
+  return !!(
+    opts.isCmsItem
+    && opts.planRole
+    && isWeakCmsPlanRole(opts.planRole)
+    && opts.collectionRole
+    && opts.collectionRoleSource
+    && opts.collectionRoleSource !== 'none'
+  );
+}
+
+function isBlogIndexPath(pagePath: string): boolean {
+  const normalized = pagePath === '/' ? '/' : pagePath.toLowerCase().replace(/\/$/, '');
+  return ['/blog', '/blogs', '/news', '/insights', '/resources'].includes(normalized);
+}
+
+export function pageKindForRole(role: SchemaPageRole, pagePath: string): PageKind | undefined {
+  if (role === 'blog' && isBlogIndexPath(pagePath)) return undefined;
+  return SCHEMA_ROLE_TO_PAGE_KIND[role];
+}
+
 function pathMatchesRolePath(rolePath: string, pagePath: string): boolean {
   const normalizedPage = pagePath === '/' ? '/' : pagePath.replace(/\/$/, '');
   const normalizedRole = rolePath === '/' ? '/' : rolePath.replace(/\/$/, '');
@@ -159,49 +198,69 @@ function resolveRoleOverride(opts: {
   ctxPageType?: SchemaPageType;
   collectionRole?: SchemaPageRole;
   collectionRoleSource?: 'mapped' | 'inferred' | 'none';
+  isCmsItem?: boolean;
 }) {
   const latestPlan = getSchemaPlan(opts.siteId);
   const activePlan = latestPlan?.status === 'active' ? latestPlan : null;
   const planRole = findPlanRole(activePlan, opts.pagePath);
+  const hasCollectionRole = !!(opts.collectionRole && opts.collectionRoleSource && opts.collectionRoleSource !== 'none');
+  const shouldCollectionBeatPlan = shouldCollectionRoleOverridePlan({
+    isCmsItem: opts.isCmsItem,
+    planRole: planRole?.role,
+    collectionRole: opts.collectionRole,
+    collectionRoleSource: hasCollectionRole ? opts.collectionRoleSource : 'none',
+  });
   if (opts.ctxPageType && opts.ctxPageType !== 'auto') {
     const role = opts.ctxPageType as SchemaPageRole;
     return {
-      pageKindOverride: SCHEMA_ROLE_TO_PAGE_KIND[role],
+      pageKindOverride: pageKindForRole(role, opts.pagePath),
       schemaRoleOverride: { role, source: 'ui' as const, industrySubtype: planRole?.industrySubtype },
+      plannedRole: planRole?.role ?? role,
       inactivePlanStatus: activePlan ? undefined : latestPlan?.status,
       activePlan,
     };
   }
-  if (planRole) {
+  if (planRole && !shouldCollectionBeatPlan) {
     return {
-      pageKindOverride: SCHEMA_ROLE_TO_PAGE_KIND[planRole.role],
+      pageKindOverride: pageKindForRole(planRole.role, opts.pagePath),
       schemaRoleOverride: {
         role: planRole.role,
         source: 'site-plan' as const,
         industrySubtype: planRole.industrySubtype,
       },
+      plannedRole: planRole.role,
       inactivePlanStatus: undefined,
       activePlan,
     };
   }
   if (opts.collectionRole && opts.collectionRoleSource === 'mapped') {
     return {
-      pageKindOverride: SCHEMA_ROLE_TO_PAGE_KIND[opts.collectionRole],
+      pageKindOverride: pageKindForRole(opts.collectionRole, opts.pagePath),
       schemaRoleOverride: {
         role: opts.collectionRole,
         source: 'collection-map' as const,
       },
+      plannedRole: planRole?.role ?? opts.collectionRole,
+      roleDecisionDiagnostics: shouldCollectionBeatPlan && planRole ? [{
+        type: 'SchemaSitePlan',
+        reason: `Site plan role ${planRole.role} ignored: ${opts.collectionRole} collection role has higher confidence.`,
+      }] : undefined,
       inactivePlanStatus: latestPlan && latestPlan.status !== 'active' ? latestPlan.status : undefined,
       activePlan,
     };
   }
   if (opts.collectionRole && opts.collectionRoleSource === 'inferred') {
     return {
-      pageKindOverride: SCHEMA_ROLE_TO_PAGE_KIND[opts.collectionRole],
+      pageKindOverride: pageKindForRole(opts.collectionRole, opts.pagePath),
       schemaRoleOverride: {
         role: opts.collectionRole,
         source: 'collection-inferred' as const,
       },
+      plannedRole: planRole?.role ?? opts.collectionRole,
+      roleDecisionDiagnostics: shouldCollectionBeatPlan && planRole ? [{
+        type: 'SchemaSitePlan',
+        reason: `Site plan role ${planRole.role} ignored: ${opts.collectionRole} collection role has higher confidence.`,
+      }] : undefined,
       inactivePlanStatus: latestPlan && latestPlan.status !== 'active' ? latestPlan.status : undefined,
       activePlan,
     };
@@ -209,6 +268,7 @@ function resolveRoleOverride(opts: {
   return {
     pageKindOverride: undefined,
     schemaRoleOverride: undefined,
+    plannedRole: planRole?.role,
     inactivePlanStatus: latestPlan && latestPlan.status !== 'active' ? latestPlan.status : undefined,
     activePlan,
   };
@@ -443,9 +503,23 @@ function cmsDeliveryStatus(item: SiteInventoryCmsItem): SchemaCmsDeliveryStatus 
   };
 }
 
-function shouldSkipBulkPage(path: string, hasActivePlanRole: boolean): boolean {
+function shouldSkipBulkPage(path: string, activePlanRole?: SchemaPageRole): boolean {
   const exclusion = isUtilitySchemaPath(path);
-  return exclusion.isUtility && !hasActivePlanRole;
+  return exclusion.isUtility && (!activePlanRole || WEAK_CMS_PLAN_ROLES.has(activePlanRole));
+}
+
+function utilitySkipMessage(skippedUtilities: Map<string, number>): string {
+  const total = Array.from(skippedUtilities.values()).reduce((sum, count) => sum + count, 0);
+  if (total === 0) return '';
+  const reasons = Array.from(skippedUtilities.entries())
+    .map(([reason, count]) => `${count} ${reason}`)
+    .join(', ');
+  return ` · skipped ${total} utility page${total === 1 ? '' : 's'} (${reasons})`;
+}
+
+function recordSkippedUtility(skippedUtilities: Map<string, number>, path: string): void {
+  const reason = isUtilitySchemaPath(path).reason ?? 'utility page';
+  skippedUtilities.set(reason, (skippedUtilities.get(reason) ?? 0) + 1);
 }
 
 export async function generateSchemaForPage(
@@ -483,6 +557,7 @@ export async function generateSchemaForPage(
       ctxPageType: ctx.pageType,
       collectionRole: cmsItem.effectiveRole,
       collectionRoleSource: cmsItem.roleSource,
+      isCmsItem: true,
     });
     let pageKeywords: { primary: string; secondary: string[] } | undefined;
     if (wsId) {
@@ -525,6 +600,8 @@ export async function generateSchemaForPage(
       aiBudget,
       pageKindOverride: roleOverride.pageKindOverride,
       schemaRoleOverride: roleOverride.schemaRoleOverride,
+      plannedSchemaRole: roleOverride.plannedRole,
+      roleDecisionDiagnostics: roleOverride.roleDecisionDiagnostics,
       inactivePlanStatus: roleOverride.inactivePlanStatus,
       collectionIdentity: collectionIdentity(cmsItem),
       cmsDeliveryStatus: cmsDeliveryStatus(cmsItem),
@@ -617,6 +694,8 @@ export async function generateSchemaForPage(
     siteContext: siteContextForPage, // cross-page hub enrichment
     pageKindOverride: roleOverride.pageKindOverride,
     schemaRoleOverride: roleOverride.schemaRoleOverride,
+    plannedSchemaRole: roleOverride.plannedRole,
+    roleDecisionDiagnostics: roleOverride.roleDecisionDiagnostics,
     inactivePlanStatus: roleOverride.inactivePlanStatus,
   });
 
@@ -670,12 +749,14 @@ export async function generateSchemaSuggestions(
   const aiBudget = allocateElementAiBudget();
 
   const results: SchemaPageSuggestion[] = [];
+  const skippedUtilities = new Map<string, number>();
 
   for (const page of pages) {
     if (isCancelled?.()) break;
     const slug = page.slug || '';
     const publishedPath = page.publishedPath || (slug ? `/${slug}` : '/');
-    if (shouldSkipBulkPage(publishedPath, !!findPlanRole(activePlan, publishedPath))) {
+    if (shouldSkipBulkPage(publishedPath, findPlanRole(activePlan, publishedPath)?.role)) {
+      recordSkippedUtility(skippedUtilities, publishedPath);
       continue;
     }
     const url = (!slug || slug === 'index') ? baseUrl : `${baseUrl}${publishedPath}`;
@@ -735,10 +816,12 @@ export async function generateSchemaSuggestions(
       siteContext, // cross-page hub enrichment
       pageKindOverride: roleOverride.pageKindOverride,
       schemaRoleOverride: roleOverride.schemaRoleOverride,
+      plannedSchemaRole: roleOverride.plannedRole,
+      roleDecisionDiagnostics: roleOverride.roleDecisionDiagnostics,
       inactivePlanStatus: roleOverride.inactivePlanStatus,
     });
     results.push(leanToSuggestion(lean));
-    onProgress?.(results, false, `Processed ${results.length} of ${pages.length} static pages...`);
+    onProgress?.(results, false, `Processed ${results.length} of ${pages.length} static pages${utilitySkipMessage(skippedUtilities)}...`);
   }
 
   // CMS pages — same lean path
@@ -746,7 +829,8 @@ export async function generateSchemaSuggestions(
     const cmsItems = siteInventory?.cmsItems ?? [];
     for (const item of cmsItems) {
       if (isCancelled?.()) break;
-      if (shouldSkipBulkPage(item.path, !!findPlanRole(activePlan, item.path))) {
+      if (shouldSkipBulkPage(item.path, findPlanRole(activePlan, item.path)?.role)) {
+        recordSkippedUtility(skippedUtilities, item.path);
         continue;
       }
       const itemHtml = await fetchPublishedHtml(item.url);
@@ -756,6 +840,7 @@ export async function generateSchemaSuggestions(
         ctxPageType: undefined,
         collectionRole: item.effectiveRole,
         collectionRoleSource: item.roleSource,
+        isCmsItem: true,
       });
       // Per-page slice fetch for CMS item pageKeywords.
       let cmsPageKeywords: { primary: string; secondary: string[] } | undefined;
@@ -799,6 +884,8 @@ export async function generateSchemaSuggestions(
         aiBudget, // PR2: same shared budget — drains across CMS pages in same run
         pageKindOverride: roleOverride.pageKindOverride,
         schemaRoleOverride: roleOverride.schemaRoleOverride,
+        plannedSchemaRole: roleOverride.plannedRole,
+        roleDecisionDiagnostics: roleOverride.roleDecisionDiagnostics,
         inactivePlanStatus: roleOverride.inactivePlanStatus,
         collectionIdentity: collectionIdentity(item),
         cmsDeliveryStatus: cmsDeliveryStatus(item),
@@ -807,7 +894,7 @@ export async function generateSchemaSuggestions(
     }
   }
 
-  onProgress?.(results, true, 'Done');
+  onProgress?.(results, true, `Done${utilitySkipMessage(skippedUtilities)}`);
   return results;
 }
 
