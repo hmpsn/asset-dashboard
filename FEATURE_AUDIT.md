@@ -1066,6 +1066,16 @@ A comprehensive value assessment of every feature in the platform — **310 feat
 
 ---
 
+### 84a. Intelligence Layer Gap Follow-Up
+
+**What it does:** Tightens audit finding auto-resolution so scheduled and on-demand audit passes only resolve bridge-generated `audit_finding` insights from `bridge-audit-page-health` or `bridge-audit-site-health`, leaving manual findings untouched. Also populates `siteHealth.cwvPassRate.desktop` from the latest audit `cwvSummary.desktop` as a homepage/site-level pass indicator until PageSpeed snapshots are keyed by strategy.
+
+**Files:** `server/scheduled-audits.ts`, `server/routes/webflow-seo.ts`, `server/workspace-intelligence.ts`, `tests/integration/audit-insight-resolution.test.ts`, `tests/assemble-site-health.test.ts`
+
+**Agency value:** Prevents automated audit cleanup from closing manually-created findings while giving AI/admin context an accurate desktop CWV signal from already-captured audit data.
+
+---
+
 ### 85. Anomaly Boost Reversal
 
 **Status:** Shipped (PR 3 — Platform Health Sprint)

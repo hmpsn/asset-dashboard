@@ -287,6 +287,45 @@ describe('assembleSiteHealth', () => {
     expect(health.schemaValidation?.valid).toBe(1);
   });
 
+  it('populates desktop CWV pass rate from the latest audit summary', async () => {
+    getWorkspace.mockReturnValue(makeMockWorkspace());
+    getLatestSnapshot.mockReturnValue({
+      ...makeMockSnapshot(90, 80),
+      audit: {
+        ...makeMockSnapshot(90, 80).audit,
+        cwvSummary: {
+          desktop: {
+            assessment: 'good',
+            fieldDataAvailable: true,
+            lighthouseScore: 95,
+            metrics: {
+              LCP: { value: 1800, rating: 'good' },
+              INP: { value: 120, rating: 'good' },
+              CLS: { value: 0.05, rating: 'good' },
+            },
+          },
+        },
+      },
+    });
+    listSnapshots.mockReturnValue([
+      { id: 'snap-1', createdAt: new Date().toISOString(), siteScore: 90, totalPages: 10, errors: 0, warnings: 1, infos: 3 },
+      { id: 'snap-0', createdAt: new Date(Date.now() - 86400000).toISOString(), siteScore: 80, totalPages: 10, errors: 2, warnings: 3, infos: 2 },
+    ]);
+    getPageSpeed.mockReturnValue(makeMockPageSpeedResult());
+    getLinkCheck.mockReturnValue(null);
+    getRedirectSnapshot.mockReturnValue(null);
+    listAnomalies.mockReturnValue([]);
+    getSeoChanges.mockReturnValue([]);
+    getCachedArchitecture.mockResolvedValue({ ...makeMockArchitecture(), orphanPaths: [] });
+    flattenTree.mockReturnValue([]);
+    getValidations.mockReturnValue([]);
+
+    const intel = await buildWorkspaceIntelligence('ws-1', { slices: ['siteHealth'] });
+    const health = intel.siteHealth as SiteHealthSlice;
+
+    expect(health.cwvPassRate.desktop).toBe(1);
+  });
+
   // ── Test 2: Empty data defaults ──────────────────────────────────────────
 
   it('returns sensible defaults when all sources return null/empty', async () => {
