@@ -1,7 +1,7 @@
 // src/components/client/OutcomeSummary.tsx
 // Outcome scorecard for the client portal — tiered display of win rates and outcomes.
 
-import { TrendingUp, TrendingDown, Minus, BarChart3, CheckCircle2, Clock, Trophy } from 'lucide-react';
+import { ArrowUp, ArrowDown, Minus, BarChart3, CheckCircle2, Clock, Trophy } from 'lucide-react';
 import { SectionCard, EmptyState, Skeleton, StatCard } from '../ui';
 import { Icon } from '../ui/Icon';
 import { FeatureFlag } from '../ui/FeatureFlag';
@@ -25,8 +25,8 @@ const ACTION_TYPE_LABELS: Record<ActionType, string> = {
 };
 
 function TrendIcon({ trend }: { trend: LearningsTrend }) {
-  if (trend === 'improving') return <Icon as={TrendingUp} size="md" className="text-accent-success" />;
-  if (trend === 'declining') return <Icon as={TrendingDown} size="md" className="text-accent-danger" />;
+  if (trend === 'improving') return <Icon as={ArrowUp} size="md" className="text-accent-success" />;
+  if (trend === 'declining') return <Icon as={ArrowDown} size="md" className="text-accent-danger" />;
   return <Icon as={Minus} size="md" className="text-[var(--brand-text)]" />;
 }
 
@@ -169,19 +169,19 @@ function PremiumBreakdown({ scorecard }: { scorecard: OutcomeScorecard }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1">
             <p className="t-caption text-[var(--brand-text-muted)]">Total scored actions</p>
-            <p className="text-xl font-semibold text-[var(--brand-text-bright)]">{totalScored}</p>
+            <p className="t-stat text-[var(--brand-text-bright)]">{totalScored}</p>
           </div>
           <div className="space-y-1">
             <p className="t-caption text-[var(--brand-text-muted)]">Confirmed wins</p>
-            <p className="text-xl font-semibold text-accent-success">{totalWins}</p>
+            <p className="t-stat text-accent-success">{totalWins}</p>
           </div>
           <div className="space-y-1">
             <p className="t-caption text-[var(--brand-text-muted)]">Pending measurement</p>
-            <p className="text-xl font-semibold text-[var(--brand-text-bright)]">{scorecard.pendingMeasurement}</p>
+            <p className="t-stat text-[var(--brand-text-bright)]">{scorecard.pendingMeasurement}</p>
           </div>
           <div className="space-y-1">
             <p className="t-caption text-[var(--brand-text-muted)]">Strong wins (top score)</p>
-            <p className={`text-xl font-semibold ${winRateColor(scorecard.strongWinRate)}`}>
+            <p className={`t-stat ${winRateColor(scorecard.strongWinRate)}`}>
               {Math.round(scorecard.strongWinRate * 100)}%
             </p>
           </div>

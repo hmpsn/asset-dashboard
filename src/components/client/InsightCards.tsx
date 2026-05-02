@@ -1,4 +1,4 @@
-import { TrendingUp, TrendingDown, Clock, Target, Award, Code2, HeartPulse } from 'lucide-react';
+import { ArrowUp, ArrowDown, Clock, Target, Award, Code2, HeartPulse } from 'lucide-react';
 import { Icon } from '../ui/Icon';
 import { SectionCard } from '../ui/SectionCard';
 import { Skeleton } from '../ui/Skeleton';
@@ -24,7 +24,7 @@ function TrafficMomentumCard({ insights, loading }: { insights: AnalyticsInsight
   return (
     <SectionCard
       title="Traffic Momentum"
-      titleIcon={<Icon as={TrendingUp} size="sm" className="text-accent-brand" />}
+      titleIcon={<Icon as={ArrowUp} size="sm" className="text-accent-brand" />}
     >
       {loading ? (
         <div className="space-y-2">
@@ -367,7 +367,7 @@ export function SiteHealthCard({
       ) : (
         <div className="space-y-2 t-body">
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-semibold text-[var(--brand-text-bright)]">{data.siteScore}</span>
+            <span className="t-stat font-semibold text-[var(--brand-text-bright)]">{data.siteScore}</span>
             <span className="text-[var(--brand-text-muted)] t-caption">/ 100</span>
             {data.scoreDelta != null && (
               <span
@@ -414,7 +414,7 @@ function CompetitorAlertCard({ insights, tier, loading }: { insights: AnalyticsI
   return (
     <SectionCard
       title="Competitor Alerts"
-      titleIcon={<Icon as={TrendingDown} size="sm" className="text-accent-info" />}
+      titleIcon={<Icon as={ArrowDown} size="sm" className="text-accent-info" />}
     >
       <TierGate
         tier={tier}
@@ -462,7 +462,7 @@ function EmergingKeywordCard({ insights, tier, loading }: { insights: AnalyticsI
   return (
     <SectionCard
       title="Rising Search Trends"
-      titleIcon={<Icon as={TrendingUp} size="sm" className="text-accent-info" />}
+      titleIcon={<Icon as={ArrowUp} size="sm" className="text-accent-info" />}
     >
       <TierGate
         tier={tier}

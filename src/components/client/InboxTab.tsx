@@ -144,7 +144,7 @@ export function InboxTab({
         <div className="flex items-center gap-3 mb-4">
           <Icon as={Inbox} size="lg" className="text-accent-brand" />
           <div>
-            <h2 className="text-xl font-semibold text-[var(--brand-text)]">Inbox</h2>
+            <h2 className="t-h2 text-[var(--brand-text)]">Inbox</h2>
             <p className="t-body text-[var(--brand-text-muted)] mt-0.5">{betaMode ? 'SEO changes and requests — all in one place.' : 'SEO changes, requests, and content — all in one place.'}</p>
           </div>
         </div>

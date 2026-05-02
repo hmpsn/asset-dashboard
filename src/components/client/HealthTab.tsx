@@ -167,7 +167,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
       {/* ── HEADER ── */}
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-[var(--brand-text)]">Site Health</h2>
+          <h2 className="t-h2 text-[var(--brand-text)]">Site Health</h2>
           <p className="t-body text-[var(--brand-text-muted)] mt-1">{auditDetail.audit.totalPages} pages · Last scanned {new Date(auditDetail.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
         </div>
         <div className="relative" ref={shareRef}>
@@ -228,7 +228,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
         return ( // pr-check-disable-next-line -- Brand signature radius intentional
           <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-5" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
             <div className="flex items-center gap-4">
-              <div className={`text-4xl font-bold ${scoreColorClass(score)}`}>{score}</div>
+              <div className={`t-stat-lg ${scoreColorClass(score)}`}>{score}</div>
               <div className="flex-1">
                 <div className="t-body font-medium text-[var(--brand-text)]">Your site's health</div>
                 <div className="t-caption text-[var(--brand-text-muted)] mt-0.5">{summary}</div>

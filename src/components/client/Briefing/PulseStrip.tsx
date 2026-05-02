@@ -143,7 +143,7 @@ export function PulseStrip({ data, isLoading }: PulseStripProps): ReactNode {
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="t-label text-[var(--brand-text-muted)]">SITE HEALTH</span>
-                <span className="text-2xl font-bold leading-none text-[var(--brand-text-muted)]">—</span>
+                <span className="t-stat leading-none text-[var(--brand-text-muted)]">—</span>
               </div>
             </>
           )}

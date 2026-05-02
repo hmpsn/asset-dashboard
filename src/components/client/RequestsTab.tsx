@@ -75,7 +75,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
         <div className="flex items-center gap-3">
           <Icon as={MessageSquare} size="lg" className="text-accent-brand" />
           <div>
-            <h2 className="text-xl font-semibold text-[var(--brand-text)]">Requests</h2>
+            <h2 className="t-h2 text-[var(--brand-text)]">Requests</h2>
             <p className="t-body text-[var(--brand-text-muted)] mt-1">Submit requests for {STUDIO_NAME} to action on.</p>
           </div>
         </div>

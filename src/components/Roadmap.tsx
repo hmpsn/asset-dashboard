@@ -141,7 +141,7 @@ export function Roadmap() {
       <SectionCard noPadding>
         <div className="px-4 py-3">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-[var(--brand-text)]">Overall Progress</span>
+            <span className="t-caption-sm font-medium text-[var(--brand-text)]">Overall Progress</span>
             {currentSprint && <span className="t-caption text-accent-brand">Current: {currentSprint.name}</span>}
           </div>
           <div className="h-2.5 bg-[var(--surface-1)] rounded-[var(--radius-pill)] overflow-hidden flex">

@@ -155,7 +155,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
       <div className="flex items-center gap-3">
         <Icon as={Shield} size="lg" className="text-accent-brand" />
         <div>
-          <h2 className="text-xl font-semibold text-[var(--brand-text)]">Schema Strategy Review</h2>
+          <h2 className="t-h2 text-[var(--brand-text)]">Schema Strategy Review</h2>
           <p className="t-body text-[var(--brand-text-muted)] mt-1">
             Review the structured data plan for your website. This determines how your pages appear in Google search results.
           </p>

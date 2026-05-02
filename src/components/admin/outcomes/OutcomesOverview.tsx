@@ -88,7 +88,7 @@ function WorkspaceRow({ ws }: { ws: WorkspaceOutcomeOverview }) {
       {/* Workspace name */}
       <td className="py-3 px-4">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-[var(--brand-text-bright)]">{ws.workspaceName}</span>
+          <span className="t-ui text-[var(--brand-text-bright)]">{ws.workspaceName}</span>
           {ws.attentionNeeded && (
             <span title={ws.attentionReason ?? 'Needs attention'}>
               <AlertTriangle className="w-3.5 h-3.5 text-accent-warning flex-shrink-0" />
@@ -96,30 +96,30 @@ function WorkspaceRow({ ws }: { ws: WorkspaceOutcomeOverview }) {
           )}
         </div>
         {ws.attentionReason && (
-          <p className="text-xs text-accent-warning mt-0.5">{ws.attentionReason}</p>
+          <p className="t-caption-sm text-accent-warning mt-0.5">{ws.attentionReason}</p>
         )}
       </td>
 
       {/* Win rate */}
-      <td className={`py-3 px-4 text-sm font-semibold ${winRateClass(ws.winRate)}`}>
+      <td className={`py-3 px-4 t-caption ${winRateClass(ws.winRate)}`}>
         {ws.scoredLast30d > 0 ? `${winPct}%` : <span className="text-[var(--brand-text-muted)] font-normal">—</span>}
       </td>
 
       {/* Trend */}
       <td className="py-3 px-4">
-        <div className={`flex items-center gap-1.5 text-xs ${trendColor(ws.trend)}`}>
+        <div className={`flex items-center gap-1.5 t-caption-sm ${trendColor(ws.trend)}`}>
           {trendIcon(ws.trend)}
           {trendLabel(ws.trend)}
         </div>
       </td>
 
       {/* Active actions */}
-      <td className="py-3 px-4 text-sm text-[var(--brand-text-bright)]">
+      <td className="py-3 px-4 t-caption-sm text-[var(--brand-text-bright)]">
         {ws.activeActions}
       </td>
 
       {/* Scored last 30d */}
-      <td className="py-3 px-4 text-sm text-accent-info">
+      <td className="py-3 px-4 t-caption-sm text-accent-info">
         {ws.scoredLast30d}
       </td>
 
@@ -127,17 +127,17 @@ function WorkspaceRow({ ws }: { ws: WorkspaceOutcomeOverview }) {
       <td className="py-3 px-4 max-w-xs">
         {ws.topWin ? (
           <div className="space-y-0.5">
-            <p className="text-xs text-[var(--brand-text-bright)] truncate">
+            <p className="t-caption-sm text-[var(--brand-text-bright)] truncate">
               {ws.topWin.targetKeyword
                 ? `"${ws.topWin.targetKeyword}"`
                 : ws.topWin.pageUrl?.replace(/^https?:\/\/[^/]+/, '') ?? 'Unknown page'}
             </p>
-            <p className={`text-xs font-medium ${winRateClass(ws.winRate)}`}>
+            <p className={`t-caption-sm font-medium ${winRateClass(ws.winRate)}`}>
               {ws.topWin.delta.delta_percent >= 0 ? '+' : ''}{ws.topWin.delta.delta_percent.toFixed(1)}% {ws.topWin.delta.primary_metric}
             </p>
           </div>
         ) : (
-          <span className="text-xs text-[var(--brand-text-muted)]">No wins yet</span>
+          <span className="t-caption-sm text-[var(--brand-text-muted)]">No wins yet</span>
         )}
       </td>
 
@@ -219,8 +219,8 @@ export default function OutcomesOverview() {
               <SectionCard>
                 <div className="flex items-center gap-2 mb-4">
                   <Activity className="w-4 h-4 text-accent-info" />
-                  <h3 className="text-sm font-semibold text-[var(--brand-text-bright)]">All workspaces</h3>
-                  <span className="text-xs text-[var(--brand-text-muted)] ml-auto">
+                  <h3 className="t-caption text-[var(--brand-text-bright)]">All workspaces</h3>
+                  <span className="t-caption-sm text-[var(--brand-text-muted)] ml-auto">
                     {workspaces.length} {workspaces.length === 1 ? 'workspace' : 'workspaces'}
                   </span>
                 </div>
@@ -228,7 +228,7 @@ export default function OutcomesOverview() {
                 <div className="overflow-x-auto -mx-1">
                   <table className="w-full text-left min-w-[640px]">
                     <thead>
-                      <tr className="text-xs font-medium uppercase tracking-wider text-[var(--brand-text-muted)]">
+                      <tr className="t-caption-sm font-medium uppercase tracking-wider text-[var(--brand-text-muted)]">
                         <th scope="col" className="pb-2 px-4">Workspace</th>
                         <th scope="col" className="pb-2 px-4">Win rate</th>
                         <th scope="col" className="pb-2 px-4">Trend</th>

@@ -141,7 +141,7 @@ export function OverviewTab({
   return (<>
     {/* Welcome header */}
     <div className="mb-2">
-      <h2 className="text-xl font-semibold text-[var(--brand-text)]">Welcome back{clientUser ? `, ${clientUser.name.split(' ')[0]}` : ''}</h2>
+      <h2 className="t-h2 text-[var(--brand-text)]">Welcome back{clientUser ? `, ${clientUser.name.split(' ')[0]}` : ''}</h2>
       <p className="t-body text-[var(--brand-text-muted)] mt-1 leading-relaxed">{dynamicSubtitle}</p>
     </div>
 
@@ -179,7 +179,7 @@ export function OverviewTab({
               </div>
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="text-2xl font-bold leading-none text-[var(--brand-text)]">{audit.siteScore}</div>
+                  <div className="t-stat leading-none text-[var(--brand-text)]">{audit.siteScore}</div>
                   <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">of 100</div>
                 </div>
                 <MetricRing score={audit.siteScore} size={44} />
@@ -361,7 +361,7 @@ export function OverviewTab({
         {!overview && !audit && !ga4Overview && ( // pr-check-disable-next-line -- Brand signature radius intentional
           <div className="bg-gradient-to-br from-teal-500/10 via-[var(--surface-2)] to-emerald-500/10 border border-[var(--brand-border)] p-8" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
             <div className="w-12 h-12 rounded-[var(--radius-xl)] bg-teal-500/10 flex items-center justify-center mx-auto mb-4"><Icon as={BarChart3} size="xl" className="text-accent-brand" /></div>
-            <h2 className="text-lg font-semibold text-[var(--brand-text)] mb-2">{ws.name}</h2>
+            <h2 className="t-h2 text-[var(--brand-text)] mb-2">{ws.name}</h2>
             <p className="t-body text-[var(--brand-text-muted)] mb-6 leading-relaxed">We're getting everything set up for you. Here's what we need:</p>
             
             <div className="space-y-3 max-w-md mx-auto">

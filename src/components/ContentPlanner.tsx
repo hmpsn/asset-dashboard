@@ -142,13 +142,13 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
           icon={AlertTriangle}
           title="Matrix not found"
           description="This content matrix may have been deleted."
-          action={<button onClick={() => setView({ mode: 'list' })} className="text-xs px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/15 transition-colors">Back to List</button>}
+          action={<button onClick={() => setView({ mode: 'list' })} className="t-caption-sm px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/15 transition-colors">Back to List</button>}
         />
       );
     }
     return (
       <div className="space-y-2">
-        <button onClick={() => setView({ mode: 'list' })} className="flex items-center gap-1 text-xs text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
+        <button onClick={() => setView({ mode: 'list' })} className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">
           ← Back to Planner
         </button>
         <MatrixGrid
@@ -168,7 +168,7 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
     return (
       <div className="flex items-center justify-center py-24 gap-3">
         <Icon as={Loader2} size="lg" className="animate-spin text-accent-brand" />
-        <span className="text-sm text-[var(--brand-text)]">Loading content planner…</span>
+        <span className="t-caption-sm text-[var(--brand-text)]">Loading content planner…</span>
       </div>
     );
   }
@@ -179,7 +179,7 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
         icon={AlertTriangle}
         title="Failed to load planner"
         description={error}
-        action={<button onClick={loadData} className="text-xs px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/15 transition-colors">Retry</button>}
+        action={<button onClick={loadData} className="t-caption-sm px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/15 transition-colors">Retry</button>}
       />
     );
   }
@@ -201,7 +201,7 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
           action={
             <button
               onClick={() => setView({ mode: 'template-editor' })}
-              className="flex items-center gap-1.5 text-xs px-4 py-2 rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/15 transition-colors font-medium"
+              className="flex items-center gap-1.5 t-caption-sm px-4 py-2 rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/15 transition-colors font-medium"
             >
               <Icon as={Plus} size="md" />
               Create First Template
@@ -225,7 +225,7 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setView({ mode: 'template-editor' })}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--brand-border-hover)] transition-colors"
+              className="flex items-center gap-1.5 t-caption-sm px-3 py-1.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--brand-border-hover)] transition-colors"
             >
               <Icon as={FileText} size="sm" />
               New Template
@@ -233,7 +233,7 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
             {templates.length > 0 && (
               <button
                 onClick={() => setView({ mode: 'matrix-builder' })}
-                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/15 transition-colors"
+                className="flex items-center gap-1.5 t-caption-sm px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/15 transition-colors"
               >
                 <Icon as={Grid3X3} size="sm" />
                 Build Matrix
@@ -247,7 +247,7 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
         // pr-check-disable-next-line -- Error banner uses brand signature radius as alert chrome, not a content card.
         <div className="flex items-start gap-2 px-4 py-3 bg-red-500/5 border border-red-500/15" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
           <Icon as={AlertTriangle} size="md" className="text-accent-danger flex-shrink-0 mt-0.5" />
-          <span className="text-xs text-accent-danger">{error}</span>
+          <span className="t-caption-sm text-accent-danger">{error}</span>
         </div>
       )}
 
@@ -274,7 +274,7 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
                   <div className="flex items-center gap-2.5 min-w-0">
                     <Icon as={FileText} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
                     <div className="min-w-0">
-                      <span className="text-xs font-medium text-[var(--brand-text-bright)] group-hover:text-white transition-colors truncate block">
+                      <span className="t-caption-sm font-medium text-[var(--brand-text-bright)] group-hover:text-white transition-colors truncate block">
                         {t.name}
                       </span>
                       <span className="t-caption-sm text-[var(--brand-text-muted)]">
@@ -321,7 +321,7 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
                   <div className="flex items-center gap-2.5 min-w-0">
                     <Icon as={Grid3X3} size="md" className="text-[var(--brand-text-muted)] flex-shrink-0" />
                     <div className="min-w-0">
-                      <span className="text-xs font-medium text-[var(--brand-text-bright)] group-hover:text-white transition-colors truncate block">
+                      <span className="t-caption-sm font-medium text-[var(--brand-text-bright)] group-hover:text-white transition-colors truncate block">
                         {m.name}
                       </span>
                       <span className="t-caption-sm text-[var(--brand-text-muted)]">

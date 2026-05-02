@@ -13,7 +13,7 @@ export function WorkspaceHealthBadge({ score, size = 36 }: WorkspaceHealthBadgeP
   return (
     <div className="flex items-center gap-1.5">
       <MetricRingSvg score={rounded} size={size} />
-      <span className={`text-sm font-semibold ${scoreColorClass(rounded)}`}>
+      <span className={`t-caption ${scoreColorClass(rounded)}`}>
         {rounded}
       </span>
     </div>

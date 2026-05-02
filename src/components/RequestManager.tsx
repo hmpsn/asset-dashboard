@@ -221,7 +221,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
         <div className="flex items-center gap-3">
           <Icon as={MessageSquare} size="lg" className="text-accent-brand" />
           <div>
-            <h2 className="text-sm font-semibold text-[var(--brand-text-bright)]">Client Requests</h2>
+            <h2 className="t-caption text-[var(--brand-text-bright)]">Client Requests</h2>
             <p className="t-caption mt-0.5 text-[var(--brand-text-muted)]">Review, respond to, and manage client requests across workspaces.</p>
           </div>
         </div>
@@ -239,14 +239,14 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
               { label: 'Resolved', value: counts.completed, cls: 'text-accent-success' },
             ].map(s => (
               <div key={s.label} className="text-center">
-                <div className={cn('text-xl font-bold', s.cls)}>{s.value}</div>
+                <div className={cn('t-stat', s.cls)}>{s.value}</div>
                 <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)]">{s.label}</div>
               </div>
             ))}
           </div>
           {counts.total > 0 && (
             <div className="text-right">
-              <div className="text-lg font-bold text-accent-success">
+              <div className="t-stat-sm text-accent-success">
                 {Math.round((counts.completed / counts.total) * 100)}%
               </div>
               <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)]">Complete</div>
@@ -296,7 +296,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
       {!loading && filtered.length === 0 && (
         <div className="text-center py-16">
           <Icon as={MessageSquare} size="2xl" className="mx-auto mb-2 text-[var(--brand-text-muted)]" />
-          <p className="text-sm text-[var(--brand-text-muted)]">
+          <p className="t-caption-sm text-[var(--brand-text-muted)]">
             {requests.length === 0 ? 'No client requests yet' : 'No requests match filters'}
           </p>
           <p className="t-caption mt-1 text-[var(--brand-text-muted)]">Clients can submit requests from their dashboard.</p>
@@ -309,7 +309,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
         <div className="rounded-[var(--radius-xl)] px-4 py-3 flex items-center gap-3 flex-wrap bg-[var(--surface-2)] border-2 border-[var(--teal)]" style={{ boxShadow: '0 0 12px color-mix(in srgb, var(--teal) 10%, transparent)' }}>
           <div className="flex items-center gap-2">
             <Icon as={CheckCheck} size="md" className="text-accent-brand" />
-            <span className="text-xs font-semibold text-[var(--brand-text-bright)]">{selected.size} selected</span>
+            <span className="t-caption-sm font-semibold text-[var(--brand-text-bright)]">{selected.size} selected</span>
           </div>
           <div className="h-4 w-px bg-[var(--brand-border)]" />
           <div className="flex items-center gap-1">
@@ -371,7 +371,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                     <div className="flex items-center gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className={cn('text-xs font-medium truncate text-[var(--brand-text-bright)]', isDone && 'line-through opacity-60')}>{req.title}</span>
+                          <span className={cn('t-caption-sm font-medium truncate text-[var(--brand-text-bright)]', isDone && 'line-through opacity-60')}>{req.title}</span>
                           <span className={cn('t-caption px-1.5 py-0.5 rounded border shrink-0', statusOpt.color)}>
                             {statusOpt.label}
                           </span>

@@ -174,7 +174,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Icon as={CalendarIcon} size="lg" className="text-accent-warning" />
-          <h2 className="text-lg font-semibold text-[var(--brand-text-bright)]">Content Calendar</h2>
+          <h2 className="t-h2 text-[var(--brand-text-bright)]">Content Calendar</h2>
         </div>
         <div className="flex items-center gap-2">
           {/* Type filter pills */}
@@ -204,7 +204,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
           { label: 'Published', value: stats.published, color: 'text-accent-success', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
         ].map(s => (
           <div key={s.label} className={`border ${s.border} ${s.bg} px-4 py-3`} style={{ borderRadius: 'var(--radius-signature)' }}>
-            <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
+            <div className={`t-stat ${s.color}`}>{s.value}</div>
             <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{s.label}</div>
           </div>
         ))}
@@ -220,7 +220,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
           <Icon as={ChevronLeft} size="md" />
         </button>
         <div className="flex items-center gap-3">
-          <span className="text-sm font-medium text-[var(--brand-text-bright)]">{formatMonthYear(currentMonth)}</span>
+          <span className="t-ui text-[var(--brand-text-bright)]">{formatMonthYear(currentMonth)}</span>
           {!isCurrentMonth && (
             <button
               onClick={() => setCurrentMonth(startOfMonth(new Date()))}
@@ -301,14 +301,14 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
         // pr-check-disable-next-line -- Selected-day detail is paired with the calendar grid and shares its signature shell.
         <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
           <div className="px-4 py-3 border-b border-[var(--brand-border)]/50 flex items-center justify-between">
-            <span className="text-xs font-medium text-[var(--brand-text-bright)]">
+            <span className="t-caption-sm font-medium text-[var(--brand-text-bright)]">
               {new Date(selectedDay + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
             </span>
             <span className="t-caption-sm text-[var(--brand-text-muted)]">{selectedItems.length} item{selectedItems.length !== 1 ? 's' : ''}</span>
           </div>
 
           {selectedItems.length === 0 ? (
-            <div className="px-4 py-8 text-center text-sm text-[var(--brand-text-muted)]">No content items on this day</div>
+            <div className="px-4 py-8 text-center t-caption-sm text-[var(--brand-text-muted)]">No content items on this day</div>
           ) : (
             <div className="divide-y divide-[var(--brand-border)]/50">
               {selectedItems.map(item => {
@@ -324,7 +324,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
                       <Icon as={ItemIcon} size="md" className={cfg.color} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-[var(--brand-text-bright)] truncate">{item.label}</div>
+                      <div className="t-ui text-[var(--brand-text-bright)] truncate">{item.label}</div>
                       <div className="t-caption-sm text-[var(--brand-text-muted)] truncate mt-0.5">{item.sublabel}</div>
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -353,7 +353,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
           action={
             <button
               onClick={() => navigate(adminPath(workspaceId, 'seo-briefs'))}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/20 transition-colors"
+              className="flex items-center gap-1.5 t-caption-sm px-3 py-1.5 rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/20 transition-colors"
             >
               <Icon as={PenLine} size="sm" />
               Create a Brief

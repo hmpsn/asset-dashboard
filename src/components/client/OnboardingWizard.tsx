@@ -86,7 +86,7 @@ export function OnboardingWizard({
                 <div className="w-14 h-14 rounded-[var(--radius-xl)] bg-gradient-to-br from-teal-500/20 to-emerald-500/20 ring-1 ring-teal-500/20 flex items-center justify-center mx-auto mb-4">
                   <Icon as={Sparkles} size="2xl" className="text-accent-brand" />
                 </div>
-                <h2 className="text-xl font-bold text-[var(--brand-text-bright)] mb-1">Welcome to your dashboard</h2>
+                <h2 className="t-h2 text-[var(--brand-text-bright)] mb-1">Welcome to your dashboard</h2>
                 <p className="t-body text-[var(--brand-text)]">{workspaceName}</p>
                 {!betaMode && <div className="flex items-center justify-center gap-2 mt-3">
                   <span className={`t-caption-sm px-2.5 py-1 rounded-[var(--radius-pill)] border font-semibold ${tierBg}`}>{tierLabel} Plan</span>
@@ -127,7 +127,7 @@ export function OnboardingWizard({
               <div className="w-10 h-10 rounded-[var(--radius-xl)] bg-blue-500/10 ring-1 ring-blue-500/20 flex items-center justify-center mx-auto mb-3">
                 <Icon as={BarChart3} size="lg" className="text-accent-info" />
               </div>
-              <h2 className="text-lg font-bold text-[var(--brand-text-bright)] mb-1">What&apos;s included</h2>
+              <h2 className="t-h2 text-[var(--brand-text-bright)] mb-1">What&apos;s included</h2>
               <p className="t-caption-sm text-[var(--brand-text-muted)]">Everything your dashboard can do</p>
             </div>
 
@@ -155,7 +155,7 @@ export function OnboardingWizard({
               <div className="w-10 h-10 rounded-[var(--radius-xl)] bg-emerald-500/10 ring-1 ring-emerald-500/20 flex items-center justify-center mx-auto mb-3">
                 <Icon as={Trophy} size="lg" className="text-accent-success" />
               </div>
-              <h2 className="text-lg font-bold text-[var(--brand-text-bright)] mb-1">Get started</h2>
+              <h2 className="t-h2 text-[var(--brand-text-bright)] mb-1">Get started</h2>
               <p className="t-caption-sm text-[var(--brand-text-muted)]">Here are some things you can do right now</p>
             </div>
 
