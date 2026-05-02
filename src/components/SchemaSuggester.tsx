@@ -27,7 +27,7 @@ import { PendingApprovals } from './PendingApprovals';
 import { SchemaWorkflowGuide } from './schema/SchemaWorkflowGuide';
 import { SCHEMA_ROLE_INDEX, SCHEMA_ROLE_LABELS } from '../../shared/types/schema-plan';
 import type { ValidationFinding } from '../../shared/types/schema-validation';
-import type { SchemaGenerationDiagnostics } from '../../shared/types/schema-generation';
+import type { SchemaDeliveryDecision, SchemaGenerationDiagnostics, SchemaPublishResponse } from '../../shared/types/schema-generation';
 import type { CmsSchemaFieldMapping, SchemaFieldTarget } from '../../shared/types/site-inventory';
 import { adminPath } from '../routes.js';
 import { queryKeys } from '../lib/queryKeys';
@@ -121,6 +121,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
   const [publishing, setPublishing] = useState<Set<string>>(new Set());
   const [published, setPublished] = useState<Set<string>>(new Set());
   const [publishError, setPublishError] = useState<Record<string, string>>({});
+  const [manualDelivery, setManualDelivery] = useState<Record<string, SchemaDeliveryDecision>>({});
   const [scanError, setScanError] = useState<string | null>(null);
   const [confirmPublish, setConfirmPublish] = useState<string | null>(null);
   const [sendingToClient, setSendingToClient] = useState(false);
@@ -392,6 +393,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
         return [...prev, result];
       });
       setExpanded(prev => new Set(prev).add(pageId));
+      setManualDelivery(prev => { const n = { ...prev }; delete n[pageId]; return n; });
     } catch (err) {
       console.error('SchemaSuggester operation failed:', err);
       setScanError('Single page generation failed');
@@ -414,6 +416,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
         } : p);
       });
       setExpanded(prev => new Set(prev).add(pageId));
+      setManualDelivery(prev => { const n = { ...prev }; delete n[pageId]; return n; });
     } catch (err) {
       console.error('SchemaSuggester operation failed:', err);
       // keep existing data
@@ -429,11 +432,16 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
   const publishToWebflow = async (pageId: string, schema: Record<string, unknown>) => {
     setPublishing(prev => new Set(prev).add(pageId));
     setPublishError(prev => { const n = { ...prev }; delete n[pageId]; return n; });
+    setManualDelivery(prev => { const n = { ...prev }; delete n[pageId]; return n; });
     setConfirmPublish(null);
     try {
       const pageData = data?.find(p => p.pageId === pageId);
       const isHomepage = !pageData?.slug || pageData.slug === '/' || pageData.slug === 'index' || pageData.slug === 'home';
-      await post(`/api/webflow/schema-publish/${siteId}`, { pageId, schema, publishAfter: true, isHomepage });
+      const result = await post<SchemaPublishResponse>(`/api/webflow/schema-publish/${siteId}`, { pageId, schema, publishAfter: true, isHomepage });
+      if (result.delivery?.status === 'manual-required') {
+        setManualDelivery(prev => ({ ...prev, [pageId]: result.delivery }));
+        return;
+      }
       setPublished(prev => new Set(prev).add(pageId));
       refreshStates();
     } catch (err) {
@@ -504,6 +512,13 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     const script = `<script type="application/ld+json">\n${json}\n</script>`;
     navigator.clipboard.writeText(script);
     setCopiedId(`${pageId}-${suggestion.type}`);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const copyJsonLd = (suggestion: SchemaSuggestion, pageId: string) => {
+    const json = manualDelivery[pageId]?.jsonLd || JSON.stringify(getEffectiveSchema(pageId, suggestion.template), null, 2);
+    navigator.clipboard.writeText(json);
+    setCopiedId(`${pageId}-${suggestion.type}-json`);
     setTimeout(() => setCopiedId(null), 2000);
   };
 
@@ -1265,6 +1280,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
               published={published.has(page.pageId)}
               publishing={publishing.has(page.pageId)}
               publishError={publishError[page.pageId]}
+              manualDelivery={manualDelivery[page.pageId]}
               confirmPublish={confirmPublish === page.pageId}
               sentPage={sentPages.has(page.pageId)}
               sendingPage={sendingPage.has(page.pageId)}
@@ -1289,6 +1305,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
               onToggleSchemaEdit={toggleSchemaEdit}
               onSchemaJsonChange={handleSchemaJsonChange}
               onCopyTemplate={copyTemplate}
+              onCopyJsonLd={copyJsonLd}
               onPublish={publishToWebflow}
               onConfirmPublish={setConfirmPublish}
               onSendToClient={sendSingleSchemaToClient}
@@ -1299,6 +1316,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
                   await schemaApi.retract(siteId, pageId);
                   setRetractedPages(prev => new Set(prev).add(pageId));
                   setPublished(prev => { const n = new Set(prev); n.delete(pageId); return n; });
+                  setManualDelivery(prev => { const n = { ...prev }; delete n[pageId]; return n; });
                 } catch (err) {
                   setPublishError(prev => ({ ...prev, [pageId]: err instanceof Error ? err.message : 'Retract failed' }));
                 } finally {
@@ -1327,6 +1345,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
                   });
                 });
                 setPublished(prev => new Set(prev).add(pageId));
+                setManualDelivery(prev => { const n = { ...prev }; delete n[pageId]; return n; });
               }}
             />
           );
@@ -1336,7 +1355,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
       <div className="flex items-start gap-2 px-3 py-2 rounded-[var(--radius-md)] bg-blue-500/5 border border-blue-500/10">
         <Icon as={Info} size="md" className="text-accent-info flex-shrink-0 mt-0.5" />
         <div className="t-caption text-[var(--brand-text-muted)]">
-          <strong className="text-[var(--brand-text-bright)]">How to use:</strong> Each page gets one unified <code className="text-accent-info">@graph</code> schema with cross-referenced types. Click <strong>Publish to Webflow</strong> to inject it directly into the page's <code className="text-accent-info">&lt;head&gt;</code> via the Custom Code API, or <strong>Copy</strong> to paste it manually. Existing custom code on your pages is never touched — only schema scripts are managed.
+          <strong className="text-[var(--brand-text-bright)]">How to use:</strong> Each page gets one unified <code className="text-accent-info">@graph</code> schema with cross-referenced types. Click <strong>Publish to Webflow</strong> to use the Custom Code API when supported, <strong>Copy script</strong> for manual custom code, or <strong>Copy JSON-LD</strong> for Webflow Page Settings -&gt; Schema markup. Existing custom code on your pages is never touched — only schema scripts are managed.
         </div>
       </div>
     </div>

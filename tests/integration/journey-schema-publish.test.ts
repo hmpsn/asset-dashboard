@@ -129,6 +129,7 @@ async function runApplyLoop(
         const schema = parseJsonFallback(value, null);
         if (!schema) throw new Error('Invalid schema JSON');
         const result = await publishSchemaToPage(siteId, item.pageId, schema as Record<string, unknown>, token);
+        if (result.delivery.status === 'manual-required') throw new Error(result.delivery.message);
         if (!result.success) throw new Error(result.error || 'Schema publish failed');
       } else {
         const fields =
@@ -240,6 +241,43 @@ describe('Journey: Schema Approval → Publish → Webflow Custom Code', () => {
     expect(upsertCall).toBeDefined();
     const upsertBody = upsertCall!.body as { scripts: Array<{ id: string }> };
     expect(upsertBody.scripts.length).toBeGreaterThan(0);
+  });
+
+  it('manual-required schema approvals are not marked applied or sent to Webflow', async () => {
+    const pageId = 'page-schema-manual-required';
+    const oversizedSchema = {
+      ...VALID_SCHEMA,
+      description: 'x'.repeat(3000),
+    };
+
+    const batch = createBatch(ws.workspaceId, ws.webflowSiteId, 'Schema manual required', [
+      {
+        pageId,
+        pageTitle: 'Large Schema',
+        pageSlug: 'large-schema',
+        field: 'schema',
+        currentValue: '',
+        proposedValue: JSON.stringify(oversizedSchema),
+      },
+    ]);
+
+    approveAllItems(ws.workspaceId, batch.id, batch.items.map(i => i.id));
+
+    const { results, appliedIds } = await runApplyLoop(
+      ws.workspaceId,
+      batch.id,
+      ws.webflowSiteId,
+      ws.webflowToken,
+    );
+
+    expect(appliedIds).toHaveLength(0);
+    expect(results).toHaveLength(1);
+    expect(results[0].success).toBe(false);
+    expect(results[0].error).toContain('Webflow Page Settings -> Schema markup');
+    expect(getCapturedRequests()).toHaveLength(0);
+
+    const persisted = getBatch(ws.workspaceId, batch.id);
+    expect(persisted!.items[0].status).toBe('approved');
   });
 
   // ────────────────────────────────────────────────────────────────────────

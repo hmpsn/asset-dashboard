@@ -80,8 +80,9 @@ function dedicatedFaqScope($: cheerio.CheerioAPI, $scope: cheerio.Cheerio<any>):
 export async function extractFaq(html: string, opts: ExtractFaqOptions = {}): Promise<FaqPair[]> {
   const $ = cheerio.load(html);
   const scoped = contentScope($);
-  const baseScope = scoped.length > 0 ? scoped : ($('body').length > 0 ? $('body') : $.root());
-  const dedicatedScope = dedicatedFaqScope($, baseScope);
+  const documentScope = $('body').length > 0 ? $('body') : $.root();
+  const baseScope = scoped.length > 0 ? scoped : documentScope;
+  const dedicatedScope = dedicatedFaqScope($, documentScope);
   if (opts.requireDedicatedSection && dedicatedScope.length === 0) return [];
   const $scope = dedicatedScope.length > 0 ? dedicatedScope : baseScope;
   const pairs: FaqPair[] = [];
@@ -104,6 +105,17 @@ export async function extractFaq(html: string, opts: ExtractFaqOptions = {}): Pr
       : $trigger.next();
     const answer = $panel.text();
     addPair(pairs, seen, question, answer, { explicit: true });
+  });
+
+  $scope.find(
+    '.faq_question, .faq-question, [class*="faq_question"], [class*="faq-question"], [data-faq-question]',
+  ).each((_, el) => {
+    const $questionBlock = $(el);
+    const question = $questionBlock.find('h2,h3,h4,h5,p,button').first().text() || $questionBlock.text();
+    const $answerBlock = $questionBlock.nextAll(
+      '.faq_answer, .faq-answer, [class*="faq_answer"], [class*="faq-answer"], [data-faq-answer]',
+    ).first();
+    addPair(pairs, seen, question, $answerBlock.text(), { explicit: true });
   });
 
   $scope.find('h2, h3, h4, h5').each((_, el) => {

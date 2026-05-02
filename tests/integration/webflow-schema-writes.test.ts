@@ -64,7 +64,7 @@ function mockRegisteredScripts(siteId: string = TEST_SITE_ID, scripts: unknown[]
 function mockRegisterInlineScript(siteId: string = TEST_SITE_ID, scriptId: string = 'script-123'): void {
   mockWebflowSuccess(`/sites/${siteId}/registered_scripts/inline`, {
     id: scriptId,
-    displayName: 'JSON-LD Schema (test-page)',
+    displayName: 'JSONLDSchematestpage',
     version: '1.0.test',
   });
 }
@@ -105,6 +105,8 @@ describe('Webflow Schema Writes — FM-2 Phantom Success', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toBeTruthy();
+    expect(result.delivery.status).toBe('failed');
+    expect(result.delivery.reason).toBe('webflow-register-failed');
 
     ws.cleanup();
   });
@@ -121,6 +123,8 @@ describe('Webflow Schema Writes — FM-2 Phantom Success', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toBeTruthy();
+    expect(result.delivery.status).toBe('failed');
+    expect(result.delivery.reason).toBe('webflow-apply-failed');
 
     ws.cleanup();
   });
@@ -136,6 +140,8 @@ describe('Webflow Schema Writes — FM-2 Phantom Success', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toBeTruthy();
+    expect(result.delivery.status).toBe('failed');
+    expect(result.delivery.reason).toBe('webflow-register-failed');
 
     ws.cleanup();
   });
@@ -151,6 +157,8 @@ describe('Webflow Schema Writes — FM-2 Phantom Success', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toBeTruthy();
+    expect(result.delivery.status).toBe('failed');
+    expect(result.delivery.reason).toBe('webflow-apply-failed');
 
     ws.cleanup();
   });
@@ -300,6 +308,10 @@ describe('Webflow Schema Writes — FM-2 Phantom Success', () => {
 
     expect(result.success).toBe(true);
     expect(result.error).toBeUndefined();
+    expect(result.delivery).toMatchObject({
+      method: 'webflow-api',
+      status: 'published',
+    });
 
     // Verify the expected Webflow endpoints were hit
     const captured = getCapturedRequests();
@@ -309,6 +321,109 @@ describe('Webflow Schema Writes — FM-2 Phantom Success', () => {
     // Must have listed existing scripts, registered the new one, and applied to page
     expect(endpoints.some(e => e.includes('registered_scripts'))).toBe(true);
     expect(endpoints.some(e => e.includes(`/pages/${TEST_PAGE_ID}/custom_code`))).toBe(true);
+
+    ws.cleanup();
+  });
+
+  it('publishSchemaToPage: registers executable JSON-LD injection script instead of raw script markup', async () => {
+    mockRegisteredScripts(ws.webflowSiteId);
+    mockRegisterInlineScript(ws.webflowSiteId);
+    mockGetPageCustomCode(TEST_PAGE_ID);
+    mockUpsertPageCustomCode(TEST_PAGE_ID);
+
+    const { publishSchemaToPage } = await import('../../server/webflow-pages.js');
+    const result = await publishSchemaToPage(ws.webflowSiteId, TEST_PAGE_ID, VALID_ARTICLE_SCHEMA, ws.webflowToken);
+
+    expect(result.success).toBe(true);
+    const registerCall = getCapturedRequests().find(r =>
+      r.endpoint.includes('registered_scripts/inline') && r.method === 'POST',
+    );
+    expect(registerCall).toBeDefined();
+    const body = registerCall!.body as Record<string, unknown>;
+    expect(body.displayName).toBe('JSONLDSchematestpagefm');
+    expect(body.sourceCode).toContain('document.createElement("script")');
+    expect(body.sourceCode).toContain('application/ld+json');
+    expect(body.sourceCode).toContain('Article');
+    expect(body.sourceCode).not.toContain('<script type="application/ld+json">');
+
+    ws.cleanup();
+  });
+
+  it('publishSchemaToPage: returns manual-required before Webflow registration when compacted schema exceeds the inline script limit', async () => {
+    mockRegisteredScripts(ws.webflowSiteId);
+    const oversizedSchema = {
+      ...VALID_ARTICLE_SCHEMA,
+      description: 'x'.repeat(2500),
+    };
+
+    const { publishSchemaToPage } = await import('../../server/webflow-pages.js');
+    const result = await publishSchemaToPage(ws.webflowSiteId, TEST_PAGE_ID, oversizedSchema, ws.webflowToken);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('2000 character registered inline script limit');
+    expect(result.delivery).toMatchObject({
+      method: 'manual-native-schema-field',
+      status: 'manual-required',
+      reason: 'webflow-inline-script-limit',
+      apiLimit: 2000,
+    });
+    expect(result.delivery.message).toContain('Webflow Page Settings -> Schema markup');
+    expect(result.delivery.jsonLd).toContain('"@context": "https://schema.org"');
+    expect(result.delivery.jsonLd).not.toContain('<script');
+    expect(() => JSON.parse(result.delivery.jsonLd)).not.toThrow();
+    const registerCall = getCapturedRequests().find(r =>
+      r.endpoint.includes('registered_scripts/inline') && r.method === 'POST',
+    );
+    expect(registerCall).toBeUndefined();
+
+    ws.cleanup();
+  });
+
+  it('publishRawSchemaToPage: returns the shared delivery contract on success and limit failures', async () => {
+    mockWebflowSuccess(`/sites/${ws.webflowSiteId}/registered_scripts`, { registeredScripts: [] });
+    mockWebflowSuccess(`/sites/${ws.webflowSiteId}/registered_scripts/inline`, {
+      id: 'raw-schema-script-id',
+      displayName: 'JSONLDSchematestpage',
+      hostedLocation: 'inline',
+      integrityHash: '',
+      version: '1.0.test',
+    });
+    mockWebflowSuccess(`/pages/${TEST_PAGE_ID}/custom_code`, { scripts: [] });
+
+    const { publishRawSchemaToPage } = await import('../../server/webflow-pages.js');
+    const success = await publishRawSchemaToPage(
+      ws.webflowSiteId,
+      TEST_PAGE_ID,
+      JSON.stringify(VALID_ARTICLE_SCHEMA),
+      ws.webflowToken,
+    );
+
+    expect(success).toMatchObject({
+      success: true,
+      published: true,
+      delivery: {
+        method: 'webflow-api',
+        status: 'published',
+      },
+    });
+
+    resetWebflowMocks();
+    const oversized = await publishRawSchemaToPage(
+      ws.webflowSiteId,
+      TEST_PAGE_ID,
+      JSON.stringify({ ...VALID_ARTICLE_SCHEMA, description: 'x'.repeat(3000) }),
+      ws.webflowToken,
+    );
+
+    expect(oversized).toMatchObject({
+      success: false,
+      delivery: {
+        method: 'webflow-api',
+        status: 'failed',
+        reason: 'webflow-inline-script-limit',
+      },
+    });
+    expect(getCapturedRequests()).toHaveLength(0);
 
     ws.cleanup();
   });

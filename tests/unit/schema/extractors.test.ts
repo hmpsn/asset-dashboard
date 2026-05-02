@@ -123,6 +123,39 @@ describe('extractFaq', () => {
     ]);
   });
 
+  it('extracts FAQs from Webflow question and answer wrapper pairs', async () => {
+    const html = `
+      <section>
+        <h2>Frequently Asked Questions</h2>
+        <div class="faq_content-wrapper">
+          <div class="faq_question background-color-dark-sand">
+            <h3>Am I a candidate for veneers?</h3>
+            <div class="faq6_icon-wrapper">+</div>
+          </div>
+          <div class="faq_answer">Veneers can be a fit after a consultation confirms your teeth are healthy.</div>
+        </div>
+        <div class="faq_content-wrapper">
+          <div class="faq_question background-color-dark-sand">
+            <h3>How much do veneers cost?</h3>
+            <div class="faq6_icon-wrapper">+</div>
+          </div>
+          <div class="faq_answer">Pricing depends on the number of veneers and your treatment plan.</div>
+        </div>
+      </section>
+    `;
+    const result = await extractFaq(html);
+    expect(result).toEqual([
+      {
+        question: 'Am I a candidate for veneers?',
+        answer: 'Veneers can be a fit after a consultation confirms your teeth are healthy.',
+      },
+      {
+        question: 'How much do veneers cost?',
+        answer: 'Pricing depends on the number of veneers and your treatment plan.',
+      },
+    ]);
+  });
+
   it('does not treat index/card teaser questions as FAQ without a dedicated section', async () => {
     const html = `
       <main>
