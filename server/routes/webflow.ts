@@ -27,7 +27,7 @@ import { createLogger } from '../logger.js';
 
 const log = createLogger('webflow');
 
-import { requireWorkspaceAccessFromQuery } from '../auth.js';
+import { requireWorkspaceAccessFromBody, requireWorkspaceAccessFromQuery } from '../auth.js';
 import { isProgrammingError } from '../errors.js';
 import { resolveBaseUrl } from '../url-helpers.js';
 const router = Router();
@@ -61,14 +61,14 @@ router.get('/api/webflow/assets/:siteId', requireWorkspaceAccessFromQuery(), asy
   }
 });
 
-router.patch('/api/webflow/assets/:assetId', async (req, res) => {
+router.patch('/api/webflow/assets/:assetId', requireWorkspaceAccessFromBody(), async (req, res) => {
   const { altText, displayName, siteId } = req.body;
   const token = siteId ? getTokenForSite(siteId) : null;
   const result = await updateAsset(req.params.assetId, { altText, displayName }, token || undefined);
   res.json(result);
 });
 
-router.delete('/api/webflow/assets/:assetId', async (req, res) => {
+router.delete('/api/webflow/assets/:assetId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   const siteId = req.query.siteId as string;
   const token = siteId ? getTokenForSite(siteId) : null;
   const result = await deleteAsset(req.params.assetId, token || undefined);
@@ -86,7 +86,7 @@ async function runConcurrent<T, R>(items: T[], limit: number, fn: (item: T) => P
 }
 
 // Bulk update alt text
-router.post('/api/webflow/assets/bulk-alt', async (req, res) => {
+router.post('/api/webflow/assets/bulk-alt', requireWorkspaceAccessFromBody(), async (req, res) => {
   const { updates, siteId } = req.body as { updates: Array<{ assetId: string; altText: string }>; siteId?: string };
   const token = siteId ? getTokenForSite(siteId) : null;
   const settled = await runConcurrent(updates, 5, u => updateAsset(u.assetId, { altText: u.altText }, token || undefined));
@@ -97,7 +97,7 @@ router.post('/api/webflow/assets/bulk-alt', async (req, res) => {
 });
 
 // Bulk delete assets
-router.post('/api/webflow/assets/bulk-delete', async (req, res) => {
+router.post('/api/webflow/assets/bulk-delete', requireWorkspaceAccessFromBody(), async (req, res) => {
   const { assetIds, siteId } = req.body as { assetIds: string[]; siteId?: string };
   const token = siteId ? getTokenForSite(siteId) : null;
   const settled = await runConcurrent(assetIds, 5, id => deleteAsset(id, token || undefined));

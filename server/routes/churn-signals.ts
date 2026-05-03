@@ -3,7 +3,7 @@
  */
 import { Router } from 'express';
 
-import { requireWorkspaceAccess } from '../auth.js';
+import { requireWorkspaceAccess, requestUserCanAccessWorkspace, sendWorkspaceAccessDenied } from '../auth.js';
 const router = Router();
 
 import { listChurnSignals, dismissSignal, getSignal } from '../churn-signals.js';
@@ -20,6 +20,7 @@ router.get('/api/churn-signals/:workspaceId', requireWorkspaceAccess('workspaceI
 router.post('/api/churn-signals/:signalId/dismiss', (req, res) => {
   const signal = getSignal(req.params.signalId);
   if (!signal) return res.status(404).json({ error: 'Signal not found' });
+  if (!requestUserCanAccessWorkspace(req, signal.workspaceId)) return sendWorkspaceAccessDenied(res);
   const ok = dismissSignal(signal.workspaceId, req.params.signalId);
   if (!ok) return res.status(404).json({ error: 'Signal not found' });
   res.json({ dismissed: true });

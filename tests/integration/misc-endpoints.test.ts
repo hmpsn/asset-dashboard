@@ -17,6 +17,7 @@ import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { signToken } from '../../server/auth.js';
 import { createUser, deleteUser } from '../../server/users.js';
+import { createContentSubscription, deleteContentSubscription } from '../../server/content-subscriptions.js';
 
 const ctx = createTestContext(13209);
 const { api, postJson, patchJson, del } = ctx;
@@ -164,6 +165,7 @@ describe('Miscellaneous read-only endpoints (cont.)', () => {
 
 describe('Scoped JWT workspace guards for workspace-keyed endpoints', () => {
   const scopedHeaders = () => ({ Authorization: `Bearer ${scopedUserToken}` });
+  let otherSubscriptionId = '';
 
   it('rejects Google annotation reads for a workspace outside the JWT scope', async () => {
     const res = await api(`/api/google/annotations/${otherWsId}`, { headers: scopedHeaders() });
@@ -201,6 +203,92 @@ describe('Scoped JWT workspace guards for workspace-keyed endpoints', () => {
       body: JSON.stringify({ keyword: 'cross workspace keyword', status: 'approved' }),
     });
     expect(res.status).toBe(403);
+  });
+
+  it('rejects Webflow asset reads when the workspace query is outside the JWT scope', async () => {
+    const res = await api(`/api/webflow/assets/site_guard_test?workspaceId=${otherWsId}`, { headers: scopedHeaders() });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects Webflow asset mutations when the body workspace is outside the JWT scope', async () => {
+    const res = await ctx.api('/api/webflow/assets/asset_guard_test', {
+      method: 'PATCH',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ altText: 'Blocked', siteId: 'site_guard_test', workspaceId: otherWsId }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects CMS image scans when the workspace query is outside the JWT scope', async () => {
+    const res = await api(`/api/webflow/cms-images/site_guard_test?workspaceId=${otherWsId}`, { headers: scopedHeaders() });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects content subscription reads by id when the row belongs to another workspace', async () => {
+    const sub = createContentSubscription(otherWsId, {
+      plan: 'content_starter',
+      postsPerMonth: 2,
+      priceUsd: 499,
+      status: 'active',
+    });
+    otherSubscriptionId = sub.id;
+
+    const res = await api(`/api/content-subscription/${sub.id}`, { headers: scopedHeaders() });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects content subscription updates by id when the row belongs to another workspace', async () => {
+    if (!otherSubscriptionId) {
+      const sub = createContentSubscription(otherWsId, {
+        plan: 'content_starter',
+        postsPerMonth: 2,
+        priceUsd: 499,
+        status: 'active',
+      });
+      otherSubscriptionId = sub.id;
+    }
+
+    const res = await ctx.api(`/api/content-subscription/${otherSubscriptionId}`, {
+      method: 'PATCH',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'paused' }),
+    });
+    expect(res.status).toBe(403);
+    deleteContentSubscription(otherWsId, otherSubscriptionId);
+    otherSubscriptionId = '';
+  });
+
+  it('rejects content subscription deletes by id when the row belongs to another workspace', async () => {
+    const sub = createContentSubscription(otherWsId, {
+      plan: 'content_starter',
+      postsPerMonth: 2,
+      priceUsd: 499,
+      status: 'active',
+    });
+
+    const res = await ctx.api(`/api/content-subscription/${sub.id}`, {
+      method: 'DELETE',
+      headers: scopedHeaders(),
+    });
+    expect(res.status).toBe(403);
+    deleteContentSubscription(otherWsId, sub.id);
+  });
+
+  it('rejects delivered-count updates when the subscription belongs to another workspace', async () => {
+    const sub = createContentSubscription(otherWsId, {
+      plan: 'content_starter',
+      postsPerMonth: 2,
+      priceUsd: 499,
+      status: 'active',
+    });
+
+    const res = await ctx.api(`/api/content-subscription/${sub.id}/delivered`, {
+      method: 'POST',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ count: 1 }),
+    });
+    expect(res.status).toBe(403);
+    deleteContentSubscription(otherWsId, sub.id);
   });
 });
 

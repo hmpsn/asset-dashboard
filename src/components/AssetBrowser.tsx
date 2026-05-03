@@ -48,9 +48,9 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
   const queryClient = useQueryClient();
   const { startJob, jobs } = useBackgroundTasks();
   const bulkCompressJobId = useRef<string | null>(null);
-  const { data: assets = [], isLoading: loading } = useWebflowAssets(siteId);
-  const { data: unusedIds = null } = useAssetAudit(siteId, assets.length > 0);
-  const { data: cmsImageData } = useCmsImages(siteId, assets.length > 0);
+  const { data: assets = [], isLoading: loading } = useWebflowAssets(siteId, workspaceId);
+  const { data: unusedIds = null } = useAssetAudit(siteId, workspaceId, assets.length > 0);
+  const { data: cmsImageData } = useCmsImages(siteId, workspaceId, assets.length > 0);
 
   // Build a quick-lookup map: assetId → CmsImageUsage[]
   const cmsUsageMap = useMemo(() => {
@@ -197,7 +197,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
   const handleSaveAlt = async (assetId: string) => {
     setAltError(null);
     try {
-      const data = await patch<{ success?: boolean; error?: string }>(`/api/webflow/assets/${assetId}`, { altText: altDraft, siteId });
+      const data = await patch<{ success?: boolean; error?: string }>(`/api/webflow/assets/${assetId}`, { altText: altDraft, siteId, workspaceId });
       if (!data.success) {
         setAltError(`Failed to save alt text: ${data.error || 'Unknown error'}`);
         return;
@@ -330,7 +330,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
     if (!renameDraft.trim()) return;
     setAltError(null);
     try {
-      const data = await patch<{ success?: boolean; error?: string }>(`/api/webflow/rename/${assetId}`, { displayName: renameDraft.trim(), siteId });
+      const data = await patch<{ success?: boolean; error?: string }>(`/api/webflow/rename/${assetId}`, { displayName: renameDraft.trim(), siteId, workspaceId });
       if (!data.success) {
         setAltError(`Rename failed: ${data.error || 'Unknown error'}`);
         return;
@@ -360,7 +360,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
           assetId: asset.id,
         });
         if (data.fullName) {
-          await patch(`/api/webflow/rename/${asset.id}`, { displayName: data.fullName, siteId });
+          await patch(`/api/webflow/rename/${asset.id}`, { displayName: data.fullName, siteId, workspaceId });
           updateAssets(prev => prev.map(a => a.id === asset.id ? { ...a, displayName: data.fullName } : a));
         }
       } catch (err) { console.error('AssetBrowser operation failed:', err); }
@@ -425,7 +425,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
     setOrganizePreview(null);
     setOrganizeResult(null);
     try {
-      const data = await get<{ error?: string; foldersToCreate?: string[]; moves?: Array<{ assetId: string; assetName: string; targetFolder: string }>; summary?: { totalAssets: number; assetsToMove: number; foldersToCreate: number; alreadyOrganized: number; unused: number; shared: number; ogImages: number } }>(`/api/webflow/organize-preview/${siteId}`);
+      const data = await get<{ error?: string; foldersToCreate?: string[]; moves?: Array<{ assetId: string; assetName: string; targetFolder: string }>; summary?: { totalAssets: number; assetsToMove: number; foldersToCreate: number; alreadyOrganized: number; unused: number; shared: number; ogImages: number } }>(`/api/webflow/organize-preview/${siteId}?workspaceId=${encodeURIComponent(workspaceId)}`);
       if (data.error) {
         setAltError(`Organize failed: ${data.error}`);
       } else if (data.moves && data.foldersToCreate && data.summary) {
@@ -449,6 +449,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
       const data = await post<{ error?: string; summary?: { moved: number; failed: number; total: number } }>(`/api/webflow/organize-execute/${siteId}`, {
         moves: organizePreview.moves,
         foldersToCreate: organizePreview.foldersToCreate,
+        workspaceId,
       });
       if (data.error) {
         setAltError(`Organize failed: ${data.error}`);
@@ -465,7 +466,7 @@ function AssetBrowser({ siteId, workspaceId }: Props) {
   const handleBulkDelete = async () => {
     if (!confirm(`Delete ${selected.size} assets permanently from Webflow?`)) return;
     setDeleting(true);
-    await post('/api/webflow/assets/bulk-delete', { assetIds: [...selected], siteId });
+    await post('/api/webflow/assets/bulk-delete', { assetIds: [...selected], siteId, workspaceId });
     updateAssets(prev => prev.filter(a => !selected.has(a.id)));
     setSelected(new Set());
     setDeleting(false);

@@ -8,7 +8,7 @@
  * Never add requireAuth to admin routes — see CLAUDE.md Auth Conventions.
  */
 import { Router } from 'express';
-import { requireWorkspaceAccess } from '../auth.js';
+import { requireWorkspaceAccess, requestUserCanAccessWorkspace, sendWorkspaceAccessDenied } from '../auth.js';
 import { validate, z } from '../middleware/validate.js';
 import {
   listClientSignals,
@@ -33,6 +33,7 @@ const router = Router();
 router.get('/api/client-signals/detail/:id', (req, res) => {
   const signal = getSignalById(req.params.id);
   if (!signal) return res.status(404).json({ error: 'Signal not found' });
+  if (!requestUserCanAccessWorkspace(req, signal.workspaceId)) return sendWorkspaceAccessDenied(res);
   res.json(signal);
 });
 
@@ -62,6 +63,7 @@ router.patch(
     const { status } = req.body as z.infer<typeof updateStatusSchema>;
     const signal = getSignalById(req.params.id);
     if (!signal) return res.status(404).json({ error: 'Signal not found' });
+    if (!requestUserCanAccessWorkspace(req, signal.workspaceId)) return sendWorkspaceAccessDenied(res);
     const ok = updateSignalStatus(req.params.id, status);
     if (!ok) return res.status(500).json({ error: 'Update failed' });
     const updated = getSignalById(req.params.id);

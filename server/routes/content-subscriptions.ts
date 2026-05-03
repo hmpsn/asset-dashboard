@@ -15,7 +15,7 @@ import { CONTENT_SUB_PLANS, type ContentSubPlan } from '../../shared/types/conte
 import { createLogger } from '../logger.js';
 
 const log = createLogger('routes:content-subscriptions');
-import { requireWorkspaceAccess } from '../auth.js';
+import { requireWorkspaceAccess, requestUserCanAccessWorkspace, sendWorkspaceAccessDenied } from '../auth.js';
 const router = Router();
 
 // ── Admin endpoints ──
@@ -36,6 +36,7 @@ router.get('/api/content-subscription/:id', (req, res) => {
   try {
     const sub = getContentSubscription(req.params.id);
     if (!sub) return res.status(404).json({ error: 'Subscription not found' });
+    if (!requestUserCanAccessWorkspace(req, sub.workspaceId)) return sendWorkspaceAccessDenied(res);
     res.json(sub);
   } catch (err) {
     log.error({ err }, 'Failed to get content subscription');
@@ -73,6 +74,7 @@ router.patch('/api/content-subscription/:id', (req, res) => {
   try {
     const existing = getContentSubscription(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Subscription not found' });
+    if (!requestUserCanAccessWorkspace(req, existing.workspaceId)) return sendWorkspaceAccessDenied(res);
 
     const { status, plan, topicSource, preferredPageTypes, notes } = req.body;
     const updates: Record<string, unknown> = {};
@@ -104,6 +106,7 @@ router.delete('/api/content-subscription/:id', (req, res) => {
   try {
     const existing = getContentSubscription(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Subscription not found' });
+    if (!requestUserCanAccessWorkspace(req, existing.workspaceId)) return sendWorkspaceAccessDenied(res);
     const ok = deleteContentSubscription(existing.workspaceId, req.params.id);
     if (!ok) return res.status(404).json({ error: 'Subscription not found' });
     res.json({ ok: true });
@@ -118,6 +121,7 @@ router.post('/api/content-subscription/:id/delivered', (req, res) => {
   try {
     const existing = getContentSubscription(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Subscription not found' });
+    if (!requestUserCanAccessWorkspace(req, existing.workspaceId)) return sendWorkspaceAccessDenied(res);
     const count = req.body.count || 1;
     incrementDeliveredPosts(existing.workspaceId, req.params.id, count);
     const sub = getContentSubscription(req.params.id);
