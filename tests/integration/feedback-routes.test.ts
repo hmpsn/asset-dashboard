@@ -31,10 +31,10 @@ beforeAll(async () => {
   updateWorkspace(protectedWsId, { clientPassword: await bcrypt.hash('feedback-secret', 12) });
 }, 25_000);
 
-afterAll(() => {
+afterAll(async () => {
   deleteWorkspace(testWsId);
   deleteWorkspace(protectedWsId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 describe('Feedback — list', () => {

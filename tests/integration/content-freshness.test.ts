@@ -22,9 +22,9 @@ describe('content freshness detection', () => {
     `).run(seed.workspaceId, STALE_DATE);
   }, 30_000);
 
-  afterAll(() => {
+  afterAll(async () => {
     seed?.cleanup();
-    ctx.stopServer();
+    await ctx.stopServer();
   });
 
   it('GET /api/public/insights/:workspaceId returns array (freshness schema accepted)', async () => {

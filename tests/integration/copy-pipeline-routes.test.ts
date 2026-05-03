@@ -78,8 +78,8 @@ beforeAll(async () => {
   );
 });
 
-afterAll(() => {
-  ctx.stopServer();
+afterAll(async () => {
+  await ctx.stopServer();
 
   // Clean up test data (order matters for FK constraints)
   db.prepare('DELETE FROM copy_sections WHERE workspace_id IN (?, ?)').run(wsId, wsOtherId);

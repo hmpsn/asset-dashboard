@@ -36,9 +36,9 @@ beforeAll(async () => {
   requestId = req.id;
 }, 25_000);
 
-afterAll(() => {
+afterAll(async () => {
   deleteWorkspace(wsId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 describe('POST /api/public/content-request/:workspaceId/:id/comment — author override', () => {

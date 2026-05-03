@@ -33,9 +33,9 @@ beforeAll(async () => {
   updateWorkspace(wsId, { webflowSiteId: OWNED_SITE });
 }, 25_000);
 
-afterAll(() => {
+afterAll(async () => {
   deleteWorkspace(wsId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 describe('bulk-rewrite — siteId workspace validation', () => {

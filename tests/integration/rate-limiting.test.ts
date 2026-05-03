@@ -43,9 +43,9 @@ beforeAll(async () => {
   publicApiWsId = createWorkspace('RL Test — PublicApi').id;
 }, 25_000);
 
-afterAll(() => {
+afterAll(async () => {
   deleteWorkspace(publicApiWsId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

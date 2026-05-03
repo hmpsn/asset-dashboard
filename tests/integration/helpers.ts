@@ -16,7 +16,7 @@ export interface TestContext {
   PORT: number;
   BASE: string;
   startServer: () => Promise<void>;
-  stopServer: () => void;
+  stopServer: () => Promise<void>;
   api: (urlPath: string, opts?: RequestInit) => Promise<Response>;
   postJson: (urlPath: string, body: unknown) => Promise<Response>;
   patchJson: (urlPath: string, body: unknown) => Promise<Response>;
@@ -112,9 +112,38 @@ export function createTestContext(port: number): TestContext {
     });
   }
 
-  function stopServer(): void {
-    proc?.kill('SIGTERM');
+  async function stopServer(): Promise<void> {
+    const child = proc;
     proc = null;
+    if (!child) return;
+    if (child.exitCode !== null || child.signalCode !== null) return;
+
+    await new Promise<void>((resolve) => {
+      let settled = false;
+      let gracefulTimer: ReturnType<typeof setTimeout> | undefined;
+      let forceTimer: ReturnType<typeof setTimeout> | undefined;
+
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        if (gracefulTimer) clearTimeout(gracefulTimer);
+        if (forceTimer) clearTimeout(forceTimer);
+        child.off('exit', finish);
+        child.off('error', finish);
+        resolve();
+      };
+
+      child.once('exit', finish);
+      child.once('error', finish);
+      gracefulTimer = setTimeout(() => {
+        if (child.exitCode === null && child.signalCode === null) {
+          child.kill('SIGKILL');
+        }
+      }, 5_000);
+      forceTimer = setTimeout(finish, 8_000);
+
+      if (!child.kill('SIGTERM')) finish();
+    });
   }
 
   function clearCookies(): void {

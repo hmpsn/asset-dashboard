@@ -31,8 +31,8 @@ beforeAll(async () => {
   await ctx.startServer();
 }, 25_000);
 
-afterAll(() => {
-  ctx.stopServer();
+afterAll(async () => {
+  await ctx.stopServer();
   // Clean up isolated temp data dir
   try { fs.rmSync(TEST_DATA_DIR, { recursive: true, force: true }); } catch { /* ignore */ }
   // Restore DATA_DIR so other tests sharing this process (if any) see the original value.

@@ -24,8 +24,8 @@ beforeAll(async () => {
   await ctx.startServer();
 }, 25_000);
 
-afterAll(() => {
-  ctx.stopServer();
+afterAll(async () => {
+  await ctx.stopServer();
   db.prepare('DELETE FROM workspaces WHERE id = ?').run(testWsId);
 });
 

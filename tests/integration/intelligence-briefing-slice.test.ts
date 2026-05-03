@@ -38,13 +38,13 @@ describe('assembleClientSignals — latestBriefing field', () => {
     await ctx.startServer();
   });
 
-  afterAll(() => {
+  afterAll(async () => {
     // Wrap each cleanup so an early throw can't orphan the spawned test
     // server (same orphan-server feedback loop fixed in PR #374).
     for (const fn of cleanupFns) {
       try { fn(); } catch (err) { console.error('cleanup failed', err); }
     }
-    ctx.stopServer();
+    await ctx.stopServer();
   });
 
   it('returns latestBriefing=null when workspace has no briefings', async () => {

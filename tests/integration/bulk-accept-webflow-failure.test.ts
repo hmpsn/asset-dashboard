@@ -40,9 +40,9 @@ beforeAll(async () => {
   updateWorkspace(wsId, { webflowSiteId: SITE_ID, webflowToken: 'test-token-bulk-fail' });
 }, 25_000);
 
-afterAll(() => {
+afterAll(async () => {
   deleteWorkspace(wsId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 /** Poll GET /api/jobs/:id until status is terminal (done/error/cancelled). */

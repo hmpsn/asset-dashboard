@@ -23,10 +23,10 @@ beforeAll(async () => {
   await ctx.startServer();
 }, 25_000);
 
-afterAll(() => {
+afterAll(async () => {
   clearCookies();
   setAuthToken('');
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 describe('User Management — auth enforcement', () => {

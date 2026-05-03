@@ -61,9 +61,9 @@ beforeAll(async () => {
   testWsId = ws.id;
 }, 30_000);
 
-afterAll(() => {
+afterAll(async () => {
   deleteWorkspace(testWsId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 // ── SEMRush HTTP routes ────────────────────────────────────────────────────

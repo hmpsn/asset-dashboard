@@ -88,11 +88,11 @@ beforeAll(async () => {
   wsAContentReqId = req.id;
 }, 25_000);
 
-afterAll(() => {
+afterAll(async () => {
   cleanSeedData(wsAId);
   cleanSeedData(wsBId);
   cleanupWorkspaces();
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

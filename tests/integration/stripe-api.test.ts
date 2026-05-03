@@ -33,10 +33,10 @@ beforeAll(async () => {
   setAuthToken(signToken({ userId: user.id, email: user.email, role: user.role }));
 }, 25_000);
 
-afterAll(() => {
+afterAll(async () => {
   setAuthToken('');
   if (testUserId) deleteUser(testUserId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 describe('Stripe Config API', () => {

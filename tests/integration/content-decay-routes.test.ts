@@ -140,12 +140,12 @@ beforeAll(async () => {
   // No decay data seeded for wsEmpty — GET should return null (no rows)
 }, 25_000);
 
-afterAll(() => {
+afterAll(async () => {
   deleteDecayAnalysis(wsWithData);
   deleteDecayAnalysis(wsEmpty);
   deleteWorkspace(wsWithData);
   deleteWorkspace(wsEmpty);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 // ── GET /api/content-decay/:workspaceId ──────────────────────────────────────

@@ -30,9 +30,9 @@ beforeAll(async () => {
   cleanup = seeded.cleanup;
 }, 25_000);
 
-afterAll(() => {
+afterAll(async () => {
   cleanup();
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 // ── Helper ────────────────────────────────────────────────────────────────────

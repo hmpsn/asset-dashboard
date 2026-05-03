@@ -38,10 +38,10 @@ beforeAll(async () => {
   updateWorkspace(workspaceId, { webflowSiteId: siteId });
 }, 25_000);
 
-afterAll(() => {
+afterAll(async () => {
   deleteSchemaPlan(siteId);
   deleteWorkspace(workspaceId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 describe('public schema plan routes', () => {

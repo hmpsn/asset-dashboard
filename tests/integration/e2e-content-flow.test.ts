@@ -40,11 +40,11 @@ beforeAll(async () => {
   requestId = req.id;
 }, 25_000);
 
-afterAll(() => {
+afterAll(async () => {
   // Clean up seeded data
   db.prepare('DELETE FROM content_topic_requests WHERE workspace_id = ?').run(testWsId);
   deleteWorkspace(testWsId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 describe('E2E: Content request lifecycle', () => {

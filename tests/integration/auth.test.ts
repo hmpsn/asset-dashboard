@@ -21,8 +21,8 @@ beforeAll(async () => {
   await ctx.startServer();
 }, 25_000);
 
-afterAll(() => {
-  ctx.stopServer();
+afterAll(async () => {
+  await ctx.stopServer();
 });
 
 describe('Auth — public endpoints', () => {

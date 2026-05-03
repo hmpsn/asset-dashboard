@@ -29,9 +29,9 @@ beforeAll(async () => {
   cleanup = seeded.cleanup;
 }, 30_000);
 
-afterAll(() => {
+afterAll(async () => {
   cleanup?.();
-  ctx.stopServer();
+  await ctx.stopServer();
   if (originalOpenAiKey !== undefined) {
     process.env.OPENAI_API_KEY = originalOpenAiKey;
   } else {
