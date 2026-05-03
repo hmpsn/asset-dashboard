@@ -8,23 +8,32 @@
  * - POST /api/feedback/:workspaceId/:id/reply (add reply)
  * - DELETE /api/feedback/:workspaceId/:id (delete)
  */
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import bcrypt from 'bcryptjs';
 import { createTestContext } from './helpers.js';
-import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { createFeedback, deleteFeedback } from '../../server/feedback.js';
+import { setBroadcast } from '../../server/broadcast.js';
+import { WS_EVENTS } from '../../server/ws-events.js';
+import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 
 const ctx = createTestContext(13220);
 const { api, postJson, patchJson, del } = ctx;
 
 let testWsId = '';
+let protectedWsId = '';
 
 beforeAll(async () => {
   await ctx.startServer();
   const ws = createWorkspace('Feedback Test Workspace');
   testWsId = ws.id;
+  const protectedWs = createWorkspace('Protected Feedback Test Workspace');
+  protectedWsId = protectedWs.id;
+  updateWorkspace(protectedWsId, { clientPassword: await bcrypt.hash('feedback-secret', 12) });
 }, 25_000);
 
 afterAll(() => {
   deleteWorkspace(testWsId);
+  deleteWorkspace(protectedWsId);
   ctx.stopServer();
 });
 
@@ -104,5 +113,83 @@ describe('Feedback — delete', () => {
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body.error).toBe('Not found');
+  });
+
+  it('DELETE broadcasts feedback update for the workspace', async () => {
+    const workspaceBroadcast = vi.fn();
+    setBroadcast(vi.fn(), workspaceBroadcast);
+
+    const item = createFeedback(testWsId, {
+      type: 'general',
+      title: 'Delete broadcast regression',
+      description: 'Deleting feedback should refresh other open dashboards.',
+    });
+
+    const deleted = deleteFeedback(testWsId, item.id);
+    expect(deleted).toBe(true);
+
+    expect(workspaceBroadcast).toHaveBeenCalledWith(
+      testWsId,
+      WS_EVENTS.FEEDBACK_UPDATE,
+      expect.objectContaining({ id: item.id, deleted: true }),
+    );
+  });
+});
+
+describe('Public Feedback — client portal auth and workspace checks', () => {
+  it('rejects protected workspace feedback submission without a client session', async () => {
+    ctx.clearCookies();
+    const res = await postJson(`/api/public/feedback/${protectedWsId}`, {
+      type: 'bug',
+      title: 'Unauthenticated submission',
+      description: 'This should not be accepted without a session.',
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects protected workspace feedback replies without a client session', async () => {
+    ctx.clearCookies();
+    const res = await postJson(`/api/public/feedback/${protectedWsId}/fb_fake/reply`, {
+      content: 'Unauthenticated reply',
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('allows protected workspace feedback after client portal login', async () => {
+    ctx.clearCookies();
+    const loginRes = await postJson(`/api/public/auth/${protectedWsId}`, { password: 'feedback-secret' });
+    expect(loginRes.status).toBe(200);
+
+    const submitRes = await postJson(`/api/public/feedback/${protectedWsId}`, {
+      type: 'feature',
+      title: 'Authenticated feedback',
+      description: 'This should be stored after login.',
+    });
+    expect(submitRes.status).toBe(200);
+    const item = await submitRes.json();
+    expect(item.workspaceId).toBe(protectedWsId);
+
+    const listRes = await api(`/api/public/feedback/${protectedWsId}`);
+    expect(listRes.status).toBe(200);
+    const items = await listRes.json();
+    expect(items.some((row: { id: string }) => row.id === item.id)).toBe(true);
+  });
+
+  it('returns 404 for unknown public feedback workspaces instead of creating orphan rows', async () => {
+    ctx.clearCookies();
+    const res = await postJson('/api/public/feedback/ws_missing_feedback', {
+      type: 'general',
+      title: 'Orphan feedback',
+      description: 'Unknown workspaces should not get feedback rows.',
+    });
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.error).toBe('Workspace not found');
+  });
+
+  it('returns 404 for unknown public feedback list requests', async () => {
+    ctx.clearCookies();
+    const res = await api('/api/public/feedback/ws_missing_feedback');
+    expect(res.status).toBe(404);
   });
 });

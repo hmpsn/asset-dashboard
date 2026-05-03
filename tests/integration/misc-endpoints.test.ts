@@ -162,6 +162,48 @@ describe('Miscellaneous read-only endpoints (cont.)', () => {
   });
 });
 
+describe('Scoped JWT workspace guards for workspace-keyed endpoints', () => {
+  const scopedHeaders = () => ({ Authorization: `Bearer ${scopedUserToken}` });
+
+  it('rejects Google annotation reads for a workspace outside the JWT scope', async () => {
+    const res = await api(`/api/google/annotations/${otherWsId}`, { headers: scopedHeaders() });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects Stripe payment reads for a workspace outside the JWT scope', async () => {
+    const res = await api(`/api/stripe/payments/${otherWsId}`, { headers: scopedHeaders() });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects keyword strategy reads for a workspace outside the JWT scope', async () => {
+    const res = await api(`/api/webflow/keyword-strategy/${otherWsId}`, { headers: scopedHeaders() });
+    expect(res.status).toBe(403);
+  });
+
+  it('allows keyword strategy reads for the JWT-scoped workspace', async () => {
+    const res = await api(`/api/webflow/keyword-strategy/${testWsId}`, { headers: scopedHeaders() });
+    expect(res.status).not.toBe(403);
+  });
+
+  it('rejects keyword strategy patches for a workspace outside the JWT scope', async () => {
+    const res = await ctx.api(`/api/webflow/keyword-strategy/${otherWsId}`, {
+      method: 'PATCH',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ siteKeywords: [] }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects keyword feedback mutations for a workspace outside the JWT scope', async () => {
+    const res = await ctx.api(`/api/webflow/keyword-feedback/${otherWsId}`, {
+      method: 'POST',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keyword: 'cross workspace keyword', status: 'approved' }),
+    });
+    expect(res.status).toBe(403);
+  });
+});
+
 describe('Requests CRUD via API', () => {
   let requestId = '';
   let otherRequestId = '';

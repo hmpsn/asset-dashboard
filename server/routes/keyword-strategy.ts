@@ -48,6 +48,7 @@ import type { Workspace, PageKeywordMap, KeywordStrategy } from '../../shared/ty
 import { METRICS_SOURCE } from '../../shared/types/keywords.js';
 import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
 import { buildStrategySignals } from '../insight-feedback.js';
+import { requireWorkspaceAccess } from '../auth.js';
 import { recordAction, getActionBySource } from '../outcome-tracking.js';
 import { filterBrandedKeywords, filterBrandedContentGaps, extractBrandTokens } from '../competitor-brand-filter.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';
@@ -56,7 +57,6 @@ import { generateRecommendations } from '../recommendations.js';
 import { getDeclinedKeywords, getRequestedKeywords } from '../keyword-feedback.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
-import { requireWorkspaceAccess } from '../auth.js';
 import { filterDeclinedFromPool, matchesQuestionKeyword } from '../strategy-filters.js';
 import { MAX_COMPETITORS } from '../constants.js';
 import { filterDiscoveredCompetitors } from '../competitor-domain-filter.js';
@@ -2483,7 +2483,7 @@ Rules:
 // so Page Intelligence must be able to surface those rows without requiring a
 // full strategy generation run. Short-circuits to null only when both sources
 // are empty.
-router.get('/api/webflow/keyword-strategy/:workspaceId', (req, res) => {
+router.get('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const strategy = ws.keywordStrategy;
@@ -2501,7 +2501,7 @@ router.get('/api/webflow/keyword-strategy/:workspaceId', (req, res) => {
 });
 
 // Get strategy diff (compare current vs previous)
-router.get('/api/webflow/keyword-strategy/:workspaceId/diff', (req, res) => {
+router.get('/api/webflow/keyword-strategy/:workspaceId/diff', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
@@ -2567,7 +2567,7 @@ const patchStrategySchema = z.object({
   opportunities: z.array(z.string()).optional(),
 }).strict();
 
-router.patch('/api/webflow/keyword-strategy/:workspaceId', validate(patchStrategySchema), (req, res) => {
+router.patch('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess('workspaceId'), validate(patchStrategySchema), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   // If pageMap is being updated, save to dedicated table
@@ -2643,7 +2643,7 @@ function getAllFeedback(workspaceId: string) {
 }
 
 // Admin: list all feedback for workspace
-router.get('/api/webflow/keyword-feedback/:workspaceId', (req, res) => {
+router.get('/api/webflow/keyword-feedback/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   res.json(getAllFeedback(ws.id));
@@ -2659,7 +2659,7 @@ const feedbackSchema = z.object({
 });
 
 // broadcast-ok: keyword feedback is internal bookkeeping, not workspace content — no real-time update needed // activity-ok: keyword approve/decline is transient feedback state, not a workspace activity event
-router.post('/api/webflow/keyword-feedback/:workspaceId', validate(feedbackSchema), (req, res) => {
+router.post('/api/webflow/keyword-feedback/:workspaceId', requireWorkspaceAccess('workspaceId'), validate(feedbackSchema), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const { keyword, status, reason, source, declinedBy } = req.body;
@@ -2693,7 +2693,7 @@ const bulkFeedbackSchema = z.object({
 });
 
 // broadcast-ok: keyword feedback is internal bookkeeping, not workspace content — no real-time update needed // activity-ok: keyword approve/decline is transient feedback state, not a workspace activity event
-router.post('/api/webflow/keyword-feedback/:workspaceId/bulk', validate(bulkFeedbackSchema), (req, res) => {
+router.post('/api/webflow/keyword-feedback/:workspaceId/bulk', requireWorkspaceAccess('workspaceId'), validate(bulkFeedbackSchema), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
@@ -2724,7 +2724,7 @@ router.post('/api/webflow/keyword-feedback/:workspaceId/bulk', validate(bulkFeed
 
 // Delete feedback (un-decline a keyword)
 // broadcast-ok: keyword feedback is internal bookkeeping, not workspace content — no real-time update needed // activity-ok: keyword approve/decline is transient feedback state, not a workspace activity event
-router.delete('/api/webflow/keyword-feedback/:workspaceId/:keyword', (req, res) => {
+router.delete('/api/webflow/keyword-feedback/:workspaceId/:keyword', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const kw = decodeURIComponent(req.params.keyword).toLowerCase().trim();
@@ -2735,7 +2735,7 @@ router.delete('/api/webflow/keyword-feedback/:workspaceId/:keyword', (req, res) 
 // --- Intelligence Signals ---
 // GET /api/webflow/keyword-strategy/:workspaceId/signals
 
-router.get('/api/webflow/keyword-strategy/:workspaceId/signals', (req, res) => {
+router.get('/api/webflow/keyword-strategy/:workspaceId/signals', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   try {

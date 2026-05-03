@@ -228,7 +228,16 @@ export function useClientData(workspaceId: string) {
       content: queryKeys.client.contentRequests(workspaceId),
       audit: queryKeys.client.auditSummary(workspaceId),
       'audit-detail': queryKeys.client.auditDetail(workspaceId),
+      annotations: queryKeys.client.annotations(workspaceId),
+      anomalies: queryKeys.client.anomalies(workspaceId),
+      strategy: queryKeys.client.strategy(workspaceId),
+      'page-keywords': queryKeys.client.pageKeywords(workspaceId),
+      pricing: queryKeys.client.pricing(workspaceId),
       recommendations: queryKeys.shared.recommendations(workspaceId),
+      'client-insights': queryKeys.client.clientInsights(workspaceId),
+      intelligence: queryKeys.client.intelligence(workspaceId),
+      'outcome-summary': queryKeys.client.outcomeSummary(workspaceId),
+      'outcome-wins': queryKeys.client.outcomeWins(workspaceId),
       // Prefix key: invalidates ALL client.postPreview queries for the workspace
       // regardless of postId (we don't know postId from the WS event payload).
       'post-preview': ['client', 'post-preview', workspaceId],

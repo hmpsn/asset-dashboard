@@ -3,6 +3,7 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
+import { WS_EVENTS } from './ws-events.js';
 
 // ── Types ──
 
@@ -145,7 +146,7 @@ export function createFeedback(workspaceId: string, data: {
   });
 
   // Real-time broadcast to admin
-  broadcastToWorkspace(workspaceId, 'feedback:new', item);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.FEEDBACK_NEW, item);
 
   return item;
 }
@@ -162,7 +163,7 @@ export function updateFeedbackStatus(workspaceId: string, id: string, status: Fe
     replies: JSON.stringify(item.replies),
     updated_at: item.updatedAt,
   });
-  broadcastToWorkspace(workspaceId, 'feedback:update', item);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.FEEDBACK_UPDATE, item);
   return item;
 }
 
@@ -184,12 +185,17 @@ export function addFeedbackReply(workspaceId: string, id: string, author: 'team'
     replies: JSON.stringify(item.replies),
     updated_at: item.updatedAt,
   });
-  broadcastToWorkspace(workspaceId, 'feedback:update', item);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.FEEDBACK_UPDATE, item);
   return item;
 }
 
 export function deleteFeedback(workspaceId: string, id: string): boolean {
+  const item = getFeedbackItem(workspaceId, id);
+  if (!item) return false;
   const info = stmts().deleteById.run(id, workspaceId);
+  if (info.changes > 0) {
+    broadcastToWorkspace(workspaceId, WS_EVENTS.FEEDBACK_UPDATE, { ...item, deleted: true });
+  }
   return info.changes > 0;
 }
 

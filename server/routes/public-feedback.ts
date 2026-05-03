@@ -2,11 +2,18 @@ import { Router } from 'express';
 import { createFeedback, listFeedback, addFeedbackReply } from '../feedback.js';
 import { getWorkspace } from '../workspaces.js';
 import { notifyTeamNewFeedback } from '../email.js';
+import { requireClientPortalAuth } from '../middleware.js';
 import type { FeedbackType } from '../feedback.js';
 
 const router = Router();
 
 const VALID_TYPES: FeedbackType[] = ['bug', 'feature', 'general'];
+
+router.use('/api/public/feedback/:workspaceId', requireClientPortalAuth(), (req, res, next) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  next();
+});
 
 /** Client submits feedback */
 router.post('/api/public/feedback/:workspaceId', (req, res) => {
@@ -35,15 +42,13 @@ router.post('/api/public/feedback/:workspaceId', (req, res) => {
 
   // Email notification to admin
   const ws = getWorkspace(workspaceId);
-  if (ws) {
-    notifyTeamNewFeedback({
-      workspaceName: ws.name,
-      workspaceId,
-      feedbackType: type,
-      title: title.trim(),
-      description: description.trim().slice(0, 200),
-    });
-  }
+  notifyTeamNewFeedback({
+    workspaceName: ws?.name ?? workspaceId,
+    workspaceId,
+    feedbackType: type,
+    title: title.trim(),
+    description: description.trim().slice(0, 200),
+  });
 
   res.json(item);
 });

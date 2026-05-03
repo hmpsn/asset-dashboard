@@ -544,6 +544,25 @@ describe('GET /api/public/content-performance/:workspaceId — auth enforcement'
   });
 });
 
+describe('GET /api/public/stripe/status/:workspaceId/:sessionId — explicit auth enforcement', () => {
+  const path = () => `/api/public/stripe/status/${protectedWsId}/cs_missing_auth_test`;
+
+  it('no auth → 401 even though workspaceId is not the generic middleware segment', async () => {
+    const res = await getNoAuth(path());
+    expect(res.status).toBe(401);
+  });
+
+  it('valid client JWT → not 401 (auth passed, missing session returns business response)', async () => {
+    const res = await getWithValidClientToken(path());
+    expect(res.status).not.toBe(401);
+  });
+
+  it('cross-workspace JWT → 401', async () => {
+    const res = await getWithCookie(path(), clientCookieHeader(protectedWsId, otherClientToken));
+    expect(res.status).toBe(401);
+  });
+});
+
 // ══════════════════════════════════════════════════════════════════════════════
 // PASSWORDLESS WORKSPACE — auth gate must NOT activate (no clientPassword)
 // ══════════════════════════════════════════════════════════════════════════════
