@@ -104,6 +104,8 @@ interface StrategyKeywordTableRow extends PriorityKeywordItem {
   clicks?: number;
   metricsSource?: string;
   contextSources: string[];
+  rationale?: string;                                      // AI rationale from contentGaps, if available
+  trendDirection?: 'rising' | 'declining' | 'stable';    // from contentGaps, if available
 }
 
 export function StrategyTab({ strategyData, requestedTopics, contentRequests, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal, contentPlanKeywords, onTabChange, workspaceId, setToast, onContentRequested, hidePrices }: StrategyTabProps) {
@@ -604,6 +606,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       clicks: page?.clicks,
       metricsSource,
       contextSources,
+      rationale: contentGap?.rationale,
+      trendDirection: contentGap?.trendDirection,
     };
   };
 
