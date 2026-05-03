@@ -89,8 +89,8 @@ beforeAll(async () => {
   updateWorkspace(disabledPortalWsId, { clientPortalEnabled: false });
 }, 30_000);
 
-afterAll(() => {
-  ctx.stopServer();
+afterAll(async () => {
+  await ctx.stopServer();
   for (const c of cleanups) c();
 });
 

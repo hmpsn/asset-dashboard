@@ -23,9 +23,9 @@ beforeAll(async () => {
   wsId = ws.id;
 }, 25_000);
 
-afterAll(() => {
+afterAll(async () => {
   deleteWorkspace(wsId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 describe('audit_finding insight dedup fix', () => {

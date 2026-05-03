@@ -54,13 +54,13 @@ beforeAll(async () => {
 // variables are typed as non-undefined so .cleanup() compiles in the test
 // body (which only runs if beforeAll succeeded), but at runtime they may be
 // unset; the helper restores the runtime safety the type system lost.
-afterAll(() => {
+afterAll(async () => {
   const tryCleanup = (w: SeededFullWorkspace | undefined) => w?.cleanup();
   tryCleanup(freeWs);
   tryCleanup(growthWs);
   tryCleanup(premiumWs);
   tryCleanup(trialWs);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 // ── Usage endpoint: per-feature limits differ by tier ─────────────────────────

@@ -187,7 +187,7 @@ beforeAll(async () => {
   });
 }, 30_000);
 
-afterAll(() => {
+afterAll(async () => {
   cleanKeywordFeedback(strategyWsId);
   cleanKeywordFeedback(feedbackWsId);
   cleanContentGapVotes(voteWsId);
@@ -197,7 +197,7 @@ afterAll(() => {
   deleteWorkspace(feedbackWsId);
   deleteWorkspace(voteWsId);
   deleteWorkspace(isolationWsId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 // ── GET /api/public/seo-strategy/:workspaceId ───────────────────────────────

@@ -20,11 +20,11 @@ beforeAll(async () => {
   updateWorkspace(privateWsId, { clientPassword: 'client-action-test' });
 });
 
-afterAll(() => {
+afterAll(async () => {
   db.prepare('DELETE FROM client_actions WHERE workspace_id IN (?, ?)').run(wsId, privateWsId);
   deleteWorkspace(wsId);
   deleteWorkspace(privateWsId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 describe('client action routes', () => {

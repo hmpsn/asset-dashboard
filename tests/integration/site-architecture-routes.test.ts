@@ -94,14 +94,14 @@ beforeAll(async () => {
   });
 }, 25_000);
 
-afterAll(() => {
+afterAll(async () => {
   if (matrixId) deleteMatrix(wsId, matrixId);
   if (wsId) {
     deleteAllPageKeywords(wsId);
     deleteWorkspace(wsId);
   }
   if (wsBId) deleteWorkspace(wsBId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 // ===========================================================================

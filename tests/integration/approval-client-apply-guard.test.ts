@@ -46,10 +46,10 @@ beforeAll(async () => {
   updateItem(wsId, cmsBatchId, cmsBatch.items[0].id, { status: 'approved' });
 });
 
-afterAll(() => {
+afterAll(async () => {
   db.prepare('DELETE FROM approval_batches WHERE workspace_id = ?').run(wsId);
   deleteWorkspace(wsId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 describe('public approval apply guard', () => {

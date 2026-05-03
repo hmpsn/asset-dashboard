@@ -43,11 +43,11 @@ beforeAll(async () => {
   scopedUserToken = signToken({ userId: scopedUser.id, email: scopedUser.email, role: scopedUser.role });
 }, 25_000);
 
-afterAll(() => {
+afterAll(async () => {
   deleteUser(scopedUserId);
   deleteWorkspace(testWsId);
   deleteWorkspace(otherWsId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 describe('Miscellaneous read-only endpoints', () => {

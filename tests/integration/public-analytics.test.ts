@@ -87,12 +87,12 @@ beforeAll(async () => {
   // Workspace B intentionally has NO insights seeded
 }, 25_000);
 
-afterAll(() => {
+afterAll(async () => {
   cleanSeedData(wsAId);
   cleanSeedData(wsBId);
   deleteWorkspace(wsAId);
   deleteWorkspace(wsBId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

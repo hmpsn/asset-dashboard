@@ -67,10 +67,10 @@ beforeAll(async () => {
   httpCleanup = httpSeed.cleanup;
 });
 
-afterAll(() => {
+afterAll(async () => {
   inProcessCleanup?.();
   httpCleanup?.();
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 beforeEach(() => {

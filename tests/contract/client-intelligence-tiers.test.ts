@@ -60,11 +60,11 @@ beforeAll(async () => {
   }
 }, 30_000);
 
-afterAll(() => {
+afterAll(async () => {
   for (const cleanup of cleanups) {
     cleanup();
   }
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 // ── Helper ────────────────────────────────────────────────────────────────

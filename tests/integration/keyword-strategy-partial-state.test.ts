@@ -51,10 +51,10 @@ beforeAll(async () => {
   }
 }, 30_000);
 
-afterAll(() => {
+afterAll(async () => {
   if (partialWsId) deleteWorkspace(partialWsId);
   if (emptyWsId) deleteWorkspace(emptyWsId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 describe('GET /api/webflow/keyword-strategy/:wsId — partial state coverage', () => {

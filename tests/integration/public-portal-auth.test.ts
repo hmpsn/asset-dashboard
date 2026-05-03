@@ -143,7 +143,7 @@ beforeAll(async () => {
   // Deliberately no clientPassword → auth gate does NOT activate
 }, 30_000);
 
-afterAll(() => {
+afterAll(async () => {
   deleteClientUser(clientUserId, protectedWsId);
   deleteClientUser(otherClientUserId, otherWsId);
   deleteUser(scopedUserId);
@@ -151,7 +151,7 @@ afterAll(() => {
   deleteWorkspace(protectedWsId);
   deleteWorkspace(otherWsId);
   deleteWorkspace(openWsId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 describe('Internal JWT workspace scoping on protected public routes', () => {

@@ -24,9 +24,9 @@ beforeAll(async () => {
   testWsId = ws.id;
 }, 25_000);
 
-afterAll(() => {
+afterAll(async () => {
   deleteWorkspace(testWsId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 describe('Client portal auth — auth-mode', () => {

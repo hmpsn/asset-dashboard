@@ -30,10 +30,10 @@ beforeAll(async () => {
   freeWsId = freeWs.id;
 }, 30_000);
 
-afterAll(() => {
+afterAll(async () => {
   deleteWorkspace(testWsId);
   deleteWorkspace(freeWsId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 describe('Voice Calibration Hardening — GET before POST returns null', () => {

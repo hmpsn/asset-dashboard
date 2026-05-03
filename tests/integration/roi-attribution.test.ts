@@ -84,11 +84,11 @@ beforeAll(async () => {
   await ctx.startServer();
 }, 25_000);
 
-afterAll(() => {
+afterAll(async () => {
   for (const id of wsIds) {
     try { deleteWorkspace(id); } catch { /* ignore */ }
   }
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 // ── Tests ────────────────────────────────────────────────────────────────────

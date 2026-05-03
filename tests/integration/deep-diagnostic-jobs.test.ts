@@ -85,7 +85,7 @@ afterAll(async () => {
   deleteWorkspace(testWsId);
   setAuthToken('');
   if (testUserId) deleteUser(testUserId);
-  ctx.stopServer();
+  await ctx.stopServer();
 });
 
 describe('deep-diagnostic job — validation', () => {
