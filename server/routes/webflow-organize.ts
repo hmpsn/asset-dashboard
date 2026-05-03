@@ -17,7 +17,7 @@ import { createLogger } from '../logger.js';
 
 const log = createLogger('webflow-organize');
 
-import { requireWorkspaceAccessFromQuery } from '../auth.js';
+import { requireWorkspaceAccessFromBody, requireWorkspaceAccessFromQuery } from '../auth.js';
 import { isProgrammingError } from '../errors.js';
 const router = Router();
 
@@ -140,7 +140,7 @@ router.get('/api/webflow/organize-preview/:siteId', requireWorkspaceAccessFromQu
 });
 
 // Execute: creates folders and moves assets according to a plan
-router.post('/api/webflow/organize-execute/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+router.post('/api/webflow/organize-execute/:siteId', requireWorkspaceAccessFromBody(), async (req, res) => {
   const { siteId } = req.params;
   const { moves, foldersToCreate } = req.body as {
     moves: Array<{ assetId: string; assetName: string; targetFolder: string }>;
@@ -199,7 +199,7 @@ router.post('/api/webflow/organize-execute/:siteId', requireWorkspaceAccessFromQ
 });
 
 // --- Rename Asset ---
-router.patch('/api/webflow/rename/:assetId', async (req, res) => {
+router.patch('/api/webflow/rename/:assetId', requireWorkspaceAccessFromBody(), async (req, res) => {
   const { displayName, siteId } = req.body;
   if (!displayName) return res.status(400).json({ error: 'displayName required' });
 

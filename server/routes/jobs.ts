@@ -27,6 +27,7 @@ import {
   hasActiveJob,
 } from '../jobs.js';
 import { APP_PASSWORD } from '../middleware.js';
+import { requestUserCanAccessWorkspace, sendWorkspaceAccessDenied } from '../auth.js';
 import { callOpenAI } from '../openai-helpers.js';
 import { generateRecommendations, loadRecommendations } from '../recommendations.js';
 import { saveSnapshot, getLatestSnapshotBefore } from '../reports.js';
@@ -126,21 +127,33 @@ export async function prefetchSemrushForTopPages(
 // --- Background Job Endpoints ---
 router.get('/api/jobs', (_req, res) => {
   const wsId = _req.query.workspaceId as string | undefined;
+  if (wsId && !requestUserCanAccessWorkspace(_req, wsId)) return sendWorkspaceAccessDenied(res);
+  if (!wsId && _req.user && _req.user.role !== 'owner') {
+    const visible = (_req.user.workspaceIds || []).flatMap(id => listJobs(id));
+    const deduped = [...new Map(visible.map(job => [job.id, job])).values()]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return res.json(deduped);
+  }
   res.json(listJobs(wsId));
 });
 
 router.get('/api/jobs/:id', (req, res) => {
   const job = getJob(req.params.id);
   if (!job) return res.status(404).json({ error: 'Job not found' });
+  if (job.workspaceId && !requestUserCanAccessWorkspace(req, job.workspaceId)) return sendWorkspaceAccessDenied(res);
   res.json(job);
 });
 
 router.delete('/api/jobs/completed', (_req, res) => {
+  if (_req.user && _req.user.role !== 'owner') return sendWorkspaceAccessDenied(res);
   const count = clearCompletedJobs();
   res.json({ cleared: count });
 });
 
 router.delete('/api/jobs/:id', (req, res) => {
+  const existing = getJob(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Job not found' });
+  if (existing.workspaceId && !requestUserCanAccessWorkspace(req, existing.workspaceId)) return sendWorkspaceAccessDenied(res);
   const job = cancelJob(req.params.id);
   if (!job) return res.status(404).json({ error: 'Job not found' });
   res.json(job);
@@ -149,6 +162,10 @@ router.delete('/api/jobs/:id', (req, res) => {
 router.post('/api/jobs', async (req, res) => {
   const { type, params } = req.body as { type: string; params: Record<string, unknown> };
   if (!type) return res.status(400).json({ error: 'type required' });
+  const requestedWorkspaceId = params?.workspaceId;
+  if (typeof requestedWorkspaceId === 'string' && !requestUserCanAccessWorkspace(req, requestedWorkspaceId)) {
+    return sendWorkspaceAccessDenied(res);
+  }
 
   try {
     switch (type) {

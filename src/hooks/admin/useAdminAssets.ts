@@ -20,14 +20,14 @@ interface Asset {
  * Fetch all Webflow assets for a site.
  * Replaces loadAssets callback + useEffect in AssetBrowser.tsx.
  */
-export function useWebflowAssets(siteId: string) {
+export function useWebflowAssets(siteId: string, workspaceId: string) {
   return useQuery<Asset[]>({
     queryKey: queryKeys.admin.webflowAssets(siteId),
     queryFn: async () => {
-      const data = await getSafe<Asset[]>(`/api/webflow/assets/${siteId}`, []);
+      const data = await getSafe<Asset[]>(`/api/webflow/assets/${siteId}?workspaceId=${encodeURIComponent(workspaceId)}`, []);
       return Array.isArray(data) ? data : [];
     },
-    enabled: !!siteId,
+    enabled: !!siteId && !!workspaceId,
     staleTime: STALE_TIMES.NORMAL,
   });
 }
@@ -36,16 +36,16 @@ export function useWebflowAssets(siteId: string) {
  * Fetch unused asset IDs from the asset audit.
  * Replaces the second useEffect in AssetBrowser.tsx that loads unused IDs.
  */
-export function useAssetAudit(siteId: string, enabled: boolean) {
+export function useAssetAudit(siteId: string, workspaceId: string, enabled: boolean) {
   return useQuery<Set<string>>({
     queryKey: queryKeys.admin.assetAudit(siteId),
     queryFn: async () => {
-      const data = await get<{ issues?: Array<{ issues: string[]; assetId: string }> }>(`/api/webflow/audit/${siteId}`);
+      const data = await get<{ issues?: Array<{ issues: string[]; assetId: string }> }>(`/api/webflow/audit/${siteId}?workspaceId=${encodeURIComponent(workspaceId)}`);
       return new Set<string>(
         (data.issues || []).filter((i) => i.issues.includes('unused')).map((i) => i.assetId)
       );
     },
-    enabled: !!siteId && enabled,
+    enabled: !!siteId && !!workspaceId && enabled,
     staleTime: STALE_TIMES.STABLE,
   });
 }
@@ -54,11 +54,11 @@ export function useAssetAudit(siteId: string, enabled: boolean) {
  * Scan CMS collections for Image/MultiImage fields and return
  * per-asset usage data + stats. Lazy-loaded — only fires when enabled.
  */
-export function useCmsImages(siteId: string, enabled: boolean) {
+export function useCmsImages(siteId: string, workspaceId: string, enabled: boolean) {
   return useQuery<CmsImageScanResult>({
     queryKey: queryKeys.admin.cmsImages(siteId),
-    queryFn: () => get<CmsImageScanResult>(`/api/webflow/cms-images/${siteId}`),
-    enabled: !!siteId && enabled,
+    queryFn: () => get<CmsImageScanResult>(`/api/webflow/cms-images/${siteId}?workspaceId=${encodeURIComponent(workspaceId)}`),
+    enabled: !!siteId && !!workspaceId && enabled,
     staleTime: STALE_TIMES.STABLE,
   });
 }

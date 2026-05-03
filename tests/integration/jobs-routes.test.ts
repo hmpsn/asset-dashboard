@@ -10,20 +10,40 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { signToken } from '../../server/auth.js';
+import { createUser, deleteUser } from '../../server/users.js';
+import { createJob, updateJob, clearCompletedJobs } from '../../server/jobs.js';
 
 const ctx = createTestContext(13210);
 const { api, postJson, del } = ctx;
 
 let testWsId = '';
+let otherWsId = '';
+let scopedUserId = '';
+let scopedUserToken = '';
 
 beforeAll(async () => {
   await ctx.startServer();
   const ws = createWorkspace('Jobs Test Workspace');
   testWsId = ws.id;
+  const otherWs = createWorkspace('Jobs Other Workspace');
+  otherWsId = otherWs.id;
+  const scopedUser = await createUser(
+    'jobs-scoped-user@test.local',
+    'ScopedPass1!',
+    'Jobs Scoped User',
+    'member',
+    [testWsId],
+  );
+  scopedUserId = scopedUser.id;
+  scopedUserToken = signToken({ userId: scopedUser.id, email: scopedUser.email, role: scopedUser.role });
 }, 25_000);
 
 afterAll(async () => {
+  clearCompletedJobs();
+  deleteUser(scopedUserId);
   deleteWorkspace(testWsId);
+  deleteWorkspace(otherWsId);
   await ctx.stopServer();
 });
 
@@ -54,6 +74,35 @@ describe('Jobs — list and get', () => {
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body.error).toBe('Job not found');
+  });
+});
+
+describe('Jobs — scoped JWT workspace guards', () => {
+  const scopedHeaders = () => ({ Authorization: `Bearer ${scopedUserToken}` });
+
+  it('rejects listing jobs for a workspace outside the JWT scope', async () => {
+    const res = await api(`/api/jobs?workspaceId=${otherWsId}`, { headers: scopedHeaders() });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects reading a job owned by another workspace', async () => {
+    const job = createJob('tenancy-regression', { workspaceId: otherWsId, message: 'cross workspace' });
+    updateJob(job.id, { status: 'done' });
+
+    const res = await api(`/api/jobs/${job.id}`, { headers: scopedHeaders() });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects creating a workspace job outside the JWT scope before job-type validation', async () => {
+    const res = await ctx.api('/api/jobs', {
+      method: 'POST',
+      headers: { ...scopedHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'seo-audit',
+        params: { workspaceId: otherWsId },
+      }),
+    });
+    expect(res.status).toBe(403);
   });
 });
 

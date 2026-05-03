@@ -103,26 +103,12 @@ export function requireRole(...roles: string[]) {
  */
 export function requireWorkspaceAccess(paramName: string = 'id') {
   return (req: Request, res: Response, next: NextFunction): void => {
-    // If no JWT user is set, pass through (legacy APP_PASSWORD auth handles access)
-    if (!req.user) {
-      next();
-      return;
-    }
-    // Owners bypass workspace checks
-    if (req.user.role === 'owner') {
-      next();
-      return;
-    }
     const wsId = req.params[paramName];
-    if (!wsId) {
+    if (!wsId || requestUserCanAccessWorkspace(req, wsId)) {
       next();
       return;
     }
-    if (!req.user.workspaceIds || !req.user.workspaceIds.includes(wsId)) {
-      res.status(403).json({ error: 'You do not have access to this workspace' });
-      return;
-    }
-    next();
+    sendWorkspaceAccessDenied(res);
   };
 }
 
@@ -135,25 +121,63 @@ export function requireWorkspaceAccess(paramName: string = 'id') {
  */
 export function requireWorkspaceAccessFromQuery(queryParam: string = 'workspaceId') {
   return (req: Request, res: Response, next: NextFunction): void => {
-    if (!req.user) {
+    const raw = req.query[queryParam];
+    const wsId = Array.isArray(raw) ? raw[0] : raw;
+    if (!wsId || typeof wsId !== 'string') {
+      if (requestUserCanOmitWorkspaceScope(req)) {
+        next();
+        return;
+      }
+      sendWorkspaceAccessDenied(res);
+      return;
+    }
+    if (requestUserCanAccessWorkspace(req, wsId)) {
       next();
       return;
     }
-    if (req.user.role === 'owner') {
-      next();
-      return;
-    }
-    const wsId = req.query[queryParam] as string | undefined;
-    if (!wsId) {
-      next();
-      return;
-    }
-    if (!req.user.workspaceIds || !req.user.workspaceIds.includes(wsId)) {
-      res.status(403).json({ error: 'You do not have access to this workspace' });
-      return;
-    }
-    next();
+    sendWorkspaceAccessDenied(res);
   };
+}
+
+/**
+ * Requires the authenticated user to have access to the workspace
+ * identified by a request body field.
+ * Owners always have access to all workspaces.
+ * Must be used AFTER requireAuth.
+ */
+export function requireWorkspaceAccessFromBody(bodyParam: string = 'workspaceId') {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const body = req.body as Record<string, unknown> | undefined;
+    const wsId = body?.[bodyParam];
+    if (typeof wsId !== 'string') {
+      if (requestUserCanOmitWorkspaceScope(req)) {
+        next();
+        return;
+      }
+      sendWorkspaceAccessDenied(res);
+      return;
+    }
+    if (requestUserCanAccessWorkspace(req, wsId)) {
+      next();
+      return;
+    }
+    sendWorkspaceAccessDenied(res);
+  };
+}
+
+export function requestUserCanAccessWorkspace(req: Request, workspaceId: string): boolean {
+  // If no JWT user is set, pass through (legacy APP_PASSWORD auth handles access).
+  if (!req.user) return true;
+  if (req.user.role === 'owner') return true;
+  return !!req.user.workspaceIds?.includes(workspaceId);
+}
+
+function requestUserCanOmitWorkspaceScope(req: Request): boolean {
+  return !req.user || req.user.role === 'owner';
+}
+
+export function sendWorkspaceAccessDenied(res: Response): void {
+  res.status(403).json({ error: 'You do not have access to this workspace' });
 }
 
 /**

@@ -239,14 +239,14 @@ export const webflow = {
   bulkFix: (siteId: string, body: Record<string, unknown>) =>
     post<unknown>(`/api/webflow/seo-bulk-fix/${siteId}`, body),
 
-  assets: (siteId: string) =>
-    get<unknown[]>(`/api/webflow/assets/${siteId}`),
+  assets: (siteId: string, workspaceId?: string) =>
+    get<unknown[]>(`/api/webflow/assets/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`),
 
   updateAsset: (assetId: string, body: Record<string, unknown>) =>
     patch<unknown>(`/api/webflow/assets/${assetId}`, body),
 
-  removeAsset: (assetId: string, siteId: string) =>
-    del(`/api/webflow/assets/${assetId}?siteId=${siteId}`),
+  removeAsset: (assetId: string, siteId: string, workspaceId?: string) =>
+    del(`/api/webflow/assets/${assetId}?siteId=${encodeURIComponent(siteId)}${workspaceId ? `&workspaceId=${encodeURIComponent(workspaceId)}` : ''}`),
 
   generateAlt: (workspaceId: string, assetId: string, body: Record<string, unknown>) =>
     post<unknown>(`/api/webflow/${workspaceId}/generate-alt/${assetId}`, body),
@@ -257,14 +257,14 @@ export const webflow = {
   rename: (assetId: string, body: Record<string, unknown>) =>
     patch<unknown>(`/api/webflow/rename/${assetId}`, body),
 
-  organizePreview: (siteId: string) =>
-    get<unknown>(`/api/webflow/organize-preview/${siteId}`),
+  organizePreview: (siteId: string, workspaceId?: string) =>
+    get<unknown>(`/api/webflow/organize-preview/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`),
 
   organizeExecute: (siteId: string, body: Record<string, unknown>) =>
     post<unknown>(`/api/webflow/organize-execute/${siteId}`, body),
 
-  auditAssets: (siteId: string) =>
-    get<unknown>(`/api/webflow/audit/${siteId}`),
+  auditAssets: (siteId: string, workspaceId?: string) =>
+    get<unknown>(`/api/webflow/audit/${siteId}${workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : ''}`),
 
   linkCheckDomains: (siteId: string) =>
     get<unknown[]>(`/api/webflow/link-check-domains/${siteId}`),
