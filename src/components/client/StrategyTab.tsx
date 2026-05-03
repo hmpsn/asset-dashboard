@@ -3,7 +3,7 @@ import {
   Zap, FileText, Sparkles, Target, CheckCircle2,
   TrendingUp, TrendingDown, Minus, ChevronDown, Layers,
   MessageCircle, BarChart3, Eye, AlertTriangle,
-  ThumbsUp, ThumbsDown, Undo2, Ban, Plus, X, Briefcase, Search, ArrowUpDown,
+  ThumbsUp, ThumbsDown, Undo2, Ban, Plus, X, Briefcase,
 } from 'lucide-react';
 import { TierGate, EmptyState, type Tier, Icon, Button } from '../ui';
 import type { ClientKeywordStrategy, ClientContentRequest } from './types';
@@ -71,7 +71,6 @@ export interface KeywordFeedback {
 }
 
 type PriorityKeywordStatus = 'client' | 'strategy' | 'suggested';
-type StrategyKeywordSortKey = 'keyword' | 'role' | 'opportunity' | 'page';
 type StrategyKeywordRole = 'strategy' | 'page' | 'content' | 'idea';
 type OpportunityTone = 'emerald' | 'amber' | 'blue' | 'zinc';
 
@@ -184,20 +183,10 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const [newTrackedKeyword, setNewTrackedKeyword] = useState('');
   const [addingKeyword, setAddingKeyword] = useState(false);
   const [removingKeyword, setRemovingKeyword] = useState<string | null>(null);
-  const [confirmRemoveKeyword, setConfirmRemoveKeyword] = useState<string | null>(null);
   const [trackedKeywordsLoading, setTrackedKeywordsLoading] = useState(false);
-  const [priorityKeywordSearch, setPriorityKeywordSearch] = useState('');
-  const [includeKeywordIdeas, setIncludeKeywordIdeas] = useState(false);
-  const [expandedKeywordRows, setExpandedKeywordRows] = useState<Set<string>>(new Set());
-  const [keywordSort, setKeywordSort] = useState<{ key: StrategyKeywordSortKey; asc: boolean }>({ key: 'role', asc: true });
   const [trackedKeywordsError, setTrackedKeywordsError] = useState(false);
-  const [managingKeyword, setManagingKeyword] = useState<string | null>(null);
   const [discussingGrowthPage, setDiscussingGrowthPage] = useState<string | null>(null);
-  const confirmRemoveKeywordButtonRef = useRef<HTMLButtonElement | null>(null);
-
-  useEffect(() => {
-    if (confirmRemoveKeyword) confirmRemoveKeywordButtonRef.current?.focus();
-  }, [confirmRemoveKeyword]);
+  const [openKeywordDrawer, setOpenKeywordDrawer] = useState<string | null>(null);
 
   const removePriorityKeyword = useCallback(async (item: PriorityKeywordItem) => {
     if (!workspaceId) return;
@@ -613,110 +602,6 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
 
   const strategyKeywordRows = strategyKeywords.map(buildKeywordRow);
   const keywordIdeaRows = keywordIdeas.map(buildKeywordRow);
-  const keywordRows = includeKeywordIdeas ? [...strategyKeywordRows, ...keywordIdeaRows] : strategyKeywordRows;
-  const filteredKeywordRows = keywordRows.filter(row => {
-    if (!priorityKeywordSearchTerm) return true;
-    return row.normalized.includes(priorityKeywordSearchTerm)
-      || normalizeKeyword(row.roleLabel).includes(priorityKeywordSearchTerm)
-      || normalizeKeyword(row.opportunityLabel).includes(priorityKeywordSearchTerm)
-      || normalizeKeyword(row.nextMoveLabel).includes(priorityKeywordSearchTerm)
-      || normalizeKeyword(row.pagePath || '').includes(priorityKeywordSearchTerm)
-      || normalizeKeyword(row.pageTitle || '').includes(priorityKeywordSearchTerm);
-  });
-
-  const roleOrder: Record<StrategyKeywordRole, number> = {
-    content: 0,
-    page: 1,
-    strategy: 2,
-    idea: 3,
-  };
-  const opportunityOrder: Record<OpportunityTone, number> = {
-    emerald: 0,
-    blue: 1,
-    amber: 2,
-    zinc: 3,
-  };
-
-  const sortedKeywordRows = [...filteredKeywordRows].sort((a, b) => {
-    let result = 0;
-    switch (keywordSort.key) {
-      case 'keyword':
-        result = a.label.localeCompare(b.label);
-        break;
-      case 'role':
-        result = roleOrder[a.role] - roleOrder[b.role] || a.label.localeCompare(b.label);
-        break;
-      case 'opportunity':
-        result = opportunityOrder[a.opportunityTone] - opportunityOrder[b.opportunityTone]
-          || (b.opportunityScore ?? -1) - (a.opportunityScore ?? -1)
-          || a.label.localeCompare(b.label);
-        break;
-      case 'page':
-        result = (a.pageTitle || a.pagePath || 'zz').localeCompare(b.pageTitle || b.pagePath || 'zz') || a.label.localeCompare(b.label);
-        break;
-    }
-    return keywordSort.asc ? result : -result;
-  });
-
-  const hasPriorityKeywordSearch = priorityKeywordSearchTerm.length > 0;
-  const priorityKeywordEmptyMessage = hasPriorityKeywordSearch
-    ? includeKeywordIdeas
-      ? 'No strategy keywords or keyword ideas match that search.'
-      : 'No strategy keywords match that search.'
-    : includeKeywordIdeas
-      ? 'No strategy keywords or keyword ideas yet.'
-      : 'No strategy keywords yet.';
-  const keywordSearchLabel = includeKeywordIdeas ? 'Search strategy keywords and ideas' : 'Search strategy keywords';
-
-  const handleKeywordSort = (key: StrategyKeywordSortKey) => {
-    setKeywordSort(prev => prev.key === key ? { key, asc: !prev.asc } : { key, asc: true });
-  };
-
-  const toggleKeywordRow = (normalized: string) => {
-    setExpandedKeywordRows(prev => {
-      const next = new Set(prev);
-      if (next.has(normalized)) next.delete(normalized);
-      else next.add(normalized);
-      return next;
-    });
-  };
-
-  const getKeywordRemovalCopy = (row: StrategyKeywordTableRow) => {
-    if (row.status === 'suggested') return 'Dismissing this idea removes it from this suggestion list.';
-    if (row.isTracked && row.isStrategy) return 'Removing this stops future tracking and marks it as not relevant for future strategy recommendations. Historical ranking data is preserved.';
-    if (row.isTracked) return 'Removing this stops future tracking. Historical ranking data is preserved.';
-    return 'Removing this marks it as not relevant so future strategies avoid using it.';
-  };
-
-  const handleKeywordConfirmKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape' && !removingKeyword) setConfirmRemoveKeyword(null);
-  };
-
-  const keywordSortColumns: Array<{ key: StrategyKeywordSortKey; label: string; align?: 'left' | 'right' }> = [
-    { key: 'keyword', label: 'Keyword' },
-    { key: 'role', label: 'Role' },
-    { key: 'opportunity', label: 'Opportunity' },
-    { key: 'page', label: 'Page' },
-  ];
-
-  const roleBadgeClass = 'border-[var(--brand-border)] bg-[var(--surface-3)] text-[var(--brand-text)]';
-
-  const opportunityClass = (tone: OpportunityTone) => {
-    switch (tone) {
-      case 'emerald': return 'border-emerald-500/20 bg-emerald-500/8 text-accent-success';
-      case 'amber': return 'border-amber-500/20 bg-amber-500/8 text-accent-warning';
-      case 'blue': return 'border-blue-500/20 bg-blue-500/10 text-accent-info';
-      default: return 'border-[var(--brand-border)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]';
-    }
-  };
-
-  const getKeywordRemovalActionLabel = (row: StrategyKeywordTableRow) => {
-    if (row.status === 'suggested') return 'Dismiss idea';
-    if (row.isTracked && !row.isStrategy) return 'Stop tracking';
-    return 'Remove from strategy';
-  };
-
-  const getKeywordKeepActionLabel = (row: StrategyKeywordTableRow) => row.status === 'suggested' ? 'Keep idea' : 'Keep in strategy';
 
   const addStrategyKeyword = async (keyword: string, options?: { clearInput?: boolean }) => {
     if (!workspaceId) return;
