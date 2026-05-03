@@ -20,8 +20,11 @@ vi.mock('../../server/outcome-playbooks.js', () => ({
   getPlaybooks: vi.fn().mockReturnValue([]),
 }));
 vi.mock('../../server/outcome-tracking.js', () => ({
-  getActionsByPage: vi.fn(),
-  getOutcomesForAction: vi.fn(),
+  getActionsByPage: vi.fn(() => []),
+  getActionsByWorkspace: vi.fn(() => []),
+  getOutcomesForAction: vi.fn(() => []),
+  getPendingActions: vi.fn(() => []),
+  getTopWinsFromActions: vi.fn(() => []),
 }));
 vi.mock('../../server/feature-flags.js', () => ({
   isFeatureEnabled: vi.fn().mockReturnValue(true),

@@ -103,9 +103,10 @@ vi.mock('../../server/rank-tracking.js', () => ({
 }));
 vi.mock('../../server/outcome-tracking.js', () => ({
   getActionsByPage: vi.fn(() => []),
+  getActionsByWorkspace: vi.fn(() => []),
   getOutcomesForAction: vi.fn(() => []),
   getPendingActions: vi.fn(() => []),
-  getActionsByWorkspace: vi.fn(() => []),
+  getTopWinsFromActions: vi.fn(() => []),
 }));
 
 const WS_ID = 'ws-contract';
