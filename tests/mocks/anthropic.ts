@@ -1,6 +1,7 @@
 /**
  * Mock factory for Anthropic callAnthropic helper.
- * Use setupAnthropicMocks() in beforeEach to intercept server/anthropic-helpers.ts.
+ * Importing this module intercepts server/anthropic-helpers.ts at module load.
+ * Use setupAnthropicMocks()/resetAnthropicMocks() to clear mock state.
  */
 import { vi } from 'vitest';
 
@@ -25,16 +26,47 @@ const DEFAULT_RESULT: AnthropicChatResult = {
   totalTokens: 0,
 };
 
-const responseMap = new Map<string, () => AnthropicChatResult>();
-const errorMap = new Map<string, string>();
-const capturedCalls: CapturedCall[] = [];
+const mockState = vi.hoisted(() => ({
+  responseMap: new Map<string, () => AnthropicChatResult>(),
+  errorMap: new Map<string, string>(),
+  capturedCalls: [] as CapturedCall[],
+}));
+
+vi.mock('../../server/anthropic-helpers.js', () => ({
+  callAnthropic: vi.fn(async (opts: { feature: string; messages: unknown[]; model?: string; system?: string }) => {
+    mockState.capturedCalls.push({
+      feature: opts.feature,
+      messages: opts.messages as CapturedCall['messages'],
+      model: opts.model,
+      system: opts.system,
+    });
+
+    const errorMessage = mockState.errorMap.get(opts.feature);
+    if (errorMessage) {
+      throw new Error(errorMessage);
+    }
+
+    const factory = mockState.responseMap.get(opts.feature);
+    if (factory) {
+      return factory();
+    }
+
+    return {
+      text: '',
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+    };
+  }),
+  isAnthropicConfigured: vi.fn(() => true),
+}));
 
 /**
  * Configure mock to return specific text for a feature.
  */
 export function mockAnthropicResponse(feature: string, text: string): void {
-  errorMap.delete(feature);
-  responseMap.set(feature, () => ({
+  mockState.errorMap.delete(feature);
+  mockState.responseMap.set(feature, () => ({
     ...DEFAULT_RESULT,
     text,
   }));
@@ -44,8 +76,8 @@ export function mockAnthropicResponse(feature: string, text: string): void {
  * Configure mock to return JSON (stringified) for a feature.
  */
 export function mockAnthropicJsonResponse(feature: string, data: unknown): void {
-  errorMap.delete(feature);
-  responseMap.set(feature, () => ({
+  mockState.errorMap.delete(feature);
+  mockState.responseMap.set(feature, () => ({
     ...DEFAULT_RESULT,
     text: JSON.stringify(data),
   }));
@@ -55,53 +87,29 @@ export function mockAnthropicJsonResponse(feature: string, data: unknown): void 
  * Configure mock to throw an error for a feature.
  */
 export function mockAnthropicError(feature: string, message: string): void {
-  responseMap.delete(feature);
-  errorMap.set(feature, message);
+  mockState.responseMap.delete(feature);
+  mockState.errorMap.set(feature, message);
 }
 
 /**
  * Get captured calls (feature, messages, model, system).
  */
 export function getCapturedAnthropicCalls(): CapturedCall[] {
-  return [...capturedCalls];
+  return [...mockState.capturedCalls];
 }
 
 /**
  * Reset all mock state.
  */
 export function resetAnthropicMocks(): void {
-  responseMap.clear();
-  errorMap.clear();
-  capturedCalls.length = 0;
+  mockState.responseMap.clear();
+  mockState.errorMap.clear();
+  mockState.capturedCalls.length = 0;
 }
 
 /**
- * Setup - mocks the anthropic-helpers module via vi.mock.
- * Call this at the top level of your test file (outside describe/it)
- * or in a beforeEach block.
+ * Setup - retained for existing tests; the module mock is registered at import time.
  */
 export function setupAnthropicMocks(): void {
-  vi.mock('../../server/anthropic-helpers.js', () => ({
-    callAnthropic: vi.fn(async (opts: { feature: string; messages: unknown[]; model?: string; system?: string }) => {
-      capturedCalls.push({
-        feature: opts.feature,
-        messages: opts.messages,
-        model: opts.model,
-        system: opts.system,
-      });
-
-      const errorMessage = errorMap.get(opts.feature);
-      if (errorMessage) {
-        throw new Error(errorMessage);
-      }
-
-      const factory = responseMap.get(opts.feature);
-      if (factory) {
-        return factory();
-      }
-
-      return { ...DEFAULT_RESULT };
-    }),
-    isAnthropicConfigured: vi.fn(() => true),
-  }));
+  resetAnthropicMocks();
 }

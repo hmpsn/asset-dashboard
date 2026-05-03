@@ -15,20 +15,38 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { signToken } from '../../server/auth.js';
+import { createUser, deleteUser } from '../../server/users.js';
 
 const ctx = createTestContext(13209);
 const { api, postJson, patchJson, del } = ctx;
 
 let testWsId = '';
+let otherWsId = '';
+let scopedUserId = '';
+let scopedUserToken = '';
 
 beforeAll(async () => {
   await ctx.startServer();
   const ws = createWorkspace('Misc Test Workspace');
   testWsId = ws.id;
+  const otherWs = createWorkspace('Misc Other Test Workspace');
+  otherWsId = otherWs.id;
+  const scopedUser = await createUser(
+    'misc-scoped-user@test.local',
+    'ScopedPass1!',
+    'Misc Scoped User',
+    'member',
+    [testWsId],
+  );
+  scopedUserId = scopedUser.id;
+  scopedUserToken = signToken({ userId: scopedUser.id, email: scopedUser.email, role: scopedUser.role });
 }, 25_000);
 
 afterAll(() => {
+  deleteUser(scopedUserId);
   deleteWorkspace(testWsId);
+  deleteWorkspace(otherWsId);
   ctx.stopServer();
 });
 
@@ -146,6 +164,7 @@ describe('Miscellaneous read-only endpoints (cont.)', () => {
 
 describe('Requests CRUD via API', () => {
   let requestId = '';
+  let otherRequestId = '';
 
   it('GET /api/requests returns 200 with array', async () => {
     const res = await api('/api/requests');
@@ -173,6 +192,76 @@ describe('Requests CRUD via API', () => {
   it('POST /api/requests without required fields returns 400', async () => {
     const res = await postJson('/api/requests', {});
     expect(res.status).toBe(400);
+  });
+
+  it('rejects scoped JWT access to another workspace request by id', async () => {
+    const createRes = await postJson('/api/requests', {
+      workspaceId: otherWsId,
+      title: 'Other workspace request',
+      description: 'Should not be visible to scoped user',
+      category: 'seo',
+      priority: 'medium',
+    });
+    expect(createRes.status).toBe(200);
+    const created = await createRes.json();
+    otherRequestId = created.id;
+
+    const headers = { Authorization: `Bearer ${scopedUserToken}` };
+    const getRes = await api(`/api/requests/${otherRequestId}`, { headers });
+    expect(getRes.status).toBe(403);
+
+    const patchRes = await ctx.api(`/api/requests/${otherRequestId}`, {
+      method: 'PATCH',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'completed' }),
+    });
+    expect(patchRes.status).toBe(403);
+
+    const deleteRes = await ctx.api(`/api/requests/${otherRequestId}`, {
+      method: 'DELETE',
+      headers,
+    });
+    expect(deleteRes.status).toBe(403);
+  });
+
+  it('rejects scoped JWT bulk update without mutating accessible requests first', async () => {
+    const accessibleRes = await postJson('/api/requests', {
+      workspaceId: testWsId,
+      title: 'Scoped bulk accessible request',
+      description: 'Should remain pending after forbidden bulk update',
+      category: 'seo',
+      priority: 'medium',
+    });
+    expect(accessibleRes.status).toBe(200);
+    const accessible = await accessibleRes.json();
+
+    const forbiddenRes = await postJson('/api/requests', {
+      workspaceId: otherWsId,
+      title: 'Scoped bulk forbidden request',
+      description: 'Should block the whole bulk update',
+      category: 'seo',
+      priority: 'medium',
+    });
+    expect(forbiddenRes.status).toBe(200);
+    const forbidden = await forbiddenRes.json();
+
+    const bulkRes = await ctx.api('/api/requests/bulk', {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${scopedUserToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ids: [accessible.id, forbidden.id], status: 'completed' }),
+    });
+    expect(bulkRes.status).toBe(403);
+
+    const checkRes = await api(`/api/requests/${accessible.id}`);
+    expect(checkRes.status).toBe(200);
+    const checked = await checkRes.json();
+    expect(checked.status).not.toBe('completed');
+
+    await del(`/api/requests/${accessible.id}`);
+    await del(`/api/requests/${forbidden.id}`);
   });
 
   it('GET /api/requests/:id returns the created request', async () => {
@@ -203,5 +292,11 @@ describe('Requests CRUD via API', () => {
   it('GET /api/requests/:id after delete returns 404', async () => {
     const res = await api(`/api/requests/${requestId}`);
     expect(res.status).toBe(404);
+  });
+
+  afterAll(async () => {
+    if (otherRequestId) {
+      await del(`/api/requests/${otherRequestId}`);
+    }
   });
 });

@@ -10,6 +10,7 @@ import { listWorkspaces, getWorkspace } from './workspaces.js';
 import { getUploadRoot } from './data-dir.js';
 import { verifyClientToken, getSafeClientUser } from './client-users.js';
 import { verifyToken as verifyJwtToken } from './auth.js';
+import { getUserById } from './users.js';
 
 // ── Rate Limiting ──
 
@@ -155,7 +156,32 @@ export function getClientActor(req: express.Request, workspaceId: string): { id?
   const payload = verifyClientToken(clientToken);
   if (!payload || payload.workspaceId !== workspaceId) return undefined;
   const user = getSafeClientUser(payload.clientUserId);
-  return user ? { id: user.id, name: user.name } : undefined;
+  return user?.workspaceId === workspaceId ? { id: user.id, name: user.name } : undefined;
+}
+
+export function verifyClientUserTokenForWorkspace(workspaceId: string, token: string | undefined): boolean {
+  if (!token) return false;
+  const payload = verifyClientToken(token);
+  if (!payload || payload.workspaceId !== workspaceId) return false;
+  const user = getSafeClientUser(payload.clientUserId);
+  return !!user && user.workspaceId === workspaceId;
+}
+
+export function requestUserCanAccessWorkspace(req: express.Request, workspaceId: string): boolean {
+  if (!req.user) return true;
+  if (req.user.role === 'owner') return true;
+  return !!req.user.workspaceIds?.includes(workspaceId);
+}
+
+export function internalJwtCanAccessWorkspace(req: express.Request, workspaceId: string): boolean {
+  const token = req.cookies?.token || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : '');
+  if (!token) return false;
+  const payload = verifyJwtToken(token);
+  if (!payload) return false;
+  const user = getUserById(payload.userId);
+  if (!user) return false;
+  if (user.role === 'owner') return true;
+  return user.workspaceIds.includes(workspaceId);
 }
 
 // ── Client Portal Auth Guard ──
@@ -165,24 +191,18 @@ export function getClientActor(req: express.Request, workspaceId: string): { id?
 export function requireClientPortalAuth(wsIdParam = 'workspaceId') {
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const workspaceId = req.params[wsIdParam];
+    const ws = getWorkspace(workspaceId);
+    if (!ws) return next();
     // Check JWT token first (preferred)
     const clientToken = req.cookies?.[`client_user_token_${workspaceId}`];
-    if (clientToken) {
-      const payload = verifyClientToken(clientToken);
-      if (payload && payload.workspaceId === workspaceId) return next();
-    }
+    if (verifyClientUserTokenForWorkspace(workspaceId, clientToken)) return next();
     // Fall back to legacy session cookie (verify HMAC signature)
     const sessionCookie = req.cookies?.[`client_session_${workspaceId}`];
     if (sessionCookie && verifyClientSession(workspaceId, sessionCookie)) return next();
-    // Allow admin access (verify JWT signature) so admin dashboard can call these endpoints
-    const jwtToken = req.cookies?.token || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : '');
-    if (jwtToken) {
-      const jwtPayload = verifyJwtToken(jwtToken);
-      if (jwtPayload) return next();
-    }
+    // Allow internal users only when their JWT is scoped to this workspace.
+    if (internalJwtCanAccessWorkspace(req, workspaceId)) return next();
     // Passwordless workspaces are accessible by URL (the workspace ID is the credential)
-    const ws = getWorkspace(workspaceId);
-    if (ws && !ws.clientPassword) return next();
+    if (!ws.clientPassword) return next();
 
     return res.status(401).json({ error: 'Authentication required' });
   };
