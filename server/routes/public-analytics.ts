@@ -3,14 +3,9 @@
  */
 import { Router } from 'express';
 import { verifyToken } from '../auth.js';
-import { verifyAdminToken, APP_PASSWORD } from '../middleware.js';
+import { verifyAdminToken, APP_PASSWORD, requireClientPortalAuth } from '../middleware.js';
 import { validate, z } from '../middleware/validate.js';
 import { createLogger } from '../logger.js';
-
-const log = createLogger('public-analytics');
-
-const router = Router();
-
 import { addActivity } from '../activity-log.js';
 import {
   addMessage,
@@ -64,6 +59,12 @@ import { notifyTeamClientSignal } from '../email.js';
 import { getBookingUrl } from '../studio-config.js';
 import { parseJsonSafe } from '../db/json-validation.js';
 import { isProgrammingError } from '../errors.js';
+
+const log = createLogger('public-analytics');
+
+const router = Router();
+
+router.use('/api/public/:resource/:workspaceId', requireClientPortalAuth('workspaceId'));
 
 // ── AI intent classification ──────────────────────────────────────────────────
 // Runs in parallel with the main chat call — zero added latency.

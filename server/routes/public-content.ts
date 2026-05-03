@@ -2,9 +2,6 @@
  * public-content routes — extracted from server/index.ts
  */
 import { Router } from 'express';
-
-const router = Router();
-
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { getBrief } from '../content-brief.js';
@@ -22,7 +19,7 @@ import { sanitizeString, validateEnum } from '../helpers.js';
 import { sanitizeRichText, sanitizePlainText } from '../html-sanitize.js';
 import { countHtmlWords } from '../content-posts-ai.js';
 import { getPageKeyword, listPageKeywords } from '../page-keywords.js';
-import { getClientActor } from '../middleware.js';
+import { getClientActor, requireClientPortalAuth } from '../middleware.js';
 import { getPageTrend, getQueryPageData } from '../search-console.js';
 import { getWorkspace } from '../workspaces.js';
 import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword } from '../rank-tracking.js';
@@ -47,8 +44,11 @@ import {
   clientPostEditSchema,
 } from '../schemas/public-content.js';
 
-
 const log = createLogger('public-content');
+const router = Router();
+
+router.use('/api/public/:resource/:workspaceId', requireClientPortalAuth('workspaceId'));
+
 function assertClientReviewRequest(workspaceId: string, requestId: string, res: import('express').Response) {
   const existing = getContentRequest(workspaceId, requestId);
   if (!existing) {

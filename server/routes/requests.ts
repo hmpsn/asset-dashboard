@@ -2,16 +2,14 @@
  * requests routes — extracted from server/index.ts
  */
 import { Router } from 'express';
-
-const router = Router();
-
 import fs from 'fs';
 import path from 'path';
 import { addActivity } from '../activity-log.js';
 import { broadcast, broadcastToWorkspace } from '../broadcast.js';
 import { STUDIO_NAME } from '../constants.js';
 import { notifyClientTeamResponse, notifyClientStatusChange } from '../email.js';
-import { upload } from '../middleware.js';
+import { requestUserCanAccessWorkspace, upload } from '../middleware.js';
+import { ADMIN_EVENTS, WS_EVENTS } from '../ws-events.js';
 import {
   listRequests,
   createRequest,
@@ -24,7 +22,15 @@ import {
 } from '../requests.js';
 import { getWorkspace, getClientPortalUrl, updatePageState } from '../workspaces.js';
 
+const router = Router();
+
 // --- Request Attachments ---
+function canAccessRequest(req: import('express').Request, workspaceId: string, res: import('express').Response): boolean {
+  if (requestUserCanAccessWorkspace(req, workspaceId)) return true;
+  res.status(403).json({ error: 'You do not have access to this workspace' });
+  return false;
+}
+
 function processUploadedAttachments(files: Express.Multer.File[]): RequestAttachment[] {
   const dir = getAttachmentsDir();
   return files.map(f => {
@@ -40,9 +46,10 @@ function processUploadedAttachments(files: Express.Multer.File[]): RequestAttach
 router.post('/api/requests', (req, res) => {
   const { workspaceId, title, description, category, priority, pageUrl, pageId } = req.body;
   if (!workspaceId || !title || !description) return res.status(400).json({ error: 'workspaceId, title, and description required' });
+  if (!canAccessRequest(req, workspaceId, res)) return;
   const request = createRequest(workspaceId, { title, description, category: category || 'seo', priority, pageUrl, pageId, submittedBy: STUDIO_NAME });
-  broadcast('request:created', request);
-  broadcastToWorkspace(workspaceId, 'request:created', { id: request.id });
+  broadcast(ADMIN_EVENTS.REQUEST_CREATED, request);
+  broadcastToWorkspace(workspaceId, WS_EVENTS.REQUEST_CREATED, { id: request.id });
   res.json(request);
 });
 
@@ -50,11 +57,12 @@ router.post('/api/requests', (req, res) => {
 router.post('/api/requests/batch', (req, res) => {
   const { workspaceId, items } = req.body as { workspaceId: string; items: Array<{ title: string; description: string; category?: string; priority?: string; pageUrl?: string }> };
   if (!workspaceId || !Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'workspaceId and items[] required' });
+  if (!canAccessRequest(req, workspaceId, res)) return;
   const created = items.map(item =>
     createRequest(workspaceId, { title: item.title, description: item.description, category: (item.category as 'seo') || 'seo', priority: (item.priority as 'high') || 'medium', pageUrl: item.pageUrl, submittedBy: STUDIO_NAME })
   );
-  broadcast('request:batch_created', { count: created.length });
-  broadcastToWorkspace(workspaceId, 'request:created', { ids: created.map(r => r.id), batch: true });
+  broadcast(ADMIN_EVENTS.REQUEST_BATCH_CREATED, { count: created.length });
+  broadcastToWorkspace(workspaceId, WS_EVENTS.REQUEST_CREATED, { ids: created.map(r => r.id), batch: true });
   res.json({ created: created.length, ids: created.map(r => r.id) });
 });
 
@@ -66,22 +74,29 @@ router.patch('/api/requests/bulk', (req, res) => {
   if (status) updates.status = status;
   if (priority) updates.priority = priority;
   // Look up each request's workspace before mutating so the update is workspace-scoped.
-  const results = ids.map(id => {
-    const existing = getRequest(id);
-    if (!existing) return null;
-    return updateRequest(existing.workspaceId, id, updates);
-  });
-  const succeeded = results.filter(Boolean).length;
-  broadcast('request:bulk_updated', { count: succeeded, status });
+  const existingRequests = ids.map(id => getRequest(id));
+  if (existingRequests.some(existing => existing && !requestUserCanAccessWorkspace(req, existing.workspaceId))) {
+    return res.status(403).json({ error: 'You do not have access to this workspace' });
+  }
+  const succeededRequests = existingRequests
+    .map((existing, index) => existing ? updateRequest(existing.workspaceId, ids[index], updates) : null)
+    .filter((r): r is NonNullable<ReturnType<typeof updateRequest>> => r !== null);
+  const succeeded = succeededRequests.length;
+  broadcast(ADMIN_EVENTS.REQUEST_BULK_UPDATED, { count: succeeded, status });
   // Broadcast to each affected workspace
-  const wsIds = new Set(results.filter(Boolean).map(r => r!.workspaceId));
-  for (const wsId of wsIds) broadcastToWorkspace(wsId, 'request:update', { bulk: true, status });
+  const wsIds = new Set(succeededRequests.map(r => r.workspaceId));
+  for (const wsId of wsIds) broadcastToWorkspace(wsId, WS_EVENTS.REQUEST_UPDATE, { bulk: true, status });
   res.json({ updated: succeeded, total: ids.length });
 });
 
 // Internal: list all requests (optionally filtered by workspace)
 router.get('/api/requests', (req, res) => {
   const wsId = req.query.workspaceId as string | undefined;
+  if (wsId && !canAccessRequest(req, wsId, res)) return;
+  if (!wsId && req.user && req.user.role !== 'owner') {
+    const scoped = (req.user.workspaceIds || []).flatMap(id => listRequests(id));
+    return res.json(scoped);
+  }
   res.json(listRequests(wsId));
 });
 
@@ -89,6 +104,7 @@ router.get('/api/requests', (req, res) => {
 router.get('/api/requests/:id', (req, res) => {
   const r = getRequest(req.params.id);
   if (!r) return res.status(404).json({ error: 'Not found' });
+  if (!canAccessRequest(req, r.workspaceId, res)) return;
   res.json(r);
 });
 
@@ -97,10 +113,11 @@ router.patch('/api/requests/:id', (req, res) => {
   const { status, priority, category } = req.body;
   const prev = getRequest(req.params.id);
   if (!prev) return res.status(404).json({ error: 'Not found' });
+  if (!canAccessRequest(req, prev.workspaceId, res)) return;
   const updated = updateRequest(prev.workspaceId, req.params.id, { status, priority, category });
   if (!updated) return res.status(404).json({ error: 'Not found' });
-  broadcast('request:updated', updated);
-  broadcastToWorkspace(updated.workspaceId, 'request:update', { id: updated.id, status: updated.status });
+  broadcast(ADMIN_EVENTS.REQUEST_UPDATED, updated);
+  broadcastToWorkspace(updated.workspaceId, WS_EVENTS.REQUEST_UPDATE, { id: updated.id, status: updated.status });
   // Email client on status change
   if (status && prev && status !== prev.status) {
     const ws = getWorkspace(updated.workspaceId);
@@ -127,10 +144,11 @@ router.post('/api/requests/:id/notes', (req, res) => {
   if (!content) return res.status(400).json({ error: 'content required' });
   const existing = getRequest(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Not found' });
+  if (!canAccessRequest(req, existing.workspaceId, res)) return;
   const updated = addNote(existing.workspaceId, req.params.id, 'team', content);
   if (!updated) return res.status(404).json({ error: 'Not found' });
-  broadcast('request:updated', updated);
-  broadcastToWorkspace(updated.workspaceId, 'request:update', { id: updated.id });
+  broadcast(ADMIN_EVENTS.REQUEST_UPDATED, updated);
+  broadcastToWorkspace(updated.workspaceId, WS_EVENTS.REQUEST_UPDATE, { id: updated.id });
   // Email client
   const ws = getWorkspace(updated.workspaceId);
   if (ws?.clientEmail) {
@@ -144,10 +162,11 @@ router.post('/api/requests/:id/notes', (req, res) => {
 router.delete('/api/requests/:id', (req, res) => {
   const existing = getRequest(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Not found' });
+  if (!canAccessRequest(req, existing.workspaceId, res)) return;
   const ok = deleteRequest(existing.workspaceId, req.params.id);
   if (!ok) return res.status(404).json({ error: 'Not found' });
-  broadcast('request:deleted', { id: req.params.id });
-  broadcastToWorkspace(existing.workspaceId, 'request:update', { id: req.params.id, deleted: true });
+  broadcast(ADMIN_EVENTS.REQUEST_DELETED, { id: req.params.id });
+  broadcastToWorkspace(existing.workspaceId, WS_EVENTS.REQUEST_UPDATE, { id: req.params.id, deleted: true });
   res.json({ ok: true });
 });
 
@@ -166,10 +185,11 @@ router.post('/api/requests/:id/notes-with-files', upload.array('files', 5), (req
   const atts = files?.length ? processUploadedAttachments(files) : undefined;
   const existing = getRequest(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Not found' });
+  if (!canAccessRequest(req, existing.workspaceId, res)) return;
   const updated = addNote(existing.workspaceId, req.params.id, 'team', content, atts);
   if (!updated) return res.status(404).json({ error: 'Not found' });
-  broadcast('request:updated', updated);
-  broadcastToWorkspace(updated.workspaceId, 'request:update', { id: updated.id });
+  broadcast(ADMIN_EVENTS.REQUEST_UPDATED, updated);
+  broadcastToWorkspace(updated.workspaceId, WS_EVENTS.REQUEST_UPDATE, { id: updated.id });
   // Email client
   const ws = getWorkspace(updated.workspaceId);
   if (ws?.clientEmail && content) {

@@ -42,6 +42,7 @@ import { createPayment, getPaymentBySession, listPayments } from '../../server/p
 import { getWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { listActivity } from '../../server/activity-log.js';
 import { createContentRequest, getContentRequest, updateContentRequest } from '../../server/content-requests.js';
+import { createContentSubscription, getContentSubscriptionByStripeId } from '../../server/content-subscriptions.js';
 
 // ---------------------------------------------------------------------------
 // Test suite
@@ -64,6 +65,7 @@ describe('Stripe Webhooks — FM-2 & FM-5', () => {
     db.prepare('DELETE FROM activity_log WHERE workspace_id = ?').run(ws.workspaceId);
     db.prepare('DELETE FROM work_orders WHERE workspace_id = ?').run(ws.workspaceId);
     db.prepare('DELETE FROM content_topic_requests WHERE workspace_id = ?').run(ws.workspaceId);
+    db.prepare('DELETE FROM content_subscriptions WHERE workspace_id = ?').run(ws.workspaceId);
     ws.cleanup();
   });
 
@@ -321,19 +323,51 @@ describe('Stripe Webhooks — FM-2 & FM-5', () => {
 
   // ── payment_intent.payment_failed ──
 
-  it('payment_intent.payment_failed — logs activity', async () => {
+  it('payment_intent.payment_failed — marks payment failed and logs useful failure metadata', async () => {
+    createPayment(ws.workspaceId, {
+      workspaceId: ws.workspaceId,
+      stripeSessionId: 'pi_test_failed',
+      productType: 'brief_blog',
+      amount: 12500,
+      currency: 'usd',
+      status: 'pending',
+      metadata: { productType: 'brief_blog' },
+    });
+
     const event = createWebhookEvent('payment_intent.payment_failed', {
       id: 'pi_test_failed',
       metadata: {
         workspaceId: ws.workspaceId,
+        productType: 'brief_blog',
+      },
+      status: 'requires_payment_method',
+      last_payment_error: {
+        message: 'Your card was declined.',
+        code: 'card_declined',
+        decline_code: 'insufficient_funds',
+        payment_method: { type: 'card' },
       },
     });
 
     await handleWebhookEvent(event as never);
 
+    const payment = getPaymentBySession(ws.workspaceId, 'pi_test_failed');
+    expect(payment?.status).toBe('failed');
+    expect(payment?.stripePaymentIntentId).toBe('pi_test_failed');
+    expect(payment?.metadata).toMatchObject({
+      productType: 'brief_blog',
+      stripePaymentIntentId: 'pi_test_failed',
+      failureStatus: 'requires_payment_method',
+      failureMessage: 'Your card was declined.',
+      failureCode: 'card_declined',
+      declineCode: 'insufficient_funds',
+      paymentMethodType: 'card',
+    });
+
     const activities = listActivity(ws.workspaceId);
     const failedActivity = activities.find(a => a.type === 'payment_failed');
     expect(failedActivity).toBeDefined();
+    expect(failedActivity?.description).toBe('Your card was declined.');
   });
 
   it('payment_intent.payment_failed — missing workspaceId silently returns', async () => {
@@ -388,6 +422,39 @@ describe('Stripe Webhooks — FM-2 & FM-5', () => {
     // Workspace unchanged — handler should not downgrade without workspaceId
     const wsCurrent = getWorkspace(ws.workspaceId);
     expect(wsCurrent?.tier).toBe('growth');
+  });
+
+  it('invoice.paid — renews content subscription when workspaceId is missing from invoice metadata', async () => {
+    const sub = createContentSubscription(ws.workspaceId, {
+      plan: 'content_growth',
+      postsPerMonth: 4,
+      priceUsd: 900,
+      stripeSubscriptionId: 'sub_test_invoice_fallback',
+      status: 'past_due',
+      currentPeriodStart: '2026-01-01T00:00:00.000Z',
+      currentPeriodEnd: '2026-02-01T00:00:00.000Z',
+    });
+
+    const event = createWebhookEvent('invoice.paid', {
+      id: 'in_test_workspace_fallback',
+      metadata: {},
+      subscription: 'sub_test_invoice_fallback',
+      amount_paid: 90000,
+      period_start: 1772323200,
+      period_end: 1775001600,
+    });
+
+    await handleWebhookEvent(event as never);
+
+    const renewed = getContentSubscriptionByStripeId('sub_test_invoice_fallback');
+    expect(renewed?.id).toBe(sub.id);
+    expect(renewed?.workspaceId).toBe(ws.workspaceId);
+    expect(renewed?.status).toBe('active');
+    expect(renewed?.currentPeriodStart).toBe('2026-03-01T00:00:00.000Z');
+    expect(renewed?.currentPeriodEnd).toBe('2026-04-01T00:00:00.000Z');
+
+    const invoiceActivity = listActivity(ws.workspaceId).find(a => a.type === 'invoice_paid');
+    expect(invoiceActivity).toBeDefined();
   });
 
   // ── Unknown event ──

@@ -34,8 +34,10 @@ interface MockRule {
 // Internal state
 // ---------------------------------------------------------------------------
 
-let rules: MockRule[] = [];
-let captured: CapturedRequest[] = [];
+const mockState = vi.hoisted(() => ({
+  rules: [] as MockRule[],
+  captured: [] as CapturedRequest[],
+}));
 
 function matchEndpoint(matcher: EndpointMatcher, endpoint: string): boolean {
   if (typeof matcher === 'string') return endpoint === matcher;
@@ -44,11 +46,49 @@ function matchEndpoint(matcher: EndpointMatcher, endpoint: string): boolean {
 
 function findRule(endpoint: string): MockRule | undefined {
   // Last-registered rule wins (allows overrides in individual tests).
-  for (let i = rules.length - 1; i >= 0; i--) {
-    if (matchEndpoint(rules[i].matcher, endpoint)) return rules[i];
+  for (let i = mockState.rules.length - 1; i >= 0; i--) {
+    if (matchEndpoint(mockState.rules[i].matcher, endpoint)) return mockState.rules[i];
   }
   return undefined;
 }
+
+vi.mock('../../server/webflow-client.js', () => ({
+  getToken: vi.fn(() => 'test-webflow-token'),
+
+  webflowFetch: vi.fn(
+    async (endpoint: string, options: RequestInit = {}, tokenOverride?: string) => {
+      // Capture the outbound request for test assertions.
+      const method = (options.method ?? 'GET').toUpperCase();
+      let body: unknown | undefined;
+      if (typeof options.body === 'string') {
+        try {
+          body = JSON.parse(options.body);
+        } catch {
+          body = options.body;
+        }
+      } else if (options.body != null) {
+        body = options.body;
+      }
+
+      mockState.captured.push({
+        endpoint,
+        method,
+        body,
+        token: tokenOverride,
+      });
+
+      // Find a matching rule and return its response.
+      const rule = findRule(endpoint);
+      if (rule) return rule.handler(endpoint);
+
+      // Default: 404 for unmocked endpoints (fail-loud in tests).
+      return new Response(
+        JSON.stringify({ error: `No mock configured for endpoint: ${endpoint}` }),
+        { status: 404, headers: { 'Content-Type': 'application/json' } },
+      );
+    },
+  ),
+}));
 
 // ---------------------------------------------------------------------------
 // Mock response builders
@@ -60,7 +100,7 @@ function findRule(endpoint: string): MockRule | undefined {
  * @param data      Response body (will be JSON-stringified). Defaults to `{}`.
  */
 export function mockWebflowSuccess(endpoint: EndpointMatcher, data: unknown = {}): void {
-  rules.push({
+  mockState.rules.push({
     matcher: endpoint,
     handler: () => new Response(JSON.stringify(data), {
       status: 200,
@@ -76,7 +116,7 @@ export function mockWebflowSuccess(endpoint: EndpointMatcher, data: unknown = {}
  * @param message   Error body string.
  */
 export function mockWebflowError(endpoint: EndpointMatcher, status: number, message: string): void {
-  rules.push({
+  mockState.rules.push({
     matcher: endpoint,
     handler: () => new Response(message, {
       status,
@@ -90,7 +130,7 @@ export function mockWebflowError(endpoint: EndpointMatcher, status: number, mess
  * Tests using this should set a short vitest timeout or use `vi.advanceTimersByTime`.
  */
 export function mockWebflowTimeout(endpoint: EndpointMatcher): void {
-  rules.push({
+  mockState.rules.push({
     matcher: endpoint,
     handler: () => new Promise<never>(() => {
       // Intentionally never resolves to simulate a network timeout.
@@ -104,7 +144,7 @@ export function mockWebflowTimeout(endpoint: EndpointMatcher): void {
 
 /** Return all captured outbound requests in call order. */
 export function getCapturedRequests(): CapturedRequest[] {
-  return [...captured];
+  return [...mockState.captured];
 }
 
 // ---------------------------------------------------------------------------
@@ -113,8 +153,8 @@ export function getCapturedRequests(): CapturedRequest[] {
 
 /** Clear all mock rules and captured requests. Call in `afterEach`. */
 export function resetWebflowMocks(): void {
-  rules = [];
-  captured = [];
+  mockState.rules = [];
+  mockState.captured = [];
 }
 
 // ---------------------------------------------------------------------------
@@ -129,42 +169,4 @@ export function resetWebflowMocks(): void {
  */
 export function setupWebflowMocks(): void {
   resetWebflowMocks();
-
-  vi.mock('../../server/webflow-client.js', () => ({
-    getToken: vi.fn(() => 'test-webflow-token'),
-
-    webflowFetch: vi.fn(
-      async (endpoint: string, options: RequestInit = {}, tokenOverride?: string) => {
-        // Capture the outbound request for test assertions.
-        const method = (options.method ?? 'GET').toUpperCase();
-        let body: unknown | undefined;
-        if (typeof options.body === 'string') {
-          try {
-            body = JSON.parse(options.body);
-          } catch {
-            body = options.body;
-          }
-        } else if (options.body != null) {
-          body = options.body;
-        }
-
-        captured.push({
-          endpoint,
-          method,
-          body,
-          token: tokenOverride,
-        });
-
-        // Find a matching rule and return its response.
-        const rule = findRule(endpoint);
-        if (rule) return rule.handler(endpoint);
-
-        // Default: 404 for unmocked endpoints (fail-loud in tests).
-        return new Response(
-          JSON.stringify({ error: `No mock configured for endpoint: ${endpoint}` }),
-          { status: 404, headers: { 'Content-Type': 'application/json' } },
-        );
-      },
-    ),
-  }));
 }

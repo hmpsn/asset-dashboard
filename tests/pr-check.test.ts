@@ -4510,10 +4510,9 @@ describe('Meta: customCheck rule name registry', () => {
 // noisy as "legitimately clean" — a reviewer has to consciously accept
 // every ✓ by adding a row to the allowlist.
 //
-// Performance: pr-check --all takes ~30-60s on the full repo (customCheck rules
-// scan many files). The test has a 120s timeout to absorb CI variance on slower
-// machines — bumped from 60s after the codebase grew enough to push scan time
-// past the original limit.
+// Performance: pr-check --all takes ~30-120s on the full repo (customCheck rules
+// scan many files). The test has a larger timeout than the subprocess so a
+// slow scan fails with captured pr-check output instead of a Vitest timeout.
 
 describe('Meta: pr-check --all status parity with verified-clean allowlist', () => {
   it('every rule reporting ✓ is listed in docs/rules/verified-clean-rules.md', () => {
@@ -4553,7 +4552,7 @@ describe('Meta: pr-check --all status parity with verified-clean allowlist', () 
       out = execFileSync(tsxBin, ['scripts/pr-check.ts', '--all'], {
         cwd: repoRoot,
         encoding: 'utf-8',
-        timeout: 120_000,
+        timeout: 240_000,
         maxBuffer: 10 * 1024 * 1024,
       });
     } catch (err: unknown) {
@@ -4673,7 +4672,7 @@ describe('Meta: pr-check --all status parity with verified-clean allowlist', () 
     if (errors.length > 0) {
       throw new Error(errors.join('\n\n─────\n\n'));
     }
-  }, 130_000);
+  }, 260_000);
 });
 
 // ════════════════════════════════════════════════════════════════════════════
