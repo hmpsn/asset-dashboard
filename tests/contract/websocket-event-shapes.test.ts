@@ -182,10 +182,7 @@ describe('broadcastToWorkspace() call sites', () => {
     //
     // KNOWN GAPS (string literals that exist in call sites but are NOT in the
     // registry — these should be fixed by migrating to WS_EVENTS constants):
-    const knownUnregisteredLiterals = new Set([
-      'feedback:new',     // server/feedback.ts — not yet added to WS_EVENTS
-      'feedback:update',  // server/feedback.ts — not yet added to WS_EVENTS
-    ]);
+    const knownUnregisteredLiterals = new Set<string>([]);
 
     const unregistered = allWsLiterals.filter(
       (ev) => !allRegisteredEvents.has(ev) && !knownUnregisteredLiterals.has(ev)
@@ -201,10 +198,7 @@ describe('broadcastToWorkspace() call sites', () => {
     //   b) Add it to knownUnregisteredLiterals above with a comment
     //
     // This prevents silent proliferation of untracked event names.
-    const knownUnregisteredLiterals = new Set([
-      'feedback:new',
-      'feedback:update',
-    ]);
+    const knownUnregisteredLiterals = new Set<string>([]);
 
     const trulyUnknown = allWsLiterals.filter(
       (ev) => !allRegisteredEvents.has(ev) && !knownUnregisteredLiterals.has(ev)

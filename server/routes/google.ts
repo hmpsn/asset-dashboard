@@ -37,6 +37,7 @@ import { listWorkspaces } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { createAnnotation, getAnnotations, updateAnnotation, deleteAnnotation } from '../analytics-annotations.js';
 import { validate, z } from '../middleware/validate.js';
+import { requireWorkspaceAccess } from '../auth.js';
 
 const log = createLogger('google-auth');
 
@@ -266,7 +267,7 @@ const createAnnotationSchema = z.object({
   pageUrl: z.string().optional(),
 });
 
-router.get('/api/google/annotations/:workspaceId', (req, res) => {
+router.get('/api/google/annotations/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   try {
     const { startDate, endDate, category } = req.query as { startDate?: string; endDate?: string; category?: string };
     const annotations = getAnnotations(req.params.workspaceId, { startDate, endDate, category });
@@ -276,7 +277,7 @@ router.get('/api/google/annotations/:workspaceId', (req, res) => {
   }
 });
 
-router.post('/api/google/annotations/:workspaceId', validate(createAnnotationSchema), (req, res) => {
+router.post('/api/google/annotations/:workspaceId', requireWorkspaceAccess('workspaceId'), validate(createAnnotationSchema), (req, res) => {
   const { date, label, category, createdBy, pageUrl } = req.body;
   try {
     const result = createAnnotation({ workspaceId: req.params.workspaceId, date, label, category, createdBy, pageUrl });
@@ -293,7 +294,7 @@ const updateAnnotationSchema = z.object({
   pageUrl: z.string().optional(),
 });
 
-router.patch('/api/google/annotations/:workspaceId/:id', validate(updateAnnotationSchema), (req, res) => {
+router.patch('/api/google/annotations/:workspaceId/:id', requireWorkspaceAccess('workspaceId'), validate(updateAnnotationSchema), (req, res) => {
   const { label, date, category, pageUrl } = req.body;
   try {
     const updated = updateAnnotation(req.params.id, req.params.workspaceId, { label, date, category, pageUrl });
@@ -304,7 +305,7 @@ router.patch('/api/google/annotations/:workspaceId/:id', validate(updateAnnotati
   }
 });
 
-router.delete('/api/google/annotations/:workspaceId/:id', (req, res) => {
+router.delete('/api/google/annotations/:workspaceId/:id', requireWorkspaceAccess('workspaceId'), (req, res) => {
   try {
     const deleted = deleteAnnotation(req.params.id, req.params.workspaceId);
     if (!deleted) return res.status(404).json({ error: 'Annotation not found' });

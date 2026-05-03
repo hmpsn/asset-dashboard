@@ -310,13 +310,6 @@ function collectFrontendHandlers(
  * Each entry must have a comment explaining why.
  */
 const KNOWN_UNHANDLED_BROADCASTS = new Set<string>([
-  // feedback:new / feedback:update — internal admin-to-admin signalling.
-  // The Feedback feature is an internal tool; the admin panel does not
-  // subscribe to these events in the current implementation.  Adding handlers
-  // is tracked but not yet done.
-  'feedback:new',
-  'feedback:update',
-
   // content-subscription:* — Stripe webhook events broadcast by stripe.ts via the
   // _broadcastFn alias.  These signal content subscription lifecycle changes but
   // the frontend does not yet subscribe to them; they are candidates for future
@@ -609,8 +602,6 @@ describe('broadcast ↔ handler pairing audit', () => {
 
     // Known raw literals that have not yet been migrated to WS_EVENTS
     const knownRawLiterals = new Set<string>([
-      'feedback:new',
-      'feedback:update',
       'post-updated',
     ]);
 

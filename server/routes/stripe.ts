@@ -6,7 +6,8 @@ import { Router } from 'express';
 const router = Router();
 
 import { sanitizeString } from '../helpers.js';
-import { checkoutLimiter } from '../middleware.js';
+import { checkoutLimiter, requireClientPortalAuth } from '../middleware.js';
+import { requireWorkspaceAccess } from '../auth.js';
 import { requireAdminAuth } from '../middleware/admin-auth.js';
 import { listPayments, getPayment } from '../payments.js';
 import { computeROI } from '../roi.js';
@@ -220,12 +221,12 @@ router.post('/api/public/upgrade-checkout/:workspaceId', checkoutLimiter, async 
 });
 
 // List payments for a workspace (admin)
-router.get('/api/stripe/payments/:workspaceId', (req, res) => {
+router.get('/api/stripe/payments/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   res.json(listPayments(req.params.workspaceId));
 });
 
 // Client checks payment status after redirect
-router.get('/api/public/stripe/status/:workspaceId/:sessionId', (req, res) => {
+router.get('/api/public/stripe/status/:workspaceId/:sessionId', requireClientPortalAuth(), (req, res) => {
   const payments = listPayments(req.params.workspaceId);
   const payment = payments.find(p => p.stripeSessionId === req.params.sessionId);
   if (!payment) return res.status(404).json({ error: 'Payment not found' });
@@ -238,7 +239,7 @@ router.get('/api/stripe/products', (_req, res) => {
 });
 
 // Get a single payment record (admin)
-router.get('/api/stripe/payments/:workspaceId/:paymentId', (req, res) => {
+router.get('/api/stripe/payments/:workspaceId/:paymentId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const payment = getPayment(req.params.workspaceId, req.params.paymentId);
   if (!payment) return res.status(404).json({ error: 'Payment not found' });
   res.json(payment);

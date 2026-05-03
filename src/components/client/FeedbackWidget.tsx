@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { MessageSquarePlus, X, Bug, Lightbulb, MessageCircle, Send, ChevronDown, CheckCircle2, Clock } from 'lucide-react';
 import { get, post } from '../../api/client';
 import { Button, ClickableRow, Icon, IconButton, cn } from '../ui';
+import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
+import { WS_EVENTS } from '../../lib/wsEvents';
 
 type FeedbackType = 'bug' | 'feature' | 'general';
 type FeedbackStatus = 'new' | 'acknowledged' | 'fixed' | 'wontfix';
@@ -63,16 +65,27 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const loadFeedback = async () => {
+  const loadFeedback = useCallback(async () => {
     try {
       const data = await get<FeedbackItem[]>(`/api/public/feedback/${workspaceId}`);
       setItems(data);
     } catch (err) { console.error('FeedbackWidget operation failed:', err); }
-  };
+  }, [workspaceId]);
 
   useEffect(() => {
     if (open && view === 'list') loadFeedback();
-  }, [open, view]); // loadFeedback reads workspaceId from closure — stable across renders
+  }, [open, view, loadFeedback]);
+
+  useWorkspaceEvents(workspaceId, {
+    // ws-invalidation-ok — FeedbackWidget uses local state, not React Query.
+    [WS_EVENTS.FEEDBACK_NEW]: () => {
+      if (open && view === 'list') void loadFeedback();
+    },
+    // ws-invalidation-ok — FeedbackWidget uses local state, not React Query.
+    [WS_EVENTS.FEEDBACK_UPDATE]: () => {
+      if (open && view === 'list') void loadFeedback();
+    },
+  });
 
   const handleSubmit = async () => {
     if (!title.trim() || !description.trim()) return;

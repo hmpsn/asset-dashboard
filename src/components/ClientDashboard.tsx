@@ -29,6 +29,7 @@ import { OverviewTab } from './client/OverviewTab';
 import { SeoEducationTip } from './client/SeoEducationTip';
 import { ErrorBoundary } from './ErrorBoundary';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
+import { WS_EVENTS } from '../lib/wsEvents';
 // AnomalyAlerts removed from overview — insights digest covers trend signals
 import { BetaProvider } from './client/BetaContext';
 import { useClientAuth } from '../hooks/useClientAuth';
@@ -195,9 +196,36 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     },
     'workspace:updated': () => {
       getOptional<WorkspaceInfo>(`/api/public/workspace/${workspaceId}`).then(data => { if (data?.id) setWs(data); }).catch((err) => { console.error('ClientDashboard operation failed:', err); });
+      refetchClient('pricing', '');
     },
     'recommendations:updated': () => refetchClient('recommendations', ''),
     'briefing:published': () => refetchClient('briefing', ''),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.STRATEGY_UPDATED]: () => {
+      refetchClient('strategy', '');
+      refetchClient('page-keywords', '');
+    },
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.OUTCOME_SCORED]: () => {
+      refetchClient('outcome-summary', '');
+      refetchClient('outcome-wins', '');
+    },
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.OUTCOME_EXTERNAL_DETECTED]: () => refetchClient('outcome-wins', ''),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.INSIGHT_BRIDGE_UPDATED]: () => {
+      refetchClient('client-insights', '');
+      refetchClient('intelligence', '');
+    },
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.INTELLIGENCE_CACHE_UPDATED]: () => {
+      refetchClient('client-insights', '');
+      refetchClient('intelligence', '');
+    },
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.ANNOTATION_BRIDGE_CREATED]: () => refetchClient('annotations', ''),
+    // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
+    [WS_EVENTS.ANOMALIES_UPDATE]: () => refetchClient('anomalies', ''),
   }, wsIdentity);
 
   // ── Load workspace info first (includes requiresPassword flag) ──
