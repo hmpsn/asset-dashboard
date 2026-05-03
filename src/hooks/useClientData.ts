@@ -10,11 +10,13 @@ import type {
   GA4Comparison, GA4NewVsReturning, GA4OrganicOverview, GA4LandingPage,
 } from '../components/client/types';
 import type { PricingData } from './usePayments';
+import type { ClientAction } from '../../shared/types/client-actions';
 import { useClientSearch } from './client/useClientSearch';
 import { useClientGA4 } from './client/useClientGA4';
 import {
   useClientActivity, useClientRankHistory, useClientLatestRanks,
   useClientAnnotations, useClientAnomalies, useClientApprovals,
+  useClientActions,
   useClientRequests as useClientRequestsQuery, useClientContentRequests,
   useClientAuditSummary, useClientAuditDetail,
   useClientStrategy, useClientPricing, useClientContentPlan,
@@ -81,6 +83,7 @@ export function useClientData(workspaceId: string) {
   const annotationsQ = useClientAnnotations(workspaceId, dataEnabled);
   const anomaliesQ = useClientAnomalies(workspaceId, dataEnabled);
   const approvalsQ = useClientApprovals(workspaceId, dataEnabled);
+  const clientActionsQ = useClientActions(workspaceId, dataEnabled);
   // copyEntries fires for every workspace once dataEnabled — adds one request
   // per session even for workspaces that don't use the copy pipeline. Acceptable
   // for now: getSafe falls back to {entries:[]} on any error, and React Query
@@ -112,12 +115,13 @@ export function useClientData(workspaceId: string) {
     if (latestRanksQ.error) errs.ranks = 'Unable to load ranking data';
     if (auditSummaryQ.error) errs.audit = 'Unable to load site health data';
     if (approvalsQ.error) errs.approvals = 'Unable to load approvals';
+    if (clientActionsQ.error) errs.clientActions = 'Unable to load client actions';
     if (requestsQ.error) errs.requests = 'Unable to load requests';
     if (contentReqQ.error) errs.content = 'Unable to load content requests';
     if (strategyQ.error) errs.strategy = 'Unable to load SEO strategy';
     if (ga4Data.sectionError) errs.analytics = ga4Data.sectionError;
     return errs;
-  }, [activityQ.error, latestRanksQ.error, auditSummaryQ.error, approvalsQ.error,
+  }, [activityQ.error, latestRanksQ.error, auditSummaryQ.error, approvalsQ.error, clientActionsQ.error,
       requestsQ.error, contentReqQ.error, strategyQ.error, ga4Data.sectionError]);
 
   // ── Compatibility setters (update React Query cache directly) ───
@@ -219,6 +223,7 @@ export function useClientData(workspaceId: string) {
     const keyFns: Record<string, readonly unknown[]> = {
       activity: queryKeys.client.activity(workspaceId),
       approvals: queryKeys.client.approvals(workspaceId),
+      clientActions: queryKeys.client.clientActions(workspaceId),
       requests: queryKeys.client.requests(workspaceId),
       content: queryKeys.client.contentRequests(workspaceId),
       audit: queryKeys.client.auditSummary(workspaceId),
@@ -271,6 +276,7 @@ export function useClientData(workspaceId: string) {
     ga4LandingPages: ga4Data.ga4LandingPages, setGa4LandingPages: noop as unknown as React.Dispatch<React.SetStateAction<GA4LandingPage[]>>,
     anomalies: anomaliesQ.data ?? [], setAnomalies: noop as unknown as React.Dispatch<React.SetStateAction<AnomalyItem[]>>,
     approvalBatches: approvalsQ.data ?? [], setApprovalBatches,
+    clientActions: (clientActionsQ.data ?? []) as ClientAction[],
     approvalsLoading: approvalsQ.isLoading, setApprovalsLoading: noop as unknown as React.Dispatch<React.SetStateAction<boolean>>,
     approvalPageKeywords: pageKeywordsQ.data ?? null,
     activityLog: activityQ.data ?? [], setActivityLog: noop as unknown as React.Dispatch<React.SetStateAction<ActivityLogItem[]>>,

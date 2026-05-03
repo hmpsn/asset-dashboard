@@ -261,6 +261,13 @@ export interface ClientSignalsSlice {
    * Always undefined until the assembler reads it (post-Phase 2 only).
    */
   latestBriefing?: BriefingSummary | null;
+  clientActions?: {
+    pending: number;
+    approved: number;
+    changesRequested: number;
+    completed: number;
+    recentDecisions: Array<{ title: string; status: string; sourceType: string; updatedAt: string }>;
+  };
 }
 
 export interface OperationalSlice {
@@ -271,6 +278,7 @@ export interface OperationalSlice {
   // New in 3A
   timeSaved?: { totalMinutes: number; byFeature: Record<string, number> } | null;
   approvalQueue?: { pending: number; oldestAge: number | null };
+  clientActionQueue?: { pending: number; oldestAge: number | null };
   recommendationQueue?: { fixNow: number; fixSoon: number; fixLater: number };
   actionBacklog?: { pendingMeasurement: number; oldestAge: number | null };
   detectedPlaybooks?: string[];
