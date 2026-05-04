@@ -12,6 +12,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import bcrypt from 'bcryptjs';
 import { createTestContext } from './helpers.js';
 import { createFeedback, deleteFeedback } from '../../server/feedback.js';
+import { listActivity } from '../../server/activity-log.js';
 import { setBroadcast } from '../../server/broadcast.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
@@ -118,21 +119,30 @@ describe('Feedback — delete', () => {
   it('DELETE broadcasts feedback update for the workspace', async () => {
     const workspaceBroadcast = vi.fn();
     setBroadcast(vi.fn(), workspaceBroadcast);
+    try {
+      const item = createFeedback(testWsId, {
+        type: 'general',
+        title: 'Delete broadcast regression',
+        description: 'Deleting feedback should refresh other open dashboards.',
+      });
 
-    const item = createFeedback(testWsId, {
-      type: 'general',
-      title: 'Delete broadcast regression',
-      description: 'Deleting feedback should refresh other open dashboards.',
-    });
+      const deleted = deleteFeedback(testWsId, item.id);
+      expect(deleted).toBe(true);
 
-    const deleted = deleteFeedback(testWsId, item.id);
-    expect(deleted).toBe(true);
+      const activity = listActivity(testWsId).find(entry => entry.title === `Deleted feedback: ${item.title}`);
+      expect(activity).toEqual(expect.objectContaining({
+        type: 'note',
+        metadata: expect.objectContaining({ feedbackId: item.id }),
+      }));
 
-    expect(workspaceBroadcast).toHaveBeenCalledWith(
-      testWsId,
-      WS_EVENTS.FEEDBACK_UPDATE,
-      expect.objectContaining({ id: item.id, deleted: true }),
-    );
+      expect(workspaceBroadcast).toHaveBeenCalledWith(
+        testWsId,
+        WS_EVENTS.FEEDBACK_UPDATE,
+        expect.objectContaining({ id: item.id, deleted: true }),
+      );
+    } finally {
+      setBroadcast(vi.fn(), vi.fn());
+    }
   });
 });
 

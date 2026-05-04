@@ -647,8 +647,8 @@
           "est": "30m",
           "priority": "P2",
           "sprint": "future",
-          "status": "pending",
-          "notes": "Module-scoped aiLimiter is shared across parallel test files. brandscript-hardening I14 (4-request burst cap) intermittently sees the 4th request return ≠429 because other test files consumed the limiter's quota. Fix: expose __resetForTest() and call in beforeEach. Audit triggered during schema-yoast-parity-fields PR1 full-suite run (commit 67d68bef)."
+          "status": "done",
+          "notes": "Verified during 2026-05-03 flake-hardening pass: no duplicate reset hook needed. brandscript-hardening and brand-identity I14 already isolate aiLimiter by creating a fresh workspace per test, and rateLimit keys include req.path with the workspaceId. Targeted run passed alongside the other flake files."
         },
         {
           "id": "test-flake-outcome-tracking-mock-drift",
@@ -657,8 +657,8 @@
           "est": "15m",
           "priority": "P2",
           "sprint": "future",
-          "status": "pending",
-          "notes": "deep-diagnostic-jobs.test.ts surfaces 'No \"getActionsByWorkspace\"/\"getPendingActions\"/\"getTopWinsFromActions\" export is defined on outcome-tracking.js mock' in full-suite mode. SUT was extended with new exports after the mock factory was last updated. Mechanical fix: add vi.fn() stubs for each missing export. Audit triggered during schema-yoast-parity-fields PR1 full-suite run."
+          "status": "done",
+          "notes": "Fixed during 2026-05-03 flake-hardening pass. Added stable no-op getActionsByWorkspace/getPendingActions/getTopWinsFromActions coverage to outcome-tracking mocks used by workspace-intelligence-related tests so dynamic imports no longer see partial mock shapes. Targeted run passed."
         },
         {
           "id": "test-flake-content-decay-ai-mock-timeout",
@@ -667,8 +667,8 @@
           "est": "30-60m",
           "priority": "P2",
           "sprint": "future",
-          "status": "pending",
-          "notes": "'returns 200 with fallback recommendations when AI call fails' times out at 60s in full-suite mode but passes in isolation. Likely AI mock state collision causing the rejection to hang instead of failing fast. Fix options: (a) reduce timeout if intent is fast-rejection; (b) hoist vi.mock with explicit mockImplementation in beforeEach. Audit triggered during schema-yoast-parity-fields PR1 full-suite run."
+          "status": "done",
+          "notes": "Fixed during 2026-05-03 flake-hardening pass. The test server now inherits OPENAI_API_KEY='' so callOpenAI fails synchronously through the missing-key guard instead of retrying a fake provider key. The route still returns 200 with fallback recommendations. Targeted run passed."
         },
         {
           "id": "schema-pillar-2-1-searchaction-correctness",

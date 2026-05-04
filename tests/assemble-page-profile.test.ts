@@ -31,9 +31,10 @@ vi.mock('../server/seo-change-tracker.js', () => ({
 
 vi.mock('../server/outcome-tracking.js', () => ({
   getActionsByPage: vi.fn(() => []),
+  getActionsByWorkspace: vi.fn(() => []),
   getOutcomesForAction: vi.fn(() => []),
   getPendingActions: vi.fn(() => []),
-  getActionsByWorkspace: vi.fn(() => []),
+  getTopWinsFromActions: vi.fn(() => []),
 }));
 
 vi.mock('../server/analytics-insights-store.js', () => ({

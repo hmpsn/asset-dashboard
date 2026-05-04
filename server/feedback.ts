@@ -194,6 +194,10 @@ export function deleteFeedback(workspaceId: string, id: string): boolean {
   if (!item) return false;
   const info = stmts().deleteById.run(id, workspaceId);
   if (info.changes > 0) {
+    addActivity(workspaceId, 'note', `Deleted feedback: ${item.title}`, `${item.type} - ${item.description.slice(0, 120)}`, {
+      feedbackId: item.id,
+      feedbackType: item.type,
+    });
     broadcastToWorkspace(workspaceId, WS_EVENTS.FEEDBACK_UPDATE, { ...item, deleted: true });
   }
   return info.changes > 0;

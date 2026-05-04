@@ -85,11 +85,15 @@ vi.mock('../server/work-orders.js', () => ({
 }));
 
 vi.mock('../server/outcome-tracking.js', () => ({
+  getActionsByPage: vi.fn(() => []),
+  getActionsByWorkspace: vi.fn(() => []),
+  getOutcomesForAction: vi.fn(() => []),
   getPendingActions: vi.fn(() => [
     { id: 'pa1', workspaceId: 'ws-1', createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString() },
     { id: 'pa2', workspaceId: 'ws-1', createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString() },
     { id: 'pa3', workspaceId: 'ws-other', createdAt: new Date().toISOString() },
   ]),
+  getTopWinsFromActions: vi.fn(() => []),
 }));
 
 vi.mock('../server/outcome-playbooks.js', () => ({
