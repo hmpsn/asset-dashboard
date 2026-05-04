@@ -28,6 +28,8 @@ import { createTestContext } from './helpers.js';
 import { createWorkspace, updateWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createContentRequest, updateContentRequest } from '../../server/content-requests.js';
 import { createMatrix, updateMatrixCell } from '../../server/content-matrices.js';
+import { upsertPageKeywordsBatch } from '../../server/page-keywords.js';
+import type { PageKeywordMap } from '../../shared/types/workspace.js';
 
 const ctx = createTestContext(13310);
 const { api } = ctx;
@@ -49,7 +51,7 @@ function makePage(
   clicks: number,
   impressions: number,
   cpc: number,
-): object {
+): PageKeywordMap {
   return {
     pagePath,
     pageTitle: primaryKeyword,
@@ -62,14 +64,14 @@ function makePage(
 }
 
 /** Seed a workspace whose keyword strategy has the supplied pages. */
-function seedWorkspaceWithStrategy(pages: object[]): string {
+function seedWorkspaceWithStrategy(pages: PageKeywordMap[]): string {
   const ws = createWorkspace(`ROI Integration Test ${Date.now()}`);
   trackWs(ws.id);
 
   updateWorkspace(ws.id, {
     keywordStrategy: {
       siteKeywords: [],
-      pageMap: pages as never[],
+      pageMap: pages,
       opportunities: [],
       generatedAt: new Date().toISOString(),
     },
@@ -138,6 +140,37 @@ describe('ROI pipeline — basic calculation', () => {
       makePage('/blog/seo-tips', 'seo tips for small business', 50, 2000, 1.20),
       makePage('/about', 'about us', 0, 800, 2.00),          // no clicks — excluded
     ]);
+  });
+
+  it('reads normalized page_keywords rows when legacy pageMap has been stripped', async () => {
+    const ws = createWorkspace(`ROI Normalized Page Keywords ${Date.now()}`);
+    trackWs(ws.id);
+
+    updateWorkspace(ws.id, {
+      keywordStrategy: {
+        siteKeywords: [],
+        opportunities: [],
+        generatedAt: new Date().toISOString(),
+      },
+    });
+    upsertPageKeywordsBatch(ws.id, [
+      makePage('/normalized-source', 'normalized roi source', 80, 1600, 2.5),
+    ]);
+
+    const res = await api(`/api/public/roi/${ws.id}`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      organicTrafficValue: number;
+      pageBreakdown: Array<{ pagePath: string; primaryKeyword: string; trafficValue: number }>;
+    };
+
+    expect(body.organicTrafficValue).toBeCloseTo(200, 1);
+    expect(body.pageBreakdown).toHaveLength(1);
+    expect(body.pageBreakdown[0]).toMatchObject({
+      pagePath: '/normalized-source',
+      primaryKeyword: 'normalized roi source',
+      trafficValue: 200,
+    });
   });
 
   it('returns 200 with expected ROI shape', async () => {

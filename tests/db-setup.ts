@@ -1,11 +1,16 @@
 /**
- * Vitest per-worker setup — disables SQLite foreign key enforcement during tests.
+ * Vitest per-worker setup.
  *
- * Migration 019 added REFERENCES workspaces(id) ON DELETE CASCADE to 20+ tables
- * that previously had no FK constraint. Production enforces these, but unit/integration
- * tests insert rows with ad-hoc workspace IDs that don't exist in the workspaces table.
- * Disabling FK checks here restores the pre-019 test behavior.
+ * Establishes an isolated DATA_DIR before importing the DB singleton so
+ * parallel workers and spawned integration servers do not share SQLite state.
+ * Then runs migrations for that worker-local DB and disables foreign keys for
+ * legacy fixtures that insert ad-hoc workspace IDs.
  */
-import db from '../server/db/index.js';
+import { ensureIsolatedTestDataDir } from './test-data-dir.js';
 
+ensureIsolatedTestDataDir();
+
+const { default: db, runMigrations } = await import('../server/db/index.js');
+
+runMigrations();
 db.pragma('foreign_keys = OFF');

@@ -347,8 +347,9 @@
           "source": "docs/superpowers/audits/2026-05-04-deep-bug-audit.md findings 2, 3, 16, 19",
           "est": "4-6h",
           "priority": "P1",
-          "status": "pending",
-          "notes": "Give integration servers isolated DATA_DIR/DB state, make spawned servers inherit it, extend the port uniqueness meta-test to raw spawned server PORT constants, await custom spawned-server shutdown, and make ROI read page_keywords as source of truth with legacy pageMap fallback. This directly targets the SQLITE_BUSY and ROI 404 flakes seen during PR #440 validation."
+          "status": "done",
+          "notes": "Added per-worker isolated Vitest DATA_DIR setup before DB singleton import, made spawned integration servers inherit the worker DATA_DIR, shared awaited child-process shutdown across raw-spawn suites, and extended the port uniqueness meta-test to raw server PORT constants. ROI now reads normalized page_keywords rows as source of truth with legacy pageMap fallback, covered by a public ROI integration test that strips legacy pageMap.",
+          "shippedAt": "2026-05-04"
         },
         {
           "id": "deep-audit-global-route-workspace-scoping",
