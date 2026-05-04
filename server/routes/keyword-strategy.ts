@@ -83,7 +83,7 @@ const activeGenerations = new Set<string>();
  *  Max raw = 0.95 (the 5% headroom is intentional — GSC signal is an additive
  *  bonus on top of volume/ease, not a co-equal component).
  *  Trend multiplier: rising ×1.3, declining ×0.7, stable ×1.0.
- *  Returns 0 when no signal data (volume, difficulty, impressions) is present. */
+ *  Returns undefined when no signal data (volume, difficulty, impressions) is present. */
 export function computeOpportunityScore(cg: {
   volume?: number;
   difficulty?: number;
