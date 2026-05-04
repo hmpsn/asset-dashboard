@@ -224,8 +224,8 @@ describe('GET /api/public/content-requests/:wsId — postId serialization', () =
     const earlyEntry = list.find(r => r.id === earlyReq.id);
     expect(earlyEntry).toBeDefined();
     expect(earlyEntry!.postId).toBeUndefined();
-    expect(earlyEntry!.deliveryUrl).toBe('https://example.com/delivery/early');
-    expect(earlyEntry!.deliveryNotes).toBe('Early delivery note');
+    expect(earlyEntry!.deliveryUrl).toBeUndefined();
+    expect(earlyEntry!.deliveryNotes).toBeUndefined();
   });
 });
 

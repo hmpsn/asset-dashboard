@@ -187,8 +187,8 @@ router.get('/api/public/content-requests/:workspaceId', (req, res) => {
     priority: r.priority, status: r.status, source: r.source,
     serviceType: r.serviceType || 'brief_only', pageType: r.pageType || 'blog', upgradedAt: r.upgradedAt,
     comments: r.comments || [], requestedAt: r.requestedAt, updatedAt: r.updatedAt,
-    deliveryUrl: r.deliveryUrl,
-    deliveryNotes: r.deliveryNotes,
+    deliveryUrl: ['delivered', 'published'].includes(r.status) ? r.deliveryUrl : undefined,
+    deliveryNotes: ['delivered', 'published'].includes(r.status) ? r.deliveryNotes : undefined,
     // Include briefId only when in client_review or later
     briefId: ['client_review', 'approved', 'changes_requested', 'in_progress', 'delivered', 'published'].includes(r.status) ? r.briefId : undefined,
     // Include postId only when post is ready for client review or beyond

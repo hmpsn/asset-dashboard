@@ -13,6 +13,7 @@ import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
 import { z } from './middleware/validate.js';
+import { clientBusinessPrioritySchema, type ClientBusinessPriorityInput } from './schemas/client-business-priorities.js';
 import type {
   WorkspaceIntelligence,
   IntelligenceOptions,
@@ -102,16 +103,8 @@ const stmts = createStmtCache(() => ({
   ),
 }));
 
-const clientBusinessPrioritySchema = z.union([
-  z.string(),
-  z.object({
-    text: z.string(),
-    category: z.string().optional(),
-  }),
-]);
-
 function formatClientBusinessPriority(
-  priority: string | { text: string; category?: string },
+  priority: ClientBusinessPriorityInput,
 ): string {
   if (typeof priority === 'string') return priority.trim();
   const text = priority.text.trim();

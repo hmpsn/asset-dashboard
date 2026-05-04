@@ -33,6 +33,7 @@ import { clearSeoContextCache } from '../seo-context.js';
 import { getBookingUrl } from '../studio-config.js';
 import { listBlueprints } from '../page-strategy.js';
 import { getSection, getSectionsForEntry, getEntryCopyStatus, updateSectionStatus, addClientSuggestion } from '../copy-review.js';
+import { clientBusinessPrioritySchema } from '../schemas/client-business-priorities.js';
 import { isProgrammingError } from '../errors.js';
 
 const log = createLogger('public-portal');
@@ -210,7 +211,7 @@ router.get('/api/public/tier/:id', (req, res) => {
   res.json({
     tier: effectiveTier,
     baseTier: ws.tier || 'free',
-    isTrial: effectiveTier === 'growth' && (ws.tier || 'free') === 'free' && trialDaysRemaining > 0,
+    isTrial: effectiveTier === 'growth' && (ws.tier || 'free') === 'free',
     trialDaysRemaining,
     trialEndsAt: ws.trialEndsAt || null,
   });
@@ -491,13 +492,7 @@ router.get('/api/public/business-priorities/:workspaceId', (req, res) => {
 
   const priorities = parseJsonSafeArray(
     row.priorities,
-    z.union([
-      z.string(),
-      z.object({
-        text: z.string(),
-        category: z.string().optional(),
-      }),
-    ]),
+    clientBusinessPrioritySchema,
     { workspaceId: wsId, field: 'priorities', table: 'client_business_priorities' },
   ).map(priority => {
     if (typeof priority === 'string') {

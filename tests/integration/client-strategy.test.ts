@@ -124,6 +124,11 @@ function cleanContentGapVotes(workspaceId: string) {
   db.prepare('DELETE FROM content_gap_votes WHERE workspace_id = ?').run(workspaceId);
 }
 
+/** Delete all client_business_priorities rows for a workspace. */
+function cleanBusinessPriorities(workspaceId: string) {
+  db.prepare('DELETE FROM client_business_priorities WHERE workspace_id = ?').run(workspaceId);
+}
+
 // ── Lifecycle ───────────────────────────────────────────────────────────────
 
 beforeAll(async () => {
@@ -196,6 +201,7 @@ afterAll(async () => {
   cleanKeywordFeedback(strategyWsId);
   cleanKeywordFeedback(feedbackWsId);
   cleanContentGapVotes(voteWsId);
+  cleanBusinessPriorities(strategyWsId);
   db.prepare('DELETE FROM page_keywords WHERE workspace_id = ?').run(strategyWsId);
   deleteWorkspace(strategyWsId);
   deleteWorkspace(gatedWsId);
@@ -280,6 +286,30 @@ describe('GET /api/public/seo-strategy — happy path', () => {
     expect(techGap.competitorProof).toBe('competitor.com ranks #3');
     expect(techGap.questionKeywords).toEqual(['how to audit technical seo']);
     expect(techGap.opportunityScore).toBe(87);
+  });
+
+  it('business priorities endpoint normalizes string and object rows', async () => {
+    db.prepare(`
+      INSERT INTO client_business_priorities (workspace_id, priorities, updated_at)
+      VALUES (?, ?, datetime('now'))
+      ON CONFLICT(workspace_id) DO UPDATE SET
+        priorities = excluded.priorities,
+        updated_at = datetime('now')
+    `).run(strategyWsId, JSON.stringify([
+      'Launch APAC market',
+      { text: 'Expand brand awareness', category: 'brand' },
+      { text: '   ', category: 'growth' },
+    ]));
+
+    const res = await api(`/api/public/business-priorities/${strategyWsId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    expect(body.priorities).toEqual([
+      { text: 'Launch APAC market', category: 'other' },
+      { text: 'Expand brand awareness', category: 'brand' },
+    ]);
+    expect(body.updatedAt).toBeTruthy();
   });
 
   it('quickWins array preserves client-safe fields only (no roiScore)', async () => {
