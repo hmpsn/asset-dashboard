@@ -2251,7 +2251,7 @@ Rules:
       }
       if (missing.length > 0) {
         try {
-          const extra = await provider.getKeywordMetrics(missing.slice(0, 15), ws.id);
+          const extra = await provider.getKeywordMetrics(missing.slice(0, 30), ws.id);
           for (const m of extra) {
             found.push({ keyword: m.keyword, volume: m.volume, difficulty: m.difficulty });
           }
@@ -2260,33 +2260,33 @@ Rules:
       siteKeywordMetrics = found;
     }
 
-    // ── Impact-based filtering & sorting ──────────────────────────
-    // Prefer content gaps with real search volume; if filtering would remove ALL, keep originals sorted by priority
+    // ── Impact-based sorting (no filtering — keep all keywords including volume=0) ──
+    // Previously dropped volume=0 keywords, but that silently removed AI-identified
+    // opportunities after enrichment. Now we keep all and sort: positive-volume first,
+    // then unenriched (no data yet), then confirmed-zero-volume at bottom.
     if (strategy.contentGaps?.length) {
       const prioWeight = (p: string) => p === 'high' ? 3 : p === 'medium' ? 2 : 1;
-      const withVolume = strategy.contentGaps
-        .filter((cg: { volume?: number; impressions?: number }) =>
-          // Keep: no enrichment data at all (unenriched), OR positive volume, OR positive impressions.
-          // Items enriched to volume=0 with no impressions ARE dropped — if SEMRush/pool says
-          // volume is 0 and GSC shows no impressions, the keyword has no proven demand.
-          (cg.volume == null && cg.impressions == null) ||
-          (cg.volume != null && cg.volume > 0) ||
-          (cg.impressions != null && cg.impressions > 0)
-        );
-      if (withVolume.length > 0) {
-        // Sort by volume descending, then priority
-        strategy.contentGaps = withVolume.sort(
-          (a: StrategyContentGap, b: StrategyContentGap) =>
-            (b.volume || 0) - (a.volume || 0) || prioWeight(b.priority ?? '') - prioWeight(a.priority ?? '')
-        );
-      } else {
-        // No volume data available — keep all but sort by priority
-        strategy.contentGaps = strategy.contentGaps.sort(
-          (a: StrategyContentGap, b: StrategyContentGap) =>
-            prioWeight(b.priority ?? '') - prioWeight(a.priority ?? '')
-        );
-      }
-      log.info(`Content gaps: ${withVolume.length} with volume data, ${strategy.contentGaps.length} total kept`);
+      strategy.contentGaps = [...strategy.contentGaps].sort(
+        (a: StrategyContentGap, b: StrategyContentGap) => {
+          // Three buckets in descending order of priority:
+          // 1. Positive volume (>0) — enriched with confirmed demand
+          // 2. Unenriched (undefined/null) — not yet checked for demand, potential
+          // 3. Zero volume (=0) — enriched but no proven demand
+          const getBundle = (gap: StrategyContentGap) => {
+            if (gap.volume === undefined) return { bucket: 1, vol: 0 };  // unenriched bucket 1
+            if (gap.volume > 0) return { bucket: 2, vol: gap.volume };   // positive bucket 2
+            return { bucket: 0, vol: 0 };                                 // zero bucket 0
+          };
+          const aBundle = getBundle(a);
+          const bBundle = getBundle(b);
+
+          // Sort by bucket desc, then by volume desc within bucket, then by priority desc
+          return bBundle.bucket - aBundle.bucket ||
+                 bBundle.vol - aBundle.vol ||
+                 prioWeight(b.priority ?? '') - prioWeight(a.priority ?? '');
+        }
+      );
+      log.info(`Content gaps: ${strategy.contentGaps.length} total (sorted, none dropped)`);
     }
 
     // ── Quick Win ROI Scoring ──────────────────────────────────
