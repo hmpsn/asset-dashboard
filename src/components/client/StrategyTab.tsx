@@ -130,13 +130,6 @@ function fmtAudience(volume?: number): string {
   return `~${fmtNum(volume)} searches/month`;
 }
 
-function fmtCompetition(difficulty?: number): string {
-  if (difficulty == null) return 'Gathering…';
-  if (difficulty < 30) return 'Approachable — good entry point';
-  if (difficulty < 50) return 'Moderate competition';
-  if (difficulty < 75) return 'Competitive';
-  return 'Highly competitive';
-}
 
 function fmtMomentum(direction?: 'rising' | 'declining' | 'stable'): string {
   if (!direction) return 'Gathering…';
@@ -1939,7 +1932,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                       </div>
                       <div className="flex items-center justify-between py-1.5 border-b border-[var(--brand-border)]/40">
                         <span className="t-caption text-[var(--brand-text-muted)]">Competition</span>
-                        <span className="t-caption font-medium text-[var(--brand-text)]">{fmtCompetition(drawerRow.difficulty)}</span>
+                        <span className="t-caption font-medium text-[var(--brand-text)]">{kdFraming(drawerRow.difficulty) ?? 'Gathering…'}</span>
                       </div>
                       <div className="flex items-center justify-between py-1.5">
                         <span className="t-caption text-[var(--brand-text-muted)]">Momentum</span>
