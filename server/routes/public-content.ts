@@ -458,19 +458,26 @@ router.post('/api/public/tracked-keywords/:workspaceId', validate(addTrackedKeyw
   if (!keyword || keyword.length < 2) return res.status(400).json({ error: 'Keyword must be at least 2 characters' });
   if (keyword.length > 120) return res.status(400).json({ error: 'Keyword too long' });
   const actor = getClientActor(req, ws.id);
-  const keywords = addTrackedKeyword(ws.id, keyword);
-  addActivity(ws.id, 'client_keyword_tracked', `"${keyword}" added to strategy keywords`, '', {}, actor ?? undefined); // client-visibility-ok: admin-only signal, not surfaced in client activity feed
-  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { keyword });
+  const existingKeywords = getTrackedKeywords(ws.id);
+  const alreadyTracked = existingKeywords.some(k => k.query === keyword);
+  const keywords = alreadyTracked ? existingKeywords : addTrackedKeyword(ws.id, keyword);
   res.json({ keywords });
 
-  // Fire-and-forget: pre-warm the DataForSEO cache for this keyword so the next
-  // strategy GET has volume/difficulty data available immediately.
-  const provider = getConfiguredProvider(ws.seoDataProvider ?? undefined);
-  if (provider) {
-    provider.getKeywordMetrics([keyword], ws.id).catch((err: unknown) => {
-      if (isProgrammingError(err)) log.warn({ err }, 'tracked-keyword enrichment: programming error');
-      // Non-critical — enrichment will run again on next strategy generation
-    });
+  if (!alreadyTracked) {
+    addActivity(ws.id, 'client_keyword_tracked', `"${keyword}" added to strategy keywords`, '', {}, actor ?? undefined); // client-visibility-ok: admin-only signal, not surfaced in client activity feed
+    broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, { keyword });
+
+    // Fire-and-forget: pre-warm the DataForSEO cache for this keyword so the next
+    // strategy GET has volume/difficulty data available immediately.
+    // Only enriches when an authenticated actor is present — prevents unauthenticated
+    // callers from amplifying SEO provider spend on passwordless workspaces.
+    const provider = actor ? getConfiguredProvider(ws.seoDataProvider ?? undefined) : null;
+    if (provider) {
+      provider.getKeywordMetrics([keyword], ws.id).catch((err: unknown) => {
+        if (isProgrammingError(err)) log.warn({ err }, 'tracked-keyword enrichment: programming error');
+        // Non-critical — enrichment will run again on next strategy generation
+      });
+    }
   }
 });
 

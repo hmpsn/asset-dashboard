@@ -887,7 +887,20 @@ router.get('/api/public/briefing/:workspaceId', (req, res) => {
       serpTargeting: gap.serpTargeting,
       opportunityScore: gap.opportunityScore ?? computeOpportunityScore(gap),
     }))
-    .sort((a, b) => (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0))
+    .sort((a, b) => {
+      // Three-bucket sort (matches keyword-strategy.ts content gap ordering):
+      //   2 = Positive volume OR GSC-proven impressions — confirmed demand
+      //   1 = Unenriched (null/undefined) — not yet checked, potential
+      //   0 = Zero volume with no impressions — confirmed no demand
+      const getBundle = (g: typeof a) => {
+        if (g.volume == null) return { bucket: 1, vol: 0 };
+        if (g.volume > 0) return { bucket: 2, vol: g.volume };
+        if ((g.impressions ?? 0) > 0) return { bucket: 2, vol: g.impressions! };
+        return { bucket: 0, vol: 0 };
+      };
+      const ab = getBundle(a), bb = getBundle(b);
+      return bb.bucket - ab.bucket || bb.vol - ab.vol || (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0);
+    })
     .slice(0, 5);
 
   // The summary's "N opportunities to consider" reflects the FULL gap pool,

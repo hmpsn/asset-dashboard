@@ -115,6 +115,61 @@ interface StrategyKeywordTableRow extends PriorityKeywordItem {
   enrichmentStatus: 'enriched' | 'partial' | 'unenriched';
 }
 
+// Single source of truth for role display labels — used in list rows and drawer badge.
+const ROLE_DISPLAY_LABELS: Record<string, string> = {
+  content: 'Content to write',
+  page: 'Page to optimize',
+  strategy: 'Strategy keyword',
+  idea: 'Keyword idea',
+};
+
+function fmtAudience(volume?: number): string {
+  if (volume == null) return 'Gathering…';
+  if (volume === 0) return 'Very niche or emerging term';
+  if (volume < 100) return 'Small, focused audience';
+  return `~${fmtNum(volume)} searches/month`;
+}
+
+function fmtCompetition(difficulty?: number): string {
+  if (difficulty == null) return 'Gathering…';
+  if (difficulty < 30) return 'Approachable — good entry point';
+  if (difficulty < 50) return 'Moderate competition';
+  if (difficulty < 75) return 'Competitive';
+  return 'Highly competitive';
+}
+
+function fmtMomentum(direction?: 'rising' | 'declining' | 'stable'): string {
+  if (!direction) return 'Gathering…';
+  if (direction === 'rising') return 'Interest growing';
+  if (direction === 'stable') return 'Steady demand';
+  return 'Declining — worth reviewing timing';
+}
+
+function confidenceStatement(row: StrategyKeywordTableRow): string {
+  if (row.enrichmentStatus === 'unenriched') return 'Gathering data';
+  if (row.enrichmentStatus === 'partial') return 'Partial signal';
+  if ((row.opportunityScore ?? 0) >= 60) return 'Strong opportunity';
+  if ((row.opportunityScore ?? 0) >= 30) return 'Moderate opportunity';
+  return 'In your strategy';
+}
+
+function confidenceColor(row: StrategyKeywordTableRow): string {
+  if (row.enrichmentStatus === 'unenriched') return 'text-[var(--brand-text-muted)]';
+  if (row.enrichmentStatus === 'partial') return 'text-amber-400';
+  if ((row.opportunityScore ?? 0) >= 60) return 'text-emerald-400';
+  if ((row.opportunityScore ?? 0) >= 30) return 'text-teal-400';
+  return 'text-[var(--brand-text-muted)]';
+}
+
+const SIGNAL_LABELS: Record<string, string> = {
+  'Generated strategy': 'Identified in your strategy',
+  'Rank tracking': "You're actively tracking this",
+  'Client request': 'You added this keyword',
+  'Page map': 'Linked to a page on your site',
+  'Content recommendation': 'AI-recommended content topic',
+  'Competitor gap': "Competitors rank here — you don't yet",
+};
+
 export function StrategyTab({ strategyData, requestedTopics, contentRequests, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal, contentPlanKeywords, onTabChange, workspaceId, setToast, onContentRequested, hidePrices }: StrategyTabProps) {
   const betaMode = useBetaMode();
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['new-content', 'optimize-existing']));
@@ -203,6 +258,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const closeDrawer = useCallback(() => {
     if (closeTimerRef.current || !openKeywordDrawer) return;
     setDrawerClosing(true);
+    setDrawerEvidenceOpen(false);
     closeTimerRef.current = setTimeout(() => {
       setOpenKeywordDrawer(null);
       setDrawerClosing(false);
@@ -734,15 +790,9 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   };
 
   const roleSubLabel = (row: StrategyKeywordTableRow): string => {
-    const labelMap: Record<StrategyKeywordRole, string> = {
-      content: 'content opportunity',
-      page: 'page opportunity',
-      strategy: 'strategy keyword',
-      idea: 'keyword idea',
-    };
-    const label = labelMap[row.role];
+    const label = ROLE_DISPLAY_LABELS[row.role] ?? row.roleLabel;
     const hasMetrics = (row.volume != null && row.volume > 0) || (row.difficulty != null && row.difficulty > 0);
-    if (!hasMetrics) return `${label} · no data yet`;
+    if (!hasMetrics) return label;
     const parts: string[] = [label];
     if (row.volume != null && row.volume > 0) {
       parts.push(row.volume >= 1000 ? `${(row.volume / 1000).toFixed(1)}k/mo` : `${row.volume}/mo`);
@@ -758,53 +808,6 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       case 'strategy': return 'border-teal-500/20 bg-teal-500/10 text-accent-brand';
       case 'idea':     return 'border-[var(--brand-border)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]';
     }
-  };
-
-  const fmtAudience = (volume?: number): string => {
-    if (volume == null) return 'Gathering…';
-    if (volume === 0) return 'Very niche or emerging term';
-    if (volume < 100) return 'Small, focused audience';
-    return `~${fmtNum(volume)} searches/month`;
-  };
-
-  const fmtCompetition = (difficulty?: number): string => {
-    if (difficulty == null) return 'Gathering…';
-    if (difficulty < 30) return 'Approachable — good entry point';
-    if (difficulty < 50) return 'Moderate competition';
-    if (difficulty < 75) return 'Competitive';
-    return 'Highly competitive';
-  };
-
-  const fmtMomentum = (direction?: 'rising' | 'declining' | 'stable'): string => {
-    if (!direction) return 'Gathering…';
-    if (direction === 'rising') return 'Interest growing';
-    if (direction === 'stable') return 'Steady demand';
-    return 'Declining — worth reviewing timing';
-  };
-
-  const confidenceStatement = (row: StrategyKeywordTableRow): string => {
-    if (row.enrichmentStatus === 'unenriched') return 'Gathering data';
-    if (row.enrichmentStatus === 'partial') return 'Partial signal';
-    if ((row.opportunityScore ?? 0) >= 60) return 'Strong opportunity';
-    if ((row.opportunityScore ?? 0) >= 30) return 'Moderate opportunity';
-    return 'In your strategy';
-  };
-
-  const confidenceColor = (row: StrategyKeywordTableRow): string => {
-    if (row.enrichmentStatus === 'unenriched') return 'text-[var(--brand-text-muted)]';
-    if (row.enrichmentStatus === 'partial') return 'text-amber-400';
-    if ((row.opportunityScore ?? 0) >= 60) return 'text-emerald-400';
-    if ((row.opportunityScore ?? 0) >= 30) return 'text-teal-400';
-    return 'text-[var(--brand-text-muted)]';
-  };
-
-  const signalLabel: Record<string, string> = {
-    'Generated strategy': 'Identified in your strategy',
-    'Rank tracking': 'You\'re actively tracking this',
-    'Client request': 'You added this keyword',
-    'Page map': 'Linked to a page on your site',
-    'Content recommendation': 'AI-recommended content topic',
-    'Competitor gap': 'Competitors rank here — you don\'t yet',
   };
 
   const sortedConfirmed = [...strategyKeywordRows].sort(
@@ -1898,7 +1901,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] border t-caption-sm font-medium ${roleBadgeClass(drawerRow.role)}`}>
-                      {({ content: 'Content to write', page: 'Page to optimize', strategy: 'Strategy keyword', idea: 'Keyword idea' } as Record<string, string>)[drawerRow.role] ?? drawerRow.roleLabel}
+                      {ROLE_DISPLAY_LABELS[drawerRow.role] ?? drawerRow.roleLabel}
                     </span>
                     <span className={`t-caption-sm font-medium ${confidenceColor(drawerRow)}`}>
                       {confidenceStatement(drawerRow)}
@@ -2051,7 +2054,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                               key={src}
                               className="px-2 py-0.5 bg-[var(--surface-3)] border border-[var(--brand-border)] rounded-[var(--radius-sm)] t-caption text-[var(--brand-text-muted)]"
                             >
-                              {signalLabel[src] ?? src}
+                              {SIGNAL_LABELS[src] ?? src}
                             </span>
                           ))}
                         </div>

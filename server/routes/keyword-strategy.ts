@@ -2269,13 +2269,14 @@ Rules:
       strategy.contentGaps = [...strategy.contentGaps].sort(
         (a: StrategyContentGap, b: StrategyContentGap) => {
           // Bucket values (higher = sorted first, descending):
-          //   2 = Positive volume (>0) — enriched with confirmed demand
+          //   2 = Positive volume (>0) OR GSC-proven impressions — confirmed demand
           //   1 = Unenriched (null/undefined) — not yet checked, potential
-          //   0 = Zero volume — enriched but no proven demand
+          //   0 = Zero volume with no impressions — enriched but no proven demand
           const getBundle = (gap: StrategyContentGap) => {
             if (gap.volume == null) return { bucket: 1, vol: 0 };  // unenriched bucket 1 (null OR undefined)
-            if (gap.volume > 0) return { bucket: 2, vol: gap.volume };   // positive bucket 2
-            return { bucket: 0, vol: 0 };                                 // zero bucket 0
+            if (gap.volume > 0) return { bucket: 2, vol: gap.volume };   // positive volume bucket 2
+            if ((gap.impressions ?? 0) > 0) return { bucket: 2, vol: gap.impressions! }; // GSC-proven demand even at volume=0
+            return { bucket: 0, vol: 0 };                                 // confirmed zero demand bucket 0
           };
           const aBundle = getBundle(a);
           const bBundle = getBundle(b);
