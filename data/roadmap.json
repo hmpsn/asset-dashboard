@@ -326,6 +326,77 @@
       ]
     },
     {
+      "id": "sprint-deep-bug-remediation",
+      "name": "Deep Bug Remediation",
+      "hours": "24-40",
+      "rationale": "Follow-up queue from docs/superpowers/audits/2026-05-04-deep-bug-audit.md. Focuses on systemic correctness issues found after PR #440: workspace/resource scoping, test isolation, path identity joins, client contract drift, content invalidation, and AI provenance.",
+      "items": [
+        {
+          "id": "deep-audit-webflow-site-ownership-guard",
+          "title": "Security scoping PR 1 - Webflow/site ownership guard",
+          "source": "docs/superpowers/audits/2026-05-04-deep-bug-audit.md findings 1",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Add a shared guard that proves a workspace owns the Webflow site before any token lookup or Webflow resource mutation. Patch Webflow assets/pages, CMS item update/publish, schema publish/retract, and organize routes. Include cross-workspace integration tests proving a scoped JWT cannot pair its own workspaceId with another workspace siteId/resource."
+        },
+        {
+          "id": "deep-audit-integration-test-db-isolation",
+          "title": "Test isolation - per-suite DB plus ROI page_keywords read path",
+          "source": "docs/superpowers/audits/2026-05-04-deep-bug-audit.md findings 2, 3, 16, 19",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Give integration servers isolated DATA_DIR/DB state, make spawned servers inherit it, extend the port uniqueness meta-test to raw spawned server PORT constants, await custom spawned-server shutdown, and make ROI read page_keywords as source of truth with legacy pageMap fallback. This directly targets the SQLITE_BUSY and ROI 404 flakes seen during PR #440 validation."
+        },
+        {
+          "id": "deep-audit-global-route-workspace-scoping",
+          "title": "Security scoping PR 2 - Google, reports, global lists, settings, billing, uploads",
+          "source": "docs/superpowers/audits/2026-05-04-deep-bug-audit.md findings 4-8",
+          "est": "5-8h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Harden remaining route/resource authorization gaps: Google/GSC/GA routes, audit report/snapshot routes, workspace list/overview filtering for scoped JWT users, global settings requireAdminAuth, billing-management auth for passwordless portals, and workspace upload authorization. Add targeted authorization tests for each route family."
+        },
+        {
+          "id": "deep-audit-page-identity-joins",
+          "title": "Page identity joins - normalize remaining page/profile/chat/recommendation lookups",
+          "source": "docs/superpowers/audits/2026-05-04-deep-bug-audit.md finding 9",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Replace remaining full-URL/bare-slug/path direct comparisons and fuzzy endsWith/includes matching in page-profile, admin chat, recommendation lookup, schema status, audit/CWV joins, and SEO-context filtering. Use shared path helpers and tests covering homepage, nested static pages, CMS synthetic IDs, full URLs, and sibling leaf slugs like /seo vs /services/seo."
+        },
+        {
+          "id": "deep-audit-client-api-contract-drift",
+          "title": "Client API contract drift - trials, strategy enrichment, delivery links, priorities",
+          "source": "docs/superpowers/audits/2026-05-04-deep-bug-audit.md findings 10, 13-15",
+          "est": "3-5h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Use computeEffectiveTier in all public tier-gated routes, expose content-gap enrichment fields used by the client strategy UI, include deliveryUrl/deliveryNotes for delivered/published public content requests, and align client business priority storage with ClientSignalsSlice reads. Add contract/integration tests for each producer-consumer pair."
+        },
+        {
+          "id": "deep-audit-content-data-flow-invalidation",
+          "title": "Content data flow - broadcasts, activity, and derived cache invalidation",
+          "source": "docs/superpowers/audits/2026-05-04-deep-bug-audit.md finding 12",
+          "est": "4-6h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "Introduce a coherent content-planning/content-updated event strategy for content-plan review, matrices, templates, briefs, post revert/delete, and publish flows. Invalidate admin content pipeline/calendar, client content plan, workspace home, intelligence, and ROI where applicable. Add activity entries for user-visible lifecycle actions and tests for broadcast-handler pairs."
+        },
+        {
+          "id": "deep-audit-ai-provenance-contracts",
+          "title": "AI provenance contracts - factual checklist, AEO citations, response parsing",
+          "source": "docs/superpowers/audits/2026-05-04-deep-bug-audit.md findings 11, 17, 18",
+          "est": "4-6h",
+          "priority": "P1",
+          "status": "pending",
+          "notes": "Stop AI-only auto-checking of factual/no-hallucination checklist items, constrain AEO citation recommendations to verified source evidence or mark them research-needed, fix AEO effort enum prompt/schema validation, and make rewrite apply paths consume structured or delimited rewrite-only content. Add tests around factual review behavior and prompt-render contracts."
+        }
+      ]
+    },
+    {
       "id": "sprint-send-to-client",
       "name": "Send to Client Expansion",
       "hours": "9-14",
