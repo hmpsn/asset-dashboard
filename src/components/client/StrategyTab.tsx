@@ -1,11 +1,11 @@
-import { Fragment, useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Zap, FileText, Sparkles, Target, CheckCircle2,
   TrendingUp, TrendingDown, Minus, ChevronDown, Layers,
   MessageCircle, BarChart3, Eye, AlertTriangle,
   ThumbsUp, ThumbsDown, Undo2, Ban, Plus, X, Briefcase,
 } from 'lucide-react';
-import { TierGate, EmptyState, type Tier, Icon, Button } from '../ui';
+import { TierGate, EmptyState, Skeleton, type Tier, Icon, Button } from '../ui';
 import type { ClientKeywordStrategy, ClientContentRequest } from './types';
 import { useBetaMode } from './BetaContext';
 import { PageKeywordMapContent } from './PageKeywordMapContent';
@@ -48,9 +48,6 @@ interface StrategyTabProps {
 const kdColor = (kd?: number) => !kd ? 'text-[var(--brand-text-muted)]' : kd <= 30 ? 'text-accent-success' : kd <= 60 ? 'text-accent-warning' : kd <= 80 ? 'text-accent-orange' : 'text-accent-danger';
 const fmtNum = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString();
 const normalizeKeyword = (keyword: string) => keyword.toLowerCase().trim();
-const formatMetricSource = (source?: string) => source
-  ? source.split('_').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join(' ')
-  : 'Not available';
 const intentColor = (intent?: string) => {
   switch (intent) {
     case 'commercial': return 'text-accent-info bg-blue-500/10 border-blue-500/20';
@@ -231,8 +228,6 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       } else if (removedTracked) {
         setToast?.(`"${item.label}" removed from strategy keywords. Historical ranking data is preserved.`);
       }
-      setConfirmRemoveKeyword(null);
-      setManagingKeyword(null);
     } catch {
       setToast?.('Failed to remove keyword');
     } finally {
@@ -375,7 +370,6 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const priorityKeywords = [...priorityKeywordMap.values()].sort((a, b) => a.label.localeCompare(b.label));
   const strategyKeywords = priorityKeywords.filter(item => item.status === 'client' || item.status === 'strategy');
   const keywordIdeas = priorityKeywords.filter(item => item.status === 'suggested');
-  const priorityKeywordSearchTerm = normalizeKeyword(priorityKeywordSearch);
   const siteMetricMap = new Map((strategyData.siteKeywordMetrics || []).map(metric => [normalizeKeyword(metric.keyword), metric]));
   const contentGapMap = new Map((strategyData.contentGaps || []).map(gap => [normalizeKeyword(gap.targetKeyword), gap]));
   const keywordGapMap = new Map((strategyData.keywordGaps || []).map(gap => [normalizeKeyword(gap.keyword), gap]));
@@ -635,421 +629,199 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
     }
   };
 
+  const roleSubLabel = (row: StrategyKeywordTableRow): string => {
+    const labelMap: Record<StrategyKeywordRole, string> = {
+      content: 'content opportunity',
+      page: 'page opportunity',
+      strategy: 'strategy keyword',
+      idea: 'keyword idea',
+    };
+    const label = labelMap[row.role];
+    const hasMetrics = row.volume != null || row.difficulty != null;
+    if (!hasMetrics) return `${label} · no data yet`;
+    const parts: string[] = [label];
+    if (row.volume != null) {
+      parts.push(row.volume >= 1000 ? `${(row.volume / 1000).toFixed(1)}k/mo` : `${row.volume}/mo`);
+    }
+    if (row.difficulty != null) parts.push(`KD ${row.difficulty}`);
+    return parts.join(' · ');
+  };
+
+  const sortedConfirmed = [...strategyKeywordRows].sort(
+    (a, b) => (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0)
+  );
+
   const priorityKeywordsPanel = (
     // pr-check-disable-next-line -- Brand signature radius intentional for top-level strategy surface
     <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
-      <div className="px-4 pt-4 pb-3">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+
+      {/* Header */}
+      <div className="px-4 pt-4 pb-3 border-b border-[var(--brand-border)]">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-teal-500/15 flex items-center justify-center flex-shrink-0">
+            <Icon as={Target} size="md" className="text-accent-brand" />
+          </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-teal-500/15 flex items-center justify-center">
-                <Icon as={Target} size="md" className="text-accent-brand" />
-              </div>
-              <div>
-                <h3 className="t-h3 text-[var(--brand-text)]">Strategy Keywords</h3>
-                <p className="t-caption-sm text-[var(--brand-text-muted)]">{strategyKeywords.length} keywords guiding tracking and future recommendations</p>
-              </div>
-            </div>
-            <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed max-w-3xl">
-              Strategy keywords guide rank tracking, page recommendations, and future content ideas. Changes affect future updates and do not rewrite this strategy instantly.
+            <h3 className="t-h3 text-[var(--brand-text)]">Strategy Keywords</h3>
+            <p className="t-caption-sm text-[var(--brand-text-muted)]">
+              {strategyKeywords.length} keyword{strategyKeywords.length === 1 ? '' : 's'} guiding tracking and recommendations
             </p>
           </div>
-          <Button variant="secondary" size="sm" onClick={() => scrollToSection('page-keyword-map', keywordMapRef)} className="self-start">
-            View Page Map
-          </Button>
         </div>
       </div>
 
-      <div className="px-4 pb-4">
-        {workspaceId && (
-          <div className="mb-4">
-            <div className="flex flex-col gap-1 mb-2 sm:flex-row sm:items-end sm:justify-between">
-              <label htmlFor="strategy-keyword-input" className="t-caption-sm font-medium text-[var(--brand-text)]">
-                Add a strategy keyword
-              </label>
-              <span className="t-caption-sm text-[var(--brand-text-muted)]">
-                Adds it to future tracking and strategy inputs.
-              </span>
-            </div>
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                await addStrategyKeyword(newTrackedKeyword, { clearInput: true });
-              }}
-              className="flex flex-col gap-2 sm:flex-row sm:items-center"
-            >
-              <input
-                id="strategy-keyword-input"
-                type="text"
-                value={newTrackedKeyword}
-                onChange={e => setNewTrackedKeyword(e.target.value)}
-                placeholder="Example: webflow agency austin"
-                disabled={addingKeyword}
-                className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] px-3 py-2 t-caption-sm text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors"
-                maxLength={120}
-              />
-              <Button
-                type="submit"
-                variant="primary"
-                size="sm"
-                icon={Plus}
-                loading={addingKeyword}
-                disabled={addingKeyword || newTrackedKeyword.trim().length < 2}
-                className="px-3 py-2 rounded-[var(--radius-lg)]"
-              >
-                {addingKeyword ? 'Adding...' : 'Add strategy keyword'}
-              </Button>
-            </form>
-          </div>
-        )}
-
-        <div className="flex flex-col gap-3 mb-3 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="t-caption-sm font-medium text-[var(--brand-text)]">Current strategy keywords</div>
-            <p className="t-caption-sm text-[var(--brand-text-muted)]">
-              These are inputs for future strategy updates, not an instant regeneration trigger.
-            </p>
-          </div>
-          <label className="inline-flex items-center gap-2 t-caption-sm text-[var(--brand-text)]">
-            <input
-              type="checkbox"
-              checked={includeKeywordIdeas}
-              onChange={e => {
-                setIncludeKeywordIdeas(e.target.checked);
-                setConfirmRemoveKeyword(null);
-                setManagingKeyword(null);
-              }}
-              className="w-4 h-4 rounded-[var(--radius-sm)] border-[var(--brand-border-strong)] bg-[var(--surface-3)] text-accent-brand focus:ring-teal-500"
-            />
-            Include keyword ideas
-            <span className="text-[var(--brand-text-muted)]">({keywordIdeas.length})</span>
-          </label>
-        </div>
-        <div className="relative mb-3">
-          <Icon as={Search} size="sm" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)] pointer-events-none" />
-          <input
-            type="search"
-            value={priorityKeywordSearch}
-            onChange={e => {
-              setPriorityKeywordSearch(e.target.value);
-              setConfirmRemoveKeyword(null);
-              setManagingKeyword(null);
+      {/* Add keyword form */}
+      {workspaceId && (
+        <div className="px-4 py-3 border-b border-[var(--brand-border)]">
+          <form
+            onSubmit={async e => {
+              e.preventDefault();
+              await addStrategyKeyword(newTrackedKeyword, { clearInput: true });
             }}
-            aria-label={keywordSearchLabel}
-            placeholder={`${keywordSearchLabel}...`}
-            className="w-full bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] pl-8 pr-9 py-1.5 t-caption-sm text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors"
-          />
-          {priorityKeywordSearch && (
-            <button
-              type="button"
-              onClick={() => {
-                setPriorityKeywordSearch('');
-                setConfirmRemoveKeyword(null);
-                setManagingKeyword(null);
-              }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-[var(--radius-sm)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-2)] transition-colors"
-              aria-label="Clear strategy keyword search"
+            className="flex gap-2"
+          >
+            <input
+              id="strategy-keyword-input"
+              type="text"
+              value={newTrackedKeyword}
+              onChange={e => setNewTrackedKeyword(e.target.value)}
+              placeholder="Search or add a keyword..."
+              disabled={addingKeyword}
+              className="flex-1 bg-[var(--surface-3)] border border-[var(--brand-border-strong)] rounded-[var(--radius-lg)] px-3 py-2 t-caption-sm text-[var(--brand-text)] placeholder:text-[var(--brand-text-muted)] focus:outline-none focus:border-teal-500 transition-colors"
+              maxLength={120}
+            />
+            <Button
+              type="submit"
+              variant="primary"
+              size="sm"
+              loading={addingKeyword}
+              disabled={addingKeyword || newTrackedKeyword.trim().length < 2}
             >
-              <Icon as={X} size="sm" />
-            </button>
+              Add
+            </Button>
+          </form>
+        </div>
+      )}
+
+      <div className="px-4 py-3 flex flex-col gap-4">
+
+        {/* Confirmed zone */}
+        <div>
+          <div className="t-caption-sm font-medium text-[var(--brand-text-muted)] uppercase tracking-wider mb-2">
+            In strategy · {sortedConfirmed.length}
+          </div>
+          {trackedKeywordsLoading && sortedConfirmed.length === 0 ? (
+            <div className="flex flex-col gap-1">
+              <Skeleton className="h-[52px] rounded-[var(--radius-lg)]" />
+              <Skeleton className="h-[52px] rounded-[var(--radius-lg)]" />
+              <Skeleton className="h-[52px] rounded-[var(--radius-lg)]" />
+            </div>
+          ) : sortedConfirmed.length === 0 ? (
+            <EmptyState
+              icon={Target}
+              title="No keywords in strategy yet"
+              description="Add your first keyword above to start tracking and shaping recommendations."
+            />
+          ) : (
+            <div className="flex flex-col gap-1">
+              {sortedConfirmed.map(row => {
+                const isOpen = openKeywordDrawer === row.normalized;
+                const isRemoving = removingKeyword === row.normalized;
+                return (
+                  <div
+                    key={row.normalized}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-lg)] cursor-pointer transition-colors ${
+                      isOpen
+                        ? 'bg-[var(--surface-3)] border border-teal-500/40 ring-1 ring-teal-500/10'
+                        : 'bg-[var(--surface-3)] border border-transparent hover:border-[var(--brand-border)]'
+                    }`}
+                    onClick={() => setOpenKeywordDrawer(isOpen ? null : row.normalized)}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="t-ui font-medium text-[var(--brand-text-bright)] truncate">{row.label}</div>
+                      <div className="t-caption text-[var(--brand-text-muted)] truncate">{roleSubLabel(row)}</div>
+                    </div>
+                    {isOpen ? (
+                      <span className="text-teal-400 t-caption flex-shrink-0 select-none">→</span>
+                    ) : (
+                      <button
+                        type="button"
+                        aria-label={`Remove ${row.label} from strategy`}
+                        className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-2)] transition-colors disabled:opacity-40"
+                        disabled={isRemoving}
+                        onClick={e => {
+                          e.stopPropagation();
+                          void removePriorityKeyword(row);
+                        }}
+                      >
+                        <Icon as={X} size="xs" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
 
-        <div className="overflow-x-auto border border-[var(--brand-border)] rounded-[var(--radius-lg)]">
-          <table className="w-full t-caption-sm">
-            <thead>
-              <tr className="border-b border-[var(--brand-border)] bg-[var(--surface-3)]/35">
-                <th className="w-8 px-2 py-2" aria-label="Expand keyword details" />
-                {keywordSortColumns.map(column => (
-                  <th
-                    key={column.key}
-                    aria-sort={keywordSort.key === column.key ? (keywordSort.asc ? 'ascending' : 'descending') : 'none'}
-                    className={`px-3 py-2 font-medium text-[var(--brand-text-muted)] ${column.align === 'right' ? 'text-right' : 'text-left'}`}
-                  >
+        {/* Suggestions zone */}
+        {keywordIdeaRows.length > 0 && (
+          <div>
+            <div className="t-caption-sm font-medium text-[var(--brand-text-muted)] uppercase tracking-wider mb-2">
+              Suggestions · {keywordIdeaRows.length}
+            </div>
+            <div className="flex flex-col gap-1">
+              {keywordIdeaRows.map(row => (
+                <div
+                  key={row.normalized}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-lg)] bg-blue-950/60 border border-blue-900/50 cursor-pointer hover:border-blue-800/60 transition-colors"
+                  onClick={() => setOpenKeywordDrawer(openKeywordDrawer === row.normalized ? null : row.normalized)}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="t-ui font-medium text-[var(--brand-text-bright)] truncate">{row.label}</div>
+                    {(row.volume != null || row.difficulty != null) && (
+                      <div className="t-caption text-[var(--brand-text-muted)] truncate">
+                        {[
+                          row.volume != null && (row.volume >= 1000 ? `${(row.volume / 1000).toFixed(1)}k/mo` : `${row.volume}/mo`),
+                          row.difficulty != null && `KD ${row.difficulty}`,
+                        ].filter(Boolean).join(' · ')}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <button
                       type="button"
-                      onClick={() => handleKeywordSort(column.key)}
-                      className={`inline-flex items-center gap-1 hover:text-[var(--brand-text)] transition-colors ${column.align === 'right' ? 'ml-auto' : ''}`}
+                      className="t-caption text-teal-400 hover:text-teal-300 transition-colors whitespace-nowrap disabled:opacity-40"
+                      disabled={addingKeyword}
+                      onClick={e => {
+                        e.stopPropagation();
+                        void addStrategyKeyword(row.label);
+                      }}
                     >
-                      {column.label}
-                      <Icon as={ArrowUpDown} size="sm" className={keywordSort.key === column.key ? 'text-accent-brand' : 'text-[var(--brand-text-faint)]'} />
+                      Add to strategy
                     </button>
-                  </th>
-                ))}
-                <th className="px-3 py-2 text-left font-medium text-[var(--brand-text-muted)]">Next move</th>
-                <th className="px-3 py-2 text-right font-medium text-[var(--brand-text-muted)]">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {trackedKeywordsLoading && sortedKeywordRows.length === 0 ? (
-                Array.from({ length: 3 }).map((_, index) => (
-                  <tr key={`keyword-skeleton-${index}`} className="border-b border-[var(--brand-border)]/60">
-                    <td className="px-2 py-3" />
-                    <td className="px-3 py-3"><div className="h-3 w-40 rounded-[var(--radius-pill)] bg-[var(--surface-3)]" /></td>
-                    <td className="px-3 py-3"><div className="h-3 w-24 rounded-[var(--radius-pill)] bg-[var(--surface-3)]" /></td>
-                    <td className="px-3 py-3"><div className="h-3 w-28 rounded-[var(--radius-pill)] bg-[var(--surface-3)]" /></td>
-                    <td className="px-3 py-3"><div className="h-3 w-32 rounded-[var(--radius-pill)] bg-[var(--surface-3)]" /></td>
-                    <td className="px-3 py-3"><div className="h-3 w-28 rounded-[var(--radius-pill)] bg-[var(--surface-3)]" /></td>
-                    <td className="px-3 py-3"><div className="h-3 w-16 ml-auto rounded-[var(--radius-pill)] bg-[var(--surface-3)]" /></td>
-                  </tr>
-                ))
-              ) : sortedKeywordRows.length > 0 ? sortedKeywordRows.map((row, index) => {
-                const expanded = expandedKeywordRows.has(row.normalized);
-                const confirming = confirmRemoveKeyword === row.normalized;
-                const removing = removingKeyword === row.normalized;
-                const managing = managingKeyword === row.normalized;
-                const isIdea = row.status === 'suggested';
-                const removalActionLabel = getKeywordRemovalActionLabel(row);
-                const showRoleGroup = keywordSort.key === 'role' && (index === 0 || sortedKeywordRows[index - 1]?.role !== row.role);
-                return (
-                  <Fragment key={row.normalized}>
-                    {showRoleGroup && (
-                      <tr className="border-b border-[var(--brand-border)]/60 bg-[var(--surface-3)]/20">
-                        <td colSpan={7} className="px-3 py-2">
-                          <div className="flex items-center gap-2">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] border t-caption-sm font-medium ${roleBadgeClass}`}>
-                              {row.roleLabel}
-                            </span>
-                            <span className="t-caption-sm text-[var(--brand-text-muted)]">{row.roleDetail}</span>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                    <tr className="border-b border-[var(--brand-border)]/60 hover:bg-[var(--surface-3)]/30">
-                      <td className="px-2 py-2 align-top">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (managing) {
-                              setManagingKeyword(null);
-                              setConfirmRemoveKeyword(null);
-                            }
-                            toggleKeywordRow(row.normalized);
-                          }}
-                          className="p-1 rounded-[var(--radius-sm)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] hover:bg-[var(--surface-3)] transition-colors"
-                          aria-label={`${expanded ? 'Collapse' : 'Expand'} ${row.label} details`}
-                          aria-expanded={expanded || managing}
-                        >
-                          <Icon as={ChevronDown} size="sm" className={`transition-transform ${expanded ? '' : '-rotate-90'}`} />
-                        </button>
-                      </td>
-                      <td className="px-3 py-2 align-top">
-                        <div className="font-medium text-[var(--brand-text)]">{row.label}</div>
-                        {row.searchIntent && (
-                          <div className="mt-0.5 t-caption-sm text-[var(--brand-text-muted)]">{row.searchIntent} intent</div>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 align-top">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] border t-caption-sm font-medium ${roleBadgeClass}`}>
-                          {row.roleLabel}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 align-top">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] border t-caption-sm font-medium ${opportunityClass(row.opportunityTone)}`}>
-                          {row.opportunityLabel}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 align-top">
-                        {row.pagePath ? (
-                          <div>
-                            <div className="text-[var(--brand-text)] max-w-[220px] truncate">{row.pageTitle || row.pagePath}</div>
-                            <div className="t-caption-sm text-[var(--brand-text-muted)] max-w-[220px] truncate">{row.pagePath}</div>
-                          </div>
-                        ) : (
-                          <span className="text-[var(--brand-text-muted)]">Unmapped</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 align-top">
-                        <div className="font-medium text-[var(--brand-text)]">{row.nextMoveLabel}</div>
-                      </td>
-                      <td className="px-3 py-2 text-right align-top">
-                        {confirming ? (
-                          <div className="flex flex-wrap items-center justify-end gap-2">
-                            <button
-                              ref={confirmRemoveKeywordButtonRef}
-                              type="button"
-                              onClick={() => removePriorityKeyword(row)}
-                              onKeyDown={handleKeywordConfirmKeyDown}
-                              disabled={removing}
-                              className="text-accent-danger hover:underline underline-offset-2 transition-colors disabled:opacity-50"
-                            >
-                              {removing ? 'Removing...' : removalActionLabel}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setConfirmRemoveKeyword(null);
-                                setManagingKeyword(null);
-                              }}
-                              onKeyDown={handleKeywordConfirmKeyDown}
-                              disabled={removing}
-                              className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors disabled:opacity-50"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : isIdea ? (
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => addStrategyKeyword(row.label)}
-                              disabled={addingKeyword}
-                              className="text-accent-brand hover:underline underline-offset-2 transition-colors disabled:opacity-50"
-                              aria-label={`Add ${row.label} to strategy keywords`}
-                            >
-                              Add to strategy
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setManagingKeyword(managing ? null : row.normalized);
-                                setConfirmRemoveKeyword(null);
-                                setExpandedKeywordRows(prev => new Set(prev).add(row.normalized));
-                              }}
-                              className="text-accent-brand hover:underline underline-offset-2 transition-colors"
-                              aria-expanded={managing}
-                              aria-label={`Manage ${row.label}`}
-                            >
-                              Manage
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setManagingKeyword(managing ? null : row.normalized);
-                              setConfirmRemoveKeyword(null);
-                              setExpandedKeywordRows(prev => new Set(prev).add(row.normalized));
-                            }}
-                            className="text-accent-brand hover:underline underline-offset-2 transition-colors"
-                            aria-expanded={managing}
-                            aria-label={`Manage ${row.label}`}
-                          >
-                            Manage
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                    {(expanded || managing) && (
-                      <tr key={`${row.normalized}-details`} className="border-b border-[var(--brand-border)]/60 bg-[var(--surface-3)]/20">
-                        <td />
-                        <td colSpan={6} className="px-3 py-3">
-                          <div className="grid gap-3 lg:grid-cols-4">
-                            <div>
-                              <div className="t-caption-sm font-medium text-[var(--brand-text)] mb-1">Why this is here</div>
-                              <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">{row.roleDetail}</p>
-                              {row.contextSources.length > 0 && (
-                                <div className="flex flex-wrap gap-1.5 mt-2">
-                                  {row.contextSources.map(source => (
-                                    <span key={source} className="px-2 py-0.5 rounded-[var(--radius-pill)] border border-[var(--brand-border)] text-[var(--brand-text-muted)] bg-[var(--surface-2)] t-caption-sm">
-                                      {source}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                            <div>
-                              <div className="t-caption-sm font-medium text-[var(--brand-text)] mb-1">Available signals</div>
-                              <div className="space-y-1 t-caption-sm text-[var(--brand-text-muted)]">
-                                <div>Monthly searches: <span className="text-accent-info">{row.volume != null && row.volume > 0 ? `${fmtNum(row.volume)}/mo` : 'Not available'}</span></div>
-                                <div>Difficulty: <span className={row.difficulty != null && row.difficulty > 0 ? kdColor(row.difficulty) : 'text-[var(--brand-text)]'}>{row.difficulty != null && row.difficulty > 0 ? `KD ${row.difficulty}` : 'Not available'}</span></div>
-                                <div>Current rank: <span className="text-accent-info">{row.currentPosition != null ? `#${Math.round(row.currentPosition)}` : 'Not ranked'}</span></div>
-                                <div>Impressions: <span className="text-[var(--brand-text)]">{row.impressions != null ? row.impressions.toLocaleString() : 'Not available'}</span></div>
-                                <div>Clicks: <span className="text-[var(--brand-text)]">{row.clicks != null ? row.clicks.toLocaleString() : 'Not available'}</span></div>
-                                <div>Metric source: <span className="text-[var(--brand-text)]">{formatMetricSource(row.metricsSource)}</span></div>
-                              </div>
-                            </div>
-                            <div>
-                              <div className="t-caption-sm font-medium text-[var(--brand-text)] mb-1">Opportunity context</div>
-                              <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">{row.opportunityDetail}</p>
-                              <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed mt-2">{row.nextMoveDetail}</p>
-                              {row.difficulty != null && row.difficulty > 0 && kdFraming(row.difficulty) && (
-                                <p className="t-caption-sm text-[var(--brand-text-muted)] mt-2">{kdFraming(row.difficulty)}</p>
-                              )}
-                            </div>
-                            <div>
-                              <div className="t-caption-sm font-medium text-[var(--brand-text)] mb-1">Manage keyword</div>
-                              <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed mb-2">{getKeywordRemovalCopy(row)}</p>
-                              {managing && !confirming ? (
-                                <div className="flex flex-wrap gap-2">
-                                  <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    icon={CheckCircle2}
-                                    onClick={() => setManagingKeyword(null)}
-                                  >
-                                    {getKeywordKeepActionLabel(row)}
-                                  </Button>
-                                  <Button
-                                    variant="danger"
-                                    size="sm"
-                                    onClick={() => setConfirmRemoveKeyword(row.normalized)}
-                                  >
-                                    {removalActionLabel}
-                                  </Button>
-                                </div>
-                              ) : confirming ? (
-                                <div className="rounded-[var(--radius-lg)] border border-red-500/20 bg-red-500/8 p-2">
-                                  <p className="t-caption-sm text-accent-danger mb-2">
-                                    Confirm {removalActionLabel.toLowerCase()} for &ldquo;{row.label}&rdquo;?
-                                  </p>
-                                  <div className="flex flex-wrap gap-2">
-                                    <Button
-                                      ref={confirmRemoveKeywordButtonRef}
-                                      variant="danger"
-                                      size="sm"
-                                      loading={removing}
-                                      onClick={() => removePriorityKeyword(row)}
-                                      onKeyDown={handleKeywordConfirmKeyDown}
-                                    >
-                                      {removing ? 'Removing...' : removalActionLabel}
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      disabled={removing}
-                                      onClick={() => setConfirmRemoveKeyword(null)}
-                                      onKeyDown={handleKeywordConfirmKeyDown}
-                                    >
-                                      Cancel
-                                    </Button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  onClick={() => setManagingKeyword(row.normalized)}
-                                >
-                                  Manage
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
-                );
-              }) : (
-                <tr>
-                  <td colSpan={7} className="px-4 py-6 text-center t-caption-sm text-[var(--brand-text-muted)]">
-                    {priorityKeywordEmptyMessage}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        <span className="sr-only" aria-live="polite">
-          {confirmRemoveKeyword ? 'Confirm removal or cancel.' : ''}
-        </span>
-        <div className="mt-2 t-caption-sm text-[var(--brand-text-muted)]">
-          Showing {sortedKeywordRows.length} of {keywordRows.length} keyword{keywordRows.length === 1 ? '' : 's'}{includeKeywordIdeas ? ' including ideas.' : '.'}
-        </div>
+                    <button
+                      type="button"
+                      aria-label={`Dismiss ${row.label}`}
+                      className="w-6 h-6 flex items-center justify-center text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
+                      onClick={e => {
+                        e.stopPropagation();
+                        void submitFeedback(row.label, 'declined', 'suggestion');
+                      }}
+                    >
+                      <Icon as={X} size="xs" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
+
 
   return (
     <div className="space-y-8">
